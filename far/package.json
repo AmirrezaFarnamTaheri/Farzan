@@ -1,0 +1,47 @@
+{
+  "name": "plasmadeck",
+  "private": true,
+  "version": "1.1.2",
+  "description": "PlasmaDeck learning studio — static app with vendored browser libs",
+  "scripts": {
+    "postinstall": "node scripts/vendor-libs.cjs",
+    "vendor": "node scripts/vendor-libs.cjs",
+    "validate": "node scripts/validate.cjs",
+    "start": "node scripts/dev-server.cjs",
+    "first-run": "npm run vendor && npm run build && npm run build:sw",
+    "build": "node scripts/build.cjs",
+    "build:watch": "node scripts/build.cjs --watch",
+    "build:sw": "node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
+    "dev": "npm run build:watch",
+    "lint": "node node_modules/eslint/bin/eslint.js src scripts tests eslint.config.js vitest.config.js",
+    "test": "node node_modules/vitest/vitest.mjs run --passWithNoTests --configLoader runner --pool vmThreads",
+    "audit": "node scripts/audit.cjs",
+    "smoke": "node scripts/smoke-test.cjs",
+    "ci": "npm run audit && npm run smoke",
+    "offline": "npm ci --offline"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/playfair-display": "^5.2.8",
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "chart.js": "^4.5.1",
+    "dompurify": "^3.4.0",
+    "fuse.js": "7.0.0",
+    "marked": "9.1.6",
+    "pdfjs-dist": "3.11.174"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.1",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.2.1",
+    "fake-indexeddb": "^6.2.5",
+    "globals": "^17.5.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^29.0.2",
+    "sharp": "^0.34.5",
+    "vitest": "^4.1.4",
+    "workbox-cli": "^7.4.0"
+  }
+}

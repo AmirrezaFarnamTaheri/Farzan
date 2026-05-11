@@ -1,0 +1,1430 @@
+# ============================================================
+# PLASMATO PDF DOWNLOAD LIST
+# Total: 280 files
+# Base dir: D:\Plasmato
+# Usage: aria2c -i "plasmato_pdfs.txt"
+# ============================================================
+
+
+# ── Cellular and molecular biology (2 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/CELLULAR-PATHOLOGY.pdf
+  dir=D:\Plasmato\Cellular and molecular biology\PDFs
+  out=CELLULAR-PATHOLOGY.pdf
+  # CELLULAR PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CELLULAR-STRUCTURES-PROCESSES.pdf
+  dir=D:\Plasmato\Cellular and molecular biology\PDFs
+  out=CELLULAR-STRUCTURES-PROCESSES.pdf
+  # CELLULAR STRUCTURES & PROCESSES PDF
+
+
+# ── دوره جامع ایمنی‌شناسی پزشکی (13 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/B-T-CELLS.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=B-T-CELLS.pdf
+  # B & T CELLS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CONTRACTION-OF-THE-IMMUNE.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=CONTRACTION-OF-THE-IMMUNE.pdf
+  # CONTRACTION OF THE IMMUNE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/IMMUNE-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=IMMUNE-SYSTEM.pdf
+  # IMMUNE SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INNATE-IMMUNITY.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=INNATE-IMMUNITY.pdf
+  # INNATE IMMUNITY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/COMBINED-B-CELL-T-CELL-DEFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=COMBINED-B-CELL-T-CELL-DEFICIENCIES.pdf
+  # COMBINED B-CELL & T-CELL DEFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/COMPLEMENT-DEFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=COMPLEMENT-DEFICIENCIES.pdf
+  # COMPLEMENT DEFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HUMORAL-B-CELL-DEFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=HUMORAL-B-CELL-DEFICIENCIES.pdf
+  # HUMORAL & B-CELL DEFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERSENSITIVITY-REACTIONS-MULTIPLE-MECHANISMS.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=HYPERSENSITIVITY-REACTIONS-MULTIPLE-MECHANISMS.pdf
+  # HYPERSENSITIVITY REACTIONS (MULTIPLE MECHANISMS) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PHAGOCYTE-DEFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=PHAGOCYTE-DEFICIENCIES.pdf
+  # PHAGOCYTE DEFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/T-CELL-DIFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=T-CELL-DIFICIENCIES.pdf
+  # T-CELL DIFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TYPE-2-HYPERSENSITIVITY-REACTIONS.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=TYPE-2-HYPERSENSITIVITY-REACTIONS.pdf
+  # TYPE 2 HYPERSENSITIVITY REACTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TYPE-3-HYPERSENSITIVITY-REACTIONS.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=TYPE-3-HYPERSENSITIVITY-REACTIONS.pdf
+  # TYPE 3 HYPERSENSITIVITY REACTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TYPE-4-HYPERSENSITIVITY-REACTIONS.pdf
+  dir=D:\Plasmato\دوره جامع ایمنی‌شناسی پزشکی\PDFs
+  out=TYPE-4-HYPERSENSITIVITY-REACTIONS.pdf
+  # TYPE 4 HYPERSENSITIVITY REACTIONS PDF
+
+
+# ── دوره جامع بیوشیمی و تغذیه  پزشکی (18 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/CARBOHYDRATE-METABOLISM.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=CARBOHYDRATE-METABOLISM.pdf
+  # CARBOHYDRATE METABOLISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FAT-CHOLESTEROL-METABOLISM.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=FAT-CHOLESTEROL-METABOLISM.pdf
+  # FAT & CHOLESTEROL METABOLISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NUCLEIC-ACID-METABOLISM.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=NUCLEIC-ACID-METABOLISM.pdf
+  # NUCLEIC ACID METABOLISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PROTEIN-METABOLISM.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=PROTEIN-METABOLISM.pdf
+  # PROTEIN METABOLISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/AMINO-ACID-METABOLISM-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=AMINO-ACID-METABOLISM-DISORDERS.pdf
+  # AMINO ACID METABOLISM DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARBOHYDRATE-METABOLISM-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=CARBOHYDRATE-METABOLISM-DISORDERS.pdf
+  # CARBOHYDRATE METABOLISM DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CHEMICAL-DRUG-TOXICITY.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=CHEMICAL-DRUG-TOXICITY.pdf
+  # CHEMICAL & DRUG TOXICITY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DYSLIPIDDEMIA.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=DYSLIPIDDEMIA.pdf
+  # DYSLIPIDDEMIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FAT-SOLUBLE-VITAMINS-DEFICIENCY.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=FAT-SOLUBLE-VITAMINS-DEFICIENCY.pdf
+  # FAT SOLUBLE VITAMINS DEFICIENCY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GLYCOGEN-STORAGE-DISEASES-GSD.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=GLYCOGEN-STORAGE-DISEASES-GSD.pdf
+  # GLYCOGEN STORAGE DISEASES (GSD) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERVITAMINOSIS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=HYPERVITAMINOSIS.pdf
+  # HYPERVITAMINOSIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MALNUTRITION.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=MALNUTRITION.pdf
+  # MALNUTRITION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MINERAL-DEFICIENCIES.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=MINERAL-DEFICIENCIES.pdf
+  # MINERAL DEFICIENCIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MITOCHONDRIAL-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=MITOCHONDRIAL-DISEASE.pdf
+  # MITOCHONDRIAL DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MUCOPOLYSACCHARIDOSIS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=MUCOPOLYSACCHARIDOSIS.pdf
+  # MUCOPOLYSACCHARIDOSIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PURINE-PYRIMIDINE-METABOLISM-DISORERS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=PURINE-PYRIMIDINE-METABOLISM-DISORERS.pdf
+  # PURINE & PYRIMIDINE METABOLISM DISORERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPHINGOLIPIDOSIS.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=SPHINGOLIPIDOSIS.pdf
+  # SPHINGOLIPIDOSIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/WATER-SOLUBLE-VITAMINS-DEFICIENCY.pdf
+  dir=D:\Plasmato\دوره جامع بیوشیمی و تغذیه  پزشکی\PDFs
+  out=WATER-SOLUBLE-VITAMINS-DEFICIENCY.pdf
+  # WATER SOLUBLE VITAMINS DEFICIENCY PDF
+
+
+# ── دوره جامع جنین‌شناسی پزشکی (13 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/Weeks-1-4.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Weeks-1-4.pdf
+  # Weeks 1-4 PDF
+
+https://plasmato.net/wp-content/uploads/2025/11/Germ-layers.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Germ-layers.pdf
+  # Germ layers PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Early-structures.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Early-structures.pdf
+  # Early structures PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-limbs.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-limbs.pdf
+  # Development of the limbs PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-integumentary-system.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-integumentary-system.pdf
+  # Development of the integumentary system PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-eye.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-eye.pdf
+  # Development of the eye PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-ear-1.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-ear-1.pdf
+  # Development of the ear PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-digestive-system-and-body-cavities.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-digestive-system-and-body-cavities.pdf
+  # Development of the digestive system and body cavities PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Development-of-the-axial-skeleton.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Development-of-the-axial-skeleton.pdf
+  # Development of the axial skeleton PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/Cardiovascular-system-1.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Cardiovascular-system-1.pdf
+  # Cardiovascular system PDF
+
+https://plasmato.net/wp-content/uploads/2025/11/Germ-layers.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Germ-layers.pdf
+  # Ectoderm
+
+https://plasmato.net/wp-content/uploads/2025/11/Germ-layers.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Germ-layers.pdf
+  # Endoderm
+
+https://plasmato.net/wp-content/uploads/2025/11/Germ-layers.pdf
+  dir=D:\Plasmato\دوره جامع جنین‌شناسی پزشکی\PDFs
+  out=Germ-layers.pdf
+  # Mesoderm
+
+
+# ── دوره جامع خون و سیستم لنفاوی پزشکی (18 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/BLOOD-COMPONENTS-FUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=BLOOD-COMPONENTS-FUNCTION.pdf
+  # BLOOD COMPONENTS & FUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CONGENITAL-ANEMIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=CONGENITAL-ANEMIA.pdf
+  # CONGENITAL ANEMIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DYSPLASTIC-PROLIFERATIVE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=DYSPLASTIC-PROLIFERATIVE-DISORDERS.pdf
+  # DYSPLASTIC & PROLIFERATIVE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERCOAGULABLE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=HYPERCOAGULABLE-DISORDERS.pdf
+  # HYPERCOAGULABLE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPOCOAGULABLE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=HYPOCOAGULABLE-DISORDERS.pdf
+  # HYPOCOAGULABLE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LEUKEMIAS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=LEUKEMIAS.pdf
+  # LEUKEMIAS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LYMPHOMAS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=LYMPHOMAS.pdf
+  # LYMPHOMAS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MACROCYTIC-ANEMIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=MACROCYTIC-ANEMIA.pdf
+  # MACROCYTIC ANEMIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/METHEMOGLOBINEMIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=METHEMOGLOBINEMIA.pdf
+  # METHEMOGLOBINEMIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MICROCYTIC-ANEMIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=MICROCYTIC-ANEMIA.pdf
+  # MICROCYTIC ANEMIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NORMOCYTIC-ANEMIA-DECREASED-PRODUCTION-.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=NORMOCYTIC-ANEMIA-DECREASED-PRODUCTION-.pdf
+  # NORMOCYTIC ANEMIA ( DECREASED PRODUCTION ) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NORMOCYTIC-ANEMIA-INCREASED-HEMOLYSIS-.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=NORMOCYTIC-ANEMIA-INCREASED-HEMOLYSIS-.pdf
+  # NORMOCYTIC ANEMIA ( INCREASED HEMOLYSIS ) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PLASMA-CELL-DYSCRASIAS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=PLASMA-CELL-DYSCRASIAS.pdf
+  # PLASMA CELL DYSCRASIAS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PLATELET-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=PLATELET-DISORDERS.pdf
+  # PLATELET DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PORPHYRIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=PORPHYRIA.pdf
+  # PORPHYRIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPLEEN-PATHOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=SPLEEN-PATHOLOGY.pdf
+  # SPLEEN PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/THROMBOCYTOPENIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=THROMBOCYTOPENIA.pdf
+  # THROMBOCYTOPENIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/THYMUS-NEOPLASIA.pdf
+  dir=D:\Plasmato\دوره جامع خون و سیستم لنفاوی پزشکی\PDFs
+  out=THYMUS-NEOPLASIA.pdf
+  # THYMUS NEOPLASIA PDF
+
+
+# ── دوره جامع سیستم اسکلتی عضلانی پزشکی (18 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/BONES-JOINTS-CARTILAGE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=BONES-JOINTS-CARTILAGE.pdf
+  # BONES, JOINTS, & CARTILAGE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MUSCLES.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=MUSCLES.pdf
+  # MUSCLES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BONE-JOINT-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=BONE-JOINT-INFECTIONS.pdf
+  # BONE & JOINT INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BONE-JOINT-PATHOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=BONE-JOINT-PATHOLOGY.pdf
+  # BONE & JOINT PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BONE-TUMORSBONE-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=BONE-TUMORSBONE-TUMORS.pdf
+  # BONE TUMORSBONE TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARTILAGE-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=CARTILAGE-TUMORS.pdf
+  # CARTILAGE TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEAD-NECK-MUSCULOSKELETAL-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=HEAD-NECK-MUSCULOSKELETAL-DISORDERS.pdf
+  # HEAD & NECK MUSCULOSKELETAL DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFLAMMATORY-ARTHRITIS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=INFLAMMATORY-ARTHRITIS.pdf
+  # INFLAMMATORY ARTHRITIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFLAMMATORY-MYOSITIS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=INFLAMMATORY-MYOSITIS.pdf
+  # INFLAMMATORY MYOSITIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFLAMMATORY-SONNECTIVE-TISSUE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=INFLAMMATORY-SONNECTIVE-TISSUE-DISORDERS.pdf
+  # INFLAMMATORY SONNECTIVE TISSUE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/JOINT-PATHOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=JOINT-PATHOLOGY.pdf
+  # JOINT PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LOWER-LIMB-INJURY.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=LOWER-LIMB-INJURY.pdf
+  # LOWER LIMB INJURY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MUSCLE-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=MUSCLE-TUMORS.pdf
+  # MUSCLE TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MUSCULOSKELETAL-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=MUSCULOSKELETAL-CONGENITAL-MALFORMATIONS.pdf
+  # MUSCULOSKELETAL CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SKELETAL-DYSPLASIA.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=SKELETAL-DYSPLASIA.pdf
+  # SKELETAL DYSPLASIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPINAL-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=SPINAL-DISORDERS.pdf
+  # SPINAL DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRAUMA-COMPLICATIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=TRAUMA-COMPLICATIONS.pdf
+  # TRAUMA COMPLICATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/UPPER-LIMB-INJURY.pdf
+  dir=D:\Plasmato\دوره جامع سیستم اسکلتی عضلانی پزشکی\PDFs
+  out=UPPER-LIMB-INJURY.pdf
+  # UPPER LIMB INJURY PDF
+
+
+# ── دوره جامع سیستم تنفسی پزشکی (18 files) ──
+https://plasmato.net/wp-content/uploads/2026/02/ACUTE-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=ACUTE-RESPIRATORY-DISEASE.pdf
+  # ACUTE RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/LOWER-RESPIRATORY-TRACK-INFECTION.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=LOWER-RESPIRATORY-TRACK-INFECTION.pdf
+  # LOWER RESPIRATORY TRACK INFECTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/LOWER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=LOWER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  # LOWER RESPIRATORY TRACK CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/OBSTRUCTIVE-LUNG-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=OBSTRUCTIVE-LUNG-DISEASE.pdf
+  # OBSTRUCTIVE LUNG DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PERINATAL-ACUTE-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=PERINATAL-ACUTE-RESPIRATORY-DISEASE.pdf
+  # PERINATAL ACUTE RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PLEURA-PLEURAL-SPACE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=PLEURA-PLEURAL-SPACE.pdf
+  # PLEURA & PLEURAL SPACE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PULMONARY-VASCULAR-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=PULMONARY-VASCULAR-DISEASE.pdf
+  # PULMONARY VASCULAR DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/RESPIRATORY-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=RESPIRATORY-TUMORS.pdf
+  # RESPIRATORY TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/RESTRICTIVE-LUNG-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=RESTRICTIVE-LUNG-DISEASE.pdf
+  # RESTRICTIVE LUNG DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/SLEEP-RELATED-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=SLEEP-RELATED-RESPIRATORY-DISEASE.pdf
+  # SLEEP-RELATED RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/UPPER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=UPPER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  # UPPER RESPIRATORY TRACK CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/UPPER-RESPIRATORY-TRACK.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=UPPER-RESPIRATORY-TRACK.pdf
+  # UPPER RESPIRATORY TRACK PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY-2.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY-2.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BREATHING-MECHANICS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=BREATHING-MECHANICS.pdf
+  # BREATHING MECHANICS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BREATHING-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=BREATHING-REGULATION.pdf
+  # BREATHING REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GAS-EXCHANGE.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=GAS-EXCHANGE.pdf
+  # GAS EXCHANGE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GAS-TRANSPORT.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=GAS-TRANSPORT.pdf
+  # GAS TRANSPORT PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NORMAL-VARIATIONS-1.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تنفسی پزشکی\PDFs
+  out=NORMAL-VARIATIONS-1.pdf
+  # NORMAL VARIATIONS PDF
+
+
+# ── دوره جامع سیستم تولید مثل پزشکی (13 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/BREAST-MASSES.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=BREAST-MASSES.pdf
+  # BREAST MASSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DISORDERS-OF-LABOR.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=DISORDERS-OF-LABOR.pdf
+  # DISORDERS OF LABOR PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FEMALE-GENITOURINARY-CANCERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=FEMALE-GENITOURINARY-CANCERS.pdf
+  # FEMALE GENITOURINARY CANCERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GENITOURINARY-TRACK-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=GENITOURINARY-TRACK-INFECTIONS.pdf
+  # GENITOURINARY TRACK INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFERTILITY-FETAL-LOSS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=INFERTILITY-FETAL-LOSS.pdf
+  # INFERTILITY & FETAL LOSS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MALE-GENITOURINARY-CANCERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=MALE-GENITOURINARY-CANCERS.pdf
+  # MALE GENITOURINARY CANCERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MATERNAL-CONDITIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=MATERNAL-CONDITIONS.pdf
+  # MATERNAL CONDITIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/OVARIAN-UTERINE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=OVARIAN-UTERINE-DISORDERS.pdf
+  # OVARIAN & UTERINE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PENILE-PROSTATE-TESTICULAR-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=PENILE-PROSTATE-TESTICULAR-DISORDERS.pdf
+  # PENILE PROSTATE & TESTICULAR DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PERINATAL-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=PERINATAL-INFECTIONS.pdf
+  # PERINATAL INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FEMALE-REPRODUCTIVE-SYSTEM-1.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=FEMALE-REPRODUCTIVE-SYSTEM-1.pdf
+  # FEMALE REPRODUCTIVE SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MALE-REPRODUCTIVE-SYSTEM-1.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=MALE-REPRODUCTIVE-SYSTEM-1.pdf
+  # MALE REPRODUCTIVE SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SEXUAL-DEVELOPMENT-1.pdf
+  dir=D:\Plasmato\دوره جامع سیستم تولید مثل پزشکی\PDFs
+  out=SEXUAL-DEVELOPMENT-1.pdf
+  # SEXUAL DEVELOPMENT PDF
+
+
+# ── دوره جامع فیزیولوژی پزشکی (42 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/ADRENAL-HORMONES.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ADRENAL-HORMONES.pdf
+  # ADRENAL HORMONES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CALCIUM-PHOSPHATE-HORMONAL-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=CALCIUM-PHOSPHATE-HORMONAL-REGULATION.pdf
+  # CALCIUM & PHOSPHATE HORMONAL REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PANCREATIC-HORMONES.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=PANCREATIC-HORMONES.pdf
+  # PANCREATIC HORMONES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PITUITARY-HORMONES.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=PITUITARY-HORMONES.pdf
+  # PITUITARY HORMONES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FEMALE-REPRODUCTIVE-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=FEMALE-REPRODUCTIVE-SYSTEM.pdf
+  # FEMALE REPRODUCTIVE SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MALE-REPRODUCTIVE-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=MALE-REPRODUCTIVE-SYSTEM.pdf
+  # MALE REPRODUCTIVE SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SEXUAL-DEVELOPMENT.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=SEXUAL-DEVELOPMENT.pdf
+  # SEXUAL DEVELOPMENT PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BLOOD-PRESSURE-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BLOOD-PRESSURE-REGULATION.pdf
+  # BLOOD PRESSURE REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BODY-TEMPERATURE-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BODY-TEMPERATURE-REGULATION.pdf
+  # BODY TEMPERATURE REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARDIAC-CYCLE.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=CARDIAC-CYCLE.pdf
+  # CARDIAC CYCLE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARDIAC-ELECTROPHYSIOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=CARDIAC-ELECTROPHYSIOLOGY.pdf
+  # CARDIAC ELECTROPHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARDIOVASCULAR-ANATOMY-PHYSIOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=CARDIOVASCULAR-ANATOMY-PHYSIOLOGY.pdf
+  # CARDIOVASCULAR ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ELECTROCARDIOGRAPHYECG.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ELECTROCARDIOGRAPHYECG.pdf
+  # ELECTROCARDIOGRAPHY(ECG) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEMODYNAMICS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=HEMODYNAMICS.pdf
+  # HEMODYNAMICS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NORMAL-VARIATIONS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=NORMAL-VARIATIONS.pdf
+  # NORMAL VARIATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPECIFIC-CIRCULATIONS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=SPECIFIC-CIRCULATIONS.pdf
+  # SPECIFIC CIRCULATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ACID_BASE-PHYSIOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ACID_BASE-PHYSIOLOGY.pdf
+  # ACID_BASE PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY-5.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY-5.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FLUIDS-IN-THE-BODY.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=FLUIDS-IN-THE-BODY.pdf
+  # FLUIDS IN THE BODY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RENAL-BLOOD-FLOW-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=RENAL-BLOOD-FLOW-REGULATION.pdf
+  # RENAL BLOOD FLOW REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RENAL-ELECTROLYTE-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=RENAL-ELECTROLYTE-REGULATION.pdf
+  # RENAL ELECTROLYTE REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RENAL-REABSORPTION-SECRETION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=RENAL-REABSORPTION-SECRETION.pdf
+  # RENAL REABSORPTION & SECRETION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/WATER-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=WATER-REGULATION.pdf
+  # WATER REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY-1.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY-1.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DIGESTION-ABSORPTION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=DIGESTION-ABSORPTION.pdf
+  # DIGESTION & ABSORPTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GASTROINTESTINAL-FUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=GASTROINTESTINAL-FUNCTION.pdf
+  # GASTROINTESTINAL FUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LIVER-GALL-BLADDER-PANCREAS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=LIVER-GALL-BLADDER-PANCREAS.pdf
+  # LIVER GALL BLADDER & PANCREAS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/UPPER-GASTROINTESTINAL-TRACK.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=UPPER-GASTROINTESTINAL-TRACK.pdf
+  # UPPER GASTROINTESTINAL TRACK PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY-3.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY-3.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/AUTONOMIC-NERVOUS-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=AUTONOMIC-NERVOUS-SYSTEM.pdf
+  # AUTONOMIC NERVOUS SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BLOOD-BRAIN-BARRIER-CSF.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BLOOD-BRAIN-BARRIER-CSF.pdf
+  # BLOOD BRAIN BARRIER & CSF PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BRAIN-FUNCTIONS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BRAIN-FUNCTIONS.pdf
+  # BRAIN FUNCTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MOTOR-NERVOUS-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=MOTOR-NERVOUS-SYSTEM.pdf
+  # MOTOR NERVOUS SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SENSORY-NERVOUS-SYSTEM.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=SENSORY-NERVOUS-SYSTEM.pdf
+  # SENSORY NERVOUS SYSTEM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPINAL-CORD-NERVES.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=SPINAL-CORD-NERVES.pdf
+  # SPINAL CORD & NERVES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANATOMY-PHYSIOLOGY-2.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=ANATOMY-PHYSIOLOGY-2.pdf
+  # ANATOMY & PHYSIOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BREATHING-MECHANICS.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BREATHING-MECHANICS.pdf
+  # BREATHING MECHANICS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BREATHING-REGULATION.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=BREATHING-REGULATION.pdf
+  # BREATHING REGULATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GAS-EXCHANGE.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=GAS-EXCHANGE.pdf
+  # GAS EXCHANGE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GAS-TRANSPORT.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=GAS-TRANSPORT.pdf
+  # GAS TRANSPORT PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NORMAL-VARIATIONS-1.pdf
+  dir=D:\Plasmato\دوره جامع فیزیولوژی پزشکی\PDFs
+  out=NORMAL-VARIATIONS-1.pdf
+  # NORMAL VARIATIONS PDF
+
+
+# ── دوره جامع میکروبیولوژی پزشکی (50 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/ADENOVIRIDAE.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ADENOVIRIDAE.pdf
+  # ADENOVIRIDAE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/AEROBIC-RODS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=AEROBIC-RODS.pdf
+  # AEROBIC RODS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANAEROBIC-RODS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ANAEROBIC-RODS.pdf
+  # ANAEROBIC RODS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ARENAVIRIDAE.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ARENAVIRIDAE.pdf
+  # ARENAVIRIDAE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BUNYAVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=BUNYAVIRUSES.pdf
+  # BUNYAVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CALICVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CALICVIRUSES.pdf
+  # CALICVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CENTRAL-NERVOUS-SYSTEM-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CENTRAL-NERVOUS-SYSTEM-INFECTIONS.pdf
+  # CENTRAL NERVOUS SYSTEM INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CESTODES-TAPEWORMS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CESTODES-TAPEWORMS.pdf
+  # CESTODES (TAPEWORMS) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CHLAMYDIA.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CHLAMYDIA.pdf
+  # CHLAMYDIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/COCCOBACILLI-AEROBES-.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=COCCOBACILLI-AEROBES-.pdf
+  # COCCOBACILLI ( AEROBES ) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/COCCOBACILLI-FACULTATIVE-ANAEROBES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=COCCOBACILLI-FACULTATIVE-ANAEROBES.pdf
+  # COCCOBACILLI (FACULTATIVE ANAEROBES) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CORONAVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CORONAVIRUSES.pdf
+  # CORONAVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CUTANEOUS-FUNGAL-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=CUTANEOUS-FUNGAL-INFECTIONS.pdf
+  # CUTANEOUS FUNGAL INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DIPLOCOCCI-AEROBIC-1.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=DIPLOCOCCI-AEROBIC-1.pdf
+  # DIPLOCOCCI (AEROBIC) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ECTOPARASITES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ECTOPARASITES.pdf
+  # ECTOPARASITES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ENTEROCOCCUS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ENTEROCOCCUS.pdf
+  # ENTEROCOCCUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FILAMENTS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=FILAMENTS.pdf
+  # FILAMENTS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FILOVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=FILOVIRUSES.pdf
+  # FILOVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/FLAVIVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=FLAVIVIRUSES.pdf
+  # FLAVIVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GASTROINTESTINAL-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=GASTROINTESTINAL-INFECTIONS.pdf
+  # GASTROINTESTINAL INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GENERAL-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=GENERAL-INFECTIONS.pdf
+  # GENERAL INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GRAM-VARIABLE.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=GRAM-VARIABLE.pdf
+  # GRAM VARIABLE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEMATOLOGIC-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=HEMATOLOGIC-INFECTIONS.pdf
+  # HEMATOLOGIC INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEPADNAVIRIDAE.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=HEPADNAVIRIDAE.pdf
+  # HEPADNAVIRIDAE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HERPESVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=HERPESVIRUSES.pdf
+  # HERPESVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LEISHMANIA.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=LEISHMANIA.pdf
+  # LEISHMANIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MYCOPLASMA.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=MYCOPLASMA.pdf
+  # MYCOPLASMA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NEMATODES-ROUNDWORMS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=NEMATODES-ROUNDWORMS.pdf
+  # NEMATODES (ROUNDWORMS) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NON-TUBERCULOUS-MYCOBACTERIUM.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=NON-TUBERCULOUS-MYCOBACTERIUM.pdf
+  # NON TUBERCULOUS MYCOBACTERIUM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/OPPORTUNISTIC-FUNGAL-INFECTIONS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=OPPORTUNISTIC-FUNGAL-INFECTIONS.pdf
+  # OPPORTUNISTIC FUNGAL INFECTIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ORTHOMYXOVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=ORTHOMYXOVIRUSES.pdf
+  # ORTHOMYXOVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PAPILLOMAVIRUS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=PAPILLOMAVIRUS.pdf
+  # PAPILLOMAVIRUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PARAMYXOVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=PARAMYXOVIRUSES.pdf
+  # PARAMYXOVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PICORNAVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=PICORNAVIRUSES.pdf
+  # PICORNAVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/POLYOMAVIRUS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=POLYOMAVIRUS.pdf
+  # POLYOMAVIRUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/POXVIRIDAE.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=POXVIRIDAE.pdf
+  # POXVIRIDAE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/REOVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=REOVIRUSES.pdf
+  # REOVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RETROVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=RETROVIRUSES.pdf
+  # RETROVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RHABDOVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=RHABDOVIRUSES.pdf
+  # RHABDOVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RICKETTSIAL-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=RICKETTSIAL-DISEASES.pdf
+  # RICKETTSIAL DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RODS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=RODS.pdf
+  # RODS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SPIROCHETES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=SPIROCHETES.pdf
+  # SPIROCHETES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/STAPHYLOCOCCUS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=STAPHYLOCOCCUS.pdf
+  # STAPHYLOCOCCUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/STREPTOCOCCUS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=STREPTOCOCCUS.pdf
+  # STREPTOCOCCUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SYSTEMIC-MYCOSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=SYSTEMIC-MYCOSES.pdf
+  # SYSTEMIC MYCOSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TOGAVIRUSES.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=TOGAVIRUSES.pdf
+  # TOGAVIRUSES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TREMATODES-FLATWORMS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=TREMATODES-FLATWORMS.pdf
+  # TREMATODES (FLATWORMS) PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRICHOMONA.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=TRICHOMONA.pdf
+  # TRICHOMONA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRYPANOSOMA.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=TRYPANOSOMA.pdf
+  # TRYPANOSOMA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TUBERCULOSIS.pdf
+  dir=D:\Plasmato\دوره جامع میکروبیولوژی پزشکی\PDFs
+  out=TUBERCULOSIS.pdf
+  # TUBERCULOSIS PDF
+
+
+# ── دوره جامع پاتولوژی پزشکی (65 files) ──
+https://plasmato.net/wp-content/uploads/2026/02/ACUTE-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ACUTE-RESPIRATORY-DISEASE.pdf
+  # ACUTE RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/LOWER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=LOWER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  # LOWER RESPIRATORY TRACK CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/LOWER-RESPIRATORY-TRACK-INFECTION.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=LOWER-RESPIRATORY-TRACK-INFECTION.pdf
+  # LOWER RESPIRATORY TRACK INFECTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/OBSTRUCTIVE-LUNG-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=OBSTRUCTIVE-LUNG-DISEASE.pdf
+  # OBSTRUCTIVE LUNG DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PERINATAL-ACUTE-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PERINATAL-ACUTE-RESPIRATORY-DISEASE.pdf
+  # PERINATAL ACUTE RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PLEURA-PLEURAL-SPACE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PLEURA-PLEURAL-SPACE.pdf
+  # PLEURA & PLEURAL SPACE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/PULMONARY-VASCULAR-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PULMONARY-VASCULAR-DISEASE.pdf
+  # PULMONARY VASCULAR DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/RESPIRATORY-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=RESPIRATORY-TUMORS.pdf
+  # RESPIRATORY TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/RESTRICTIVE-LUNG-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=RESTRICTIVE-LUNG-DISEASE.pdf
+  # RESTRICTIVE LUNG DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/SLEEP-RELATED-RESPIRATORY-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=SLEEP-RELATED-RESPIRATORY-DISEASE.pdf
+  # SLEEP-RELATED RESPIRATORY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/UPPER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=UPPER-RESPIRATORY-TRACK-CONGENITAL-MALFORMATIONS.pdf
+  # UPPER RESPIRATORY TRACK CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/02/UPPER-RESPIRATORY-TRACK.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=UPPER-RESPIRATORY-TRACK.pdf
+  # UPPER RESPIRATORY TRACK PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ADRENAL-HYPERFUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ADRENAL-HYPERFUNCTION.pdf
+  # ADRENAL HYPERFUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ADRENAL-HYPERPLASIA.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ADRENAL-HYPERPLASIA.pdf
+  # ADRENAL HYPERPLASIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ADRENAL-HYPOFUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ADRENAL-HYPOFUNCTION.pdf
+  # ADRENAL HYPOFUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DIABETES-MELLITUS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=DIABETES-MELLITUS.pdf
+  # DIABETES MELLITUS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ENDOCRINE-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ENDOCRINE-TUMORS.pdf
+  # ENDOCRINE TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GONADAL-DYSFUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=GONADAL-DYSFUNCTION.pdf
+  # GONADAL DYSFUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERPARATHYROIDISM-HYPOPARATHYROIDISM.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HYPERPARATHYROIDISM-HYPOPARATHYROIDISM.pdf
+  # HYPERPARATHYROIDISM & HYPOPARATHYROIDISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERPITUITARISM-HYPOPITUITARISM.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HYPERPITUITARISM-HYPOPITUITARISM.pdf
+  # HYPERPITUITARISM & HYPOPITUITARISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERTHYROIDISM-HYPOTHYROIDISM.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HYPERTHYROIDISM-HYPOTHYROIDISM.pdf
+  # HYPERTHYROIDISM & HYPOTHYROIDISM PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/NEUROENDOCRINE-TUMORS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=NEUROENDOCRINE-TUMORS.pdf
+  # NEUROENDOCRINE TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/THYROIDITIS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=THYROIDITIS.pdf
+  # THYROIDITIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ACUTE-CORONARY-SYNDROMES-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ACUTE-CORONARY-SYNDROMES-1.pdf
+  # ACUTE CORONARY SYNDROMES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ACYANOTIC-DEFECTS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ACYANOTIC-DEFECTS-1.pdf
+  # ACYANOTIC DEFECTS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ANEURYSMS-DISSECTION-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ANEURYSMS-DISSECTION-1.pdf
+  # ANEURYSMS & DISSECTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BRADYCARDIA-HEART-BLOCK-2.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=BRADYCARDIA-HEART-BLOCK-2.pdf
+  # BRADYCARDIA & HEART BLOCK PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARDIAC-TUMORS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=CARDIAC-TUMORS-1.pdf
+  # CARDIAC TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CARDIOMYOPATHY-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=CARDIOMYOPATHY-1.pdf
+  # CARDIOMYOPATHY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CORONARY-ARTERY-DISEASE-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=CORONARY-ARTERY-DISEASE-1.pdf
+  # CORONARY ARTERY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CYANOTIC-DEFECTS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=CYANOTIC-DEFECTS-1.pdf
+  # CYANOTIC DEFECTS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEART-FAILURE-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HEART-FAILURE-1.pdf
+  # HEART FAILURE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HEART-VALVE-DISEASE-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HEART-VALVE-DISEASE-1.pdf
+  # HEART VALVE DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/HYPERTENSION-HYPOTENSION-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=HYPERTENSION-HYPOTENSION-1.pdf
+  # HYPERTENSION & HYPOTENSION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFECTIONS-INFLAMMATION-OF-THE-HEART-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=INFECTIONS-INFLAMMATION-OF-THE-HEART-1.pdf
+  # INFECTIONS & INFLAMMATION OF THE HEART PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PERICARDIAL-DISEASE-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PERICARDIAL-DISEASE-1.pdf
+  # PERICARDIAL DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PERIPHERAL-ARTERY-DISEASE-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PERIPHERAL-ARTERY-DISEASE-1.pdf
+  # PERIPHERAL ARTERY DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PRE-EXCITATION-DISORDERS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PRE-EXCITATION-DISORDERS-1.pdf
+  # PRE-EXCITATION DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PREMATURE-CONTRACTION-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PREMATURE-CONTRACTION-1.pdf
+  # PREMATURE CONTRACTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SHOCK.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=SHOCK.pdf
+  # SHOCK PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SUDDEN-CARDIAC-DEATH-2.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=SUDDEN-CARDIAC-DEATH-2.pdf
+  # SUDDEN CARDIAC DEATH PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SUPRAVENTRICULAR-TACHYCARDIA-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=SUPRAVENTRICULAR-TACHYCARDIA-1.pdf
+  # SUPRAVENTRICULAR TACHYCARDIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VASCULAR-COMPRESSION-SYNDROMES-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VASCULAR-COMPRESSION-SYNDROMES-1.pdf
+  # VASCULAR COMPRESSION SYNDROMES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VASCULAR-MALFORMATIONS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VASCULAR-MALFORMATIONS-1.pdf
+  # VASCULAR MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VASCULAR-STEAL-SYNDROMES-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VASCULAR-STEAL-SYNDROMES-1.pdf
+  # VASCULAR STEAL SYNDROMES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VASCULAR-TUMORS-1.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VASCULAR-TUMORS-1.pdf
+  # VASCULAR TUMORS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VASCULITIES.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VASCULITIES.pdf
+  # VASCULITIES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VENOUS-DYSFUNCTION.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VENOUS-DYSFUNCTION.pdf
+  # VENOUS DYSFUNCTION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/VENTRICULAR-TACHYCARDIA.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=VENTRICULAR-TACHYCARDIA.pdf
+  # VENTRICULAR TACHYCARDIA PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/BILIARY-TRACT-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=BILIARY-TRACT-DISEASES.pdf
+  # BILIARY TRACT DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/COLORECTAL-POLYP-CONDITIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=COLORECTAL-POLYP-CONDITIONS.pdf
+  # COLORECTAL POLYP CONDITIONS  PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ESOPHAGEAL-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ESOPHAGEAL-DISEASE.pdf
+  # ESOPHAGEAL DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GASTRIC-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=GASTRIC-DISEASE.pdf
+  # GASTRIC DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GASTROINTESTINAL-CANCERS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=GASTROINTESTINAL-CANCERS.pdf
+  # GASTROINTESTINAL CANCERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INFLAMMATORY-BOWEL-DISEASE.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=INFLAMMATORY-BOWEL-DISEASE.pdf
+  # INFLAMMATORY BOWEL DISEASE PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/INTESTINAL-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=INTESTINAL-DISEASES.pdf
+  # INTESTINAL DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LIVER-GALLBLADDER-CONGENTINAL-CONDITIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=LIVER-GALLBLADDER-CONGENTINAL-CONDITIONS.pdf
+  # LIVER & GALLBLADDER CONGENTINAL CONDITIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LIVER-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=LIVER-DISEASES.pdf
+  # LIVER DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/LOWER-GASTROINTESTINAL-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=LOWER-GASTROINTESTINAL-CONGENITAL-MALFORMATIONS.pdf
+  # LOWER GASTROINTESTINAL CONGENITAL MALFORMATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/MALABSORPTION-CONDITIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=MALABSORPTION-CONDITIONS.pdf
+  # MALABSORPTION CONDITIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/ORAL-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=ORAL-DISEASES.pdf
+  # ORAL DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PANCREATITIS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PANCREATITIS.pdf
+  # PANCREATITIS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/PERITONEAL-PATHOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=PERITONEAL-PATHOLOGY.pdf
+  # PERITONEAL PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/RECTAL-ANAL-PATHOLOGY.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=RECTAL-ANAL-PATHOLOGY.pdf
+  # RECTAL & ANAL PATHOLOGY PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/UPPER-GASTROINTESTINAL-CONGENITAL-MALFORMATIONS.pdf
+  dir=D:\Plasmato\دوره جامع پاتولوژی پزشکی\PDFs
+  out=UPPER-GASTROINTESTINAL-CONGENITAL-MALFORMATIONS.pdf
+  # UPPER GASTROINTESTINAL CONGENITAL MALFORMATIONS PDF
+
+
+# ── دوره جامع ژنتیک و زیست مولکولی پزشکی (10 files) ──
+https://plasmato.net/wp-content/uploads/2026/01/POPULATION-GENETICS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=POPULATION-GENETICS.pdf
+  # POPULATION GENETICS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRANSCRIPTION-TRANSLATION-REPLICATION.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=TRANSCRIPTION-TRANSLATION-REPLICATION.pdf
+  # TRANSCRIPTION TRANSLATION & REPLICATION PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CHIROMOSOMAL-DELETION-SYNDROMES.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=CHIROMOSOMAL-DELETION-SYNDROMES.pdf
+  # CHIROMOSOMAL DELETION SYNDROMES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/CONNECTIVE-TISSUE-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=CONNECTIVE-TISSUE-DISORDERS.pdf
+  # CONNECTIVE TISSUE DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/DNA-REPLICATION-REPAIR-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=DNA-REPLICATION-REPAIR-DISORDERS.pdf
+  # DNA REPLICATION & REPAIR DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/GENETIC-MUTATIONS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=GENETIC-MUTATIONS.pdf
+  # GENETIC MUTATIONS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/IMPRINTING-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=IMPRINTING-DISORDERS.pdf
+  # IMPRINTING DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/SEX-CHROMOSOME-DISORDERS.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=SEX-CHROMOSOME-DISORDERS.pdf
+  # SEX CHROMOSOME DISORDERS PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRINUCLEOTIDE-REPEAT-EXPANSION-DISEASES.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=TRINUCLEOTIDE-REPEAT-EXPANSION-DISEASES.pdf
+  # TRINUCLEOTIDE REPEAT EXPANSION DISEASES PDF
+
+https://plasmato.net/wp-content/uploads/2026/01/TRISOMIES.pdf
+  dir=D:\Plasmato\دوره جامع ژنتیک و زیست مولکولی پزشکی\PDFs
+  out=TRISOMIES.pdf
+  # TRISOMIES
