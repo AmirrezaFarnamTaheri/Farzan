@@ -1,0 +1,28 @@
+function D(b={}){let{setView:f,Router:C,setPendingCourseMedia:I}=b;f(`
+    <section class="view view-achievements">
+      <div class="page-header">
+        <div class="page-title-row">
+          <h1 class="page-title">Achievements</h1>
+          <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+        </div>
+        <p class="page-subtitle">Milestones based on your current progress.</p>
+      </div>
+      <div class="stat-grid" data-achievement-metrics></div>
+      <div class="card card-filled" style="margin-top:16px">
+        <div class="card-body">
+          <div class="grid grid-3" data-achievement-list>
+            <p>Loading achievements...</p>
+          </div>
+        </div>
+      </div>
+      <div class="card card-filled" style="margin-top:16px">
+        <div class="card-body">
+          <h2 class="h3">Review queue</h2>
+          <div class="grid grid-3" data-review-list>
+            <p>Loading review prompts...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  `),A();async function A(){let p=document.querySelector("[data-achievement-metrics]"),d=document.querySelector("[data-achievement-list]"),o=document.querySelector("[data-review-list]");if(!p||!d)return;let[r,E,N,u]=await Promise.all([(async()=>{try{return await window.DB?.getAllProgress?.()??[]}catch{return[]}})(),(async()=>{try{return await window.DB?.getAllNotes?.()??[]}catch{return[]}})(),(async()=>{try{return await window.DB?.getAllTimestamps?.()??[]}catch{return[]}})(),(async()=>{try{return await window.DataStore?.init?.(),window.DataStore?.allTopics?.()??[]}catch{return[]}})()]);if(!document.body.contains(d))return;let g=new Map(u.map(e=>[e.topicId,e])),x=new Map(r.map(e=>[e.topicId,e])),m=r.filter(e=>e.status==="done"||Number(e.percent)>=100),l=r.filter(e=>Number(e.percent)>0||Number(e.position)>0||e.status==="in-progress"),w=r.reduce((e,t)=>e+Math.max(0,Number(t.position)||0),0),k=new Set(u.map(e=>e.courseId).filter(Boolean)),y=Date.now(),T=720*60*60*1e3,S=(e,t)=>[t?.reviewedAt,t?.updatedAt,t?.completedAt,...N.filter(a=>a?.topicId===e).map(a=>a.updatedAt||a.createdAt),...E.filter(a=>a?.topicId===e).map(a=>a.updatedAt||a.createdAt)].map(a=>Number(a)||0),v=m.map(e=>{let t=g.get(e.topicId),a=Math.max(...S(e.topicId,e),0);return{topicId:e.topicId,courseId:e.courseId||t?.courseId,title:t?.title||e.topicTitle||e.topicId||"Completed topic",courseTitle:t?.courseTitle||e.courseTitle||e.courseId||t?.courseId||"Course",lastActivity:a,daysSince:a?Math.floor((y-a)/(1440*60*1e3)):null}}).filter(e=>e.topicId&&(!e.lastActivity||y-e.lastActivity>=T)).sort((e,t)=>(e.lastActivity||0)-(t.lastActivity||0)).slice(0,6),h=0;k.forEach(e=>{let t=u.filter(a=>a.courseId===e);t.length&&t.every(a=>{let c=x.get(a.topicId);return c?.status==="done"||Number(c?.percent)>=100})&&(h+=1)});let M=[["Touched topics",l.length],["Done topics",m.length],["Completed courses",h],["Watched minutes",Math.round(w/60)],["Due reviews",v.length]];p.replaceChildren(),M.forEach(([e,t])=>{let a=document.createElement("div");a.className="stat-card";let c=document.createElement("strong");c.textContent=String(t);let s=document.createElement("span");s.textContent=e,a.append(c,s),p.appendChild(a)});let R=[{id:"first-step",title:"First Step",detail:"Start any topic.",unlocked:l.length>=1},{id:"first-finish",title:"First Finish",detail:"Complete one topic.",unlocked:m.length>=1},{id:"deep-focus",title:"Deep Focus",detail:"Watch at least 30 minutes.",unlocked:w>=1800},{id:"course-complete",title:"Course Complete",detail:"Finish every topic in a course.",unlocked:h>=1},{id:"collector",title:"Collector",detail:"Make progress on 10 topics.",unlocked:l.length>=10},{id:"catalog-roamer",title:"Catalog Roamer",detail:"Touch topics from three courses.",unlocked:new Set(l.map(e=>e.courseId||g.get(e.topicId)?.courseId).filter(Boolean)).size>=3}];if(d.replaceChildren(),R.forEach(e=>{let t=document.createElement("article");t.className=`card ${e.unlocked?"card-filled":""}`.trim(),t.dataset.achievementId=e.id,t.dataset.achievementState=e.unlocked?"unlocked":"locked";let a=document.createElement("div");a.className="card-body";let c=document.createElement("h2");c.className="h4",c.textContent=e.title;let s=document.createElement("p");s.textContent=e.detail;let n=document.createElement("span");n.className=`badge ${e.unlocked?"badge-success":"badge-muted"}`,n.textContent=e.unlocked?"Unlocked":"Locked",n.setAttribute("aria-label",`Achievement status: ${n.textContent}`),a.append(c,s,n),t.appendChild(a),d.appendChild(t)}),!!o){if(o.replaceChildren(),!v.length){let e=document.createElement("p");e.className="text-muted",e.textContent="No completed topics are due for review yet.",o.appendChild(e);return}v.forEach(e=>{let t=document.createElement("article");t.className="card",t.dataset.reviewTopicId=e.topicId;let a=document.createElement("div");a.className="card-body";let c=document.createElement("span");c.className="badge badge-warning",c.textContent=e.daysSince==null?"Review":`${e.daysSince} days`;let s=document.createElement("h2");s.className="h4",s.textContent=e.title;let n=document.createElement("p");n.textContent=`Revisit notes and media from ${e.courseTitle}.`;let i=document.createElement("button");i.className="btn btn-ghost",i.type="button",i.dataset.reviewTopic=e.topicId,i.textContent="Review",a.append(c,s,n,i),t.appendChild(a),o.appendChild(t)}),o.onclick=e=>{let t=e.target?.closest?.("[data-review-topic]");t&&(I(t.dataset.reviewTopic),C.navigate("#/courses"))}}}}export{D as mountAchievementsView};
+//# sourceMappingURL=achievementsRoute-Y4ROSBGK.js.map

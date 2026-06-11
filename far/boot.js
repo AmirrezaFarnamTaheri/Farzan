@@ -57,4 +57,28 @@ try {
   __pdPost('boot:import_plasma_ok', {});
 } catch (err) {
   __pdPost('boot:import_plasma_fail', { err: String(err), stack: err?.stack });
+  const statusEl = document.getElementById('splash-status');
+  if (statusEl) {
+    statusEl.innerHTML = '';
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'color: #ef4444; margin-top: 1rem; font-family: sans-serif;';
+    
+    const strong = document.createElement('strong');
+    strong.textContent = 'Failed to load application modules.';
+    errDiv.appendChild(strong);
+    errDiv.appendChild(document.createElement('br'));
+    
+    const small = document.createElement('small');
+    small.textContent = 'Try running "npm run build" or hard refreshing (Ctrl+F5).';
+    errDiv.appendChild(small);
+    errDiv.appendChild(document.createElement('br'));
+    
+    const btn = document.createElement('button');
+    btn.textContent = 'Retry';
+    btn.style.cssText = 'margin-top: 10px; padding: 6px 16px; cursor: pointer; border-radius: 4px; border: 1px solid #ef4444; background: transparent; color: #ef4444;';
+    btn.onclick = () => location.reload(true);
+    errDiv.appendChild(btn);
+    
+    statusEl.appendChild(errDiv);
+  }
 }

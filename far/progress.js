@@ -346,39 +346,34 @@ const ProgressStats = (() => {
         await Promise.all(payload.progress.map(p =>
           DB.saveProgress(p.topicId, p.courseId, p)
         ));
-        // Notes are stored by notes.js in localStorage under "plasma-notes".
-        // Older backups may have {topicId, courseId, html, text}; keep whatever fields exist.
-        if (payload.notes?.length) {
-          let existing = [];
-          try { existing = JSON.parse(localStorage.getItem('plasma-notes')) ?? []; } catch { existing = []; }
+        // Import notes using DB.saveNote (handles IndexedDB/localStorage abstraction)
+          if (payload.notes?.length) {
+            const imported = payload.notes.map((n) => ({
+              id: n.id ?? `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+              title: n.title ?? (n.topicId ? `Topic ${n.topicId}` : 'Imported note'),
+              content: n.content ?? n.html ?? '',
+              folderId: n.folderId ?? 'default',
+              tags: n.tags ?? [],
+              pinned: !!n.pinned,
+              color: n.color ?? '',
+              createdAt: n.createdAt ?? Date.now(),
+              updatedAt: n.updatedAt ?? Date.now(),
+              wordCount: n.wordCount ?? 0,
+              charCount: n.charCount ?? 0,
+              topicId: n.topicId,
+              courseId: n.courseId,
+              text: n.text,
+              html: n.html,
+            }));
 
-          const imported = payload.notes.map((n) => ({
-            id: n.id ?? `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-            title: n.title ?? (n.topicId ? `Topic ${n.topicId}` : 'Imported note'),
-            content: n.content ?? n.html ?? '',
-            folderId: n.folderId ?? 'default',
-            tags: n.tags ?? [],
-            pinned: !!n.pinned,
-            color: n.color ?? '',
-            createdAt: n.createdAt ?? Date.now(),
-            updatedAt: n.updatedAt ?? Date.now(),
-            wordCount: n.wordCount ?? 0,
-            charCount: n.charCount ?? 0,
-            // Preserve original linkage if present
-            topicId: n.topicId,
-            courseId: n.courseId,
-            text: n.text,
-            html: n.html,
-          }));
+            for (const n of imported) {
+              await DB.saveNote(n);
+            }
 
-          // Merge by id (import wins)
-          const byId = new Map(existing.map(x => [x.id, x]));
-          imported.forEach(x => byId.set(x.id, x));
-          const merged = [...byId.values()];
-          localStorage.setItem('plasma-notes', JSON.stringify(merged));
-
-          // Nudge Notes UI to refresh if open
-          try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
+            // Nudge Notes UI to refresh if open
+            try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
+            try { window.PlasmaDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
+          } catch { /* ignore */ }
           try { window.PlasmaDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
         }
         if (payload.timestamps) {

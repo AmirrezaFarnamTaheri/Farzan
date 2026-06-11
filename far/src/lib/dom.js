@@ -127,3 +127,47 @@ export function trapFocus(container, { initialFocus = true } = {}) {
 
   return () => container.removeEventListener('keydown', onKeyDown);
 }
+
+export function createElement(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null) continue;
+    if (k === 'class') {
+      el.className = v;
+    } else if (k.startsWith('data-')) {
+      el.dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+    } else if (k === 'style' && typeof v === 'object') {
+      Object.assign(el.style, v);
+    } else {
+      el.setAttribute(k, v);
+    }
+  }
+  const append = (parent, content) => {
+    if (Array.isArray(content)) {
+      content.forEach(c => append(parent, c));
+    } else if (content != null) {
+      parent.append(typeof content === 'string' ? document.createTextNode(content) : content);
+    }
+  };
+  append(el, children);
+  return el;
+}
+
+export function appendContent(parent, content) {
+  if (content == null) return;
+  const append = (item) => {
+    if (item == null) return;
+    if (item instanceof Node) parent.appendChild(item);
+    else parent.appendChild(document.createTextNode(String(item)));
+  };
+  if (Array.isArray(content)) content.forEach(append);
+  else append(content);
+}
+
+export const esc = s => {
+  if (s == null) return '';
+  if (s instanceof Node) return s.outerHTML || '';
+  return String(s).replace(/[&<>"']/g, m =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+};
+

@@ -1,0 +1,72 @@
+.bg-orbs {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.4;
+    animation: orb-float 20s infinite ease-in-out alternate;
+  }
+  .orb-1 {
+    width: 60vw; height: 60vw;
+    top: -20vw; left: -10vw;
+    background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+    animation-delay: 0s;
+  }
+  .orb-2 {
+    width: 50vw; height: 50vw;
+    bottom: -10vw; right: -10vw;
+    background: radial-gradient(circle, var(--info-muted), transparent 70%);
+    animation-delay: -5s;
+    animation-duration: 25s;
+  }
+  .orb-3 {
+    width: 40vw; height: 40vw;
+    top: 30vh; left: 40vw;
+    background: radial-gradient(circle, var(--success-muted), transparent 70%);
+    animation-delay: -10s;
+    animation-duration: 30s;
+  }
+
+  @keyframes orb-float {
+    0% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(5%, 10%) scale(1.1); }
+    66% { transform: translate(-5%, 5%) scale(0.9); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+
+  .plasma-app {
+    background: transparent !important;
+  }
+  
+  .sidebar, .topbar {
+    background: var(--glass-bg-strong) !important;
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-right: 1px solid var(--glass-border);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+  
+  .topbar {
+    border-bottom: 1px solid var(--glass-border);
+    border-right: none;
+  }
+
+  .card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
+  }
+
+  .card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow) !important;
+  }

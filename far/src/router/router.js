@@ -10,6 +10,7 @@ export function createRouter({
   return {
     _routes: {},
     _current: null,
+    _routeDisposers: [],
 
     on(path, handler) {
       this._routes[path] = handler;
@@ -21,14 +22,21 @@ export function createRouter({
     },
 
     init() {
-      const handle = () => {
+      const handle = async () => {
         const hash = window.location.hash || '#/';
         const handler = this._routes[hash];
 
         if (this._current === hash) return;
+
+        // Cleanup previous route
+        if (this._routeDisposers) {
+          this._routeDisposers.forEach(fn => { try { fn(); } catch(e) { console.warn('[Router] Cleanup failed', e); } });
+          this._routeDisposers = [];
+        }
+
         this._current = hash;
 
-        // Update active nav (match the actual <a href="#/..."> in index.html)
+        // Update active nav
         if (typeof $$ === 'function') {
           $$('.nav-item').forEach((item) => {
             const href = item.getAttribute('href') || '';
@@ -39,30 +47,49 @@ export function createRouter({
         Progress?.pageBar?.start?.();
 
         const announce = () => {
-          const main = document.getElementById('main-content');
-          main?.focus?.({ preventScroll: true });
-          const region = document.getElementById('aria-announcer');
-          if (region) region.textContent = `Navigated to ${hash.replace('#/', '') || 'home'}`;
+          try {
+            const main = document.getElementById('main-content');
+            main?.focus?.({ preventScroll: true });
+            const region = document.getElementById('aria-announcer');
+            const getLabel = typeof this._getRouteLabel === 'function' ? this._getRouteLabel : h => h.replace('#/', '') || 'home';
+            const label = getLabel(hash);
+            if (region) region.textContent = `Navigated to ${label}`;
+          } catch {}
         };
 
-        if (handler) {
-          Promise.resolve(handler(hash)).then(() => {
-            Progress?.pageBar?.finish?.();
-            announce();
-          });
-        } else {
-          console.warn(`[PlasmaDeck Router] No handler for "${hash}"`);
-          try { getNotFoundView?.()?.(hash); } catch { /* ignore */ }
+        try {
+          const viewResult = handler ? handler(hash) : getNotFoundView?.()?.(hash);
+          const result = await Promise.resolve(viewResult);
+
+          if (result && typeof result === 'object') {
+            const { beforeLeave, unmount } = result;
+            if (typeof beforeLeave === 'function') this._routeDisposers.push(beforeLeave);
+            if (typeof unmount === 'function') this._routeDisposers.push(unmount);
+          }
+
           Progress?.pageBar?.finish?.();
           announce();
+          bus?.emit?.('route:ready', { hash });
+        } catch (error) {
+          console.error(`[PlasmaDeck Router] Error mounting "${hash}":`, error);
+          Progress?.pageBar?.fail?.();
+          
+          // Attempt fallback to 404
+          try { 
+            const fallback = getNotFoundView?.()?.(hash);
+            await Promise.resolve(fallback);
+          } catch { /* critical failure */ }
+          
+          announce();
+          bus?.emit?.('route:ready', { hash, error: String(error) });
+        } finally {
+          bus?.emit?.('route:change', { hash });
         }
-
-        bus?.emit?.('route:change', { hash });
       };
 
       window.addEventListener('hashchange', handle);
-      handle();
+      // Guard initial call
+      try { handle(); } catch(e) { console.error('[Router] Initial handle failed', e); }
     },
   };
 }
-

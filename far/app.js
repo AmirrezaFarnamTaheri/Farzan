@@ -1,5 +1,5 @@
 // ============================================================
-// PlasmaDeck UI — app.js
+// PlasmaDeck UI â€” app.js
 // Complete JavaScript Interaction Layer
 // Version 1.1.2 (keep aligned with package.json)
 // ============================================================
@@ -18,13 +18,14 @@ import {
   uid,
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
+import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
 (() => {
   'use strict';
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 0. NAMESPACE & GLOBAL STATE
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // IMPORTANT: merge into any existing window.PlasmaDeck so earlier modules
   // (e.g. data.js, db.js) are not clobbered.
   const PlasmaDeck = window.PlasmaDeck ?? {};
@@ -87,108 +88,17 @@ import { createRouter } from './src/router/router.js';
   window.PlasmaDeck = PlasmaDeck;
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 1. UTILITIES
-  // ──────────────────────────────────────────────────────────
-
-  /**
-   * Create element with optional attributes and children
-   * @param {string} tag
-   * @param {Object} attrs
-   * @param {...(string|Node)} children
-   * @returns {HTMLElement}
-   */
-  function createElement(tag, attrs = {}, ...children) {
-    const el = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === 'class') {
-        el.className = v;
-      } else if (k.startsWith('data-')) {
-        el.dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
-      } else if (k === 'style' && typeof v === 'object') {
-        Object.assign(el.style, v);
-      } else {
-        el.setAttribute(k, v);
-      }
-    }
-    for (const child of children) {
-      if (child == null) continue;
-      el.append(typeof child === 'string' ? document.createTextNode(child) : child);
-    }
-    return el;
-  }
-
-  /**
-   * Simple event emitter
-   */
-  class EventEmitter {
-    constructor() { this._events = {}; }
-    on(event, fn) {
-      (this._events[event] ??= []).push(fn);
-      return this;
-    }
-    off(event, fn) {
-      if (this._events[event]) {
-        this._events[event] = this._events[event].filter(f => f !== fn);
-      }
-      return this;
-    }
-    emit(event, ...args) {
-      (this._events[event] ?? []).forEach(fn => fn(...args));
-      return this;
-    }
-    once(event, fn) {
-      const wrapper = (...args) => { fn(...args); this.off(event, wrapper); };
-      return this.on(event, wrapper);
-    }
-  }
-
-  // Global event bus
-  PlasmaDeck.bus = new EventEmitter();
-
-  /**
-   * Animate element height from 0 → auto (or auto → 0)
-   * @param {HTMLElement} el
-   * @param {boolean} open   true = expand, false = collapse
-   * @param {number} duration ms
-   * @returns {Promise<void>}
-   */
-  function animateHeight(el, open, duration = PlasmaDeck.config.animationDuration) {
-    return new Promise(resolve => {
-      const startHeight = open ? 0 : el.scrollHeight;
-      const endHeight   = open ? el.scrollHeight : 0;
-
-      el.style.overflow = 'hidden';
-      el.style.height   = `${startHeight}px`;
-      el.style.transition = `height ${duration}ms ease`;
-
-      requestAnimationFrame(() => {
-        el.style.height = `${endHeight}px`;
-        setTimeout(() => {
-          el.style.height   = open ? '' : '0px';
-          el.style.overflow = open ? '' : 'hidden';
-          el.style.transition = '';
-          resolve();
-        }, duration);
-      });
-    });
-  }
-
-
-  // ──────────────────────────────────────────────────────────
+  const createElement = window.DomUtils.createElement;
+  const appendContent = window.DomUtils.appendContent;
+  const esc = window.DomUtils.esc;
   // 2. THEME SYSTEM
-  // ──────────────────────────────────────────────────────────
-  // Extracted into `src/core/themeManager.js` and imported at file top.
-
-  // ──────────────────────────────────────────────────────────
-  // 2b. UI PREFERENCES (accent, density, font scale)
-  // ──────────────────────────────────────────────────────────
-  // Extracted into `src/core/prefs.js` and imported at file top.
-
-
-  // ──────────────────────────────────────────────────────────
+  const ThemeManager = window.ThemeManager;
+  const Prefs = window.Prefs;
+  const FontScale = window.FontScale;
   // 3. SIDEBAR
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Sidebar = {
     // Keep in sync with storageMigrate + index pre-boot.
@@ -205,7 +115,7 @@ import { createRouter } from './src/router/router.js';
 
       // Restore collapsed state
       const collapsed = localStorage.getItem(this.STORAGE_KEY) === 'true';
-      if (collapsed) this._setCollapsed(true, false);
+      if (collapsed) this._setCollapsed(true);
 
       // Collapse toggle button
       document.addEventListener('click', e => {
@@ -245,7 +155,7 @@ import { createRouter } from './src/router/router.js';
       this._setCollapsed(!PlasmaDeck.state.sidebarCollapsed);
     },
 
-    _setCollapsed(collapsed, animate = true) {
+    _setCollapsed(collapsed) {
       PlasmaDeck.state.sidebarCollapsed = collapsed;
       localStorage.setItem(this.STORAGE_KEY, String(collapsed));
 
@@ -356,14 +266,16 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
-  // 4. TOPBAR — SEARCH
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 4. TOPBAR â€” SEARCH
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const TopbarSearch = {
     input: null,
     resultsBox: null,
     _data: [],
+    _universalData: null,
+    _hasDataOverride: false,
 
     init() {
       this.input = $('.topbar-search input, .topbar-search [data-search-input]');
@@ -389,56 +301,226 @@ import { createRouter } from './src/router/router.js';
     },
 
     /**
-     * Provide data for client-side search (optional — falls back to server fetch)
+     * Provide data for client-side search (optional â€” falls back to server fetch)
      */
     setData(data) {
-      this._data = data;
+      this._data = Array.isArray(data) ? data : [];
+      this._universalData = null;
+      this._hasDataOverride = true;
     },
 
     async _onInput(value) {
       if (value.trim().length < 2) { this._close(); return; }
 
       let results;
-      if (this._data.length) {
+      if (this._hasDataOverride) {
         // Client-side filter
         const q = value.toLowerCase();
         results = this._data.filter(item =>
           item.label?.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q)
         ).slice(0, 8);
       } else {
-        // Optionally fetch from API
-        PlasmaDeck.bus.emit('search:query', { value, setResults: r => (results = r) });
-        results ??= [];
+        results = await this._queryUniversal(value);
       }
 
       this._render(results, value);
     },
 
+    async _queryUniversal(value) {
+      const q = String(value || '').trim().toLowerCase();
+      if (!q) return [];
+      const data = await this._loadUniversalData();
+      const eventPayload = { value, setResults: r => { if (Array.isArray(r)) data.push(...r); } };
+      PlasmaDeck.bus.emit('search:query', eventPayload);
+      const lexical = data
+        .filter((item) => {
+          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
+          return haystack.includes(q);
+        })
+        .slice(0, 12);
+      const semantic = await this._querySemanticNotes(value, data);
+      const seen = new Set(lexical.map(item => item.id || `${item.category}:${item.label}`));
+      return [
+        ...lexical,
+        ...semantic.filter(item => {
+          const key = item.id || `${item.category}:${item.label}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }),
+      ].slice(0, 12);
+    },
+
+    async _querySemanticNotes(value, data = []) {
+      const ai = window.PlasmaDeck?.AI;
+      if (!ai?.upsertEmbedding || !ai?.searchEmbeddings) return [];
+      const notes = data.filter(item => item.sourceType === 'note' && item.sourceId);
+      if (!notes.length) return [];
+      try {
+        await Promise.all(notes.map(item => ai.upsertEmbedding({
+          id: item.sourceId,
+          text: `${item.label || ''}\n${item.searchText || item.description || ''}`,
+          metadata: { type: 'note', title: item.label || '', href: item.href || '#/notes' },
+        })));
+        const hits = await ai.searchEmbeddings(value, { limit: 4 });
+        const byId = new Map(notes.map(item => [item.sourceId, item]));
+        return hits.map(hit => {
+          const item = byId.get(hit.id);
+          if (!item) return null;
+          return {
+            ...item,
+            id: `semantic-note:${item.sourceId}`,
+            icon: '🧠',
+            category: 'Semantic note',
+            description: `Semantic match${hit.score ? ` · ${Math.round(hit.score * 100)}%` : ''}`,
+          };
+        }).filter(Boolean);
+      } catch {
+        return [];
+      }
+    },
+
+    async _loadUniversalData() {
+      if (Array.isArray(this._universalData)) return [...this._universalData];
+      const [catalog, notes, timestamps, annotations] = await Promise.all([
+        (async () => {
+          try {
+            await window.DataStore?.init?.();
+            return {
+              courses: window.DataStore?.allCourses?.() ?? [],
+              topics: window.DataStore?.allTopics?.() ?? [],
+            };
+          } catch {
+            return { courses: [], topics: [] };
+          }
+        })(),
+        (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
+        (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
+        (async () => { try { return await window.DB?.getAllAnnotations?.() ?? []; } catch { return []; } })(),
+      ]);
+      const results = [];
+      (catalog.courses || []).forEach((course) => {
+        if (!course?.id) return;
+        results.push({
+          icon: '📚',
+          label: String(course.title || course.name || course.id),
+          description: 'Course',
+          category: 'Course',
+          href: '#/courses',
+        });
+      });
+      (catalog.topics || []).forEach((topic) => {
+        if (!topic?.topicId) return;
+        const title = String(topic.title || topic.topicTitle || topic.topicId);
+        const source = String(topic.sourceLabel || topic.courseTitle || topic.courseId || 'Catalog topic');
+        results.push({
+          icon: topic.pdfs?.length ? '📄' : topic.videos?.length ? '▶' : '🔎',
+          label: title,
+          description: source,
+          category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
+          href: '#/courses',
+          action: () => {
+            setPendingCourseMedia(topic.topicId);
+          },
+        });
+      });
+      (notes || []).forEach((note) => {
+        if (!note?.id) return;
+        results.push({
+          id: `note:${note.id}`,
+          icon: '📝',
+          label: String(note.title || 'Untitled note'),
+          description: note.topicId ? `Linked to ${note.topicId}` : 'Note',
+          searchText: this._plainText(note.content || note.text || ''),
+          sourceType: 'note',
+          sourceId: note.id,
+          category: 'Note',
+          href: '#/notes',
+        });
+      });
+      (timestamps || []).forEach((timestamp) => {
+        const target = timestamp?.topicId || timestamp?.id;
+        if (!target) return;
+        results.push({
+          icon: '⏱',
+          label: String(timestamp.title || timestamp.topicTitle || target),
+          description: timestamp.position != null ? `Timestamp at ${this._formatDuration(timestamp.position)}` : 'Saved timestamp',
+          category: 'Timestamp',
+          href: '#/courses',
+          action: () => {
+            setPendingCourseMedia(target, timestamp.position);
+          },
+        });
+      });
+      (annotations || []).forEach((annotation) => {
+        const target = annotation?.docId || annotation?.id;
+        if (!target) return;
+        results.push({
+          icon: '✏',
+          label: String(annotation.title || annotation.text || target),
+          description: `PDF annotation${annotation.page ? ` · page ${annotation.page}` : ''}`,
+          category: 'PDF annotation',
+          href: '#/pdf',
+        });
+      });
+      this._universalData = results;
+      return [...results];
+    },
+
+    _formatDuration(seconds) {
+      const total = Math.max(0, Math.floor(Number(seconds) || 0));
+      const minutes = Math.floor(total / 60);
+      const secs = total % 60;
+      return `${minutes}:${String(secs).padStart(2, '0')}`;
+    },
+
+    _plainText(value) {
+      if (value == null) return '';
+      if (value instanceof Node) return (value.textContent || value.innerText || '').replace(/\s+/g, ' ').trim();
+      const s = String(value);
+      if (!s.includes('<') && !s.includes('&')) return s.replace(/\s+/g, ' ').trim();
+      try {
+        const doc = new DOMParser().parseFromString(s, 'text/html');
+        return (doc.body.textContent || doc.body.innerText || '').replace(/\s+/g, ' ').trim();
+      } catch {
+        return s.replace(/\s+/g, ' ').trim();
+      }
+    },
+
     _render(results, query) {
-      this.resultsBox.innerHTML = '';
+      this.resultsBox.replaceChildren();
       if (!results.length) {
-        this.resultsBox.innerHTML =
-          `<div class="search-no-results">No results for "<strong>${this._escHtml(query)}</strong>"</div>`;
+        const empty = createElement('div', { class: 'search-no-results' }, 'No results for "');
+        empty.appendChild(createElement('strong', {}, query));
+        empty.appendChild(document.createTextNode('"'));
+        this.resultsBox.appendChild(empty);
       } else {
         results.forEach((item, i) => {
-          const highlighted = this._highlight(item.label ?? '', query);
           const el = createElement('div', {
             class: 'search-result-item',
             role: 'option',
             tabindex: '-1',
             'data-index': String(i),
           });
-          el.innerHTML = `
-            <span class="search-result-icon">${item.icon ?? '🔍'}</span>
-            <span class="search-result-text">
-              <span class="search-result-label">${highlighted}</span>
-              ${item.description ? `<span class="search-result-desc">${this._escHtml(item.description)}</span>` : ''}
-            </span>
-            ${item.category ? `<span class="search-result-cat">${this._escHtml(item.category)}</span>` : ''}
-          `;
+          const icon = createElement('span', { class: 'search-result-icon' }, item.icon ?? 'Search');
+          const text = createElement('span', { class: 'search-result-text' });
+          const label = createElement('span', { class: 'search-result-label' });
+          this._appendHighlighted(label, item.label ?? '', query);
+          text.appendChild(label);
+          if (item.description) {
+            text.appendChild(createElement('span', { class: 'search-result-desc' }, item.description));
+          }
+          el.append(icon, text);
+          if (item.category) {
+            el.appendChild(createElement('span', { class: 'search-result-cat' }, item.category));
+          }
           el.addEventListener('click', () => {
             PlasmaDeck.bus.emit('search:select', item);
-            if (item.href) window.location.href = item.href;
+            if (typeof item.action === 'function') {
+              try { item.action(item); } catch (e) { console.warn('[TopbarSearch] select action failed', e); }
+            }
+            const href = safeNavigationUrl(item.href);
+            if (href) window.location.href = href;
             this._close();
           });
           this.resultsBox.appendChild(el);
@@ -480,10 +562,26 @@ import { createRouter } from './src/router/router.js';
       $$('.search-result-item', this.resultsBox).forEach(el => el.removeAttribute('aria-selected'));
     },
 
-    _highlight(text, query) {
-      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return text.replace(new RegExp(`(${escaped})`, 'gi'),
-        '<mark class="search-highlight">$1</mark>');
+    _appendHighlighted(parent, text, query) {
+      const source = (text instanceof Node ? text.textContent : String(text || ''));
+      const needle = String(query ?? '').trim();
+      if (!needle) {
+        parent.textContent = source;
+        return;
+      }
+      const lower = source.toLowerCase();
+      const q = needle.toLowerCase();
+      let cursor = 0;
+      while (cursor < source.length) {
+        const idx = lower.indexOf(q, cursor);
+        if (idx === -1) {
+          parent.appendChild(document.createTextNode(source.slice(cursor)));
+          break;
+        }
+        if (idx > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, idx)));
+        parent.appendChild(createElement('mark', { class: 'search-highlight' }, source.slice(idx, idx + q.length)));
+        cursor = idx + q.length;
+      }
     },
 
     _escHtml(str) {
@@ -492,9 +590,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 5. RIPPLE EFFECT (Buttons)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Ripple = {
     init() {
@@ -533,349 +631,13 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 6. MODALS & DRAWERS
-  // ──────────────────────────────────────────────────────────
-
-  const Modal = {
-    _cleanupFns: new Map(),
-    _previousFocus: new WeakMap(),
-
-    /**
-     * Open a modal by its ID or element reference
-     * @param {string|HTMLElement} target
-     * @param {Object} [opts]
-     */
-    open(target, opts = {}) {
-      const modal = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!modal) return;
-      if (modal.classList.contains('open')) return;
-
-      // Backdrop
-      let backdrop = modal.previousElementSibling;
-      if (!backdrop?.classList.contains('modal-backdrop')) {
-        backdrop = createElement('div', { class: 'modal-backdrop', 'aria-hidden': 'true' });
-        modal.parentNode.insertBefore(backdrop, modal);
-      }
-
-      modal.removeAttribute('hidden');
-      modal.setAttribute('aria-modal', 'true');
-      modal.setAttribute('role', 'dialog');
-      modal.setAttribute('tabindex', '-1');
-
-      requestAnimationFrame(() => {
-        backdrop.classList.add('open');
-        modal.classList.add('open');
-      });
-
-      document.body.style.overflow = 'hidden';
-      PlasmaDeck.state.openModals.push(modal);
-      this._previousFocus.set(modal, document.activeElement);
-      setAppInert(true);
-
-      // Trap focus
-      const cleanup = trapFocus(modal);
-      this._cleanupFns.set(modal, cleanup);
-
-      // Close on backdrop click
-      backdrop.addEventListener('click', () => this.close(modal), { once: true });
-
-      // Close on Escape
-      const onEsc = e => { if (e.key === 'Escape') this.close(modal); };
-      document.addEventListener('keydown', onEsc);
-      this._cleanupFns.set(modal, () => {
-        cleanup();
-        document.removeEventListener('keydown', onEsc);
-      });
-
-      // Wire close buttons inside modal
-      $$('[data-modal-close]', modal).forEach(btn => {
-        btn.addEventListener('click', () => this.close(modal), { once: true });
-      });
-
-      PlasmaDeck.bus.emit('modal:open', { modal, opts });
-    },
-
-    /**
-     * Close a modal
-     */
-    close(target) {
-      const modal = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!modal) return;
-      if (!modal.classList.contains('open')) return;
-
-      const backdrop = modal.previousElementSibling;
-      modal.classList.remove('open');
-      if (backdrop?.classList.contains('modal-backdrop')) {
-        backdrop.classList.remove('open');
-      }
-
-      setTimeout(() => {
-        modal.setAttribute('hidden', '');
-        modal.removeAttribute('aria-modal');
-        if (backdrop?.classList.contains('modal-backdrop')) {
-          backdrop.remove();
-        }
-      }, PlasmaDeck.config.animationDuration);
-
-      PlasmaDeck.state.openModals = PlasmaDeck.state.openModals.filter(m => m !== modal);
-
-      if (!PlasmaDeck.state.openModals.length) {
-        document.body.style.overflow = '';
-      }
-
-      // Cleanup focus trap
-      const cleanup = this._cleanupFns.get(modal);
-      if (cleanup) { cleanup(); this._cleanupFns.delete(modal); }
-      setAppInert(false);
-      restoreFocus(this._previousFocus.get(modal));
-      this._previousFocus.delete(modal);
-
-      modal.dispatchEvent(new CustomEvent('modal:close', { detail: { modal } }));
-      PlasmaDeck.bus.emit('modal:close', { modal });
-    },
-
-    /**
-     * Create and open a modal programmatically
-     */
-    create({
-      title    = '',
-      body     = '',
-      footer   = '',
-      size     = '',          // 'sm' | 'lg' | 'xl' | 'fullscreen'
-      onClose  = null,
-      onConfirm = null,
-    } = {}) {
-      const id    = uid('modal');
-      const sizeClass = size ? `modal-${size}` : '';
-
-      const closeBtn = createElement('button', {
-        class: 'modal-close-btn',
-        'aria-label': 'Close dialog',
-        'data-modal-close': '',
-      }, '×');
-
-      const header = title
-        ? createElement('div', { class: 'modal-header' },
-            createElement('h3', { class: 'modal-title' }, title),
-            closeBtn)
-        : closeBtn;
-
-      const bodyEl = createElement('div', { class: 'modal-body' });
-      if (typeof body === 'string') bodyEl.innerHTML = body;
-      else bodyEl.appendChild(body);
-
-      const children = [header, bodyEl];
-
-      if (footer || onConfirm) {
-        const footerEl = createElement('div', { class: 'modal-footer' });
-        if (typeof footer === 'string' && footer) {
-          footerEl.innerHTML = footer;
-        } else if (onConfirm) {
-          const cancelBtn = createElement('button', { class: 'btn btn-ghost', 'data-modal-close': '' }, 'Cancel');
-          const confirmBtn = createElement('button', { class: 'btn btn-primary' }, 'Confirm');
-          confirmBtn.addEventListener('click', () => {
-            onConfirm();
-            this.close(modal);
-          });
-          footerEl.append(cancelBtn, confirmBtn);
-        }
-        children.push(footerEl);
-      }
-
-      const modal = createElement('div',
-        { id, class: `modal-container ${sizeClass}`, hidden: '' },
-        ...children
-      );
-
-      if (onClose) modal.addEventListener('modal:close', onClose, { once: true });
-
-      document.body.appendChild(modal);
-
-      // Auto-remove from DOM after closing
-      PlasmaDeck.bus.on('modal:close', ({ modal: m }) => {
-        if (m === modal) setTimeout(() => modal.remove(), 400);
-      });
-
-      this.open(modal);
-      return modal;
-    },
-
-    /**
-     * Confirm dialog shorthand
-     */
-    confirm({ title = 'Are you sure?', message = '', onConfirm = () => {}, confirmLabel = 'Confirm', cancelLabel = 'Cancel' } = {}) {
-      const modal = this.create({
-        title,
-        body: createElement('p', {}, String(message ?? '')),
-        footer: '',
-      });
-      const footer = $('.modal-footer', modal) ?? createElement('div', { class: 'modal-footer' });
-      if (!footer.isConnected) modal.appendChild(footer);
-      footer.replaceChildren();
-      const cancelBtn = createElement('button', { class: 'btn btn-ghost', 'data-modal-close': '' }, cancelLabel);
-      const confirmBtn = createElement('button', { class: 'btn btn-primary' }, confirmLabel);
-      confirmBtn.addEventListener('click', () => {
-        onConfirm();
-        this.close(modal);
-      });
-      footer.append(cancelBtn, confirmBtn);
-      return modal;
-    },
-
-    confirmAsync({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel' } = {}) {
-      return new Promise((resolve) => {
-        let settled = false;
-        const settle = (value) => {
-          if (settled) return;
-          settled = true;
-          resolve(value);
-        };
-        const modal = this.create({
-          title,
-          body: createElement('p', {}, String(message ?? '')),
-          footer: '',
-        });
-        const footer = $('.modal-footer', modal) ?? createElement('div', { class: 'modal-footer' });
-        if (!footer.isConnected) modal.appendChild(footer);
-        footer.replaceChildren();
-        const cancelBtn = createElement('button', { class: 'btn btn-ghost' }, cancelLabel);
-        const confirmBtn = createElement('button', { class: 'btn btn-primary' }, confirmLabel);
-        cancelBtn.addEventListener('click', () => {
-          settle(false);
-          this.close(modal);
-        });
-        confirmBtn.addEventListener('click', () => {
-          settle(true);
-          this.close(modal);
-        });
-        PlasmaDeck.bus.once('modal:close', ({ modal: closed }) => {
-          if (closed === modal) settle(false);
-        });
-        footer.append(cancelBtn, confirmBtn);
-      });
-    },
-
-    /**
-     * Init data-attribute driven modals
-     */
-    init() {
-      document.addEventListener('click', e => {
-        const target = eventTargetEl(e);
-        if (!target) return;
-        const trigger = target.closest('[data-modal-open]');
-        if (trigger) {
-          e.preventDefault();
-          this.open(trigger.dataset.modalOpen);
-        }
-        const closeBtn = target.closest('[data-modal-close]');
-        if (closeBtn) {
-          const modal = closeBtn.closest('.modal-container, .drawer');
-          if (modal) this.close(modal);
-        }
-      });
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
+  const Modal = window.Modal;
   // 7. DRAWERS
-  // ──────────────────────────────────────────────────────────
-
-  const Drawer = {
-    _cleanupFns: new WeakMap(),
-    _previousFocus: new WeakMap(),
-
-    open(target) {
-      const drawer = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!drawer) return;
-      if (drawer.classList.contains('open')) return;
-
-      let backdrop = $('.drawer-backdrop');
-      if (!backdrop) {
-        backdrop = createElement('div', { class: 'drawer-backdrop' });
-        document.body.appendChild(backdrop);
-        backdrop.addEventListener('click', () => this.closeAll());
-      }
-
-      drawer.removeAttribute('hidden');
-      drawer.setAttribute('aria-hidden', 'false');
-      requestAnimationFrame(() => {
-        backdrop.classList.add('open');
-        drawer.classList.add('open');
-      });
-
-      document.body.style.overflow = 'hidden';
-      this._previousFocus.set(drawer, document.activeElement);
-      setAppInert(true);
-      this._cleanupFns.set(drawer, trapFocus(drawer));
-
-      PlasmaDeck.bus.emit('drawer:open', { drawer });
-    },
-
-    close(target) {
-      const drawer = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!drawer) return;
-      if (!drawer.classList.contains('open')) return;
-
-      drawer.classList.remove('open');
-      setTimeout(() => {
-        drawer.setAttribute('hidden', '');
-        drawer.setAttribute('aria-hidden', 'true');
-      }, PlasmaDeck.config.animationDuration);
-
-      const backdrop = $('.drawer-backdrop');
-      if (backdrop) {
-        backdrop.classList.remove('open');
-        setTimeout(() => backdrop.remove(), PlasmaDeck.config.animationDuration);
-      }
-
-      document.body.style.overflow = '';
-      this._cleanupFns.get(drawer)?.();
-      this._cleanupFns.delete(drawer);
-      setAppInert(false);
-      restoreFocus(this._previousFocus.get(drawer));
-      this._previousFocus.delete(drawer);
-      PlasmaDeck.bus.emit('drawer:close', { drawer });
-    },
-
-    closeAll() {
-      $$('.drawer.open').forEach(d => this.close(d));
-    },
-
-    init() {
-      document.addEventListener('click', e => {
-        const target = eventTargetEl(e);
-        if (!target) return;
-        const trigger = target.closest('[data-drawer-open]');
-        if (trigger) { e.preventDefault(); this.open(trigger.dataset.drawerOpen); }
-
-        const closeBtn = target.closest('[data-drawer-close]');
-        if (closeBtn) {
-          const drawer = closeBtn.closest('.drawer');
-          if (drawer) this.close(drawer);
-        }
-      });
-
-      // Close on Escape
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') this.closeAll();
-      });
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
+  const Drawer = window.Drawer;
   // 8. DROPDOWN MENUS
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Dropdown = {
     _active: null,
@@ -980,9 +742,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 9. TABS
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Tabs = {
     init() {
@@ -990,7 +752,7 @@ import { createRouter } from './src/router/router.js';
       $$('.tab-list').forEach(list => {
         const active = $('.tab-item[aria-selected="true"]', list)
           ?? $('.tab-item', list);
-        if (active) this._activate(active, false);
+        if (active) this._activate(active);
       });
 
       // Click handler
@@ -1034,7 +796,7 @@ import { createRouter } from './src/router/router.js';
       });
     },
 
-    _activate(tab, animate = true) {
+    _activate(tab) {
       const list  = tab.closest('.tab-list');
       const panel = tab.getAttribute('data-tab-target')
         ? document.getElementById(tab.getAttribute('data-tab-target'))
@@ -1079,9 +841,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 10. ACCORDION
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Accordion = {
     init() {
@@ -1142,157 +904,78 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 11. TOAST NOTIFICATIONS
-  // ──────────────────────────────────────────────────────────
+  const Toast = window.Toast;
+  // 12. FORMS â€” Validation, Inputs, Toggles, Range
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  const Toast = {
-    _containers: {},
-
-    /**
-     * Show a toast
-     * @param {Object} opts
-     * @param {string} opts.message
-     * @param {'info'|'success'|'warning'|'error'} opts.type
-     * @param {number} opts.duration  ms (0 = persistent)
-     * @param {'top-right'|'top-left'|'top-center'|'bottom-right'|'bottom-left'|'bottom-center'} opts.position
-     * @param {boolean} opts.dismissible
-     * @param {string} opts.title
-     * @param {string} opts.action  HTML string for action button area
-     * @returns {HTMLElement} the toast element
-     */
-    show({
-      message     = '',
-      type        = 'info',
-      duration    = PlasmaDeck.config.toastDuration,
-      position    = 'top-right',
-      dismissible = true,
-      title       = '',
-      action      = '',
-    } = {}) {
-      const container = this._getContainer(position);
-
-      // Enforce max stack
-      const stack = $$('.toast', container);
-      if (stack.length >= PlasmaDeck.config.toastMaxStack) {
-        stack[0].remove();
-      }
-
-      const id   = uid('toast');
-      const icon = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' }[type] ?? 'ℹ️';
-
-      const toast = createElement('div', {
-        id,
-        class: `toast toast-${type}`,
-        role: type === 'error' ? 'alert' : 'status',
-        'aria-live': type === 'error' ? 'assertive' : 'polite',
-        'aria-atomic': 'true',
-      });
-
-      toast.innerHTML = `
-        <span class="toast-icon" aria-hidden="true">${icon}</span>
-        <div class="toast-content">
-          ${title ? `<div class="toast-title">${this._escHtml(title)}</div>` : ''}
-          <div class="toast-message">${this._escHtml(message)}</div>
-          ${action}
-        </div>
-        ${dismissible ? `<button class="toast-close" aria-label="Dismiss notification">×</button>` : ''}
-        ${duration > 0 ? `<div class="toast-timer"></div>` : ''}
-      `;
-
-      // Close button
-      const closeBtn = toast.querySelector('.toast-close');
-      if (closeBtn) closeBtn.addEventListener('click', () => this.dismiss(toast));
-
-      // Timer bar
-      if (duration > 0) {
-        const timerBar = toast.querySelector('.toast-timer');
-        timerBar.style.animationDuration = `${duration}ms`;
-        timerBar.classList.add('running');
-      }
-
-      // Pause on hover
-      let dismissTimeout;
-      const startDismiss = () => {
-        if (duration > 0) {
-          dismissTimeout = setTimeout(() => this.dismiss(toast), duration);
-        }
-      };
-      toast.addEventListener('mouseenter', () => clearTimeout(dismissTimeout));
-      toast.addEventListener('mouseleave', startDismiss);
-
-      container.appendChild(toast);
-
-      // Entrance animation
-      requestAnimationFrame(() => toast.classList.add('show'));
-
-      startDismiss();
-
-      PlasmaDeck.state.activeToasts.push(toast);
-      PlasmaDeck.bus.emit('toast:show', { toast, type, message });
-
-      return toast;
-    },
-
-    dismiss(toast) {
-      toast.classList.remove('show');
-      toast.classList.add('hide');
-      toast.addEventListener('animationend', () => {
-        toast.remove();
-        PlasmaDeck.state.activeToasts = PlasmaDeck.state.activeToasts.filter(t => t !== toast);
-        PlasmaDeck.bus.emit('toast:dismiss', { toast });
-      }, { once: true });
-    },
-
-    dismissAll() {
-      [...PlasmaDeck.state.activeToasts].forEach(t => this.dismiss(t));
-    },
-
-    // Convenience shortcuts
-    info   (msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'info' }); },
-    success(msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'success' }); },
-    warning(msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'warning' }); },
-    error  (msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'error', duration: 0 }); },
-
-    _getContainer(position) {
-      if (this._containers[position]) return this._containers[position];
-
-      const container = createElement('div', {
-        class:       `toast-container toast-${position}`,
-        'aria-live': 'polite',
-        'aria-relevant': 'additions',
-      });
-      document.body.appendChild(container);
-      this._containers[position] = container;
-      return container;
-    },
-
-    _escHtml(str) {
-      return String(str).replace(/[&<>"']/g, m =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-    },
+  const StorageAlerts = {
+    _seen: new Set(),
+    _dbVersionPrompted: false,
 
     init() {
-      // Wire any static [data-toast] trigger buttons
-      document.addEventListener('click', e => {
-        const target = eventTargetEl(e);
-        if (!target) return;
-        const btn = target.closest('[data-toast]');
-        if (!btn) return;
-        this.show({
-          message:  btn.dataset.toastMessage  ?? btn.textContent.trim(),
-          type:     btn.dataset.toastType     ?? 'info',
-          title:    btn.dataset.toastTitle    ?? '',
-          position: btn.dataset.toastPosition ?? 'top-right',
+      const keyFor = (detail = {}) => [
+        detail.kind || 'unknown',
+        detail.backend || 'storage',
+        detail.error?.name || '',
+        detail.error?.message || '',
+        detail.error?.quota ? 'quota' : 'transient',
+      ].join('|');
+
+      const showSaveError = (detail = {}) => {
+        if (!detail?.error?.quota) return;
+        const key = keyFor(detail);
+        if (this._seen.has(key)) return;
+        this._seen.add(key);
+        Toast.show({
+          type: 'error',
+          duration: 0,
+          title: 'Storage full',
+          message: 'PlasmaDeck cannot save this change because browser storage is full. Export your data, then clear browser storage before continuing.',
         });
-      });
+      };
+
+      const showFallback = (detail = {}) => {
+        if (detail?.error?.quota) return;
+        const key = keyFor(detail);
+        if (this._seen.has(key)) return;
+        this._seen.add(key);
+        Toast.show({
+          type: 'warning',
+          duration: 8000,
+          title: 'Storage fallback used',
+          message: 'IndexedDB did not accept a save, so PlasmaDeck used the browser fallback. Export a backup soon if this repeats.',
+        });
+      };
+
+      const showDbVersionChange = () => {
+        if (this._dbVersionPrompted) return;
+        this._dbVersionPrompted = true;
+        const reloadWrap = createElement('div', { style: { marginTop: '8px' } });
+        const reloadBtn = createElement('button', { class: 'btn btn-primary btn-sm', 'data-db-reload': '' }, 'Reload');
+        reloadWrap.appendChild(reloadBtn);
+        const toast = Toast.show({
+          type: 'warning',
+          duration: 0,
+          title: 'Refresh required',
+          message: 'Another PlasmaDeck tab upgraded the local database. Reload this tab before saving more changes.',
+          action: reloadWrap,
+        });
+        toast?.querySelector?.('[data-db-reload]')?.addEventListener?.('click', () => window.location.reload());
+      };
+
+      PlasmaDeck.bus.on?.('storage:save-error', showSaveError);
+      PlasmaDeck.bus.on?.('storage:fallback', showFallback);
+      PlasmaDeck.bus.on?.('db:versionchange', showDbVersionChange);
+      if (window.__pdDbVersionChangeHandler) {
+        window.removeEventListener?.('plasma:db-versionchange', window.__pdDbVersionChangeHandler);
+      }
+      window.__pdDbVersionChangeHandler = showDbVersionChange;
+      window.addEventListener?.('plasma:db-versionchange', showDbVersionChange);
+      if (window.PlasmaDeck?.lastStorageIssue) showSaveError(window.PlasmaDeck.lastStorageIssue);
     },
   };
-
-
-  // ──────────────────────────────────────────────────────────
-  // 12. FORMS — Validation, Inputs, Toggles, Range
-  // ──────────────────────────────────────────────────────────
 
   const Forms = {
     init() {
@@ -1303,7 +986,7 @@ import { createRouter } from './src/router/router.js';
       this._initFileInputs();
     },
 
-    // ── Inline validation ──────────────────────────────────
+    // â”€â”€ Inline validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initValidation() {
       document.addEventListener('blur', e => {
         const target = eventTargetEl(e);
@@ -1318,6 +1001,7 @@ import { createRouter } from './src/router/router.js';
         if (!target) return;
         const form = target.closest('form[data-validate]');
         if (!form) return;
+        if (e.submitter?.formNoValidate) return;
         const valid = this._validateForm(form);
         if (!valid) e.preventDefault();
       });
@@ -1367,7 +1051,7 @@ import { createRouter } from './src/router/router.js';
       return inputs.every(input => this._validateField(input));
     },
 
-    // ── Password visibility toggle ────────────────────────
+    // â”€â”€ Password visibility toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initPasswordToggles() {
       document.addEventListener('click', e => {
         const target = eventTargetEl(e);
@@ -1383,11 +1067,11 @@ import { createRouter } from './src/router/router.js';
         input.type = isVisible ? 'password' : 'text';
         btn.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
         const icon = btn.querySelector('[data-icon]');
-        if (icon) icon.textContent = isVisible ? '👁️' : '🙈';
+        if (icon) icon.textContent = isVisible ? 'Show' : 'Hide';
       });
     },
 
-    // ── Range sliders ─────────────────────────────────────
+    // â”€â”€ Range sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initRangeSliders() {
       $$('input[type="range"][data-range]').forEach(range => {
         const output = document.getElementById(range.dataset.output)
@@ -1402,7 +1086,7 @@ import { createRouter } from './src/router/router.js';
       });
     },
 
-    // ── Character counters ────────────────────────────────
+    // â”€â”€ Character counters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initCharCounters() {
       $$('[data-char-count]').forEach(input => {
         const max     = input.maxLength;
@@ -1420,7 +1104,7 @@ import { createRouter } from './src/router/router.js';
       });
     },
 
-    // ── Custom file inputs ────────────────────────────────
+    // â”€â”€ Custom file inputs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initFileInputs() {
       $$('[data-file-input]').forEach(wrapper => {
         const input   = $('input[type="file"]', wrapper);
@@ -1453,9 +1137,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
-  // 13. TABLES — Sorting, Selection, Pagination
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 13. TABLES â€” Sorting, Selection, Pagination
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Tables = {
     init() {
@@ -1465,7 +1149,7 @@ import { createRouter } from './src/router/router.js';
       this._initSearch();
     },
 
-    // ── Column sorting ────────────────────────────────────
+    // â”€â”€ Column sorting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initSorting() {
       document.addEventListener('click', e => {
         const target = eventTargetEl(e);
@@ -1499,9 +1183,16 @@ import { createRouter } from './src/router/router.js';
           const bVal  = bCell?.dataset.value ?? bCell?.textContent.trim() ?? '';
 
           if (numeric) {
+            const aNum = parseFloat(aVal);
+            const bNum = parseFloat(bVal);
+            const aOk = Number.isFinite(aNum);
+            const bOk = Number.isFinite(bNum);
+            if (!aOk && !bOk) return 0;
+            if (!aOk) return 1;
+            if (!bOk) return -1;
             return dir === 'asc'
-              ? parseFloat(aVal) - parseFloat(bVal)
-              : parseFloat(bVal) - parseFloat(aVal);
+              ? aNum - bNum
+              : bNum - aNum;
           }
           return dir === 'asc'
             ? aVal.localeCompare(bVal)
@@ -1513,7 +1204,7 @@ import { createRouter } from './src/router/router.js';
       });
     },
 
-    // ── Row selection ─────────────────────────────────────
+    // â”€â”€ Row selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initRowSelection() {
       document.addEventListener('change', e => {
         const target = eventTargetEl(e);
@@ -1556,7 +1247,7 @@ import { createRouter } from './src/router/router.js';
       if (countEl) countEl.textContent = count;
     },
 
-    // ── Client-side pagination ────────────────────────────
+    // â”€â”€ Client-side pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initPagination() {
       $$('[data-pagination]').forEach(nav => {
         const tableId = nav.dataset.pagination;
@@ -1585,7 +1276,7 @@ import { createRouter } from './src/router/router.js';
 
     _renderPageButtons(nav, pages, current, onPage) {
       const ul = nav.querySelector('.pagination-list') ?? nav;
-      ul.innerHTML = '';
+      ul.replaceChildren();
 
       const mkBtn = (label, page, disabled = false, active = false) => {
         const li  = createElement('li', { class: 'page-item' + (active ? ' active' : '') + (disabled ? ' disabled' : '') });
@@ -1596,7 +1287,7 @@ import { createRouter } from './src/router/router.js';
         return li;
       };
 
-      ul.appendChild(mkBtn('‹', current - 1, current === 1));
+      ul.appendChild(mkBtn('â€¹', current - 1, current === 1));
 
       // Ellipsis logic
       const range = this._pageRange(current, pages);
@@ -1604,13 +1295,13 @@ import { createRouter } from './src/router/router.js';
       range.forEach(p => {
         if (prev !== null && p - prev > 1) {
           ul.appendChild(createElement('li', { class: 'page-item page-ellipsis' },
-            createElement('span', {}, '…')));
+            createElement('span', {}, 'â€¦')));
         }
         ul.appendChild(mkBtn(p, p, false, p === current));
         prev = p;
       });
 
-      ul.appendChild(mkBtn('›', current + 1, current === pages));
+      ul.appendChild(mkBtn('â€º', current + 1, current === pages));
     },
 
     _pageRange(current, total, delta = 2) {
@@ -1623,7 +1314,7 @@ import { createRouter } from './src/router/router.js';
       return range;
     },
 
-    // ── Per-table search filter ───────────────────────────
+    // â”€â”€ Per-table search filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initSearch() {
       $$('[data-table-search]').forEach(input => {
         const tableId = input.dataset.tableSearch;
@@ -1660,9 +1351,9 @@ import { createRouter } from './src/router/router.js';
     },
   };
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 13b. LIST PAGINATION (cards/lists, not tables)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Paginator = {
     paginate(items, { page = 1, perPage = 50 } = {}) {
@@ -1674,27 +1365,65 @@ import { createRouter } from './src/router/router.js';
     },
     renderControls(container, { page, pages, total, perPage, perPageOptions = [25, 50, 100, 200], onChange }) {
       if (!container) return;
-      const mkBtn = (label, nextPage, disabled) => `
-        <button class="btn btn-ghost btn-sm" ${disabled ? 'disabled' : ''} data-page="${nextPage}">
-          ${label}
-        </button>`;
-      container.innerHTML = `
-        <div class="card card-ghost" style="padding:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div class="text-sm" style="opacity:.8">
-              ${total.toLocaleString()} items • Page <strong>${page}</strong> / ${pages}
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <label class="text-sm" style="opacity:.75">Per page</label>
-              <select class="select input-sm" data-per-page>
-                ${perPageOptions.map(n => `<option value="${n}" ${n === perPage ? 'selected' : ''}>${n}</option>`).join('')}
-              </select>
-              ${mkBtn('‹ Prev', page - 1, page <= 1)}
-              ${mkBtn('Next ›', page + 1, page >= pages)}
-            </div>
-          </div>
-        </div>
-      `;
+      const mkBtn = (label, nextPage, disabled) => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-ghost btn-sm';
+        button.disabled = Boolean(disabled);
+        button.dataset.page = String(nextPage);
+        button.textContent = label;
+        return button;
+      };
+
+      const card = document.createElement('div');
+      card.className = 'card card-ghost';
+      card.style.padding = '12px';
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
+      row.style.gap = '12px';
+      row.style.flexWrap = 'wrap';
+
+      const summary = document.createElement('div');
+      summary.className = 'text-sm';
+      summary.style.opacity = '.8';
+      summary.append(`${total.toLocaleString()} items • Page `);
+      const currentPage = document.createElement('strong');
+      currentPage.textContent = String(page);
+      summary.append(currentPage, ` / ${pages}`);
+
+      const controls = document.createElement('div');
+      controls.style.display = 'flex';
+      controls.style.alignItems = 'center';
+      controls.style.gap = '8px';
+      controls.style.flexWrap = 'wrap';
+
+      const label = document.createElement('label');
+      label.className = 'text-sm';
+      label.style.opacity = '.75';
+      label.textContent = 'Per page';
+
+      const select = document.createElement('select');
+      select.className = 'select input-sm';
+      select.dataset.perPage = '';
+      perPageOptions.forEach(n => {
+        const option = document.createElement('option');
+        option.value = String(n);
+        option.selected = n === perPage;
+        option.textContent = String(n);
+        select.appendChild(option);
+      });
+
+      controls.append(
+        label,
+        select,
+        mkBtn('‹ Prev', page - 1, page <= 1),
+        mkBtn('Next ›', page + 1, page >= pages),
+      );
+      row.append(summary, controls);
+      card.appendChild(row);
+      container.replaceChildren(card);
 
       if (container.dataset.pdBound) return;
       container.dataset.pdBound = 'true';
@@ -1718,15 +1447,17 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 14. TOOLTIPS
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Tooltips = {
     _current: null,
+    _anchor: null,
+    _observer: null,
 
     init() {
-      // CSS-only tooltips use [data-tip] — we enhance with JS for dynamic content
+      // CSS-only tooltips use [data-tip] â€” we enhance with JS for dynamic content
       document.addEventListener('mouseenter', e => {
         const target = eventTargetEl(e);
         if (!target) return;
@@ -1754,6 +1485,13 @@ import { createRouter } from './src/router/router.js';
         const el = target.closest('[data-tip-js]');
         if (el) this._hide();
       });
+
+      if (!this._observer && window.MutationObserver) {
+        this._observer = new MutationObserver(() => {
+          if (this._anchor && !this._anchor.isConnected) this._hide();
+        });
+        this._observer.observe(document.body, { childList: true, subtree: true });
+      }
     },
 
     _show(el) {
@@ -1764,6 +1502,7 @@ import { createRouter } from './src/router/router.js';
       const tip = createElement('div', { class: 'tooltip tooltip-js', role: 'tooltip' }, text);
       document.body.appendChild(tip);
       this._current = tip;
+      this._anchor = el;
 
       const rect  = el.getBoundingClientRect();
       const tRect = tip.getBoundingClientRect();
@@ -1795,13 +1534,14 @@ import { createRouter } from './src/router/router.js';
       if (!this._current) return;
       this._current.remove();
       this._current = null;
+      this._anchor = null;
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 15. PROGRESS & LOADERS
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Progress = {
     /**
@@ -1883,9 +1623,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
-  // 16. CHARTS (Thin wrappers — expects Chart.js or similar)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 16. CHARTS (Thin wrappers â€” expects Chart.js or similar)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Charts = {
     _instances: new Map(),
@@ -1954,6 +1694,25 @@ import { createRouter } from './src/router/router.js';
       };
     },
 
+    _mergeOptions(target, source) {
+      for (const [key, value] of Object.entries(source || {})) {
+        const existing = target[key];
+        if (
+          value
+          && typeof value === 'object'
+          && !Array.isArray(value)
+          && existing
+          && typeof existing === 'object'
+          && !Array.isArray(existing)
+        ) {
+          this._mergeOptions(existing, value);
+        } else {
+          target[key] = value;
+        }
+      }
+      return target;
+    },
+
     /**
      * Re-render all charts when theme changes
      */
@@ -1961,7 +1720,7 @@ import { createRouter } from './src/router/router.js';
       PlasmaDeck.bus.on('theme:change', () => {
         this._instances.forEach(chart => {
           if (!chart?.options) return;
-          Object.assign(chart.options, this.themeOptions());
+          this._mergeOptions(chart.options, this.themeOptions());
           chart.update();
         });
       });
@@ -1969,9 +1728,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
-  // 17. STAT CARDS — Animated counters
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 17. STAT CARDS â€” Animated counters
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const StatCards = {
     init() {
@@ -2018,9 +1777,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 18. NOTIFICATIONS PANEL
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const NotificationsPanel = {
     _badge: null,
@@ -2033,7 +1792,7 @@ import { createRouter } from './src/router/router.js';
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
           const list = $('#notifications-panel .notif-list');
-          if (list) list.innerHTML = '';
+          if (list) list.replaceChildren();
           this.markAllRead();
         });
       }
@@ -2087,9 +1846,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 19. USER PROFILE MENU
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const UserMenu = {
     init() {
@@ -2105,9 +1864,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 20. COPY TO CLIPBOARD
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Clipboard = {
     init() {
@@ -2132,32 +1891,39 @@ import { createRouter } from './src/router/router.js';
     },
 
     _feedback(btn, success) {
-      const original = btn.innerHTML;
-      btn.innerHTML = success ? '✅ Copied!' : '❌ Failed';
+      const original = [...btn.childNodes];
+      btn.replaceChildren(document.createTextNode(success ? '✓ Copied!' : 'Copy failed'));
       btn.disabled  = true;
-      setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+      setTimeout(() => {
+        btn.replaceChildren(...original);
+        btn.disabled = false;
+      }, 2000);
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 21. DARK MODE AWARE IMAGES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const ThemeImages = {
     init() {
       PlasmaDeck.bus.on('theme:change', ({ effective }) => {
         $$('[data-src-dark][data-src-light]').forEach(img => {
-          img.src = effective === 'dark' ? img.dataset.srcDark : img.dataset.srcLight;
+          const nextSrc = effective === 'dark' ? img.dataset.srcDark : img.dataset.srcLight;
+          const url = safeImageUrl(nextSrc);
+          applyImageFallback(img);
+          img.src = url ?? IMAGE_FALLBACK_SRC;
+          if (!url) img.classList.add('image-fallback');
         });
       });
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 22. SKELETON LOADERS
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Skeleton = {
     /**
@@ -2185,15 +1951,15 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 23. INFINITE SCROLL
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const InfiniteScroll = {
     /**
      * @param {Object} opts
      * @param {string|HTMLElement} opts.container
-     * @param {Function} opts.onLoad  async fn(page) → returns false when exhausted
+     * @param {Function} opts.onLoad  async fn(page) â†’ returns false when exhausted
      * @param {string} opts.sentinel  selector for bottom sentinel element
      */
     init({ container, onLoad, sentinel = '.scroll-sentinel' } = {}) {
@@ -2215,9 +1981,15 @@ import { createRouter } from './src/router/router.js';
         const loader = el.querySelector('.scroll-loader');
         if (loader) loader.removeAttribute('hidden');
 
-        const hasMore = await onLoad(++page);
-        loading = false;
-        if (loader) loader.setAttribute('hidden', '');
+        let hasMore;
+        try {
+          hasMore = await onLoad(++page);
+        } catch (err) {
+          PlasmaDeck.bus.emit('infinite-scroll:error', { err, page });
+        } finally {
+          loading = false;
+          if (loader) loader.setAttribute('hidden', '');
+        }
 
         if (hasMore === false) {
           done = true;
@@ -2232,21 +2004,101 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 24. ROUTER (Hash-based SPA helper)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  function routeTitle(hash) {
+    return {
+      '#/home': 'Home',
+      '#/courses': 'Courses',
+      '#/my-courses': 'My Courses',
+      '#/materials': 'Materials',
+      '#/tags': 'Tags',
+      '#/playlists': 'Playlists',
+      '#/bookmarks': 'Bookmarks',
+      '#/notes': 'Notes',
+      '#/pdf': 'PDF',
+      '#/studio': 'Studio',
+      '#/progress': 'Progress',
+      '#/help': 'Help',
+      '#/achievements': 'Achievements',
+      '#/settings': 'Settings',
+    }[hash] ?? 'PlasmaDeck';
+  }
 
   const Router = createRouter({
     $$,
     Progress,
     bus: PlasmaDeck.bus,
     getNotFoundView: () => PlasmaDeck.Views?.notFound,
+    getRouteLabel: hash => routeTitle(hash),
   });
 
+  async function loadRouteFeatures(...names) {
+    if (!names.length) return;
+    const loader = PlasmaDeck.loadFeatures;
+    if (typeof loader === 'function') {
+      await loader(...names);
+      return;
+    }
+    await Promise.all(names.map(name => PlasmaDeck.loadFeature?.(name)).filter(Boolean));
+  }
 
-  // ──────────────────────────────────────────────────────────
+  const SyncRouteRefresh = (() => {
+    const safeRoutes = new Set([
+      '#/home',
+      '#/my-courses',
+      '#/materials',
+      '#/tags',
+      '#/playlists',
+      '#/bookmarks',
+      '#/progress',
+      '#/achievements',
+    ]);
+    const routeMap = {
+      progress: ['#/home', '#/my-courses', '#/playlists', '#/bookmarks', '#/progress', '#/achievements'],
+      timestamp: ['#/home', '#/playlists', '#/bookmarks', '#/progress', '#/achievements'],
+      note: ['#/home', '#/bookmarks', '#/progress', '#/achievements'],
+      folder: ['#/home', '#/bookmarks', '#/progress'],
+      annotation: ['#/home', '#/bookmarks', '#/progress'],
+      setting: ['#/home', '#/my-courses', '#/materials', '#/tags', '#/playlists', '#/progress', '#/achievements'],
+    };
+    let pending = null;
+    let timer = 0;
+
+    const affectsRoute = (payload, hash) => {
+      if (!safeRoutes.has(hash)) return false;
+      if (payload?.action === 'clear') return true;
+      const routes = routeMap[payload?.kind];
+      return Array.isArray(routes) && routes.includes(hash);
+    };
+
+    const schedule = (payload = {}) => {
+      const hash = window.location.hash || '#/';
+      if (!affectsRoute(payload, hash)) return;
+      pending = payload;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const currentHash = window.location.hash || '#/';
+        if (!affectsRoute(pending, currentHash)) return;
+        const detail = { source: 'sync', payload: pending };
+        PlasmaDeck.bus.emit?.('sync:route-refresh', { hash: currentHash, payload: pending });
+        Router.refresh?.(detail);
+      }, 80);
+    };
+
+    return {
+      init() {
+        PlasmaDeck.bus.on?.('sync:message', schedule);
+      },
+    };
+  })();
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 25. RESPONSIVE UTILITIES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Responsive = {
     /**
@@ -2276,9 +2128,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 33. VIEWS (SPA route rendering)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Views = (() => {
     const container = () => document.getElementById('view-container');
@@ -2288,1112 +2140,157 @@ import { createRouter } from './src/router/router.js';
       if (!el) return null;
       const purify = window.DOMPurify;
       if (purify?.sanitize) {
+        // Intentional rich route-template boundary; dynamic rows inside routes use DOM nodes.
         el.innerHTML = purify.sanitize(String(html ?? ''), {
-          ADD_TAGS: ['template', 'canvas'],
+          ADD_TAGS: ['canvas'],
           ADD_ATTR: ['tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-live', 'aria-atomic'],
+          FORBID_TAGS: ['template'],
         });
       } else {
-        el.innerHTML = html;
+        // Same route-template boundary, using the local fallback sanitizer above.
+        el.innerHTML = fallbackSanitizeHtml(html);
       }
       return el;
     }
 
-    function home() {
-      set(`
-        <section class="view view-home">
-          <div class="home-hero card card-filled">
-            <div class="home-hero-copy">
-              <span class="eyebrow">Local-first learning studio</span>
-              <h1 class="home-title">Your study command deck is ready.</h1>
-              <p class="home-subtitle">Open a course, capture notes, mark progress, and keep backups close. PlasmaDeck stores your work on this device unless you export it.</p>
-              <div class="home-actions">
-                <a class="btn btn-primary" href="#/courses">
-                  <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
-                  Browse courses
-                </a>
-                <a class="btn btn-ghost" href="#/notes">
-                  <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
-                  Write notes
-                </a>
-                <a class="btn btn-ghost" href="#/help">
-                  <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
-                  First-run guide
-                </a>
-              </div>
-            </div>
-            <div class="home-orbit" aria-hidden="true">
-              <div class="home-orbit-core">PD</div>
-              <span style="--i:0">Notes</span>
-              <span style="--i:1">PDF</span>
-              <span style="--i:2">Video</span>
-              <span style="--i:3">Canvas</span>
-            </div>
-          </div>
-
-          <div class="home-grid">
-            <section class="card card-filled home-card home-card-wide">
-              <div class="card-body">
-                <div class="home-card-head">
-                  <div>
-                    <span class="eyebrow">Next best steps</span>
-                    <h2 class="home-card-title">Start strong in three clicks</h2>
-                  </div>
-                  <kbd>Ctrl+K</kbd>
-                </div>
-                <div class="home-steps">
-                  <a href="#/courses">
-                    <span>1</span>
-                    <strong>Choose a course</strong>
-                    <small>Browse the catalog and open the first lesson.</small>
-                  </a>
-                  <a href="#/notes">
-                    <span>2</span>
-                    <strong>Create a note</strong>
-                    <small>Capture ideas, links, code blocks, and tags.</small>
-                  </a>
-                  <a href="#/progress">
-                    <span>3</span>
-                    <strong>Review progress</strong>
-                    <small>Export backups before changing browser or port.</small>
-                  </a>
-                </div>
-              </div>
-            </section>
-
-            <section class="card card-filled home-card">
-              <div class="card-body">
-                <span class="eyebrow">Library snapshot</span>
-                <div class="home-stat"><strong id="home-course-count">-</strong><span>Courses</span></div>
-                <div class="home-stat"><strong id="home-topic-count">-</strong><span>Topics</span></div>
-                <p class="home-card-note">Counts load from the active catalog selected in <code>data/catalog.json</code>.</p>
-              </div>
-            </section>
-
-            <section class="card card-filled home-card">
-              <div class="card-body">
-                <span class="eyebrow">Daily tools</span>
-                <div class="home-tool-list">
-                  <a href="#/pdf"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i><span>Read PDFs</span></a>
-                  <a href="#/studio"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i><span>Sketch in Studio</span></a>
-                  <a href="#/settings"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Tune preferences</span></a>
-                </div>
-              </div>
-            </section>
-          </div>
-        </section>
-      `);
-
-      (async () => {
-        try {
-          await window.DataStore?.init?.();
-          const courses = window.DataStore?.allCourses?.() ?? [];
-          const topics = window.DataStore?.allTopics?.() ?? [];
-          const courseCount = document.getElementById('home-course-count');
-          const topicCount = document.getElementById('home-topic-count');
-          if (courseCount) courseCount.textContent = String(courses.length);
-          if (topicCount) topicCount.textContent = String(topics.length);
-        } catch {
-          const note = document.querySelector('.home-card-note');
-          if (note) note.textContent = 'Catalog counts are unavailable right now. Try rebuilding or checking data/catalog.json.';
-        }
-      })();
+    async function home() {
+      const { mountHomeView } = await import('./src/views/homeRoute.js');
+      return mountHomeView({
+        setView: set,
+        Router,
+        setPendingCourseMedia,
+      });
     }
 
-    function notes() {
-      set(`
-        <section class="view view-notes">
-          <div class="page-header">
-            <h1 class="page-title">Notes</h1>
-            <p class="page-subtitle">Local-first rich notes.</p>
-          </div>
-
-          <div class="notes-shell">
-            <aside class="notes-sidebar">
-              <div class="notes-actions">
-                <button class="btn btn-primary" data-action="new-note">New note</button>
-                <button class="btn btn-ghost" data-action="export-all">Export JSON</button>
-                <button class="btn btn-ghost" data-action="export-md">Export MD</button>
-                <button class="btn btn-ghost" data-action="import-notes">Import</button>
-              </div>
-
-              <div class="notes-search">
-                <input class="input" type="search" placeholder="Search notes…" data-notes-search />
-              </div>
-
-              <div class="notes-folders" data-folders-panel></div>
-              <div class="notes-list" data-notes-list></div>
-            </aside>
-
-            <main class="notes-main" data-notes-main-pane>
-              <div class="notes-top">
-                <input class="input notes-title" data-note-title-input placeholder="Title" />
-                <span class="notes-save" data-save-status></span>
-              </div>
-
-              <div class="notes-toolbar" data-notes-toolbar>
-                <div class="notes-toolbar-row">
-                  <button class="btn btn-ghost" data-cmd="bold"><strong>B</strong></button>
-                  <button class="btn btn-ghost" data-cmd="italic"><em>I</em></button>
-                  <button class="btn btn-ghost" data-cmd="underline"><u>U</u></button>
-                  <button class="btn btn-ghost" data-cmd="strikethrough"><s>S</s></button>
-                  <button class="btn btn-ghost" data-cmd="ul">• List</button>
-                  <button class="btn btn-ghost" data-cmd="ol">1. List</button>
-                  <button class="btn btn-ghost" data-cmd="blockquote">❝</button>
-                  <button class="btn btn-ghost" data-cmd="code">Code</button>
-                  <button class="btn btn-ghost" data-cmd-block data-cmd="codeblock">Code block</button>
-                  <button class="btn btn-ghost" data-cmd="link">Link</button>
-                  <button class="btn btn-ghost" data-cmd="image">Image</button>
-                  <button class="btn btn-ghost" data-cmd="hr">HR</button>
-                  <button class="btn btn-ghost" data-cmd="undo">Undo</button>
-                  <button class="btn btn-ghost" data-cmd="redo">Redo</button>
-                  <button class="btn btn-ghost" data-cmd="clearFormat">Clear</button>
-                </div>
-                <div class="notes-toolbar-row" style="gap:10px;flex-wrap:wrap;margin-top:8px">
-                  <label style="display:flex;align-items:center;gap:6px">
-                    <span style="opacity:.75">Size</span>
-                    <select class="input input-sm" data-font-size>
-                      <option value="12px">12</option>
-                      <option value="14px">14</option>
-                      <option value="16px" selected>16</option>
-                      <option value="18px">18</option>
-                      <option value="22px">22</option>
-                      <option value="28px">28</option>
-                    </select>
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px">
-                    <span style="opacity:.75">Font</span>
-                    <select class="input input-sm" data-font-family>
-                      <option value="Inter">Inter</option>
-                      <option value="JetBrains Mono">JetBrains Mono</option>
-                      <option value="Playfair Display">Playfair Display</option>
-                      <option value="system-ui">System</option>
-                    </select>
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px">
-                    <span style="opacity:.75">Text</span>
-                    <input type="color" data-text-color value="#e5e7eb" />
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px">
-                    <span style="opacity:.75">Highlight</span>
-                    <input type="color" data-highlight-color value="#f59e0b" />
-                  </label>
-                </div>
-              </div>
-              <div class="notes-editor-wrap">
-                <div class="notes-editor" data-notes-editor></div>
-              </div>
-
-              <div class="notes-meta">
-                <span data-note-words></span>
-                <span data-note-chars></span>
-                <span data-note-date></span>
-              </div>
-
-              <div class="notes-tags" data-tags-cloud></div>
-            </main>
-          </div>
-        </section>
-      `);
-
-      // Kick notes init (notes.js guards against missing DOM / double init)
-      try { window.PlasmaNotesApp?.init?.(); } catch (e) { console.warn('[Notes view] init failed', e); }
+    async function notes() {
+      const { mountNotesView } = await import('./src/views/notesRoute.js');
+      return mountNotesView({ setView: set });
     }
 
-    function pdf() {
-      set(`
-        <section class="view view-pdf">
-          <div class="page-header">
-            <h1 class="page-title">PDF</h1>
-            <p class="page-subtitle">Drop a PDF here or load via file picker.</p>
-          </div>
-
-          <div class="pdf-shell">
-            <aside class="pdf-sidebar" data-pdf-thumbnails></aside>
-            <div class="pdf-main">
-              <div class="pdf-toolbar">
-                <input class="input" data-pdf-search-input placeholder="Search…" />
-                <div data-pdf-search-results class="pdf-search-results"></div>
-                <div class="pdf-toolbar-row">
-                  <button class="btn btn-ghost" data-pdf-action="prev" data-pdf-prev>Prev</button>
-                  <input class="input input-sm" data-pdf-current-page value="1" style="width:80px" />
-                  <span>/ <span data-pdf-total-pages>0</span></span>
-                  <button class="btn btn-ghost" data-pdf-action="next" data-pdf-next>Next</button>
-                  <span class="pdf-zoom" data-pdf-zoom>100%</span>
-                </div>
-                <div class="pdf-toolbar-row" style="gap:8px;flex-wrap:wrap;margin-top:8px">
-                  <input type="file" data-pdf-open style="display:none" />
-                  <button class="btn btn-ghost" data-pdf-action="open">Open</button>
-                  <button class="btn btn-ghost" data-pdf-action="zoom-out">-</button>
-                  <button class="btn btn-ghost" data-pdf-action="zoom-in">+</button>
-                  <button class="btn btn-ghost" data-pdf-action="fit-width">Fit width</button>
-                  <button class="btn btn-ghost" data-pdf-action="fit-page">Fit page</button>
-                  <button class="btn btn-ghost" data-pdf-action="rotate-ccw">CCW</button>
-                  <button class="btn btn-ghost" data-pdf-action="rotate-cw">CW</button>
-                  <button class="btn btn-ghost" data-pdf-action="download">Download</button>
-                </div>
-              </div>
-
-              <div class="pdf-viewer-wrap">
-                <div class="pdf-viewer" data-pdf-viewer tabindex="0"></div>
-                <div class="pdf-loading" data-pdf-loading hidden>
-                  <div class="pdf-progress"><div data-pdf-progress class="pdf-progress-bar"></div></div>
-                </div>
-                <div class="pdf-error" data-pdf-error hidden></div>
-              </div>
-            </div>
-          </div>
-        </section>
-      `);
-
-      try { window.PlasmaPDFInit?.(); } catch (e) { console.warn('[PDF view] init failed', e); }
+    async function pdf() {
+      const { mountPdfView } = await import('./src/views/pdfRoute.js');
+      return mountPdfView();
     }
 
-    function studio() {
-      set(`
-        <section class="view view-studio">
-          <div class="page-header">
-            <h1 class="page-title">Studio</h1>
-            <p class="page-subtitle">Whiteboard canvas.</p>
-          </div>
-          <div class="studio-shell">
-            <canvas id="studio-canvas" class="studio-canvas"></canvas>
-          </div>
-        </section>
-      `);
-
-      const canvas = document.getElementById('studio-canvas');
-      if (canvas) {
-        // Give it a size; canvas.js reads offsetWidth/Height
-        canvas.style.width = '100%';
-        canvas.style.height = '70vh';
-        try { window.PlasmaDeck?.Canvas?.init?.(canvas); } catch (e) { console.warn('[Studio view] init failed', e); }
-      }
+    async function studio() {
+      const { mountStudioView } = await import('./src/views/studioRoute.js');
+      return mountStudioView({
+        setView: set,
+        safeFetchUrl,
+        safeMediaUrl,
+        safeFrameUrl,
+        setPendingCourseMedia,
+        Router,
+        Toast,
+        downloadTextFile,
+        downloadDataUrl,
+        printStudioBoardPdf,
+      });
     }
-
-    function progress() {
-      set(`
-        <section class="view view-progress">
-          <div class="page-header">
-            <h1 class="page-title">Progress</h1>
-            <p class="page-subtitle">Analytics and export.</p>
-          </div>
-
-          <div class="progress-actions">
-            <button class="btn btn-primary" id="btn-export-json">Export JSON</button>
-            <button class="btn btn-ghost" id="btn-export-csv">Export CSV</button>
-            <button class="btn btn-ghost" id="btn-export-md">Export Notes MD</button>
-            <button class="btn btn-ghost" id="btn-import-json">Import</button>
-            <button class="btn btn-danger" id="btn-reset-all">Reset all</button>
-          </div>
-
-          <div class="progress-grid">
-            <div class="card card-filled">
-              <div class="card-body">
-                <div>Total topics: <strong id="stat-total-topics">0</strong></div>
-                <div>Done: <strong id="stat-done-topics">0</strong></div>
-                <div>In progress: <strong id="stat-in-progress">0</strong></div>
-                <div>Completion: <strong id="stat-completion-pct">0%</strong></div>
-                <div>Watched: <strong id="stat-watched-time">0:00</strong></div>
-                <div>Streak: <strong id="stat-streak">0</strong></div>
-                <div>Active days: <strong id="stat-active-days">0</strong></div>
-                <div class="mini-bar-wrap" style="margin-top:10px">
-                  <div class="mini-bar" id="stat-overall-bar" style="width:0%"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card card-filled">
-              <div class="card-body">
-                <canvas id="chart-overall" height="220"></canvas>
-              </div>
-            </div>
-
-            <div class="card card-filled" style="grid-column:1/-1">
-              <div class="card-body">
-                <canvas id="chart-courses" height="220"></canvas>
-              </div>
-            </div>
-
-            <div class="card card-filled" style="grid-column:1/-1">
-              <div class="card-body">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th>Course</th><th>Total</th><th>Done</th><th>In progress</th><th>%</th><th>Watch time</th><th>Last</th>
-                    </tr>
-                  </thead>
-                  <tbody id="stat-course-table-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-      `);
-
-      // Bind buttons + render stats (progress.js exports init helper)
-      window.PlasmaDeck?.ProgressStatsInit?.();
+    async function progress() {
+      const { mountProgressView } = await import('./src/views/progressRoute.js');
+      return mountProgressView({ setView: set });
     }
 
     async function courses() {
-      set(`
-        <section class="view view-courses">
-          <div class="page-header">
-            <h1 class="page-title">Courses</h1>
-            <p class="page-subtitle">Browse your catalog.</p>
-          </div>
-
-          <div class="courses-shell">
-            <aside class="courses-sidebar">
-              <input class="input" id="courses-search" type="search" placeholder="Search courses…" />
-              <div id="courses-list" class="courses-list"></div>
-            </aside>
-
-            <main class="courses-main">
-              <div id="course-detail" class="course-detail">
-                <div class="card card-filled">
-                  <div class="card-body">
-                    Select a course on the left.
-                  </div>
-                </div>
-              </div>
-
-              <div class="card card-filled" style="margin-top:12px">
-                <div class="card-body">
-                  <div id="course-player" data-player data-player-options='{"type":"video","autoplay":false,"controls":true,"theme":"dark"}'></div>
-                </div>
-              </div>
-            </main>
-          </div>
-        </section>
-      `);
-
-      // Ensure catalog loaded
-      await window.DataStore?.init?.();
-      const listEl = document.getElementById('courses-list');
-      const searchEl = document.getElementById('courses-search');
-      const detailEl = document.getElementById('course-detail');
-      const playerEl = document.getElementById('course-player');
-      if (!listEl || !detailEl) return;
-
-      // Ensure player auto-inits for the inserted element
-      try { window.PlasmaDeck?.Player?.init?.(); } catch { /* ignore */ }
-
-      const allCourses = window.DataStore?.allCourses?.() ?? [];
-      const allTopics = window.DataStore?.allTopics?.() ?? [];
-      const topicsByCourse = allTopics.reduce((acc, t) => {
-        (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
-        return acc;
-      }, {});
-
-      const renderCourses = (query = '') => {
-        const q = query.trim().toLowerCase();
-        const filtered = q
-          ? allCourses.filter(c => String(c.title ?? '').toLowerCase().includes(q))
-          : allCourses;
-        listEl.innerHTML = filtered.map(c => {
-          const count = (topicsByCourse[c.id] ?? []).length;
-          return `
-            <button class="course-item" data-course-id="${c.id}">
-              <div class="course-item-title">${c.title}</div>
-              <div class="course-item-meta">${count} topics</div>
-            </button>
-          `;
-        }).join('') || `<div class="card card-ghost"><div class="card-body">No courses.</div></div>`;
-      };
-
-      const renderCourseDetail = async (courseId) => {
-        const course = allCourses.find(c => c.id === courseId);
-        const topics = (topicsByCourse[courseId] ?? []);
-        if (!course) return;
-
-        // Load progress for this course topics
-        const progList = await Promise.all(topics.map(t => window.DB?.getProgress?.(t.topicId)));
-        const progById = new Map(progList.filter(Boolean).map(p => [p.topicId, p]));
-
-        detailEl.innerHTML = `
-          <div class="card card-filled">
-            <div class="card-body">
-              <h2 style="margin:0 0 6px 0">${course.title}</h2>
-              ${course.productUrl ? `<a href="${course.productUrl}" target="_blank" rel="noopener">Product page</a>` : ''}
-            </div>
-          </div>
-
-          <div class="card card-filled" style="margin-top:12px">
-            <div class="card-body">
-              <div class="topics-list">
-                ${topics.map(t => {
-                  const p = progById.get(t.topicId);
-                  const status = p?.status ?? 'not-started';
-                  const hasVideo = (t.videos?.length ?? 0) > 0;
-                  const hasPdf = (t.pdfs?.length ?? 0) > 0;
-                  return `
-                    <div class="topic-row" data-topic-id="${t.topicId}" data-course-id="${t.courseId}">
-                      <div class="topic-title">${t.title}</div>
-                      <div class="topic-meta">
-                        <span class="badge">${status}</span>
-                      </div>
-                      <div class="topic-actions">
-                        ${hasVideo ? `<button class="btn btn-ghost btn-sm" data-action="play-video">Play</button>` : ''}
-                        ${hasPdf ? `<button class="btn btn-ghost btn-sm" data-action="open-pdf">PDF</button>` : ''}
-                        <button class="btn btn-ghost btn-sm" data-action="toggle-done">${status === 'done' ? 'Undone' : 'Done'}</button>
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          </div>
-        `;
-      };
-
-      // Initial render
-      renderCourses('');
-
-      if (!listEl.dataset.pdBound) {
-        listEl.dataset.pdBound = 'true';
-        listEl.addEventListener('click', (e) => {
-          const target = eventTargetEl(e);
-          if (!target) return;
-          const btn = target.closest('[data-course-id]');
-          if (!btn) return;
-          $$('.course-item', listEl).forEach(x => x.classList.toggle('active', x === btn));
-          renderCourseDetail(btn.dataset.courseId);
-        });
-      }
-
-      if (searchEl && !searchEl.dataset.pdBound) {
-        searchEl.dataset.pdBound = 'true';
-        searchEl.addEventListener('input', () => renderCourses(searchEl.value));
-      }
-
-      if (!detailEl.dataset.pdBound) {
-        detailEl.dataset.pdBound = 'true';
-        detailEl.addEventListener('click', async (e) => {
-          const target = eventTargetEl(e);
-          if (!target) return;
-          const actionBtn = target.closest('[data-action]');
-          if (!actionBtn) return;
-          const row = target.closest('[data-topic-id]');
-          if (!row) return;
-          const topicId = row.dataset.topicId;
-          const courseId = row.dataset.courseId;
-          const topic = (window.DataStore?.allTopics?.() ?? []).find(t => t.topicId === topicId);
-          if (!topic) return;
-
-          const action = actionBtn.dataset.action;
-          if (action === 'toggle-done') {
-            const existing = await window.DB?.getProgress?.(topicId);
-            const isDone = existing?.status === 'done';
-            await window.DB?.saveProgress?.(topicId, courseId, {
-              status: isDone ? 'not-started' : 'done',
-              percent: isDone ? 0 : 100,
-              updatedAt: Date.now(),
-            });
-            // Re-render current course
-            renderCourseDetail(courseId);
-            return;
-          }
-
-          if (action === 'open-pdf') {
-            const url = topic.pdfs?.[0];
-            if (!url) return;
-            Router.navigate('#/pdf');
-            // Wait a tick for the view to mount, then load
-            setTimeout(() => {
-              try { window.PlasmaPDFViewer?.load?.(url); } catch {}
-            }, 50);
-            return;
-          }
-
-          if (action === 'play-video') {
-            const url = topic.videos?.[0];
-            if (!url) return;
-            // Ensure player exists and has an instance
-            const el = playerEl;
-            const inst = el?._pdPlayer;
-            if (inst?.loadPlaylist) {
-              inst.loadPlaylist([{
-                title: topic.title,
-                src: url,
-                artist: topic.courseTitle ?? courseId,
-                topicId,
-                courseId,
-              }], true);
-            } else {
-              // Fallback: try to init then load
-              try { window.PlasmaDeck?.Player?.init?.(); } catch {}
-              setTimeout(() => {
-                const i2 = el?._pdPlayer;
-                i2?.loadPlaylist?.([{
-                  title: topic.title,
-                  src: url,
-                  artist: topic.courseTitle ?? courseId,
-                  topicId,
-                  courseId,
-                }], true);
-              }, 50);
-            }
-          }
-        });
-      }
-
-      // Persist watch progress into DB as the player runs (idempotent per player element)
-      if (playerEl && !playerEl.dataset.pdProgressBound) {
-        playerEl.dataset.pdProgressBound = 'true';
-        const inst = playerEl._pdPlayer;
-        const throttleMs = 2500;
-        let lastSave = 0;
-
-        const save = async (track, { currentTime, duration, percent } = {}) => {
-          const t = track ?? inst?.queue?.[inst?.trackIndex ?? 0] ?? null;
-          const topicId = t?.topicId;
-          const courseId = t?.courseId;
-          if (!topicId || !courseId) return;
-
-          const cur = currentTime ?? inst?.currentTime ?? 0;
-          const dur = duration ?? inst?.duration ?? 0;
-          const pct = percent ?? (dur > 0 ? Math.round((cur / dur) * 100) : 0);
-
-          const status = pct >= 98 ? 'done' : (pct > 0 ? 'in-progress' : 'not-started');
-          await window.DB?.saveProgress?.(topicId, courseId, {
-            position: Math.max(0, cur),
-            duration: Math.max(0, dur || 0),
-            percent: Math.max(0, Math.min(100, pct || 0)),
-            status,
-            updatedAt: Date.now(),
-          });
-        };
-
-        inst?.on?.('timeupdate', async (payload) => {
-          const now = Date.now();
-          if (now - lastSave < throttleMs) return;
-          lastSave = now;
-          await save(null, payload);
-        });
-        inst?.on?.('ended', async (track) => {
-          await save(track, { currentTime: inst?.duration ?? 0, duration: inst?.duration ?? 0, percent: 100 });
-        });
-        inst?.on?.('trackChange', async (track) => {
-          // Record a "start" touch so it shows up in activity/streaks
-          await save(track, { currentTime: 0, duration: inst?.duration ?? 0, percent: 0 });
-        });
-      }
-
-      // Auto-select first course
-      const pendingTopicId = sessionStorage.getItem('plasma_pending_topic');
-      if (pendingTopicId) sessionStorage.removeItem('plasma_pending_topic');
-
-      const selectCourse = (courseId) => {
-        const btn = listEl.querySelector(`[data-course-id="${courseId}"]`);
-        if (!btn) return false;
-        $$('.course-item', listEl).forEach(x => x.classList.toggle('active', x === btn));
-        renderCourseDetail(courseId);
-        return true;
-      };
-
-      if (pendingTopicId) {
-        const t = allTopics.find(x => x.topicId === pendingTopicId);
-        if (t && selectCourse(t.courseId)) {
-          // Autoplay after detail is rendered
-          setTimeout(() => {
-            const url = t.videos?.[0];
-            if (!url) return;
-            const el = playerEl;
-            const inst = el?._pdPlayer;
-            if (inst?.loadPlaylist) {
-              inst.loadPlaylist([{
-                title: t.title,
-                src: url,
-                artist: t.courseTitle ?? t.courseId,
-                topicId: t.topicId,
-                courseId: t.courseId,
-              }], true);
-            }
-          }, 120);
-          return;
-        }
-      }
-
-      const first = listEl.querySelector('[data-course-id]');
-      if (first) {
-        first.classList.add('active');
-        renderCourseDetail(first.dataset.courseId);
-      }
+      const { mountCoursesView } = await import('./src/views/coursesRoute.js');
+      return mountCoursesView({
+        setView: set,
+        createElement,
+        $$,
+        eventTargetEl,
+        safeExternalUrl,
+        safeMediaUrl,
+        Router,
+        Toast,
+        consumePendingCourseSession,
+        formatMediaClock,
+        escapeHtmlText,
+      });
     }
-
     async function materials() {
-      set(`
-        <section class="view view-materials">
-          <div class="page-header">
-            <h1 class="page-title">Materials</h1>
-            <p class="page-subtitle">All videos and PDFs in your catalog.</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <input class="input" id="materials-search" type="search" placeholder="Search topics…" />
-            </div>
-          </div>
-          <div id="materials-pager" style="margin-top:12px"></div>
-          <div id="materials-list" class="materials-list" style="margin-top:12px"></div>
-        </section>
-      `);
-
-      await window.DataStore?.init?.();
-      const pagerEl = document.getElementById('materials-pager');
-      const listEl = document.getElementById('materials-list');
-      const searchEl = document.getElementById('materials-search');
-      if (!listEl) return;
-
-      const topics = window.DataStore?.allTopics?.() ?? [];
-      let state = { page: 1, perPage: 50, query: '' };
-      const render = (query = state.query) => {
-        const q = query.trim().toLowerCase();
-        const filtered = q ? topics.filter(t => String(t.title ?? '').toLowerCase().includes(q)) : topics;
-        state.query = query;
-        const { page, perPage, pages, total, slice } = Paginator.paginate(filtered, state);
-        state.page = page;
-        state.perPage = perPage;
-        Paginator.renderControls(pagerEl, {
-          page,
-          pages,
-          total,
-          perPage,
-          perPageOptions: [25, 50, 100, 200],
-          onChange: ({ page: p, perPage: pp }) => {
-            state.page = p ?? state.page;
-            state.perPage = pp ?? state.perPage;
-            render(state.query);
-            try { listEl.scrollTo?.({ top: 0, behavior: 'smooth' }); } catch { listEl.scrollTop = 0; }
-          },
-        });
-
-        listEl.innerHTML = slice.map(t => {
-          const v = t.videos?.[0];
-          const p = t.pdfs?.[0];
-          return `
-            <div class="topic-row" data-topic-id="${t.topicId}" data-course-id="${t.courseId}">
-              <div class="topic-title">${t.title}</div>
-              <div class="topic-actions">
-                ${v ? `<button class="btn btn-ghost btn-sm" data-action="play-video">Play</button>` : ''}
-                ${p ? `<button class="btn btn-ghost btn-sm" data-action="open-pdf">PDF</button>` : ''}
-              </div>
-            </div>
-          `;
-        }).join('');
-      };
-
-      render('');
-
-      if (searchEl && !searchEl.dataset.pdBound) {
-        searchEl.dataset.pdBound = 'true';
-        searchEl.addEventListener('input', () => render(searchEl.value));
-      }
-
-      if (!listEl.dataset.pdBound) {
-        listEl.dataset.pdBound = 'true';
-        listEl.addEventListener('click', (e) => {
-          const target = eventTargetEl(e);
-          if (!target) return;
-          const btn = target.closest('[data-action]');
-          if (!btn) return;
-          const row = target.closest('[data-topic-id]');
-          if (!row) return;
-          const t = topics.find(x => x.topicId === row.dataset.topicId);
-          if (!t) return;
-          if (btn.dataset.action === 'open-pdf') {
-            const url = t.pdfs?.[0];
-            if (!url) return;
-            Router.navigate('#/pdf');
-            setTimeout(() => { try { window.PlasmaPDFViewer?.load?.(url); } catch {} }, 50);
-          }
-          if (btn.dataset.action === 'play-video') {
-            const url = t.videos?.[0];
-            if (!url) return;
-            // Jump to courses and autoplay the exact topic
-            try { sessionStorage.setItem('plasma_pending_topic', t.topicId); } catch { /* ignore */ }
-            Router.navigate('#/courses');
-          }
-        });
-      }
+      const { mountMaterialsView } = await import('./src/views/materialsRoute.js');
+      return mountMaterialsView({
+        setView: set,
+        createElement,
+        eventTargetEl,
+        safeMediaUrl,
+        Router,
+        Paginator,
+        setPendingCourseMedia,
+      });
+    }
+    async function settings() {
+      const { mountSettingsView } = await import('./src/views/settingsRoute.js');
+      return mountSettingsView({
+        setView: set,
+        ThemeManager,
+        FontScale,
+        Prefs,
+        Toast,
+        formatBytes,
+        localStorageFootprint,
+      });
+    }
+    async function help() {
+      const { mountHelpView } = await import('./src/views/helpRoute.js');
+      return mountHelpView({
+        setView: set,
+        Toast,
+      });
+    }
+    async function myCourses() {
+      const { mountMyCoursesView } = await import('./src/views/myCoursesRoute.js');
+      return mountMyCoursesView({ setView: set, Toast });
     }
 
-    function settings() {
-      set(`
-        <section class="view view-settings">
-          <div class="page-header">
-            <h1 class="page-title">Settings</h1>
-            <p class="page-subtitle">Personalization and data tools.</p>
-          </div>
+    async function tags() {
+      const { mountTagsView } = await import('./src/views/tagsRoute.js');
+      return mountTagsView({ setView: set });
+    }
 
-          <div class="card card-filled">
-            <div class="card-body">
-              <div class="dashboard-grid" style="margin-bottom:12px">
-                <div class="card card-gradient col-12 col-lg-6">
-                  <div class="card-body">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-                      <div>
-                        <div style="font-weight:800">UI font size</div>
-                        <div class="text-sm" style="opacity:.7">Affects the whole app (Ctrl + / Ctrl - / Ctrl 0)</div>
-                      </div>
-                      <div style="display:flex;align-items:center;gap:8px">
-                        <button class="btn btn-ghost btn-sm" id="btn-font-dec" aria-label="Decrease font size">A-</button>
-                        <span class="badge" id="font-scale-label">100%</span>
-                        <button class="btn btn-ghost btn-sm" id="btn-font-inc" aria-label="Increase font size">A+</button>
-                        <button class="btn btn-ghost btn-sm" id="btn-font-reset" aria-label="Reset font size">Reset</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="card card-gradient col-12 col-lg-6">
-                  <div class="card-body">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-                      <div>
-                        <div style="font-weight:800">Density</div>
-                        <div class="text-sm" style="opacity:.7">Compact / Comfortable / Spacious</div>
-                      </div>
-                      <select class="select input-sm" id="select-density" aria-label="UI density">
-                        <option value="compact">Compact</option>
-                        <option value="comfortable">Comfortable</option>
-                        <option value="spacious">Spacious</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-                <button class="btn btn-ghost" id="btn-theme-toggle">Toggle theme</button>
-                <button class="btn btn-ghost" id="btn-clear-data">Wipe local data</button>
-                <button class="btn btn-primary" id="btn-export-json-2">Export backup JSON</button>
-                <button class="btn btn-ghost" id="btn-import-json-2">Import backup JSON</button>
-              </div>
-              <p style="margin-top:10px;opacity:.75">
-                Data is stored locally (IndexedDB). Use export/import to move it between devices.
-              </p>
-            </div>
-          </div>
-        </section>
-      `);
-
-      const themeBtn = document.getElementById('btn-theme-toggle');
-      themeBtn?.addEventListener('click', () => ThemeManager.toggle?.());
-
-      const updateFontLabel = () => {
-        const el = document.getElementById('font-scale-label');
-        if (!el) return;
-        el.textContent = `${Math.round(FontScale.get() * 100)}%`;
-      };
-      updateFontLabel();
-      document.getElementById('btn-font-inc')?.addEventListener('click', () => { FontScale.inc(); updateFontLabel(); });
-      document.getElementById('btn-font-dec')?.addEventListener('click', () => { FontScale.dec(); updateFontLabel(); });
-      document.getElementById('btn-font-reset')?.addEventListener('click', () => { FontScale.reset(); updateFontLabel(); });
-      PlasmaDeck.bus.on?.('fontScale:change', updateFontLabel);
-
-      const densitySel = document.getElementById('select-density');
-      if (densitySel) {
-        densitySel.value = document.documentElement.getAttribute('data-density') || Prefs.get(Prefs.KEYS.density, 'comfortable') || 'comfortable';
-        densitySel.addEventListener('change', () => {
-          const v = densitySel.value;
-          document.documentElement.setAttribute('data-density', v);
-          Prefs.set(Prefs.KEYS.density, v);
-          PlasmaDeck.bus.emit('density:change', { density: v });
-        });
-      }
-
-      const wipeBtn = document.getElementById('btn-clear-data');
-      wipeBtn?.addEventListener('click', async () => {
-        const ok = await PlasmaDeck.UI?.confirm?.('This will delete all local data. Continue?');
-        if (!ok) return;
-        try { await window.DB?.clearAll?.(); } catch {}
-        try { localStorage.clear(); sessionStorage.clear(); } catch {}
-        Toast.success('Local data cleared');
-      });
-
-      document.getElementById('btn-export-json-2')?.addEventListener('click', () => {
-        try { window.ProgressStats?.exportJSON?.(); } catch { Toast.error('Export failed'); }
-      });
-      document.getElementById('btn-import-json-2')?.addEventListener('click', () => {
-        try { window.ProgressStats?.importJSON?.(); } catch { Toast.error('Import failed'); }
+    async function playlists() {
+      const { mountPlaylistsView } = await import('./src/views/playlistsRoute.js');
+      return mountPlaylistsView({
+        setView: set,
+        safeMediaUrl,
+        Toast,
       });
     }
 
-    function help() {
-      set(`
-        <section class="view view-help">
-          <div class="page-header">
-            <div>
-              <h1 class="page-title">Help</h1>
-              <p class="page-subtitle">Start quickly, find your data, and keep your library portable.</p>
-            </div>
-            <div class="page-actions">
-              <button class="btn btn-primary" id="help-backup-btn">
-                <i class="fa-solid fa-file-export" aria-hidden="true"></i>
-                Export backup
-              </button>
-              <button class="btn btn-ghost" id="help-shortcuts-btn">
-                <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
-                Shortcuts
-              </button>
-            </div>
-          </div>
-
-          <div class="help-grid">
-            <section class="card card-filled help-card help-card-primary">
-              <div class="card-body">
-                <h2 class="help-card-title">First-run checklist</h2>
-                <ol class="help-checklist">
-                  <li><span aria-hidden="true">1</span><p>Start with <code>npm start</code> or the Windows launcher, then open <code>http://localhost:5173/</code>.</p></li>
-                  <li><span aria-hidden="true">2</span><p>Use Courses or Materials to open content from the active catalog.</p></li>
-                  <li><span aria-hidden="true">3</span><p>Create a note, try the PDF view, and open Studio for canvas work.</p></li>
-                  <li><span aria-hidden="true">4</span><p>Export a backup before switching ports, browsers, profiles, or catalogs.</p></li>
-                </ol>
-              </div>
-            </section>
-
-            <section class="card card-filled help-card">
-              <div class="card-body">
-                <h2 class="help-card-title">Where your data lives</h2>
-                <p>PlasmaDeck stores your data in this browser profile for this exact origin. Changing from <code>localhost:5173</code> to another port creates a different storage bucket.</p>
-                <dl class="help-facts">
-                  <div><dt>Progress</dt><dd>IndexedDB</dd></div>
-                  <div><dt>Preferences</dt><dd>localStorage</dd></div>
-                  <div><dt>Backups</dt><dd>JSON export files</dd></div>
-                  <div><dt>Current origin</dt><dd id="help-origin"></dd></div>
-                </dl>
-              </div>
-            </section>
-
-            <section class="card card-filled help-card">
-              <div class="card-body">
-                <h2 class="help-card-title">Quick links</h2>
-                <div class="help-links" aria-label="Help links">
-                  <a href="docs/getting-started.md">Getting started</a>
-                  <a href="docs/content-and-catalog.md">Content and catalog</a>
-                  <a href="docs/backup-restore.md">Backup and restore</a>
-                  <a href="docs/troubleshooting.md">Troubleshooting</a>
-                  <a href="docs/roadmap.md">Roadmap</a>
-                </div>
-              </div>
-            </section>
-
-            <section class="card card-filled help-card">
-              <div class="card-body">
-                <h2 class="help-card-title">Common recovery moves</h2>
-                <div class="help-recovery-list">
-                  <div>
-                    <strong>Blank or stuck loading?</strong>
-                    <p>Run <code>npm run build</code>, hard refresh, then open <code>?debug=1</code> if it still stalls.</p>
-                  </div>
-                  <div>
-                    <strong>Data looks missing?</strong>
-                    <p>Check that you are using the same browser, profile, hostname, and port as before.</p>
-                  </div>
-                  <div>
-                    <strong>Offline app seems stale?</strong>
-                    <p>Run <code>npm run build:sw</code>, reload once online, or clear the service worker in browser devtools.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section class="card card-filled help-card">
-              <div class="card-body">
-                <h2 class="help-card-title">Keyboard essentials</h2>
-                <table class="shortcuts-table help-shortcuts">
-                  <tbody>
-                    <tr><td><kbd>Ctrl+K</kbd></td><td>Command palette</td></tr>
-                    <tr><td><kbd>Ctrl+/</kbd></td><td>All shortcuts</td></tr>
-                    <tr><td><kbd>Ctrl+B</kbd></td><td>Toggle sidebar</td></tr>
-                    <tr><td><kbd>Ctrl+=</kbd></td><td>Increase UI font size</td></tr>
-                    <tr><td><kbd>Ctrl+-</kbd></td><td>Decrease UI font size</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-        </section>
-      `);
-
-      const origin = document.getElementById('help-origin');
-      if (origin) origin.textContent = window.location.origin || 'Current browser origin';
-
-      document.getElementById('help-backup-btn')?.addEventListener('click', () => {
-        try { window.ProgressStats?.exportJSON?.(); }
-        catch { Toast.error('Export failed'); }
-      });
-      document.getElementById('help-shortcuts-btn')?.addEventListener('click', () => {
-        KeyboardShortcuts._showHelp();
+    async function bookmarks() {
+      const { mountBookmarksView } = await import('./src/views/bookmarksRoute.js');
+      return mountBookmarksView({
+        setView: set,
+        createElement,
+        Router,
+        Toast,
+        setPendingCourseMedia,
+        setPendingPdfPage,
+        sanitizeHtml: fallbackSanitizeHtml,
       });
     }
-
-    function myCourses() {
-      set(`
-        <section class="view view-my-courses">
-          <div class="page-header">
-            <h1 class="page-title">My Courses</h1>
-            <p class="page-subtitle">Your custom course drafts (coming next).</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <p>This view is now live and will store custom courses in IndexedDB in the next iteration.</p>
-            </div>
-          </div>
-        </section>
-      `);
+    async function achievements() {
+      const { mountAchievementsView } = await import('./src/views/achievementsRoute.js');
+      return mountAchievementsView({
+        setView: set,
+        Router,
+        setPendingCourseMedia,
+      });
     }
-
-    function tags() {
-      set(`
-        <section class="view view-tags">
-          <div class="page-header">
-            <h1 class="page-title">Tags</h1>
-            <p class="page-subtitle">Browse content by tag.</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <p>Tag browsing will be backed by catalog + note tags.</p>
-            </div>
-          </div>
-        </section>
-      `);
-    }
-
-    function playlists() {
-      set(`
-        <section class="view view-playlists">
-          <div class="page-header">
-            <h1 class="page-title">Playlists</h1>
-            <p class="page-subtitle">Manage playback queues.</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <p>Playlist management will be wired to the MediaPlayer queue.</p>
-            </div>
-          </div>
-        </section>
-      `);
-    }
-
-    function bookmarks() {
-      set(`
-        <section class="view view-bookmarks">
-          <div class="page-header">
-            <h1 class="page-title">Bookmarks</h1>
-            <p class="page-subtitle">Quick links into your study materials.</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <p>Bookmarks will unify PDF pages, video timestamps, and note anchors.</p>
-            </div>
-          </div>
-        </section>
-      `);
-    }
-
-    function achievements() {
-      set(`
-        <section class="view view-achievements">
-          <div class="page-header">
-            <h1 class="page-title">Achievements</h1>
-            <p class="page-subtitle">Milestones based on your progress.</p>
-          </div>
-          <div class="card card-filled">
-            <div class="card-body">
-              <p>Achievements will be computed from your progress history.</p>
-            </div>
-          </div>
-        </section>
-      `);
-    }
-
     function notFound(hash) {
-      set(`
-        <section class="view view-notfound">
-          <div class="page-header">
-            <h1 class="page-title">Not found</h1>
-            <p class="page-subtitle">No view for <code>${String(hash ?? '')}</code></p>
-          </div>
-        </section>
-      `);
+      return mountNotFoundView({ setView: set, hash });
     }
 
     return { home, courses, myCourses, materials, tags, playlists, bookmarks, achievements, settings, help, notes, pdf, studio, progress, notFound };
   })();
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 26. KEYBOARD SHORTCUTS
-  // ──────────────────────────────────────────────────────────
-
-  const KeyboardShortcuts = {
-    _shortcuts: [],
-
-    /**
-     * Register a shortcut
-     * @param {string} combo  e.g. 'ctrl+k', 'shift+/', '?'
-     * @param {Function} handler
-     * @param {string} description
-     */
-    register(combo, handler, description = '') {
-      this._shortcuts.push({ combo: combo.toLowerCase(), handler, description });
-      return this;
-    },
-
-    init() {
-      // Built-in shortcuts
-      this.register('ctrl+shift+f', () => {
-        const input = $('.topbar-search input');
-        if (input) { input.focus(); input.select(); }
-      }, 'Focus global search');
-
-      this.register('ctrl+/', () => this._showHelp(), 'Show keyboard shortcuts');
-
-      this.register('ctrl+b', () => Sidebar.toggle(), 'Toggle sidebar');
-
-      this.register('ctrl+shift+d', () => ThemeManager.toggle(), 'Toggle dark/light mode');
-
-      // Global UI font scale
-      this.register('ctrl+=', () => FontScale.inc(), 'Increase UI font size');
-      this.register('ctrl++', () => FontScale.inc(), 'Increase UI font size');
-      this.register('ctrl+-', () => FontScale.dec(), 'Decrease UI font size');
-      this.register('ctrl+0', () => FontScale.reset(), 'Reset UI font size');
-
-      document.addEventListener('keydown', e => {
-        const combo = [
-          e.ctrlKey  ? 'ctrl'  : '',
-          e.altKey   ? 'alt'   : '',
-          e.shiftKey ? 'shift' : '',
-          e.key.toLowerCase(),
-        ].filter(Boolean).join('+');
-
-        for (const { combo: c, handler } of this._shortcuts) {
-          if (c === combo) {
-            e.preventDefault();
-            handler(e);
-            return;
-          }
-        }
-      });
-    },
-
-    _showHelp() {
-      const rows = this._shortcuts.map(s =>
-        `<tr><td><kbd>${s.combo}</kbd></td><td>${s.description}</td></tr>`
-      ).join('');
-
-      Modal.create({
-        title: '⌨️ Keyboard Shortcuts',
-        body:  `<table class="shortcuts-table"><tbody>${rows}</tbody></table>`,
-        size:  'sm',
-      });
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
+  const KeyboardShortcuts = window.KeyboardShortcuts;
   // 27. AVATAR UPLOAD (settings page)
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const AvatarUpload = {
     init() {
@@ -3426,9 +2323,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 28. SETTINGS PAGE
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Settings = {
     init() {
@@ -3440,7 +2337,7 @@ import { createRouter } from './src/router/router.js';
           try {
             PlasmaDeck.bus.emit('settings:save', { data });
             if (saveIndicator) {
-              saveIndicator.textContent = '✅ Saved';
+              saveIndicator.textContent = 'âœ… Saved';
               setTimeout(() => { saveIndicator.textContent = ''; }, 2000);
             }
           } catch {
@@ -3455,24 +2352,25 @@ import { createRouter } from './src/router/router.js';
       // Delete account confirmation
       const deleteBtn = $('[data-delete-account]');
       if (deleteBtn) {
-        deleteBtn.addEventListener('click', () => {
-          Modal.confirm({
-            title:     '⚠️ Delete Account',
+        deleteBtn.addEventListener('click', async () => {
+          const confirmed = await Modal.confirmAsync({
+            title:     'âš ï¸ Delete Account',
             message:   'This action is <strong>irreversible</strong>. All your data will be permanently deleted. Are you absolutely sure?',
-            onConfirm: () => {
-              PlasmaDeck.bus.emit('account:delete');
-              Toast.error('Account deletion initiated.');
-            },
+            confirmLabel: 'Delete account',
+            cancelLabel: 'Cancel',
           });
+          if (!confirmed) return;
+          PlasmaDeck.bus.emit('account:delete');
+          Toast.error('Account deletion initiated.');
         });
       }
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 29. LAZY IMAGE LOADING
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const LazyImages = {
     init() {
@@ -3481,7 +2379,10 @@ import { createRouter } from './src/router/router.js';
           if (!entry.isIntersecting) return;
           const img = entry.target;
           if (img.dataset.src) {
-            img.src = img.dataset.src;
+            const url = safeImageUrl(img.dataset.src);
+            applyImageFallback(img);
+            img.src = url ?? IMAGE_FALLBACK_SRC;
+            if (!url) img.classList.add('image-fallback');
             img.removeAttribute('data-src');
             img.classList.add('loaded');
           }
@@ -3489,17 +2390,23 @@ import { createRouter } from './src/router/router.js';
         });
       }, { rootMargin: '0px 0px 200px 0px' });
 
-      $$('img[data-src]').forEach(img => observer.observe(img));
+      $$('img[data-src]').forEach(img => {
+        applyImageFallback(img);
+        observer.observe(img);
+      });
 
       // Expose so dynamically added images can be observed
-      PlasmaDeck.lazy = img => observer.observe(img);
+      PlasmaDeck.lazy = img => {
+        applyImageFallback(img);
+        observer.observe(img);
+      };
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 30. DATA FETCHING HELPER
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const API = {
     _baseURL: '',
@@ -3510,13 +2417,17 @@ import { createRouter } from './src/router/router.js';
 
     async request(method, path, body = null, opts = {}) {
       Progress.pageBar.start();
-      const url     = `${this._baseURL}${path}`;
+      const url     = safeFetchUrl(this._baseURL, path);
+      if (!url) {
+        Progress.pageBar.fail();
+        throw new Error('Unsafe fetch URL');
+      }
       const options = {
         method,
         headers: { ...this._headers, ...opts.headers },
         signal:  opts.signal,
       };
-      if (body) options.body = JSON.stringify(body);
+      if (body !== null && body !== undefined) options.body = JSON.stringify(body);
 
       try {
         const res  = await fetch(url, options);
@@ -3544,9 +2455,9 @@ import { createRouter } from './src/router/router.js';
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 31. HEATMAP CALENDAR (renders inside [data-heatmap])
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Heatmap = {
     /**
@@ -3585,71 +2496,29 @@ import { createRouter } from './src/router/router.js';
         grid.appendChild(col);
       }
 
-      el.innerHTML = '';
-      el.appendChild(grid);
+      el.replaceChildren(grid);
     }
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 32. INITIALIZATION
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function initEnhancements() {
     // Breadcrumb updates from router events
     const breadcrumbList = document.getElementById('breadcrumb-list');
-    const routeTitle = (hash) => ({
-      '#/home': 'Home',
-      '#/courses': 'Courses',
-      '#/my-courses': 'My Courses',
-      '#/materials': 'Materials',
-      '#/tags': 'Tags',
-      '#/playlists': 'Playlists',
-      '#/bookmarks': 'Bookmarks',
-      '#/notes': 'Notes',
-      '#/pdf': 'PDF',
-      '#/studio': 'Studio',
-      '#/progress': 'Progress',
-      '#/achievements': 'Achievements',
-      '#/settings': 'Settings',
-    }[hash] ?? 'PlasmaDeck');
-
-    const escHtml = (str) => String(str).replace(
-      /[&<>"']/g,
-      m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])
-    );
-
     if (breadcrumbList) {
       PlasmaDeck.bus.on?.('route:change', ({ hash }) => {
-        breadcrumbList.innerHTML = `
-          <li class="breadcrumb-item"><a href="#/home" class="breadcrumb-link">Home</a></li>
-          <li class="breadcrumb-item"><span class="breadcrumb-current">${escHtml(routeTitle(hash))}</span></li>
-        `;
+        const home = createElement('li', { class: 'breadcrumb-item' },
+          createElement('a', { href: '#/home', class: 'breadcrumb-link' }, 'Home')
+        );
+        const current = createElement('li', { class: 'breadcrumb-item' },
+          createElement('span', { class: 'breadcrumb-current' }, routeTitle(hash))
+        );
+        breadcrumbList.replaceChildren(home, current);
       });
     }
-
-    // Storage usage meter
-    const storageBar = document.getElementById('storage-bar');
-    const storageLabel = document.getElementById('storage-label');
-    const updateStorage = async () => {
-      if (!storageBar || !storageLabel || !navigator.storage?.estimate) return;
-      try {
-        const est = await navigator.storage.estimate();
-        const used = est.usage ?? 0;
-        const quota = est.quota ?? 0;
-        const pct = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0;
-        storageBar.style.width = `${pct}%`;
-        storageLabel.textContent = quota
-          ? `${(used / (1024 * 1024)).toFixed(1)} MB / ${(quota / (1024 * 1024)).toFixed(0)} MB`
-          : '—';
-        const wrap = storageBar.closest('[role="progressbar"]');
-        wrap?.setAttribute?.('aria-valuenow', String(pct));
-      } catch {
-        storageLabel.textContent = '—';
-      }
-    };
-    updateStorage();
-    setInterval(updateStorage, 30_000);
 
     // Theme-color meta sync
     const metaTheme = document.getElementById('meta-theme-color');
@@ -3674,10 +2543,13 @@ import { createRouter } from './src/router/router.js';
     if (!document.documentElement.dataset.pdSwBound) {
       document.documentElement.dataset.pdSwBound = 'true';
       document.addEventListener('plasma:sw-update-ready', () => {
+        const reloadWrap = createElement('div', { style: { marginTop: '8px' } });
+        const reloadBtn = createElement('button', { class: 'btn btn-primary btn-sm', 'data-sw-reload': '' }, 'Reload');
+        reloadWrap.appendChild(reloadBtn);
         const t = Toast.show?.({
           type: 'info',
           message: 'Update available. Reload to apply?',
-          action: `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" data-sw-reload>Reload</button></div>`,
+          action: reloadWrap,
           duration: 8000,
         });
         const btn = t?.querySelector?.('[data-sw-reload]');
@@ -3705,6 +2577,7 @@ import { createRouter } from './src/router/router.js';
     Accordion.init();
 
     Toast.init();
+    StorageAlerts.init();
 
     Forms.init();
     Tables.init();
@@ -3734,11 +2607,11 @@ import { createRouter } from './src/router/router.js';
     Router
       .on('#/', () => Router.navigate('#/home'))
       .on('#/home', () => Views.home())
-      .on('#/courses', () => Views.courses())
-      .on('#/notes', () => Views.notes())
-      .on('#/pdf', () => Views.pdf())
-      .on('#/studio', () => Views.studio())
-      .on('#/progress', () => Views.progress())
+      .on('#/courses', async (_hash, ctx) => { await loadRouteFeatures('player'); if (!ctx?.isCurrent?.()) return undefined; return Views.courses(); })
+      .on('#/notes', async (_hash, ctx) => { await loadRouteFeatures('notes'); if (!ctx?.isCurrent?.()) return undefined; return Views.notes(); })
+      .on('#/pdf', async (_hash, ctx) => { await loadRouteFeatures('pdf'); if (!ctx?.isCurrent?.()) return undefined; return Views.pdf(); })
+      .on('#/studio', async (_hash, ctx) => { await loadRouteFeatures('canvas'); if (!ctx?.isCurrent?.()) return undefined; return Views.studio(); })
+      .on('#/progress', async (_hash, ctx) => { await loadRouteFeatures('progress'); if (!ctx?.isCurrent?.()) return undefined; return Views.progress(); })
       .on('#/help', () => Views.help())
       .on('#/settings', () => Views.settings())
       .on('#/my-courses', () => Views.myCourses())
@@ -3748,16 +2621,19 @@ import { createRouter } from './src/router/router.js';
       .on('#/bookmarks', () => Views.bookmarks())
       .on('#/achievements', () => Views.achievements());
 
+    SyncRouteRefresh.init();
     Router.init();
 
     // Expose utilities globally
     PlasmaDeck.Toast      = Toast;
+    PlasmaDeck.StorageAlerts = StorageAlerts;
     PlasmaDeck.Modal      = Modal;
     PlasmaDeck.Drawer     = Drawer;
     PlasmaDeck.Dropdown   = Dropdown;
     PlasmaDeck.Progress   = Progress;
     PlasmaDeck.API        = API;
     PlasmaDeck.Router     = Router;
+    PlasmaDeck.SyncRouteRefresh = SyncRouteRefresh;
     // Core preferences + theming (used by ES modules in src/)
     PlasmaDeck.ThemeManager = ThemeManager;
     PlasmaDeck.Prefs        = Prefs;
@@ -3766,7 +2642,17 @@ import { createRouter } from './src/router/router.js';
     PlasmaDeck.Heatmap    = Heatmap;
     PlasmaDeck.Skeleton   = Skeleton;
     PlasmaDeck.InfiniteScroll = InfiniteScroll;
+    PlasmaDeck.Charts     = Charts;
     PlasmaDeck.Views      = Views;
+    PlasmaDeck.TopbarSearch = TopbarSearch;
+    PlasmaDeck.safeExternalUrl = safeExternalUrl;
+    PlasmaDeck.safeNavigationUrl = safeNavigationUrl;
+    PlasmaDeck.safeMediaUrl = safeMediaUrl;
+    PlasmaDeck.safeImageUrl = safeImageUrl;
+    PlasmaDeck.safeFrameUrl = safeFrameUrl;
+    PlasmaDeck.safeFetchUrl = safeFetchUrl;
+    PlasmaDeck.applyImageFallback = applyImageFallback;
+    PlasmaDeck.IMAGE_FALLBACK_SRC = IMAGE_FALLBACK_SRC;
 
     // Fire ready event
     PlasmaDeck.bus.emit('app:ready');
@@ -3786,7 +2672,7 @@ import { createRouter } from './src/router/router.js';
       requestAnimationFrame(() => splash.classList.add('fade-out'));
 
       // Remove after transition (and fallback timeout)
-      const remove = () => { try { splash.remove(); } catch (_) {} };
+      const remove = () => { try { splash.remove(); } catch {} };
       splash.addEventListener('transitionend', remove, { once: true });
       setTimeout(remove, 1500);
     }
@@ -3801,3 +2687,8 @@ import { createRouter } from './src/router/router.js';
   }
 
 })();
+
+
+
+
+

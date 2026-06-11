@@ -1,0 +1,18 @@
+{
+  "name": "PlasmaDeck",
+  "version": "1.1.2",
+  "entry": "desktop/main.cjs",
+  "fallbackEntry": "desktop/app-window.cjs",
+  "generatedAt": "2026-05-07T08:25:12.286Z",
+  "runtime": {
+    "preferred": "electron",
+    "fallback": "chromium-app-window"
+  },
+  "security": {
+    "nodeIntegration": false,
+    "contextIsolation": true,
+    "sandbox": true,
+    "externalNavigation": "open-http-https-in-os",
+    "permissions": "deny-by-default"
+  }
+}

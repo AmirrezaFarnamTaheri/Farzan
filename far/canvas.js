@@ -1,9 +1,9 @@
 // ============================================================
-// PlasmaDeck — canvas.js
+// PlasmaDeck â€” canvas.js
 // Full Whiteboard / Drawing Canvas
 // Features: Pen, Shapes, Text, Eraser, Select, Layers,
 //           Undo/Redo, Grid, Export PNG/SVG, Mini-map
-// Pure Canvas 2D — no external dependencies
+// Version: 1.1.1 (Schema Normalization)
 // ============================================================
 
 (() => {
@@ -16,9 +16,9 @@
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 0. STATE
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const State = {
     // Canvas transform
@@ -79,9 +79,9 @@
     dragLastY:   0,
   };
 
-  // ──────────────────────────────────────────────────────────
-  // 1. ELEMENT TYPES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 1. ELEMENT TYPES (Canonical Schema)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   class CanvasElement {
     constructor(type, opts = {}) {
@@ -90,9 +90,6 @@
       this.layerId     = opts.layerId ?? State.layers[State.activeLayerIdx]?.id;
       this.strokeColor = opts.strokeColor ?? State.strokeColor;
       this.fillColor   = opts.fillColor   ?? State.fillColor;
-      this.strokeWidth = opts.strokeWidth ?? State.strokeWidth;
-      this.opacity     = opts.opacity     ?? State.opacity;
-      this.lineCap     = opts.lineCap     ?? State.lineCap;
       this.lineJoin    = opts.lineJoin    ?? State.lineJoin;
       this.dashPattern = opts.dashPattern ?? [...State.dashPattern];
       this.x           = opts.x           ?? 0;
@@ -104,7 +101,7 @@
   class PathElement extends CanvasElement {
     constructor(opts = {}) {
       super('path', opts);
-      this.points = opts.points ?? []; // [{x, y, pressure}]
+      this.points = opts.points ?? [];
       this.smooth = opts.smooth ?? true;
     }
   }
@@ -112,21 +109,28 @@
   class RectElement extends CanvasElement {
     constructor(opts = {}) {
       super('rect', opts);
-      this.x      = opts.x      ?? 0;
-      this.y      = opts.y      ?? 0;
       this.width  = opts.width  ?? 100;
       this.height = opts.height ?? 60;
-      this.rx     = opts.rx     ?? 0;    // border radius
+      this.rx     = opts.rx     ?? 0;
     }
   }
 
   class CircleElement extends CanvasElement {
     constructor(opts = {}) {
       super('circle', opts);
-      this.cx = opts.cx ?? 0;
-      this.cy = opts.cy ?? 0;
-      this.rx = opts.rx ?? 50;
-      this.ry = opts.ry ?? 50;
+      this.x      = opts.x      ?? opts.cx ?? 0;
+      this.y      = opts.y      ?? opts.cy ?? 0;
+      this.radius = opts.radius ?? opts.rx ?? 50;
+    }
+  }
+
+  class EllipseElement extends CanvasElement {
+    constructor(opts = {}) {
+      super('ellipse', opts);
+      this.x       = opts.x       ?? opts.cx ?? 0;
+      this.y       = opts.y       ?? opts.cy ?? 0;
+      this.radiusX = opts.radiusX ?? opts.rx ?? 50;
+      this.radiusY = opts.radiusY ?? opts.ry ?? 30;
     }
   }
 
@@ -173,7 +177,7 @@
   }
 
 
-  // ──────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────
   // 2. CANVAS MANAGER
   // ──────────────────────────────────────────────────────────
 

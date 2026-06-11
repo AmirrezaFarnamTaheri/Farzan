@@ -1,0 +1,179 @@
+/* ── DARK (default) ── */
+  [data-theme="dark"] {
+    --bg:             #0f0f1a;
+    --bg-secondary:   #13131f;
+    --surface:        #1a1a2e;
+    --surface-2:      #1e1e35;
+    --surface-3:      #252540;
+    --surface-hover:  #2a2a48;
+    --surface-active: #30305a;
+    --border:         rgba(255,255,255,0.07);
+    --border-strong:  rgba(255,255,255,0.14);
+    --text-primary:   #f0f0ff;
+    --text-secondary: rgba(240,240,255,0.65);
+    --text-tertiary:  rgba(240,240,255,0.38);
+    --text-disabled:  rgba(240,240,255,0.22);
+    --text-inverse:   #0f0f1a;
+    --shadow-xs:      0 1px 2px rgba(0,0,0,0.4);
+    --shadow-sm:      0 2px 8px rgba(0,0,0,0.45);
+    --shadow-md:      0 4px 20px rgba(0,0,0,0.5);
+    --shadow-lg:      0 8px 40px rgba(0,0,0,0.6);
+    --shadow-xl:      0 16px 64px rgba(0,0,0,0.7);
+    --shadow-card:    0 2px 12px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── LIGHT ── */
+  [data-theme="light"] {
+    --bg:             #f5f5fa;
+    --bg-secondary:   #ededf5;
+    --surface:        #ffffff;
+    --surface-2:      #f8f8fd;
+    --surface-3:      #f0f0f8;
+    --surface-hover:  #ebebf5;
+    --surface-active: #e0e0f0;
+    --border:         rgba(0,0,0,0.08);
+    --border-strong:  rgba(0,0,0,0.15);
+    --text-primary:   #1a1a2e;
+    --text-secondary: rgba(26,26,46,0.65);
+    --text-tertiary:  rgba(26,26,46,0.40);
+    --text-disabled:  rgba(26,26,46,0.25);
+    --text-inverse:   #ffffff;
+    --shadow-xs:      0 1px 2px rgba(0,0,0,0.06);
+    --shadow-sm:      0 2px 8px rgba(0,0,0,0.08);
+    --shadow-md:      0 4px 20px rgba(0,0,0,0.10);
+    --shadow-lg:      0 8px 40px rgba(0,0,0,0.12);
+    --shadow-xl:      0 16px 64px rgba(0,0,0,0.15);
+    --shadow-card:    0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px var(--border);
+    color-scheme: light;
+  }
+
+  /* ── MIDNIGHT ── */
+  [data-theme="midnight"] {
+    --bg:             #000008;
+    --bg-secondary:   #05050f;
+    --surface:        #0a0a18;
+    --surface-2:      #0e0e20;
+    --surface-3:      #141428;
+    --surface-hover:  #1a1a32;
+    --surface-active: #20203c;
+    --border:         rgba(100,100,255,0.08);
+    --border-strong:  rgba(100,100,255,0.16);
+    --text-primary:   #e8e8ff;
+    --text-secondary: rgba(232,232,255,0.60);
+    --text-tertiary:  rgba(232,232,255,0.35);
+    --text-disabled:  rgba(232,232,255,0.20);
+    --text-inverse:   #000008;
+    --shadow-xs:      0 1px 2px rgba(0,0,20,0.6);
+    --shadow-sm:      0 2px 8px rgba(0,0,20,0.7);
+    --shadow-md:      0 4px 20px rgba(0,0,20,0.8);
+    --shadow-lg:      0 8px 40px rgba(0,0,20,0.9);
+    --shadow-xl:      0 16px 64px rgba(0,0,20,0.95);
+    --shadow-card:    0 2px 12px rgba(0,0,20,0.7), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── FOREST ── */
+  [data-theme="forest"] {
+    --bg:             #0a120a;
+    --bg-secondary:   #0e180e;
+    --surface:        #141e14;
+    --surface-2:      #182418;
+    --surface-3:      #1e2c1e;
+    --surface-hover:  #243424;
+    --surface-active: #2a3c2a;
+    --border:         rgba(100,200,100,0.08);
+    --border-strong:  rgba(100,200,100,0.16);
+    --text-primary:   #e8f5e8;
+    --text-secondary: rgba(232,245,232,0.65);
+    --text-tertiary:  rgba(232,245,232,0.38);
+    --text-disabled:  rgba(232,245,232,0.22);
+    --text-inverse:   #0a120a;
+    --shadow-card:    0 2px 12px rgba(0,10,0,0.5), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── OCEAN ── */
+  [data-theme="ocean"] {
+    --bg:             #020c18;
+    --bg-secondary:   #041020;
+    --surface:        #071828;
+    --surface-2:      #0a1e30;
+    --surface-3:      #0e2638;
+    --surface-hover:  #122e44;
+    --surface-active: #163650;
+    --border:         rgba(0,180,255,0.08);
+    --border-strong:  rgba(0,180,255,0.16);
+    --text-primary:   #e0f4ff;
+    --text-secondary: rgba(224,244,255,0.65);
+    --text-tertiary:  rgba(224,244,255,0.38);
+    --text-disabled:  rgba(224,244,255,0.22);
+    --text-inverse:   #020c18;
+    --shadow-card:    0 2px 12px rgba(0,10,30,0.6), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── SUNSET ── */
+  [data-theme="sunset"] {
+    --bg:             #180a00;
+    --bg-secondary:   #200e00;
+    --surface:        #2a1200;
+    --surface-2:      #321600;
+    --surface-3:      #3c1c00;
+    --surface-hover:  #482200;
+    --surface-active: #542800;
+    --border:         rgba(255,140,0,0.08);
+    --border-strong:  rgba(255,140,0,0.16);
+    --text-primary:   #fff0e0;
+    --text-secondary: rgba(255,240,224,0.65);
+    --text-tertiary:  rgba(255,240,224,0.38);
+    --text-disabled:  rgba(255,240,224,0.22);
+    --text-inverse:   #180a00;
+    --shadow-card:    0 2px 12px rgba(30,10,0,0.6), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── ROSE ── */
+  [data-theme="rose"] {
+    --bg:             #180010;
+    --bg-secondary:   #200018;
+    --surface:        #2a0020;
+    --surface-2:      #320028;
+    --surface-3:      #3c0030;
+    --surface-hover:  #480038;
+    --surface-active: #540040;
+    --border:         rgba(255,100,180,0.08);
+    --border-strong:  rgba(255,100,180,0.16);
+    --text-primary:   #ffe8f8;
+    --text-secondary: rgba(255,232,248,0.65);
+    --text-tertiary:  rgba(255,232,248,0.38);
+    --text-disabled:  rgba(255,232,248,0.22);
+    --text-inverse:   #180010;
+    --shadow-card:    0 2px 12px rgba(30,0,20,0.6), 0 0 0 1px var(--border);
+    color-scheme: dark;
+  }
+
+  /* ── PAPER ── */
+  [data-theme="paper"] {
+    --bg:             #faf8f0;
+    --bg-secondary:   #f5f2e8;
+    --surface:        #fffef8;
+    --surface-2:      #faf8f0;
+    --surface-3:      #f5f2e8;
+    --surface-hover:  #ede9dc;
+    --surface-active: #e5e0d0;
+    --border:         rgba(100,80,40,0.10);
+    --border-strong:  rgba(100,80,40,0.20);
+    --text-primary:   #2c2416;
+    --text-secondary: rgba(44,36,22,0.65);
+    --text-tertiary:  rgba(44,36,22,0.40);
+    --text-disabled:  rgba(44,36,22,0.25);
+    --text-inverse:   #fffef8;
+    --shadow-xs:      0 1px 2px rgba(100,80,40,0.08);
+    --shadow-sm:      0 2px 8px rgba(100,80,40,0.10);
+    --shadow-md:      0 4px 20px rgba(100,80,40,0.12);
+    --shadow-lg:      0 8px 40px rgba(100,80,40,0.15);
+    --shadow-xl:      0 16px 64px rgba(100,80,40,0.18);
+    --shadow-card:    0 2px 12px rgba(100,80,40,0.10), 0 0 0 1px var(--border);
+    color-scheme: light;
+  }

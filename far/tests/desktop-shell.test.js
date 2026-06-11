@@ -1,0 +1,80 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+describe('desktop shell wiring', () => {
+  it('keeps the desktop launcher wired as an explicit app-window path', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+    const rootLauncher = fs.readFileSync(path.join(process.cwd(), '..', 'PlasmaDeck.bat'), 'utf8');
+    const rootInstaller = fs.readFileSync(path.join(process.cwd(), '..', 'Install-PlasmaDeck.cmd'), 'utf8');
+    const main = fs.readFileSync(path.join(process.cwd(), 'desktop/main.cjs'), 'utf8');
+    const launch = fs.readFileSync(path.join(process.cwd(), 'desktop/launch.cjs'), 'utf8');
+    const appWindow = fs.readFileSync(path.join(process.cwd(), 'desktop/app-window.cjs'), 'utf8');
+    const pack = fs.readFileSync(path.join(process.cwd(), 'desktop/package-portable.cjs'), 'utf8');
+    const nativeCargo = fs.readFileSync(path.join(process.cwd(), 'scripts/native-cargo.cjs'), 'utf8');
+    const preflight = fs.readFileSync(path.join(process.cwd(), 'scripts/native-preflight.cjs'), 'utf8');
+    const stageNative = fs.readFileSync(path.join(process.cwd(), 'scripts/stage-native-exe.cjs'), 'utf8');
+    const tauriCargo = fs.readFileSync(path.join(process.cwd(), 'src-tauri/Cargo.toml'), 'utf8');
+    const tauriConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8'));
+    const tauriNsis = fs.readFileSync(
+      path.join(process.cwd(), 'tauri-dev/tauri-dev/crates/tauri-bundler/src/bundle/windows/nsis/mod.rs'),
+      'utf8',
+    );
+
+    expect(packageJson.scripts.desktop).toBe('npm run build && node desktop/launch.cjs');
+    expect(packageJson.scripts['desktop:app-window']).toBe('npm run build && node desktop/app-window.cjs');
+    expect(packageJson.scripts['desktop:package']).toBe('npm run build && node desktop/package-portable.cjs');
+    expect(packageJson.scripts['native:preflight']).toBe('node scripts/native-preflight.cjs');
+    expect(packageJson.scripts['native:preflight:strict']).toBe('node scripts/native-preflight.cjs --strict');
+    expect(packageJson.scripts['tauri:check']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml');
+    expect(packageJson.scripts['tauri:build']).toContain('node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml');
+    expect(packageJson.scripts['native:exe']).toBe('npm run tauri:build && node scripts/stage-native-exe.cjs');
+    expect(packageJson.scripts['tauri:bundle']).toContain('node scripts/native-cargo.cjs run --manifest-path tauri-dev/tauri-dev/crates/tauri-cli/Cargo.toml');
+    expect(packageJson.scripts['native:package']).toBe('npm run tauri:bundle');
+    expect(rootLauncher).toContain('desktop-dist\\PlasmaDeck-Native\\PlasmaDeck.exe');
+    expect(rootLauncher).toContain('PlasmaDeck-OneClick.bat');
+    expect(rootInstaller).toContain('PlasmaDeck_1.1.2_x64-setup.exe');
+    expect(rootInstaller).toContain('npm run native:package');
+    expect(main).toContain('BrowserWindow');
+    expect(main).toContain("createServer({ root })");
+    expect(main).toContain('setWindowOpenHandler');
+    expect(main).toContain('nodeIntegration: false');
+    expect(main).toContain('contextIsolation: true');
+    expect(main).toContain('requestSingleInstanceLock');
+    expect(main).toContain('setPermissionRequestHandler');
+    expect(main).toContain("app.setPath('userData'");
+    expect(main).toContain('webSecurity: true');
+    expect(launch).toContain('Electron is not installed');
+    expect(appWindow).toContain('--app=');
+    expect(appWindow).toContain('PLASMADECK_BROWSER');
+    expect(appWindow).toContain('createServer({ root })');
+    expect(pack).toContain('plasmadeck-desktop.json');
+    expect(pack).toContain("preferred: 'electron'");
+    expect(pack).toContain("permissions: 'deny-by-default'");
+    expect(nativeCargo).toContain('CARGO_HOME');
+    expect(nativeCargo).toContain("path.resolve(root, '..', '.cargo')");
+    expect(preflight).toContain('Cargo dependencies resolve offline');
+    expect(preflight).toContain('repo-root Cargo cache is available');
+    expect(preflight).toContain('repo-root Cargo cache covers locked registry packages');
+    expect(preflight).toContain('parseLockedRegistryPackages');
+    expect(preflight).toContain('native-cargo-missing.txt');
+    expect(preflight).toContain('native:preflight:strict');
+    expect(stageNative).toContain('PlasmaDeck-Native');
+    expect(stageNative).toContain("dist', 'index.html'");
+    expect(stageNative).toContain('Native frontend asset not found');
+    expect(stageNative).toContain('pending-nsis-toolchain');
+    expect(stageNative).toContain("status: stagedInstallers.length ? 'staged'");
+    expect(stageNative).toContain('PlasmaDeck.exe');
+    expect(stageNative).toContain('embedded dist assets with index.html shell');
+    expect(preflight).toContain('tauri-dev/tauri-dev/crates/tauri');
+    expect(tauriCargo).toContain('../tauri-dev/tauri-dev/crates/tauri');
+    expect(tauriCargo).toContain('../tauri-dev/tauri-dev/crates/tauri-build');
+    expect(tauriNsis).toContain('Bin").join("makensis.exe")');
+    expect(tauriNsis).toContain('bin_makensis.exists()');
+    expect(tauriConfig.productName).toBe('PlasmaDeck');
+    expect(tauriConfig.build.frontendDist).toBe('../dist');
+    expect(tauriConfig.bundle.targets).toContain('nsis');
+    expect(tauriConfig.app.windows[0].title).toBe('PlasmaDeck');
+    expect(tauriConfig.app.security.freezePrototype).toBe(true);
+  });
+});

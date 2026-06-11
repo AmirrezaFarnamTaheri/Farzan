@@ -147,3 +147,5 @@ if ('serviceWorker' in navigator) {
 }
 
 try { initCommandPalette(); } catch (e) { console.warn('[PlasmaDeck] initCommandPalette failed', e); }
+
+

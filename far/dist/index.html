@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="plasma" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="PlasmaDeck — Your personal interactive learning studio" />
+  <meta name="theme-color" content="#7c3aed" id="meta-theme-color" />
+  <meta name="color-scheme" content="dark light" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' blob: data:;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline';
+             font-src 'self' data:;
+             img-src 'self' blob: data: http: https:;
+             media-src 'self' blob: data: http: https:;
+             connect-src 'self' blob: data: http: https:;
+             frame-src 'self' blob: http: https:;
+             worker-src 'self' blob:;" />
+
+  <!-- Open Graph / Share -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="PlasmaDeck Learning Studio" />
+  <meta property="og:description" content="Your personal interactive learning studio with video, PDF, notes, canvas and progress tracking." />
+  <meta property="og:image" content="./assets/og-cover.svg" />
+  <meta property="og:url" content="" id="og-url" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PlasmaDeck Learning Studio" />
+  <meta name="twitter:description" content="Your personal interactive learning studio." />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+
+  <!-- Stylesheets are loaded directly so strict CSP does not block inline preload handlers. -->
+  <link rel="stylesheet" href="./vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="./style.css" />
+
+  <title>PlasmaDeck — Learning Studio</title>
+
+  <!-- Critical inline styles to prevent FOUC -->
+  <style>
+    :root {
+      --skeleton-base: #1e1e2e;
+      --skeleton-shine: #2a2a3e;
+    }
+    [data-theme="light"] {
+      --skeleton-base: #e8e8f0;
+      --skeleton-shine: #f0f0f8;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--skeleton-base);
+      font-family: Inter, system-ui, sans-serif;
+      overflow-x: hidden;
+      overflow-y: auto;
+      min-height: 100%;
+    }
+    #app-loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--skeleton-base);
+      z-index: 99999;
+      gap: 1.5rem;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    #app-loading.fade-out {
+      opacity: 0; visibility: hidden; pointer-events: none;
+    }
+    .splash-logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #7c3aed, #06b6d4);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; color: white;
+      animation: splash-pulse 1.2s ease-in-out infinite alternate;
+      box-shadow: 0 0 40px rgba(124,58,237,0.4);
+    }
+    .splash-label {
+      font-size: 1.5rem; font-weight: 800;
+      background: linear-gradient(135deg, #7c3aed, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+    .splash-bar-wrap {
+      width: 200px; height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px; overflow: hidden;
+    }
+    .splash-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #06b6d4);
+      border-radius: 99px;
+      animation: splash-bar 1.8s ease-in-out infinite;
+    }
+    .splash-status {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.05em;
+    }
+    [data-theme="light"] .splash-status { color: rgba(0,0,0,0.4); }
+    @keyframes splash-pulse {
+      from { transform: scale(1); box-shadow: 0 0 40px rgba(124,58,237,0.4); }
+      to   { transform: scale(1.08); box-shadow: 0 0 60px rgba(6,182,212,0.5); }
+    }
+    @keyframes splash-bar {
+      0%   { width: 0%; margin-left: 0%; }
+      50%  { width: 60%; margin-left: 20%; }
+      100% { width: 0%; margin-left: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <!-- ═══════════════════════════════════════════
+       LOADING SPLASH SCREEN
+  ════════════════════════════════════════════ -->
+  <div id="app-loading" role="status" aria-label="Loading PlasmaDeck">
+    <div class="splash-logo" aria-hidden="true">⚡</div>
+    <div class="splash-label">PlasmaDeck</div>
+    <div class="splash-bar-wrap">
+      <div class="splash-bar"></div>
+    </div>
+    <div class="splash-status" id="splash-status">Initializing…</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       NO-SCRIPT FALLBACK
+  ════════════════════════════════════════════ -->
+  <noscript>
+    <div style="
+      position:fixed;inset:0;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      background:#0f0f1a;color:#fff;
+      font-family:Inter,system-ui,sans-serif;
+      text-align:center;gap:1rem;padding:2rem;
+      z-index:999999;">
+      <div style="font-size:3rem;">⚡</div>
+      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">PlasmaDeck requires JavaScript</h1>
+      <p style="color:rgba(255,255,255,0.6);max-width:400px;line-height:1.6;margin:0;">
+        Please enable JavaScript in your browser to use PlasmaDeck.
+        This application is a client-side learning studio that stores all your data locally.
+      </p>
+      <div style="color:rgba(255,255,255,0.6);max-width:520px;line-height:1.6;">
+        To use PlasmaDeck, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
+      </div>
+    </div>
+  </noscript>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN APPLICATION LAYOUT
+  ════════════════════════════════════════════ -->
+  <div id="plasma-app" class="plasma-app" aria-label="PlasmaDeck Learning Studio">
+
+    <!-- ── SIDEBAR ─────────────────────────────── -->
+    <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">
+
+      <!-- Logo -->
+      <div class="sidebar-logo" aria-label="PlasmaDeck home">
+        <div class="sidebar-logo-icon" aria-hidden="true">⚡</div>
+        <span class="sidebar-logo-text">PlasmaDeck</span>
+        <button class="sidebar-collapse-btn" id="sidebar-collapse-btn"
+          aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+B)">
+          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <!-- Search -->
+      <div class="sidebar-search-wrap" role="search">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="sidebar-search" class="sidebar-search"
+          placeholder="Quick search… (Ctrl+K)"
+          aria-label="Quick search courses and lessons"
+          autocomplete="off" spellcheck="false" />
+        <kbd class="sidebar-search-kbd" aria-hidden="true">⌘K</kbd>
+      </div>
+
+      <!-- Navigation Groups -->
+      <nav class="sidebar-nav" aria-label="Application sections">
+
+        <div class="nav-group">
+          <span class="nav-group-label">Library</span>
+          <a href="#/home" class="nav-item" data-route="/home" aria-label="Home dashboard">
+            <i class="fa-solid fa-house" aria-hidden="true"></i>
+            <span class="nav-item-text">Home</span>
+            <span class="nav-badge" id="nav-badge-home" aria-label="0 items" hidden>0</span>
+          </a>
+          <a href="#/courses" class="nav-item" data-route="/courses" aria-label="Browse courses">
+            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+            <span class="nav-item-text">Courses</span>
+            <span class="nav-badge" id="nav-badge-courses" aria-label="" hidden></span>
+          </a>
+          <a href="#/my-courses" class="nav-item" data-route="/my-courses" aria-label="My custom courses">
+            <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+            <span class="nav-item-text">My Courses</span>
+            <span class="nav-badge" id="nav-badge-my-courses" aria-label="" hidden></span>
+          </a>
+          <a href="#/materials" class="nav-item" data-route="/materials" aria-label="My materials library">
+            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+            <span class="nav-item-text">Materials</span>
+            <span class="nav-badge" id="nav-badge-materials" aria-label="" hidden></span>
+          </a>
+          <a href="#/tags" class="nav-item" data-route="/tags" aria-label="Browse by tags">
+            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+            <span class="nav-item-text">Tags</span>
+          </a>
+          <a href="#/playlists" class="nav-item" data-route="/playlists" aria-label="Playlists">
+            <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+            <span class="nav-item-text">Playlists</span>
+            <span class="nav-badge" id="nav-badge-playlists" aria-label="" hidden></span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">Tools</span>
+          <a href="#/studio" class="nav-item" data-route="/studio" aria-label="Canvas studio">
+            <i class="fa-solid fa-pen-ruler" aria-hidden="true"></i>
+            <span class="nav-item-text">Studio</span>
+          </a>
+          <a href="#/notes" class="nav-item" data-route="/notes" aria-label="All notes">
+            <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+            <span class="nav-item-text">Notes</span>
+            <span class="nav-badge" id="nav-badge-notes" aria-label="" hidden></span>
+          </a>
+          <a href="#/bookmarks" class="nav-item" data-route="/bookmarks" aria-label="Bookmarks">
+            <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+            <span class="nav-item-text">Bookmarks</span>
+            <span class="nav-badge" id="nav-badge-bookmarks" aria-label="" hidden></span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">Insights</span>
+          <a href="#/progress" class="nav-item" data-route="/progress" aria-label="Progress and analytics">
+            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+            <span class="nav-item-text">Progress</span>
+          </a>
+          <a href="#/achievements" class="nav-item" data-route="/achievements" aria-label="Achievements">
+            <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+            <span class="nav-item-text">Achievements</span>
+            <span class="nav-badge nav-badge--gold" id="nav-badge-achievements" aria-label="" hidden></span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">System</span>
+          <a href="#/help" class="nav-item" data-route="/help" aria-label="Help and onboarding">
+            <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+            <span class="nav-item-text">Help</span>
+          </a>
+          <a href="#/settings" class="nav-item" data-route="/settings" aria-label="Settings">
+            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+            <span class="nav-item-text">Settings</span>
+          </a>
+        </div>
+
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <!-- Currently Playing Mini -->
+        <div class="now-playing-mini" id="now-playing-mini" hidden aria-live="polite">
+          <div class="now-playing-thumb" id="now-playing-thumb" aria-hidden="true"></div>
+          <div class="now-playing-info">
+            <span class="now-playing-title" id="now-playing-title"></span>
+            <span class="now-playing-course" id="now-playing-course"></span>
+          </div>
+          <button class="now-playing-btn" id="now-playing-stop" aria-label="Stop playback">
+            <i class="fa-solid fa-stop" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Storage Usage -->
+        <div class="storage-usage" id="storage-usage" title="Storage usage">
+          <div class="storage-bar-wrap" role="progressbar" aria-label="Storage used"
+            aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="storage-bar" id="storage-bar"></div>
+          </div>
+          <span class="storage-label" id="storage-label">Calculating…</span>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="sidebar-footer-actions">
+          <button class="footer-btn" id="theme-toggle-btn"
+            aria-label="Toggle theme" title="Toggle theme (Ctrl+T)">
+            <i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>
+          </button>
+          <button class="footer-btn" id="fullscreen-btn"
+            aria-label="Toggle fullscreen" title="Toggle fullscreen (F11)">
+            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+          </button>
+          <button class="footer-btn" id="command-palette-btn"
+            aria-label="Open command palette" title="Command palette (Ctrl+K)">
+            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── MAIN CONTENT ──────────────────────────── -->
+    <main id="main-content" class="main-content" role="main" aria-live="polite" aria-atomic="false" tabindex="-1">
+
+      <!-- Top Bar -->
+      <header class="topbar" id="topbar" role="banner">
+        <div class="topbar-left">
+          <button class="topbar-menu-btn" id="mobile-menu-btn"
+            aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
+          <!-- Breadcrumb -->
+          <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb navigation">
+            <ol class="breadcrumb-list" id="breadcrumb-list">
+              <li class="breadcrumb-item">
+                <a href="#/home" class="breadcrumb-link">Home</a>
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <div class="topbar-right">
+          <!-- Quick actions -->
+          <button class="topbar-action-btn" id="topbar-search-btn"
+            aria-label="Search" title="Search (Ctrl+K)">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          </button>
+          <button class="topbar-action-btn" id="topbar-notifications-btn"
+            type="button"
+            data-notifications-toggle
+            aria-label="Notifications" title="Notifications">
+            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+            <span class="topbar-notif-badge topbar-notif-dot" id="topbar-notif-dot" hidden aria-hidden="true"></span>
+          </button>
+          <button class="topbar-action-btn" id="topbar-add-btn"
+            aria-label="Add content" title="Add content">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+          </button>
+          <!-- Theme Quick Switcher -->
+          <div class="theme-quick-wrap" id="theme-quick-wrap">
+            <button class="theme-quick-btn" data-theme-set="dark"
+              aria-label="Dark theme" title="Dark theme">
+              <i class="fa-solid fa-moon" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="light"
+              aria-label="Light theme" title="Light theme">
+              <i class="fa-solid fa-sun" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="midnight"
+              aria-label="Midnight theme" title="Midnight theme">
+              <i class="fa-solid fa-star-and-crescent" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="forest"
+              aria-label="Forest theme" title="Forest theme">
+              <i class="fa-solid fa-leaf" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="ocean"
+              aria-label="Ocean theme" title="Ocean theme">
+              <i class="fa-solid fa-water" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="sunset"
+              aria-label="Sunset theme" title="Sunset theme">
+              <i class="fa-solid fa-cloud-sun" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="rose"
+              aria-label="Rose theme" title="Rose theme">
+              <i class="fa-solid fa-heart" aria-hidden="true"></i>
+            </button>
+            <button class="theme-quick-btn" data-theme-set="paper"
+              aria-label="Paper theme" title="Paper theme">
+              <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+            </button>
+          </div>
+          <!-- Accent Color Picker -->
+          <div class="accent-picker" id="accent-picker" role="group" aria-label="Accent color">
+            <button class="accent-dot" data-accent="plasma"
+              aria-label="Plasma accent" style="--dot-color:#7c3aed"></button>
+            <button class="accent-dot" data-accent="cyan"
+              aria-label="Cyan accent" style="--dot-color:#06b6d4"></button>
+            <button class="accent-dot" data-accent="amber"
+              aria-label="Amber accent" style="--dot-color:#f59e0b"></button>
+            <button class="accent-dot" data-accent="rose"
+              aria-label="Rose accent" style="--dot-color:#f43f5e"></button>
+            <button class="accent-dot" data-accent="emerald"
+              aria-label="Emerald accent" style="--dot-color:#10b981"></button>
+            <button class="accent-dot" data-accent="sakura"
+              aria-label="Sakura accent" style="--dot-color:#ec4899"></button>
+          </div>
+        </div>
+      </header>
+
+      <!-- View Container -->
+      <div id="view-container" class="view-container" aria-live="polite">
+        <!-- Views are dynamically injected here by app.js -->
+      </div>
+
+    </main>
+
+  </div><!-- /#plasma-app -->
+
+
+  <!-- ═══════════════════════════════════════════
+       GLOBAL OVERLAY LAYERS
+  ════════════════════════════════════════════ -->
+
+  <!-- Modal System -->
+  <div id="modal-overlay" class="modal-overlay" role="dialog"
+    aria-modal="true" aria-labelledby="modal-title" aria-hidden="true"
+    tabindex="-1">
+    <div class="modal-container" id="modal-container" role="document">
+      <div class="modal-header" id="modal-header">
+        <h2 class="modal-title" id="modal-title"></h2>
+        <button class="modal-close-btn" id="modal-close-btn"
+          aria-label="Close dialog" title="Close (Escape)">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-body" tabindex="0"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Command Palette -->
+  <div id="command-palette-overlay" class="command-palette-overlay"
+    role="dialog" aria-modal="true" aria-label="Command palette" aria-hidden="true">
+    <div class="command-palette" id="command-palette">
+      <div class="cp-search-wrap">
+        <i class="fa-solid fa-terminal cp-icon" aria-hidden="true"></i>
+        <input type="text" id="cp-input" class="cp-input"
+          placeholder="Type a command or search…"
+          autocomplete="off" spellcheck="false"
+          aria-label="Command palette input"
+          aria-autocomplete="list"
+          aria-controls="cp-results"
+          aria-expanded="false" />
+        <kbd class="cp-close-kbd" aria-hidden="true">ESC</kbd>
+      </div>
+      <div class="cp-categories" id="cp-categories" role="tablist" aria-label="Command categories">
+        <button class="cp-cat active" data-cat="all" role="tab" aria-selected="true">All</button>
+        <button class="cp-cat" data-cat="nav" role="tab" aria-selected="false">Navigate</button>
+        <button class="cp-cat" data-cat="action" role="tab" aria-selected="false">Actions</button>
+        <button class="cp-cat" data-cat="theme" role="tab" aria-selected="false">Theme</button>
+        <button class="cp-cat" data-cat="tools" role="tab" aria-selected="false">Tools</button>
+      </div>
+      <ul class="cp-results" id="cp-results" role="listbox" aria-label="Results">
+        <!-- Populated dynamically -->
+      </ul>
+      <div class="cp-footer">
+        <span><kbd>↑↓</kbd> Navigate</span>
+        <span><kbd>↵</kbd> Select</span>
+        <span><kbd>ESC</kbd> Close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"
+    role="region" aria-live="polite" aria-atomic="false"
+    aria-label="Notifications" aria-relevant="additions">
+    <!-- Toasts are injected here by app.js -->
+  </div>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="context-menu" role="menu"
+    aria-label="Context menu" hidden>
+    <ul class="context-menu-list" id="context-menu-list" role="none">
+      <!-- Items injected dynamically -->
+    </ul>
+  </div>
+
+  <!-- Drag Ghost -->
+  <div id="drag-ghost" class="drag-ghost" aria-hidden="true" hidden></div>
+
+  <!-- Slide-over Panel -->
+  <div id="slideover-overlay" class="slideover-overlay" aria-hidden="true">
+    <aside id="slideover-panel" class="slideover-panel"
+      role="complementary" aria-label="Details panel">
+      <div class="slideover-header">
+        <h3 class="slideover-title" id="slideover-title"></h3>
+        <button class="slideover-close" id="slideover-close" aria-label="Close panel">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="slideover-body" id="slideover-body"></div>
+    </aside>
+  </div>
+
+  <!-- Keyboard Shortcut Cheatsheet -->
+  <div id="shortcut-overlay" class="shortcut-overlay" role="dialog"
+    aria-modal="true" aria-label="Keyboard shortcuts" aria-hidden="true">
+    <div class="shortcut-panel">
+      <div class="shortcut-panel-header">
+        <h2>Keyboard Shortcuts</h2>
+        <button id="shortcut-close" aria-label="Close shortcuts">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="shortcut-panel-body" id="shortcut-panel-body">
+        <!-- Populated by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Panel (Slide-In) — opened via Drawer (see app.js) -->
+  <div id="notifications-panel" class="drawer notif-panel" role="log" hidden
+    aria-label="Notification history" aria-hidden="true">
+    <div class="notif-panel-header">
+      <h3>Notifications</h3>
+      <div class="notif-panel-actions">
+        <button id="notif-clear-all" type="button" class="notif-clear-btn" aria-label="Clear all notifications">
+          Clear all
+        </button>
+        <button id="notif-close" type="button" class="notif-close-btn" data-drawer-close aria-label="Close notifications">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <ul class="notif-list" id="notif-list" aria-label="Notification items">
+      <!-- Populated dynamically -->
+    </ul>
+  </div>
+
+  <!-- Add Content Quick Menu -->
+  <div id="add-content-menu" class="add-content-menu" aria-hidden="true"
+    role="menu" aria-label="Add content options">
+    <button class="add-content-item" data-action="add-video" role="menuitem">
+      <i class="fa-solid fa-video" aria-hidden="true"></i>
+      <span>Add Video</span>
+    </button>
+    <button class="add-content-item" data-action="add-pdf" role="menuitem">
+      <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+      <span>Add PDF</span>
+    </button>
+    <button class="add-content-item" data-action="create-topic" role="menuitem">
+      <i class="fa-solid fa-folder-plus" aria-hidden="true"></i>
+      <span>Create Topic</span>
+    </button>
+    <button class="add-content-item" data-action="create-course" role="menuitem">
+      <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+      <span>Create Course</span>
+    </button>
+    <button class="add-content-item" data-action="add-link" role="menuitem">
+      <i class="fa-solid fa-link" aria-hidden="true"></i>
+      <span>Add URL / Embed</span>
+    </button>
+    <button class="add-content-item" data-action="import-backup" role="menuitem">
+      <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+      <span>Import Backup</span>
+    </button>
+  </div>
+
+  <!-- Hidden file inputs for file operations -->
+  <input type="file" id="file-input-video"
+    accept="video/mp4,video/webm,video/ogg,video/mov,video/avi"
+    aria-hidden="true" tabindex="-1" style="display:none" />
+  <input type="file" id="file-input-pdf"
+    accept="application/pdf"
+    aria-hidden="true" tabindex="-1" style="display:none" />
+  <input type="file" id="file-input-image"
+    accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+    aria-hidden="true" tabindex="-1" style="display:none" />
+  <input type="file" id="file-input-backup"
+    accept="application/json,.plasmabackup"
+    aria-hidden="true" tabindex="-1" style="display:none" />
+  <input type="file" id="file-input-any"
+    multiple aria-hidden="true" tabindex="-1" style="display:none" />
+
+  <!-- HTML Template Library (populated into DOM for cloning) -->
+  <template id="tpl-course-card">
+    <article class="course-card" role="article">
+      <div class="course-card-thumb" aria-hidden="true">
+        <img class="course-card-img" alt="" loading="lazy" decoding="async" />
+        <div class="course-card-overlay">
+          <button class="course-card-play" aria-label="Resume course">
+            <i class="fa-solid fa-play" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="course-card-badges" aria-hidden="true"></div>
+        <div class="course-card-progress-bar">
+          <div class="course-card-progress-fill"></div>
+        </div>
+      </div>
+      <div class="course-card-body">
+        <div class="course-card-meta">
+          <span class="course-card-category"></span>
+          <span class="course-card-duration"></span>
+        </div>
+        <h3 class="course-card-title"></h3>
+        <p class="course-card-desc"></p>
+        <div class="course-card-tags" aria-label="Tags"></div>
+        <div class="course-card-footer">
+          <div class="course-card-instructor">
+            <img class="instructor-avatar" alt="" loading="lazy" />
+            <span class="instructor-name"></span>
+          </div>
+          <span class="course-card-lessons-count"></span>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <template id="tpl-lesson-row">
+    <li class="lesson-row" role="listitem">
+      <button class="lesson-row-check" aria-label="Mark complete"></button>
+      <div class="lesson-row-thumb" aria-hidden="true">
+        <img class="lesson-row-img" alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="lesson-row-info">
+        <span class="lesson-row-title"></span>
+        <div class="lesson-row-meta">
+          <span class="lesson-row-duration"></span>
+          <span class="lesson-row-tags"></span>
+        </div>
+      </div>
+      <div class="lesson-row-actions">
+        <button class="lesson-row-btn lesson-row-notes" aria-label="Open notes">
+          <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+        </button>
+        <button class="lesson-row-btn lesson-row-bookmark" aria-label="Bookmark">
+          <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+        </button>
+        <button class="lesson-row-btn lesson-row-more" aria-label="More options"
+          aria-haspopup="menu">
+          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+      </div>
+    </li>
+  </template>
+
+  <template id="tpl-tag-badge">
+    <span class="tag-badge" role="listitem">
+      <span class="tag-badge-dot" aria-hidden="true"></span>
+      <span class="tag-badge-text"></span>
+      <button class="tag-badge-remove" aria-label="Remove tag" hidden>
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </span>
+  </template>
+
+  <template id="tpl-toast">
+    <div class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-icon" aria-hidden="true"></div>
+      <div class="toast-content">
+        <div class="toast-message"></div>
+        <div class="toast-sub" hidden></div>
+      </div>
+      <button class="toast-close" aria-label="Dismiss notification">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+      <div class="toast-progress" aria-hidden="true">
+        <div class="toast-progress-bar"></div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-skeleton-card">
+    <div class="skeleton-card" aria-hidden="true">
+      <div class="skeleton skeleton-thumb"></div>
+      <div class="skeleton-body">
+        <div class="skeleton skeleton-line w-60"></div>
+        <div class="skeleton skeleton-line w-90"></div>
+        <div class="skeleton skeleton-line w-40"></div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ═══════════════════════════════════════════
+       ARIA LIVE REGIONS
+  ════════════════════════════════════════════ -->
+  <div id="aria-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="aria-announcer-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- ═══════════════════════════════════════════
+       EXTERNAL LIBRARY SCRIPTS
+  ════════════════════════════════════════════ -->
+
+  <!-- Chart.js -->
+  <script id="lib-chartjs"
+    src="./vendor/chart.umd.js"
+    defer></script>
+
+  <!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->
+  <script id="lib-pdfjs"
+    src="./vendor/pdf.min.js"
+    defer></script>
+
+  <!-- Marked (Markdown) -->
+  <script id="lib-marked"
+    src="./vendor/marked.min.js"
+    defer></script>
+
+  <!-- DOMPurify (sanitize markdown/HTML output) -->
+  <script id="lib-dompurify"
+    src="./vendor/purify.min.js"
+    defer></script>
+
+  <!-- Fuse.js (fuzzy search) -->
+  <script id="lib-fuse"
+    src="./vendor/fuse.min.js"
+    defer></script>
+
+  <!-- ═══════════════════════════════════════════
+       APPLICATION SCRIPTS (module type)
+  ════════════════════════════════════════════ -->
+  <script type="module" src="./boot.js"></script>
+
+  <!-- ═══════════════════════════════════════════
+       SERVICE WORKER REGISTRATION
+  ════════════════════════════════════════════ -->
+  <!-- Boot script imports dist/plasma.js and logs early failures -->
+
+</body>
+</html>

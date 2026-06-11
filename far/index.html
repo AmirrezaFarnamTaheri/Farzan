@@ -33,16 +33,16 @@
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
 
   <!-- Local fonts (vendored from @fontsource/*) -->
-  <link rel="preload" as="style" href="./vendor/fonts/fonts.css" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="./vendor/fonts/fonts.css" /></noscript>
+  <link rel="stylesheet" href="./vendor/fonts/fonts.css" />
+  
 
   <!-- Font Awesome Icons (vendored) -->
-  <link rel="preload" as="style" href="./vendor/fontawesome/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" /></noscript>
+  <link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" />
+  
 
   <!-- Main Stylesheet -->
-  <link rel="preload" as="style" href="./style.css" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="./style.css" /></noscript>
+  <link rel="stylesheet" href="./style.css" />
+  
 
   <title>PlasmaDeck — Learning Studio</title>
 
@@ -164,7 +164,14 @@
   <!-- ═══════════════════════════════════════════
        MAIN APPLICATION LAYOUT
   ════════════════════════════════════════════ -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
   <div id="plasma-app" class="plasma-app" aria-label="PlasmaDeck Learning Studio">
+
 
     <!-- ── SIDEBAR ─────────────────────────────── -->
     <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">

@@ -50,6 +50,7 @@
     searchQuery:   '',
     searchResults: [],          // [{page, items}]
     searchIdx:     -1,
+    currentDocId:   null,
     annotations:   {},          // { [pageNum]: Annotation[] }
     activeTool:    'pan',       // 'pan' | 'highlight' | 'text' | 'draw'
     highlights:    [],          // persisted highlight annotations
@@ -145,7 +146,8 @@
           },
         });
 
-        State.pdfDoc    = await loadingTask.promise;
+        State.currentDocId = typeof source === 'string' ? source : (source instanceof File ? source.name : 'buffer-' + Date.now());
+      State.pdfDoc    = await loadingTask.promise;
         State.totalPages = State.pdfDoc.numPages;
         State.currentPage = 1;
         State.rotation  = 0;
@@ -429,25 +431,38 @@
         this._clearSearch();
         return;
       }
+
+      // Cancel previous search if running
+      if (this._searchAbort) this._searchAbort.abort();
+      this._searchAbort = new AbortController();
+      const { signal } = this._searchAbort;
+
       State.searchQuery   = query;
       State.searchResults = [];
       State.searchIdx     = -1;
 
       const q = query.toLowerCase();
-
+      
+      // Non-blocking search with feedback
       for (let p = 1; p <= State.totalPages; p++) {
+        if (signal.aborted) return;
+        
         const page        = await State.pdfDoc.getPage(p);
         const textContent = await page.getTextContent();
         const text        = textContent.items.map(i => i.str).join(' ').toLowerCase();
 
         if (text.includes(q)) {
           State.searchResults.push({ page: p, text });
+          this._renderSearchResults(); // Partial results
         }
+        
+        // Yield to UI thread every 10 pages
+        if (p % 10 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
       this._renderSearchResults();
 
-      if (State.searchResults.length) {
+      if (State.searchResults.length && State.searchIdx === -1) {
         State.searchIdx = 0;
         this.goTo(State.searchResults[0].page);
       }
@@ -578,15 +593,27 @@
       if (DOM.errorBanner) DOM.errorBanner.hidden = true;
     },
 
-    _loadAnnotations() {
-      const saved = localStorage.getItem('plasma-pdf-annotations');
-      if (saved) {
-        try { State.annotations = JSON.parse(saved); } catch {}
+    async _loadAnnotations() {
+      if (!State.currentDocId) return;
+      try {
+        const list = await window.DB?.getAnnotations(State.currentDocId) ?? [];
+        State.annotations = {};
+        list.forEach(a => {
+          if (!State.annotations[a.page]) State.annotations[a.page] = [];
+          State.annotations[a.page].push(a);
+        });
+      } catch (err) {
+        console.warn('[PDF] Failed to load annotations from DB:', err);
       }
     },
 
-    _saveAnnotations() {
-      localStorage.setItem('plasma-pdf-annotations', JSON.stringify(State.annotations));
+    async _saveAnnotations() {
+      if (!State.currentDocId) return;
+      try {
+        await window.DB?.saveAnnotations(State.currentDocId, State.annotations);
+      } catch (err) {
+        console.warn('[PDF] Failed to save annotations to DB:', err);
+      }
     },
   };
 

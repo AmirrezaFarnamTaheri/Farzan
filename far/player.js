@@ -14,6 +14,19 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const uid = (p = 'pd') => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 
+  const throttle = (fn, limit) => {
+    let inThrottle;
+    return function() {
+      const args = arguments;
+      const context = this;
+      if (!inThrottle) {
+        fn.apply(context, args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    };
+  };
+
   const clampPct = (value) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
@@ -487,7 +500,7 @@
       }
 
       this._emit('timeupdate', { currentTime: cur, duration: dur || 0, percent: pct });
-      this._saveSession();
+      this._saveSessionThrottled();
     }
 
     _onVolumeChange() {

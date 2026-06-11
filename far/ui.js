@@ -11,8 +11,12 @@
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => [...r.querySelectorAll(s)];
     const uid = (p = 'ui') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
-    const esc = s => String(s).replace(/[&<>"']/g, m =>
-      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const esc = s => {
+      if (s == null) return '';
+      if (s instanceof Node) return s.outerHTML || '';
+      return String(s).replace(/[&<>"']/g, m =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    };
 
     function animH(el, open, dur = 250) {
       return new Promise(resolve => {
@@ -49,7 +53,8 @@
 
       setLoading(btn, on) {
         if (on) {
-          btn._originalHTML = btn.innerHTML;
+          // Keep a reference to original children, not just innerHTML string
+          btn._originalNodes = [...btn.childNodes];
           btn._originalWidth = btn.offsetWidth + 'px';
           btn.style.minWidth = btn._originalWidth;
           btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span>
@@ -57,7 +62,10 @@
           btn.disabled = true;
           btn.setAttribute('aria-busy', 'true');
         } else {
-          btn.innerHTML = btn._originalHTML ?? btn.innerHTML;
+          if (btn._originalNodes) {
+            btn.replaceChildren(...btn._originalNodes);
+            delete btn._originalNodes;
+          }
           btn.disabled = false;
           btn.style.minWidth = '';
           btn.removeAttribute('aria-busy');
@@ -73,7 +81,22 @@
         const btn = document.createElement('button');
         btn.className = classes;
         btn.disabled  = disabled;
-        btn.innerHTML = `${icon ? `<span class="btn-icon-left" aria-hidden="true">${icon}</span>` : ''}${esc(label)}`;
+
+        const append = (parent, content) => {
+          if (content == null) return;
+          if (content instanceof Node) parent.appendChild(content);
+          else parent.appendChild(document.createTextNode(String(content)));
+        };
+
+        if (icon) {
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'btn-icon-left';
+          iconSpan.setAttribute('aria-hidden', 'true');
+          append(iconSpan, icon);
+          btn.appendChild(iconSpan);
+        }
+        append(btn, label);
+
         if (onClick) btn.addEventListener('click', onClick);
         if (loading) this.setLoading(btn, true);
         return btn;
@@ -104,17 +127,33 @@
 
         if (image) {
           const img = document.createElement('img');
-          img.src = image; img.alt = imageAlt;
-          img.className = 'card-image';
-          card.appendChild(img);
+          // Only apply src if it is a safe url
+          const url = window.PlasmaDeck?.safeImageUrl?.(image) || (image.startsWith('https://') || image.startsWith('http://') ? image : '');
+          if (url) {
+            img.src = url; img.alt = imageAlt;
+            img.className = 'card-image';
+            card.appendChild(img);
+          }
         }
 
         if (title || actions.length) {
           const header = document.createElement('div');
           header.className = 'card-header';
           if (title) {
-            header.innerHTML = `<div class="card-title">${esc(title)}</div>
-              ${subtitle ? `<div class="card-subtitle">${esc(subtitle)}</div>` : ''}`;
+            const titleEl = document.createElement('div');
+            titleEl.className = 'card-title';
+            if (title instanceof Node) titleEl.appendChild(title);
+            else titleEl.textContent = String(title);
+
+            header.appendChild(titleEl);
+
+            if (subtitle) {
+              const subEl = document.createElement('div');
+              subEl.className = 'card-subtitle';
+              if (subtitle instanceof Node) subEl.appendChild(subtitle);
+              else subEl.textContent = String(subtitle);
+              header.appendChild(subEl);
+            }
           }
           if (actions.length) {
             const actionsEl = document.createElement('div');
@@ -130,14 +169,14 @@
 
         const bodyEl = document.createElement('div');
         bodyEl.className = 'card-body';
-        if (typeof body === 'string') bodyEl.innerHTML = body;
+        if (typeof body === 'string') bodyEl.textContent = body;
         else bodyEl.appendChild(body);
         card.appendChild(bodyEl);
 
         if (footer) {
           const footerEl = document.createElement('div');
           footerEl.className = 'card-footer';
-          if (typeof footer === 'string') footerEl.innerHTML = footer;
+          if (typeof footer === 'string') footerEl.textContent = footer;
           else footerEl.appendChild(footer);
           card.appendChild(footerEl);
         }
@@ -193,9 +232,12 @@
         if (color) el.style.setProperty('--avatar-color', color);
 
         if (src) {
-          const img = document.createElement('img');
-          img.src = src; img.alt = alt ?? initials;
-          el.appendChild(img);
+          const url = window.PlasmaDeck?.safeImageUrl?.(src) || (src.startsWith('https://') || src.startsWith('http://') || src.startsWith('data:image/') ? src : '');
+          if (url) {
+            const img = document.createElement('img');
+            img.src = url; img.alt = alt ?? initials;
+            el.appendChild(img);
+          }
         } else if (initials) {
           const span = document.createElement('span');
           span.className    = 'avatar-initials';
@@ -237,19 +279,32 @@
       ICONS: { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' },
 
       create({ message = '', type = 'info', title = '', dismissible = true,
-               icon = null, actions = '' } = {}) {
+               icon = null, actions = null } = {}) {
         const el = document.createElement('div');
         el.className = `alert alert-${type}`;
         el.setAttribute('role', type === 'error' ? 'alert' : 'status');
         el.innerHTML = `
-          <span class="alert-icon" aria-hidden="true">${icon ?? this.ICONS[type] ?? 'ℹ️'}</span>
+          <span class="alert-icon" aria-hidden="true">${esc(icon ?? this.ICONS[type] ?? 'ℹ️')}</span>
           <div class="alert-content">
             ${title ? `<div class="alert-title">${esc(title)}</div>` : ''}
             <div class="alert-message">${esc(message)}</div>
-            ${actions}
+            <div class="alert-actions"></div>
           </div>
           ${dismissible ? '<button class="alert-close" aria-label="Dismiss">×</button>' : ''}
         `;
+
+        const actionsContainer = el.querySelector('.alert-actions');
+        if (actions) {
+          if (typeof actions === 'string') {
+            actionsContainer.textContent = actions;
+          } else if (actions instanceof Node) {
+            actionsContainer.appendChild(actions);
+          } else if (Array.isArray(actions)) {
+            actions.forEach(a => typeof a === 'string' ? actionsContainer.appendChild(document.createTextNode(a)) : actionsContainer.appendChild(a));
+          }
+        } else {
+          actionsContainer.remove();
+        }
 
         if (dismissible) {
           el.querySelector('.alert-close').addEventListener('click', () => this.dismiss(el));
@@ -854,3 +909,5 @@ document.addEventListener('DOMContentLoaded', () => {
   window.PlasmaDeck?.Progress?.init?.();
   window.PlasmaDeck?.UI?.init?.();
 });
+
+

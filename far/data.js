@@ -742,6 +742,24 @@
         const display = transform ? transform(val) : val;
         elements.forEach(el => {
           if (!el) return;
+
+          // Handle Node content for textContent or innerHTML
+          if (display instanceof Node && (attr === 'textContent' || attr === 'innerHTML')) {
+            el.replaceChildren(display);
+            return;
+          }
+
+          if (attr === 'innerHTML') {
+            const purify = window.DOMPurify;
+            if (purify?.sanitize) {
+              el.innerHTML = purify.sanitize(String(display ?? ''));
+            } else {
+              // Fail-safe to textContent if sanitizer is missing
+              el.textContent = String(display ?? '');
+            }
+            return;
+          }
+
           if (attr === 'class') {
             el.className = display;
           } else if (attr === 'style') {
