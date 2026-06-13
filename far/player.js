@@ -108,6 +108,9 @@
       this._shuffleOrder = [];   // index map when shuffled
       this._listeners    = {};   // event map
 
+      // Throttled session-save so storage writes don't fire every timeupdate
+      this._saveSessionThrottled = throttle(this._saveSession.bind(this), 2000);
+
       // ── Build DOM ──────────────────────────────────────
       this._buildDOM();
       this._bindNative();
@@ -829,12 +832,22 @@
 
       const canvas   = this._vizCanvas;
       const ctx      = canvas.getContext('2d');
+      // Guard: getContext can return null (e.g. in jsdom tests without canvas support)
+      if (!ctx) return;
+
+      // Respect reduced-motion preference — clear canvas once then stop
+      if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        this._vizAnimId = null;
+        return;
+      }
+
       const bufLen   = this._analyser.frequencyBinCount;
       const dataArr  = new Uint8Array(bufLen);
       const barCount = this._opts.visualizerBars;
 
       const draw = () => {
-        if (!this._state.playing) {
+        if (!this._state.playing || !this._vizCanvas) {
           this._vizAnimId = null;
           return;
         }

@@ -373,9 +373,7 @@ const ProgressStats = (() => {
             // Nudge Notes UI to refresh if open
             try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
             try { window.PlasmaDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
-          } catch { /* ignore */ }
-          try { window.PlasmaDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
-        }
+          }
         if (payload.timestamps) {
           await Promise.all(payload.timestamps.map(ts =>
             DB.saveTimestamp(ts)
