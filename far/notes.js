@@ -49,11 +49,66 @@
   // 1. DATA STORE (Using window.DB)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  const Store = {
-    async getNotes() { return (await window.DB?.getAllNotes()) ?? []; },
-    async getNote(id) { const all = await this.getNotes(); return all.find(n => n.id === id) ?? null; },
+  // In-memory store: sync reads served from cache; writes update cache then
+  // persist to IndexedDB (fire-and-forget) with localStorage fallback.
+  const STORAGE_SETTINGS_KEY = 'plasma-notes-settings';
+  const STORAGE_NOTES_KEY    = 'plasma-notes';
+  const STORAGE_FOLDERS_KEY  = 'plasma-notes-folders';
 
-    async createNote(data = {}) {
+  const Store = {
+    _notes:    [],
+    _folders:  [],
+    _settings: {},
+    _hydrated: false,
+
+    // -- Hydration -------------------------------------------------------
+    hydrateFromDB() {
+      return Promise.all([
+        window.DB?.getAllNotes?.().then(v => { if (v?.length) this._notes = v; }).catch(() => {}),
+        window.DB?.getAllFolders?.().then(v => { if (v?.length) this._folders = v; }).catch(() => {}),
+        window.DB?.getSetting?.(STORAGE_SETTINGS_KEY).then(v => { if (v) this._settings = v; }).catch(() => {}),
+      ]).then(() => { this._hydrated = true; });
+    },
+
+    hydrateFromStorage() {
+      try { const n = localStorage.getItem(STORAGE_NOTES_KEY);    if (n) this._notes    = JSON.parse(n); } catch { /* ignore */ }
+      try { const f = localStorage.getItem(STORAGE_FOLDERS_KEY);  if (f) this._folders  = JSON.parse(f); } catch { /* ignore */ }
+      try { const s = localStorage.getItem(STORAGE_SETTINGS_KEY); if (s) this._settings = JSON.parse(s); } catch { /* ignore */ }
+      this._hydrated = true;
+    },
+
+    // -- Internal helpers ------------------------------------------------
+    _defaultFolders() {
+      return [
+        { id: 'default', name: 'Personal', icon: '📁', color: '' },
+        { id: 'work',    name: 'Work',      icon: '💼', color: '' },
+        { id: 'archive', name: 'Archive',   icon: '🗃️', color: '' },
+      ];
+    },
+
+    _persistNotes() {
+      if (typeof window.DB?.saveNote === 'function') return;
+      try { localStorage.setItem(STORAGE_NOTES_KEY, JSON.stringify(this._notes)); } catch { /* ignore */ }
+    },
+
+    _persistFolders() {
+      if (typeof window.DB?.saveFolder === 'function') return;
+      try { localStorage.setItem(STORAGE_FOLDERS_KEY, JSON.stringify(this._folders)); } catch { /* ignore */ }
+    },
+
+    _persistSettings(s) {
+      if (typeof window.DB?.saveSetting === 'function') {
+        window.DB.saveSetting(STORAGE_SETTINGS_KEY, s).catch(() => {});
+      } else {
+        try { localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+      }
+    },
+
+    // -- Notes -----------------------------------------------------------
+    getNotes()  { return [...this._notes]; },
+    getNote(id) { return this._notes.find(n => n.id === id) ?? null; },
+
+    createNote(data = {}) {
       const note = {
         id:        uid('note'),
         title:     data.title     ?? 'Untitled Note',
@@ -67,41 +122,60 @@
         wordCount: 0,
         charCount: 0,
       };
-      return await window.DB?.saveNote(note);
+      this._notes.unshift(note);
+      window.DB?.saveNote?.(note).catch(() => {});
+      this._persistNotes();
+      return note;
     },
 
-    async updateNote(id, patch) {
-      const existing = await this.getNote(id);
-      if (!existing) return null;
-      const next = { ...existing, ...patch, id, updatedAt: Date.now() };
-      return await window.DB?.saveNote(next);
+    updateNote(id, patch) {
+      const idx = this._notes.findIndex(n => n.id === id);
+      if (idx === -1) return null;
+      const next = { ...this._notes[idx], ...patch, id, updatedAt: Date.now() };
+      this._notes[idx] = next;
+      window.DB?.saveNote?.(next).catch(() => {});
+      this._persistNotes();
+      return next;
     },
 
-    async deleteNote(id) { await window.DB?.deleteNote(id); },
-
-    async getFolders() {
-      const custom = await window.DB?.getAllFolders();
-      if (custom?.length) return custom;
-      return [
-        { id: 'default', name: 'Personal',  icon: 'ðŸ“', color: '' },
-        { id: 'work',    name: 'Work',       icon: 'ðŸ’¼', color: '' },
-        { id: 'archive', name: 'Archive',    icon: 'ðŸ—ƒï¸', color: '' },
-      ];
+    deleteNote(id) {
+      this._notes = this._notes.filter(n => n.id !== id);
+      window.DB?.deleteNote?.(id).catch(() => {});
+      this._persistNotes();
     },
 
-    async createFolder(name, icon = 'ðŸ“', color = '') {
+    // -- Folders ---------------------------------------------------------
+    getFolders() {
+      if (!this._folders.length) return this._defaultFolders();
+      return [...this._folders];
+    },
+
+    createFolder(name, icon = '📁', color = '') {
+      if (name === '__pinned__') return null;
       const folder = { id: uid('folder'), name, icon, color, updatedAt: Date.now() };
-      return await window.DB?.saveFolder(folder);
+      this._folders.push(folder);
+      window.DB?.saveFolder?.(folder).catch(() => {});
+      this._persistFolders();
+      return folder;
     },
 
-    async deleteFolder(id) {
-      await window.DB?.deleteFolder(id);
-      const notes = await this.getNotes();
-      for (const n of notes) { if (n.folderId === id) await this.updateNote(n.id, { folderId: 'default' }); }
+    deleteFolder(id) {
+      this._folders = this._folders.filter(f => f.id !== id);
+      this._notes = this._notes.map(n =>
+        n.folderId === id ? { ...n, folderId: 'default', updatedAt: Date.now() } : n
+      );
+      window.DB?.deleteFolder?.(id).catch(() => {});
+      this._persistFolders();
+      this._persistNotes();
     },
 
-    async getSettings() { return (await window.DB?.getSetting('notes')) ?? {}; },
-    async saveSettings(s) { return await window.DB?.saveSetting('notes', s); },
+    // -- Settings --------------------------------------------------------
+    getSettings()   { return { ...this._settings }; },
+
+    saveSettings(s) {
+      this._settings = { ...this._settings, ...s };
+      this._persistSettings(this._settings);
+    },
   };
 
 
