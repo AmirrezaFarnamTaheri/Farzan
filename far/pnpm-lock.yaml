@@ -48,6 +48,9 @@ importers:
       eslint:
         specifier: ^10.2.1
         version: 10.5.0
+      espree:
+        specifier: ^11.2.0
+        version: 11.2.0
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.5
