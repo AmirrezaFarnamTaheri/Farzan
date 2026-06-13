@@ -1,0 +1,19 @@
+0 verbose cli /vercel/runtimes/node24/bin/node /vercel/runtimes/node24/bin/npm
+1 info using npm@11.11.0
+2 info using node@v24.14.1
+3 silly config load:file:/vercel/runtimes/node24/lib/node_modules/npm/npmrc
+4 silly config load:file:/vercel/share/v0-project/far/.npmrc
+5 silly config load:file:/home/vercel-sandbox/.npmrc
+6 silly config load:file:/home/vercel-sandbox/.config/pnpm/rc
+7 verbose title npm run build:watch
+8 verbose argv "run" "build:watch"
+9 verbose logfile logs-max:10 dir:/vercel/share/v0-project/far/.npm-cache/_logs/2026-06-13T11_34_11_825Z-
+10 verbose logfile /vercel/share/v0-project/far/.npm-cache/_logs/2026-06-13T11_34_11_825Z-debug-0.log
+11 warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+12 warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+13 warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+14 warn Unknown env config "global-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+15 warn Unknown env config "global-bin-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+16 warn Unknown global config "global-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+17 warn Unknown global config "global-bin-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+18 silly logfile done cleaning log files
