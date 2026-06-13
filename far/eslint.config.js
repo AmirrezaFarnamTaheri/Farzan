@@ -23,6 +23,7 @@ module.exports = [
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
   {

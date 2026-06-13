@@ -1,5 +1,5 @@
 
-import { $, $$, uid, createElement, appendContent, eventTargetEl } from '../lib/dom.js';
+import { createElement } from '../lib/dom.js';
 
 export const Toast = {
   _containers: {},
@@ -24,7 +24,7 @@ export const Toast = {
     });
 
     const iconEl = createElement('div', { class: 'toast-icon' });
-    iconEl.textContent = { info: '??', success: '?', warning: '??', error: '?' }[type] ?? '??';
+    iconEl.textContent = { info: 'i', success: 'OK', warning: '!', error: '!' }[type] ?? 'i';
 
     const content = createElement('div', { class: 'toast-content' });
     if (title) content.appendChild(createElement('div', { class: 'toast-title' }, title));
@@ -33,7 +33,7 @@ export const Toast = {
     toast.append(iconEl, content);
 
     if (duration === 0 || duration > 10000) {
-      toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, '×'));
+      toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, 'x'));
     }
     if (duration > 0) {
       toast.appendChild(createElement('div', { class: 'toast-timer' }));

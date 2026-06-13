@@ -11,10 +11,13 @@
              script-src 'self';
              style-src 'self' 'unsafe-inline';
              font-src 'self' data:;
-             img-src 'self' blob: data:;
-             media-src 'self' blob: data:;
-             connect-src 'self' blob: data:;
+             img-src 'self' blob: data: http: https:;
+             media-src 'self' blob: data: http: https:;
+             connect-src 'self' blob: data: http: https:;
+             frame-src 'self' blob: data: http: https:;
              worker-src 'self' blob:;" />
+
+  <!-- Stylesheets are normal blocking links so strict CSP does not block inline preload handlers. -->
 
   <!-- Open Graph / Share -->
   <meta property="og:type" content="website" />

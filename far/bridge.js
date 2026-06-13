@@ -188,11 +188,15 @@
     const IDB_VERSION = 2;
 
     let _idb = null;
+    let _idbCtor = null;
+    let _sync = null;
+    const _sourceId = `pd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
     function _getIdb() {
-      if (_idb) return _idb;
       const PlasmaDB = window.PlasmaDeck?.DB?.PlasmaDB;
       if (typeof PlasmaDB !== 'function') return null;
+      if (_idb && _idbCtor === PlasmaDB) return _idb;
+      _idbCtor = PlasmaDB;
       _idb = new PlasmaDB(IDB_NAME, IDB_VERSION, [
         { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
@@ -204,6 +208,50 @@
         { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }, { field: 'page' }] },
       ]);
       return _idb;
+    }
+
+    function _emit(name, payload) {
+      window.PlasmaDeck?.bus?.emit?.(name, payload);
+    }
+
+    function _errorInfo(error) {
+      return {
+        name: error?.name || 'Error',
+        message: error?.message || String(error || ''),
+        quota: error?.name === 'QuotaExceededError',
+      };
+    }
+
+    function _signalSaveError(kind, backend, error, extra = {}) {
+      _emit('storage:save-error', {
+        kind,
+        backend,
+        error: _errorInfo(error),
+        ...extra,
+      });
+    }
+
+    function _isMigrated() {
+      return localStorage.getItem(KEY_MIGRATED) === 'true';
+    }
+
+    function _broadcast(kind, action, record) {
+      const payload = { kind, action, record, source: _sourceId, timestamp: Date.now() };
+      try {
+        if (!_sync && typeof window.BroadcastChannel === 'function') {
+          _sync = new window.BroadcastChannel('plasmadeck_sync');
+          _sync.onmessage = (event) => {
+            const message = event?.data;
+            if (!message || message.source === _sourceId) return;
+            _emit('sync:message', message);
+            _emit(`${message.kind}:${message.action}`, message);
+          };
+        }
+        _sync?.postMessage?.(payload);
+      } catch {
+        // BroadcastChannel is optional.
+      }
+      _emit('sync:local-change', payload);
     }
 
     function _read(key, fallback) {
@@ -218,6 +266,7 @@
       if (localStorage.getItem(KEY_MIGRATED) === 'true') return true;
       const idb = _getIdb();
       if (!idb) return false;
+      const failures = [];
       try {
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration starting',data:{hasLegacyProgress:!!localStorage.getItem(KEY_PROGRESS),hasLegacyTs:!!localStorage.getItem(KEY_TIMESTAMPS),hasLegacyNotes:!!localStorage.getItem('plasma-notes')},timestamp:Date.now()});
         // Progress map -> progress store
@@ -243,7 +292,7 @@
             const id = n.id ?? `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
             await idb.put('notes', { ...n, id });
           }
-        } catch {}
+        } catch (error) { failures.push({ section: 'notes', error: _errorInfo(error) }); }
 
         // Folders
         try {
@@ -253,23 +302,31 @@
             const id = f.id ?? `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
             await idb.put('folders', { ...f, id });
           }
-        } catch {}
+        } catch (error) { failures.push({ section: 'folders', error: _errorInfo(error) }); }
 
         // Notes settings
         try {
           const ns = _read('plasma-notes-settings', null);
           if (ns && typeof ns === 'object') await idb.put('settings', { key: 'notes', value: ns });
-        } catch {}
+        } catch (error) { failures.push({ section: 'settings', error: _errorInfo(error) }); }
 
         // PDF annotations
         try {
-          const anns = _read('plasma-pdf-annotations', []);
+          const annsRaw = _read('plasma-pdf-annotations', {});
+          const anns = Array.isArray(annsRaw)
+            ? annsRaw
+            : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
           for (const a of anns) {
             if (!a) continue;
             const id = a.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
             await idb.put('annotations', { ...a, id });
           }
-        } catch {}
+        } catch (error) { failures.push({ section: 'annotations', error: _errorInfo(error) }); }
+
+        if (failures.length) {
+          _emit('storage:migration-error', { kind: 'migration', backend: 'indexedDB', failures });
+          return false;
+        }
 
         localStorage.setItem(KEY_MIGRATED, 'true');
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration completed',data:{},timestamp:Date.now()});
@@ -317,9 +374,13 @@
         try {
           await idb.put('progress', next);
           window.PlasmaDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
+          _broadcast('progress', 'save', next);
           return next;
         } catch (e) {
+          _signalSaveError('progress', 'indexedDB', e);
+          if (_errorInfo(e).quota) throw e;
           console.warn('[DB] saveProgress IDB failed, falling back to localStorage:', e);
+          _emit('storage:fallback', { kind: 'progress', fallbackBackend: 'localStorage' });
         }
       }
 
@@ -345,23 +406,39 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.put('timestamps', next); return true; } catch (e) {
+        try { await idb.put('timestamps', next); _broadcast('timestamp', 'save', next); return true; } catch (e) {
+          _signalSaveError('timestamp', 'indexedDB', e);
+          if (_errorInfo(e).quota) throw e;
           console.warn('[DB] saveTimestamp IDB failed, falling back to localStorage:', e);
         }
       }
 
       const list = _read(KEY_TIMESTAMPS, []);
-      list.push(next);
+      const idx = list.findIndex(item => item?.id === next.id);
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
       _write(KEY_TIMESTAMPS, list);
       return true;
+    }
+
+    async function deleteTimestamp(id) {
+      const idb = _getIdb();
+      if (idb) {
+        try { await idb.delete('timestamps', id); } catch {}
+      }
+      const list = _read(KEY_TIMESTAMPS, []);
+      _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
+      _broadcast('timestamp', 'delete', { id });
     }
 
     // Notes in this codebase live in localStorage via notes.js.
     async function getAllNotes() {
       const idb = _getIdb();
       if (idb) {
-        await _migrateOnce();
-        try { return (await idb.getAll('notes')) ?? []; } catch {}
+        const migrated = await _migrateOnce();
+        if (migrated || _isMigrated()) {
+          try { return (await idb.getAll('notes')) ?? []; } catch {}
+        }
       }
       try { return JSON.parse(localStorage.getItem('plasma-notes')) ?? []; } catch { return []; }
     }
@@ -373,7 +450,12 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.put('notes', next); return next; } catch {}
+        try { await idb.put('notes', next); _broadcast('note', 'save', next); return next; } catch (e) {
+          if (_isMigrated()) {
+            _signalSaveError('note', 'indexedDB', e, { canonical: true });
+            throw e;
+          }
+        }
       }
 
       // IndexedDB unavailable: mirror notes in localStorage (see notes.js primary store).
@@ -381,7 +463,10 @@
       const idx = list.findIndex(n => n?.id === id);
       if (idx >= 0) list[idx] = next;
       else list.push(next);
-      _write('plasma-notes', list);
+      try { _write('plasma-notes', list); } catch (e) {
+        _signalSaveError('note', 'localStorage', e, { key: 'plasma-notes' });
+        throw e;
+      }
       return next;
     }
 
@@ -390,9 +475,14 @@
       if (idb) {
         try { await idb.delete('notes', id); } catch {}
       }
-      const list = _read('plasma-notes', []);
-      const next = list.filter(n => n?.id !== id);
-      _write('plasma-notes', next);
+      if (!_isMigrated()) {
+        const list = _read('plasma-notes', []);
+        const next = list.filter(n => n?.id !== id);
+        _write('plasma-notes', next);
+      } else {
+        localStorage.removeItem('plasma-notes');
+      }
+      _broadcast('note', 'delete', { id });
     }
 
     async function getAllFolders() {
@@ -410,7 +500,12 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.put('folders', next); return next; } catch {}
+        try { await idb.put('folders', next); _broadcast('folder', 'save', next); return next; } catch (e) {
+          if (_isMigrated()) {
+            _signalSaveError('folder', 'indexedDB', e, { canonical: true });
+            throw e;
+          }
+        }
       }
       const list = _read('plasma-folders', []);
       const idx = list.findIndex(f => f?.id === id);
@@ -425,9 +520,14 @@
       if (idb) {
         try { await idb.delete('folders', id); } catch {}
       }
-      const list = _read('plasma-folders', []);
-      const next = list.filter(f => f?.id !== id);
-      _write('plasma-folders', next);
+      if (!_isMigrated()) {
+        const list = _read('plasma-folders', []);
+        const next = list.filter(f => f?.id !== id);
+        _write('plasma-folders', next);
+      } else {
+        localStorage.removeItem('plasma-folders');
+      }
+      _broadcast('folder', 'delete', { id });
     }
 
     async function getSetting(key) {
@@ -446,7 +546,12 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.put('settings', { key, value }); return value; } catch {}
+        try { await idb.put('settings', { key, value }); _broadcast('setting', 'save', { key, value }); return value; } catch (e) {
+          if (_isMigrated()) {
+            _signalSaveError('setting', 'indexedDB', e, { canonical: true });
+            throw e;
+          }
+        }
       }
       _write(key, value);
       return value;
@@ -459,7 +564,8 @@
         try { return (await idb.getAll('annotations')) ?? []; } catch {}
       }
       const dict = _read('plasma-pdf-annotations', {});
-      return Object.values(dict).flat();
+      if (Array.isArray(dict)) return dict;
+      return Object.entries(dict).flatMap(([key, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? key), docId: a.docId ?? (Number.isFinite(Number(key)) ? 'global' : key) })));
     }
 
     async function getAnnotations(docId) {
@@ -467,12 +573,12 @@
       if (idb) {
         await _migrateOnce();
         try {
+          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('annotations', 'docId', docId) ?? [];
           const all = await idb.getAll('annotations') ?? [];
           return all.filter(a => a.docId === docId);
         } catch {}
       }
-      const dict = _read('plasma-pdf-annotations', {});
-      return Object.values(dict).flat().filter(a => a.docId === docId);
+      return (await getAllAnnotations()).filter(a => a.docId === docId);
     }
 
     async function saveAnnotations(docId, pagesObj) {
@@ -490,8 +596,14 @@
         await _migrateOnce();
         try {
           for (const next of nextArr) await idb.put('annotations', next);
+          _broadcast('annotation', 'save', { docId, annotations: nextArr });
           return nextArr;
-        } catch {}
+        } catch (e) {
+          if (_isMigrated()) {
+            _signalSaveError('annotation', 'indexedDB', e, { canonical: true });
+            throw e;
+          }
+        }
       }
 
       const dict = _read('plasma-pdf-annotations', {});
@@ -546,25 +658,98 @@
       return true;
     }
 
+    async function clearUserData(scope) {
+      const idb = _getIdb();
+      const clearStores = async (stores) => {
+        if (idb) {
+          for (const store of stores) {
+            try { await idb.clear(store); } catch {}
+          }
+        }
+      };
+      if (scope === 'notes') {
+        await clearStores(['notes', 'folders']);
+        localStorage.removeItem('plasma-notes');
+        localStorage.removeItem('plasma-folders');
+        localStorage.removeItem('plasma-notes-settings');
+      } else if (scope === 'progress') {
+        await clearStores(['progress']);
+        localStorage.removeItem(KEY_PROGRESS);
+      } else if (scope === 'media') {
+        await clearStores(['timestamps', 'annotations']);
+        localStorage.removeItem(KEY_TIMESTAMPS);
+        localStorage.removeItem('plasma-pdf-annotations');
+      } else if (scope === 'playlists') {
+        if (idb) try { await idb.delete('settings', 'plasma-playlists'); } catch {}
+        localStorage.removeItem('plasma-playlists');
+      } else if (scope === 'studio') {
+        if (idb) try { await idb.delete('settings', 'plasma-studio-board'); } catch {}
+        localStorage.removeItem('plasma-studio-board');
+      } else {
+        await clearAll();
+      }
+      return { scope };
+    }
+
+    async function _byIndex(store, indexName, value, fallback) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex(store, indexName, value) ?? [];
+          const all = await idb.getAll(store) ?? [];
+          return all.filter(record => record?.[indexName] === value);
+        } catch {}
+      }
+      return fallback().filter(record => record?.[indexName] === value);
+    }
+
+    const getProgressByCourse = (courseId) => _byIndex('progress', 'courseId', courseId, () => Object.values(_read(KEY_PROGRESS, {})));
+    const getTimestampsByTopic = (topicId) => _byIndex('timestamps', 'topicId', topicId, () => _read(KEY_TIMESTAMPS, []));
+    const getTimestampsByCourse = (courseId) => _byIndex('timestamps', 'courseId', courseId, () => _read(KEY_TIMESTAMPS, []));
+    const getNotesByTopic = (topicId) => _byIndex('notes', 'topicId', topicId, () => _read('plasma-notes', []));
+    const getNotesByCourse = (courseId) => _byIndex('notes', 'courseId', courseId, () => _read('plasma-notes', []));
+    const getNotesByFolder = (folderId) => _byIndex('notes', 'folderId', folderId, () => _read('plasma-notes', []).map(n => ({ folderId: n.folderId ?? 'default', ...n })));
+    const getFoldersByParent = (parentId) => _byIndex('folders', 'parentId', parentId, () => _read('plasma-folders', []).map(f => ({ parentId: f.parentId ?? null, ...f })));
+    async function getRecentNotes(limit = 10) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          if (typeof idb.queryIndex === 'function') return await idb.queryIndex('notes', 'updatedAt', null, limit, { direction: 'prev' }) ?? [];
+        } catch {}
+      }
+      return (await getAllNotes()).sort((a, b) => Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0)).slice(0, limit);
+    }
+
     return {
       getProgress,
       getAllProgress,
       saveProgress,
       getAllTimestamps,
       saveTimestamp,
+      deleteTimestamp,
+      getProgressByCourse,
+      getTimestampsByTopic,
+      getTimestampsByCourse,
       getAllNotes,
       saveNote,
       deleteNote,
+      getNotesByTopic,
+      getNotesByCourse,
+      getNotesByFolder,
+      getRecentNotes,
       getAllFolders,
       saveFolder,
       deleteFolder,
+      getFoldersByParent,
       getSetting,
       saveSetting,
       getAllAnnotations,
       getAnnotations,
       saveAnnotations,
       clearAll,
-      clearUserData: clearAll,
+      clearUserData,
     };
   })();
 

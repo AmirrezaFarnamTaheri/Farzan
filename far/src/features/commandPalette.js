@@ -2,10 +2,6 @@ import { debounce, eventTargetEl, restoreFocus, setAppInert, trapFocus } from '.
 
 export function initCommandPalette() {
   const PlasmaDeck = window.PlasmaDeck ?? {};
-  const Router = PlasmaDeck.Router;
-  const ThemeManager = PlasmaDeck.ThemeManager;
-  const Prefs = PlasmaDeck.Prefs;
-  const FontScale = PlasmaDeck.FontScale;
 
   const cpOverlay = document.getElementById('command-palette-overlay');
   const cpInput = document.getElementById('cp-input');
@@ -18,9 +14,17 @@ export function initCommandPalette() {
   cpOverlay.dataset.pdCommandPaletteInited = 'true';
 
   let cpCleanupFocusTrap = null;
+  let cpCleanupFocusGuard = null;
   let cpPrevFocus = null;
   let cpSelectedIdx = -1;
   let cpActiveCat = 'all';
+
+  const app = () => window.PlasmaDeck ?? PlasmaDeck;
+  const applyTheme = (theme) => {
+    const manager = app().ThemeManager;
+    if (typeof manager?.apply === 'function') manager.apply(theme);
+    else manager?.set?.(theme);
+  };
 
   const cpClose = () => {
     cpOverlay.setAttribute('aria-hidden', 'true');
@@ -30,7 +34,11 @@ export function initCommandPalette() {
     if (typeof cpCleanupFocusTrap === 'function') {
       try { cpCleanupFocusTrap(); } catch { /* ignore */ }
     }
+    if (typeof cpCleanupFocusGuard === 'function') {
+      try { cpCleanupFocusGuard(); } catch { /* ignore */ }
+    }
     cpCleanupFocusTrap = null;
+    cpCleanupFocusGuard = null;
     setAppInert(false);
     restoreFocus(cpPrevFocus);
   };
@@ -46,6 +54,13 @@ export function initCommandPalette() {
     cpInput.select();
     setAppInert(true);
     try { cpCleanupFocusTrap = trapFocus(cpRoot, { initialFocus: false }); } catch { /* ignore */ }
+    const onFocusIn = (event) => {
+      if (!cpOverlay.classList.contains('open')) return;
+      if (cpRoot.contains(event.target)) return;
+      cpInput.focus({ preventScroll: true });
+    };
+    document.addEventListener('focusin', onFocusIn);
+    cpCleanupFocusGuard = () => document.removeEventListener('focusin', onFocusIn);
   };
 
   const items = [
@@ -65,22 +80,22 @@ export function initCommandPalette() {
     { label: 'Tags', hash: '#/tags', cat: 'nav' },
     { label: 'My Courses', hash: '#/my-courses', cat: 'nav' },
     // Theme
-    { label: 'Theme: System', action: () => ThemeManager?.set?.('system'), cat: 'theme' },
-    { label: 'Theme: Dark', action: () => ThemeManager?.set?.('dark'), cat: 'theme' },
-    { label: 'Theme: Light', action: () => ThemeManager?.set?.('light'), cat: 'theme' },
-    { label: 'Theme: Midnight', action: () => ThemeManager?.set?.('midnight'), cat: 'theme' },
-    { label: 'Theme: Forest', action: () => ThemeManager?.set?.('forest'), cat: 'theme' },
-    { label: 'Theme: Ocean', action: () => ThemeManager?.set?.('ocean'), cat: 'theme' },
-    { label: 'Theme: Sunset', action: () => ThemeManager?.set?.('sunset'), cat: 'theme' },
-    { label: 'Theme: Rose', action: () => ThemeManager?.set?.('rose'), cat: 'theme' },
-    { label: 'Theme: Paper', action: () => ThemeManager?.set?.('paper'), cat: 'theme' },
+    { label: 'Theme: System', action: () => applyTheme('system'), cat: 'theme' },
+    { label: 'Theme: Dark', action: () => applyTheme('dark'), cat: 'theme' },
+    { label: 'Theme: Light', action: () => applyTheme('light'), cat: 'theme' },
+    { label: 'Theme: Midnight', action: () => applyTheme('midnight'), cat: 'theme' },
+    { label: 'Theme: Forest', action: () => applyTheme('forest'), cat: 'theme' },
+    { label: 'Theme: Ocean', action: () => applyTheme('ocean'), cat: 'theme' },
+    { label: 'Theme: Sunset', action: () => applyTheme('sunset'), cat: 'theme' },
+    { label: 'Theme: Rose', action: () => applyTheme('rose'), cat: 'theme' },
+    { label: 'Theme: Paper', action: () => applyTheme('paper'), cat: 'theme' },
     // Tools (quick UI prefs)
-    { label: 'UI: Font size +', action: () => FontScale?.inc?.(), cat: 'tools' },
-    { label: 'UI: Font size -', action: () => FontScale?.dec?.(), cat: 'tools' },
-    { label: 'UI: Font size reset', action: () => FontScale?.reset?.(), cat: 'tools' },
-    { label: 'UI: Density compact', action: () => Prefs?.set?.(Prefs.KEYS?.density, 'compact'), cat: 'tools' },
-    { label: 'UI: Density comfortable', action: () => Prefs?.set?.(Prefs.KEYS?.density, 'comfortable'), cat: 'tools' },
-    { label: 'UI: Density spacious', action: () => Prefs?.set?.(Prefs.KEYS?.density, 'spacious'), cat: 'tools' },
+    { label: 'UI: Font size +', action: () => app().FontScale?.inc?.(), cat: 'tools' },
+    { label: 'UI: Font size -', action: () => app().FontScale?.dec?.(), cat: 'tools' },
+    { label: 'UI: Font size reset', action: () => app().FontScale?.reset?.(), cat: 'tools' },
+    { label: 'UI: Density compact', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'compact'), cat: 'tools' },
+    { label: 'UI: Density comfortable', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'comfortable'), cat: 'tools' },
+    { label: 'UI: Density spacious', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'spacious'), cat: 'tools' },
     // Actions
     { label: 'Export backup', action: () => window.ProgressStats?.exportJSON?.(), cat: 'action' },
     { label: 'Show keyboard shortcuts', action: () => window.PlasmaDeck?.KeyboardShortcuts?._showHelp?.(), cat: 'action' },
@@ -112,7 +127,7 @@ export function initCommandPalette() {
     const list = getFiltered(cpInput.value ?? '');
     const item = list[idx];
     if (!item) return;
-    if (item.hash) Router?.navigate?.(item.hash);
+    if (item.hash) app().Router?.navigate?.(item.hash);
     if (typeof item.action === 'function') {
       try { item.action(); } catch (e) { console.warn('[Command palette] action failed', e); }
     }

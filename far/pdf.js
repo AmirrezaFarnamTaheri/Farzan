@@ -1,5 +1,5 @@
-// ============================================================
-// PlasmaDeck — pdf.js
+﻿// ============================================================
+// PlasmaDeck â€” pdf.js
 // Full PDF Viewer with Thumbnails, Annotations, Search
 // Requires: PDF.js library (pdfjs-dist)
 //   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -8,22 +8,128 @@
 (() => {
   'use strict';
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 0. SETUP
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-  function debounce(fn, ms = 300) {
-    let t;
-    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  const RouteListeners = {
+    items: [],
+    on(target, type, handler, options) {
+      if (!target) return;
+      target.addEventListener(type, handler, options);
+      this.items.push({ target, type, handler, options });
+    },
+    clear() {
+      for (const { target, type, handler, options } of this.items) {
+        try { target.removeEventListener(type, handler, options); } catch {}
+      }
+      this.items = [];
+    },
+  };
+
+  async function pdConfirm(input) {
+    const pd = window.PlasmaDeck;
+    const fn = pd?.UI?.confirm ?? pd?.Modal?.confirmAsync;
+    if (typeof fn === 'function') return fn(input);
+    const message = input && typeof input === 'object' ? input.message : input;
+    return window.confirm(String(message ?? 'Are you sure?'));
   }
 
-  async function pdConfirm(message) {
-    const fn = window.PlasmaDeck?.UI?.confirm;
-    if (typeof fn === 'function') return fn(message);
-    return window.confirm(String(message ?? 'Are you sure?'));
+  function escapeHtmlText(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function stableIdPart(value) {
+    return String(value || 'global')
+      .replace(/[^a-z0-9_-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'global';
+  }
+
+  function _joinPdfText(line, next, gap = 0) {
+    const left = String(line || '').trimEnd();
+    const right = String(next || '').trim();
+    if (!left) return right;
+    if (!right) return left;
+    if (/[\s([{"'-]$/.test(left)) return `${left}${right}`;
+    if (/^[,.;:!?%)\]}"']/.test(right)) return `${left}${right}`;
+    return gap <= 1 ? `${left}${right}` : `${left} ${right}`;
+  }
+
+  function _buildPdfSelectionLines(hits) {
+    const rows = [];
+    hits.sort((a, b) => a.top - b.top || a.left - b.left).forEach((hit) => {
+      const row = rows.find(item => Math.abs(item.top - hit.top) <= Math.max(3, hit.height * 0.65));
+      if (row) {
+        row.top = Math.min(row.top, hit.top);
+        row.height = Math.max(row.height, hit.height);
+        row.items.push(hit);
+      } else {
+        rows.push({ top: hit.top, height: hit.height, items: [hit] });
+      }
+    });
+    return rows
+      .sort((a, b) => a.top - b.top)
+      .flatMap((row) => {
+        const items = row.items.sort((a, b) => a.left - b.left);
+        const segments = [];
+        items.forEach((item) => {
+          const previous = segments.at(-1)?.items.at(-1);
+          if (previous && item.left - previous.right > Math.max(36, row.height * 1.8)) {
+            segments.push({ items: [item] });
+          } else if (segments.length) {
+            segments.at(-1).items.push(item);
+          } else {
+            segments.push({ items: [item] });
+          }
+        });
+        return segments.map((segment) => ({
+          top: row.top,
+          height: row.height,
+          left: segment.items[0]?.left ?? 0,
+          right: segment.items[segment.items.length - 1]?.right ?? 0,
+          text: segment.items.reduce((line, item, index) => {
+            const previous = segment.items[index - 1];
+            return _joinPdfText(line, item.value, previous ? item.left - previous.right : 0);
+          }, ''),
+        }));
+      })
+      .filter(line => line.text.trim());
+  }
+
+  function _pdfSelectionTextFromLines(lines) {
+    const avgHeight = lines.reduce((total, line) => total + line.height, 0) / Math.max(lines.length, 1);
+    const tolerance = Math.max(30, avgHeight * 2);
+    const columns = [];
+    lines.forEach((line) => {
+      const column = columns.find(item => Math.abs(item.left - line.left) <= tolerance);
+      if (column) {
+        column.left = Math.min(column.left, line.left);
+        column.right = Math.max(column.right, line.right);
+        column.lines.push(line);
+      } else {
+        columns.push({ left: line.left, right: line.right, lines: [line] });
+      }
+    });
+    const realColumns = columns.length > 1 && columns.filter(item => item.lines.length > 1).length > 1;
+    const orderedLines = realColumns
+      ? columns.sort((a, b) => a.left - b.left).flatMap(column => column.lines.sort((a, b) => a.top - b.top))
+      : lines.sort((a, b) => a.top - b.top || a.left - b.left);
+    return orderedLines
+      .map(line => line.text)
+      .join('\n')
+      .replace(/([A-Za-z])-\n([A-Za-z])/g, '$1$2')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   // Point PDF.js to its worker
@@ -35,9 +141,9 @@
   }
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 1. CORE STATE
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const State = {
     pdfDoc:        null,
@@ -47,19 +153,24 @@
     rotation:      0,           // 0 | 90 | 180 | 270
     fitMode:       'width',     // 'width' | 'page' | 'custom'
     renderingPage: false,
+    renderToken:   0,
+    queuedRender:  null,
     searchQuery:   '',
     searchResults: [],          // [{page, items}]
     searchIdx:     -1,
-    currentDocId:   null,
+    searchToken:   0,
+    textCache:     new Map(),
     annotations:   {},          // { [pageNum]: Annotation[] }
+    annotationDocId: 'global',
+    searchDocId:   'global',
     activeTool:    'pan',       // 'pan' | 'highlight' | 'text' | 'draw'
     highlights:    [],          // persisted highlight annotations
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 2. DOM REFERENCES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const DOM = {
     viewerContainer:   null,
@@ -109,9 +220,9 @@
   }
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 3. LOAD PDF
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const PDFViewer = {
 
@@ -128,6 +239,8 @@
 
       this._showLoading(true);
       this._clearError();
+      State.renderToken += 1;
+      State.queuedRender = null;
 
       try {
         let src;
@@ -146,17 +259,26 @@
           },
         });
 
-        State.currentDocId = typeof source === 'string' ? source : (source instanceof File ? source.name : 'buffer-' + Date.now());
-      State.pdfDoc    = await loadingTask.promise;
+        State.pdfDoc    = await loadingTask.promise;
         State.totalPages = State.pdfDoc.numPages;
         State.currentPage = 1;
         State.rotation  = 0;
+        State.searchToken += 1;
+        State.searchQuery = '';
+        State.searchResults = [];
+        State.searchIdx = -1;
+        State.textCache = new Map();
         State.annotations = {};
+        State.annotationDocId = typeof source === 'string'
+          ? source
+          : `file:${source?.name || 'local'}:${source?.size || 0}`;
+        State.searchDocId = this._deriveSearchDocId(source, State.pdfDoc);
 
         this._updatePageUI();
+        await this._loadAnnotations();
         await this.renderPage(State.currentPage);
+        this._applyPendingPage();
         await this._buildThumbnails();
-        this._loadAnnotations();
 
         window.PlasmaDeck?.bus?.emit('pdf:load', {
           pages: State.totalPages,
@@ -171,20 +293,27 @@
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 4. PAGE RENDERING
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async renderPage(pageNum, {
       scale    = State.scale,
       rotation = State.rotation,
     } = {}) {
-      if (!State.pdfDoc || State.renderingPage) return;
+      if (!State.pdfDoc) return;
+      const request = { pageNum, scale, rotation };
+      if (State.renderingPage) {
+        State.queuedRender = request;
+        return;
+      }
+      const token = ++State.renderToken;
       State.renderingPage = true;
       State.currentPage   = Math.max(1, Math.min(pageNum, State.totalPages));
 
       try {
         const page    = await State.pdfDoc.getPage(State.currentPage);
+        if (token !== State.renderToken || !State.pdfDoc) return;
         const rotated = (rotation + page.rotate) % 360;
         const baseVP  = page.getViewport({ scale: 1, rotation: rotated });
 
@@ -220,9 +349,11 @@
 
         // Render
         await page.render({ canvasContext: ctx, viewport }).promise;
+        if (token !== State.renderToken || !State.pdfDoc) return;
 
         // Text layer
         await this._renderTextLayer(page, viewport);
+        if (token !== State.renderToken || !State.pdfDoc) return;
 
         // Annotation layer
         this._renderAnnotationLayer(State.currentPage, viewport);
@@ -238,14 +369,271 @@
         console.error('[PlasmaDeck PDF] Render error:', err);
       } finally {
         State.renderingPage = false;
+        if (token === State.renderToken && State.queuedRender) {
+          const nextRender = State.queuedRender;
+          State.queuedRender = null;
+          this.renderPage(nextRender.pageNum, {
+            scale: nextRender.scale,
+            rotation: nextRender.rotation,
+          });
+        }
       }
     },
 
-    // ── Text layer ─────────────────────────────────────────
+    getSnapshot() {
+      return {
+        docId: State.annotationDocId,
+        searchDocId: State.searchDocId,
+        page: State.currentPage,
+        totalPages: State.totalPages,
+        scale: State.scale,
+        rotation: State.rotation,
+      };
+    },
+
+    getAnnotations() {
+      return Object.entries(State.annotations || {}).flatMap(([pageKey, annotations]) => {
+        const page = Math.max(1, Number(pageKey || 1));
+        return (Array.isArray(annotations) ? annotations : []).map(annotation => ({
+          ...annotation,
+          page: Math.max(1, Number(annotation?.page || page)),
+          docId: annotation?.docId || State.annotationDocId,
+        }));
+      });
+    },
+
+    _selectionOwner(range) {
+      const node = range?.commonAncestorContainer;
+      const ElementCtor = window.Element;
+      const NodeCtor = window.Node;
+      if (!node) return null;
+      if (ElementCtor && node instanceof ElementCtor) return node;
+      if (NodeCtor && node.nodeType === NodeCtor.ELEMENT_NODE) return node;
+      return node.parentElement || null;
+    },
+
+    _pageFromSelectionOwner(owner) {
+      const pageEl = this._pageElementFromSelectionOwner(owner);
+      return this._pageFromPageElement(pageEl);
+    },
+
+    _pageFromPageElement(pageEl) {
+      const raw = pageEl?.dataset?.pdfPage
+        ?? pageEl?.dataset?.pageNumber
+        ?? pageEl?.dataset?.page
+        ?? pageEl?.dataset?.pageIndex;
+      const page = Number(raw);
+      if (!Number.isFinite(page)) return null;
+      return Math.max(1, pageEl?.dataset?.pageIndex ? page + 1 : page);
+    },
+
+    _pageElementFromSelectionOwner(owner) {
+      return owner?.closest?.('[data-pdf-page], [data-page-number], [data-page], [data-page-index]') || null;
+    },
+
+    _pageElementForRect(rect, fallbackEl) {
+      const candidates = Array.from(DOM.viewerContainer?.querySelectorAll?.('[data-pdf-page], [data-page-number], [data-page], [data-page-index]') || []);
+      const centerX = Number(rect.left || 0) + Number(rect.width || 0) / 2;
+      const centerY = Number(rect.top || 0) + Number(rect.height || 0) / 2;
+      const match = candidates.find((pageEl) => {
+        const pageRect = pageEl.getBoundingClientRect?.();
+        if (!pageRect) return false;
+        return centerX >= Number(pageRect.left || 0)
+          && centerX <= Number(pageRect.right ?? (Number(pageRect.left || 0) + Number(pageRect.width || 0)))
+          && centerY >= Number(pageRect.top || 0)
+          && centerY <= Number(pageRect.bottom ?? (Number(pageRect.top || 0) + Number(pageRect.height || 0)));
+      });
+      return match || fallbackEl || null;
+    },
+
+    _selectionRects(range, owner, page) {
+      const rects = [];
+      const fallbackPageEl = this._pageElementFromSelectionOwner(owner);
+      try {
+        Array.from(range?.getClientRects?.() || []).forEach((rect) => {
+          const width = Number(rect.width || 0);
+          const height = Number(rect.height || 0);
+          if (width <= 0 || height <= 0) return;
+          const pageEl = this._pageElementForRect(rect, fallbackPageEl);
+          const resolvedPage = this._pageFromPageElement(pageEl) || page;
+          if (!resolvedPage) return;
+          const pageRect = pageEl?.getBoundingClientRect?.() || DOM.viewerContainer?.getBoundingClientRect?.();
+          const pageWidth = Math.max(1, Number(pageRect?.width || 0));
+          const pageHeight = Math.max(1, Number(pageRect?.height || 0));
+          rects.push({
+            page: resolvedPage,
+            x: Number(((Number(rect.left || 0) - Number(pageRect?.left || 0)) / pageWidth).toFixed(4)),
+            y: Number(((Number(rect.top || 0) - Number(pageRect?.top || 0)) / pageHeight).toFixed(4)),
+            w: Number((width / pageWidth).toFixed(4)),
+            h: Number((height / pageHeight).toFixed(4)),
+          });
+        });
+      } catch {}
+      return rects;
+    },
+
+    _selectionTextFromLayer(clientRects, fallback) {
+      const hits = [];
+      if (!DOM.viewerContainer || !clientRects?.length) return fallback;
+      DOM.viewerContainer.querySelectorAll('[data-pdf-text-item],.pdf-text-layer span').forEach((el) => {
+        const value = String(el.textContent || '').trim();
+        const rect = el.getBoundingClientRect?.();
+        if (!value || !rect?.width || !rect?.height) return;
+        const right = rect.right ?? rect.left + rect.width;
+        const bottom = rect.bottom ?? rect.top + rect.height;
+        if (!clientRects.some(item => Math.max(rect.left, item.left) < Math.min(right, item.right ?? item.left + item.width) && Math.max(rect.top, item.top) < Math.min(bottom, item.bottom ?? item.top + item.height))) return;
+        hits.push({ top: rect.top, left: rect.left, right, height: rect.height, value });
+      });
+      const text = _pdfSelectionTextFromLines(_buildPdfSelectionLines(hits));
+      return text || fallback;
+    },
+
+    getSelectionSnapshot() {
+      const selection = window.getSelection?.();
+      const text = String(selection?.toString?.() || '').trim();
+      if (!text) return { text: '', page: Math.max(1, Number(State.currentPage || 1)), rects: [] };
+      const fallback = { text, page: Math.max(1, Number(State.currentPage || 1)), rects: [] };
+      if (!DOM.viewerContainer || !selection?.rangeCount) return fallback;
+      const pages = [];
+      const rects = [];
+      const clientRects = [];
+      try {
+        for (let index = 0; index < selection.rangeCount; index += 1) {
+          const range = selection.getRangeAt(index);
+          const owner = this._selectionOwner(range);
+          if (owner && !DOM.viewerContainer.contains(owner)) return { text: '', page: fallback.page };
+          const page = this._pageFromSelectionOwner(owner);
+          clientRects.push(...Array.from(range?.getClientRects?.() || []));
+          const rangeRects = this._selectionRects(range, owner, page);
+          rects.push(...rangeRects);
+          rangeRects.forEach(rect => pages.push(rect.page));
+          if (page && !rangeRects.length) pages.push(page);
+        }
+      } catch {
+        return fallback;
+      }
+      const uniquePages = [...new Set(pages)].sort((a, b) => a - b);
+      const layerText = this._selectionTextFromLayer(clientRects, text);
+      return { text: layerText, page: uniquePages[0] || fallback.page, pages: uniquePages, rects };
+    },
+
+    async saveSelectionToNote() {
+      const saveNote = window.DB?.saveNote;
+      const selectionSnapshot = this.getSelectionSnapshot();
+      const text = selectionSnapshot.text;
+      if (!text) return { saved: false, reason: 'empty-selection' };
+      if (typeof saveNote !== 'function') return { saved: false, reason: 'storage-unavailable' };
+
+      const docId = State.annotationDocId || 'global';
+      const page = Math.max(1, Number(selectionSnapshot.page || State.currentPage || 1));
+      const pages = Array.isArray(selectionSnapshot.pages) && selectionSnapshot.pages.length
+        ? [...new Set(selectionSnapshot.pages.map(item => Math.max(1, Number(item) || 1)))].sort((a, b) => a - b)
+        : [page];
+      const pageLabel = pages.length > 1 ? `pages ${pages.join(', ')}` : `page ${page}`;
+      const now = Date.now();
+      const excerpt = text.length > 80 ? `${text.slice(0, 77)}...` : text;
+      await saveNote({
+        id: `pdf-selection-note-${stableIdPart(docId)}-${now}`,
+        title: `PDF selection: ${excerpt}`,
+        content: `<blockquote>${escapeHtmlText(text)}</blockquote><p><strong>Source:</strong> PDF ${pageLabel}</p>`,
+        sourceType: 'pdf-selection',
+        docId,
+        pdfDocId: docId,
+        page,
+        pdfPage: page,
+        pdfPages: pages,
+        selectionRects: selectionSnapshot.rects,
+        tags: ['pdf', 'selection'],
+        createdAt: now,
+        updatedAt: now,
+      });
+      try { window.getSelection?.()?.removeAllRanges?.(); } catch {}
+      return pages.length > 1 ? { saved: true, page, pages, docId } : { saved: true, page, docId };
+    },
+
+    async exportAnnotationsToNotes() {
+      const saveNote = window.DB?.saveNote;
+      const annotations = this.getAnnotations();
+      const result = {
+        total: annotations.length,
+        created: 0,
+        skipped: 0,
+        errors: 0,
+      };
+      if (typeof saveNote !== 'function') {
+        result.skipped = annotations.length;
+        return result;
+      }
+
+      const docId = State.annotationDocId || 'global';
+      const docPart = stableIdPart(docId);
+      const now = Date.now();
+      for (const annotation of annotations) {
+        if (!annotation?.id) {
+          result.skipped += 1;
+          continue;
+        }
+        const page = Math.max(1, Number(annotation.page || 1));
+        const type = String(annotation.type || 'annotation');
+        const noteText = String(annotation.note || '').trim();
+        const annotationPart = stableIdPart(annotation.id);
+        const geometry = [
+          `x=${Number(annotation.x || 0).toFixed(4)}`,
+          `y=${Number(annotation.y || 0).toFixed(4)}`,
+          `w=${Number(annotation.w || 0).toFixed(4)}`,
+          `h=${Number(annotation.h || 0).toFixed(4)}`,
+        ].join(', ');
+        const content = [
+          noteText ? `<p>${escapeHtmlText(noteText)}</p>` : `<p>${escapeHtmlText(type)} annotation</p>`,
+          `<p><strong>Source:</strong> PDF page ${page}</p>`,
+          `<p><strong>Annotation:</strong> ${escapeHtmlText(type)} (${escapeHtmlText(geometry)})</p>`,
+        ].join('');
+
+        try {
+          await saveNote({
+            id: `pdf-annotation-note-${docPart}-${annotationPart}`,
+            title: noteText ? `PDF annotation: ${noteText.slice(0, 60)}` : `PDF page ${page} ${type}`,
+            content,
+            sourceType: 'pdf-annotation',
+            docId,
+            pdfDocId: docId,
+            annotationId: annotation.id,
+            annotationType: type,
+            page,
+            pdfPage: page,
+            tags: ['pdf', 'annotation'],
+            createdAt: annotation.createdAt || now,
+            updatedAt: now,
+          });
+          result.created += 1;
+        } catch {
+          result.errors += 1;
+        }
+      }
+      return result;
+    },
+
+    _applyPendingPage() {
+      let pendingDoc = '';
+      let pendingPage = 0;
+      try {
+        pendingDoc = sessionStorage.getItem('plasma_pending_pdf_doc') || '';
+        pendingPage = Number(sessionStorage.getItem('plasma_pending_pdf_page') || 0);
+      } catch {}
+      if (!pendingPage) return;
+      if (pendingDoc && pendingDoc !== State.annotationDocId && pendingDoc !== State.searchDocId) return;
+      try {
+        sessionStorage.removeItem('plasma_pending_pdf_doc');
+        sessionStorage.removeItem('plasma_pending_pdf_page');
+      } catch {}
+      this.goTo(pendingPage);
+    },
+
+    // â”€â”€ Text layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async _renderTextLayer(page, viewport) {
       const textLayerDiv = DOM.textLayer;
       if (!textLayerDiv) return;
-      textLayerDiv.innerHTML = '';
+      textLayerDiv.replaceChildren();
       textLayerDiv.style.width  = `${viewport.width}px`;
       textLayerDiv.style.height = `${viewport.height}px`;
 
@@ -261,11 +649,11 @@
       }
     },
 
-    // ── Annotation layer ────────────────────────────────────
+    // â”€â”€ Annotation layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _renderAnnotationLayer(pageNum, viewport) {
       const layer = DOM.annotationLayer;
       if (!layer) return;
-      layer.innerHTML = '';
+      layer.replaceChildren();
       layer.style.width  = `${viewport.width}px`;
       layer.style.height = `${viewport.height}px`;
 
@@ -285,9 +673,14 @@
         el.dataset.annotId = annot.id;
 
         // Right-click to delete
-        el.addEventListener('contextmenu', async e => {
+        RouteListeners.on(el, 'contextmenu', async e => {
           e.preventDefault();
-          if (await pdConfirm('Delete this annotation?')) {
+          if (await pdConfirm({
+            title: 'Delete annotation',
+            message: 'Delete this PDF annotation?',
+            confirmLabel: 'Delete annotation',
+            cancelLabel: 'Keep annotation',
+          })) {
             AnnotationManager.delete(pageNum, annot.id);
             el.remove();
           }
@@ -298,9 +691,9 @@
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 5. NAVIGATION
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     goTo(page) {
       const p = parseInt(page, 10);
@@ -320,9 +713,9 @@
     last()  { this.renderPage(State.totalPages); },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 6. ZOOM
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     zoomIn(step = 0.25) {
       State.fitMode = 'custom';
@@ -350,22 +743,25 @@
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 7. ROTATION
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     rotateCW()  { State.rotation = (State.rotation + 90)  % 360; this.renderPage(State.currentPage); },
     rotateCCW() { State.rotation = (State.rotation + 270) % 360; this.renderPage(State.currentPage); },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 8. THUMBNAILS
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async _buildThumbnails() {
       const sidebar = DOM.thumbnailSidebar;
       if (!sidebar || !State.pdfDoc) return;
-      sidebar.innerHTML = '<div class="thumb-loading">Loading thumbnails…</div>';
+      const loading = document.createElement('div');
+      loading.className = 'thumb-loading';
+      loading.textContent = 'Loading thumbnails…';
+      sidebar.replaceChildren(loading);
 
       const fragment = document.createDocumentFragment();
 
@@ -383,13 +779,13 @@
         wrapper.append(canvas, label);
         fragment.appendChild(wrapper);
 
-        wrapper.addEventListener('click', () => this.goTo(i));
+        RouteListeners.on(wrapper, 'click', () => this.goTo(i));
       }
 
-      sidebar.innerHTML = '';
-      sidebar.appendChild(fragment);
+      sidebar.replaceChildren(fragment);
 
       // Lazy-render thumbnails via IntersectionObserver
+      this._thumbnailObserver?.disconnect?.();
       const observer = new IntersectionObserver(async entries => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
@@ -408,6 +804,7 @@
         }
       }, { root: sidebar, rootMargin: '0px 0px 400px 0px' });
 
+      this._thumbnailObserver = observer;
       $$('.thumb-item', sidebar).forEach(el => observer.observe(el));
     },
 
@@ -422,47 +819,40 @@
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 9. TEXT SEARCH
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async search(query) {
       if (!State.pdfDoc || !query.trim()) {
         this._clearSearch();
         return;
       }
-
-      // Cancel previous search if running
-      if (this._searchAbort) this._searchAbort.abort();
-      this._searchAbort = new AbortController();
-      const { signal } = this._searchAbort;
-
+      const token = ++State.searchToken;
       State.searchQuery   = query;
       State.searchResults = [];
       State.searchIdx     = -1;
 
       const q = query.toLowerCase();
-      
-      // Non-blocking search with feedback
-      for (let p = 1; p <= State.totalPages; p++) {
-        if (signal.aborted) return;
-        
-        const page        = await State.pdfDoc.getPage(p);
-        const textContent = await page.getTextContent();
-        const text        = textContent.items.map(i => i.str).join(' ').toLowerCase();
 
-        if (text.includes(q)) {
-          State.searchResults.push({ page: p, text });
-          this._renderSearchResults(); // Partial results
+      for (let p = 1; p <= State.totalPages; p++) {
+        if (token !== State.searchToken) return;
+        const text = await this._getPageSearchText(p);
+        if (token !== State.searchToken) return;
+
+        const idx = text.indexOf(q);
+        if (idx >= 0) {
+          State.searchResults.push({
+            page: p,
+            text,
+            snippet: text.slice(Math.max(0, idx - 40), idx + q.length + 40),
+          });
         }
-        
-        // Yield to UI thread every 10 pages
-        if (p % 10 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
       this._renderSearchResults();
 
-      if (State.searchResults.length && State.searchIdx === -1) {
+      if (State.searchResults.length) {
         State.searchIdx = 0;
         this.goTo(State.searchResults[0].page);
       }
@@ -471,6 +861,55 @@
         query,
         count: State.searchResults.length,
       });
+    },
+
+    async _getPageSearchText(pageNum) {
+      const cacheKey = `${State.searchDocId || State.annotationDocId || 'global'}:${pageNum}`;
+      if (State.textCache.has(cacheKey)) return State.textCache.get(cacheKey);
+      const textPromise = (async () => {
+        const page = await State.pdfDoc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        return textContent.items.map(i => i.str).join(' ').toLowerCase();
+      })();
+      State.textCache.set(cacheKey, textPromise);
+      try {
+        return await textPromise;
+      } catch (err) {
+        State.textCache.delete(cacheKey);
+        throw err;
+      }
+    },
+
+    async getPageText(pageNum = State.currentPage) {
+      if (!State.pdfDoc) return '';
+      const page = Math.max(1, Math.min(Number(pageNum) || State.currentPage || 1, State.totalPages || 1));
+      const text = await this._getPageSearchText(page);
+      return String(text || '').replace(/\s+/g, ' ').trim();
+    },
+
+    async extractTextForSummary({ maxPages = 5, maxChars = 12000 } = {}) {
+      if (!State.pdfDoc) return { text: '', pages: 0, totalPages: 0, docId: State.annotationDocId || 'global' };
+      const totalPages = Math.max(0, Number(State.totalPages) || 0);
+      const limitPages = Math.max(1, Math.min(totalPages || 1, Number(maxPages) || 5));
+      const limitChars = Math.max(1000, Number(maxChars) || 12000);
+      const pageTexts = [];
+      for (let page = 1; page <= limitPages; page += 1) {
+        const text = await this.getPageText(page);
+        if (text) pageTexts.push(`Page ${page}: ${text}`);
+        if (pageTexts.join('\n\n').length >= limitChars) break;
+      }
+      const text = pageTexts.join('\n\n').slice(0, limitChars).trim();
+      return { text, pages: pageTexts.length, totalPages, docId: State.annotationDocId || 'global' };
+    },
+
+    _deriveSearchDocId(source, pdfDoc = State.pdfDoc) {
+      const fingerprints = Array.isArray(pdfDoc?.fingerprints) ? pdfDoc.fingerprints.filter(Boolean) : [];
+      if (fingerprints.length) return `fingerprint:${fingerprints.join(':')}`;
+      if (pdfDoc?.fingerprint) return `fingerprint:${pdfDoc.fingerprint}`;
+      if (typeof source === 'string') return `url:${source}`;
+      if (source instanceof File) return `file:${source.name}:${source.size}:${source.lastModified || 0}`;
+      if (source instanceof ArrayBuffer) return `arraybuffer:${source.byteLength}`;
+      return State.annotationDocId || 'global';
     },
 
     searchNext() {
@@ -488,34 +927,38 @@
     },
 
     _clearSearch() {
+      State.searchToken += 1;
       State.searchQuery   = '';
       State.searchResults = [];
       State.searchIdx     = -1;
-      if (DOM.searchResults) DOM.searchResults.innerHTML = '';
+      if (DOM.searchResults) DOM.searchResults.replaceChildren();
     },
 
     _renderSearchResults() {
       const el = DOM.searchResults;
       if (!el) return;
       const { searchResults: results, searchIdx } = State;
+      el.replaceChildren();
       if (!results.length) {
-        el.innerHTML = `<span class="search-no-result">No matches for "${State.searchQuery}"</span>`;
+        const noResult = document.createElement('span');
+        noResult.className = 'search-no-result';
+        noResult.textContent = `No matches for "${State.searchQuery}"`;
+        el.appendChild(noResult);
         return;
       }
-      el.innerHTML = `
-        <span class="search-count">
-          Match ${searchIdx + 1} of ${results.length}
-        </span>
-        <span class="search-pages">
-          Pages: ${[...new Set(results.map(r => r.page))].join(', ')}
-        </span>
-      `;
+      const count = document.createElement('span');
+      count.className = 'search-count';
+      count.textContent = `Match ${searchIdx + 1} of ${results.length}`;
+      const pages = document.createElement('span');
+      pages.className = 'search-pages';
+      pages.textContent = `Pages: ${[...new Set(results.map(r => r.page))].join(', ')}`;
+      el.append(count, pages);
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 10. DOWNLOAD & PRINT
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async download(filename = 'document.pdf') {
       if (!State.pdfDoc) return;
@@ -536,11 +979,20 @@
       iframe.style.display = 'none';
       const data   = await State.pdfDoc.getData();
       const blob   = new Blob([data], { type: 'application/pdf' });
-      iframe.src   = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
+      const validateFrameUrl = window.PlasmaDeck?.safeFrameUrl;
+      const frameUrl = typeof validateFrameUrl === 'function'
+        ? validateFrameUrl(objectUrl)
+        : objectUrl;
+      if (!frameUrl) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      iframe.src   = frameUrl;
       document.body.appendChild(iframe);
       iframe.onload = () => {
         iframe.contentWindow.print();
-        setTimeout(() => { iframe.remove(); URL.revokeObjectURL(iframe.src); }, 5000);
+        setTimeout(() => { iframe.remove(); URL.revokeObjectURL(objectUrl); }, 5000);
       };
     },
 
@@ -555,9 +1007,9 @@
     },
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 11. UI HELPERS
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _updatePageUI() {
       if (DOM.currentPageInput) DOM.currentPageInput.value = State.currentPage;
@@ -594,33 +1046,50 @@
     },
 
     async _loadAnnotations() {
-      if (!State.currentDocId) return;
-      try {
-        const list = await window.DB?.getAnnotations(State.currentDocId) ?? [];
-        State.annotations = {};
-        list.forEach(a => {
-          if (!State.annotations[a.page]) State.annotations[a.page] = [];
-          State.annotations[a.page].push(a);
-        });
-      } catch (err) {
-        console.warn('[PDF] Failed to load annotations from DB:', err);
+      if (window.DB?.getAnnotations) {
+        try {
+          const records = await window.DB.getAnnotations(State.annotationDocId);
+          State.annotations = records.reduce((acc, annotation) => {
+            const page = annotation.page ?? 1;
+            (acc[page] = acc[page] ?? []).push(annotation);
+            return acc;
+          }, {});
+          return;
+        } catch {}
+      }
+      const saved = localStorage.getItem('plasma-pdf-annotations');
+      if (saved) {
+        try { State.annotations = JSON.parse(saved); } catch {}
       }
     },
 
-    async _saveAnnotations() {
-      if (!State.currentDocId) return;
-      try {
-        await window.DB?.saveAnnotations(State.currentDocId, State.annotations);
-      } catch (err) {
-        console.warn('[PDF] Failed to save annotations to DB:', err);
+    async refreshAnnotationsFromStorage() {
+      await this._loadAnnotations();
+      const canvas = DOM.pageCanvas;
+      const viewport = {
+        width: Math.max(1, Number(canvas?.width || canvas?.getBoundingClientRect?.().width || 0)),
+        height: Math.max(1, Number(canvas?.height || canvas?.getBoundingClientRect?.().height || 0)),
+      };
+      this._renderAnnotationLayer(State.currentPage, viewport);
+      return this.getAnnotations();
+    },
+
+    _saveAnnotations() {
+      if (window.DB?.saveAnnotations) {
+        try {
+          window.DB.saveAnnotations(State.annotationDocId, State.annotations)
+            .catch(() => localStorage.setItem('plasma-pdf-annotations', JSON.stringify(State.annotations)));
+          return;
+        } catch {}
       }
+      localStorage.setItem('plasma-pdf-annotations', JSON.stringify(State.annotations));
     },
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 12. ANNOTATION MANAGER
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const AnnotationManager = {
     _drawing:   false,
@@ -631,9 +1100,9 @@
       const layer = DOM.annotationLayer;
       if (!layer) return;
 
-      layer.addEventListener('mousedown', e => this._onMouseDown(e));
-      layer.addEventListener('mousemove', e => this._onMouseMove(e));
-      layer.addEventListener('mouseup',   e => this._onMouseUp(e));
+      RouteListeners.on(layer, 'mousedown', e => this._onMouseDown(e));
+      RouteListeners.on(layer, 'mousemove', e => this._onMouseMove(e));
+      RouteListeners.on(layer, 'mouseup',   e => this._onMouseUp(e));
     },
 
     _onMouseDown(e) {
@@ -721,7 +1190,7 @@
     clearPage(pageNum) {
       delete State.annotations[pageNum];
       PDFViewer._saveAnnotations();
-      if (DOM.annotationLayer) DOM.annotationLayer.innerHTML = '';
+      if (DOM.annotationLayer) DOM.annotationLayer.replaceChildren();
     },
 
     clearAll() {
@@ -740,17 +1209,18 @@
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 13. KEYBOARD & TOUCH GESTURES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const PDFInput = {
     _pinchDist: null,
 
     init() {
-      document.addEventListener('keydown', e => {
-        if (!$('[data-pdf-viewer]')?.closest(':focus-within') &&
-            document.activeElement?.tagName !== 'INPUT') {
+      RouteListeners.on(document, 'keydown', e => {
+        const root = DOM.viewerContainer?.closest('.view-pdf') ?? DOM.viewerContainer;
+        const target = e.target?.nodeType === 1 ? e.target : document.activeElement;
+        if (!root?.contains(target) && !root?.contains(document.activeElement)) {
           return;
         }
         switch (e.key) {
@@ -772,20 +1242,20 @@
       });
 
       // Mouse wheel zoom
-      DOM.viewerContainer?.addEventListener('wheel', e => {
+      RouteListeners.on(DOM.viewerContainer, 'wheel', e => {
         if (!e.ctrlKey && !e.metaKey) return;
         e.preventDefault();
         e.deltaY < 0 ? PDFViewer.zoomIn(0.1) : PDFViewer.zoomOut(0.1);
       }, { passive: false });
 
       // Pinch-to-zoom (touch)
-      DOM.viewerContainer?.addEventListener('touchstart', e => {
+      RouteListeners.on(DOM.viewerContainer, 'touchstart', e => {
         if (e.touches.length === 2) {
           this._pinchDist = this._dist(e.touches);
         }
       }, { passive: true });
 
-      DOM.viewerContainer?.addEventListener('touchmove', e => {
+      RouteListeners.on(DOM.viewerContainer, 'touchmove', e => {
         if (e.touches.length !== 2 || !this._pinchDist) return;
         const newDist = this._dist(e.touches);
         const delta   = (newDist - this._pinchDist) / 200;
@@ -796,6 +1266,10 @@
       }, { passive: true });
     },
 
+    destroy() {
+      this._pinchDist = null;
+    },
+
     _dist(touches) {
       const dx = touches[0].clientX - touches[1].clientX;
       const dy = touches[0].clientY - touches[1].clientY;
@@ -804,19 +1278,21 @@
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 14. TOOLBAR WIRING
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const PDFToolbar = {
     _inited: false,
     init() {
       if (this._inited) return;
       this._inited = true;
-      document.addEventListener('click', e => {
+      RouteListeners.on(document, 'click', e => {
         const t = e?.target;
         const target = t && t.nodeType === 1 ? t : t?.parentElement;
         const btn = target?.closest?.('[data-pdf-action]');
+        const root = DOM.viewerContainer?.closest('.view-pdf') ?? DOM.viewerContainer;
+        if (!root?.contains(btn)) return;
         if (!btn) return;
 
         const action = btn.dataset.pdfAction;
@@ -853,19 +1329,17 @@
 
       // Page number input
       if (DOM.currentPageInput) {
-        if (DOM.currentPageInput.dataset.pdBound) return;
-        DOM.currentPageInput.dataset.pdBound = 'true';
-        DOM.currentPageInput.addEventListener('keydown', e => {
+        RouteListeners.on(DOM.currentPageInput, 'keydown', e => {
           if (e.key === 'Enter') PDFViewer.goTo(DOM.currentPageInput.value);
         });
-        DOM.currentPageInput.addEventListener('blur', () =>
+        RouteListeners.on(DOM.currentPageInput, 'blur', () =>
           PDFViewer.goTo(DOM.currentPageInput.value));
       }
 
       // Zoom select
       const zoomSelect = $('[data-pdf-zoom-select]');
       if (zoomSelect) {
-        zoomSelect.addEventListener('change', () => {
+        RouteListeners.on(zoomSelect, 'change', () => {
           const v = zoomSelect.value;
           if (v === 'width') PDFViewer.fitWidth();
           else if (v === 'page') PDFViewer.fitPage();
@@ -875,7 +1349,7 @@
 
       // Search
       if (DOM.searchInput) {
-        DOM.searchInput.addEventListener('keydown', e => {
+        RouteListeners.on(DOM.searchInput, 'keydown', e => {
           if (e.key === 'Enter') {
             e.shiftKey
               ? PDFViewer.searchPrev()
@@ -891,23 +1365,20 @@
       // Open file
       const openInput = $('[data-pdf-open]');
       if (openInput) {
-        if (!openInput.dataset.pdBound) {
-          openInput.dataset.pdBound = 'true';
         openInput.accept = 'application/pdf';
-        openInput.addEventListener('change', () => {
+        RouteListeners.on(openInput, 'change', () => {
           if (openInput.files[0]) PDFViewer.load(openInput.files[0]);
         });
         const openBtn = $('[data-pdf-action="open"]');
-        if (openBtn) openBtn.addEventListener('click', () => openInput.click());
-        }
+        if (openBtn) RouteListeners.on(openBtn, 'click', () => openInput.click());
       }
 
       // Drag-and-drop on viewer
       const viewer = $('[data-pdf-viewer]');
       if (viewer) {
-        viewer.addEventListener('dragover',  e => { e.preventDefault(); viewer.classList.add('drag-over'); });
-        viewer.addEventListener('dragleave', () => viewer.classList.remove('drag-over'));
-        viewer.addEventListener('drop', e => {
+        RouteListeners.on(viewer, 'dragover',  e => { e.preventDefault(); viewer.classList.add('drag-over'); });
+        RouteListeners.on(viewer, 'dragleave', () => viewer.classList.remove('drag-over'));
+        RouteListeners.on(viewer, 'drop', e => {
           e.preventDefault();
           viewer.classList.remove('drag-over');
           const file = e.dataTransfer.files[0];
@@ -918,9 +1389,9 @@
   };
 
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 15. INIT
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   let _inited = false;
   function initPDFViewer() {
@@ -941,6 +1412,38 @@
     if (src) PDFViewer.load(src);
   }
 
+  function destroyPDFViewer() {
+    RouteListeners.clear();
+    PDFInput.destroy();
+    PDFViewer._thumbnailObserver?.disconnect?.();
+    PDFViewer._thumbnailObserver = null;
+    try { State.pdfDoc?.destroy?.(); } catch {}
+    Object.assign(State, {
+      pdfDoc: null,
+      currentPage: 1,
+      totalPages: 0,
+      scale: 1.0,
+      rotation: 0,
+      fitMode: 'width',
+      renderingPage: false,
+      renderToken: State.renderToken + 1,
+      queuedRender: null,
+      searchQuery: '',
+      searchResults: [],
+      searchIdx: -1,
+      searchToken: 0,
+      textCache: new Map(),
+      annotations: {},
+      annotationDocId: 'global',
+      searchDocId: 'global',
+      activeTool: 'pan',
+      highlights: [],
+    });
+    Object.keys(DOM).forEach((key) => { DOM[key] = null; });
+    PDFToolbar._inited = false;
+    _inited = false;
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initPDFViewer);
   } else {
@@ -952,5 +1455,6 @@
   window.PlasmaAnnotationMgr   = AnnotationManager;
   window.PlasmaPDFState        = State;
   window.PlasmaPDFInit         = initPDFViewer;
+  window.PlasmaPDFDestroy      = destroyPDFViewer;
 
 })();

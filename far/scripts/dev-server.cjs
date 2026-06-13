@@ -79,47 +79,73 @@ function withNoSniff(headers) {
 function streamFile(req, res, filePath, type, relPath) {
   const stat = fs.statSync(filePath);
   const range = req.headers.range;
+  const cspHeader = type.startsWith('text/html') ? extractCsp(filePath) : null;
+  const baseHeaders = {
+    'Content-Type': type,
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': cacheControlForPath(relPath),
+    ...(cspHeader ? { 'Content-Security-Policy': cspHeader } : {}),
+  };
 
   // HEAD: just metadata
   if (req.method === 'HEAD') {
     res.writeHead(200, withNoSniff({
-      'Content-Type': type,
+      ...baseHeaders,
       'Content-Length': stat.size,
-      'Accept-Ranges': 'bytes',
-      'Cache-Control': cacheControlForPath(relPath),
     }));
     res.end();
     return 200;
   }
 
-  if (range && /^bytes=\d*-\d*$/.test(range)) {
+  if (range) {
+    if (!/^bytes=\d*-\d*$/.test(range) || range.includes(',')) {
+      send(res, 416, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Range': `bytes */${stat.size}` }, 'Range Not Satisfiable');
+      return 416;
+    }
     const [startRaw, endRaw] = range.replace('bytes=', '').split('-');
-    const start = startRaw ? Number(startRaw) : 0;
-    const end = endRaw ? Number(endRaw) : stat.size - 1;
+    let start;
+    let end;
+    if (!startRaw) {
+      const suffixLength = Number(endRaw);
+      if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+        send(res, 416, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Range': `bytes */${stat.size}` }, 'Range Not Satisfiable');
+        return 416;
+      }
+      start = Math.max(stat.size - suffixLength, 0);
+      end = stat.size - 1;
+    } else {
+      start = Number(startRaw);
+      end = endRaw ? Number(endRaw) : stat.size - 1;
+    }
     if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || end >= stat.size) {
       send(res, 416, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Range': `bytes */${stat.size}` }, 'Range Not Satisfiable');
       return 416;
     }
 
     res.writeHead(206, withNoSniff({
-      'Content-Type': type,
+      ...baseHeaders,
       'Content-Length': end - start + 1,
       'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-      'Accept-Ranges': 'bytes',
-      'Cache-Control': cacheControlForPath(relPath),
     }));
     fs.createReadStream(filePath, { start, end }).pipe(res);
     return 206;
   }
 
   res.writeHead(200, withNoSniff({
-    'Content-Type': type,
+    ...baseHeaders,
     'Content-Length': stat.size,
-    'Accept-Ranges': 'bytes',
-    'Cache-Control': cacheControlForPath(relPath),
   }));
   fs.createReadStream(filePath).pipe(res);
   return 200;
+}
+
+function extractCsp(filePath) {
+  try {
+    const html = fs.readFileSync(filePath, 'utf8');
+    return html.match(/Content-Security-Policy"[\s\S]*?content="([^"]+)"/)?.[1] || null;
+  } catch {
+    return null;
+  }
 }
 
 function createServer(options = {}) {
@@ -177,7 +203,7 @@ function createServer(options = {}) {
   }
 
   // Static
-  const rel = u.pathname === '/' ? 'index.html' : u.pathname.replace(/^\//, '');
+  const rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.replace(/^\//, ''));
   const filePath = safeJoin(serverRoot, rel);
   if (!filePath) {
     finish(403);

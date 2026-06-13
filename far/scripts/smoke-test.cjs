@@ -37,6 +37,58 @@ function getStatus(url) {
   return request('GET', url);
 }
 
+function extractChunkPaths(source, basePath = '/dist/plasma.js') {
+  const paths = new Set();
+  const baseDir = path.posix.dirname(basePath);
+  for (const match of String(source || '').matchAll(/import\(\s*["']([^"']+)["']\s*\)/g)) {
+    const specifier = match[1];
+    if (!specifier.startsWith('.')) continue;
+    const normalized = path.posix.normalize(path.posix.join(baseDir, specifier));
+    paths.add(normalized.startsWith('/') ? normalized : `/${normalized}`);
+  }
+  return [...paths].sort();
+}
+
+async function defaultFetchText(url) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port || 80,
+      path: u.pathname + u.search,
+      method: 'GET',
+      timeout: 8000,
+    }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('timeout'));
+    });
+    req.end();
+  });
+}
+
+async function collectChunkPaths(origin, entrySource, fetchText = defaultFetchText, entryPath = '/dist/plasma.js') {
+  const seen = new Set();
+  const queue = extractChunkPaths(entrySource, entryPath);
+  while (queue.length) {
+    const chunkPath = queue.shift();
+    if (seen.has(chunkPath)) continue;
+    seen.add(chunkPath);
+    const response = await fetchText(new URL(chunkPath, origin).href);
+    if (response.status !== 200) continue;
+    for (const nested of extractChunkPaths(response.body, chunkPath)) {
+      if (!seen.has(nested)) queue.push(nested);
+    }
+  }
+  return [...seen].sort();
+}
+
 async function waitForReady() {
   const url = `http://127.0.0.1:${port}/`;
   for (let i = 0; i < 80; i++) {
@@ -78,6 +130,13 @@ async function main() {
       if (code !== 200) throw new Error(`${p} -> HTTP ${code}`);
     }
 
+    const entry = await defaultFetchText(`http://127.0.0.1:${port}/dist/plasma.js`);
+    const chunks = await collectChunkPaths(`http://127.0.0.1:${port}`, entry.body);
+    for (const p of chunks) {
+      const code = await getStatus(`http://127.0.0.1:${port}${p}`);
+      if (code !== 200) throw new Error(`${p} -> HTTP ${code}`);
+    }
+
     const headCss = await request('HEAD', `http://127.0.0.1:${port}/style.css`);
     if (headCss !== 200) throw new Error(`HEAD /style.css -> HTTP ${headCss}`);
 
@@ -93,8 +152,16 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('[smoke] FAIL:', err?.message || err);
-  try { server.close(); } catch { /* ignore */ }
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[smoke] FAIL:', err?.message || err);
+    try { server.close(); } catch { /* ignore */ }
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  collectChunkPaths,
+  extractChunkPaths,
+  main,
+};

@@ -1,24 +1,17 @@
 // ============================================================
-// PlasmaDeck â€” canvas.js
+// PlasmaDeck — canvas.js
 // Full Whiteboard / Drawing Canvas
 // Features: Pen, Shapes, Text, Eraser, Select, Layers,
 //           Undo/Redo, Grid, Export PNG/SVG, Mini-map
-// Version: 1.1.1 (Schema Normalization)
+// Pure Canvas 2D — no external dependencies
 // ============================================================
 
 (() => {
   'use strict';
 
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-
-  function uid(prefix = 'el') {
-    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  }
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 0. STATE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const State = {
     // Canvas transform
@@ -79,106 +72,59 @@
     dragLastY:   0,
   };
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 1. ELEMENT TYPES (Canonical Schema)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  class CanvasElement {
-    constructor(type, opts = {}) {
-      this.id          = uid(type);
-      this.type        = type;
-      this.layerId     = opts.layerId ?? State.layers[State.activeLayerIdx]?.id;
-      this.strokeColor = opts.strokeColor ?? State.strokeColor;
-      this.fillColor   = opts.fillColor   ?? State.fillColor;
-      this.lineJoin    = opts.lineJoin    ?? State.lineJoin;
-      this.dashPattern = opts.dashPattern ?? [...State.dashPattern];
-      this.x           = opts.x           ?? 0;
-      this.y           = opts.y           ?? 0;
-      this.rotation    = opts.rotation    ?? 0;
+  const safeImageUrl = (raw) => {
+    const helper = window.PlasmaDeck?.safeImageUrl;
+    if (typeof helper === 'function') return helper(raw);
+    const value = String(raw ?? '').trim();
+    if (!value) return null;
+    try {
+      const url = new URL(value, document.baseURI);
+      if (url.protocol === 'data:') return /^data:image\//i.test(value) ? url.href : null;
+      return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
     }
-  }
+  };
 
-  class PathElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('path', opts);
-      this.points = opts.points ?? [];
-      this.smooth = opts.smooth ?? true;
+  const cloneJSON = (value, fallback = null) => {
+    try {
+      return JSON.parse(JSON.stringify(value ?? fallback));
+    } catch {
+      return fallback;
     }
-  }
+  };
 
-  class RectElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('rect', opts);
-      this.width  = opts.width  ?? 100;
-      this.height = opts.height ?? 60;
-      this.rx     = opts.rx     ?? 0;
-    }
-  }
+  const baseLayer = () => ({ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] });
 
-  class CircleElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('circle', opts);
-      this.x      = opts.x      ?? opts.cx ?? 0;
-      this.y      = opts.y      ?? opts.cy ?? 0;
-      this.radius = opts.radius ?? opts.rx ?? 50;
-    }
-  }
+  const normalizeLayers = (layers) => {
+    const source = Array.isArray(layers) ? layers : [];
+    const normalized = source
+      .filter((layer) => layer && typeof layer === 'object')
+      .map((layer, index) => ({
+        id: String(layer.id || `layer-${index + 1}`),
+        name: String(layer.name || `Layer ${index + 1}`),
+        visible: layer.visible !== false,
+        locked: !!layer.locked,
+        opacity: Number.isFinite(Number(layer.opacity)) ? Math.min(1, Math.max(0, Number(layer.opacity))) : 1,
+        elements: Array.isArray(layer.elements) ? cloneJSON(layer.elements, []) : [],
+      }));
+    return normalized.length ? normalized : [baseLayer()];
+  };
 
-  class EllipseElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('ellipse', opts);
-      this.x       = opts.x       ?? opts.cx ?? 0;
-      this.y       = opts.y       ?? opts.cy ?? 0;
-      this.radiusX = opts.radiusX ?? opts.rx ?? 50;
-      this.radiusY = opts.radiusY ?? opts.ry ?? 30;
-    }
-  }
+  const finiteNumber = (value, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
 
-  class LineElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('line', opts);
-      this.x1 = opts.x1 ?? 0;
-      this.y1 = opts.y1 ?? 0;
-      this.x2 = opts.x2 ?? 100;
-      this.y2 = opts.y2 ?? 100;
-    }
-  }
+  const xmlEscape = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 
-  class ArrowElement extends LineElement {
-    constructor(opts = {}) {
-      super(opts);
-      this.type      = 'arrow';
-      this.headStart = opts.headStart ?? false;
-      this.headEnd   = opts.headEnd   ?? true;
-    }
-  }
-
-  class TextElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('text', opts);
-      this.text       = opts.text       ?? '';
-      this.fontSize   = opts.fontSize   ?? State.fontSize;
-      this.fontFamily = opts.fontFamily ?? State.fontFamily;
-      this.fontBold   = opts.fontBold   ?? false;
-      this.fontItalic = opts.fontItalic ?? false;
-      this.align      = opts.align      ?? 'left';
-      this.width      = opts.width      ?? 200;
-    }
-  }
-
-  class ImageElement extends CanvasElement {
-    constructor(opts = {}) {
-      super('image', opts);
-      this.src    = opts.src    ?? '';
-      this.width  = opts.width  ?? 200;
-      this.height = opts.height ?? 150;
-      this._img   = null;
-    }
-  }
-
-
-  // ──────────────────────────────────────────────────────
-  // 2. CANVAS MANAGER
+  // ──────────────────────────────────────────────────────────
+  // 1. CANVAS MANAGER
   // ──────────────────────────────────────────────────────────
 
   const Canvas = {
@@ -187,32 +133,699 @@
     _raf:      null,
     _dirty:    true,
     _paused:   false,
+    _listeners: [],
+    _pointerId: null,
 
     init(canvasEl) {
       if (!canvasEl) return;
+      if (this._canvas && this._canvas !== canvasEl) this.destroy();
       if (canvasEl.dataset.pdCanvasInited === 'true') return;
       canvasEl.dataset.pdCanvasInited = 'true';
+      if (!canvasEl.hasAttribute('tabindex')) canvasEl.tabIndex = 0;
+      canvasEl.dataset.studioTool = State.tool;
       this._canvas = canvasEl;
       this._ctx    = canvasEl.getContext('2d');
+      this._paused = false;
 
       this._resize();
-      this._resizeHandler = () => { this._resize(); this._dirty = true; };
-      window.addEventListener('resize', this._resizeHandler);
+      this._listen(window, 'resize', () => { this._resize(); this._dirty = true; });
 
       this._bindPointer();
       this._bindKeyboard();
       this._bindWheel();
 
       // Pause expensive render loop when tab is hidden
-      if (!document.documentElement.dataset.pdCanvasVisBound) {
-        document.documentElement.dataset.pdCanvasVisBound = 'true';
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) this._pause();
-          else this._resume();
-        });
-      }
+      this._listen(document, 'visibilitychange', () => {
+        if (document.hidden) this._pause();
+        else this._resume();
+      });
 
       this._loop();
+    },
+
+    serialize() {
+      return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        viewport: {
+          offsetX: State.offsetX,
+          offsetY: State.offsetY,
+          zoom: State.zoom,
+          rotation: State.rotation,
+        },
+        tool: State.tool,
+        style: {
+          strokeColor: State.strokeColor,
+          fillColor: State.fillColor,
+          strokeWidth: State.strokeWidth,
+          opacity: State.opacity,
+          lineCap: State.lineCap,
+          lineJoin: State.lineJoin,
+          dashPattern: cloneJSON(State.dashPattern, []),
+          fontSize: State.fontSize,
+          fontFamily: State.fontFamily,
+        },
+        grid: {
+          enabled: State.gridEnabled,
+          size: State.gridSize,
+          snap: State.gridSnap,
+        },
+        activeLayerIdx: State.activeLayerIdx,
+        layers: normalizeLayers(State.layers),
+      };
+    },
+
+    loadState(payload = {}, options = {}) {
+      const data = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+      const viewport = data.viewport && typeof data.viewport === 'object' ? data.viewport : {};
+      const style = data.style && typeof data.style === 'object' ? data.style : {};
+      const grid = data.grid && typeof data.grid === 'object' ? data.grid : {};
+      const layers = normalizeLayers(data.layers);
+      const previous = {
+        offsetX: State.offsetX,
+        offsetY: State.offsetY,
+        zoom: State.zoom,
+        rotation: State.rotation,
+        tool: State.tool,
+        selectedIds: Array.from(State.selectedIds),
+      };
+
+      State.offsetX = finiteNumber(viewport.offsetX, 0);
+      State.offsetY = finiteNumber(viewport.offsetY, 0);
+      State.zoom = Math.min(4, Math.max(0.1, finiteNumber(viewport.zoom, 1)));
+      State.rotation = finiteNumber(viewport.rotation, 0);
+      State.tool = options.preserveTool ? previous.tool : (typeof data.tool === 'string' ? data.tool : 'pen');
+      State.strokeColor = typeof style.strokeColor === 'string' ? style.strokeColor : '#6366f1';
+      State.fillColor = typeof style.fillColor === 'string' ? style.fillColor : 'transparent';
+      State.strokeWidth = Math.max(1, finiteNumber(style.strokeWidth, 2));
+      State.opacity = Math.min(1, Math.max(0, finiteNumber(style.opacity, 1)));
+      State.lineCap = typeof style.lineCap === 'string' ? style.lineCap : 'round';
+      State.lineJoin = typeof style.lineJoin === 'string' ? style.lineJoin : 'round';
+      State.dashPattern = Array.isArray(style.dashPattern) ? style.dashPattern.map((n) => finiteNumber(n, 0)).filter((n) => n > 0) : [];
+      State.fontSize = Math.max(8, finiteNumber(style.fontSize, 18));
+      State.fontFamily = typeof style.fontFamily === 'string' ? style.fontFamily : 'Inter, sans-serif';
+      State.gridEnabled = !!grid.enabled;
+      State.gridSize = Math.max(4, finiteNumber(grid.size, 24));
+      State.gridSnap = !!grid.snap;
+      State.layers = layers;
+      State.activeLayerIdx = Math.min(layers.length - 1, Math.max(0, Math.floor(finiteNumber(data.activeLayerIdx, 0))));
+      if (options.preserveViewport) {
+        State.offsetX = previous.offsetX;
+        State.offsetY = previous.offsetY;
+        State.zoom = previous.zoom;
+        State.rotation = previous.rotation;
+      }
+      if (options.preserveSelection) {
+        const validIds = new Set(layers.flatMap((layer) => layer.elements.map((element) => element.id)));
+        State.selectedIds = new Set(previous.selectedIds.filter((id) => validIds.has(id)));
+      } else {
+        State.selectedIds = new Set();
+      }
+      State.hoveredId = null;
+      State.currentPath = null;
+      State.currentShape = null;
+      State.currentText = null;
+      State.clipboard = [];
+      State.history = [];
+      State.historyIdx = -1;
+      State.isDrawing = false;
+      State.isDragging = false;
+      State.isResizing = false;
+      this._scheduleRender();
+      return this.serialize();
+    },
+
+    addElement(element = {}) {
+      const layers = normalizeLayers(State.layers);
+      State.layers = layers;
+      const layer = layers[Math.min(layers.length - 1, Math.max(0, State.activeLayerIdx))] ?? layers[0];
+      if (!layer || layer.locked) return null;
+      const now = Date.now().toString(36);
+      const id = String(element.id || `studio-${now}-${Math.random().toString(36).slice(2, 7)}`);
+      const created = {
+        type: String(element.type || 'rect'),
+        x: finiteNumber(element.x, 80),
+        y: finiteNumber(element.y, 80),
+        ...cloneJSON(element, {}),
+        id,
+      };
+      layer.elements.push(created);
+      State.selectedIds = new Set([id]);
+      this._scheduleRender();
+      return cloneJSON(created, created);
+    },
+
+    setTool(tool = 'select') {
+      const allowed = new Set(['select', 'pen']);
+      State.tool = allowed.has(tool) ? tool : 'select';
+      State.currentPath = null;
+      State.currentShape = null;
+      State.isDrawing = false;
+      State.isDragging = false;
+      if (this._canvas) this._canvas.dataset.studioTool = State.tool;
+      this._scheduleRender();
+      return State.tool;
+    },
+
+    getState() {
+      return {
+        tool: State.tool,
+        zoom: State.zoom,
+        offsetX: State.offsetX,
+        offsetY: State.offsetY,
+        selectedIds: Array.from(State.selectedIds),
+      };
+    },
+
+    screenToWorld(clientX = 0, clientY = 0) {
+      return this._screenToWorld(clientX, clientY);
+    },
+
+    addText(text = 'New note', options = {}) {
+      return this.addElement({
+        type: 'text',
+        x: 96,
+        y: 112,
+        fill: State.strokeColor,
+        fontSize: State.fontSize,
+        fontFamily: State.fontFamily,
+        ...options,
+        text: String(text || 'New note').slice(0, 500),
+      });
+    },
+
+    addCard(options = {}) {
+      return this.addElement({
+        type: 'roundRect',
+        x: 80,
+        y: 80,
+        width: 240,
+        height: 140,
+        radius: 12,
+        fill: 'rgba(99, 102, 241, 0.14)',
+        stroke: State.strokeColor,
+        strokeWidth: Math.max(1, State.strokeWidth),
+        ...options,
+      });
+    },
+
+    addRectangle(options = {}) {
+      return this.addElement({
+        type: 'rect',
+        x: 100,
+        y: 100,
+        width: 220,
+        height: 120,
+        fill: 'rgba(16, 185, 129, 0.12)',
+        stroke: State.strokeColor,
+        strokeWidth: Math.max(1, State.strokeWidth),
+        ...options,
+      });
+    },
+
+    addCircle(options = {}) {
+      return this.addElement({
+        type: 'circle',
+        x: 190,
+        y: 160,
+        radius: 64,
+        fill: 'rgba(14, 165, 233, 0.12)',
+        stroke: State.strokeColor,
+        strokeWidth: Math.max(1, State.strokeWidth),
+        ...options,
+      });
+    },
+
+    addArrow(options = {}) {
+      const hasOwn = (key) => Object.prototype.hasOwnProperty.call(options, key);
+      const arrow = {
+        type: 'arrow',
+        x: 96,
+        y: 96,
+        x1: 96,
+        y1: 96,
+        x2: 280,
+        y2: 180,
+        width: 184,
+        height: 84,
+        fill: 'none',
+        stroke: State.strokeColor,
+        strokeWidth: Math.max(2, State.strokeWidth),
+        headSize: 12,
+        ...options,
+      };
+      if (!hasOwn('x') && hasOwn('x1')) arrow.x = arrow.x1;
+      if (!hasOwn('y') && hasOwn('y1')) arrow.y = arrow.y1;
+      arrow.x = finiteNumber(arrow.x, finiteNumber(arrow.x1, 96));
+      arrow.y = finiteNumber(arrow.y, finiteNumber(arrow.y1, 96));
+      arrow.x1 = finiteNumber(arrow.x1, arrow.x);
+      arrow.y1 = finiteNumber(arrow.y1, arrow.y);
+      arrow.x2 = finiteNumber(arrow.x2, arrow.x1 + finiteNumber(arrow.width, 184));
+      arrow.y2 = finiteNumber(arrow.y2, arrow.y1 + finiteNumber(arrow.height, 84));
+      arrow.width = finiteNumber(arrow.width, arrow.x2 - arrow.x1);
+      arrow.height = finiteNumber(arrow.height, arrow.y2 - arrow.y1);
+      return this.addElement(arrow);
+    },
+
+    addImage(src, options = {}) {
+      const imageSrc = safeImageUrl(src);
+      if (!imageSrc) return null;
+      return this.addElement({
+        type: 'image',
+        x: 120,
+        y: 120,
+        width: 280,
+        height: 160,
+        fit: 'contain',
+        ...options,
+        src: imageSrc,
+      });
+    },
+
+    applyTemplate(templateName = 'study-map') {
+      const templates = {
+        'study-map': {
+          layers: [{
+            id: 'layer-template-main',
+            name: 'Study map',
+            visible: true,
+            locked: false,
+            opacity: 1,
+            elements: [
+              { id: 'template-goal', type: 'roundRect', x: 72, y: 72, width: 260, height: 120, radius: 12, fill: 'rgba(99, 102, 241, 0.14)', stroke: '#6366f1', strokeWidth: 2, text: 'Learning goal' },
+              { id: 'template-evidence', type: 'roundRect', x: 456, y: 72, width: 280, height: 120, radius: 12, fill: 'rgba(16, 185, 129, 0.12)', stroke: '#10b981', strokeWidth: 2, text: 'Key evidence' },
+              { id: 'template-recall', type: 'roundRect', x: 72, y: 292, width: 280, height: 120, radius: 12, fill: 'rgba(245, 158, 11, 0.13)', stroke: '#f59e0b', strokeWidth: 2, text: 'Recall prompts' },
+              { id: 'template-next', type: 'roundRect', x: 456, y: 292, width: 280, height: 120, radius: 12, fill: 'rgba(14, 165, 233, 0.12)', stroke: '#0ea5e9', strokeWidth: 2, text: 'Next review' },
+              { id: 'template-flow-1', type: 'arrow', x: 336, y: 132, x1: 336, y1: 132, x2: 444, y2: 132, width: 108, height: 0, fill: 'none', stroke: '#94a3b8', strokeWidth: 2, headSize: 10 },
+              { id: 'template-flow-2', type: 'arrow', x: 596, y: 200, x1: 596, y1: 200, x2: 596, y2: 282, width: 0, height: 82, fill: 'none', stroke: '#94a3b8', strokeWidth: 2, headSize: 10 },
+              { id: 'template-flow-3', type: 'arrow', x: 444, y: 352, x1: 444, y1: 352, x2: 364, y2: 352, width: -80, height: 0, fill: 'none', stroke: '#94a3b8', strokeWidth: 2, headSize: 10 },
+            ],
+          }],
+        },
+        cornell: {
+          layers: [{
+            id: 'layer-template-cornell',
+            name: 'Cornell notes',
+            visible: true,
+            locked: false,
+            opacity: 1,
+            elements: [
+              { id: 'cornell-cues', type: 'rect', x: 64, y: 72, width: 220, height: 420, fill: 'rgba(99, 102, 241, 0.10)', stroke: '#6366f1', strokeWidth: 2 },
+              { id: 'cornell-notes', type: 'rect', x: 300, y: 72, width: 500, height: 420, fill: 'rgba(16, 185, 129, 0.08)', stroke: '#10b981', strokeWidth: 2 },
+              { id: 'cornell-summary', type: 'rect', x: 64, y: 520, width: 736, height: 140, fill: 'rgba(245, 158, 11, 0.10)', stroke: '#f59e0b', strokeWidth: 2 },
+              { id: 'cornell-cues-label', type: 'text', x: 88, y: 104, text: 'Cues / questions', fill: '#e5e7eb', fontSize: 18 },
+              { id: 'cornell-notes-label', type: 'text', x: 324, y: 104, text: 'Notes', fill: '#e5e7eb', fontSize: 18 },
+              { id: 'cornell-summary-label', type: 'text', x: 88, y: 552, text: 'Summary', fill: '#e5e7eb', fontSize: 18 },
+            ],
+          }],
+        },
+      };
+      const template = templates[String(templateName || '').trim()] || templates['study-map'];
+      return this.loadState({
+        version: 1,
+        viewport: { offsetX: 0, offsetY: 0, zoom: 1, rotation: 0 },
+        activeLayerIdx: 0,
+        layers: template.layers,
+      });
+    },
+
+    clearBoard() {
+      State.layers = normalizeLayers(State.layers).map((layer) => ({ ...layer, elements: [] }));
+      State.activeLayerIdx = Math.min(State.layers.length - 1, Math.max(0, State.activeLayerIdx));
+      State.selectedIds = new Set();
+      State.hoveredId = null;
+      State.currentPath = null;
+      State.currentShape = null;
+      State.currentText = null;
+      State.clipboard = [];
+      State.history = [];
+      State.historyIdx = -1;
+      this._scheduleRender();
+      return this.serialize();
+    },
+
+    addLayer(name = '') {
+      const layers = normalizeLayers(State.layers);
+      const id = `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const layer = {
+        id,
+        name: String(name || `Layer ${layers.length + 1}`).slice(0, 80),
+        visible: true,
+        locked: false,
+        opacity: 1,
+        elements: [],
+      };
+      layers.push(layer);
+      State.layers = layers;
+      State.activeLayerIdx = layers.length - 1;
+      State.selectedIds = new Set();
+      this._scheduleRender();
+      return cloneJSON(layer, layer);
+    },
+
+    setActiveLayer(index = 0) {
+      const layers = normalizeLayers(State.layers);
+      State.layers = layers;
+      State.activeLayerIdx = Math.min(layers.length - 1, Math.max(0, Math.floor(finiteNumber(index, 0))));
+      State.selectedIds = new Set();
+      this._scheduleRender();
+      return this.serialize();
+    },
+
+    removeLayer(layerId) {
+      const layers = normalizeLayers(State.layers);
+      if (layers.length <= 1) return null;
+      const idx = layers.findIndex((layer) => layer.id === layerId);
+      if (idx < 0) return null;
+      const [removed] = layers.splice(idx, 1);
+      State.layers = layers.length ? layers : [baseLayer()];
+      State.activeLayerIdx = Math.min(State.layers.length - 1, Math.max(0, State.activeLayerIdx >= idx ? State.activeLayerIdx - 1 : State.activeLayerIdx));
+      State.selectedIds = new Set();
+      this._scheduleRender();
+      return cloneJSON(removed, removed);
+    },
+
+    removeElement(elementId) {
+      const layers = normalizeLayers(State.layers);
+      for (const layer of layers) {
+        const idx = layer.elements.findIndex((element) => element?.id === elementId);
+        if (idx >= 0) {
+          const [removed] = layer.elements.splice(idx, 1);
+          State.layers = layers;
+          State.selectedIds.delete(elementId);
+          this._scheduleRender();
+          return cloneJSON(removed, removed);
+        }
+      }
+      return null;
+    },
+
+    updateElement(elementId, patch = {}) {
+      if (!elementId || !patch || typeof patch !== 'object' || Array.isArray(patch)) return null;
+      const layers = normalizeLayers(State.layers);
+      const allowed = ['text', 'fill', 'stroke', 'strokeWidth', 'fontSize', 'width', 'height', 'x', 'y', 'linkType', 'linkTarget', 'linkLabel'];
+      for (const layer of layers) {
+        const element = layer.elements.find((item) => item?.id === elementId);
+        if (!element) continue;
+        for (const key of allowed) {
+          if (!(key in patch)) continue;
+          if (['strokeWidth', 'fontSize', 'width', 'height', 'x', 'y'].includes(key)) {
+            element[key] = Math.max(key === 'strokeWidth' ? 1 : 0, finiteNumber(patch[key], element[key] ?? 0));
+          } else if (key === 'linkType') {
+            const value = String(patch[key] ?? '').trim();
+            element[key] = ['course', 'pdf', 'note', 'timestamp', 'url', ''].includes(value) ? value : '';
+          } else if (key === 'linkTarget') {
+            element[key] = String(patch[key] ?? '').trim().slice(0, 500);
+          } else if (key === 'linkLabel') {
+            element[key] = String(patch[key] ?? '').trim().slice(0, 160);
+          } else {
+            element[key] = String(patch[key] ?? '').slice(0, key === 'text' ? 500 : 120);
+          }
+        }
+        State.layers = layers;
+        State.selectedIds = new Set([elementId]);
+        this._scheduleRender();
+        return cloneJSON(element, element);
+      }
+      return null;
+    },
+
+    exportPNG(type = 'image/png') {
+      if (!this._canvas || typeof this._canvas.toDataURL !== 'function') return null;
+      if (this._ctx) this._render();
+      return this._canvas.toDataURL(type);
+    },
+
+    exportSVG(options = {}) {
+      const width = Math.max(1, finiteNumber(options.width, this._canvas?.offsetWidth || 1200));
+      const height = Math.max(1, finiteNumber(options.height, this._canvas?.offsetHeight || 800));
+      const board = this.serialize();
+      const elements = board.layers
+        .filter((layer) => layer.visible !== false)
+        .map((layer) => {
+          const opacity = Number.isFinite(Number(layer.opacity)) ? ` opacity="${xmlEscape(layer.opacity)}"` : '';
+          return `<g id="${xmlEscape(layer.id)}" data-layer-name="${xmlEscape(layer.name)}"${opacity}>${layer.elements.map((el) => this._elementToSVG(el)).join('')}</g>`;
+        })
+        .join('');
+      const viewport = board.viewport || {};
+      const transform = `translate(${finiteNumber(viewport.offsetX, 0)} ${finiteNumber(viewport.offsetY, 0)}) scale(${finiteNumber(viewport.zoom, 1)})`;
+      return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="PlasmaDeck Studio board">`,
+        '<rect width="100%" height="100%" fill="#1e1e2e"/>',
+        `<g transform="${xmlEscape(transform)}">${elements}</g>`,
+        '</svg>',
+      ].join('');
+    },
+
+    destroy() {
+      this._pause();
+      for (const { target, type, handler, options } of this._listeners) {
+        try { target.removeEventListener(type, handler, options); } catch {}
+      }
+      this._listeners = [];
+      if (this._canvas) delete this._canvas.dataset.pdCanvasInited;
+      this._canvas = null;
+      this._ctx = null;
+      this._dirty = true;
+      this._pointerId = null;
+      State.isDrawing = false;
+      State.isDragging = false;
+      State.currentPath = null;
+    },
+
+    _listen(target, type, handler, options) {
+      target.addEventListener(type, handler, options);
+      this._listeners.push({ target, type, handler, options });
+    },
+
+    _bindPointer() {
+      this._listen(this._canvas, 'pointerdown', (event) => this._onPointerDown(event));
+      this._listen(this._canvas, 'pointermove', (event) => this._onPointerMove(event));
+      this._listen(this._canvas, 'pointerup', (event) => this._onPointerUp(event));
+      this._listen(this._canvas, 'pointercancel', (event) => this._onPointerUp(event));
+    },
+
+    _bindKeyboard() {
+      this._listen(this._canvas, 'keydown', (event) => {
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+          const ids = Array.from(State.selectedIds);
+          if (!ids.length) return;
+          event.preventDefault();
+          ids.forEach((id) => this.removeElement(id));
+          State.selectedIds = new Set();
+          this._emitInteractiveChange('delete');
+        } else if (event.key === 'Escape') {
+          State.selectedIds = new Set();
+          State.currentPath = null;
+          State.currentShape = null;
+          State.isDrawing = false;
+          State.isDragging = false;
+          this._scheduleRender();
+        }
+      });
+    },
+
+    _bindWheel() {
+      this._listen(this._canvas, 'wheel', (event) => {
+        event.preventDefault();
+        const before = this._eventToWorld(event);
+        const factor = event.deltaY < 0 ? 1.08 : 0.92;
+        const nextZoom = Math.min(4, Math.max(0.2, State.zoom * factor));
+        State.zoom = nextZoom;
+        State.offsetX = event.clientX - this._canvas.getBoundingClientRect().left - before.x * nextZoom;
+        State.offsetY = event.clientY - this._canvas.getBoundingClientRect().top - before.y * nextZoom;
+        this._scheduleRender();
+        this._emitInteractiveChange('zoom');
+      }, { passive: false });
+    },
+
+    _onPointerDown(event) {
+      if (!this._canvas) return;
+      event.preventDefault();
+      this._pointerId = event.pointerId ?? 'mouse';
+      this._canvas.setPointerCapture?.(event.pointerId);
+      this._canvas.focus?.();
+      const point = this._eventToWorld(event);
+      State.dragStartX = point.x;
+      State.dragStartY = point.y;
+      State.dragLastX = point.x;
+      State.dragLastY = point.y;
+
+      if (State.tool === 'pen') {
+        State.isDrawing = true;
+        State.currentPath = {
+          id: `path-${Date.now().toString(36)}`,
+          type: 'polyline',
+          points: [[point.x, point.y]],
+          stroke: State.strokeColor,
+          strokeWidth: Math.max(1, State.strokeWidth),
+          fill: null,
+          lineCap: State.lineCap,
+          lineJoin: State.lineJoin,
+        };
+        this._scheduleRender();
+        return;
+      }
+
+      const hit = this._hitTest(point.x, point.y);
+      if (hit) {
+        State.selectedIds = new Set([hit.element.id]);
+        State.activeLayerIdx = hit.layerIndex;
+        State.isDragging = !hit.layer.locked;
+      } else {
+        State.selectedIds = new Set();
+        State.isDragging = false;
+      }
+      this._scheduleRender();
+    },
+
+    _onPointerMove(event) {
+      if (this._pointerId == null) return;
+      const pointerId = event.pointerId ?? 'mouse';
+      if (pointerId !== this._pointerId) return;
+      const point = this._eventToWorld(event);
+
+      if (State.isDrawing && State.currentPath) {
+        const last = State.currentPath.points.at(-1);
+        const distance = Math.hypot(point.x - last[0], point.y - last[1]);
+        if (distance >= 1.5) {
+          State.currentPath.points.push([point.x, point.y]);
+          this._scheduleRender();
+        }
+        return;
+      }
+
+      if (State.isDragging && State.selectedIds.size) {
+        const dx = point.x - State.dragLastX;
+        const dy = point.y - State.dragLastY;
+        if (dx || dy) {
+          this._moveElements(Array.from(State.selectedIds), dx, dy);
+          State.dragLastX = point.x;
+          State.dragLastY = point.y;
+          this._scheduleRender();
+        }
+      } else {
+        const hit = this._hitTest(point.x, point.y);
+        State.hoveredId = hit?.element?.id ?? null;
+      }
+    },
+
+    _onPointerUp(event) {
+      const pointerId = event.pointerId ?? 'mouse';
+      if (this._pointerId != null && pointerId !== this._pointerId) return;
+      this._canvas?.releasePointerCapture?.(event.pointerId);
+      this._pointerId = null;
+
+      if (State.isDrawing && State.currentPath) {
+        const path = State.currentPath;
+        State.currentPath = null;
+        State.isDrawing = false;
+        if (path.points.length >= 2) {
+          this.addElement(path);
+          this._emitInteractiveChange('draw');
+        } else {
+          this._scheduleRender();
+        }
+        return;
+      }
+
+      if (State.isDragging) {
+        State.isDragging = false;
+        this._emitInteractiveChange('move');
+      }
+    },
+
+    _eventToWorld(event) {
+      return this._screenToWorld(event.clientX, event.clientY);
+    },
+
+    _screenToWorld(clientX = 0, clientY = 0) {
+      const rect = this._canvas?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+      return {
+        x: ((clientX - rect.left) - State.offsetX) / State.zoom,
+        y: ((clientY - rect.top) - State.offsetY) / State.zoom,
+      };
+    },
+
+    _emitInteractiveChange(action) {
+      this._canvas?.dispatchEvent?.(new CustomEvent('plasma:studio-board-change', {
+        bubbles: true,
+        detail: { action, board: this.serialize() },
+      }));
+    },
+
+    _moveElements(ids, dx, dy) {
+      const wanted = new Set(ids);
+      for (const layer of State.layers) {
+        if (layer.locked) continue;
+        for (const element of layer.elements) {
+          if (!wanted.has(element.id)) continue;
+          element.x = finiteNumber(element.x, 0) + dx;
+          element.y = finiteNumber(element.y, 0) + dy;
+          if (['line', 'arrow'].includes(element.type)) {
+            element.x1 = finiteNumber(element.x1, element.x) + dx;
+            element.y1 = finiteNumber(element.y1, element.y) + dy;
+            element.x2 = finiteNumber(element.x2, element.x) + dx;
+            element.y2 = finiteNumber(element.y2, element.y) + dy;
+          }
+          if (Array.isArray(element.points)) {
+            element.points = element.points.map((point) => [finiteNumber(point[0], 0) + dx, finiteNumber(point[1], 0) + dy]);
+          }
+        }
+      }
+    },
+
+    _hitTest(x, y) {
+      for (let layerIndex = State.layers.length - 1; layerIndex >= 0; layerIndex--) {
+        const layer = State.layers[layerIndex];
+        if (!layer?.visible) continue;
+        for (let elementIndex = layer.elements.length - 1; elementIndex >= 0; elementIndex--) {
+          const element = layer.elements[elementIndex];
+          if (this._pointInElement(x, y, element)) return { layer, layerIndex, element };
+        }
+      }
+      return null;
+    },
+
+    _pointInElement(x, y, element = {}) {
+      if (element.type === 'circle') {
+        return Math.hypot(x - finiteNumber(element.x, 0), y - finiteNumber(element.y, 0)) <= finiteNumber(element.radius, 0) + 6;
+      }
+      if (element.type === 'arrow' || element.type === 'line') {
+        return this._pointNearLine(x, y, finiteNumber(element.x1, element.x), finiteNumber(element.y1, element.y), finiteNumber(element.x2, element.x), finiteNumber(element.y2, element.y), finiteNumber(element.strokeWidth, 2) + 8);
+      }
+      const box = this._elementBounds(element);
+      return x >= box.x - 6 && x <= box.x + box.width + 6 && y >= box.y - 6 && y <= box.y + box.height + 6;
+    },
+
+    _pointNearLine(px, py, x1, y1, x2, y2, tolerance) {
+      const lengthSq = ((x2 - x1) ** 2) + ((y2 - y1) ** 2);
+      if (!lengthSq) return Math.hypot(px - x1, py - y1) <= tolerance;
+      const t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / lengthSq));
+      const x = x1 + t * (x2 - x1);
+      const y = y1 + t * (y2 - y1);
+      return Math.hypot(px - x, py - y) <= tolerance;
+    },
+
+    _elementBounds(element = {}) {
+      if (Array.isArray(element.points) && element.points.length) {
+        const [x, y, width, height] = this._boundingBox(element.points);
+        return { x, y, width, height };
+      }
+      if (element.type === 'circle') {
+        const radius = finiteNumber(element.radius, 0);
+        return { x: finiteNumber(element.x, 0) - radius, y: finiteNumber(element.y, 0) - radius, width: radius * 2, height: radius * 2 };
+      }
+      if (element.type === 'text') {
+        return { x: finiteNumber(element.x, 0), y: finiteNumber(element.y, 0) - finiteNumber(element.fontSize, State.fontSize), width: finiteNumber(element.width, String(element.text || '').length * 10 || 80), height: finiteNumber(element.height, finiteNumber(element.fontSize, State.fontSize) + 12) };
+      }
+      return {
+        x: finiteNumber(element.x, finiteNumber(element.x1, 0)),
+        y: finiteNumber(element.y, finiteNumber(element.y1, 0)),
+        width: Math.max(0, finiteNumber(element.width, finiteNumber(element.x2, 0) - finiteNumber(element.x1, 0))),
+        height: Math.max(0, finiteNumber(element.height, finiteNumber(element.y2, 0) - finiteNumber(element.y1, 0))),
+      };
     },
 
     // ── Resize ────────────────────────────────────────────
@@ -350,11 +963,11 @@
     // ── Draw element ──────────────────────────────────────
     _drawElement(ctx, el) {
       ctx.save();
-            ctx.globalAlpha = el.opacity ?? 1;
+      ctx.globalAlpha = el.opacity ?? 1;
 
       // Apply transform
       if (el.transform) {
-        const { x = 0, y = 0, rotation = 0, scaleX = 1, scaleY = 1 } = el.transform;
+        const { rotation = 0, scaleX = 1, scaleY = 1 } = el.transform;
         const cx = el.x + (el.width  ?? 0) / 2;
         const cy = el.y + (el.height ?? 0) / 2;
         ctx.translate(cx, cy);
@@ -398,6 +1011,93 @@
       }
 
       ctx.restore();
+    },
+
+    _elementToSVG(el = {}) {
+      const wrap = (node) => {
+        const transform = this._svgTransform(el);
+        const linkAttrs = this._svgLinkAttrs(el);
+        const wrapped = linkAttrs ? `<g${linkAttrs}>${node}</g>` : node;
+        return transform ? `<g transform="${transform}">${wrapped}</g>` : wrapped;
+      };
+      const style = this._svgPaint(el);
+      const x = finiteNumber(el.x, 0);
+      const y = finiteNumber(el.y, 0);
+      const width = finiteNumber(el.width, 0);
+      const height = finiteNumber(el.height, 0);
+      switch (el.type) {
+        case 'rect':
+        case 'gradient':
+        case 'heatCell':
+          return wrap(`<rect x="${x}" y="${y}" width="${width}" height="${height}"${style}/>`); 
+        case 'roundRect':
+        case 'badge':
+          return wrap(`<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${finiteNumber(el.radius, 8)}" ry="${finiteNumber(el.radius, 8)}"${style}/>`); 
+        case 'circle':
+          return wrap(`<circle cx="${x}" cy="${y}" r="${finiteNumber(el.radius, Math.max(width, height) / 2)}"${style}/>`); 
+        case 'ellipse':
+          return wrap(`<ellipse cx="${x + width / 2}" cy="${y + height / 2}" rx="${Math.max(0, width / 2)}" ry="${Math.max(0, height / 2)}"${style}/>`); 
+        case 'line':
+        case 'arrow':
+          return wrap(`<line x1="${x}" y1="${y}" x2="${finiteNumber(el.x2, x + width)}" y2="${finiteNumber(el.y2, y + height)}"${style}/>`); 
+        case 'polyline':
+        case 'sparkline':
+          return wrap(`<polyline points="${this._svgPoints(el.points)}"${style} fill="none"/>`); 
+        case 'polygon':
+          return wrap(`<polygon points="${this._svgPoints(el.points)}"${style}/>`); 
+        case 'text':
+          return wrap(`<text x="${x}" y="${y}" font-family="${xmlEscape(el.fontFamily || State.fontFamily)}" font-size="${finiteNumber(el.fontSize, State.fontSize)}" fill="${xmlEscape(el.fill || el.color || '#f8fafc')}" opacity="${finiteNumber(el.opacity, 1)}">${xmlEscape(el.text || '')}</text>`); 
+        case 'image': {
+          const src = safeImageUrl(el.src);
+          return src ? wrap(`<image href="${xmlEscape(src)}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet"/>`) : '';
+        }
+        case 'group':
+          return wrap((Array.isArray(el.children) ? el.children : []).map((child) => this._elementToSVG(child)).join(''));
+        default:
+          return `<desc>Unsupported Studio element: ${xmlEscape(el.type || 'unknown')}</desc>`;
+      }
+    },
+
+    _svgPaint(el = {}) {
+      const attrs = [];
+      const fill = el.fill ?? (el.type === 'line' || el.type === 'arrow' || el.type === 'polyline' ? 'none' : 'transparent');
+      const stroke = el.stroke ?? el.color ?? State.strokeColor;
+      attrs.push(` fill="${xmlEscape(typeof fill === 'string' ? fill : 'transparent')}"`);
+      if (stroke) attrs.push(` stroke="${xmlEscape(stroke)}"`);
+      attrs.push(` stroke-width="${finiteNumber(el.strokeWidth, State.strokeWidth)}"`);
+      attrs.push(` opacity="${finiteNumber(el.opacity, 1)}"`);
+      if (Array.isArray(el.dashPattern) && el.dashPattern.length) attrs.push(` stroke-dasharray="${xmlEscape(el.dashPattern.join(' '))}"`);
+      return attrs.join('');
+    },
+
+    _svgLinkAttrs(el = {}) {
+      const type = String(el.linkType || '').trim();
+      const target = String(el.linkTarget || '').trim();
+      const label = String(el.linkLabel || '').trim();
+      if (!type && !target && !label) return '';
+      const attrs = [];
+      if (type) attrs.push(` data-link-type="${xmlEscape(type)}"`);
+      if (target) attrs.push(` data-link-target="${xmlEscape(target)}"`);
+      if (label) attrs.push(` data-link-label="${xmlEscape(label)}"`);
+      return attrs.join('');
+    },
+
+    _svgTransform(el = {}) {
+      if (!el.transform) return '';
+      const { rotation = 0, scaleX = 1, scaleY = 1 } = el.transform;
+      const cx = finiteNumber(el.x, 0) + finiteNumber(el.width, 0) / 2;
+      const cy = finiteNumber(el.y, 0) + finiteNumber(el.height, 0) / 2;
+      const transforms = [];
+      if (rotation) transforms.push(`rotate(${finiteNumber(rotation, 0)} ${cx} ${cy})`);
+      if (scaleX !== 1 || scaleY !== 1) transforms.push(`translate(${cx} ${cy}) scale(${finiteNumber(scaleX, 1)} ${finiteNumber(scaleY, 1)}) translate(${-cx} ${-cy})`);
+      return xmlEscape(transforms.join(' '));
+    },
+
+    _svgPoints(points = []) {
+      return xmlEscape((Array.isArray(points) ? points : [])
+        .map((point) => Array.isArray(point) ? `${finiteNumber(point[0], 0)},${finiteNumber(point[1], 0)}` : '')
+        .filter(Boolean)
+        .join(' '));
     },
 
 
@@ -507,6 +1207,33 @@
       }
       ctx.stroke();
       ctx.setLineDash([]);
+    },
+
+    _drawPathPreview(ctx) {
+      this._drawPolyline(ctx, State.currentPath);
+    },
+
+    _drawShapePreview(ctx) {
+      this._drawElement(ctx, State.currentShape);
+    },
+
+    _drawSelectionHandle(ctx, el) {
+      const { x, y, width, height } = this._elementBounds(el);
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#a5b4fc';
+      ctx.lineWidth = 1.5 / Math.max(0.2, State.zoom);
+      ctx.strokeRect(x - 6, y - 6, width + 12, height + 12);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#6366f1';
+      const size = 6 / Math.max(0.2, State.zoom);
+      [
+        [x - 6, y - 6],
+        [x + width + 6, y - 6],
+        [x + width + 6, y + height + 6],
+        [x - 6, y + height + 6],
+      ].forEach(([cx, cy]) => ctx.fillRect(cx - size / 2, cy - size / 2, size, size));
+      ctx.restore();
     },
 
     _drawPolygon(ctx, el) {
@@ -648,23 +1375,9 @@
     _imageCache: new Map(),
 
     _drawImage(ctx, el) {
-      const { x, y, width, height, radius = 0, fit = 'cover' } = el;
-      let { src } = el;
-      if (!src) return;
-
-      // Security: reject javascript: and non-image data: URIs before any loader is created
-      if (/^javascript:/i.test(src.trim())) return;
-      if (/^data:(?!image\/(png|jpeg|gif|webp|svg\+xml))/i.test(src.trim())) return;
-
-      // Delegate URL validation to the app shell when available
-      if (window.PlasmaDeck?.safeImageUrl) {
-        src = window.PlasmaDeck.safeImageUrl(src);
-        if (!src) return;
-      }
-
-      // Use a resolved absolute URL as the cache key so relative paths are stable
-      let cacheKey;
-      try { cacheKey = new URL(src, document.baseURI).href; } catch { cacheKey = src; }
+      const { src, x, y, width, height, radius = 0, fit = 'cover' } = el;
+      const imageSrc = safeImageUrl(src);
+      if (!imageSrc) return;
 
       const render = img => {
         ctx.save();
@@ -681,22 +1394,19 @@
           ctx.drawImage(img, x, y, width, height);
         }
         ctx.restore();
-        // Do NOT call _scheduleRender for already-cached images
       };
 
-      if (this._imageCache.has(cacheKey)) {
-        render(this._imageCache.get(cacheKey));
-        // Cache hit: no re-render needed
+      if (this._imageCache.has(imageSrc)) {
+        render(this._imageCache.get(imageSrc));
       } else {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          this._imageCache.set(cacheKey, img);
-          render(img);
-          this._scheduleRender();  // only schedule after async load
+          this._imageCache.set(imageSrc, img);
+          this._scheduleRender();
         };
-        img.onerror = () => console.warn(`[CanvasRenderer] Failed to load image: ${src}`);
-        img.src = src;
+        img.onerror = () => console.warn(`[CanvasRenderer] Failed to load image: ${imageSrc}`);
+        img.src = imageSrc;
       }
     },
 
@@ -1082,7 +1792,6 @@
         showLabels    = false,
         labelFont     = '11px Inter, sans-serif',
         labelColor    = '#94a3b8',
-        animated      = false,
         animProgress  = 1,
       } = el;
 
@@ -1296,425 +2005,9 @@
     },
 
     _scheduleRender() {
-      // Called after async operations (image loads) to re-render
-      if (this._renderPending) return;
-      this._renderPending = true;
-      requestAnimationFrame(() => {
-        this._renderPending = false;
-        if (!this._paused && this._ctx) this._render();
-      });
-    },
-
-    // ── Pointer / keyboard / wheel event binding ──────────────
-
-    _resizeHandler: null,
-
-    _bindPointer() {
-      const el = this._canvas;
-      if (!el) return;
-
-      el.addEventListener('pointerdown', (e) => {
-        const { x, y } = this._toWorld(e.clientX, e.clientY);
-        if (State.tool === 'pen') {
-          State.isDrawing = true;
-          State.currentPath = { id: uid('path'), type: 'polyline', points: [{ x, y }], stroke: State.strokeColor, strokeWidth: State.strokeWidth };
-        } else if (State.tool === 'select') {
-          const hit = this._hitTest(x, y);
-          if (hit) {
-            State.selectedIds = new Set([hit.id]);
-            State.isDragging = true;
-            State._dragStart = { x, y, origX: hit.x ?? 0, origY: hit.y ?? 0, id: hit.id };
-          } else {
-            State.selectedIds = new Set();
-          }
-          this._dirty = true;
-        }
-      });
-
-      el.addEventListener('pointermove', (e) => {
-        const { x, y } = this._toWorld(e.clientX, e.clientY);
-        if (State.tool === 'pen' && State.isDrawing && State.currentPath) {
-          State.currentPath.points.push({ x, y });
-          this._dirty = true;
-        } else if (State.tool === 'select' && State.isDragging && State._dragStart) {
-          const dx = x - State._dragStart.x;
-          const dy = y - State._dragStart.y;
-          const el2 = this._findElement(State._dragStart.id);
-          if (el2) {
-            el2.x = State._dragStart.origX + dx;
-            el2.y = State._dragStart.origY + dy;
-            this._dirty = true;
-          }
-        }
-      });
-
-      const endDraw = (e) => {
-        if (State.tool === 'pen' && State.isDrawing && State.currentPath) {
-          const { x, y } = this._toWorld(e.clientX, e.clientY);
-          State.currentPath.points.push({ x, y });
-          this._activeLayer().elements.push(State.currentPath);
-          this._emit('plasma:studio-board-change', { action: 'draw', element: State.currentPath });
-          State.currentPath = null;
-          State.isDrawing = false;
-          this._dirty = true;
-        } else if (State.tool === 'select' && State.isDragging) {
-          State.isDragging = false;
-          State._dragStart = null;
-        }
-      };
-      el.addEventListener('pointerup', endDraw);
-      el.addEventListener('pointercancel', endDraw);
-    },
-
-    _bindKeyboard() {
-      const handler = (e) => {
-        if (!this._canvas) return;
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          for (const id of State.selectedIds) this.removeElement(id);
-          State.selectedIds = new Set();
-          this._dirty = true;
-        }
-      };
-      this._canvas.addEventListener('keydown', handler);
-      // Also listen on window so the canvas doesn't need focus
-      this._keyboardHandler = handler;
-    },
-
-    _bindWheel() {
-      const el = this._canvas;
-      if (!el) return;
-      el.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        State.zoom = Math.min(8, Math.max(0.1, State.zoom * factor));
-        this._dirty = true;
-      }, { passive: false });
-    },
-
-    // ── Coordinate helpers ────────────────────────────────────
-
-    _toWorld(clientX, clientY) {
-      const rect = this._canvas ? this._canvas.getBoundingClientRect() : { left: 0, top: 0 };
-      return {
-        x: (clientX - rect.left - State.offsetX) / State.zoom,
-        y: (clientY - rect.top  - State.offsetY) / State.zoom,
-      };
-    },
-
-    _activeLayer() {
-      return State.layers[State.activeLayerIdx] ?? State.layers[0];
-    },
-
-    _findElement(id) {
-      for (const layer of State.layers) {
-        const el = layer.elements.find(e => e.id === id);
-        if (el) return el;
-      }
-      return null;
-    },
-
-    _hitTest(wx, wy) {
-      for (let i = State.layers.length - 1; i >= 0; i--) {
-        const layer = State.layers[i];
-        if (!layer.visible || layer.locked) continue;
-        for (let j = layer.elements.length - 1; j >= 0; j--) {
-          const el = layer.elements[j];
-          const x = el.x ?? 0, y = el.y ?? 0;
-          const w = el.width ?? el.radius * 2 ?? 60, h = el.height ?? el.radius * 2 ?? 30;
-          if (wx >= x && wx <= x + w && wy >= y && wy <= y + h) return el;
-        }
-      }
-      return null;
-    },
-
-    _emit(eventName, detail) {
-      if (!this._canvas) return;
-      this._canvas.dispatchEvent(new CustomEvent(eventName, { bubbles: true, detail }));
-    },
-
-    // ── Studio persistence ────────────────────────────────────
-
-    loadState(snapshot = {}, opts = {}) {
-      const preserveSelection = opts.preserveSelection && State.selectedIds.size > 0;
-      const preserveTool = opts.preserveTool;
-      const preserveViewport = opts.preserveViewport;
-
-      const savedSelectedIds = preserveSelection ? new Set(State.selectedIds) : null;
-      const savedTool = preserveTool ? State.tool : null;
-      const savedVP = preserveViewport
-        ? { offsetX: State.offsetX, offsetY: State.offsetY, zoom: State.zoom, rotation: State.rotation }
-        : null;
-
-      if (snapshot.viewport && !preserveViewport) {
-        State.offsetX  = snapshot.viewport.offsetX  ?? State.offsetX;
-        State.offsetY  = snapshot.viewport.offsetY  ?? State.offsetY;
-        State.zoom     = snapshot.viewport.zoom     ?? State.zoom;
-        State.rotation = snapshot.viewport.rotation ?? State.rotation;
-      } else if (savedVP) {
-        Object.assign(State, savedVP);
-      }
-
-      if (snapshot.tool && !preserveTool) State.tool = snapshot.tool;
-      else if (savedTool) State.tool = savedTool;
-
-      if (snapshot.style) {
-        State.strokeColor = snapshot.style.strokeColor ?? State.strokeColor;
-        State.fillColor   = snapshot.style.fillColor   ?? State.fillColor;
-        State.strokeWidth = snapshot.style.strokeWidth ?? State.strokeWidth;
-        State.opacity     = snapshot.style.opacity     ?? State.opacity;
-      }
-      if (snapshot.grid) {
-        State.gridEnabled = snapshot.grid.enabled ?? State.gridEnabled;
-        State.gridSize    = snapshot.grid.size    ?? State.gridSize;
-        State.snapToGrid  = snapshot.grid.snap    ?? State.snapToGrid;
-      }
-
-      if (Array.isArray(snapshot.layers)) {
-        State.layers = snapshot.layers.map(l => ({
-          id:       l.id       ?? uid('layer'),
-          name:     l.name     ?? 'Layer',
-          visible:  l.visible  ?? true,
-          locked:   l.locked   ?? false,
-          elements: (l.elements ?? []).map(e => ({ ...e })),
-        }));
-        State.activeLayerIdx = snapshot.activeLayerIdx ?? 0;
-      }
-
-      // Restore preserved selection (only keep ids still present after reload)
-      if (preserveSelection && savedSelectedIds) {
-        const presentIds = new Set(State.layers.flatMap(l => l.elements.map(e => e.id)));
-        State.selectedIds = new Set([...savedSelectedIds].filter(id => presentIds.has(id)));
-      } else {
-        State.selectedIds = new Set();
-      }
-
+      // Called after async operations (image loads) to let the render loop redraw once.
       this._dirty = true;
-      return this.serialize();
-    },
-
-    serialize() {
-      return {
-        version: 1,
-        viewport: { offsetX: State.offsetX, offsetY: State.offsetY, zoom: State.zoom, rotation: State.rotation },
-        tool: State.tool,
-        style: { strokeColor: State.strokeColor, fillColor: State.fillColor, strokeWidth: State.strokeWidth, opacity: State.opacity },
-        grid: { enabled: State.gridEnabled ?? false, size: State.gridSize ?? 20, snap: State.snapToGrid ?? false },
-        activeLayerIdx: State.activeLayerIdx,
-        layers: State.layers.map(l => ({
-          id: l.id, name: l.name, visible: l.visible, locked: l.locked,
-          elements: l.elements.map(e => ({ ...e })),
-        })),
-      };
-    },
-
-    getState() {
-      return {
-        tool:       State.tool,
-        zoom:       State.zoom,
-        offsetX:    State.offsetX,
-        offsetY:    State.offsetY,
-        rotation:   State.rotation,
-        selectedIds: [...State.selectedIds],
-        activeLayerIdx: State.activeLayerIdx,
-      };
-    },
-
-    clearBoard() {
-      State.layers.forEach(l => { l.elements = []; });
-      State.selectedIds = new Set();
-      this._dirty = true;
-      return this.serialize();
-    },
-
-    // ── Studio element factory ────────────────────────────────
-
-    _safeUrl(src) {
-      if (!src || typeof src !== 'string') return null;
-      if (/^javascript:/i.test(src.trim())) return null;
-      if (/^data:(?!image\/(png|jpeg|gif|webp|svg\+xml))/i.test(src.trim())) return null;
-      if (window.PlasmaDeck?.safeImageUrl) return window.PlasmaDeck.safeImageUrl(src);
-      return src;
-    },
-
-    addText(text = '', opts = {}) {
-      const el = { id: uid('text'), type: 'text', text, x: opts.x ?? 60, y: opts.y ?? 60, width: opts.width ?? 200, height: opts.height ?? 30, fill: State.strokeColor, fontSize: State.fontSize, fontFamily: State.fontFamily, ...opts };
-      this._activeLayer().elements.push(el);
-      State.selectedIds = new Set([el.id]);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    addCard(opts = {}) {
-      const el = { id: uid('card'), type: 'roundRect', x: opts.x ?? 80, y: opts.y ?? 80, width: opts.width ?? 200, height: opts.height ?? 120, radius: opts.radius ?? 12, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
-      this._activeLayer().elements.push(el);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    addRectangle(opts = {}) {
-      const el = { id: uid('rect'), type: 'rect', x: opts.x ?? 80, y: opts.y ?? 80, width: opts.width ?? 160, height: opts.height ?? 100, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
-      this._activeLayer().elements.push(el);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    addCircle(opts = {}) {
-      const r = opts.radius ?? 50;
-      const el = { id: uid('circle'), type: 'circle', x: opts.x ?? 100, y: opts.y ?? 100, radius: r, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
-      this._activeLayer().elements.push(el);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    addArrow(opts = {}) {
-      const x1 = opts.x1 ?? 40, y1 = opts.y1 ?? 40, x2 = opts.x2 ?? 160, y2 = opts.y2 ?? 120;
-      const el = { id: uid('arrow'), type: 'arrow', x: x1, y: y1, x1, y1, x2, y2, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
-      this._activeLayer().elements.push(el);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    addImage(src, opts = {}) {
-      const safeSrc = this._safeUrl(src);
-      if (!safeSrc) return null;
-      const el = { id: uid('img'), type: 'image', src: safeSrc, x: opts.x ?? 60, y: opts.y ?? 60, width: opts.width ?? 200, height: opts.height ?? 150, fit: 'contain' };
-      this._activeLayer().elements.push(el);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    // ── Studio layer management ───────────────────────────────
-
-    addLayer(name = 'New layer') {
-      const layer = { id: uid('layer'), name, visible: true, locked: false, elements: [] };
-      State.layers.push(layer);
-      State.activeLayerIdx = State.layers.length - 1;
-      this._dirty = true;
-      return { ...layer };
-    },
-
-    setActiveLayer(idx) {
-      if (idx >= 0 && idx < State.layers.length) {
-        State.activeLayerIdx = idx;
-        this._dirty = true;
-      }
-    },
-
-    removeElement(id) {
-      for (const layer of State.layers) {
-        const idx = layer.elements.findIndex(e => e.id === id);
-        if (idx !== -1) {
-          const [removed] = layer.elements.splice(idx, 1);
-          State.selectedIds.delete(id);
-          this._dirty = true;
-          return { ...removed };
-        }
-      }
-      return null;
-    },
-
-    removeLayer(id) {
-      const idx = State.layers.findIndex(l => l.id === id);
-      if (idx === -1) return null;
-      const [removed] = State.layers.splice(idx, 1);
-      State.activeLayerIdx = Math.max(0, Math.min(State.activeLayerIdx, State.layers.length - 1));
-      this._dirty = true;
-      return { id: removed.id, name: removed.name };
-    },
-
-    updateElement(id, patch = {}) {
-      const el = this._findElement(id);
-      if (!el) return null;
-      Object.assign(el, patch);
-      this._dirty = true;
-      return { ...el };
-    },
-
-    setTool(tool) {
-      State.tool = tool;
-    },
-
-    // ── Studio templates ──────────────────────────────────────
-
-    applyTemplate(name) {
-      let layers;
-      if (name === 'study-map') {
-        layers = [{
-          id: uid('layer'), name: 'Study map', visible: true, locked: false,
-          elements: [
-            { id: 'template-goal',    type: 'roundRect', x: 160, y: 20,  width: 200, height: 60, fill: '#6366f1', stroke: '#4f46e5', strokeWidth: 2, text: 'Goal' },
-            { id: 'template-topic-1', type: 'roundRect', x: 60,  y: 140, width: 160, height: 50, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 2, text: 'Topic 1' },
-            { id: 'template-topic-2', type: 'roundRect', x: 300, y: 140, width: 160, height: 50, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 2, text: 'Topic 2' },
-            { id: uid('arrow'), type: 'arrow', x: 220, y: 80, x1: 220, y1: 80,  x2: 140, y2: 140, stroke: '#6366f1', strokeWidth: 2 },
-            { id: uid('arrow'), type: 'arrow', x: 260, y: 80, x1: 260, y1: 80,  x2: 380, y2: 140, stroke: '#6366f1', strokeWidth: 2 },
-          ],
-        }];
-      } else if (name === 'cornell') {
-        layers = [{
-          id: uid('layer'), name: 'Cornell notes', visible: true, locked: false,
-          elements: [
-            { id: 'cornell-cues',    type: 'rect', x: 0,   y: 0,   width: 160, height: 420, fill: '#1a1a2e', stroke: '#6366f1', strokeWidth: 1, text: 'Cues / questions' },
-            { id: 'cornell-notes',   type: 'rect', x: 170, y: 0,   width: 390, height: 420, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 1, text: 'Notes' },
-            { id: 'cornell-summary', type: 'rect', x: 0,   y: 430, width: 560, height: 120, fill: '#12122a', stroke: '#6366f1', strokeWidth: 1, text: 'Summary' },
-          ],
-        }];
-      } else {
-        layers = [{ id: uid('layer'), name: name, visible: true, locked: false, elements: [] }];
-      }
-      return this.loadState({ layers });
-    },
-
-    // ── Studio export ─────────────────────────────────────────
-
-    exportPNG() {
-      if (!this._canvas) return null;
-      return this._canvas.toDataURL('image/png');
-    },
-
-    exportSVG({ width = 800, height = 600 } = {}) {
-      const escAttr = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const escTxt  = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      let body = '';
-      for (const layer of State.layers) {
-        if (!layer.visible) continue;
-        for (const el of layer.elements) {
-          const linkAttrs = el.linkType
-            ? ` data-link-type="${escAttr(el.linkType)}" data-link-target="${escAttr(el.linkTarget)}" data-link-label="${escAttr(el.linkLabel)}"`
-            : '';
-          if (el.type === 'rect' || el.type === 'roundRect') {
-            const r = el.type === 'roundRect' ? ` rx="${el.radius ?? 8}"` : '';
-            body += `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}"${r} fill="${escAttr(el.fill ?? 'none')}" stroke="${escAttr(el.stroke ?? 'none')}"${linkAttrs}/>\n`;
-          } else if (el.type === 'circle') {
-            const cx = (el.x ?? 0) + (el.radius ?? 0);
-            const cy = (el.y ?? 0) + (el.radius ?? 0);
-            body += `<circle cx="${cx}" cy="${cy}" r="${el.radius ?? 0}" fill="${escAttr(el.fill ?? 'none')}" stroke="${escAttr(el.stroke ?? 'none')}"${linkAttrs}/>\n`;
-          } else if (el.type === 'arrow' || el.type === 'line') {
-            body += `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${escAttr(el.stroke ?? '#000')}" stroke-width="${el.strokeWidth ?? 2}"${linkAttrs}/>\n`;
-          } else if (el.type === 'text') {
-            body += `<text x="${el.x}" y="${(el.y ?? 0) + (el.fontSize ?? 16)}" fill="${escAttr(el.fill ?? '#000')}" font-size="${el.fontSize ?? 16}"${linkAttrs}>${escTxt(el.text)}</text>\n`;
-          } else if (el.type === 'image') {
-            body += `<image href="${escAttr(el.src)}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}"${linkAttrs}/>\n`;
-          }
-        }
-      }
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">\n${body}</svg>`;
-    },
-
-    // ── destroy ───────────────────────────────────────────────
-
-    destroy() {
-      if (this._raf != null) cancelAnimationFrame(this._raf);
-      this._raf = null;
-      if (this._canvas) {
-        delete this._canvas.dataset.pdCanvasInited;
-        if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler, undefined);
-      }
-      this._canvas = null;
-      this._ctx    = null;
-      this._paused = false;
-      State.isDrawing  = false;
-      State.isDragging = false;
-      State.currentPath = null;
+      if (this._paused && this._canvas && this._ctx) this._resume();
     },
 
   };

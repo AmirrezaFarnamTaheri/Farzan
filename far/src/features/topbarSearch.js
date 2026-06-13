@@ -1,9 +1,11 @@
-
+import Fuse from 'fuse.js';
 import { $, createElement, debounce } from '../lib/dom.js';
 
 export const TopbarSearch = {
   input: null,
   resultsBox: null,
+  _fuse: null,
+  _indexedData: null,
 
   init() {
     this.input = $('.topbar-search input');
@@ -40,8 +42,28 @@ export const TopbarSearch = {
   async _search(query) {
     const q = query.toLowerCase();
     const data = await this._loadUniversalData();
-    
-    // Simple substring search for now, could use Fuse.js if available
+
+    if (Fuse) {
+      if (this._indexedData !== data) {
+        this._indexedData = data;
+        this._fuse = new Fuse(data, {
+          includeMatches: true,
+          threshold: 0.35,
+          ignoreLocation: true,
+          keys: [
+            { name: 'label', weight: 0.55 },
+            { name: 'description', weight: 0.2 },
+            { name: 'searchText', weight: 0.2 },
+            { name: 'tags', weight: 0.05 },
+          ],
+        });
+      }
+      return this._fuse.search(query, { limit: 10 }).map(result => ({
+        ...result.item,
+        matches: result.matches || [],
+      }));
+    }
+
     return data.filter(item => 
       String(item.label || '').toLowerCase().includes(q) ||
       String(item.description || '').toLowerCase().includes(q) ||
@@ -62,6 +84,7 @@ export const TopbarSearch = {
         icon: '??',
         label: String(course.title || course.id),
         description: 'Course',
+        tags: course.tags || [],
         href: `#/courses?id=${course.id}`,
       });
     });
@@ -71,6 +94,8 @@ export const TopbarSearch = {
         icon: topic.videos?.length ? '??' : '??',
         label: String(topic.title || topic.topicId),
         description: String(topic.sourceLabel || 'Topic'),
+        tags: topic.tags || [],
+        searchText: `${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
         href: `#/courses?topic=${topic.topicId}`,
       });
     });
@@ -115,7 +140,7 @@ export const TopbarSearch = {
       const text = createElement('div', { class: 'search-result-text' });
       
       const label = createElement('span', { class: 'search-result-label' });
-      this._appendHighlighted(label, item.label, query);
+      this._appendHighlighted(label, item.label, query, item.matches);
       
       text.appendChild(label);
       if (item.description) {
@@ -134,8 +159,19 @@ export const TopbarSearch = {
     });
   },
 
-  _appendHighlighted(parent, text, query) {
+  _appendHighlighted(parent, text, query, matches = []) {
     const source = (text instanceof Node ? text.textContent : String(text || ''));
+    const labelMatch = matches.find(match => match.key === 'label' && Array.isArray(match.indices));
+    if (labelMatch) {
+      let cursor = 0;
+      labelMatch.indices.forEach(([start, end]) => {
+        if (start > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, start)));
+        parent.appendChild(createElement('mark', { class: 'search-highlight' }, source.slice(start, end + 1)));
+        cursor = end + 1;
+      });
+      if (cursor < source.length) parent.appendChild(document.createTextNode(source.slice(cursor)));
+      return;
+    }
     const q = String(query || '').trim().toLowerCase();
     if (!q || !source.toLowerCase().includes(q)) {
       parent.appendChild(document.createTextNode(source));
@@ -156,4 +192,3 @@ export const TopbarSearch = {
     }
   },
 };
-

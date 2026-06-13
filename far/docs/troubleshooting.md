@@ -37,13 +37,13 @@ Allow Node.js on local/private networks. The dev server binds to `127.0.0.1`, bu
 
 ### Offline Or Service Worker Looks Stale
 
-Local dev unregisters the service worker once per session. Production-like serving registers `sw.js`.
+Local development and production-like serving intentionally behave differently. Localhost development unregisters the service worker once per browser session so stale precaches do not hide source changes. Non-localhost HTTP(S) origins register `sw.js`.
 
 Try:
 
 1. Run `npm run build:sw`.
 2. Reload once online.
-3. Use browser devtools to unregister the service worker if old files persist.
+3. Use browser devtools: Clear service worker and reload if old files persist.
 
 ### PDF Search Is Slow
 

@@ -9,10 +9,7 @@ import { ThemeManager } from './src/core/themeManager.js';
 import {
   $,
   $$,
-  appendContent,
-  createElement,
   debounce,
-  esc,
   eventTargetEl,
   restoreFocus,
   setAppInert,
@@ -22,9 +19,6 @@ import {
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
-import { Modal, Drawer } from './src/ui/overlays.js';
-import { Toast } from './src/ui/toast.js';
-import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 
 (() => {
   'use strict';
@@ -96,196 +90,565 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 1. UTILITIES
-  // Shim window.DomUtils so legacy runtime callers still work.
-  window.DomUtils = window.DomUtils ?? { createElement, appendContent, esc };
-  // 2. THEME SYSTEM  (ThemeManager, Prefs, FontScale are ESM imports at top)
-  // 3. SIDEBAR
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 1b. MISSING HELPER DEFINITIONS
-  // All functions below were referenced but never defined; they are defined
-  // here once, close to the top of the IIFE, so every section can use them.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // -- Animation helper (sub-nav accordion, accordion widgets) ---------------
-  function animateHeight(el, open) {
-    if (!el) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      el.style.height = open ? 'auto' : '0';
-      el.style.overflow = 'hidden';
-      return;
+  /**
+   * Create element with optional attributes and children
+   * @param {string} tag
+   * @param {Object} attrs
+   * @param {...(string|Node)} children
+   * @returns {HTMLElement}
+   */
+  function createElement(tag, attrs = {}, ...children) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') {
+        el.className = v;
+      } else if (k.startsWith('data-')) {
+        el.dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+      } else if (k === 'style' && typeof v === 'object') {
+        Object.assign(el.style, v);
+      } else {
+        el.setAttribute(k, v);
+      }
     }
-    if (open) {
-      el.style.overflow = 'hidden';
-      el.style.height = '0';
-      const target = el.scrollHeight;
-      requestAnimationFrame(() => {
-        el.style.transition = 'height 250ms ease';
-        el.style.height = target + 'px';
-        el.addEventListener('transitionend', () => {
-          el.style.height = 'auto';
-          el.style.overflow = '';
-          el.style.transition = '';
-        }, { once: true });
-      });
-    } else {
-      el.style.height = el.scrollHeight + 'px';
-      el.style.overflow = 'hidden';
-      requestAnimationFrame(() => {
-        el.style.transition = 'height 250ms ease';
-        el.style.height = '0';
-        el.addEventListener('transitionend', () => {
-          el.style.transition = '';
-        }, { once: true });
-      });
-    }
+    const appendChild = (child) => {
+      if (Array.isArray(child)) {
+        child.forEach(appendChild);
+      } else if (child != null) {
+        el.append(typeof child === 'string' ? document.createTextNode(child) : child);
+      }
+    };
+    children.forEach(appendChild);
+    return el;
   }
 
-  // -- Pending course/PDF session (cross-route navigation state) -------------
-  const _pendingSession = {};
-
-  function setPendingCourseMedia(topicId, position) {
-    if (topicId != null) {
-      _pendingSession.topicId = topicId;
-      _pendingSession.position = position ?? null;
-    }
+  function appendContent(parent, content) {
+    if (content == null) return;
+    const append = (item) => {
+      if (item == null) return;
+      if (item instanceof Node) parent.appendChild(item);
+      else parent.appendChild(document.createTextNode(String(item)));
+    };
+    if (Array.isArray(content)) content.forEach(append);
+    else append(content);
   }
 
-  function consumePendingCourseSession() {
-    const snap = { ...(_pendingSession) };
-    delete _pendingSession.topicId;
-    delete _pendingSession.position;
-    return snap.topicId ? snap : null;
-  }
-
-  function setPendingPdfPage(docId, page) {
-    if (docId != null) {
-      _pendingSession.pdfDocId = docId;
-      _pendingSession.pdfPage = page ?? 1;
-    }
-  }
-
-  // -- URL safety guards (CSP-aligned) ---------------------------------------
-  const _SAFE_URL_RE   = /^(https?:|\/|#|data:image\/|data:audio\/|data:video\/|blob:)/i;
-  const _SAFE_MEDIA_RE = /^(https?:|\/|data:audio\/|data:video\/|blob:)/i;
-  const _SAFE_IMG_RE   = /^(https?:|\/|data:image\/|blob:)/i;
-  const _SAFE_FRAME_RE = /^(https?:|\/)/i;
-
-  function safeNavigationUrl(url) {
-    const s = String(url ?? '').trim();
-    return _SAFE_URL_RE.test(s) ? s : '#/';
-  }
-
-  function safeExternalUrl(url) {
-    const s = String(url ?? '').trim();
-    return /^https?:/i.test(s) ? s : null;
-  }
-
-  function safeMediaUrl(url) {
-    const s = String(url ?? '').trim();
-    return _SAFE_MEDIA_RE.test(s) ? s : null;
-  }
-
-  function safeImageUrl(url) {
-    const s = String(url ?? '').trim();
-    return _SAFE_IMG_RE.test(s) ? s : null;
-  }
-
-  function safeFrameUrl(url) {
-    const s = String(url ?? '').trim();
-    return _SAFE_FRAME_RE.test(s) ? s : null;
-  }
-
-  function safeFetchUrl(base, path) {
+  function safeExternalUrl(value) {
+    if (!value) return null;
     try {
-      const resolved = path ? new URL(path, base || location.origin).href : (base || '');
-      return /^https?:/i.test(resolved) || resolved.startsWith('/') ? resolved : null;
+      const url = new URL(String(value), document.baseURI);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
     } catch {
       return null;
     }
   }
 
-  // -- Image fallback ---------------------------------------------------------
-  const IMAGE_FALLBACK_SRC = 'assets/placeholder.svg';
-
-  function applyImageFallback(img) {
-    if (!img) return;
-    img.addEventListener('error', () => {
-      if (img.src !== IMAGE_FALLBACK_SRC) {
-        img.src = IMAGE_FALLBACK_SRC;
-        img.classList.add('image-fallback');
-      }
-    }, { once: true });
+  function safeNavigationUrl(value) {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (raw.startsWith('#/')) return raw;
+    try {
+      const url = new URL(raw, document.baseURI);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
   }
 
-  // -- Sanitize HTML (fallback when DOMPurify is absent) ---------------------
-  function fallbackSanitizeHtml(html) {
-    const tmp = document.createElement('div');
-    tmp.textContent = String(html ?? '');
-    return tmp.innerHTML;
+  function safeMediaUrl(value) {
+    if (!value) return null;
+    try {
+      const raw = String(value).trim();
+      const url = new URL(raw, document.baseURI);
+      if (url.protocol === 'data:') return /^data:(?:video|audio|application\/pdf)\//i.test(raw) ? url.href : null;
+      return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
   }
 
-  // -- Download helpers -------------------------------------------------------
-  function downloadTextFile(text, filename, mime = 'text/plain') {
-    const blob = new Blob([text], { type: mime });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  function safeImageUrl(value) {
+    if (!value) return null;
+    try {
+      const raw = String(value).trim();
+      const url = new URL(raw, document.baseURI);
+      if (url.protocol === 'data:') return /^data:image\//i.test(raw) ? url.href : null;
+      return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
   }
 
-  function downloadDataUrl(dataUrl, filename) {
-    const a    = document.createElement('a');
-    a.href     = dataUrl;
-    a.download = filename;
-    a.click();
+  function safeFrameUrl(value) {
+    if (!value) return null;
+    try {
+      const url = new URL(String(value).trim(), document.baseURI);
+      return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
   }
 
-  function printStudioBoardPdf() {
-    window.print();
+  function formatBytes(value) {
+    if (!Number.isFinite(Number(value))) return '—';
+    const bytes = Math.max(0, Number(value));
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    const precision = unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
+    return `${size.toFixed(precision)} ${units[unitIndex]}`;
   }
 
-  // -- Formatting helpers ----------------------------------------------------
   function formatMediaClock(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return h
-      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-      : `${m}:${String(s).padStart(2, '0')}`;
+    const hrs = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
   }
 
-  function escapeHtmlText(str) {
-    return String(str ?? '').replace(
-      /[&<>"']/g,
-      m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])
-    );
+  function setPendingCourseMedia(topicId, position = null) {
+    if (!topicId) return;
+    try {
+      sessionStorage.setItem('plasma_pending_topic', String(topicId));
+      if (Number.isFinite(Number(position)) && Number(position) > 0) {
+        sessionStorage.setItem('plasma_pending_position', String(Math.max(0, Number(position))));
+      } else {
+        sessionStorage.removeItem('plasma_pending_position');
+      }
+    } catch {}
   }
 
-  function formatBytes(bytes) {
-    const b = Number(bytes) || 0;
-    if (b < 1024) return `${b} B`;
-    if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1048576).toFixed(1)} MB`;
+  function setPendingCourseSession(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    try {
+      const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
+      if (!queue.length) {
+        sessionStorage.removeItem('plasma_pending_course_session');
+        return;
+      }
+      sessionStorage.setItem('plasma_pending_course_session', JSON.stringify({
+        queue,
+        queueIndex: Math.max(0, Number(snapshot.queueIndex) || 0),
+        currentTime: Math.max(0, Number(snapshot.currentTime) || 0),
+        duration: Math.max(0, Number(snapshot.duration) || 0),
+        playing: Boolean(snapshot.playing),
+        volume: Number(snapshot.volume),
+        muted: Boolean(snapshot.muted),
+        shuffle: Boolean(snapshot.shuffle),
+        repeat: typeof snapshot.repeat === 'string' ? snapshot.repeat : 'none',
+        playbackRate: Math.max(0, Number(snapshot.playbackRate) || 1),
+        track: snapshot.track && typeof snapshot.track === 'object' ? { ...snapshot.track } : null,
+      }));
+    } catch {}
   }
+
+  function consumePendingCourseSession() {
+    try {
+      const raw = sessionStorage.getItem('plasma_pending_course_session');
+      if (!raw) return null;
+      sessionStorage.removeItem('plasma_pending_course_session');
+      const snapshot = JSON.parse(raw);
+      if (!snapshot || typeof snapshot !== 'object') return null;
+      const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
+      if (!queue.length) return null;
+      return {
+        ...snapshot,
+        queue,
+        queueIndex: Math.max(0, Number(snapshot.queueIndex) || 0),
+        currentTime: Math.max(0, Number(snapshot.currentTime) || 0),
+        duration: Math.max(0, Number(snapshot.duration) || 0),
+        playing: Boolean(snapshot.playing),
+        volume: Number(snapshot.volume),
+        muted: Boolean(snapshot.muted),
+        shuffle: Boolean(snapshot.shuffle),
+        repeat: typeof snapshot.repeat === 'string' ? snapshot.repeat : 'none',
+        playbackRate: Math.max(0, Number(snapshot.playbackRate) || 1),
+        track: snapshot.track && typeof snapshot.track === 'object' ? { ...snapshot.track } : null,
+      };
+    } catch {
+      try { sessionStorage.removeItem('plasma_pending_course_session'); } catch {}
+      return null;
+    }
+  }
+
+  function setPendingPdfPage(docId, page = null) {
+    try {
+      if (docId) sessionStorage.setItem('plasma_pending_pdf_doc', String(docId));
+      if (Number.isFinite(Number(page)) && Number(page) > 0) {
+        sessionStorage.setItem('plasma_pending_pdf_page', String(Math.max(1, Math.floor(Number(page)))));
+      } else {
+        sessionStorage.removeItem('plasma_pending_pdf_page');
+      }
+    } catch {}
+  }
+
+  function escapeHtmlText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
+  }
+
+  const MiniPlayer = (() => {
+    let currentSnapshot = null;
+    let node = null;
+    let livePlayerEl = null;
+    let liveDispose = null;
+
+    const normalize = (snapshot) => {
+      if (!snapshot || typeof snapshot !== 'object') return null;
+      const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
+      const track = snapshot.track || queue[Math.max(0, Number(snapshot.queueIndex) || 0)] || null;
+      if (!track && queue.length === 0) return null;
+      const duration = Math.max(0, Number(snapshot.duration) || 0);
+      const currentTime = Math.max(0, Math.min(duration || Infinity, Number(snapshot.currentTime) || 0));
+      return {
+        ...snapshot,
+        queue,
+        queueIndex: Math.max(0, Number(snapshot.queueIndex) || 0),
+        currentTime,
+        duration,
+        playing: Boolean(snapshot.playing),
+        track: track ? { ...track } : null,
+      };
+    };
+
+    const hide = () => {
+      try { liveDispose?.(); } catch {}
+      liveDispose = null;
+      if (livePlayerEl?.isConnected) {
+        try { livePlayerEl._pdPlayer?.destroy?.(); } catch {}
+        livePlayerEl.remove();
+      }
+      livePlayerEl = null;
+      node?.remove();
+      node = null;
+      currentSnapshot = null;
+    };
+
+    const resume = () => {
+      const track = currentSnapshot?.track;
+      setPendingCourseSession(currentSnapshot);
+      if (track?.topicId) setPendingCourseMedia(track.topicId, currentSnapshot?.currentTime);
+      Router.navigate('#/courses');
+      if (!livePlayerEl) hide();
+    };
+
+    const refreshFromLive = () => {
+      const next = normalize(livePlayerEl?._pdPlayer?.snapshot?.());
+      if (next) currentSnapshot = next;
+      return next;
+    };
+
+    const liveAction = (action) => {
+      const inst = livePlayerEl?._pdPlayer;
+      if (!inst) return;
+      try {
+        if (action === 'prev') inst.prev?.();
+        if (action === 'next') inst.next?.();
+        if (action === 'play') inst.toggle?.();
+        if (action === 'queue') {
+          const panel = livePlayerEl.querySelector?.('.pd-queue-panel');
+          if (panel?.hidden === false) inst.hideQueue?.();
+          else inst.showQueue?.();
+        }
+      } catch {}
+      setTimeout(() => {
+        refreshFromLive();
+        render();
+      }, 0);
+    };
+
+    const render = () => {
+      const snapshot = currentSnapshot;
+      if (!snapshot) return hide();
+      const track = snapshot.track || {};
+      const title = String(track.title || 'Current lesson');
+      const meta = String(track.artist || track.courseTitle || track.courseId || 'Course media');
+      const percent = snapshot.duration > 0 ? Math.min(100, (snapshot.currentTime / snapshot.duration) * 100) : 0;
+
+      if (!node) {
+        node = createElement('aside', {
+          class: 'global-mini-player',
+          'data-mini-player': '',
+          role: 'status',
+          'aria-live': 'polite',
+        });
+        document.body.appendChild(node);
+      }
+      node.classList.toggle('has-live-player', Boolean(livePlayerEl));
+
+      node.replaceChildren(
+        createElement('div', { class: 'global-mini-player__body' },
+          createElement('div', { class: 'global-mini-player__eyebrow' }, snapshot.playing ? 'Playing' : 'Ready to resume'),
+          createElement('div', { class: 'global-mini-player__title' }, title),
+          createElement('div', { class: 'global-mini-player__meta' }, meta),
+          createElement('div', {
+            class: 'global-mini-player__progress',
+            role: 'progressbar',
+            'aria-valuemin': '0',
+            'aria-valuemax': '100',
+            'aria-valuenow': String(Math.round(percent)),
+          }, createElement('span', { style: { width: `${percent}%` } })),
+          createElement('div', { class: 'global-mini-player__time' },
+            `${formatMediaClock(snapshot.currentTime)} / ${snapshot.duration ? formatMediaClock(snapshot.duration) : '--:--'}`
+          )
+        ),
+        createElement('div', { class: 'global-mini-player__actions' },
+          ...(livePlayerEl ? [
+            createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-prev': '', 'aria-label': 'Previous track' }, 'Prev'),
+            createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-play': '', 'aria-label': snapshot.playing ? 'Pause' : 'Play' }, snapshot.playing ? 'Pause' : 'Play'),
+            createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-next': '', 'aria-label': 'Next track' }, 'Next'),
+            createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-queue': '', 'aria-label': 'Toggle queue' }, 'Queue'),
+          ] : []),
+          createElement('button', { class: 'btn btn-primary btn-sm', type: 'button', 'data-mini-resume': '' }, 'Resume'),
+          createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-close': '', 'aria-label': 'Close mini player' }, 'Close')
+        )
+      );
+      if (livePlayerEl) {
+        const liveSlot = createElement('div', { class: 'global-mini-player__live', 'data-mini-player-live': '' });
+        liveSlot.appendChild(livePlayerEl);
+        node.insertBefore(liveSlot, node.firstChild);
+      }
+      node.querySelector('[data-mini-prev]')?.addEventListener('click', () => liveAction('prev'));
+      node.querySelector('[data-mini-play]')?.addEventListener('click', () => liveAction('play'));
+      node.querySelector('[data-mini-next]')?.addEventListener('click', () => liveAction('next'));
+      node.querySelector('[data-mini-queue]')?.addEventListener('click', () => liveAction('queue'));
+      node.querySelector('[data-mini-resume]')?.addEventListener('click', resume, { once: true });
+      node.querySelector('[data-mini-close]')?.addEventListener('click', hide, { once: true });
+      return node;
+    };
+
+    return {
+      show(snapshot) {
+        const next = normalize(snapshot);
+        if (!next) return hide();
+        currentSnapshot = next;
+        return render();
+      },
+      adoptPlayer(el, snapshot, { dispose } = {}) {
+        if (!el?._pdPlayer) return this.show(snapshot);
+        const next = normalize(snapshot || el._pdPlayer?.snapshot?.());
+        if (!next) return hide();
+        if (livePlayerEl && livePlayerEl !== el) {
+          try { livePlayerEl._pdPlayer?.destroy?.(); } catch {}
+          livePlayerEl.remove();
+        }
+        livePlayerEl = el;
+        liveDispose = typeof dispose === 'function' ? dispose : null;
+        currentSnapshot = next;
+        el.classList.add('pd-live-mini-player');
+        return render();
+      },
+      restorePlayer(placeholder) {
+        if (!placeholder || !livePlayerEl) return placeholder;
+        const restored = livePlayerEl;
+        try { liveDispose?.(); } catch {}
+        restored.classList.remove('pd-live-mini-player');
+        delete restored.dataset.pdProgressBound;
+        livePlayerEl = null;
+        liveDispose = null;
+        placeholder.replaceWith(restored);
+        node?.remove();
+        node = null;
+        return restored;
+      },
+      hide,
+      getSnapshot() {
+        return currentSnapshot
+          ? { ...currentSnapshot, queue: [...currentSnapshot.queue], track: currentSnapshot.track ? { ...currentSnapshot.track } : null }
+          : null;
+      },
+    };
+  })();
+
+  PlasmaDeck.MiniPlayer = MiniPlayer;
 
   function localStorageFootprint() {
     try {
       let total = 0;
-      for (let i = 0; i < localStorage.length; i++) {
+      for (let i = 0; i < localStorage.length; i += 1) {
         const key = localStorage.key(i);
-        total += (key?.length ?? 0) + (localStorage.getItem(key)?.length ?? 0);
+        if (!key) continue;
+        total += new Blob([key, localStorage.getItem(key) ?? '']).size;
       }
-      return total * 2; // UTF-16 characters = 2 bytes each
+      return total;
     } catch {
-      return 0;
+      return null;
     }
   }
+
+  function downloadTextFile(text, filename, mime = 'text/plain') {
+    const blob = new Blob([String(text ?? '')], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    if (!dataUrl) return false;
+    const link = document.createElement('a');
+    link.href = String(dataUrl);
+    link.download = filename;
+    link.click();
+    return true;
+  }
+
+  function printStudioBoardPdf({ title = 'PlasmaDeck Studio board', svg = '', png = '' } = {}) {
+    const media = svg || (png ? `<img src="${String(png).replace(/"/g, '&quot;')}" alt="Studio board" />` : '');
+    if (!media) return false;
+    const win = window.open?.('', '_blank', 'noopener,noreferrer');
+    if (!win?.document) return false;
+    win.document.open();
+    win.document.write([
+      '<!doctype html><html><head><meta charset="utf-8">',
+      `<title>${String(title).replace(/[<>&"]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch])}</title>`,
+      '<style>html,body{margin:0;background:#fff;color:#111;font:14px system-ui,sans-serif}main{padding:24px}svg,img{display:block;max-width:100%;height:auto;border:1px solid #ddd}@media print{main{padding:0}svg,img{border:0}}</style>',
+      '</head><body><main>',
+      media,
+      '</main></body></html>',
+    ].join(''));
+    win.document.close();
+    try { win.focus?.(); } catch {}
+    try { win.print?.(); } catch {}
+    return true;
+  }
+
+  function safeFetchUrl(base, path) {
+    try {
+      const url = new URL(`${base ?? ''}${path ?? ''}`, document.baseURI);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function fallbackSanitizeHtml(html) {
+    const template = document.createElement('template');
+    // Intentional parser boundary: route templates are sanitized before insertion.
+    template.innerHTML = String(html ?? '');
+    const forbiddenSelector = 'script, style, meta, link, iframe, object, embed, form, template';
+    template.content.querySelectorAll(forbiddenSelector).forEach(node => node.remove());
+    template.content.querySelectorAll('*').forEach(node => {
+      [...node.attributes].forEach(attr => {
+        const name = attr.name.toLowerCase();
+        const value = attr.value;
+        if (name.startsWith('on') || name === 'srcdoc') {
+          node.removeAttribute(attr.name);
+          return;
+        }
+        if (['href', 'action'].includes(name) && !safeNavigationUrl(value)) {
+          node.removeAttribute(attr.name);
+          return;
+        }
+        if (['src', 'poster'].includes(name) && !safeMediaUrl(value)) {
+          node.removeAttribute(attr.name);
+        }
+      });
+    });
+    return template.innerHTML;
+  }
+
+  const IMAGE_FALLBACK_SRC = './assets/og-cover.svg';
+  function applyImageFallback(img) {
+    if (!img || img.dataset.pdImageFallbackBound === 'true') return img;
+    img.dataset.pdImageFallbackBound = 'true';
+    img.addEventListener('error', () => {
+      if (img.dataset.pdFallbackActive === 'true') return;
+      img.dataset.pdFallbackActive = 'true';
+      img.dataset.failedSrc = img.currentSrc || img.src || img.dataset.src || '';
+      img.src = IMAGE_FALLBACK_SRC;
+      img.classList.add('image-fallback');
+      if (!img.alt) img.alt = 'Image unavailable';
+    });
+    return img;
+  }
+
+  /**
+   * Simple event emitter
+   */
+  class EventEmitter {
+    constructor() { this._events = {}; }
+    on(event, fn) {
+      (this._events[event] ??= []).push(fn);
+      return this;
+    }
+    off(event, fn) {
+      if (this._events[event]) {
+        this._events[event] = this._events[event].filter(f => f !== fn && f.fn !== fn);
+      }
+      return this;
+    }
+    emit(event, ...args) {
+      (this._events[event] ?? []).forEach(fn => fn(...args));
+      return this;
+    }
+    once(event, fn) {
+      const wrapper = (...args) => { fn(...args); this.off(event, wrapper); };
+      wrapper.fn = fn;
+      return this.on(event, wrapper);
+    }
+  }
+
+  // Global event bus
+  PlasmaDeck.bus = new EventEmitter();
+
+  /**
+   * Animate element height from 0 â†’ auto (or auto â†’ 0)
+   * @param {HTMLElement} el
+   * @param {boolean} open   true = expand, false = collapse
+   * @param {number} duration ms
+   * @returns {Promise<void>}
+   */
+  function animateHeight(el, open, duration = PlasmaDeck.config.animationDuration) {
+    return new Promise(resolve => {
+      const startHeight = open ? 0 : el.scrollHeight;
+      const endHeight   = open ? el.scrollHeight : 0;
+
+      el.style.overflow = 'hidden';
+      el.style.height   = `${startHeight}px`;
+      el.style.transition = `height ${duration}ms ease`;
+
+      requestAnimationFrame(() => {
+        el.style.height = `${endHeight}px`;
+        setTimeout(() => {
+          el.style.height   = open ? '' : '0px';
+          el.style.overflow = open ? '' : 'hidden';
+          el.style.transition = '';
+          resolve();
+        }, duration);
+      });
+    });
+  }
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 2. THEME SYSTEM
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Extracted into `src/core/themeManager.js` and imported at file top.
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 2b. UI PREFERENCES (accent, density, font scale)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Extracted into `src/core/prefs.js` and imported at file top.
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 3. SIDEBAR
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Sidebar = {
     // Keep in sync with storageMigrate + index pre-boot.
@@ -662,16 +1025,9 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
     },
 
     _plainText(value) {
-      if (value == null) return '';
-      if (value instanceof Node) return (value.textContent || value.innerText || '').replace(/\s+/g, ' ').trim();
-      const s = String(value);
-      if (!s.includes('<') && !s.includes('&')) return s.replace(/\s+/g, ' ').trim();
-      try {
-        const doc = new DOMParser().parseFromString(s, 'text/html');
-        return (doc.body.textContent || doc.body.innerText || '').replace(/\s+/g, ' ').trim();
-      } catch {
-        return s.replace(/\s+/g, ' ').trim();
-      }
+      const div = document.createElement('div');
+      div.innerHTML = String(value || '');
+      return (div.textContent || div.innerText || String(value || '')).replace(/\s+/g, ' ').trim();
     },
 
     _render(results, query) {
@@ -750,7 +1106,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
     },
 
     _appendHighlighted(parent, text, query) {
-      const source = (text instanceof Node ? text.textContent : String(text || ''));
+      const source = String(text ?? '');
       const needle = String(query ?? '').trim();
       if (!needle) {
         parent.textContent = source;
@@ -818,11 +1174,330 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â���€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 6. MODALS & DRAWERS (imported from ./src/ui/overlays.js as `Modal`, `Drawer`)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 6. MODALS & DRAWERS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const Modal = {
+    _cleanupFns: new WeakMap(),
+    _previousFocus: new WeakMap(),
+
+    /**
+     * Open a modal by its ID or element reference
+     * @param {string|HTMLElement} target
+     * @param {Object} [opts]
+     */
+    open(target, opts = {}) {
+      const modal = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!modal) return;
+      if (modal.classList.contains('open')) return;
+
+      // Backdrop
+      let backdrop = modal.previousElementSibling;
+      if (!backdrop?.classList.contains('modal-backdrop')) {
+        backdrop = createElement('div', { class: 'modal-backdrop', 'aria-hidden': 'true' });
+        modal.parentNode.insertBefore(backdrop, modal);
+      }
+
+      modal.removeAttribute('hidden');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('tabindex', '-1');
+
+      requestAnimationFrame(() => {
+        backdrop.classList.add('open');
+        modal.classList.add('open');
+      });
+
+      document.body.style.overflow = 'hidden';
+      PlasmaDeck.state.openModals.push(modal);
+      this._previousFocus.set(modal, document.activeElement);
+      setAppInert(true);
+
+      // Trap focus
+      const cleanup = trapFocus(modal);
+      this._cleanupFns.set(modal, cleanup);
+
+      // Close on backdrop click
+      backdrop.addEventListener('click', () => this.close(modal), { once: true });
+
+      // Close on Escape
+      const onEsc = e => { if (e.key === 'Escape') this.close(modal); };
+      document.addEventListener('keydown', onEsc);
+      this._cleanupFns.set(modal, () => {
+        cleanup();
+        document.removeEventListener('keydown', onEsc);
+      });
+
+      // Wire close buttons inside modal
+      $$('[data-modal-close]', modal).forEach(btn => {
+        btn.addEventListener('click', () => this.close(modal), { once: true });
+      });
+
+      PlasmaDeck.bus.emit('modal:open', { modal, opts });
+    },
+
+    /**
+     * Close a modal
+     */
+    close(target) {
+      const modal = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!modal) return;
+      if (!modal.classList.contains('open')) return;
+
+      const backdrop = modal.previousElementSibling;
+      modal.classList.remove('open');
+      if (backdrop?.classList.contains('modal-backdrop')) {
+        backdrop.classList.remove('open');
+      }
+
+      setTimeout(() => {
+        modal.setAttribute('hidden', '');
+        modal.removeAttribute('aria-modal');
+        if (backdrop?.classList.contains('modal-backdrop')) {
+          backdrop.remove();
+        }
+      }, PlasmaDeck.config.animationDuration);
+
+      PlasmaDeck.state.openModals = PlasmaDeck.state.openModals.filter(m => m !== modal);
+
+      if (!PlasmaDeck.state.openModals.length) {
+        document.body.style.overflow = '';
+      }
+
+      // Cleanup focus trap
+      const cleanup = this._cleanupFns.get(modal);
+      if (cleanup) { cleanup(); this._cleanupFns.delete(modal); }
+      setAppInert(false);
+      restoreFocus(this._previousFocus.get(modal));
+      this._previousFocus.delete(modal);
+
+      modal.dispatchEvent(new CustomEvent('modal:close', { detail: { modal } }));
+      PlasmaDeck.bus.emit('modal:close', { modal });
+    },
+
+    /**
+     * Create and open a modal programmatically
+     */
+    create({
+      title    = '',
+      body     = '',
+      footer   = '',
+      size     = '',          // 'sm' | 'lg' | 'xl' | 'fullscreen'
+      onClose  = null,
+      onConfirm = null,
+    } = {}) {
+      const id    = uid('modal');
+      const sizeClass = size ? `modal-${size}` : '';
+
+      const closeBtn = createElement('button', {
+        class: 'modal-close-btn',
+        'aria-label': 'Close dialog',
+        'data-modal-close': '',
+      }, 'Ã—');
+
+      const header = title
+        ? createElement('div', { class: 'modal-header' },
+            createElement('h3', { class: 'modal-title' }, title),
+            closeBtn)
+        : closeBtn;
+
+      const bodyEl = createElement('div', { class: 'modal-body' });
+      appendContent(bodyEl, body);
+
+      const children = [header, bodyEl];
+
+      if (footer || onConfirm) {
+        const footerEl = createElement('div', { class: 'modal-footer' });
+        if (footer) {
+          appendContent(footerEl, footer);
+        } else if (onConfirm) {
+          const cancelBtn = createElement('button', { class: 'btn btn-ghost', 'data-modal-close': '' }, 'Cancel');
+          const confirmBtn = createElement('button', { class: 'btn btn-primary' }, 'Confirm');
+          confirmBtn.addEventListener('click', () => {
+            onConfirm();
+            this.close(modal);
+          });
+          footerEl.append(cancelBtn, confirmBtn);
+        }
+        children.push(footerEl);
+      }
+
+      const modal = createElement('div',
+        { id, class: `modal-container ${sizeClass}`, hidden: '' },
+        ...children
+      );
+
+      if (onClose) modal.addEventListener('modal:close', onClose, { once: true });
+
+      document.body.appendChild(modal);
+
+      // Auto-remove from DOM after closing
+      PlasmaDeck.bus.on('modal:close', ({ modal: m }) => {
+        if (m === modal) setTimeout(() => modal.remove(), 400);
+      });
+
+      this.open(modal);
+      return modal;
+    },
+
+    confirmAsync({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel' } = {}) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+        const modal = this.create({
+          title,
+          body: createElement('p', {}, String(message ?? '')),
+          footer: '',
+        });
+        const footer = $('.modal-footer', modal) ?? createElement('div', { class: 'modal-footer' });
+        if (!footer.isConnected) modal.appendChild(footer);
+        footer.replaceChildren();
+        const cancelBtn = createElement('button', { class: 'btn btn-ghost' }, cancelLabel);
+        const confirmBtn = createElement('button', { class: 'btn btn-primary' }, confirmLabel);
+        cancelBtn.addEventListener('click', () => {
+          settle(false);
+          this.close(modal);
+        });
+        confirmBtn.addEventListener('click', () => {
+          settle(true);
+          this.close(modal);
+        });
+        PlasmaDeck.bus.once('modal:close', ({ modal: closed }) => {
+          if (closed === modal) settle(false);
+        });
+        footer.append(cancelBtn, confirmBtn);
+      });
+    },
+
+    /**
+     * Init data-attribute driven modals
+     */
+    init() {
+      document.addEventListener('click', e => {
+        const target = eventTargetEl(e);
+        if (!target) return;
+        const trigger = target.closest('[data-modal-open]');
+        if (trigger) {
+          e.preventDefault();
+          this.open(trigger.dataset.modalOpen);
+        }
+        const closeBtn = target.closest('[data-modal-close]');
+        if (closeBtn) {
+          const modal = closeBtn.closest('.modal-container, .drawer');
+          if (modal) this.close(modal);
+        }
+      });
+    },
+  };
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 7. DRAWERS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const Drawer = {
+    _cleanupFns: new WeakMap(),
+    _previousFocus: new WeakMap(),
+
+    open(target) {
+      const drawer = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!drawer) return;
+      if (drawer.classList.contains('open')) return;
+
+      let backdrop = $('.drawer-backdrop');
+      if (!backdrop) {
+        backdrop = createElement('div', { class: 'drawer-backdrop' });
+        document.body.appendChild(backdrop);
+        backdrop.addEventListener('click', () => this.closeAll());
+      }
+
+      drawer.removeAttribute('hidden');
+      drawer.setAttribute('aria-hidden', 'false');
+      drawer.setAttribute('aria-modal', 'true');
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('tabindex', '-1');
+      requestAnimationFrame(() => {
+        backdrop.classList.add('open');
+        drawer.classList.add('open');
+      });
+
+      document.body.style.overflow = 'hidden';
+      this._previousFocus.set(drawer, document.activeElement);
+      setAppInert(true);
+      this._cleanupFns.set(drawer, trapFocus(drawer));
+
+      PlasmaDeck.bus.emit('drawer:open', { drawer });
+    },
+
+    close(target) {
+      const drawer = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!drawer) return;
+      if (!drawer.classList.contains('open')) return;
+
+      drawer.classList.remove('open');
+      setTimeout(() => {
+        drawer.setAttribute('hidden', '');
+        drawer.setAttribute('aria-hidden', 'true');
+        drawer.removeAttribute('aria-modal');
+      }, PlasmaDeck.config.animationDuration);
+
+      const backdrop = $('.drawer-backdrop');
+      if (backdrop) {
+        backdrop.classList.remove('open');
+        setTimeout(() => backdrop.remove(), PlasmaDeck.config.animationDuration);
+      }
+
+      document.body.style.overflow = '';
+      this._cleanupFns.get(drawer)?.();
+      this._cleanupFns.delete(drawer);
+      setAppInert(false);
+      restoreFocus(this._previousFocus.get(drawer));
+      this._previousFocus.delete(drawer);
+      PlasmaDeck.bus.emit('drawer:close', { drawer });
+    },
+
+    closeAll() {
+      $$('.drawer.open').forEach(d => this.close(d));
+    },
+
+    init() {
+      document.addEventListener('click', e => {
+        const target = eventTargetEl(e);
+        if (!target) return;
+        const trigger = target.closest('[data-drawer-open]');
+        if (trigger) { e.preventDefault(); this.open(trigger.dataset.drawerOpen); }
+
+        const closeBtn = target.closest('[data-drawer-close]');
+        if (closeBtn) {
+          const drawer = closeBtn.closest('.drawer');
+          if (drawer) this.close(drawer);
+        }
+      });
+
+      // Close on Escape
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') this.closeAll();
+      });
+    },
+  };
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 8. DROPDOWN MENUS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”���â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Dropdown = {
     _active: null,
@@ -1090,7 +1765,171 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 11. TOAST NOTIFICATIONS (imported from ./src/ui/toast.js as `Toast`)
+  // 11. TOAST NOTIFICATIONS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const Toast = {
+    _containers: {},
+
+    /**
+     * Show a toast
+     * @param {Object} opts
+     * @param {string} opts.message
+     * @param {'info'|'success'|'warning'|'error'} opts.type
+     * @param {number} opts.duration  ms (0 = persistent)
+     * @param {'top-right'|'top-left'|'top-center'|'bottom-right'|'bottom-left'|'bottom-center'} opts.position
+     * @param {boolean} opts.dismissible
+     * @param {string} opts.title
+     * @param {string|Node|Node[]} opts.action  Action content rendered as text unless a Node is supplied
+     * @returns {HTMLElement} the toast element
+     */
+    show({
+      message     = '',
+      type        = 'info',
+      duration    = PlasmaDeck.config.toastDuration,
+      position    = 'top-right',
+      dismissible = true,
+      title       = '',
+      action      = '',
+    } = {}) {
+      const container = this._getContainer(position);
+
+      // Enforce max stack
+      const stack = $$('.toast', container);
+      if (stack.length >= PlasmaDeck.config.toastMaxStack) {
+        const oldest = stack[0];
+        oldest.remove();
+        PlasmaDeck.state.activeToasts = PlasmaDeck.state.activeToasts.filter(t => t !== oldest);
+      }
+
+      const id   = uid('toast');
+      const icon = { info: 'i', success: 'OK', warning: '!', error: 'X' }[type] ?? 'i';
+
+      const toast = createElement('div', {
+        id,
+        class: `toast toast-${type}`,
+        role: type === 'error' ? 'alert' : 'status',
+        'aria-live': type === 'error' ? 'assertive' : 'polite',
+        'aria-atomic': 'true',
+      });
+
+      const iconEl = createElement('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon);
+      const content = createElement('div', { class: 'toast-content' });
+      if (title) content.appendChild(createElement('div', { class: 'toast-title' }, title));
+      content.appendChild(createElement('div', { class: 'toast-message' }, message));
+      this._appendAction(content, action);
+      toast.append(iconEl, content);
+      if (dismissible) {
+        toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, 'Ã—'));
+      }
+      if (duration > 0) {
+        toast.appendChild(createElement('div', { class: 'toast-timer' }));
+      }
+
+      // Close button
+      const closeBtn = toast.querySelector('.toast-close');
+      if (closeBtn) closeBtn.addEventListener('click', () => this.dismiss(toast));
+
+      // Timer bar
+      if (duration > 0) {
+        const timerBar = toast.querySelector('.toast-timer');
+        timerBar.style.animationDuration = `${duration}ms`;
+        timerBar.classList.add('running');
+      }
+
+      // Pause on hover
+      let dismissTimeout;
+      const startDismiss = () => {
+        if (duration > 0) {
+          dismissTimeout = setTimeout(() => this.dismiss(toast), duration);
+        }
+      };
+      toast.addEventListener('mouseenter', () => clearTimeout(dismissTimeout));
+      toast.addEventListener('mouseleave', startDismiss);
+
+      container.appendChild(toast);
+
+      // Entrance animation
+      requestAnimationFrame(() => toast.classList.add('show'));
+
+      startDismiss();
+
+      PlasmaDeck.state.activeToasts.push(toast);
+      PlasmaDeck.bus.emit('toast:show', { toast, type, message });
+
+      return toast;
+    },
+
+    dismiss(toast) {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+      toast.addEventListener('animationend', () => {
+        toast.remove();
+        PlasmaDeck.state.activeToasts = PlasmaDeck.state.activeToasts.filter(t => t !== toast);
+        PlasmaDeck.bus.emit('toast:dismiss', { toast });
+      }, { once: true });
+    },
+
+    dismissAll() {
+      [...PlasmaDeck.state.activeToasts].forEach(t => this.dismiss(t));
+    },
+
+    // Convenience shortcuts
+    info   (msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'info' }); },
+    success(msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'success' }); },
+    warning(msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'warning' }); },
+    error  (msg, opts = {}) { return this.show({ ...opts, message: msg, type: 'error', duration: 0 }); },
+
+    _getContainer(position) {
+      if (this._containers[position]) return this._containers[position];
+
+      const container = createElement('div', {
+        class:       `toast-container toast-${position}`,
+        'aria-live': 'polite',
+        'aria-relevant': 'additions',
+      });
+      document.body.appendChild(container);
+      this._containers[position] = container;
+      return container;
+    },
+
+    _escHtml(str) {
+      return String(str).replace(/[&<>"']/g, m =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    },
+
+    _appendAction(parent, action) {
+      if (!action) return;
+      const wrap = createElement('div', { class: 'toast-action' });
+      const append = (item) => {
+        if (!item) return;
+        if (item instanceof Node) wrap.appendChild(item);
+        else wrap.appendChild(document.createTextNode(String(item)));
+      };
+      if (Array.isArray(action)) action.forEach(append);
+      else append(action);
+      parent.appendChild(wrap);
+    },
+
+    init() {
+      // Wire any static [data-toast] trigger buttons
+      document.addEventListener('click', e => {
+        const target = eventTargetEl(e);
+        if (!target) return;
+        const btn = target.closest('[data-toast]');
+        if (!btn) return;
+        this.show({
+          message:  btn.dataset.toastMessage  ?? btn.textContent.trim(),
+          type:     btn.dataset.toastType     ?? 'info',
+          title:    btn.dataset.toastTitle    ?? '',
+          position: btn.dataset.toastPosition ?? 'top-right',
+        });
+      });
+    },
+  };
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 12. FORMS â€” Validation, Inputs, Toggles, Range
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2135,7 +2974,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”��â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 23. INFINITE SCROLL
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2280,7 +3119,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   })();
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â���€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 25. RESPONSIVE UTILITIES
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2312,7 +3151,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”��â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 33. VIEWS (SPA route rendering)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2471,7 +3310,86 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 26. KEYBOARD SHORTCUTS (imported from ./src/core/keyboardShortcuts.js)
+  // 26. KEYBOARD SHORTCUTS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const KeyboardShortcuts = {
+    _shortcuts: [],
+
+    /**
+     * Register a shortcut
+     * @param {string} combo  e.g. 'ctrl+k', 'shift+/', '?'
+     * @param {Function} handler
+     * @param {string} description
+     */
+    register(combo, handler, description = '') {
+      this._shortcuts.push({ combo: combo.toLowerCase(), handler, description });
+      return this;
+    },
+
+    init() {
+      // Built-in shortcuts
+      this.register('ctrl+shift+f', () => {
+        const input = $('.topbar-search input');
+        if (input) { input.focus(); input.select(); }
+      }, 'Focus global search');
+
+      this.register('ctrl+/', () => this._showHelp(), 'Show keyboard shortcuts');
+
+      this.register('ctrl+b', () => Sidebar.toggle(), 'Toggle sidebar');
+
+      this.register('ctrl+shift+d', () => ThemeManager.toggle(), 'Toggle dark/light mode');
+
+      // Global UI font scale
+      this.register('ctrl+=', () => FontScale.inc(), 'Increase UI font size');
+      this.register('ctrl++', () => FontScale.inc(), 'Increase UI font size');
+      this.register('ctrl+-', () => FontScale.dec(), 'Decrease UI font size');
+      this.register('ctrl+0', () => FontScale.reset(), 'Reset UI font size');
+
+      document.addEventListener('keydown', e => {
+        const target = eventTargetEl(e);
+        if (target?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
+        if (target?.closest?.('[contenteditable],[contenteditable="true"]')) return;
+        const combo = [
+          e.ctrlKey  ? 'ctrl'  : '',
+          e.altKey   ? 'alt'   : '',
+          e.shiftKey ? 'shift' : '',
+          e.key.toLowerCase(),
+        ].filter(Boolean).join('+');
+
+        for (const { combo: c, handler } of this._shortcuts) {
+          if (c === combo) {
+            e.preventDefault();
+            handler(e);
+            return;
+          }
+        }
+      });
+    },
+
+    _showHelp() {
+      const table = createElement('table', { class: 'shortcuts-table' });
+      const tbody = document.createElement('tbody');
+      this._shortcuts.forEach((shortcut) => {
+        const tr = document.createElement('tr');
+        tr.append(
+          createElement('td', {}, createElement('kbd', {}, shortcut.combo)),
+          createElement('td', {}, shortcut.description)
+        );
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      Modal.create({
+        title: 'âŒ¨ï¸ Keyboard Shortcuts',
+        body:  table,
+        size:  'sm',
+      });
+    },
+  };
+
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 27. AVATAR UPLOAD (settings page)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2638,7 +3556,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”���â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 31. HEATMAP CALENDAR (renders inside [data-heatmap])
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2855,7 +3773,7 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
       requestAnimationFrame(() => splash.classList.add('fade-out'));
 
       // Remove after transition (and fallback timeout)
-      const remove = () => { try { splash.remove(); } catch { /* ignore */ } };
+      const remove = () => { try { splash.remove(); } catch {} };
       splash.addEventListener('transitionend', remove, { once: true });
       setTimeout(remove, 1500);
     }
@@ -2870,8 +3788,6 @@ import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
   }
 
 })();
-
-
 
 
 

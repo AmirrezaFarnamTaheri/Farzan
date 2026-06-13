@@ -750,20 +750,27 @@
           }
 
           if (attr === 'innerHTML') {
-            const purify = window.DOMPurify;
-            if (purify?.sanitize) {
-              el.innerHTML = purify.sanitize(String(display ?? ''));
-            } else {
-              // Fail-safe to textContent if sanitizer is missing
-              el.textContent = String(display ?? '');
-            }
+            el.textContent = String(display ?? '');
             return;
           }
 
           if (attr === 'class') {
             el.className = display;
           } else if (attr === 'style') {
-            Object.assign(el.style, display);
+            if (display && typeof display === 'object' && !Array.isArray(display)) {
+              Object.entries(display).forEach(([name, value]) => {
+                if (/^[-_a-zA-Z0-9]+$/.test(name)) el.style[name] = value;
+              });
+            }
+          } else if (/^on/i.test(attr)) {
+            el.removeAttribute(attr);
+          } else if (['href', 'src', 'poster'].includes(attr)) {
+            const safeUrl = window.PlasmaDeck?.safeUrl?.(display) ?? window.PlasmaDeck?.safeImageUrl?.(display);
+            if (safeUrl || /^(?:https?:|blob:|data:image\/|\/|\.\/|#)/i.test(String(display || ''))) {
+              el.setAttribute(attr, safeUrl || String(display));
+            } else {
+              el.removeAttribute(attr);
+            }
           } else if (attr in el) {
             el[attr] = display;
           } else {

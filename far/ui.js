@@ -237,6 +237,11 @@
             const img = document.createElement('img');
             img.src = url; img.alt = alt ?? initials;
             el.appendChild(img);
+          } else if (initials) {
+            const span = document.createElement('span');
+            span.className    = 'avatar-initials';
+            span.textContent  = initials.slice(0, 2).toUpperCase();
+            el.appendChild(span);
           }
         } else if (initials) {
           const span = document.createElement('span');
@@ -439,6 +444,8 @@
         const menu    = $('[data-select-menu]', wrapper);
         const label   = $('[data-select-label]', wrapper);
         if (!trigger || !menu) return;
+        menu.setAttribute('role', 'listbox');
+        trigger.setAttribute('aria-haspopup', 'listbox');
 
         // Build options
         const buildOptions = () => {
@@ -449,17 +456,29 @@
             item.className   = `dropdown-item ${opt.selected ? 'selected' : ''}`;
             item.textContent = opt.text;
             item.dataset.value = opt.value;
+            item.id = item.id || `${native.id || 'select'}-option-${i}`;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', opt.selected ? 'true' : 'false');
             item.addEventListener('click', () => {
               native.value = opt.value;
               native.dispatchEvent(new Event('change', { bubbles: true }));
               if (label) label.textContent = opt.text;
-              $$('.dropdown-item', menu).forEach(d => d.classList.remove('selected'));
+              $$('.dropdown-item', menu).forEach(d => {
+                d.classList.remove('selected');
+                d.setAttribute('aria-selected', 'false');
+              });
               item.classList.add('selected');
+              item.setAttribute('aria-selected', 'true');
+              trigger.setAttribute('aria-activedescendant', item.id);
               menu.classList.remove('open');
               trigger.setAttribute('aria-expanded', 'false');
             });
             menu.appendChild(item);
           });
+          if (!native.options.length) {
+            if (label) label.textContent = '';
+            trigger.removeAttribute('aria-activedescendant');
+          }
         };
 
         buildOptions();
@@ -474,6 +493,10 @@
         native.addEventListener('change', () => {
           const sel = native.options[native.selectedIndex];
           if (label && sel) label.textContent = sel.text;
+          if (!sel) {
+            if (label) label.textContent = '';
+            trigger.removeAttribute('aria-activedescendant');
+          }
         });
 
         document.addEventListener('click', e => {
@@ -626,15 +649,24 @@
           const month = viewDate.getMonth();
           const first = new Date(year, month, 1).getDay();
           const days  = new Date(year, month + 1, 0).getDate();
+          const locale = document.documentElement.lang || navigator.language || 'en-US';
+          const monthTitle = new Intl.DateTimeFormat(locale, {
+            month: 'long',
+            year: 'numeric',
+          }).format(new Date(year, month, 1));
+          const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(locale, {
+            weekday: 'short',
+            timeZone: 'UTC',
+          }).format(new Date(Date.UTC(2024, 0, 7 + i))));
 
           popup.innerHTML = `
             <div class="dp-header">
               <button class="dp-prev" aria-label="Previous month">‹</button>
-              <span class="dp-title">${this._months[month]} ${year}</span>
+              <span class="dp-title">${esc(monthTitle)}</span>
               <button class="dp-next" aria-label="Next month">›</button>
             </div>
             <div class="dp-grid">
-              ${this._days.map(d => `<span class="dp-dow">${d}</span>`).join('')}
+              ${weekdays.map(d => `<span class="dp-dow">${esc(d)}</span>`).join('')}
               ${Array.from({ length: first }, () => '<span class="dp-empty"></span>').join('')}
               ${Array.from({ length: days }, (_, i) => {
                 const d    = i + 1;
@@ -705,6 +737,11 @@
         this._tooltip = document.createElement('div');
         this._tooltip.className = 'tooltip';
         document.body.appendChild(this._tooltip);
+        this._observer?.disconnect?.();
+        this._observer = new MutationObserver(() => {
+          if (this._anchor && !this._anchor.isConnected) this.hide();
+        });
+        this._observer.observe(document.body, { childList: true, subtree: true });
 
         document.addEventListener('mouseover', e => {
           const el = e.target.closest('[data-tooltip]');
@@ -722,6 +759,7 @@
       show(el) {
         const text = el.dataset.tooltip;
         if (!text) return;
+        this._anchor = el;
 
         this._tooltip.textContent = text;
         this._tooltip.classList.add('visible');
@@ -738,6 +776,7 @@
 
       hide() {
         this._tooltip.classList.remove('visible');
+        this._anchor = null;
       }
     };
 
@@ -866,12 +905,13 @@
     async function confirm(message) {
       const modalConfirm = window.PlasmaDeck?.Modal?.confirmAsync;
       if (typeof modalConfirm === 'function') {
+        if (message && typeof message === 'object') return modalConfirm(message);
         return modalConfirm({
           title: 'Confirm action',
           message: String(message ?? 'Are you sure?'),
         });
       }
-      return window.confirm(String(message ?? 'Are you sure?'));
+      return window.confirm(String(message?.message ?? message ?? 'Are you sure?'));
     }
 
     return {
@@ -909,5 +949,3 @@ document.addEventListener('DOMContentLoaded', () => {
   window.PlasmaDeck?.Progress?.init?.();
   window.PlasmaDeck?.UI?.init?.();
 });
-
-

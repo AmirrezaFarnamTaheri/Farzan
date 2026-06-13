@@ -1,5 +1,5 @@
-// ============================================================
-// PlasmaDeck — player.js
+﻿// ============================================================
+// PlasmaDeck - player.js
 // Full Media Player System
 // Audio | Video | Playlist | Visualizer | Queue
 // ============================================================
@@ -7,25 +7,11 @@
 (() => {
   'use strict';
 
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // UTILITIES
-  // ──────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const uid = (p = 'pd') => `${p}-${Math.random().toString(36).slice(2, 9)}`;
-
-  const throttle = (fn, limit) => {
-    let inThrottle;
-    return function() {
-      const args = arguments;
-      const context = this;
-      if (!inThrottle) {
-        fn.apply(context, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  };
 
   const clampPct = (value) => {
     const n = Number(value);
@@ -33,8 +19,32 @@
     return Math.min(100, Math.max(0, n));
   };
 
+  const safeUrlFor = (raw, { dataPattern } = {}) => {
+    const value = String(raw ?? '').trim();
+    if (!value) return null;
+    try {
+      const url = new URL(value, document.baseURI);
+      if (url.protocol === 'data:') return dataPattern?.test(value) ? url.href : null;
+      return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const safeMediaUrl = (raw) => {
+    const helper = window.PlasmaDeck?.safeMediaUrl;
+    if (typeof helper === 'function') return helper(raw);
+    return safeUrlFor(raw, { dataPattern: /^data:(?:video|audio|application\/pdf)\//i });
+  };
+
+  const safeImageUrl = (raw) => {
+    const helper = window.PlasmaDeck?.safeImageUrl;
+    if (typeof helper === 'function') return helper(raw);
+    return safeUrlFor(raw, { dataPattern: /^data:image\//i });
+  };
+
   const fmt = {
-    /** Format seconds → M:SS or H:MM:SS */
+    /** Format seconds â†’ M:SS or H:MM:SS */
     time(secs) {
       if (isNaN(secs) || secs < 0) return '0:00';
       const h = Math.floor(secs / 3600);
@@ -44,7 +54,7 @@
         ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
         : `${m}:${String(s).padStart(2, '0')}`;
     },
-    /** Bytes → human-readable */
+    /** Bytes â†’ human-readable */
     bytes(b) {
       if (b < 1024) return `${b} B`;
       if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
@@ -53,12 +63,12 @@
   };
 
 
-  // ══════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // CLASS: MediaPlayer
-  // ══════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   class MediaPlayer {
     /**
-     * @param {string|HTMLElement} container  – Wrapper element or selector
+     * @param {string|HTMLElement} container  â€“ Wrapper element or selector
      * @param {Object} options
      */
     constructor(container, options = {}) {
@@ -89,7 +99,7 @@
         theme:         'dark',
       }, options);
 
-      // ── State ──────────────────────────────────────────
+      // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       this._state = {
         playing:   false,
         loading:   false,
@@ -107,11 +117,10 @@
       this._history      = [];   // played track history
       this._shuffleOrder = [];   // index map when shuffled
       this._listeners    = {};   // event map
+      this._domListeners = [];
+      this._destroyed    = false;
 
-      // Throttled session-save so storage writes don't fire every timeupdate
-      this._saveSessionThrottled = throttle(this._saveSession.bind(this), 2000);
-
-      // ── Build DOM ──────────────────────────────────────
+      // â”€â”€ Build DOM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       this._buildDOM();
       this._bindNative();
       if (this._opts.keyboard) this._bindKeyboard();
@@ -119,22 +128,22 @@
         this._initVisualizer();
       }
 
-      // ── Load initial playlist ──────────────────────────
+      // â”€â”€ Load initial playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (this._opts.playlist.length) {
         this.loadPlaylist(this._opts.playlist);
       }
 
-      // ── Restore session ────────────────────────────────
+      // â”€â”€ Restore session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       this._restoreSession();
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // DOM BUILDER
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _buildDOM() {
       this._container.classList.add('pd-player', `pd-player-${this._opts.type}`, `theme-${this._opts.theme}`);
-      this._container.innerHTML = '';
+      this._container.replaceChildren();
 
       // Native media element
       this._media = document.createElement(this._opts.type === 'video' ? 'video' : 'audio');
@@ -154,18 +163,19 @@
 
       if (!this._opts.controls) return;
 
-      // ── Controls wrapper ──────────────────────────────
+      // â”€â”€ Controls wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const controls = document.createElement('div');
       controls.className = 'pd-controls';
       controls.setAttribute('role', 'region');
       controls.setAttribute('aria-label', 'Media controls');
 
+      // Static player chrome; track and queue metadata are rendered later with textContent.
       controls.innerHTML = `
         <!-- Track info -->
         <div class="pd-info">
           <div class="pd-artwork">
             <img class="pd-art-img" src="" alt="" aria-hidden="true">
-            <div class="pd-art-placeholder" aria-hidden="true">🎵</div>
+            <div class="pd-art-placeholder" aria-hidden="true">Audio</div>
           </div>
           <div class="pd-meta">
             <div class="pd-title" aria-live="polite">—</div>
@@ -239,7 +249,16 @@
             <div class="pd-volume-fill"></div>
             <div class="pd-volume-thumb"></div>
           </div>
-          <button class="pd-btn pd-btn-icon pd-speed-btn" aria-label="Playback speed" data-pd="speed">1×</button>
+          <button class="pd-btn pd-btn-icon pd-speed-btn" aria-label="Playback speed" data-pd="speed">1x</button>
+          <button class="pd-btn pd-btn-icon" aria-label="Chapters" data-pd="chapters">Ch</button>
+          <button class="pd-btn pd-btn-icon" aria-label="Transcript" data-pd="transcript">Tx</button>
+          <button class="pd-btn pd-btn-icon" aria-label="Captions" data-pd="captions">CC</button>
+          <button class="pd-btn pd-btn-icon" aria-label="Picture in picture" data-pd="pip">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="5" width="18" height="14" rx="2"/>
+              <rect x="13" y="11" width="6" height="4" rx="1"/>
+            </svg>
+          </button>
           <button class="pd-btn pd-btn-icon" aria-label="Queue" data-pd="queue">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
@@ -256,7 +275,7 @@
         </div>
       `;
 
-      // ── Visualizer canvas (audio mode) ────────────────
+      // â”€â”€ Visualizer canvas (audio mode) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (this._opts.visualizer && this._opts.type === 'audio') {
         this._vizCanvas = document.createElement('canvas');
         this._vizCanvas.className = 'pd-visualizer';
@@ -266,18 +285,33 @@
       this._container.appendChild(controls);
       this._controls = controls;
 
-      // ── Queue panel (initially hidden) ───────────────
+      // â”€â”€ Queue panel (initially hidden) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       this._queuePanel = document.createElement('div');
       this._queuePanel.className = 'pd-queue-panel';
       this._queuePanel.hidden = true;
+      // Static queue shell; individual queue rows are DOM-built.
       this._queuePanel.innerHTML = `
         <div class="pd-queue-header">
           <span>Queue</span>
-          <button class="pd-btn pd-btn-icon" data-pd="queue-close" aria-label="Close queue">×</button>
+          <button class="pd-btn pd-btn-icon" data-pd="queue-close" aria-label="Close queue">x</button>
         </div>
         <div class="pd-queue-list"></div>
+        <div class="pd-queue-footer">
+          <button class="pd-btn pd-btn-sm" data-pd="queue-clear" type="button">Clear queue</button>
+        </div>
       `;
       this._container.appendChild(this._queuePanel);
+
+      this._learningPanel = document.createElement('div');
+      this._learningPanel.className = 'pd-learning-panel';
+      this._learningPanel.hidden = true;
+      this._container.appendChild(this._learningPanel);
+
+      this._captionOverlay = document.createElement('div');
+      this._captionOverlay.className = 'pd-caption-overlay';
+      this._captionOverlay.hidden = true;
+      this._captionOverlay.setAttribute('aria-live', 'polite');
+      this._container.appendChild(this._captionOverlay);
 
       // Cache DOM refs
       this._dom = {
@@ -299,42 +333,49 @@
         shuffleBtn: $('[data-pd="shuffle"]', controls),
         repeatBtn:  $('[data-pd="repeat"]',  controls),
         speedBtn:   $('[data-pd="speed"]',   controls),
+        chaptersBtn: $('[data-pd="chapters"]', controls),
+        transcriptBtn: $('[data-pd="transcript"]', controls),
+        captionsBtn: $('[data-pd="captions"]', controls),
+        pipBtn:     $('[data-pd="pip"]',     controls),
         likeBtn:    $('[data-pd="like"]',    controls),
         loadingOverlay: $('.pd-loading-overlay', controls),
         queueList:  $('.pd-queue-list', this._queuePanel),
       };
+      this._learningMode = null;
+      this._captionsEnabled = false;
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // NATIVE MEDIA EVENTS
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _bindNative() {
       const m = this._media;
 
-      m.addEventListener('loadstart',  () => this._setLoading(true));
-      m.addEventListener('canplay',    () => this._setLoading(false));
-      m.addEventListener('waiting',    () => this._setBuffering(true));
-      m.addEventListener('playing',    () => { this._setBuffering(false); this._onPlay(); });
-      m.addEventListener('pause',      () => this._onPause());
-      m.addEventListener('ended',      () => this._onEnded());
-      m.addEventListener('error',      () => this._onError());
-      m.addEventListener('durationchange', () => this._onDurationChange());
-      m.addEventListener('timeupdate',    () => this._onTimeUpdate());
-      m.addEventListener('volumechange',  () => this._onVolumeChange());
+      this._on(m, 'loadstart',  () => this._setLoading(true));
+      this._on(m, 'canplay',    () => this._setLoading(false));
+      this._on(m, 'waiting',    () => this._setBuffering(true));
+      this._on(m, 'playing',    () => { this._setBuffering(false); this._onPlay(); });
+      this._on(m, 'pause',      () => this._onPause());
+      this._on(m, 'ended',      () => this._onEnded());
+      this._on(m, 'error',      () => this._onError());
+      this._on(m, 'durationchange', () => this._onDurationChange());
+      this._on(m, 'timeupdate',    () => this._onTimeUpdate());
+      this._on(m, 'seeked',        () => this._onSeeked());
+      this._on(m, 'volumechange',  () => this._onVolumeChange());
 
       // Buffer progress
-      m.addEventListener('progress', () => {
+      this._on(m, 'progress', () => {
         if (!m.buffered.length || !Number.isFinite(m.duration) || m.duration <= 0) return;
         const pct = clampPct((m.buffered.end(m.buffered.length - 1) / m.duration) * 100);
         if (this._dom?.seekBuf) this._dom.seekBuf.style.width = `${pct}%`;
       });
 
-      // ── Controls interaction ───────────────────────────
+      // â”€â”€ Controls interaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (!this._opts.controls) return;
 
       // Play/pause button
-      this._controls.addEventListener('click', e => {
+      this._on(this._controls, 'click', e => {
         const btn = e.target.closest('[data-pd]');
         if (!btn) return;
         switch (btn.dataset.pd) {
@@ -345,9 +386,23 @@
           case 'shuffle':    this.toggleShuffle();           break;
           case 'repeat':     this.cycleRepeat();             break;
           case 'speed':      this.cycleSpeed();              break;
+          case 'chapters':   this.showChapters();            break;
+          case 'transcript': this.showTranscript();          break;
+          case 'captions':   this.toggleCaptions();          break;
+          case 'pip':        this.togglePictureInPicture();  break;
           case 'like':       this._toggleLike();             break;
           case 'queue':      this.showQueue();               break;
           case 'queue-close': this.hideQueue();              break;
+          case 'queue-clear': this.clearQueue();             break;
+        }
+      });
+
+      this._on(this._queuePanel, 'click', e => {
+        const btn = e.target.closest('[data-pd]');
+        if (!btn) return;
+        switch (btn.dataset.pd) {
+          case 'queue-close': this.hideQueue(); break;
+          case 'queue-clear': this.clearQueue(); break;
         }
       });
 
@@ -381,18 +436,18 @@
       const move = e => { if (dragging) onPct(calc(e)); };
       const end  = ()  => { dragging = false; };
 
-      track.addEventListener('mousedown',  start);
-      track.addEventListener('touchstart', start, { passive: false });
-      window.addEventListener('mousemove', move);
-      window.addEventListener('touchmove', move, { passive: false });
-      window.addEventListener('mouseup',   end);
-      window.addEventListener('touchend',  end);
+      this._on(track, 'mousedown',  start);
+      this._on(track, 'touchstart', start, { passive: false });
+      this._on(window, 'mousemove', move);
+      this._on(window, 'touchmove', move, { passive: false });
+      this._on(window, 'mouseup',   end);
+      this._on(window, 'touchend',  end);
 
       // Click also works
-      track.addEventListener('click', e => onPct(calc(e)));
+      this._on(track, 'click', e => onPct(calc(e)));
 
       // Keyboard for seek/volume
-      track.addEventListener('keydown', e => {
+      this._on(track, 'keydown', e => {
         const step = e.shiftKey ? 0.10 : 0.02;
         const role = track.getAttribute('aria-label') ?? '';
         const isSeek = role.toLowerCase().includes('seek');
@@ -409,9 +464,12 @@
     }
 
     _bindKeyboard() {
-      document.addEventListener('keydown', e => {
-        if (!this._container.matches(':focus-within') &&
-            !['Space','KeyK','KeyM','KeyJ','KeyL'].includes(e.code)) return;
+      this._on(document, 'keydown', e => {
+        const focusedWithin =
+          this._container.matches(':focus-within') ||
+          this._container.contains(document.activeElement) ||
+          this._container.contains(e.target);
+        if (!this._container.isConnected || !focusedWithin) return;
         const t = e.target;
         if (t?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
         if (t?.closest?.('[contenteditable],[contenteditable="true"]')) return;
@@ -432,9 +490,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // NATIVE EVENT HANDLERS
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _onPlay() {
       this._state.playing = true;
       if (this._dom) {
@@ -502,8 +560,23 @@
         this._dom.seekTrack?.setAttribute('aria-valuenow', String(Math.round(pct)));
       }
 
+      this._updateCaptionCue(cur);
+      this._highlightTimedPanelItem(cur);
       this._emit('timeupdate', { currentTime: cur, duration: dur || 0, percent: pct });
-      this._saveSessionThrottled();
+      this._saveSession();
+    }
+
+    _onSeeked() {
+      const cur = this._media.currentTime;
+      const dur = this._state.duration || this._media.duration || 0;
+      const pct = dur > 0 ? clampPct((cur / dur) * 100) : 0;
+      this._emit('seeked', {
+        track: this._currentTrack(),
+        currentTime: cur,
+        duration: dur,
+        percent: pct,
+      });
+      this._saveSession();
     }
 
     _onVolumeChange() {
@@ -517,9 +590,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // PUBLIC TRANSPORT API
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     play() {
       return this._media.play().catch(err => {
         if (err.name !== 'AbortError') console.warn('[MediaPlayer]', err);
@@ -583,21 +656,25 @@
       btn.dataset.repeatMode = this._state.repeat;
     }
 
-    /** Cycle playback speeds: 0.5 → 0.75 → 1 → 1.25 → 1.5 → 2 */
+    /** Cycle playback speeds: 0.5 â†’ 0.75 â†’ 1 â†’ 1.25 â†’ 1.5 â†’ 2 */
     cycleSpeed() {
       const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
       const cur    = this._media.playbackRate;
       const idx    = speeds.indexOf(cur);
       const next   = speeds[(idx + 1) % speeds.length];
       this._media.playbackRate = next;
-      if (this._dom?.speedBtn) this._dom.speedBtn.textContent = `${next}×`;
+      if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(next);
       this._emit('speed', next);
     }
 
+    _formatSpeedLabel(rate) {
+      return `${Number(rate) || 1}x`;
+    }
 
-    // ──────────────────────────────────────────────────────
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // PLAYLIST / QUEUE API
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     /**
      * Load a full playlist
      * @param {Array<TrackObject>} tracks
@@ -607,6 +684,17 @@
       this._queue = tracks.map((t, i) => ({ ...t, _id: t.id ?? uid('trk'), _index: i }));
       this._state.queueIndex = 0;
       if (this._state.shuffle) this._buildShuffleOrder();
+      if (!this._queue.length) {
+        this.pause();
+        this._media.removeAttribute('src');
+        this._media.load();
+        this._updateTrackUI({});
+        this._renderLearningPanel();
+        this._updateCaptionCue(0);
+        this._renderQueue();
+        this._emit('playlistLoaded', this._queue);
+        return;
+      }
       this._loadTrack(0);
       this._renderQueue();
       if (autoplay) this.play();
@@ -628,13 +716,55 @@
 
     removeFromQueue(index) {
       if (index < 0 || index >= this._queue.length) return;
+      const wasCurrent = index === this._state.queueIndex;
       this._queue.splice(index, 1);
       if (index < this._state.queueIndex) this._state.queueIndex--;
+      if (!this._queue.length) {
+        this.pause();
+        this._media.removeAttribute('src');
+        this._media.load();
+        this._state.queueIndex = 0;
+        this._updateTrackUI({});
+      } else if (wasCurrent) {
+        this._state.queueIndex = Math.min(index, this._queue.length - 1);
+        this._loadTrack(this._state.queueIndex);
+      }
+      if (this._state.shuffle) this._buildShuffleOrder();
+      this._renderQueue();
+      this._emit('queueUpdated', this._queue);
+    }
+
+    moveQueueItem(fromIndex, toIndex) {
+      if (fromIndex < 0 || fromIndex >= this._queue.length) return false;
+      const target = Math.max(0, Math.min(this._queue.length - 1, toIndex));
+      if (fromIndex === target) return false;
+      const currentTrack = this._currentTrack();
+      const [track] = this._queue.splice(fromIndex, 1);
+      this._queue.splice(target, 0, track);
+      this._queue.forEach((item, i) => { item._index = i; });
+      this._state.queueIndex = Math.max(0, this._queue.indexOf(currentTrack));
+      if (this._state.shuffle) this._buildShuffleOrder();
+      this._renderQueue();
+      this._emit('queueUpdated', this._queue);
+      return true;
+    }
+
+    clearQueue() {
+      this.pause();
+      this._queue = [];
+      this._history = [];
+      this._state.queueIndex = 0;
+      this._media.removeAttribute('src');
+      this._media.load();
+      this._updateTrackUI({});
+      this._renderLearningPanel();
+      this._updateCaptionCue(0);
       this._renderQueue();
       this._emit('queueUpdated', this._queue);
     }
 
     next(wrap = false) {
+      if (!this._queue.length) return;
       let idx = this._state.queueIndex;
       if (this._state.shuffle) {
         const pos = this._shuffleOrder.indexOf(idx);
@@ -649,6 +779,7 @@
     }
 
     prev() {
+      if (!this._queue.length) return;
       // If > 3s into track, restart; else go to previous
       if (this._media.currentTime > 3) {
         this.seekTo(0);
@@ -675,16 +806,27 @@
       if (!this._queue.length) return;
       const track = this._queue[index];
       if (!track) return;
+      const previous = this._currentTrack();
+      if (previous && previous !== track) {
+        this._emit('beforeTrackChange', previous);
+      }
 
       this._state.queueIndex = index;
       this._history.push(index);
 
-      // Set source
-      this._media.src = track.src ?? track.url ?? '';
+      const source = safeMediaUrl(track.src ?? track.url);
+      if (source) {
+        this._media.src = source;
+      } else {
+        this._media.removeAttribute('src');
+      }
       this._media.load();
+      this._loadTextTracks(track);
 
       // Update info UI
       this._updateTrackUI(track);
+      this._renderLearningPanel();
+      this._updateCaptionCue(0);
       this._renderQueue();
       this._emit('trackChange', track);
     }
@@ -696,8 +838,9 @@
       this._dom.title.textContent  = title;
       this._dom.artist.textContent = artist || album || '—';
 
-      if (artwork) {
-        this._dom.artImg.src = artwork;
+      const artworkUrl = safeImageUrl(artwork);
+      if (artworkUrl) {
+        this._dom.artImg.src = artworkUrl;
         this._dom.artImg.style.display = '';
         this._dom.artPlaceholder.style.display = 'none';
       } else {
@@ -716,6 +859,10 @@
     }
 
     _buildShuffleOrder() {
+      if (!this._queue.length) {
+        this._shuffleOrder = [];
+        return;
+      }
       const arr = Array.from({ length: this._queue.length }, (_, i) => i);
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -737,9 +884,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // QUEUE PANEL
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     showQueue() {
       this._queuePanel.hidden = false;
       this._renderQueue();
@@ -755,25 +902,91 @@
       const list = this._dom?.queueList;
       if (!list || this._queuePanel.hidden) return;
 
-      list.innerHTML = '';
+      list.replaceChildren();
+      if (!this._queue.length) {
+        const empty = document.createElement('div');
+        empty.className = 'pd-queue-empty';
+        empty.textContent = 'Queue is empty.';
+        list.appendChild(empty);
+        return;
+      }
       this._queue.forEach((track, i) => {
         const item = document.createElement('div');
         item.className = `pd-queue-item ${i === this._state.queueIndex ? 'active' : ''}`;
         item.draggable = true;
         item.dataset.queueIndex = String(i);
-        item.innerHTML = `
-          <div class="pd-queue-num">${i === this._state.queueIndex
-            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
-            : i + 1}</div>
-          <div class="pd-queue-info">
-            <div class="pd-queue-title">${track.title ?? 'Unknown'}</div>
-            <div class="pd-queue-artist">${track.artist ?? '—'}</div>
-          </div>
-          <div class="pd-queue-duration">${track.duration ? fmt.time(track.duration) : '—'}</div>
-          <button class="pd-btn pd-btn-icon pd-queue-remove" data-remove-index="${i}" aria-label="Remove from queue">×</button>
-        `;
+        const num = document.createElement('div');
+        num.className = 'pd-queue-num';
+        if (i === this._state.queueIndex) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('width', '12');
+          svg.setAttribute('height', '12');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('fill', 'currentColor');
+          svg.setAttribute('aria-hidden', 'true');
+          const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          polygon.setAttribute('points', '5 3 19 12 5 21 5 3');
+          svg.appendChild(polygon);
+          num.appendChild(svg);
+        } else {
+          num.textContent = String(i + 1);
+        }
+
+        const info = document.createElement('div');
+        info.className = 'pd-queue-info';
+        const title = document.createElement('div');
+        title.className = 'pd-queue-title';
+        title.textContent = track.title ?? 'Unknown';
+        const artist = document.createElement('div');
+        artist.className = 'pd-queue-artist';
+        artist.textContent = track.artist ?? '—';
+        info.append(title, artist);
+
+        const duration = document.createElement('div');
+        duration.className = 'pd-queue-duration';
+        duration.textContent = track.duration ? fmt.time(track.duration) : '—';
+
+        const remove = document.createElement('button');
+        remove.className = 'pd-btn pd-btn-icon pd-queue-remove';
+        remove.dataset.removeIndex = String(i);
+        remove.setAttribute('aria-label', 'Remove from queue');
+        remove.textContent = 'x';
+        const actions = document.createElement('div');
+        actions.className = 'pd-queue-actions';
+        const play = document.createElement('button');
+        play.className = 'pd-btn pd-btn-icon';
+        play.setAttribute('aria-label', `Play ${track.title ?? 'track'}`);
+        play.textContent = 'Play';
+        const up = document.createElement('button');
+        up.className = 'pd-btn pd-btn-icon';
+        up.setAttribute('aria-label', 'Move up');
+        up.disabled = i === 0;
+        up.textContent = 'Up';
+        const down = document.createElement('button');
+        down.className = 'pd-btn pd-btn-icon';
+        down.setAttribute('aria-label', 'Move down');
+        down.disabled = i === this._queue.length - 1;
+        down.textContent = 'Down';
+        actions.append(play, up, down, remove);
+        item.append(num, info, duration, actions);
         item.addEventListener('dblclick', () => this.playAt(i));
-        item.querySelector('[data-remove-index]').addEventListener('click', e => {
+        item.addEventListener('click', e => {
+          if (e.target.closest('button')) return;
+          this.playAt(i);
+        });
+        play.addEventListener('click', e => {
+          e.stopPropagation();
+          this.playAt(i);
+        });
+        up.addEventListener('click', e => {
+          e.stopPropagation();
+          this.moveQueueItem(i, i - 1);
+        });
+        down.addEventListener('click', e => {
+          e.stopPropagation();
+          this.moveQueueItem(i, i + 1);
+        });
+        remove.addEventListener('click', e => {
           e.stopPropagation();
           this.removeFromQueue(i);
         });
@@ -785,10 +998,139 @@
       active?.scrollIntoView({ block: 'nearest' });
     }
 
+    _trackCues(type) {
+      const value = this._currentTrack()?.[type];
+      if (!Array.isArray(value)) return [];
+      return value
+        .map((cue, index) => ({
+          start: Number(cue.start ?? cue.time ?? cue.at ?? 0) || 0,
+          end: Number(cue.end ?? cue.stop ?? cue.to ?? Number(cue.start ?? cue.time ?? cue.at ?? 0) + 4) || 0,
+          title: String(cue.title ?? cue.label ?? cue.text ?? `Cue ${index + 1}`),
+          text: String(cue.text ?? cue.body ?? cue.title ?? cue.label ?? ''),
+          index,
+        }))
+        .sort((a, b) => a.start - b.start);
+    }
 
-    // ──────────────────────────────────────────────────────
+    _loadTextTracks(track) {
+      this._media.querySelectorAll?.('track[data-pd-caption-track]').forEach(el => el.remove());
+      const tracks = Array.isArray(track?.captionTracks) ? track.captionTracks : [];
+      tracks.forEach((item, index) => {
+        const src = safeUrlFor(item?.src ?? item?.url, { dataPattern: /^data:text\/vtt/i });
+        if (!src) return;
+        const trackEl = document.createElement('track');
+        trackEl.dataset.pdCaptionTrack = 'true';
+        trackEl.kind = item.kind || 'subtitles';
+        trackEl.label = item.label || `Captions ${index + 1}`;
+        trackEl.srclang = item.srclang || item.lang || 'en';
+        trackEl.src = src;
+        if (item.default) trackEl.default = true;
+        this._media.appendChild(trackEl);
+      });
+    }
+
+    showChapters() {
+      this._learningMode = this._learningMode === 'chapters' ? null : 'chapters';
+      this._renderLearningPanel();
+    }
+
+    showTranscript() {
+      this._learningMode = this._learningMode === 'transcript' ? null : 'transcript';
+      this._renderLearningPanel();
+    }
+
+    toggleCaptions(force) {
+      this._captionsEnabled = typeof force === 'boolean' ? force : !this._captionsEnabled;
+      this._dom?.captionsBtn?.classList.toggle('active', this._captionsEnabled);
+      this._dom?.captionsBtn?.setAttribute('aria-pressed', this._captionsEnabled ? 'true' : 'false');
+      this._updateCaptionCue(this._media.currentTime || 0);
+      this._emit('captions', this._captionsEnabled);
+      return this._captionsEnabled;
+    }
+
+    _renderLearningPanel() {
+      if (!this._learningPanel) return;
+      this._dom?.chaptersBtn?.classList.toggle('active', this._learningMode === 'chapters');
+      this._dom?.transcriptBtn?.classList.toggle('active', this._learningMode === 'transcript');
+      this._dom?.chaptersBtn?.setAttribute('aria-pressed', this._learningMode === 'chapters' ? 'true' : 'false');
+      this._dom?.transcriptBtn?.setAttribute('aria-pressed', this._learningMode === 'transcript' ? 'true' : 'false');
+      this._learningPanel.replaceChildren();
+      if (!this._learningMode) {
+        this._learningPanel.hidden = true;
+        return;
+      }
+      const cues = this._trackCues(this._learningMode);
+      const header = document.createElement('div');
+      header.className = 'pd-learning-header';
+      const title = document.createElement('span');
+      title.textContent = this._learningMode === 'chapters' ? 'Chapters' : 'Transcript';
+      const close = document.createElement('button');
+      close.className = 'pd-btn pd-btn-icon';
+      close.type = 'button';
+      close.setAttribute('aria-label', 'Close media panel');
+      close.textContent = 'x';
+      close.addEventListener('click', () => {
+        this._learningMode = null;
+        this._renderLearningPanel();
+      });
+      header.append(title, close);
+      this._learningPanel.appendChild(header);
+      if (!cues.length) {
+        const empty = document.createElement('div');
+        empty.className = 'pd-learning-empty';
+        empty.textContent = this._learningMode === 'chapters' ? 'No chapters for this track.' : 'No transcript for this track.';
+        this._learningPanel.appendChild(empty);
+      } else {
+        const list = document.createElement('div');
+        list.className = 'pd-learning-list';
+        cues.forEach(cue => {
+          const item = document.createElement('button');
+          item.className = 'pd-learning-item';
+          item.type = 'button';
+          item.dataset.cueStart = String(cue.start);
+          const time = document.createElement('span');
+          time.className = 'pd-learning-time';
+          time.textContent = fmt.time(cue.start);
+          const copy = document.createElement('span');
+          copy.className = 'pd-learning-copy';
+          copy.textContent = this._learningMode === 'chapters' ? cue.title : cue.text;
+          item.append(time, copy);
+          item.addEventListener('click', () => this.seekTo(cue.start));
+          list.appendChild(item);
+        });
+        this._learningPanel.appendChild(list);
+      }
+      this._learningPanel.hidden = false;
+      this._highlightTimedPanelItem(this._media.currentTime || 0);
+    }
+
+    _highlightTimedPanelItem(currentTime) {
+      if (!this._learningPanel || this._learningPanel.hidden) return;
+      const items = Array.from(this._learningPanel.querySelectorAll('[data-cue-start]'));
+      let active = null;
+      for (const item of items) {
+        const start = Number(item.dataset.cueStart);
+        if (Number.isFinite(start) && start <= currentTime) active = item;
+      }
+      items.forEach(item => item.classList.toggle('active', item === active));
+    }
+
+    _updateCaptionCue(currentTime) {
+      if (!this._captionOverlay) return;
+      if (!this._captionsEnabled) {
+        this._captionOverlay.hidden = true;
+        this._captionOverlay.textContent = '';
+        return;
+      }
+      const cue = this._trackCues('captions').find(item => currentTime >= item.start && currentTime <= item.end);
+      this._captionOverlay.textContent = cue?.text || '';
+      this._captionOverlay.hidden = !cue?.text;
+    }
+
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // AUDIO VISUALIZER
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _initVisualizer() {
       if (this._opts.type !== 'audio') return;
 
@@ -823,7 +1165,15 @@
         this._vizResizeObserver = new ResizeObserver(resize);
         this._vizResizeObserver.observe(this._vizCanvas);
       } else {
-        window.addEventListener('resize', resize);
+        this._on(window, 'resize', resize);
+      }
+    }
+
+    _visualizerMotionReduced() {
+      try {
+        return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+      } catch {
+        return false;
       }
     }
 
@@ -832,28 +1182,21 @@
 
       const canvas   = this._vizCanvas;
       const ctx      = canvas.getContext('2d');
-      // Guard: getContext can return null (e.g. in jsdom tests without canvas support)
-      if (!ctx) return;
-
-      // Respect reduced-motion preference — clear canvas once then stop
-      if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (this._visualizerMotionReduced()) {
+        ctx?.clearRect?.(0, 0, canvas.width, canvas.height);
         this._vizAnimId = null;
         return;
       }
-
       const bufLen   = this._analyser.frequencyBinCount;
       const dataArr  = new Uint8Array(bufLen);
       const barCount = this._opts.visualizerBars;
 
       const draw = () => {
-        if (!this._state.playing || !this._vizCanvas) {
+        if (!this._state.playing) {
           this._vizAnimId = null;
           return;
         }
         this._vizAnimId = requestAnimationFrame(draw);
-
-        this._resizeVisualizer?.();
 
         this._analyser.getByteFrequencyData(dataArr);
 
@@ -885,9 +1228,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SESSION PERSISTENCE
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _saveSession() {
       try {
         const data = {
@@ -919,7 +1262,7 @@
         if (data.playbackRate)   this._media.playbackRate = data.playbackRate;
         // Restore position after metadata loads
         if (data.currentTime > 5) {
-          this._media.addEventListener('loadedmetadata', () => {
+          this._on(this._media, 'loadedmetadata', () => {
             this.seekTo(data.currentTime);
           }, { once: true });
         }
@@ -927,9 +1270,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LOADING STATES
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _setLoading(on) {
       this._state.loading = on;
       if (this._dom?.loadingOverlay) this._dom.loadingOverlay.hidden = !on;
@@ -941,9 +1284,9 @@
     }
 
 
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // EVENT EMITTER
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     on(event, handler) {
       (this._listeners[event] = this._listeners[event] ?? []).push(handler);
       return this;
@@ -959,10 +1302,24 @@
       window.PlasmaDeck?.bus?.emit?.(`player:${event}`, data);
     }
 
+    _on(target, type, handler, options) {
+      if (!target?.addEventListener) return null;
+      target.addEventListener(type, handler, options);
+      this._domListeners.push({ target, type, handler, options });
+      return handler;
+    }
 
-    // ──────────────────────────────────────────────────────
+    _removeDomListeners() {
+      for (const { target, type, handler, options } of this._domListeners) {
+        try { target.removeEventListener(type, handler, options); } catch {}
+      }
+      this._domListeners = [];
+    }
+
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // PUBLIC GETTERS
-    // ──────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     get currentTime() { return this._media.currentTime; }
     get duration()    { return this._media.duration;    }
     get volume()      { return this._media.volume;      }
@@ -970,29 +1327,131 @@
     get queue()       { return [...this._queue];        }
     get trackIndex()  { return this._state.queueIndex;  }
 
+    snapshot() {
+      const cloneTrack = (track) => track ? { ...track } : null;
+      const currentTime = Number.isFinite(this._media.currentTime) ? this._media.currentTime : this._state.currentTime;
+      const duration = Number.isFinite(this._media.duration) ? this._media.duration : this._state.duration;
+      return {
+        queue: this._queue.map(cloneTrack),
+        queueIndex: this._state.queueIndex,
+        currentTime: Math.max(0, currentTime || 0),
+        duration: Math.max(0, duration || 0),
+        playing: Boolean(this._state.playing && !this._media.paused),
+        volume: this._state.volume,
+        muted: this._state.muted,
+        shuffle: this._state.shuffle,
+        repeat: this._state.repeat,
+        playbackRate: Number.isFinite(this._media.playbackRate) ? this._media.playbackRate : 1,
+        track: cloneTrack(this._currentTrack()),
+      };
+    }
 
-    // ──────────────────────────────────────────────────────
-    // DESTROY
-    // ──────────────────────────────────────────────────────
-    destroy() {
-      this._media.pause();
-      this._media.src = '';
-      if (this._audioCtx) this._audioCtx.close();
-      if (this._vizAnimId) cancelAnimationFrame(this._vizAnimId);
-      this._vizResizeObserver?.disconnect?.();
-      if (!this._vizResizeObserver && this._resizeVisualizer) {
-        window.removeEventListener('resize', this._resizeVisualizer);
+    restoreSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== 'object') return false;
+      const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
+      if (!queue.length) return false;
+
+      const queueIndex = Math.max(0, Math.min(queue.length - 1, Number(snapshot.queueIndex) || 0));
+      const currentTime = Math.max(0, Number(snapshot.currentTime) || 0);
+      const shouldPlay = Boolean(snapshot.playing);
+      const volume = Number(snapshot.volume);
+      const playbackRate = Number(snapshot.playbackRate);
+
+      this.loadPlaylist(queue, false);
+      if (snapshot.repeat === 'one' || snapshot.repeat === 'all' || snapshot.repeat === 'none') {
+        this._state.repeat = snapshot.repeat;
+        this._media.loop = snapshot.repeat === 'one';
+        this._updateRepeatUI();
       }
-      this._container.innerHTML = '';
+      if (typeof snapshot.shuffle === 'boolean' && snapshot.shuffle !== this._state.shuffle) {
+        this.toggleShuffle();
+      }
+      if (Number.isFinite(volume)) this.setVolume(volume);
+      if (typeof snapshot.muted === 'boolean') {
+        this._media.muted = snapshot.muted;
+        this._state.muted = snapshot.muted;
+      }
+      if (Number.isFinite(playbackRate) && playbackRate > 0) {
+        this._media.playbackRate = playbackRate;
+        if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(playbackRate);
+      }
+      if (queueIndex > 0) {
+        this._loadTrack(queueIndex);
+      }
+      if (currentTime > 0) {
+        const seek = () => {
+          try { this.seekTo(currentTime); } catch {}
+        };
+        seek();
+        try { this._media?.addEventListener?.('loadedmetadata', seek, { once: true }); } catch {}
+        setTimeout(seek, 80);
+      }
+      if (shouldPlay) {
+        this.play();
+      } else {
+        this.pause();
+      }
+      return true;
+    }
+
+    canPictureInPicture() {
+      return this._opts.type === 'video'
+        && typeof this._media?.requestPictureInPicture === 'function'
+        && document.pictureInPictureEnabled !== false;
+    }
+
+    async togglePictureInPicture() {
+      if (!this.canPictureInPicture()) {
+        return { active: false, supported: false, reason: 'unsupported' };
+      }
+      try {
+        if (document.pictureInPictureElement === this._media) {
+          await document.exitPictureInPicture?.();
+          this._emit('pip:change', { active: false });
+          return { active: false, supported: true };
+        }
+        await this._media.requestPictureInPicture();
+        this._emit('pip:change', { active: true });
+        return { active: true, supported: true };
+      } catch (error) {
+        this._emit('pip:error', { error });
+        return { active: false, supported: true, error };
+      }
+    }
+
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // DESTROY
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    destroy() {
+      if (this._destroyed) return;
+      this._destroyed = true;
+      this._removeDomListeners();
+      try { this._media.pause(); } catch {}
+      this._media.src = '';
+      try { this._media.load(); } catch {}
+      if (this._audioCtx) {
+        try { this._audioCtx.close(); } catch {}
+        this._audioCtx = null;
+      }
+      if (this._vizAnimId) cancelAnimationFrame(this._vizAnimId);
+      this._vizAnimId = null;
+      this._vizResizeObserver?.disconnect?.();
+      this._vizResizeObserver = null;
+      this._resizeVisualizer = null;
+      this._container.replaceChildren();
       this._listeners = {};
+      this._dom = null;
+      this._controls = null;
+      this._queuePanel = null;
       sessionStorage.removeItem(this._opts.storageKey);
     }
   }
 
 
-  // ══════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // AUTO-INIT: [data-player] elements
-  // ══════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   function autoInit() {
     document.querySelectorAll('[data-player]').forEach(el => {
       if (el._pdPlayer) return;
@@ -1005,11 +1464,40 @@
     });
   }
 
+  function destroyAll(root = document) {
+    root.querySelectorAll('[data-player]').forEach(el => {
+      try { el._pdPlayer?.destroy?.(); } catch {}
+      delete el._pdPlayer;
+    });
+  }
+
+  function getActiveSnapshot(root = document) {
+    const players = Array.from(root.querySelectorAll?.('[data-player]') ?? [])
+      .map(el => el._pdPlayer)
+      .filter(Boolean);
+    for (const player of players) {
+      try {
+        const snapshot = player.snapshot?.();
+        if (snapshot?.track || snapshot?.queue?.length) return snapshot;
+      } catch {}
+    }
+    return null;
+  }
+
+  async function requestActivePictureInPicture(root = document) {
+    const players = Array.from(root.querySelectorAll?.('[data-player]') ?? [])
+      .map(el => el._pdPlayer)
+      .filter(Boolean);
+    const player = players.find(item => item?.canPictureInPicture?.());
+    if (!player) return { active: false, supported: false, reason: 'unsupported' };
+    return player.togglePictureInPicture();
+  }
+
   document.addEventListener('DOMContentLoaded', autoInit);
 
-  // ── Export ────────────────────────────────────────────────
+  // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   window.PlasmaDeck            = window.PlasmaDeck ?? {};
   window.PlasmaDeck.MediaPlayer = MediaPlayer;
-  window.PlasmaDeck.Player      = { init: autoInit };
+  window.PlasmaDeck.Player      = { init: autoInit, destroyAll, getActiveSnapshot, requestActivePictureInPicture };
 
 })();

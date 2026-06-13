@@ -14,8 +14,10 @@
              img-src 'self' blob: data: http: https:;
              media-src 'self' blob: data: http: https:;
              connect-src 'self' blob: data: http: https:;
-             frame-src 'self' blob: http: https:;
+             frame-src 'self' blob: data: http: https:;
              worker-src 'self' blob:;" />
+
+  <!-- Stylesheets are normal blocking links so strict CSP does not block inline preload handlers. -->
 
   <!-- Open Graph / Share -->
   <meta property="og:type" content="website" />
@@ -33,10 +35,17 @@
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
 
-  <!-- Stylesheets are loaded directly so strict CSP does not block inline preload handlers. -->
+  <!-- Local fonts (vendored from @fontsource/*) -->
   <link rel="stylesheet" href="./vendor/fonts/fonts.css" />
+  
+
+  <!-- Font Awesome Icons (vendored) -->
   <link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" />
+  
+
+  <!-- Main Stylesheet -->
   <link rel="stylesheet" href="./style.css" />
+  
 
   <title>PlasmaDeck — Learning Studio</title>
 
@@ -158,7 +167,14 @@
   <!-- ═══════════════════════════════════════════
        MAIN APPLICATION LAYOUT
   ════════════════════════════════════════════ -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
   <div id="plasma-app" class="plasma-app" aria-label="PlasmaDeck Learning Studio">
+
 
     <!-- ── SIDEBAR ─────────────────────────────── -->
     <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">
@@ -713,7 +729,7 @@
   <!-- ═══════════════════════════════════════════
        SERVICE WORKER REGISTRATION
   ════════════════════════════════════════════ -->
-  <!-- Boot script imports dist/plasma.js and logs early failures -->
+  <!-- Boot script imports ./plasma.js and logs early failures -->
 
 </body>
 </html>

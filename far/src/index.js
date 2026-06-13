@@ -4,15 +4,30 @@ import './core/storageMigrate.js';
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
 import '../data.js';
 import '../db.js';
-import '../app.js';
 import '../ui.js';
-import '../player.js';
-import '../notes.js';
-import '../pdf.js';
-import '../canvas.js';
 import '../bridge.js';
-import '../progress.js';
 import { initCommandPalette } from './features/commandPalette.js';
+
+const pd = window.PlasmaDeck = window.PlasmaDeck || {};
+const featureLoaders = {
+  player: () => import('../player.js'),
+  notes: () => import('../notes.js'),
+  pdf: () => import('../pdf.js'),
+  canvas: () => import('../canvas.js'),
+  progress: () => import('../progress.js'),
+};
+const featurePromises = new Map();
+
+pd.loadFeature = (name) => {
+  const loader = featureLoaders[name];
+  if (!loader) return Promise.reject(new Error(`Unknown PlasmaDeck feature: ${name}`));
+  if (!featurePromises.has(name)) {
+    featurePromises.set(name, loader());
+  }
+  return featurePromises.get(name);
+};
+
+pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature(name)));
 
 // Theme + layout pre-boot (FOUC) — runs after migration module, before async init().
 (() => {
@@ -146,6 +161,12 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-try { initCommandPalette(); } catch (e) { console.warn('[PlasmaDeck] initCommandPalette failed', e); }
+import('../app.js')
+  .then(() => {
+    try { initCommandPalette(); } catch (e) { console.warn('[PlasmaDeck] initCommandPalette failed', e); }
+  })
+  .catch((e) => {
+    console.error('[PlasmaDeck] app shell failed to load', e);
+  });
 
 

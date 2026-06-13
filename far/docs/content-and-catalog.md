@@ -17,6 +17,8 @@ PlasmaDeck separates the app shell from the learning catalog. The app reads `dat
 
 `currentCatalog` is resolved relative to the app root unless the data loader says otherwise. Keep catalog files inside the project if you want offline-friendly behavior.
 
+Catalog fetches intentionally use `cache: 'no-cache'` so the browser can revalidate without breaking offline-friendly runtime caching. Do not switch catalog fetches back to `no-store`; that prevents the service worker from helping with catalog availability. Run `npm run build:sw` after changing `data/catalog.json` so the generated service worker precache reflects the active catalog pointer.
+
 ### Safe Editing Workflow
 
 1. Stop the local server if you are doing large catalog edits.

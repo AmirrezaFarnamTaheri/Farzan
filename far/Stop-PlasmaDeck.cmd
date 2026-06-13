@@ -1,20 +1,14 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal EnableExtensions
+cd /d "%~dp0"
+set "PID_FILE=%~dp0plasmadeck-server.pid"
 
-REM Attempts to stop the server started by Run-PlasmaDeck.cmd
-REM This kills the process listening on port 5173.
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$pidFile = '%PID_FILE%';" ^
+  "$ids = @();" ^
+  "if (Test-Path $pidFile) { $ids += Get-Content $pidFile | Where-Object { $_ -match '^\d+$' } }" ^
+  "$ids += Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'dev-server\.cjs' } | Select-Object -ExpandProperty ProcessId;" ^
+  "$ids | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -ErrorAction SilentlyContinue };" ^
+  "Remove-Item $pidFile -ErrorAction SilentlyContinue"
 
-set "PIDS="
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
-  echo [PlasmaDeck] Found PID %%p on port 5173
-  echo !PIDS! | findstr /c:" %%p " >nul 2>nul || set "PIDS=!PIDS! %%p "
-)
-
-for %%p in (!PIDS!) do (
-  echo [PlasmaDeck] Stopping process PID %%p on port 5173...
-  taskkill /PID %%p /F >nul 2>nul
-)
-
-echo [PlasmaDeck] Done.
 exit /b 0
-
