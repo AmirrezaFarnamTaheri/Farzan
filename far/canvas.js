@@ -196,7 +196,8 @@
       this._ctx    = canvasEl.getContext('2d');
 
       this._resize();
-      window.addEventListener('resize', () => { this._resize(); this._dirty = true; });
+      this._resizeHandler = () => { this._resize(); this._dirty = true; };
+      window.addEventListener('resize', this._resizeHandler);
 
       this._bindPointer();
       this._bindKeyboard();
@@ -647,8 +648,23 @@
     _imageCache: new Map(),
 
     _drawImage(ctx, el) {
-      const { src, x, y, width, height, radius = 0, fit = 'cover' } = el;
+      const { x, y, width, height, radius = 0, fit = 'cover' } = el;
+      let { src } = el;
       if (!src) return;
+
+      // Security: reject javascript: and non-image data: URIs before any loader is created
+      if (/^javascript:/i.test(src.trim())) return;
+      if (/^data:(?!image\/(png|jpeg|gif|webp|svg\+xml))/i.test(src.trim())) return;
+
+      // Delegate URL validation to the app shell when available
+      if (window.PlasmaDeck?.safeImageUrl) {
+        src = window.PlasmaDeck.safeImageUrl(src);
+        if (!src) return;
+      }
+
+      // Use a resolved absolute URL as the cache key so relative paths are stable
+      let cacheKey;
+      try { cacheKey = new URL(src, document.baseURI).href; } catch { cacheKey = src; }
 
       const render = img => {
         ctx.save();
@@ -665,17 +681,19 @@
           ctx.drawImage(img, x, y, width, height);
         }
         ctx.restore();
-        this._scheduleRender();
+        // Do NOT call _scheduleRender for already-cached images
       };
 
-      if (this._imageCache.has(src)) {
-        render(this._imageCache.get(src));
+      if (this._imageCache.has(cacheKey)) {
+        render(this._imageCache.get(cacheKey));
+        // Cache hit: no re-render needed
       } else {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          this._imageCache.set(src, img);
+          this._imageCache.set(cacheKey, img);
           render(img);
+          this._scheduleRender();  // only schedule after async load
         };
         img.onerror = () => console.warn(`[CanvasRenderer] Failed to load image: ${src}`);
         img.src = src;
@@ -1283,8 +1301,420 @@
       this._renderPending = true;
       requestAnimationFrame(() => {
         this._renderPending = false;
-        this.render();
+        if (!this._paused && this._ctx) this._render();
       });
+    },
+
+    // ── Pointer / keyboard / wheel event binding ──────────────
+
+    _resizeHandler: null,
+
+    _bindPointer() {
+      const el = this._canvas;
+      if (!el) return;
+
+      el.addEventListener('pointerdown', (e) => {
+        const { x, y } = this._toWorld(e.clientX, e.clientY);
+        if (State.tool === 'pen') {
+          State.isDrawing = true;
+          State.currentPath = { id: uid('path'), type: 'polyline', points: [{ x, y }], stroke: State.strokeColor, strokeWidth: State.strokeWidth };
+        } else if (State.tool === 'select') {
+          const hit = this._hitTest(x, y);
+          if (hit) {
+            State.selectedIds = new Set([hit.id]);
+            State.isDragging = true;
+            State._dragStart = { x, y, origX: hit.x ?? 0, origY: hit.y ?? 0, id: hit.id };
+          } else {
+            State.selectedIds = new Set();
+          }
+          this._dirty = true;
+        }
+      });
+
+      el.addEventListener('pointermove', (e) => {
+        const { x, y } = this._toWorld(e.clientX, e.clientY);
+        if (State.tool === 'pen' && State.isDrawing && State.currentPath) {
+          State.currentPath.points.push({ x, y });
+          this._dirty = true;
+        } else if (State.tool === 'select' && State.isDragging && State._dragStart) {
+          const dx = x - State._dragStart.x;
+          const dy = y - State._dragStart.y;
+          const el2 = this._findElement(State._dragStart.id);
+          if (el2) {
+            el2.x = State._dragStart.origX + dx;
+            el2.y = State._dragStart.origY + dy;
+            this._dirty = true;
+          }
+        }
+      });
+
+      const endDraw = (e) => {
+        if (State.tool === 'pen' && State.isDrawing && State.currentPath) {
+          const { x, y } = this._toWorld(e.clientX, e.clientY);
+          State.currentPath.points.push({ x, y });
+          this._activeLayer().elements.push(State.currentPath);
+          this._emit('plasma:studio-board-change', { action: 'draw', element: State.currentPath });
+          State.currentPath = null;
+          State.isDrawing = false;
+          this._dirty = true;
+        } else if (State.tool === 'select' && State.isDragging) {
+          State.isDragging = false;
+          State._dragStart = null;
+        }
+      };
+      el.addEventListener('pointerup', endDraw);
+      el.addEventListener('pointercancel', endDraw);
+    },
+
+    _bindKeyboard() {
+      const handler = (e) => {
+        if (!this._canvas) return;
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          for (const id of State.selectedIds) this.removeElement(id);
+          State.selectedIds = new Set();
+          this._dirty = true;
+        }
+      };
+      this._canvas.addEventListener('keydown', handler);
+      // Also listen on window so the canvas doesn't need focus
+      this._keyboardHandler = handler;
+    },
+
+    _bindWheel() {
+      const el = this._canvas;
+      if (!el) return;
+      el.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        State.zoom = Math.min(8, Math.max(0.1, State.zoom * factor));
+        this._dirty = true;
+      }, { passive: false });
+    },
+
+    // ── Coordinate helpers ────────────────────────────────────
+
+    _toWorld(clientX, clientY) {
+      const rect = this._canvas ? this._canvas.getBoundingClientRect() : { left: 0, top: 0 };
+      return {
+        x: (clientX - rect.left - State.offsetX) / State.zoom,
+        y: (clientY - rect.top  - State.offsetY) / State.zoom,
+      };
+    },
+
+    _activeLayer() {
+      return State.layers[State.activeLayerIdx] ?? State.layers[0];
+    },
+
+    _findElement(id) {
+      for (const layer of State.layers) {
+        const el = layer.elements.find(e => e.id === id);
+        if (el) return el;
+      }
+      return null;
+    },
+
+    _hitTest(wx, wy) {
+      for (let i = State.layers.length - 1; i >= 0; i--) {
+        const layer = State.layers[i];
+        if (!layer.visible || layer.locked) continue;
+        for (let j = layer.elements.length - 1; j >= 0; j--) {
+          const el = layer.elements[j];
+          const x = el.x ?? 0, y = el.y ?? 0;
+          const w = el.width ?? el.radius * 2 ?? 60, h = el.height ?? el.radius * 2 ?? 30;
+          if (wx >= x && wx <= x + w && wy >= y && wy <= y + h) return el;
+        }
+      }
+      return null;
+    },
+
+    _emit(eventName, detail) {
+      if (!this._canvas) return;
+      this._canvas.dispatchEvent(new CustomEvent(eventName, { bubbles: true, detail }));
+    },
+
+    // ── Studio persistence ────────────────────────────────────
+
+    loadState(snapshot = {}, opts = {}) {
+      const preserveSelection = opts.preserveSelection && State.selectedIds.size > 0;
+      const preserveTool = opts.preserveTool;
+      const preserveViewport = opts.preserveViewport;
+
+      const savedSelectedIds = preserveSelection ? new Set(State.selectedIds) : null;
+      const savedTool = preserveTool ? State.tool : null;
+      const savedVP = preserveViewport
+        ? { offsetX: State.offsetX, offsetY: State.offsetY, zoom: State.zoom, rotation: State.rotation }
+        : null;
+
+      if (snapshot.viewport && !preserveViewport) {
+        State.offsetX  = snapshot.viewport.offsetX  ?? State.offsetX;
+        State.offsetY  = snapshot.viewport.offsetY  ?? State.offsetY;
+        State.zoom     = snapshot.viewport.zoom     ?? State.zoom;
+        State.rotation = snapshot.viewport.rotation ?? State.rotation;
+      } else if (savedVP) {
+        Object.assign(State, savedVP);
+      }
+
+      if (snapshot.tool && !preserveTool) State.tool = snapshot.tool;
+      else if (savedTool) State.tool = savedTool;
+
+      if (snapshot.style) {
+        State.strokeColor = snapshot.style.strokeColor ?? State.strokeColor;
+        State.fillColor   = snapshot.style.fillColor   ?? State.fillColor;
+        State.strokeWidth = snapshot.style.strokeWidth ?? State.strokeWidth;
+        State.opacity     = snapshot.style.opacity     ?? State.opacity;
+      }
+      if (snapshot.grid) {
+        State.gridEnabled = snapshot.grid.enabled ?? State.gridEnabled;
+        State.gridSize    = snapshot.grid.size    ?? State.gridSize;
+        State.snapToGrid  = snapshot.grid.snap    ?? State.snapToGrid;
+      }
+
+      if (Array.isArray(snapshot.layers)) {
+        State.layers = snapshot.layers.map(l => ({
+          id:       l.id       ?? uid('layer'),
+          name:     l.name     ?? 'Layer',
+          visible:  l.visible  ?? true,
+          locked:   l.locked   ?? false,
+          elements: (l.elements ?? []).map(e => ({ ...e })),
+        }));
+        State.activeLayerIdx = snapshot.activeLayerIdx ?? 0;
+      }
+
+      // Restore preserved selection (only keep ids still present after reload)
+      if (preserveSelection && savedSelectedIds) {
+        const presentIds = new Set(State.layers.flatMap(l => l.elements.map(e => e.id)));
+        State.selectedIds = new Set([...savedSelectedIds].filter(id => presentIds.has(id)));
+      } else {
+        State.selectedIds = new Set();
+      }
+
+      this._dirty = true;
+      return this.serialize();
+    },
+
+    serialize() {
+      return {
+        version: 1,
+        viewport: { offsetX: State.offsetX, offsetY: State.offsetY, zoom: State.zoom, rotation: State.rotation },
+        tool: State.tool,
+        style: { strokeColor: State.strokeColor, fillColor: State.fillColor, strokeWidth: State.strokeWidth, opacity: State.opacity },
+        grid: { enabled: State.gridEnabled ?? false, size: State.gridSize ?? 20, snap: State.snapToGrid ?? false },
+        activeLayerIdx: State.activeLayerIdx,
+        layers: State.layers.map(l => ({
+          id: l.id, name: l.name, visible: l.visible, locked: l.locked,
+          elements: l.elements.map(e => ({ ...e })),
+        })),
+      };
+    },
+
+    getState() {
+      return {
+        tool:       State.tool,
+        zoom:       State.zoom,
+        offsetX:    State.offsetX,
+        offsetY:    State.offsetY,
+        rotation:   State.rotation,
+        selectedIds: [...State.selectedIds],
+        activeLayerIdx: State.activeLayerIdx,
+      };
+    },
+
+    clearBoard() {
+      State.layers.forEach(l => { l.elements = []; });
+      State.selectedIds = new Set();
+      this._dirty = true;
+      return this.serialize();
+    },
+
+    // ── Studio element factory ────────────────────────────────
+
+    _safeUrl(src) {
+      if (!src || typeof src !== 'string') return null;
+      if (/^javascript:/i.test(src.trim())) return null;
+      if (/^data:(?!image\/(png|jpeg|gif|webp|svg\+xml))/i.test(src.trim())) return null;
+      if (window.PlasmaDeck?.safeImageUrl) return window.PlasmaDeck.safeImageUrl(src);
+      return src;
+    },
+
+    addText(text = '', opts = {}) {
+      const el = { id: uid('text'), type: 'text', text, x: opts.x ?? 60, y: opts.y ?? 60, width: opts.width ?? 200, height: opts.height ?? 30, fill: State.strokeColor, fontSize: State.fontSize, fontFamily: State.fontFamily, ...opts };
+      this._activeLayer().elements.push(el);
+      State.selectedIds = new Set([el.id]);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    addCard(opts = {}) {
+      const el = { id: uid('card'), type: 'roundRect', x: opts.x ?? 80, y: opts.y ?? 80, width: opts.width ?? 200, height: opts.height ?? 120, radius: opts.radius ?? 12, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
+      this._activeLayer().elements.push(el);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    addRectangle(opts = {}) {
+      const el = { id: uid('rect'), type: 'rect', x: opts.x ?? 80, y: opts.y ?? 80, width: opts.width ?? 160, height: opts.height ?? 100, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
+      this._activeLayer().elements.push(el);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    addCircle(opts = {}) {
+      const r = opts.radius ?? 50;
+      const el = { id: uid('circle'), type: 'circle', x: opts.x ?? 100, y: opts.y ?? 100, radius: r, fill: State.fillColor, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
+      this._activeLayer().elements.push(el);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    addArrow(opts = {}) {
+      const x1 = opts.x1 ?? 40, y1 = opts.y1 ?? 40, x2 = opts.x2 ?? 160, y2 = opts.y2 ?? 120;
+      const el = { id: uid('arrow'), type: 'arrow', x: x1, y: y1, x1, y1, x2, y2, stroke: State.strokeColor, strokeWidth: State.strokeWidth };
+      this._activeLayer().elements.push(el);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    addImage(src, opts = {}) {
+      const safeSrc = this._safeUrl(src);
+      if (!safeSrc) return null;
+      const el = { id: uid('img'), type: 'image', src: safeSrc, x: opts.x ?? 60, y: opts.y ?? 60, width: opts.width ?? 200, height: opts.height ?? 150, fit: 'contain' };
+      this._activeLayer().elements.push(el);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    // ── Studio layer management ───────────────────────────────
+
+    addLayer(name = 'New layer') {
+      const layer = { id: uid('layer'), name, visible: true, locked: false, elements: [] };
+      State.layers.push(layer);
+      State.activeLayerIdx = State.layers.length - 1;
+      this._dirty = true;
+      return { ...layer };
+    },
+
+    setActiveLayer(idx) {
+      if (idx >= 0 && idx < State.layers.length) {
+        State.activeLayerIdx = idx;
+        this._dirty = true;
+      }
+    },
+
+    removeElement(id) {
+      for (const layer of State.layers) {
+        const idx = layer.elements.findIndex(e => e.id === id);
+        if (idx !== -1) {
+          const [removed] = layer.elements.splice(idx, 1);
+          State.selectedIds.delete(id);
+          this._dirty = true;
+          return { ...removed };
+        }
+      }
+      return null;
+    },
+
+    removeLayer(id) {
+      const idx = State.layers.findIndex(l => l.id === id);
+      if (idx === -1) return null;
+      const [removed] = State.layers.splice(idx, 1);
+      State.activeLayerIdx = Math.max(0, Math.min(State.activeLayerIdx, State.layers.length - 1));
+      this._dirty = true;
+      return { id: removed.id, name: removed.name };
+    },
+
+    updateElement(id, patch = {}) {
+      const el = this._findElement(id);
+      if (!el) return null;
+      Object.assign(el, patch);
+      this._dirty = true;
+      return { ...el };
+    },
+
+    setTool(tool) {
+      State.tool = tool;
+    },
+
+    // ── Studio templates ──────────────────────────────────────
+
+    applyTemplate(name) {
+      let layers;
+      if (name === 'study-map') {
+        layers = [{
+          id: uid('layer'), name: 'Study map', visible: true, locked: false,
+          elements: [
+            { id: 'template-goal',    type: 'roundRect', x: 160, y: 20,  width: 200, height: 60, fill: '#6366f1', stroke: '#4f46e5', strokeWidth: 2, text: 'Goal' },
+            { id: 'template-topic-1', type: 'roundRect', x: 60,  y: 140, width: 160, height: 50, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 2, text: 'Topic 1' },
+            { id: 'template-topic-2', type: 'roundRect', x: 300, y: 140, width: 160, height: 50, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 2, text: 'Topic 2' },
+            { id: uid('arrow'), type: 'arrow', x: 220, y: 80, x1: 220, y1: 80,  x2: 140, y2: 140, stroke: '#6366f1', strokeWidth: 2 },
+            { id: uid('arrow'), type: 'arrow', x: 260, y: 80, x1: 260, y1: 80,  x2: 380, y2: 140, stroke: '#6366f1', strokeWidth: 2 },
+          ],
+        }];
+      } else if (name === 'cornell') {
+        layers = [{
+          id: uid('layer'), name: 'Cornell notes', visible: true, locked: false,
+          elements: [
+            { id: 'cornell-cues',    type: 'rect', x: 0,   y: 0,   width: 160, height: 420, fill: '#1a1a2e', stroke: '#6366f1', strokeWidth: 1, text: 'Cues / questions' },
+            { id: 'cornell-notes',   type: 'rect', x: 170, y: 0,   width: 390, height: 420, fill: '#1e1e2e', stroke: '#6366f1', strokeWidth: 1, text: 'Notes' },
+            { id: 'cornell-summary', type: 'rect', x: 0,   y: 430, width: 560, height: 120, fill: '#12122a', stroke: '#6366f1', strokeWidth: 1, text: 'Summary' },
+          ],
+        }];
+      } else {
+        layers = [{ id: uid('layer'), name: name, visible: true, locked: false, elements: [] }];
+      }
+      return this.loadState({ layers });
+    },
+
+    // ── Studio export ─────────────────────────────────────────
+
+    exportPNG() {
+      if (!this._canvas) return null;
+      return this._canvas.toDataURL('image/png');
+    },
+
+    exportSVG({ width = 800, height = 600 } = {}) {
+      const escAttr = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const escTxt  = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let body = '';
+      for (const layer of State.layers) {
+        if (!layer.visible) continue;
+        for (const el of layer.elements) {
+          const linkAttrs = el.linkType
+            ? ` data-link-type="${escAttr(el.linkType)}" data-link-target="${escAttr(el.linkTarget)}" data-link-label="${escAttr(el.linkLabel)}"`
+            : '';
+          if (el.type === 'rect' || el.type === 'roundRect') {
+            const r = el.type === 'roundRect' ? ` rx="${el.radius ?? 8}"` : '';
+            body += `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}"${r} fill="${escAttr(el.fill ?? 'none')}" stroke="${escAttr(el.stroke ?? 'none')}"${linkAttrs}/>\n`;
+          } else if (el.type === 'circle') {
+            const cx = (el.x ?? 0) + (el.radius ?? 0);
+            const cy = (el.y ?? 0) + (el.radius ?? 0);
+            body += `<circle cx="${cx}" cy="${cy}" r="${el.radius ?? 0}" fill="${escAttr(el.fill ?? 'none')}" stroke="${escAttr(el.stroke ?? 'none')}"${linkAttrs}/>\n`;
+          } else if (el.type === 'arrow' || el.type === 'line') {
+            body += `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${escAttr(el.stroke ?? '#000')}" stroke-width="${el.strokeWidth ?? 2}"${linkAttrs}/>\n`;
+          } else if (el.type === 'text') {
+            body += `<text x="${el.x}" y="${(el.y ?? 0) + (el.fontSize ?? 16)}" fill="${escAttr(el.fill ?? '#000')}" font-size="${el.fontSize ?? 16}"${linkAttrs}>${escTxt(el.text)}</text>\n`;
+          } else if (el.type === 'image') {
+            body += `<image href="${escAttr(el.src)}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}"${linkAttrs}/>\n`;
+          }
+        }
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">\n${body}</svg>`;
+    },
+
+    // ── destroy ───────────────────────────────────────────────
+
+    destroy() {
+      if (this._raf != null) cancelAnimationFrame(this._raf);
+      this._raf = null;
+      if (this._canvas) {
+        delete this._canvas.dataset.pdCanvasInited;
+        if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler, undefined);
+      }
+      this._canvas = null;
+      this._ctx    = null;
+      this._paused = false;
+      State.isDrawing  = false;
+      State.isDragging = false;
+      State.currentPath = null;
     },
 
   };
