@@ -9,7 +9,10 @@ import { ThemeManager } from './src/core/themeManager.js';
 import {
   $,
   $$,
+  appendContent,
+  createElement,
   debounce,
+  esc,
   eventTargetEl,
   restoreFocus,
   setAppInert,
@@ -19,6 +22,9 @@ import {
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
+import { Modal, Drawer } from './src/ui/overlays.js';
+import { Toast } from './src/ui/toast.js';
+import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 
 (() => {
   'use strict';
@@ -90,15 +96,196 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 1. UTILITIES
-  const createElement = window.DomUtils.createElement;
-  const appendContent = window.DomUtils.appendContent;
-  const esc = window.DomUtils.esc;
-  // 2. THEME SYSTEM
-  const ThemeManager = window.ThemeManager;
-  const Prefs = window.Prefs;
-  const FontScale = window.FontScale;
+  // Shim window.DomUtils so legacy runtime callers still work.
+  window.DomUtils = window.DomUtils ?? { createElement, appendContent, esc };
+  // 2. THEME SYSTEM  (ThemeManager, Prefs, FontScale are ESM imports at top)
   // 3. SIDEBAR
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 1b. MISSING HELPER DEFINITIONS
+  // All functions below were referenced but never defined; they are defined
+  // here once, close to the top of the IIFE, so every section can use them.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // -- Animation helper (sub-nav accordion, accordion widgets) ---------------
+  function animateHeight(el, open) {
+    if (!el) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      el.style.height = open ? 'auto' : '0';
+      el.style.overflow = 'hidden';
+      return;
+    }
+    if (open) {
+      el.style.overflow = 'hidden';
+      el.style.height = '0';
+      const target = el.scrollHeight;
+      requestAnimationFrame(() => {
+        el.style.transition = 'height 250ms ease';
+        el.style.height = target + 'px';
+        el.addEventListener('transitionend', () => {
+          el.style.height = 'auto';
+          el.style.overflow = '';
+          el.style.transition = '';
+        }, { once: true });
+      });
+    } else {
+      el.style.height = el.scrollHeight + 'px';
+      el.style.overflow = 'hidden';
+      requestAnimationFrame(() => {
+        el.style.transition = 'height 250ms ease';
+        el.style.height = '0';
+        el.addEventListener('transitionend', () => {
+          el.style.transition = '';
+        }, { once: true });
+      });
+    }
+  }
+
+  // -- Pending course/PDF session (cross-route navigation state) -------------
+  const _pendingSession = {};
+
+  function setPendingCourseMedia(topicId, position) {
+    if (topicId != null) {
+      _pendingSession.topicId = topicId;
+      _pendingSession.position = position ?? null;
+    }
+  }
+
+  function consumePendingCourseSession() {
+    const snap = { ...(_pendingSession) };
+    delete _pendingSession.topicId;
+    delete _pendingSession.position;
+    return snap.topicId ? snap : null;
+  }
+
+  function setPendingPdfPage(docId, page) {
+    if (docId != null) {
+      _pendingSession.pdfDocId = docId;
+      _pendingSession.pdfPage = page ?? 1;
+    }
+  }
+
+  // -- URL safety guards (CSP-aligned) ---------------------------------------
+  const _SAFE_URL_RE   = /^(https?:|\/|#|data:image\/|data:audio\/|data:video\/|blob:)/i;
+  const _SAFE_MEDIA_RE = /^(https?:|\/|data:audio\/|data:video\/|blob:)/i;
+  const _SAFE_IMG_RE   = /^(https?:|\/|data:image\/|blob:)/i;
+  const _SAFE_FRAME_RE = /^(https?:|\/)/i;
+
+  function safeNavigationUrl(url) {
+    const s = String(url ?? '').trim();
+    return _SAFE_URL_RE.test(s) ? s : '#/';
+  }
+
+  function safeExternalUrl(url) {
+    const s = String(url ?? '').trim();
+    return /^https?:/i.test(s) ? s : null;
+  }
+
+  function safeMediaUrl(url) {
+    const s = String(url ?? '').trim();
+    return _SAFE_MEDIA_RE.test(s) ? s : null;
+  }
+
+  function safeImageUrl(url) {
+    const s = String(url ?? '').trim();
+    return _SAFE_IMG_RE.test(s) ? s : null;
+  }
+
+  function safeFrameUrl(url) {
+    const s = String(url ?? '').trim();
+    return _SAFE_FRAME_RE.test(s) ? s : null;
+  }
+
+  function safeFetchUrl(base, path) {
+    try {
+      const resolved = path ? new URL(path, base || location.origin).href : (base || '');
+      return /^https?:/i.test(resolved) || resolved.startsWith('/') ? resolved : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // -- Image fallback ---------------------------------------------------------
+  const IMAGE_FALLBACK_SRC = 'assets/placeholder.svg';
+
+  function applyImageFallback(img) {
+    if (!img) return;
+    img.addEventListener('error', () => {
+      if (img.src !== IMAGE_FALLBACK_SRC) {
+        img.src = IMAGE_FALLBACK_SRC;
+        img.classList.add('image-fallback');
+      }
+    }, { once: true });
+  }
+
+  // -- Sanitize HTML (fallback when DOMPurify is absent) ---------------------
+  function fallbackSanitizeHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.textContent = String(html ?? '');
+    return tmp.innerHTML;
+  }
+
+  // -- Download helpers -------------------------------------------------------
+  function downloadTextFile(text, filename, mime = 'text/plain') {
+    const blob = new Blob([text], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    const a    = document.createElement('a');
+    a.href     = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  function printStudioBoardPdf() {
+    window.print();
+  }
+
+  // -- Formatting helpers ----------------------------------------------------
+  function formatMediaClock(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return h
+      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      : `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function escapeHtmlText(str) {
+    return String(str ?? '').replace(
+      /[&<>"']/g,
+      m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])
+    );
+  }
+
+  function formatBytes(bytes) {
+    const b = Number(bytes) || 0;
+    if (b < 1024) return `${b} B`;
+    if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / 1048576).toFixed(1)} MB`;
+  }
+
+  function localStorageFootprint() {
+    try {
+      let total = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        total += (key?.length ?? 0) + (localStorage.getItem(key)?.length ?? 0);
+      }
+      return total * 2; // UTF-16 characters = 2 bytes each
+    } catch {
+      return 0;
+    }
+  }
 
   const Sidebar = {
     // Keep in sync with storageMigrate + index pre-boot.
@@ -631,13 +818,11 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 6. MODALS & DRAWERS
-  const Modal = window.Modal;
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â���€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 6. MODALS & DRAWERS (imported from ./src/ui/overlays.js as `Modal`, `Drawer`)
   // 7. DRAWERS
-  const Drawer = window.Drawer;
   // 8. DROPDOWN MENUS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”���â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Dropdown = {
     _active: null,
@@ -905,8 +1090,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 11. TOAST NOTIFICATIONS
-  const Toast = window.Toast;
+  // 11. TOAST NOTIFICATIONS (imported from ./src/ui/toast.js as `Toast`)
   // 12. FORMS â€” Validation, Inputs, Toggles, Range
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1951,7 +2135,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”��â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 23. INFINITE SCROLL
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2096,7 +2280,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   })();
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â���€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 25. RESPONSIVE UTILITIES
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2128,7 +2312,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”��â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 33. VIEWS (SPA route rendering)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2287,8 +2471,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 26. KEYBOARD SHORTCUTS
-  const KeyboardShortcuts = window.KeyboardShortcuts;
+  // 26. KEYBOARD SHORTCUTS (imported from ./src/core/keyboardShortcuts.js)
   // 27. AVATAR UPLOAD (settings page)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2455,7 +2638,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”���â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 31. HEATMAP CALENDAR (renders inside [data-heatmap])
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2672,7 +2855,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       requestAnimationFrame(() => splash.classList.add('fade-out'));
 
       // Remove after transition (and fallback timeout)
-      const remove = () => { try { splash.remove(); } catch {} };
+      const remove = () => { try { splash.remove(); } catch { /* ignore */ } };
       splash.addEventListener('transitionend', remove, { once: true });
       setTimeout(remove, 1500);
     }
