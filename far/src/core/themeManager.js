@@ -8,7 +8,7 @@ export const ThemeManager = {
   /**
    * Determine effective theme ('dark' | 'light')
    */
-  getEffective(theme = window.PlasmaDeck?.state?.theme) {
+  getEffective(theme = window.OpenCourseDeck?.state?.theme) {
     if (theme === 'system') {
       return this.SYSTEM_QUERY.matches ? 'dark' : 'light';
     }
@@ -19,7 +19,7 @@ export const ThemeManager = {
    * Apply a theme to <html>
    */
   apply(theme) {
-    const PlasmaDeck = window.PlasmaDeck ?? {};
+    const OpenCourseDeck = window.OpenCourseDeck ?? {};
 
     // IMPORTANT:
     // - Our CSS supports multiple themes via [data-theme="..."] (dark/light/midnight/forest/ocean/sunset/rose/paper)
@@ -35,9 +35,9 @@ export const ThemeManager = {
     document.documentElement.classList.toggle('light', isLightTheme);
     document.documentElement.classList.toggle('dark', !isLightTheme);
 
-    PlasmaDeck.state = PlasmaDeck.state ?? {};
-    PlasmaDeck.state.theme = theme;
-    window.PlasmaDeck = PlasmaDeck;
+    OpenCourseDeck.state = OpenCourseDeck.state ?? {};
+    OpenCourseDeck.state.theme = theme;
+    window.OpenCourseDeck = OpenCourseDeck;
 
     try { localStorage.setItem(this.STORAGE_KEY, theme); } catch { /* ignore */ }
 
@@ -56,7 +56,7 @@ export const ThemeManager = {
       el.setAttribute('aria-pressed', String(isActive));
     });
 
-    PlasmaDeck.bus?.emit?.('theme:change', { theme, effective });
+    OpenCourseDeck.bus?.emit?.('theme:change', { theme, effective });
   },
 
   /**
@@ -71,7 +71,7 @@ export const ThemeManager = {
    * Load saved theme or default
    */
   init() {
-    const PlasmaDeck = window.PlasmaDeck ?? {};
+    const OpenCourseDeck = window.OpenCourseDeck ?? {};
     const saved = (() => {
       try {
         return localStorage.getItem(this.STORAGE_KEY) ?? 'dark';
@@ -84,7 +84,7 @@ export const ThemeManager = {
 
     // React to OS-level changes when theme = 'system'
     this.SYSTEM_QUERY.addEventListener('change', () => {
-      if (PlasmaDeck.state?.theme === 'system') this.apply('system');
+      if (OpenCourseDeck.state?.theme === 'system') this.apply('system');
     });
 
     // Wire toggle buttons
@@ -98,7 +98,7 @@ export const ThemeManager = {
       if (opt) this.apply(opt.dataset.themeOption);
     });
 
-    window.PlasmaDeck = PlasmaDeck;
+    window.OpenCourseDeck = OpenCourseDeck;
   },
 };
 

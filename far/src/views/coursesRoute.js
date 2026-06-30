@@ -7,7 +7,7 @@ export async function mountCoursesView(deps = {}) {
     safeExternalUrl,
     safeMediaUrl,
     Router,
-    Toast = window.PlasmaDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast,
     consumePendingCourseSession,
     formatMediaClock,
     escapeHtmlText,
@@ -104,7 +104,7 @@ export async function mountCoursesView(deps = {}) {
   const sourceScopeEl = document.getElementById('courses-source-scope');
   const detailEl = document.getElementById('course-detail');
   let playerEl = document.getElementById('course-player');
-  playerEl = window.PlasmaDeck?.MiniPlayer?.restorePlayer?.(playerEl) || playerEl;
+  playerEl = window.OpenCourseDeck?.MiniPlayer?.restorePlayer?.(playerEl) || playerEl;
   const timestampStatusEl = document.querySelector('[data-timestamp-note-status]');
   const learningMarkerStatusEl = document.querySelector('[data-learning-marker-status]');
   const learningMarkerListEl = document.querySelector('[data-learning-marker-list]');
@@ -129,9 +129,9 @@ export async function mountCoursesView(deps = {}) {
       try { flushPlayerProgress(); } catch {}
       let adoptedPlayer = false;
       try {
-        const snapshot = window.PlasmaDeck?.Player?.getActiveSnapshot?.(document);
+        const snapshot = window.OpenCourseDeck?.Player?.getActiveSnapshot?.(document);
         if (snapshot && playerEl?._pdPlayer) {
-          window.PlasmaDeck?.MiniPlayer?.adoptPlayer?.(playerEl, snapshot, {
+          window.OpenCourseDeck?.MiniPlayer?.adoptPlayer?.(playerEl, snapshot, {
             dispose() {
               routeDisposers.splice(0).forEach(fn => {
                 try { fn(); } catch {}
@@ -140,21 +140,21 @@ export async function mountCoursesView(deps = {}) {
           });
           adoptedPlayer = true;
         } else if (snapshot) {
-          window.PlasmaDeck?.MiniPlayer?.show?.(snapshot);
+          window.OpenCourseDeck?.MiniPlayer?.show?.(snapshot);
         }
       } catch {}
       if (!adoptedPlayer) {
         routeDisposers.splice(0).forEach(fn => {
           try { fn(); } catch {}
         });
-        try { window.PlasmaDeck?.Player?.destroyAll?.(document); } catch {}
+        try { window.OpenCourseDeck?.Player?.destroyAll?.(document); } catch {}
       }
     },
   };
   if (!listEl || !detailEl) return;
 
   // Ensure player auto-inits for the inserted element
-  try { window.PlasmaDeck?.Player?.init?.(); } catch { /* ignore */ }
+  try { window.OpenCourseDeck?.Player?.init?.(); } catch { /* ignore */ }
 
   const MEDIA_CUES_KEY = 'plasma-course-media-cues';
   let authoredMediaCues = {};
@@ -296,7 +296,7 @@ export async function mountCoursesView(deps = {}) {
   });
   const cueDedupeKey = (type, cue) => `${type}|${cueTime(cue).toFixed(3)}|${cueLabel(cue).toLowerCase()}`;
   const aiReady = async () => {
-    try { return Boolean((await window.PlasmaDeck?.AI?.status?.())?.available); } catch { return false; }
+    try { return Boolean((await window.OpenCourseDeck?.AI?.status?.())?.available); } catch { return false; }
   };
   const courseSummaryInput = (course, topics) => [
     `Course: ${course.title || course.id}`,
@@ -585,7 +585,7 @@ export async function mountCoursesView(deps = {}) {
       if (!affectsDetail && !affectsPlayer) return;
       if (activeCourseId) await renderCourseDetail(activeCourseId);
       if (affectsPlayer) setTimestampStatus('Progress refreshed from another tab.', 'success');
-      window.PlasmaDeck?.bus.emit?.('player:sync-refresh', {
+      window.OpenCourseDeck?.bus.emit?.('player:sync-refresh', {
         kind: 'progress',
         topicId: record.topicId || null,
         courseId: record.courseId || activeCourseId || null,
@@ -605,7 +605,7 @@ export async function mountCoursesView(deps = {}) {
     context?.inst?.showChapters?.();
     context?.inst?.showTranscript?.();
     setLearningMarkerStatus('Learning cues refreshed from another tab.', 'success');
-    window.PlasmaDeck?.bus.emit?.('courses:sync-refresh', { kind: 'media-cues', topicId: context?.topicId || null });
+    window.OpenCourseDeck?.bus.emit?.('courses:sync-refresh', { kind: 'media-cues', topicId: context?.topicId || null });
   };
   const saveTimestampCapture = async ({ createNote = false } = {}) => {
     const context = currentPlayerContext();
@@ -829,7 +829,7 @@ export async function mountCoursesView(deps = {}) {
         topicsList.appendChild(section);
         groupTopics.forEach(topic => rowTasks.push({ section, topic }));
       });
-      const batchSize = Math.max(1, Number(window.PlasmaDeck?.courseDetailRenderBatchSize) || 50);
+      const batchSize = Math.max(1, Number(window.OpenCourseDeck?.courseDetailRenderBatchSize) || 50);
       const status = createElement('div', {
         class: 'course-detail-render-status text-sm',
         'aria-live': 'polite',
@@ -929,7 +929,7 @@ export async function mountCoursesView(deps = {}) {
         const course = allCourses.find(c => c.id === courseId);
         const topics = topicsByCourse[courseId] ?? [];
         const statusEl = detailEl.querySelector('[data-course-ai-status]');
-        const ai = window.PlasmaDeck?.AI;
+        const ai = window.OpenCourseDeck?.AI;
         if (!course || !ai?.summarizeText) return;
         const previous = actionBtn.textContent;
         actionBtn.disabled = true;
@@ -996,7 +996,7 @@ export async function mountCoursesView(deps = {}) {
           inst.loadPlaylist([courseMediaTrack(topic, url, courseId)], true);
         } else {
           // Fallback: try to init then load
-          try { window.PlasmaDeck?.Player?.init?.(); } catch {}
+          try { window.OpenCourseDeck?.Player?.init?.(); } catch {}
           setTimeout(() => {
             const i2 = el?._pdPlayer;
             bindCoursePlayerProgress();
@@ -1097,7 +1097,7 @@ export async function mountCoursesView(deps = {}) {
       const snapshot = playerEl._pdPlayer?.snapshot?.();
       if (!snapshot?.playing) return;
       requestedForHiddenPass = true;
-      window.PlasmaDeck?.Player?.requestActivePictureInPicture?.(document).catch?.(() => {});
+      window.OpenCourseDeck?.Player?.requestActivePictureInPicture?.(document).catch?.(() => {});
     }, { threshold: [0, 0.2, 0.6, 1] });
     observer.observe(playerEl);
     routeDisposers.push(() => {
@@ -1141,8 +1141,8 @@ export async function mountCoursesView(deps = {}) {
     if (!button) return;
     deleteLearningCue(button.dataset.deleteLearningCue, Number(button.dataset.cueIndex));
   });
-  window.PlasmaDeck?.bus.on?.('sync:message', onCourseSyncMessage);
-  routeDisposers.push(() => window.PlasmaDeck?.bus.off?.('sync:message', onCourseSyncMessage));
+  window.OpenCourseDeck?.bus.on?.('sync:message', onCourseSyncMessage);
+  routeDisposers.push(() => window.OpenCourseDeck?.bus.off?.('sync:message', onCourseSyncMessage));
 
   // Auto-select first course
   const pendingSession = consumePendingCourseSession();

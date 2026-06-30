@@ -1,5 +1,5 @@
 /**
- * PlasmaDeck dev server (same-origin debug endpoint).
+ * OpenCourseDeck dev server (same-origin debug endpoint).
  * - Serves static files from project root
  * - Accepts POST /__debug to append NDJSON logs to debug.log (opt-in)
  */
@@ -160,7 +160,7 @@ function createServer(options = {}) {
   const finish = (status) => {
     try {
       const ms = Date.now() - started;
-      console.log(`[plasmadeck] ${req.method} ${u.pathname} -> ${status} (${ms}ms)`);
+      console.log(`[opencoursedeck] ${req.method} ${u.pathname} -> ${status} (${ms}ms)`);
     } catch {
       // ignore
     }
@@ -237,7 +237,7 @@ function startServer(options = {}) {
   const host = options.host || '127.0.0.1';
   const server = createServer(options);
   server.listen(port, host, () => {
-    console.log(`[plasmadeck] dev server http://${host}:${port}/`);
+    console.log(`[opencoursedeck] dev server http://${host}:${port}/`);
   });
   return server;
 }

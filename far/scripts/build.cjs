@@ -22,7 +22,7 @@ const options = {
   pure: isWatch ? [] : ['console.warn', 'console.error'],
   assetNames: 'assets/[name]-[hash]',
   chunkNames: 'chunks/[name]-[hash]',
-  entryNames: 'plasma',
+  entryNames: 'opencoursedeck',
   logLevel: 'info',
 };
 
@@ -48,8 +48,8 @@ async function main() {
     let content = fs.readFileSync(from, 'utf8');
     if (file === 'index.html') {
       content = content
-        .replaceAll('./dist/plasma.js', './plasma.js')
-        .replaceAll('dist/plasma.js', './plasma.js');
+        .replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js')
+        .replaceAll('dist/opencoursedeck.js', './opencoursedeck.js');
     }
     fs.writeFileSync(to, content, 'utf8');
   }

@@ -159,7 +159,7 @@ describe('AI client', () => {
     const localProvider = vi.fn(async ({ prompt, model }) => ({ text: `${model}: ${prompt.slice(0, 7)}` }));
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma', model: 'gemma-4-local' })) },
-      PlasmaDeck: { bus: { emit: vi.fn() } },
+      OpenCourseDeck: { bus: { emit: vi.fn() } },
       sessionStorage,
     };
     const client = createAIClient(root);
@@ -174,7 +174,7 @@ describe('AI client', () => {
       text: 'gemma-4-local: Explain',
     });
     expect(localProvider).toHaveBeenCalledWith(expect.objectContaining({ model: 'gemma-4-local' }));
-    expect(root.PlasmaDeck.bus.emit).toHaveBeenCalledWith('ai:provider-ready', { provider: 'local' });
+    expect(root.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('ai:provider-ready', { provider: 'local' });
 
     unregister();
     await client.complete({ prompt: 'Local fallback sentence.' });
@@ -213,12 +213,12 @@ describe('AI client', () => {
     });
   });
 
-  it('installs the client on PlasmaDeck once', () => {
-    const root = { PlasmaDeck: {}, DB: {}, sessionStorage };
+  it('installs the client on OpenCourseDeck once', () => {
+    const root = { OpenCourseDeck: {}, DB: {}, sessionStorage };
     const first = initAIClient(root);
     const second = initAIClient(root);
 
     expect(first).toBe(second);
-    expect(root.PlasmaDeck.AI).toBe(first);
+    expect(root.OpenCourseDeck.AI).toBe(first);
   });
 });

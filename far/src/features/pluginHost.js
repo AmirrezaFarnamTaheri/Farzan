@@ -96,7 +96,7 @@ export function createPluginHost(root = window) {
   async function saveRegistry(registry) {
     const clean = normalizeRegistry(registry);
     await Promise.resolve(root.DB?.saveSetting?.(REGISTRY_KEY, clean));
-    root.PlasmaDeck?.bus?.emit?.('plugins:registry-changed', { count: clean.plugins.length });
+    root.OpenCourseDeck?.bus?.emit?.('plugins:registry-changed', { count: clean.plugins.length });
     return clean;
   }
 
@@ -158,7 +158,7 @@ export function createPluginHost(root = window) {
 }
 
 export function initPluginHost(root = window) {
-  const pd = root.PlasmaDeck = root.PlasmaDeck || {};
+  const pd = root.OpenCourseDeck = root.OpenCourseDeck || {};
   if (!pd.PluginHost) pd.PluginHost = createPluginHost(root);
   return pd.PluginHost;
 }

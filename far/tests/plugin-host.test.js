@@ -6,7 +6,7 @@ const manifest = {
   name: 'Notes Helper',
   version: '1.0.0',
   description: 'Adds note commands.',
-  author: 'PlasmaDeck',
+  author: 'OpenCourseDeck',
   entry: 'plugins/notes-helper/main.js',
   type: 'worker',
   permissions: ['notes', 'commands'],
@@ -16,7 +16,7 @@ const manifest = {
 function rootWithRegistry(initial = null) {
   let registry = initial;
   return {
-    PlasmaDeck: { bus: { emit: vi.fn() } },
+    OpenCourseDeck: { bus: { emit: vi.fn() } },
     DB: {
       getSetting: vi.fn(async () => registry),
       saveSetting: vi.fn(async (_key, value) => { registry = value; }),
@@ -76,15 +76,15 @@ describe('plugin host', () => {
 
     await expect(host.uninstall('deck.example.notes')).resolves.toBe(true);
     expect(await host.list()).toEqual([]);
-    expect(root.PlasmaDeck.bus.emit).toHaveBeenCalledWith('plugins:registry-changed', expect.any(Object));
+    expect(root.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('plugins:registry-changed', expect.any(Object));
   });
 
-  it('installs the host on PlasmaDeck once', () => {
-    const root = { PlasmaDeck: {}, DB: {} };
+  it('installs the host on OpenCourseDeck once', () => {
+    const root = { OpenCourseDeck: {}, DB: {} };
     const first = initPluginHost(root);
     const second = initPluginHost(root);
 
     expect(first).toBe(second);
-    expect(root.PlasmaDeck.PluginHost).toBe(first);
+    expect(root.OpenCourseDeck.PluginHost).toBe(first);
   });
 });

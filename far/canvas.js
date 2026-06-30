@@ -1,5 +1,5 @@
 // ============================================================
-// PlasmaDeck — canvas.js
+// OpenCourseDeck — canvas.js
 // Full Whiteboard / Drawing Canvas
 // Features: Pen, Shapes, Text, Eraser, Select, Layers,
 //           Undo/Redo, Grid, Export PNG/SVG, Mini-map
@@ -70,10 +70,15 @@
     dragStartY:  0,
     dragLastX:   0,
     dragLastY:   0,
+
+    // Undo/redo (operation-based snapshots)
+    undoStack:   [],
+    redoStack:   [],
+    maxUndo:     80,
   };
 
   const safeImageUrl = (raw) => {
-    const helper = window.PlasmaDeck?.safeImageUrl;
+    const helper = window.OpenCourseDeck?.safeImageUrl;
     if (typeof helper === 'function') return helper(raw);
     const value = String(raw ?? '').trim();
     if (!value) return null;
@@ -95,6 +100,12 @@
   };
 
   const baseLayer = () => ({ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] });
+
+  const getAllowedTools = () => {
+    const defaults = ['select', 'pen', 'eraser', 'rect', 'circle', 'line', 'arrow', 'text', 'fill'];
+    const names = window.OpenCourseDeck?.CanvasTools?.getToolNames?.();
+    return new Set([...defaults, ...(Array.isArray(names) ? names : [])]);
+  };
 
   const normalizeLayers = (layers) => {
     const source = Array.isArray(layers) ? layers : [];
@@ -135,6 +146,14 @@
     _paused:   false,
     _listeners: [],
     _pointerId: null,
+    _spaceDown: false,
+    _panning:   false,
+    _marquee:   null,
+    _panStartX: 0,
+    _panStartY: 0,
+    _panStartOX: 0,
+    _panStartOY: 0,
+    _touchState: null,
 
     init(canvasEl) {
       if (!canvasEl) return;
@@ -248,6 +267,8 @@
       State.clipboard = [];
       State.history = [];
       State.historyIdx = -1;
+      State.undoStack = [];
+      State.redoStack = [];
       State.isDrawing = false;
       State.isDragging = false;
       State.isResizing = false;
@@ -276,7 +297,7 @@
     },
 
     setTool(tool = 'select') {
-      const allowed = new Set(['select', 'pen']);
+      const allowed = getAllowedTools();
       State.tool = allowed.has(tool) ? tool : 'select';
       State.currentPath = null;
       State.currentShape = null;
@@ -295,6 +316,10 @@
         offsetY: State.offsetY,
         selectedIds: Array.from(State.selectedIds),
       };
+    },
+
+    getRegisteredTools() {
+      return Array.from(getAllowedTools());
     },
 
     screenToWorld(clientX = 0, clientY = 0) {
@@ -460,6 +485,8 @@
       State.clipboard = [];
       State.history = [];
       State.historyIdx = -1;
+      State.undoStack = [];
+      State.redoStack = [];
       this._scheduleRender();
       return this.serialize();
     },
@@ -556,6 +583,27 @@
       return this._canvas.toDataURL(type);
     },
 
+    downloadPNG(filename = 'canvas.png') {
+      const mod = window.OpenCourseDeck?.CanvasExport;
+      if (!mod || !this._canvas) return;
+      this._render();
+      mod.downloadCanvas(this._canvas, 'png', filename);
+    },
+
+    downloadJPEG(filename = 'canvas.jpg', quality = 0.92) {
+      const mod = window.OpenCourseDeck?.CanvasExport;
+      if (!mod || !this._canvas) return;
+      this._render();
+      mod.downloadCanvas(this._canvas, 'jpeg', filename, quality);
+    },
+
+    downloadPDF(filename = 'canvas.pdf') {
+      const mod = window.OpenCourseDeck?.CanvasExport;
+      if (!mod || !this._canvas) return;
+      this._render();
+      mod.exportToPDF([this._canvas], filename);
+    },
+
     exportSVG(options = {}) {
       const width = Math.max(1, finiteNumber(options.width, this._canvas?.offsetWidth || 1200));
       const height = Math.max(1, finiteNumber(options.height, this._canvas?.offsetHeight || 800));
@@ -571,7 +619,7 @@
       const transform = `translate(${finiteNumber(viewport.offsetX, 0)} ${finiteNumber(viewport.offsetY, 0)}) scale(${finiteNumber(viewport.zoom, 1)})`;
       return [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="PlasmaDeck Studio board">`,
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="OpenCourseDeck Studio board">`,
         '<rect width="100%" height="100%" fill="#1e1e2e"/>',
         `<g transform="${xmlEscape(transform)}">${elements}</g>`,
         '</svg>',
@@ -592,6 +640,10 @@
       State.isDrawing = false;
       State.isDragging = false;
       State.currentPath = null;
+      State._marquee = null;
+      this._panning = false;
+      this._spaceDown = false;
+      this._touchState = null;
     },
 
     _listen(target, type, handler, options) {
@@ -604,24 +656,72 @@
       this._listen(this._canvas, 'pointermove', (event) => this._onPointerMove(event));
       this._listen(this._canvas, 'pointerup', (event) => this._onPointerUp(event));
       this._listen(this._canvas, 'pointercancel', (event) => this._onPointerUp(event));
+      this._listen(this._canvas, 'contextmenu', (event) => this._onContextMenu(event));
+      this._listen(this._canvas, 'touchstart', (e) => this._onTouchStart(e), { passive: false });
+      this._listen(this._canvas, 'touchmove', (e) => this._onTouchMove(e), { passive: false });
+      this._listen(this._canvas, 'touchend', (e) => this._onTouchEnd(e));
+      this._listen(this._canvas, 'touchcancel', (e) => this._onTouchEnd(e));
     },
 
     _bindKeyboard() {
       this._listen(this._canvas, 'keydown', (event) => {
+        const ctrl = event.ctrlKey || event.metaKey;
+        const shift = event.shiftKey;
+
         if (event.key === 'Delete' || event.key === 'Backspace') {
           const ids = Array.from(State.selectedIds);
           if (!ids.length) return;
           event.preventDefault();
+          this._pushUndo('delete');
           ids.forEach((id) => this.removeElement(id));
           State.selectedIds = new Set();
           this._emitInteractiveChange('delete');
+        } else if (ctrl && shift && (event.key === 'z' || event.key === 'Z')) {
+          event.preventDefault();
+          this.redo();
+        } else if (ctrl && (event.key === 'z' || event.key === 'Z')) {
+          event.preventDefault();
+          this.undo();
+        } else if (ctrl && (event.key === 'c' || event.key === 'C')) {
+          event.preventDefault();
+          this._copySelection();
+        } else if (ctrl && (event.key === 'x' || event.key === 'X')) {
+          event.preventDefault();
+          this._cutSelection();
+        } else if (ctrl && (event.key === 'v' || event.key === 'V')) {
+          event.preventDefault();
+          this._pasteClipboard();
+        } else if (ctrl && (event.key === 'a' || event.key === 'A')) {
+          event.preventDefault();
+          this._selectAll();
+        } else if (ctrl && (event.key === 'd' || event.key === 'D')) {
+          event.preventDefault();
+          this._duplicateSelection();
+        } else if (ctrl && shift && (event.key === 'g' || event.key === 'G')) {
+          event.preventDefault();
+          this._ungroupSelection();
+        } else if (ctrl && (event.key === 'g' || event.key === 'G')) {
+          event.preventDefault();
+          this._groupSelection();
+        } else if (event.key === ' ') {
+          event.preventDefault();
+          this._spaceDown = true;
+          if (this._canvas) this._canvas.style.cursor = 'grab';
         } else if (event.key === 'Escape') {
           State.selectedIds = new Set();
           State.currentPath = null;
           State.currentShape = null;
           State.isDrawing = false;
           State.isDragging = false;
+          State._marquee = null;
           this._scheduleRender();
+        }
+      });
+      this._listen(this._canvas, 'keyup', (event) => {
+        if (event.key === ' ') {
+          this._spaceDown = false;
+          this._panning = false;
+          if (this._canvas) this._canvas.style.cursor = '';
         }
       });
     },
@@ -652,7 +752,19 @@
       State.dragLastX = point.x;
       State.dragLastY = point.y;
 
+      // Space+drag pan
+      if (this._spaceDown || event.button === 1) {
+        this._panning = true;
+        this._panStartX = event.clientX;
+        this._panStartY = event.clientY;
+        this._panStartOX = State.offsetX;
+        this._panStartOY = State.offsetY;
+        if (this._canvas) this._canvas.style.cursor = 'grabbing';
+        return;
+      }
+
       if (State.tool === 'pen') {
+        this._pushUndo('draw');
         State.isDrawing = true;
         State.currentPath = {
           id: `path-${Date.now().toString(36)}`,
@@ -668,14 +780,61 @@
         return;
       }
 
+      if (State.tool === 'eraser') {
+        const hit = this._hitTest(point.x, point.y);
+        if (hit && !hit.layer.locked) {
+          this._pushUndo('erase');
+          this.removeElement(hit.element.id);
+          this._emitInteractiveChange('erase');
+        }
+        return;
+      }
+
+      if (State.tool === 'rect' || State.tool === 'circle' || State.tool === 'line' || State.tool === 'arrow') {
+        this._pushUndo('draw');
+        State.isDrawing = true;
+        State.currentShape = this._createShapeFromTool(State.tool, point);
+        this._scheduleRender();
+        return;
+      }
+
+      if (State.tool === 'text') {
+        const text = prompt('Enter text:', 'Text') || 'Text';
+        this._pushUndo('draw');
+        this.addText(text, { x: point.x, y: point.y });
+        this._emitInteractiveChange('draw');
+        return;
+      }
+
+      if (State.tool === 'fill') {
+        const hit = this._hitTest(point.x, point.y);
+        if (hit) {
+          this._pushUndo('fill');
+          this.updateElement(hit.element.id, { fill: State.strokeColor });
+          this._emitInteractiveChange('fill');
+        }
+        return;
+      }
+
+      // select tool
       const hit = this._hitTest(point.x, point.y);
       if (hit) {
-        State.selectedIds = new Set([hit.element.id]);
+        if (event.shiftKey) {
+          if (State.selectedIds.has(hit.element.id)) {
+            State.selectedIds.delete(hit.element.id);
+          } else {
+            State.selectedIds.add(hit.element.id);
+          }
+        } else if (!State.selectedIds.has(hit.element.id)) {
+          State.selectedIds = new Set([hit.element.id]);
+        }
         State.activeLayerIdx = hit.layerIndex;
         State.isDragging = !hit.layer.locked;
+        if (State.isDragging) this._pushUndo('move');
       } else {
-        State.selectedIds = new Set();
-        State.isDragging = false;
+        if (!event.shiftKey) State.selectedIds = new Set();
+        // Start marquee selection
+        State._marquee = { x1: point.x, y1: point.y, x2: point.x, y2: point.y };
       }
       this._scheduleRender();
     },
@@ -685,6 +844,41 @@
       const pointerId = event.pointerId ?? 'mouse';
       if (pointerId !== this._pointerId) return;
       const point = this._eventToWorld(event);
+
+      // Panning
+      if (this._panning) {
+        const dx = event.clientX - this._panStartX;
+        const dy = event.clientY - this._panStartY;
+        State.offsetX = this._panStartOX + dx;
+        State.offsetY = this._panStartOY + dy;
+        this._scheduleRender();
+        return;
+      }
+
+      // Marquee selection update
+      if (State._marquee) {
+        State._marquee.x2 = point.x;
+        State._marquee.y2 = point.y;
+        this._scheduleRender();
+        return;
+      }
+
+      // Shape drawing preview
+      if (State.isDrawing && State.currentShape) {
+        State.currentShape.width = point.x - State.currentShape.x;
+        State.currentShape.height = point.y - State.currentShape.y;
+        if (State.currentShape.type === 'circle') {
+          State.currentShape.radius = Math.hypot(point.x - State.currentShape.x, point.y - State.currentShape.y);
+        }
+        if (State.currentShape.type === 'line' || State.currentShape.type === 'arrow') {
+          State.currentShape.x2 = point.x;
+          State.currentShape.y2 = point.y;
+          State.currentShape.width = point.x - State.currentShape.x;
+          State.currentShape.height = point.y - State.currentShape.y;
+        }
+        this._scheduleRender();
+        return;
+      }
 
       if (State.isDrawing && State.currentPath) {
         const last = State.currentPath.points.at(-1);
@@ -716,6 +910,53 @@
       if (this._pointerId != null && pointerId !== this._pointerId) return;
       this._canvas?.releasePointerCapture?.(event.pointerId);
       this._pointerId = null;
+
+      // End panning
+      if (this._panning) {
+        this._panning = false;
+        if (this._canvas) this._canvas.style.cursor = this._spaceDown ? 'grab' : '';
+        return;
+      }
+
+      // Finalize marquee selection
+      if (State._marquee) {
+        const m = State._marquee;
+        const x = Math.min(m.x1, m.x2);
+        const y = Math.min(m.y1, m.y2);
+        const w = Math.abs(m.x2 - m.x1);
+        const h = Math.abs(m.y2 - m.y1);
+        State._marquee = null;
+        if (w > 2 || h > 2) {
+          for (const layer of State.layers) {
+            if (!layer.visible || layer.locked) continue;
+            for (const el of layer.elements) {
+              const bounds = this._elementBounds(el);
+              if (bounds.x >= x && bounds.y >= y &&
+                  bounds.x + bounds.width <= x + w &&
+                  bounds.y + bounds.height <= y + h) {
+                State.selectedIds.add(el.id);
+              }
+            }
+          }
+        }
+        this._scheduleRender();
+        return;
+      }
+
+      // Finalize shape drawing
+      if (State.isDrawing && State.currentShape) {
+        const shape = State.currentShape;
+        State.currentShape = null;
+        State.isDrawing = false;
+        const bounds = this._elementBounds(shape);
+        if (bounds.width > 2 || bounds.height > 2 || shape.radius > 2) {
+          this.addElement(shape);
+          this._emitInteractiveChange('draw');
+        } else {
+          this._scheduleRender();
+        }
+        return;
+      }
 
       if (State.isDrawing && State.currentPath) {
         const path = State.currentPath;
@@ -753,6 +994,301 @@
         bubbles: true,
         detail: { action, board: this.serialize() },
       }));
+    },
+
+    // ── Shape factory from tool name ──────────────────────
+    _createShapeFromTool(tool, point) {
+      const base = {
+        x: point.x, y: point.y, width: 0, height: 0,
+        stroke: State.strokeColor, strokeWidth: Math.max(1, State.strokeWidth),
+        fill: State.fillColor,
+      };
+      switch (tool) {
+        case 'rect': return { ...base, id: `rect-${Date.now().toString(36)}`, type: 'rect' };
+        case 'circle': return { ...base, id: `circle-${Date.now().toString(36)}`, type: 'circle', radius: 0 };
+        case 'line': return { ...base, id: `line-${Date.now().toString(36)}`, type: 'line', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+        case 'arrow': return { ...base, id: `arrow-${Date.now().toString(36)}`, type: 'arrow', x1: point.x, y1: point.y, x2: point.x, y2: point.y, headSize: 12, fill: 'none' };
+        default: return { ...base, id: `shape-${Date.now().toString(36)}`, type: 'rect' };
+      }
+    },
+
+    // ── Undo / Redo (operation-based) ─────────────────────
+    _pushUndo(action) {
+      const snapshot = cloneJSON(State.layers, []);
+      State.undoStack = State.undoStack.slice(0, State.historyIdx + 1);
+      State.undoStack.push({ action, layers: snapshot, activeLayerIdx: State.activeLayerIdx });
+      if (State.undoStack.length > State.maxUndo) State.undoStack.shift();
+      State.historyIdx = State.undoStack.length - 1;
+      State.redoStack = [];
+    },
+
+    undo() {
+      if (State.historyIdx <= 0) {
+        if (State.historyIdx === 0 && State.undoStack.length) {
+          const entry = State.undoStack[0];
+          State.layers = normalizeLayers(cloneJSON(entry.layers, []));
+          State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
+          State.selectedIds = new Set();
+          State.historyIdx = -1;
+          this._scheduleRender();
+          this._emitInteractiveChange('undo');
+        }
+        return;
+      }
+      State.historyIdx--;
+      const entry = State.undoStack[State.historyIdx];
+      if (!entry) return;
+      State.redoStack.push(State.undoStack[State.historyIdx + 1]);
+      State.layers = normalizeLayers(cloneJSON(entry.layers, []));
+      State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
+      State.selectedIds = new Set();
+      this._scheduleRender();
+      this._emitInteractiveChange('undo');
+    },
+
+    redo() {
+      if (!State.redoStack.length) return;
+      const entry = State.redoStack.pop();
+      if (!entry) return;
+      State.historyIdx++;
+      State.layers = normalizeLayers(cloneJSON(entry.layers, []));
+      State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
+      State.selectedIds = new Set();
+      this._scheduleRender();
+      this._emitInteractiveChange('redo');
+    },
+
+    // ── Clipboard ─────────────────────────────────────────
+    _copySelection() {
+      const ids = Array.from(State.selectedIds);
+      if (!ids.length) return;
+      const elements = [];
+      for (const layer of State.layers) {
+        for (const el of layer.elements) {
+          if (ids.includes(el.id)) elements.push(cloneJSON(el, el));
+        }
+      }
+      State.clipboard = elements;
+      const ClipClass = window.OpenCourseDeck?.Clipboard;
+      if (ClipClass) {
+        try {
+          const instance = new ClipClass();
+          instance.copy(elements);
+        } catch {}
+      }
+    },
+
+    _cutSelection() {
+      this._copySelection();
+      const ids = Array.from(State.selectedIds);
+      if (!ids.length) return;
+      this._pushUndo('cut');
+      ids.forEach((id) => this.removeElement(id));
+      State.selectedIds = new Set();
+      this._emitInteractiveChange('cut');
+    },
+
+    _pasteClipboard() {
+      const clip = State.clipboard;
+      if (!clip || !clip.length) return;
+      this._pushUndo('paste');
+      const pasted = [];
+      const layer = State.layers[Math.min(State.layers.length - 1, State.activeLayerIdx)];
+      if (!layer || layer.locked) return;
+      for (const el of clip) {
+        const id = `studio-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        const newEl = { ...cloneJSON(el, el), id, x: (el.x || 0) + 20, y: (el.y || 0) + 20 };
+        if (Array.isArray(newEl.points)) {
+          newEl.points = newEl.points.map((p) => [p[0] + 20, p[1] + 20]);
+        }
+        if (newEl.x1 != null) { newEl.x1 += 20; newEl.y1 += 20; }
+        if (newEl.x2 != null) { newEl.x2 += 20; newEl.y2 += 20; }
+        layer.elements.push(newEl);
+        pasted.push(id);
+      }
+      State.selectedIds = new Set(pasted);
+      this._scheduleRender();
+      this._emitInteractiveChange('paste');
+    },
+
+    _deleteSelection() {
+      const ids = Array.from(State.selectedIds);
+      if (!ids.length) return;
+      this._pushUndo('delete');
+      ids.forEach((id) => this.removeElement(id));
+      State.selectedIds = new Set();
+      this._emitInteractiveChange('delete');
+    },
+
+    _duplicateSelection() {
+      this._copySelection();
+      this._pasteClipboard();
+    },
+
+    _selectAll() {
+      const ids = [];
+      for (const layer of State.layers) {
+        if (!layer.locked) {
+          for (const el of layer.elements) ids.push(el.id);
+        }
+      }
+      State.selectedIds = new Set(ids);
+      this._scheduleRender();
+    },
+
+    // ── Group / Ungroup ───────────────────────────────────
+    _groupSelection() {
+      const ids = Array.from(State.selectedIds);
+      if (ids.length < 2) return;
+      this._pushUndo('group');
+      const layer = State.layers[Math.min(State.layers.length - 1, State.activeLayerIdx)];
+      if (!layer || layer.locked) return;
+      const children = [];
+      const remaining = [];
+      for (const el of layer.elements) {
+        if (ids.includes(el.id)) children.push(el);
+        else remaining.push(el);
+      }
+      if (children.length < 2) return;
+      let minX = Infinity, minY = Infinity;
+      for (const el of children) {
+        const b = this._elementBounds(el);
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+      }
+      const groupId = `group-${Date.now().toString(36)}`;
+      const group = {
+        id: groupId,
+        type: 'group',
+        x: minX,
+        y: minY,
+        children: children.map((el) => ({ ...el, x: (el.x || 0) - minX, y: (el.y || 0) - minY })),
+        fill: null,
+        stroke: null,
+      };
+      layer.elements = [...remaining, group];
+      State.selectedIds = new Set([groupId]);
+      this._scheduleRender();
+      this._emitInteractiveChange('group');
+    },
+
+    _ungroupSelection() {
+      const ids = Array.from(State.selectedIds);
+      if (!ids.length) return;
+      this._pushUndo('ungroup');
+      const layer = State.layers[Math.min(State.layers.length - 1, State.activeLayerIdx)];
+      if (!layer || layer.locked) return;
+      const newSelection = [];
+      const newElements = [];
+      for (const el of layer.elements) {
+        if (ids.includes(el.id) && el.type === 'group' && Array.isArray(el.children)) {
+          for (const child of el.children) {
+            const restored = {
+              ...child,
+              id: child.id || `studio-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+              x: (child.x || 0) + (el.x || 0),
+              y: (child.y || 0) + (el.y || 0),
+            };
+            newElements.push(restored);
+            newSelection.push(restored.id);
+          }
+        } else {
+          newElements.push(el);
+        }
+      }
+      layer.elements = newElements;
+      State.selectedIds = new Set(newSelection);
+      this._scheduleRender();
+      this._emitInteractiveChange('ungroup');
+    },
+
+    // ── Context Menu ──────────────────────────────────────
+    _onContextMenu(event) {
+      event.preventDefault();
+      const menu = window.OpenCourseDeck?.ContextMenu;
+      if (!menu) return;
+      const point = this._eventToWorld(event);
+      const hit = this._hitTest(point.x, point.y);
+      const items = [];
+      if (hit) {
+        if (!State.selectedIds.has(hit.element.id)) {
+          State.selectedIds = new Set([hit.element.id]);
+        }
+        State.activeLayerIdx = hit.layerIndex;
+        items.push({ key: 'copy', label: 'Copy', shortcut: 'Ctrl+C', icon: '\u{1F4CB}' });
+        items.push({ key: 'cut', label: 'Cut', shortcut: 'Ctrl+X', icon: '\u2702' });
+        items.push({ key: 'delete', label: 'Delete', shortcut: 'Del', icon: '\u{1F5D1}' });
+        items.push({ divider: true });
+        items.push({ key: 'duplicate', label: 'Duplicate', shortcut: 'Ctrl+D' });
+        if (State.selectedIds.size >= 2) {
+          items.push({ key: 'group', label: 'Group', shortcut: 'Ctrl+G' });
+        }
+      } else {
+        State.selectedIds = new Set();
+        items.push({ key: 'paste', label: 'Paste', shortcut: 'Ctrl+V', icon: '\u{1F4CB}' });
+        items.push({ divider: true });
+        items.push({ key: 'select-all', label: 'Select All', shortcut: 'Ctrl+A' });
+      }
+      items.push({ divider: true });
+      items.push({ key: 'undo', label: 'Undo', shortcut: 'Ctrl+Z' });
+      items.push({ key: 'redo', label: 'Redo', shortcut: 'Ctrl+Shift+Z' });
+      menu.show(items, event.clientX, event.clientY, (key) => this._handleContextAction(key));
+      this._scheduleRender();
+    },
+
+    _handleContextAction(key) {
+      switch (key) {
+        case 'copy':       this._copySelection();      break;
+        case 'cut':        this._cutSelection();        break;
+        case 'paste':      this._pasteClipboard();      break;
+        case 'delete':     this._deleteSelection();     break;
+        case 'duplicate':  this._duplicateSelection();  break;
+        case 'group':      this._groupSelection();      break;
+        case 'select-all': this._selectAll();           break;
+        case 'undo':       this.undo();                 break;
+        case 'redo':       this.redo();                 break;
+      }
+    },
+
+    // ── Touch / Pinch-to-zoom ─────────────────────────────
+    _onTouchStart(event) {
+      if (event.touches.length === 2) {
+        event.preventDefault();
+        const dx = event.touches[0].clientX - event.touches[1].clientX;
+        const dy = event.touches[0].clientY - event.touches[1].clientY;
+        this._touchState = {
+          dist: Math.hypot(dx, dy),
+          zoom: State.zoom,
+          cx: (event.touches[0].clientX + event.touches[1].clientX) / 2,
+          cy: (event.touches[0].clientY + event.touches[1].clientY) / 2,
+          offsetX: State.offsetX,
+          offsetY: State.offsetY,
+        };
+      }
+    },
+
+    _onTouchMove(event) {
+      if (!this._touchState || event.touches.length < 2) return;
+      event.preventDefault();
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const scale = dist / (this._touchState.dist || 1);
+      const newZoom = Math.min(4, Math.max(0.1, this._touchState.zoom * scale));
+      const cx = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+      const cy = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+      const ratio = newZoom / this._touchState.zoom;
+      State.zoom = newZoom;
+      State.offsetX = this._touchState.cx - ratio * (this._touchState.cx - this._touchState.offsetX) + (cx - this._touchState.cx);
+      State.offsetY = this._touchState.cy - ratio * (this._touchState.cy - this._touchState.offsetY) + (cy - this._touchState.cy);
+      this._scheduleRender();
+      this._emitInteractiveChange('pinch-zoom');
+    },
+
+    _onTouchEnd(event) {
+      if (event.touches.length < 2) {
+        this._touchState = null;
+      }
     },
 
     _moveElements(ids, dx, dy) {
@@ -905,6 +1441,24 @@
       // Current in-progress drawing
       if (State.currentPath)  this._drawPathPreview(ctx);
       if (State.currentShape) this._drawShapePreview(ctx);
+
+      // Marquee selection rectangle
+      if (State._marquee) {
+        const m = State._marquee;
+        const x = Math.min(m.x1, m.x2);
+        const y = Math.min(m.y1, m.y2);
+        const w = Math.abs(m.x2 - m.x1);
+        const h = Math.abs(m.y2 - m.y1);
+        ctx.save();
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 1 / Math.max(0.2, State.zoom);
+        ctx.setLineDash([4 / State.zoom, 4 / State.zoom]);
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
+        ctx.fillRect(x, y, w, h);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
 
       ctx.restore();
 
@@ -2012,6 +2566,6 @@
 
   };
 
-  window.PlasmaDeck = window.PlasmaDeck ?? {};
-  window.PlasmaDeck.Canvas = Canvas;
+  window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+  window.OpenCourseDeck.Canvas = Canvas;
 })();

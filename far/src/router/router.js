@@ -57,8 +57,8 @@ export function createRouter({
         const beforeEvent = force ? { from, to: hash, refresh: true, detail } : { from, to: hash };
         bus?.emit?.('route:beforechange', beforeEvent);
         if (previousController) {
-          try { await previousController.beforeLeave?.({ from, to: hash }); } catch (err) { console.warn('[PlasmaDeck Router] beforeLeave failed', err); }
-          try { await previousController.unmount?.({ from, to: hash }); } catch (err) { console.warn('[PlasmaDeck Router] unmount failed', err); }
+          try { await previousController.beforeLeave?.({ from, to: hash }); } catch (err) { console.warn('[OpenCourseDeck Router] beforeLeave failed', err); }
+          try { await previousController.unmount?.({ from, to: hash }); } catch (err) { console.warn('[OpenCourseDeck Router] unmount failed', err); }
         }
 
         // Update active nav (match the actual <a href="#/..."> in index.html)
@@ -86,7 +86,7 @@ export function createRouter({
 
         const showRouteError = (err) => {
           if (!isCurrent()) return;
-          console.error(`[PlasmaDeck Router] Handler failed for "${hash}"`, err);
+          console.error(`[OpenCourseDeck Router] Handler failed for "${hash}"`, err);
           bus?.emit?.('route:error', { hash, error: err });
           const main = document.getElementById('main-content');
           if (main) {
@@ -95,7 +95,7 @@ export function createRouter({
                 <div class="empty-state">
                   <div class="empty-state-icon" aria-hidden="true">!</div>
                   <h1 id="route-error-title">This view could not load</h1>
-                  <p>PlasmaDeck hit an error while opening this section. Try reloading, or return home and continue from there.</p>
+                  <p>OpenCourseDeck hit an error while opening this section. Try reloading, or return home and continue from there.</p>
                   <div class="empty-state-actions">
                     <button class="btn btn-primary" type="button" data-route-reload>Reload</button>
                     <a class="btn btn-secondary" href="#/home">Go home</a>
@@ -128,7 +128,7 @@ export function createRouter({
               bus?.emit?.('route:ready', routeEvent);
             });
         } else {
-          console.warn(`[PlasmaDeck Router] No handler for "${hash}"`);
+          console.warn(`[OpenCourseDeck Router] No handler for "${hash}"`);
           try { getNotFoundView?.()?.(hash); } catch { /* ignore */ }
           Progress?.pageBar?.finish?.();
           announce();

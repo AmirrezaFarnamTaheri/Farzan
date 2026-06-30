@@ -1,6 +1,6 @@
-# PlasmaDeck Native Packaging Strategy
+# OpenCourseDeck Native Packaging Strategy
 
-PlasmaDeck now has three desktop paths, in priority order.
+OpenCourseDeck now has three desktop paths, in priority order.
 
 ## 1. Tauri native app
 
@@ -42,7 +42,7 @@ Release binary build without installer bundling:
 npm run tauri:build
 ```
 
-Stage the browserless native executable into `desktop-dist/PlasmaDeck-Native`:
+Stage the browserless native executable into `desktop-dist/OpenCourseDeck-Native`:
 
 ```sh
 npm run native:exe
@@ -52,7 +52,7 @@ Security and packaging shape:
 
 - Frontend output: `dist`
 - Build command: `npm run build`, followed by `npm run build:sw` for the canonical service worker
-- App id: `app.plasmadeck.desktop`
+- App id: `app.opencoursedeck.desktop`
 - Bundle target: Windows NSIS
 - Capability permissions: empty by default
 - Prototype freezing: enabled
@@ -60,7 +60,7 @@ Security and packaging shape:
 - Tauri crates: local path dependencies, not registry-only dependencies
 - Native preflight: static wrapper checks plus optional offline Cargo dependency resolution
 - Cargo cache: native scripts prefer the repo-root `.cargo` cache when present
-- Native executable staging: `desktop-dist/PlasmaDeck-Native/PlasmaDeck.exe`
+- Native executable staging: `desktop-dist/OpenCourseDeck-Native/OpenCourseDeck.exe`
 
 ## 2. Electron app shell
 

@@ -4,7 +4,7 @@ export function mountSettingsView(deps = {}) {
     ThemeManager,
     FontScale,
     Prefs,
-    Toast = window.PlasmaDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast,
     formatBytes,
     localStorageFootprint,
   } = deps;
@@ -181,7 +181,7 @@ export function mountSettingsView(deps = {}) {
   on(document.getElementById('btn-font-inc'), 'click', () => { FontScale.inc(); updateFontLabel(); });
   on(document.getElementById('btn-font-dec'), 'click', () => { FontScale.dec(); updateFontLabel(); });
   on(document.getElementById('btn-font-reset'), 'click', () => { FontScale.reset(); updateFontLabel(); });
-  window.PlasmaDeck?.bus?.on?.('fontScale:change', updateFontLabel);
+  window.OpenCourseDeck?.bus?.on?.('fontScale:change', updateFontLabel);
 
   const densitySel = document.getElementById('select-density');
   if (densitySel) {
@@ -190,7 +190,7 @@ export function mountSettingsView(deps = {}) {
       const v = densitySel.value;
       document.documentElement.setAttribute('data-density', v);
       Prefs.set(Prefs.KEYS.density, v);
-      window.PlasmaDeck?.bus?.emit?.('density:change', { density: v });
+      window.OpenCourseDeck?.bus?.emit?.('density:change', { density: v });
     });
   }
 
@@ -203,12 +203,12 @@ export function mountSettingsView(deps = {}) {
     playlists: 'saved playlists',
     studio: 'Studio boards',
     preferences: 'preferences',
-    all: 'all local PlasmaDeck data',
+    all: 'all local OpenCourseDeck data',
   };
   on(wipeBtn, 'click', async () => {
     const scope = wipeScope?.value || 'all';
     const label = scopeLabels[scope] || scopeLabels.all;
-    const ok = await window.PlasmaDeck?.UI?.confirm?.(`This will delete ${label}. Continue?`);
+    const ok = await window.OpenCourseDeck?.UI?.confirm?.(`This will delete ${label}. Continue?`);
     if (!ok) return;
     try {
       if (window.DB?.clearUserData) await window.DB.clearUserData(scope);
@@ -239,7 +239,7 @@ export function mountSettingsView(deps = {}) {
         try { target.removeEventListener(type, handler, options); } catch {}
       });
       if (storageController?.timer) clearInterval(storageController.timer);
-      window.PlasmaDeck?.bus?.off?.('fontScale:change', updateFontLabel);
+      window.OpenCourseDeck?.bus?.off?.('fontScale:change', updateFontLabel);
     },
   };
 
@@ -257,7 +257,7 @@ export function mountSettingsView(deps = {}) {
     if (!mode || !model || !endpoint || !apiKey || !keyStorage || !localPackage || !localSource || !localFileInput || !status || !summary) return null;
 
     const keyName = 'plasma-ai-api-key-session';
-    const gemmaOptions = window.PlasmaDeck?.AI?.gemmaModelOptions || [
+    const gemmaOptions = window.OpenCourseDeck?.AI?.gemmaModelOptions || [
       { id: 'gemma-4-local', label: 'Gemma 4', url: 'https://ai.google.dev/gemma' },
       { id: 'gemma-3n-local', label: 'Gemma 3n', url: 'https://ai.google.dev/gemma' },
     ];
@@ -317,7 +317,7 @@ export function mountSettingsView(deps = {}) {
       endpoint.value = current.endpoint;
       keyStorage.value = current.keyStorage;
       apiKey.value = '';
-      window.PlasmaDeck.AISettings = { ...current };
+      window.OpenCourseDeck.AISettings = { ...current };
       setStatus();
     };
 
@@ -386,7 +386,7 @@ export function mountSettingsView(deps = {}) {
     on(localFileInput, 'change', async () => {
       const file = localFileInput.files?.[0];
       if (!file) return;
-      const imported = await window.PlasmaDeck?.AI?.importLocalModelFile?.(file);
+      const imported = await window.OpenCourseDeck?.AI?.importLocalModelFile?.(file);
       const stored = {
         ...current,
         mode: mode.value,
@@ -420,7 +420,7 @@ export function mountSettingsView(deps = {}) {
       button.disabled = true;
       button.textContent = 'Downloading...';
       try {
-        const downloaded = await window.PlasmaDeck?.AI?.downloadLocalModel?.(url, {
+        const downloaded = await window.OpenCourseDeck?.AI?.downloadLocalModel?.(url, {
           onProgress(progress) {
             if (progress.percent) button.textContent = `Downloading ${progress.percent}%`;
           },
@@ -463,7 +463,7 @@ export function mountSettingsView(deps = {}) {
     });
 
     on(document.querySelector('[data-ai-clear-local-model]'), 'click', async () => {
-      await window.PlasmaDeck?.AI?.clearLocalModelFile?.();
+      await window.OpenCourseDeck?.AI?.clearLocalModelFile?.();
       const stored = { ...current, localModelStatus: 'not-installed', localModelFile: null };
       await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
       apply(stored);
@@ -501,7 +501,7 @@ export function mountSettingsView(deps = {}) {
       const pct = hasQuota ? Math.min(100, Math.round((usage / quota) * 100)) : 0;
       const available = hasQuota ? Math.max(0, quota - usage) : null;
       const localBytes = localStorageFootprint();
-      const issue = window.PlasmaDeck?.lastStorageIssue;
+      const issue = window.OpenCourseDeck?.lastStorageIssue;
       const statusText = !hasQuota ? 'Unavailable' : pct >= 90 || issue?.error?.quota ? 'Critical' : pct >= 75 ? 'Watch' : 'Healthy';
 
       status.textContent = statusText;

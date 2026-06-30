@@ -1,12 +1,12 @@
-## PlasmaDeck Learning Studio
+﻿## OpenCourseDeck Learning Studio
 
-PlasmaDeck is the app inside this repository. The parent folder may be named Farzan Lite, but the runnable product is a self-contained, browser-based learning studio for videos, PDFs, notes, canvas work, bookmarks, progress tracking, and local backups.
+OpenCourseDeck is the app inside this repository. The parent folder may be named Farzan Lite, but the runnable product is a self-contained, browser-based learning studio for videos, PDFs, notes, canvas work, bookmarks, progress tracking, and local backups.
 
 It is designed for private study libraries and offline-friendly use. The app runs from a local HTTP server, uses vendored dependencies instead of CDNs, and stores user data in the browser on the current device.
 
 ### What You Can Do In 5 Minutes
 
-1. Start the local server and open PlasmaDeck.
+1. Start the local server and open OpenCourseDeck.
 2. Browse the bundled catalog from `data/catalog.json`.
 3. Open a lesson, PDF, or Studio canvas.
 4. Create a note and search it from the Notes view.
@@ -30,9 +30,9 @@ Open `http://localhost:5173/`.
 
 On Windows, the launchers are often easier:
 
-- `Run-PlasmaDeck.vbs`: app-like launch with no console window.
-- `Run-PlasmaDeck.cmd`: launch with console logs visible.
-- `Stop-PlasmaDeck.cmd`: stop the local server.
+- `Run-OpenCourseDeck.vbs`: app-like launch with no console window.
+- `Run-OpenCourseDeck.cmd`: launch with console logs visible.
+- `Stop-OpenCourseDeck.cmd`: stop the local server.
 
 ### Regular Run
 
@@ -55,13 +55,13 @@ npm test
 npm run audit
 ```
 
-- `npm run build` writes `dist/plasma.js`.
+- `npm run build` writes `dist/opencoursedeck.js`.
 - `npm run build:sw` regenerates `sw.js` with Workbox.
 - `npm run vendor` refreshes local vendor assets and fonts.
 
 ### Data And Privacy
 
-PlasmaDeck stores data locally in the browser profile for the origin you open, usually `http://localhost:5173`.
+OpenCourseDeck stores data locally in the browser profile for the origin you open, usually `http://localhost:5173`.
 
 - IndexedDB stores progress, timestamps, and database-backed records.
 - Some preferences and notes compatibility data may be mirrored in `localStorage`.
@@ -91,7 +91,7 @@ The app also includes an in-app Help route at `#/help` with the first-run checkl
 - `db.js`, `bridge.js`: storage layer and compatibility bridge.
 - `data/catalog.json`: selects the active catalog JSON.
 - `vendor/`: vendored browser libraries, icons, and fonts.
-- `dist/plasma.js`: generated bundle.
+- `dist/opencoursedeck.js`: generated bundle.
 
 ### Debugging Boot
 

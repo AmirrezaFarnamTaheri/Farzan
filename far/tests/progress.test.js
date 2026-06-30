@@ -9,7 +9,7 @@ describe('progress backup exports', () => {
     downloadedBlob = null;
     downloadedFilename = '';
     document.body.innerHTML = '';
-    window.PlasmaDeck = { Toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } };
+    window.OpenCourseDeck = { Toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } };
     window.DB = {
       getAllProgress: vi.fn(async () => [{ topicId: 'topic-1', courseId: 'course-1', updatedAt: 20 }]),
       getProgress: vi.fn(async () => null),
@@ -41,7 +41,7 @@ describe('progress backup exports', () => {
     });
     vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
       downloadedBlob = blob;
-      return 'blob:plasmadeck-test';
+      return 'blob:opencoursedeck-test';
     });
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function clickMock() {
@@ -100,8 +100,8 @@ describe('progress backup exports', () => {
     await window.ProgressStats.exportVaultMarkdown();
 
     const markdown = await downloadedBlob.text();
-    expect(downloadedFilename).toMatch(/^plasmadeck-vault-.*\.md$/);
-    expect(markdown).toContain('# PlasmaDeck Vault Export');
+    expect(downloadedFilename).toMatch(/^opencoursedeck-vault-.*\.md$/);
+    expect(markdown).toContain('# OpenCourseDeck Vault Export');
     expect(markdown).toContain('- [notes/current-note.md](notes/current-note.md)');
     expect(markdown).toContain('<!-- notes/current-note.md -->');
     expect(markdown).toContain('sourceType: "pdf-selection"');
@@ -137,8 +137,8 @@ describe('progress backup exports', () => {
     await window.ProgressStats.exportVaultArchive();
 
     const archive = JSON.parse(await downloadedBlob.text());
-    expect(downloadedFilename).toMatch(/^plasmadeck-vault-archive-.*\.json$/);
-    expect(archive.version).toBe('plasmadeck-vault-archive-1');
+    expect(downloadedFilename).toMatch(/^opencoursedeck-vault-archive-.*\.json$/);
+    expect(archive.version).toBe('opencoursedeck-vault-archive-1');
     expect(archive.files).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'manifest.json', type: 'application/json' }),
       expect.objectContaining({ path: 'notes/archive-note.md', type: 'text/markdown' }),
@@ -157,7 +157,7 @@ describe('progress backup exports', () => {
     const bytes = new Uint8Array(buffer);
     const text = new TextDecoder().decode(bytes);
     const view = new DataView(buffer);
-    expect(downloadedFilename).toMatch(/^plasmadeck-vault-.*\.zip$/);
+    expect(downloadedFilename).toMatch(/^opencoursedeck-vault-.*\.zip$/);
     expect(downloadedBlob.type).toBe('application/zip');
     expect(view.getUint32(0, true)).toBe(0x04034b50);
     expect(text).toContain('manifest.json');
@@ -196,8 +196,8 @@ describe('progress backup exports', () => {
     await window.ProgressStats.exportVaultDirectory();
 
     const archive = JSON.parse(await downloadedBlob.text());
-    expect(archive.version).toBe('plasmadeck-vault-archive-1');
-    expect(downloadedFilename).toMatch(/^plasmadeck-vault-archive-.*\.json$/);
+    expect(archive.version).toBe('opencoursedeck-vault-archive-1');
+    expect(downloadedFilename).toMatch(/^opencoursedeck-vault-archive-.*\.json$/);
   });
 
   it('wires the route export buttons to current backup exporters', async () => {
@@ -238,13 +238,13 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-vault').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(await downloadedBlob.text()).toContain('# PlasmaDeck Vault Export');
+    expect(await downloadedBlob.text()).toContain('# OpenCourseDeck Vault Export');
 
     downloadedBlob = null;
     document.getElementById('btn-export-vault-archive').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('plasmadeck-vault-archive-1');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('opencoursedeck-vault-archive-1');
 
     downloadedBlob = null;
     document.getElementById('btn-export-vault-zip').click();
@@ -257,7 +257,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-vault-directory').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('plasmadeck-vault-archive-1');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('opencoursedeck-vault-archive-1');
   });
 
   it('keeps the latest note body in JSON and Markdown exports after edits', async () => {
@@ -349,7 +349,7 @@ describe('progress backup exports', () => {
   it('renders step progress indicators without HTML injection', () => {
     document.body.innerHTML = '<div data-steps="3" data-step-current="2"></div>';
 
-    window.PlasmaDeck.ProgressUI.steps.init();
+    window.OpenCourseDeck.ProgressUI.steps.init();
 
     const tracker = document.querySelector('[data-steps]');
     expect(tracker.querySelectorAll('.step-item')).toHaveLength(3);
@@ -377,7 +377,7 @@ describe('progress backup exports', () => {
       if (topicId === 'bad-topic') throw new Error('write failed');
       return true;
     });
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => true) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify(payload)], 'backup.json', { type: 'application/json' });
     let input;
     const originalCreateElement = document.createElement.bind(document);
@@ -392,10 +392,10 @@ describe('progress backup exports', () => {
     });
 
     await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastImportResult).toBeTruthy());
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult).toBeTruthy());
 
     expect(input.accept).toContain('application/json');
-    expect(window.PlasmaDeck.lastImportResult.preview).toEqual(expect.objectContaining({
+    expect(window.OpenCourseDeck.lastImportResult.preview).toEqual(expect.objectContaining({
       version: '1.3',
       fileName: 'backup.json',
       progress: 2,
@@ -404,21 +404,21 @@ describe('progress backup exports', () => {
       invalid: 0,
       totalValid: 5,
     }));
-    expect(window.PlasmaDeck.lastImportPreview).toEqual(window.PlasmaDeck.lastImportResult.preview);
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
+    expect(window.OpenCourseDeck.lastImportPreview).toEqual(window.OpenCourseDeck.lastImportResult.preview);
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
       title: 'وارد کردن پشتیبان',
       confirmLabel: 'وارد کردن',
       cancelLabel: 'انصراف',
       message: expect.stringContaining('Progress records: 2'),
     }));
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.stringContaining('Invalid records that will be skipped: 0'),
     }));
-    expect(window.PlasmaDeck.lastImportResult.progress).toBe(1);
-    expect(window.PlasmaDeck.lastImportResult.settings).toBe(2);
+    expect(window.OpenCourseDeck.lastImportResult.progress).toBe(1);
+    expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-playlists', [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }]);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-studio-board', { version: 1, layers: [{ id: 'layer-1', elements: [] }] });
-    expect(window.PlasmaDeck.lastImportResult.errors).toEqual([
+    expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'progress', id: 'bad-topic', message: 'write failed' }),
     ]);
   });
@@ -442,7 +442,7 @@ describe('progress backup exports', () => {
       if (note.id === 'new-note') throw new Error('note write failed');
       return true;
     });
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => true) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify(payload)], 'rollback-backup.json', { type: 'application/json' });
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
@@ -455,7 +455,7 @@ describe('progress backup exports', () => {
     });
 
     await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastImportResult?.rolledBack).toBe(true));
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult?.rolledBack).toBe(true));
 
     expect(window.DB.clearUserData.mock.calls.map(([scope]) => scope)).toEqual([
       'progress',
@@ -468,11 +468,11 @@ describe('progress backup exports', () => {
     expect(window.DB.saveProgress).toHaveBeenCalledWith('old-progress', 'course-1', oldProgress);
     expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'new-note' }));
     expect(window.DB.saveNote).toHaveBeenCalledWith(oldNote);
-    expect(window.PlasmaDeck.lastImportResult.errors).toEqual([
+    expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'notes', id: 'new-note', message: 'note write failed' }),
     ]);
-    expect(window.PlasmaDeck.lastImportResult.rollbackErrors).toEqual([]);
-    expect(window.PlasmaDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Import rolled back'));
+    expect(window.OpenCourseDeck.lastImportResult.rollbackErrors).toEqual([]);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Import rolled back'));
   });
 
   it('shows import preview and does not write records when cancelled', async () => {
@@ -485,7 +485,7 @@ describe('progress backup exports', () => {
       annotations: [{ id: 'ann-cancel', docId: 'doc-1', page: 1, updatedAt: 13 }],
       timestamps: [{ id: 'ts-cancel', topicId: 'topic-cancel' }],
     };
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => false) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => false) };
     const file = new File([JSON.stringify(payload)], 'cancelled-backup.json', { type: 'application/json' });
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
@@ -498,9 +498,9 @@ describe('progress backup exports', () => {
     });
 
     await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastImportPreview).toBeTruthy());
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportPreview).toBeTruthy());
 
-    expect(window.PlasmaDeck.lastImportPreview).toEqual(expect.objectContaining({
+    expect(window.OpenCourseDeck.lastImportPreview).toEqual(expect.objectContaining({
       fileName: 'cancelled-backup.json',
       progress: 1,
       notes: 1,
@@ -510,12 +510,12 @@ describe('progress backup exports', () => {
       timestamps: 1,
       totalValid: 6,
     }));
-    expect(window.PlasmaDeck.UI.confirm.mock.calls[0][0]).toEqual(expect.objectContaining({
+    expect(window.OpenCourseDeck.UI.confirm.mock.calls[0][0]).toEqual(expect.objectContaining({
       title: 'وارد کردن پشتیبان',
       message: expect.stringContaining('Import backup "cancelled-backup.json"?'),
     }));
-    expect(window.PlasmaDeck.UI.confirm.mock.calls[0][0].message).toContain('PDF annotations: 1');
-    expect(window.PlasmaDeck.lastImportResult).toBeUndefined();
+    expect(window.OpenCourseDeck.UI.confirm.mock.calls[0][0].message).toContain('PDF annotations: 1');
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
     expect(window.DB.saveNote).not.toHaveBeenCalled();
     expect(window.DB.saveFolder).not.toHaveBeenCalled();
@@ -529,7 +529,7 @@ describe('progress backup exports', () => {
       version: '1.2',
       notes: [{ id: 'note-only', title: 'Notes only', content: '<p>Body</p>', updatedAt: 12 }],
     };
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => true) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify(payload)], 'notes-only.json', { type: 'application/json' });
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
@@ -542,9 +542,9 @@ describe('progress backup exports', () => {
     });
 
     await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastImportResult).toBeTruthy());
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult).toBeTruthy());
 
-    expect(window.PlasmaDeck.lastImportPreview).toEqual(expect.objectContaining({
+    expect(window.OpenCourseDeck.lastImportPreview).toEqual(expect.objectContaining({
       fileName: 'notes-only.json',
       progress: 0,
       notes: 1,
@@ -556,7 +556,7 @@ describe('progress backup exports', () => {
       title: 'Notes only',
       content: '<p>Body</p>',
     }));
-    expect(window.PlasmaDeck.lastImportResult.notes).toBe(1);
+    expect(window.OpenCourseDeck.lastImportResult.notes).toBe(1);
   });
 
   it('rejects unsupported backup versions before writing records', async () => {
@@ -568,7 +568,7 @@ describe('progress backup exports', () => {
       annotations: [],
       timestamps: [],
     };
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => true) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify(payload)], 'future-backup.json', { type: 'application/json' });
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
@@ -581,11 +581,11 @@ describe('progress backup exports', () => {
     });
 
     await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.PlasmaDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Unsupported backup version: 9.9')));
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Unsupported backup version: 9.9')));
 
-    expect(window.PlasmaDeck.UI.confirm).not.toHaveBeenCalled();
-    expect(window.PlasmaDeck.lastImportPreview).toBeUndefined();
-    expect(window.PlasmaDeck.lastImportResult).toBeUndefined();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.lastImportPreview).toBeUndefined();
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 describe('catalog normalization', () => {
   beforeEach(async () => {
     vi.resetModules();
-    window.PlasmaDeck = { bus: { emit: vi.fn() } };
+    window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     globalThis.fetch = vi.fn(async (url) => {
       const requested = String(url);
       if (requested.includes('data/catalog.json')) {

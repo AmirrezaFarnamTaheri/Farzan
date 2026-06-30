@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
@@ -28,7 +28,7 @@ function rel(file) {
 
 function isAppBundleJs(file) {
   const normalized = rel(file);
-  return normalized === 'dist/plasma.js' || normalized.startsWith('dist/chunks/');
+  return normalized === 'dist/opencoursedeck.js' || normalized.startsWith('dist/chunks/');
 }
 
 function parseCsp(html) {
@@ -57,7 +57,7 @@ function createBundleReport() {
     });
   const totalJsBytes = files.reduce((sum, file) => sum + file.bytes, 0);
   const largest = [...files].sort((a, b) => b.bytes - a.bytes)[0] ?? null;
-  const entry = files.find(file => file.path === 'dist/plasma.js') ?? null;
+  const entry = files.find(file => file.path === 'dist/opencoursedeck.js') ?? null;
   const html = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '';
   const csp = parseCsp(html);
   return {
@@ -77,8 +77,8 @@ function createBundleReport() {
 
 function evaluateReport(report) {
   const failures = [];
-  if (!report.files?.some((file) => file.path === 'dist/plasma.js')) {
-    failures.push('dist/plasma.js is missing from the bundle report');
+  if (!report.files?.some((file) => file.path === 'dist/opencoursedeck.js')) {
+    failures.push('dist/opencoursedeck.js is missing from the bundle report');
   }
   if (!report.totals.files) {
     failures.push('no generated app bundle files were found');

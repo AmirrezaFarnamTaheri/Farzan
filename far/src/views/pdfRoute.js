@@ -105,8 +105,8 @@ export function mountPdfView() {
     </section>
   `);
 
-  const PlasmaDeck = window.PlasmaDeck ?? {};
-  const Toast = PlasmaDeck.Toast ?? { success() {}, error() {} };
+  const OpenCourseDeck = window.OpenCourseDeck ?? {};
+  const Toast = OpenCourseDeck.Toast ?? { success() {}, error() {} };
   try { window.PlasmaPDFInit?.(); } catch (e) { console.warn('[PDF view] init failed', e); }
   const saveButton = document.querySelector('[data-pdf-save-page-note]');
   const selectionButton = document.querySelector('[data-pdf-save-selection]');
@@ -194,14 +194,14 @@ export function mountPdfView() {
   const refreshAIControls = async () => {
     if (!aiSummaryButton) return;
     try {
-      const status = await window.PlasmaDeck?.AI?.status?.();
+      const status = await window.OpenCourseDeck?.AI?.status?.();
       aiSummaryButton.hidden = !status?.available;
     } catch {
       aiSummaryButton.hidden = true;
     }
   };
   const onAISummary = async () => {
-    const ai = window.PlasmaDeck?.AI;
+    const ai = window.OpenCourseDeck?.AI;
     if (!ai?.summarizeText || typeof window.PlasmaPDFViewer?.extractTextForSummary !== 'function') {
       setNoteStatus('AI summary unavailable');
       Toast.error('PDF AI summary unavailable');
@@ -256,7 +256,7 @@ export function mountPdfView() {
     try {
       const annotations = await window.PlasmaPDFViewer.refreshAnnotationsFromStorage();
       setNoteStatus(`Annotations refreshed (${annotations.length})`);
-      PlasmaDeck.bus?.emit?.('pdf:sync-refresh', { docId: currentDoc, annotations: annotations.length });
+      OpenCourseDeck.bus?.emit?.('pdf:sync-refresh', { docId: currentDoc, annotations: annotations.length });
     } catch {
       setNoteStatus('Annotation refresh failed');
     }
@@ -265,7 +265,7 @@ export function mountPdfView() {
   selectionButton?.addEventListener('click', onSaveSelection);
   aiSummaryButton?.addEventListener('click', onAISummary);
   exportButton?.addEventListener('click', onExportAnnotations);
-  PlasmaDeck.bus?.on?.('sync:message', onPdfSyncMessage);
+  OpenCourseDeck.bus?.on?.('sync:message', onPdfSyncMessage);
   refreshAIControls();
   return {
     unmount() {
@@ -273,7 +273,7 @@ export function mountPdfView() {
       selectionButton?.removeEventListener('click', onSaveSelection);
       aiSummaryButton?.removeEventListener('click', onAISummary);
       exportButton?.removeEventListener('click', onExportAnnotations);
-      PlasmaDeck.bus?.off?.('sync:message', onPdfSyncMessage);
+      OpenCourseDeck.bus?.off?.('sync:message', onPdfSyncMessage);
       try { window.PlasmaPDFDestroy?.(); } catch {}
     },
   };

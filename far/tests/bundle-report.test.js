@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+﻿import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -49,7 +49,7 @@ describe('bundle and CSP reporting', () => {
     const { isAppBundleJs } = await import('../scripts/bundle-report.cjs');
     const cwd = process.cwd();
 
-    expect(isAppBundleJs(path.join(cwd, 'dist', 'plasma.js'))).toBe(true);
+    expect(isAppBundleJs(path.join(cwd, 'dist', 'opencoursedeck.js'))).toBe(true);
     expect(isAppBundleJs(path.join(cwd, 'dist', 'chunks', 'app-HASH.js'))).toBe(true);
     expect(isAppBundleJs(path.join(cwd, 'dist', 'boot.js'))).toBe(false);
     expect(isAppBundleJs(path.join(cwd, 'dist', 'vendor', 'pdf.worker.min.js'))).toBe(false);

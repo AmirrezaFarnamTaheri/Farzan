@@ -7,7 +7,7 @@ describe('MediaPlayer queue rendering', () => {
   beforeEach(async () => {
     vi.resetModules();
     document.body.innerHTML = '<div id="player"></div>';
-    window.PlasmaDeck = { bus: { emit: vi.fn() } };
+    window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     originalAudioContext = window.AudioContext;
     originalResizeObserver = window.ResizeObserver;
     Element.prototype.scrollIntoView = vi.fn();
@@ -24,7 +24,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('renders queue metadata as text instead of executable HTML', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([
       {
         title: '<img src=x onerror="window.__queueXss = true">',
@@ -45,7 +45,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('rejects unsafe media and artwork URLs before assigning DOM sources', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([
       {
         title: 'Unsafe',
@@ -66,7 +66,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('allows standalone player media and artwork URL families that match their context', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([
       {
         title: 'Safe',
@@ -81,7 +81,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('clears stale media and tolerates empty playlists', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([{ title: 'Old track', artist: 'Old artist', src: 'old.mp3' }]);
 
     expect(player.queue).toHaveLength(1);
@@ -98,7 +98,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('emits seeked progress payloads and flushes the previous track before switching', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const seeked = vi.fn();
     const beforeTrackChange = vi.fn();
     player.on('seeked', seeked);
@@ -127,7 +127,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('emits durable timeupdate and pause payloads for the active track', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const timeupdate = vi.fn();
     const pause = vi.fn();
     player.on('timeupdate', timeupdate);
@@ -160,7 +160,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('captures a resumable snapshot of the active queue and playback position', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     Object.defineProperty(player._media, 'duration', { value: 180, configurable: true });
     player.loadPlaylist([
       { id: 'a', title: 'A', src: 'a.mp3', topicId: 'topic-a', courseId: 'course-a' },
@@ -183,7 +183,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('restores a full queue snapshot including index, timing, and playback settings', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const seekTo = vi.spyOn(player, 'seekTo');
     const play = vi.spyOn(player, 'play').mockResolvedValue(undefined);
 
@@ -255,7 +255,7 @@ describe('MediaPlayer queue rendering', () => {
       toJSON() { return {}; },
     });
 
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio', visualizer: true });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio', visualizer: true });
     const canvas = document.querySelector('#player .pd-visualizer');
 
     expect(observers).toHaveLength(1);
@@ -295,7 +295,7 @@ describe('MediaPlayer queue rendering', () => {
       fill: vi.fn(),
     });
 
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio', visualizer: true });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio', visualizer: true });
     player._state.playing = true;
     player._startViz();
 
@@ -306,18 +306,18 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('returns the first active player snapshot before route teardown', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     document.querySelector('#player').setAttribute('data-player', '');
     document.querySelector('#player')._pdPlayer = player;
     player.loadPlaylist([{ id: 'a', title: 'A', src: 'a.mp3', topicId: 'topic-a' }]);
 
-    const snapshot = window.PlasmaDeck.Player.getActiveSnapshot(document);
+    const snapshot = window.OpenCourseDeck.Player.getActiveSnapshot(document);
 
     expect(snapshot.track).toEqual(expect.objectContaining({ id: 'a', topicId: 'topic-a' }));
   });
 
   it('supports explicit Picture-in-Picture requests for video players', async () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'video' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
     document.querySelector('#player').setAttribute('data-player', '');
     document.querySelector('#player')._pdPlayer = player;
     const requestPictureInPicture = vi.fn(async () => {
@@ -343,12 +343,12 @@ describe('MediaPlayer queue rendering', () => {
     await expect(player.togglePictureInPicture()).resolves.toEqual({ active: true, supported: true });
     expect(requestPictureInPicture).toHaveBeenCalledTimes(1);
 
-    await expect(window.PlasmaDeck.Player.requestActivePictureInPicture(document)).resolves.toEqual({ active: false, supported: true });
+    await expect(window.OpenCourseDeck.Player.requestActivePictureInPicture(document)).resolves.toEqual({ active: false, supported: true });
     expect(exitPictureInPicture).toHaveBeenCalledTimes(1);
   });
 
   it('reports Picture-in-Picture as unsupported for audio players', async () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
 
     expect(player.canPictureInPicture()).toBe(false);
     await expect(player.togglePictureInPicture()).resolves.toEqual({
@@ -359,7 +359,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('provides richer queue controls for playing, reordering, removing, and clearing tracks', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const playAt = vi.spyOn(player, 'playAt').mockImplementation(() => {});
     player.loadPlaylist([
       { id: 'a', title: 'A', src: 'a.mp3' },
@@ -387,7 +387,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('renders chapters, transcript, and caption cues safely for the active track', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'video' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
     Object.defineProperty(player._media, 'duration', { value: 120, configurable: true });
     player._state.duration = 120;
     player.loadPlaylist([{
@@ -434,7 +434,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('scopes keyboard shortcuts to the focused player and removes them on destroy', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.toggle = vi.fn();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', bubbles: true, cancelable: true }));
@@ -451,7 +451,7 @@ describe('MediaPlayer queue rendering', () => {
   });
 
   it('removes native media and drag listeners during destroy', () => {
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const timeUpdate = vi.spyOn(player, '_onTimeUpdate');
     const seekTo = vi.spyOn(player, 'seekTo');
     Object.defineProperty(player._media, 'duration', { value: 100, configurable: true });
@@ -479,7 +479,7 @@ describe('MediaPlayer queue rendering', () => {
 
   it('removes restored-position metadata listeners and tolerates repeated destroy calls', () => {
     sessionStorage.setItem('pd-player', JSON.stringify({ currentTime: 42 }));
-    const player = new window.PlasmaDeck.MediaPlayer('#player', { type: 'audio' });
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     const seekTo = vi.spyOn(player, 'seekTo');
     const media = player._media;
 

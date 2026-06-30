@@ -17,7 +17,7 @@ describe('command palette', () => {
         </div>
       </div>
     `;
-    window.PlasmaDeck = {
+    window.OpenCourseDeck = {
       Router: { navigate: vi.fn() },
       ThemeManager: { apply: vi.fn(), set: vi.fn() },
       Prefs: { KEYS: { density: 'density' }, set: vi.fn(), applyAll: vi.fn() },
@@ -29,28 +29,28 @@ describe('command palette', () => {
 
   it('navigates and applies themes through current app APIs', () => {
     initCommandPalette();
-    window.PlasmaDeck.CommandPalette.open();
+    window.OpenCourseDeck.CommandPalette.open();
 
     const input = document.getElementById('cp-input');
     input.value = 'Courses';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-    expect(window.PlasmaDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
+    expect(window.OpenCourseDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
 
-    window.PlasmaDeck.CommandPalette.open();
+    window.OpenCourseDeck.CommandPalette.open();
     input.value = 'Theme: Light';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-    expect(window.PlasmaDeck.ThemeManager.apply).toHaveBeenCalledWith('light');
-    expect(window.PlasmaDeck.ThemeManager.set).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.ThemeManager.apply).toHaveBeenCalledWith('light');
+    expect(window.OpenCourseDeck.ThemeManager.set).not.toHaveBeenCalled();
   });
 
   it('late-binds optional app globals and tolerates missing services', () => {
-    window.PlasmaDeck = { bus: { emit: vi.fn() } };
+    window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     expect(() => initCommandPalette()).not.toThrow();
-    expect(() => window.PlasmaDeck.CommandPalette.open()).not.toThrow();
+    expect(() => window.OpenCourseDeck.CommandPalette.open()).not.toThrow();
 
     const input = document.getElementById('cp-input');
     input.value = 'Theme: Light';
@@ -59,13 +59,13 @@ describe('command palette', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }).not.toThrow();
 
-    window.PlasmaDeck.Router = { navigate: vi.fn() };
-    window.PlasmaDeck.CommandPalette.open();
+    window.OpenCourseDeck.Router = { navigate: vi.fn() };
+    window.OpenCourseDeck.CommandPalette.open();
     input.value = 'Courses';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-    expect(window.PlasmaDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
+    expect(window.OpenCourseDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
   it('traps focus, inert background, and restores opener on close', () => {
@@ -75,14 +75,14 @@ describe('command palette', () => {
     const input = document.getElementById('cp-input');
     opener.focus();
 
-    window.PlasmaDeck.CommandPalette.open();
+    window.OpenCourseDeck.CommandPalette.open();
 
     expect(document.activeElement).toBe(input);
     expect(app.hasAttribute('inert')).toBe(true);
     opener.focus();
     expect(document.activeElement).toBe(input);
 
-    window.PlasmaDeck.CommandPalette.close();
+    window.OpenCourseDeck.CommandPalette.close();
 
     expect(app.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(opener);
@@ -92,12 +92,12 @@ describe('command palette', () => {
     initCommandPalette();
     const app = document.getElementById('plasma-app');
 
-    window.PlasmaDeck.CommandPalette.open();
-    window.PlasmaDeck.CommandPalette.close();
-    window.PlasmaDeck.CommandPalette.close();
+    window.OpenCourseDeck.CommandPalette.open();
+    window.OpenCourseDeck.CommandPalette.close();
+    window.OpenCourseDeck.CommandPalette.close();
 
     expect(app.hasAttribute('inert')).toBe(false);
-    window.PlasmaDeck.CommandPalette.open();
+    window.OpenCourseDeck.CommandPalette.open();
     expect(app.hasAttribute('inert')).toBe(true);
   });
 });

@@ -8,7 +8,64 @@ import '../ui.js';
 import '../bridge.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
-const pd = window.PlasmaDeck = window.PlasmaDeck || {};
+// ── Orphaned module integration: expose all src/ utilities on OpenCourseDeck namespace ──
+import * as easing from './lib/easing.js';
+import { HElement, h } from './lib/hElement.js';
+import { RAFLoop } from './lib/rafLoop.js';
+import { RequestQueue } from './lib/requestQueue.js';
+import { stagger } from './lib/stagger.js';
+import { Timeline } from './lib/timeline.js';
+import { normalizeTimeIntervals, updateTimeIntervals } from './lib/timeRange.js';
+import { VirtualList } from './lib/virtualScroll.js';
+import { runInWorker, terminateAll, getWorkerStatus } from './lib/workerPool.js';
+import { buildUserThemeVars } from './core/themeBuilder.js';
+import * as locale from './core/locale.js';
+import enUS from './locales/en-US.js';
+import faIR from './locales/fa-IR.js';
+import { TranslatorRegistry, BaseTranslator, GoogleTranslator, OpenAITranslator, CustomAPITranslator, LANGUAGES, getLanguageName } from './features/translator.js';
+import * as translationCache from './features/translationCache.js';
+import { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems } from './features/noteTemplates.js';
+import { initErrorBoundary } from './features/errorBoundary.js';
+import { initOfflineBanner } from './features/offlineBanner.js';
+import { CanvasZoom } from './features/canvasZoom.js';
+import { CourseGraph } from './features/courseGraph.js';
+import { KnowledgeGraph } from './features/knowledgeGraph.js';
+
+const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
+
+// ── Expose all integrated modules on OpenCourseDeck namespace ──
+pd.easing = easing;
+pd.HElement = HElement;
+pd.h = h;
+pd.RAFLoop = RAFLoop;
+pd.RequestQueue = RequestQueue;
+pd.stagger = stagger;
+pd.Timeline = Timeline;
+pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
+pd.VirtualList = VirtualList;
+pd.WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
+pd.ThemeBuilder = { buildUserThemeVars };
+pd.locale = { ...locale, messages: { 'en-US': enUS, 'fa-IR': faIR } };
+// Register locale messages
+locale.locale('en-US', enUS);
+locale.locale('fa-IR', faIR);
+pd.TranslatorRegistry = TranslatorRegistry;
+pd.BaseTranslator = BaseTranslator;
+pd.GoogleTranslator = GoogleTranslator;
+pd.OpenAITranslator = OpenAITranslator;
+pd.CustomAPITranslator = CustomAPITranslator;
+pd.LANGUAGES = LANGUAGES;
+pd.getLanguageName = getLanguageName;
+pd.TranslationCache = translationCache;
+pd.NoteTemplates = { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems };
+pd.CanvasZoom = CanvasZoom;
+pd.CourseGraph = CourseGraph;
+pd.KnowledgeGraph = KnowledgeGraph;
+pd.workers = {
+  search: new URL('./workers/search.worker.js', import.meta.url).href,
+  catalog: new URL('./workers/catalog.worker.js', import.meta.url).href,
+};
+
 const featureLoaders = {
   player: () => import('../player.js'),
   notes: () => import('../notes.js'),
@@ -20,7 +77,7 @@ const featurePromises = new Map();
 
 pd.loadFeature = (name) => {
   const loader = featureLoaders[name];
-  if (!loader) return Promise.reject(new Error(`Unknown PlasmaDeck feature: ${name}`));
+  if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
   if (!featurePromises.has(name)) {
     featurePromises.set(name, loader());
   }
@@ -54,6 +111,8 @@ pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature
 })();
 
 initBeforeUnloadGuard();
+initErrorBoundary();
+initOfflineBanner();
 
 try { performance.mark?.('pd:bundle:evaluated'); } catch {
   // Performance API may be unavailable in unusual embedded browsers.
@@ -163,10 +222,10 @@ if ('serviceWorker' in navigator) {
 
 import('../app.js')
   .then(() => {
-    try { initCommandPalette(); } catch (e) { console.warn('[PlasmaDeck] initCommandPalette failed', e); }
+    try { initCommandPalette(); } catch (e) { console.warn('[OpenCourseDeck] initCommandPalette failed', e); }
   })
   .catch((e) => {
-    console.error('[PlasmaDeck] app shell failed to load', e);
+    console.error('[OpenCourseDeck] app shell failed to load', e);
   });
 
 

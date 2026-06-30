@@ -106,7 +106,7 @@ async function renderTags() {
     (b.noteCount + b.topicCount) - (a.noteCount + a.topicCount)
     || a.label.localeCompare(b.label)
   ));
-  const routeState = window.PlasmaDeck = window.PlasmaDeck ?? {};
+  const routeState = window.OpenCourseDeck = window.OpenCourseDeck ?? {};
   routeState.tagFacetState = routeState.tagFacetState || { query: '', filter: 'all' };
   const state = routeState.tagFacetState;
   const noteTagCount = tagEntries.filter(tag => tag.noteCount > 0).length;

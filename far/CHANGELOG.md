@@ -1,10 +1,10 @@
-## Changelog
+﻿## Changelog
 
 All notable changes to this project will be documented in this file.
 
 ### Unreleased
 
-- Tooling: esbuild bundling (`dist/plasma.js`), Workbox service worker generation, local fonts + Font Awesome vendoring.
+- Tooling: esbuild bundling (`dist/opencoursedeck.js`), Workbox service worker generation, local fonts + Font Awesome vendoring.
 - Fixes: splash dismiss, Progress namespace collision mitigation, canvas DPR transform, HttpClient cache TTL race, realtime disconnect payload, notes undo index.
 - Security: DOMPurify-based sanitization for notes + view injection, CSP tightening (removed `unsafe-eval`), removed external font/CDN usage.
 - UX: command palette, breadcrumb updates, storage meter, theme-color meta sync, SW update toast, skip link, overlay focus restore, app-root inert background, styled async confirm.

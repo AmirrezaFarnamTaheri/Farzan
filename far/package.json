@@ -1,8 +1,8 @@
 {
-  "name": "plasmadeck",
+  "name": "opencoursedeck",
   "private": true,
   "version": "1.1.2",
-  "description": "PlasmaDeck learning studio — static app with vendored browser libs",
+  "description": "OpenCourseDeck learning studio — static app with vendored browser libs",
   "scripts": {
     "postinstall": "node scripts/vendor-libs.cjs",
     "vendor": "node scripts/vendor-libs.cjs",
@@ -57,6 +57,6 @@
     "jsdom": "^29.0.2",
     "sharp": "^0.34.5",
     "vitest": "^4.1.4",
-    "workbox-cli": "^7.4.0"
+    "workbox-cli": "^7.4.1"
   }
 }

@@ -1,4 +1,4 @@
-const __pdDebugEnabled = (() => {
+﻿const __pdDebugEnabled = (() => {
   try {
     const isLocal =
       location.hostname === 'localhost' ||
@@ -48,9 +48,9 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 try {
-  __pdPost('boot:import_plasma', { src: './dist/plasma.js' });
+  __pdPost('boot:import_plasma', { src: './dist/opencoursedeck.js' });
   __pdMark('pd:boot:import:start');
-  await import('./dist/plasma.js');
+  await import('./dist/opencoursedeck.js');
   __pdMark('pd:boot:import:end');
   __pdMeasure('pd:boot:import', 'pd:boot:import:start', 'pd:boot:import:end');
   __pdMeasure('pd:boot:total_to_import', 'pd:boot:start', 'pd:boot:import:end');

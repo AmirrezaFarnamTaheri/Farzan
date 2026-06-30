@@ -25,7 +25,7 @@ describe('static assets and service worker precache', () => {
     expect(pkg.scripts['build:sw']).toContain('scripts/clean-workbox.cjs');
     expect(pkg.scripts['build:sw']).toContain('generateSW scripts/workbox.config.cjs');
     expect(config).toContain('cleanupOutdatedCaches: true');
-    expect(config).toContain('cacheId: `plasmadeck-v${pkg.version}`');
+    expect(config).toContain('cacheId: `opencoursedeck-v${pkg.version}`');
   });
 
   it('keeps index.html local script/link references present on disk', () => {
@@ -130,19 +130,19 @@ describe('static assets and service worker precache', () => {
   });
 
   it('keeps Windows launchers identity-safe and free of stale debug timestamp placeholders', () => {
-    const run = fs.readFileSync(path.join(root, 'Run-PlasmaDeck.cmd'), 'utf8');
-    const oneClick = fs.readFileSync(path.join(root, 'PlasmaDeck-OneClick.bat'), 'utf8');
-    const stop = fs.readFileSync(path.join(root, 'Stop-PlasmaDeck.cmd'), 'utf8');
+    const run = fs.readFileSync(path.join(root, 'Run-OpenCourseDeck.cmd'), 'utf8');
+    const oneClick = fs.readFileSync(path.join(root, 'OpenCourseDeck-OneClick.bat'), 'utf8');
+    const stop = fs.readFileSync(path.join(root, 'Stop-OpenCourseDeck.cmd'), 'utf8');
 
     for (const launcher of [run, oneClick]) {
       expect(launcher).toContain('Get-Date -Format o');
       expect(launcher).not.toContain('"timestamp":%RANDOM%');
       expect(launcher).toContain('node_modules\\esbuild\\package.json');
-      expect(launcher).toContain('plasmadeck-server.pid');
+      expect(launcher).toContain('opencoursedeck-server.pid');
     }
 
     expect(oneClick).not.toContain('SERVER_LOG=');
-    expect(stop).toContain('plasmadeck-server.pid');
+    expect(stop).toContain('opencoursedeck-server.pid');
     expect(stop).toContain("CommandLine -match 'dev-server\\.cjs'");
     expect(stop).not.toMatch(/taskkill\s+\/F\s+\/PID/i);
   });

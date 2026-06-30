@@ -1,5 +1,5 @@
-﻿// ============================================================
-// PlasmaDeck - player.js
+// ============================================================
+// OpenCourseDeck - player.js
 // Full Media Player System
 // Audio | Video | Playlist | Visualizer | Queue
 // ============================================================
@@ -32,19 +32,19 @@
   };
 
   const safeMediaUrl = (raw) => {
-    const helper = window.PlasmaDeck?.safeMediaUrl;
+    const helper = window.OpenCourseDeck?.safeMediaUrl;
     if (typeof helper === 'function') return helper(raw);
     return safeUrlFor(raw, { dataPattern: /^data:(?:video|audio|application\/pdf)\//i });
   };
 
   const safeImageUrl = (raw) => {
-    const helper = window.PlasmaDeck?.safeImageUrl;
+    const helper = window.OpenCourseDeck?.safeImageUrl;
     if (typeof helper === 'function') return helper(raw);
     return safeUrlFor(raw, { dataPattern: /^data:image\//i });
   };
 
   const fmt = {
-    /** Format seconds â†’ M:SS or H:MM:SS */
+    /** Format seconds → M:SS or H:MM:SS */
     time(secs) {
       if (isNaN(secs) || secs < 0) return '0:00';
       const h = Math.floor(secs / 3600);
@@ -54,13 +54,34 @@
         ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
         : `${m}:${String(s).padStart(2, '0')}`;
     },
-    /** Bytes â†’ human-readable */
+    /** Bytes → human-readable */
     bytes(b) {
       if (b < 1024) return `${b} B`;
       if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
       return `${(b / 1048576).toFixed(1)} MB`;
     },
   };
+
+  /** Merge overlapping/adjacent time intervals */
+  function _mergeIntervals(intervals) {
+    if (!intervals || intervals.length === 0) return [];
+    const sorted = intervals
+      .filter(i => i && Number.isFinite(i.start) && Number.isFinite(i.end) && i.start < i.end)
+      .slice()
+      .sort((a, b) => a.start - b.start);
+    if (sorted.length === 0) return [];
+    const merged = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const last = merged[merged.length - 1];
+      const curr = sorted[i];
+      if (curr.start <= last.end) {
+        last.end = Math.max(last.end, curr.end);
+      } else {
+        merged.push(curr);
+      }
+    }
+    return merged;
+  }
 
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -97,9 +118,10 @@
         repeat:        'none',     // 'none' | 'one' | 'all'
         controls:      true,       // render custom controls
         theme:         'dark',
+        mediaId:       null,       // per-video ID for MediaStorage
       }, options);
 
-      // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // State
       this._state = {
         playing:   false,
         loading:   false,
@@ -120,7 +142,28 @@
       this._domListeners = [];
       this._destroyed    = false;
 
-      // â”€â”€ Build DOM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // AB loop state
+      this._loopA = null;
+      this._loopB = null;
+
+      // Watched segment tracking
+      this._watchedSegStart = null;
+      this._watchedOverlayCanvas = null;
+      this._watchedIntervals = [];
+
+      // MediaStorage (per-video IndexedDB persistence)
+      this._mediaStorage = window.OpenCourseDeck?.MediaStorage
+        ? new window.OpenCourseDeck.MediaStorage()
+        : null;
+
+      // Speed presets
+      this._speedPresets = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3];
+
+      // Keyboard seek accumulator
+      this._seekAccum = 0;
+      this._seekAccumTimer = null;
+
+      // Build DOM
       this._buildDOM();
       this._bindNative();
       if (this._opts.keyboard) this._bindKeyboard();
@@ -128,17 +171,18 @@
         this._initVisualizer();
       }
 
-      // â”€â”€ Load initial playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Load initial playlist
       if (this._opts.playlist.length) {
         this.loadPlaylist(this._opts.playlist);
       }
 
-      // â”€â”€ Restore session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Restore session
       this._restoreSession();
+      this._restorePlaylistMode();
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────
     // DOM BUILDER
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _buildDOM() {
@@ -194,9 +238,12 @@
           <div class="pd-progress-track" role="slider" aria-label="Seek"
                aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
                tabindex="0">
+            <canvas class="pd-waveform-canvas" aria-hidden="true"></canvas>
+            <div class="pd-watched-overlay" aria-hidden="true"></div>
             <div class="pd-progress-buf"></div>
             <div class="pd-progress-fill"></div>
             <div class="pd-progress-thumb"></div>
+            <div class="pd-ab-loop-region" aria-hidden="true"></div>
           </div>
           <span class="pd-time-dur">0:00</span>
         </div>
@@ -231,6 +278,13 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
               <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+          </button>
+          <button class="pd-btn pd-btn-icon" aria-label="AB loop" data-pd="abloop">A-B</button>
+          <button class="pd-btn pd-btn-icon" aria-label="Screenshot" data-pd="screenshot">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
             </svg>
           </button>
         </div>
@@ -272,6 +326,20 @@
         <!-- Loading overlay -->
         <div class="pd-loading-overlay" hidden>
           <div class="pd-spinner"></div>
+        </div>
+
+        <!-- Resume hint overlay -->
+        <div class="pd-resume-hint" hidden>
+          <span class="pd-resume-text"></span>
+          <button class="pd-btn pd-btn-sm pd-resume-go" data-pd="resume-go">Resume</button>
+          <button class="pd-btn pd-btn-sm pd-resume-start" data-pd="resume-start">Start over</button>
+        </div>
+
+        <!-- Fine speed control -->
+        <div class="pd-speed-panel" hidden>
+          <label class="pd-speed-label">Speed: <span class="pd-speed-value">1x</span></label>
+          <input type="range" class="pd-speed-slider" min="0.25" max="3" step="0.05" value="1">
+          <div class="pd-speed-presets"></div>
         </div>
       `;
 
@@ -325,6 +393,15 @@
         seekFill:   $('.pd-progress-fill',  controls),
         seekBuf:    $('.pd-progress-buf',   controls),
         seekThumb:  $('.pd-progress-thumb', controls),
+        waveformCanvas:  $('.pd-waveform-canvas', controls),
+        watchedOverlay:  $('.pd-watched-overlay', controls),
+        abLoopRegion:    $('.pd-ab-loop-region', controls),
+        resumeHint:      $('.pd-resume-hint', controls),
+        resumeText:      $('.pd-resume-text', controls),
+        speedPanel:      $('.pd-speed-panel', controls),
+        speedSlider:     $('.pd-speed-slider', controls),
+        speedValue:      $('.pd-speed-value', controls),
+        speedPresetsContainer: $('.pd-speed-presets', controls),
         volTrack:   $('.pd-volume-track',   controls),
         volFill:    $('.pd-volume-fill',    controls),
         playBtn:    $('[data-pd="play"]',   controls),
@@ -333,6 +410,8 @@
         shuffleBtn: $('[data-pd="shuffle"]', controls),
         repeatBtn:  $('[data-pd="repeat"]',  controls),
         speedBtn:   $('[data-pd="speed"]',   controls),
+        abLoopBtn:  $('[data-pd="abloop"]',  controls),
+        screenshotBtn: $('[data-pd="screenshot"]', controls),
         chaptersBtn: $('[data-pd="chapters"]', controls),
         transcriptBtn: $('[data-pd="transcript"]', controls),
         captionsBtn: $('[data-pd="captions"]', controls),
@@ -386,6 +465,8 @@
           case 'shuffle':    this.toggleShuffle();           break;
           case 'repeat':     this.cycleRepeat();             break;
           case 'speed':      this.cycleSpeed();              break;
+          case 'abloop':     this.toggleLoop();              break;
+          case 'screenshot': this.screenshot();              break;
           case 'chapters':   this.showChapters();            break;
           case 'transcript': this.showTranscript();          break;
           case 'captions':   this.toggleCaptions();          break;
@@ -394,8 +475,28 @@
           case 'queue':      this.showQueue();               break;
           case 'queue-close': this.hideQueue();              break;
           case 'queue-clear': this.clearQueue();             break;
+          case 'resume-go':  this._handleResumeGo();         break;
+          case 'resume-start': this._handleResumeStart();    break;
         }
       });
+
+      // Speed panel: slider
+      if (this._dom?.speedSlider) {
+        this._on(this._dom.speedSlider, 'input', e => {
+          const rate = parseFloat(e.target.value) || 1;
+          this._media.playbackRate = rate;
+          if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
+          if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
+          this._emit('speed', rate);
+          this._saveSession();
+          if (this._mediaStorage && this._currentTrack()) {
+            this._mediaStorage.set(this._mediaId(), 'rate', rate);
+          }
+        });
+      }
+
+      // Speed panel: preset buttons
+      this._initSpeedPresets();
 
       this._on(this._queuePanel, 'click', e => {
         const btn = e.target.closest('[data-pd]');
@@ -474,19 +575,91 @@
         if (t?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
         if (t?.closest?.('[contenteditable],[contenteditable="true"]')) return;
 
+        // Shift+A/B/L for AB loop
+        if (e.shiftKey) {
+          switch (e.code) {
+            case 'KeyA': e.preventDefault(); this.setLoopA(); return;
+            case 'KeyB': e.preventDefault(); this.setLoopB(); return;
+            case 'KeyL': e.preventDefault(); this.toggleLoop(); return;
+          }
+        }
+
+        // Number keys 0-9: seek to percentage
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey && e.code.startsWith('Digit')) {
+          const digit = parseInt(e.code.slice(5), 10);
+          if (digit >= 0 && digit <= 9 && this._state.duration > 0) {
+            e.preventDefault();
+            this.seekTo((digit / 10) * this._state.duration);
+            return;
+          }
+        }
+
         switch (e.code) {
           case 'Space': case 'KeyK': e.preventDefault(); this.toggle();       break;
           case 'KeyM':               e.preventDefault(); this.toggleMute();   break;
-          case 'KeyJ': case 'ArrowLeft': e.preventDefault(); this.seekBy(-10); break;
-          case 'KeyL': case 'ArrowRight':e.preventDefault(); this.seekBy(+10); break;
+          case 'KeyJ': {
+            e.preventDefault();
+            this._seekAccum -= 10;
+            this._applySeekAccum();
+            break;
+          }
+          case 'KeyL': {
+            if (!e.shiftKey) {
+              e.preventDefault();
+              this._seekAccum += 10;
+              this._applySeekAccum();
+            }
+            break;
+          }
+          case 'ArrowLeft': e.preventDefault(); this.seekBy(-5); break;
+          case 'ArrowRight':e.preventDefault(); this.seekBy(+5); break;
           case 'ArrowUp':            e.preventDefault(); this.setVolume(Math.min(1, this._state.volume + 0.1)); break;
           case 'ArrowDown':          e.preventDefault(); this.setVolume(Math.max(0, this._state.volume - 0.1)); break;
           case 'KeyN':               this.next();   break;
           case 'KeyP':               this.prev();   break;
           case 'KeyS':               this.toggleShuffle(); break;
           case 'KeyR':               this.cycleRepeat();   break;
+          case 'BracketLeft': {
+            e.preventDefault();
+            this._media.playbackRate = Math.max(0.25, this._media.playbackRate - 0.05);
+            if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(this._media.playbackRate);
+            this._emit('speed', this._media.playbackRate);
+            break;
+          }
+          case 'BracketRight': {
+            e.preventDefault();
+            this._media.playbackRate = Math.min(3, this._media.playbackRate + 0.05);
+            if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(this._media.playbackRate);
+            this._emit('speed', this._media.playbackRate);
+            break;
+          }
+          case 'Period': {
+            if (this._state.playing) {
+              e.preventDefault();
+              this._media.currentTime += 1 / 30;
+            }
+            break;
+          }
+          case 'Comma': {
+            if (this._state.playing) {
+              e.preventDefault();
+              this._media.currentTime -= 1 / 30;
+            }
+            break;
+          }
         }
       });
+    }
+
+    _applySeekAccum() {
+      if (this._seekAccumTimer) clearTimeout(this._seekAccumTimer);
+      this._seekAccumTimer = setTimeout(() => {
+        if (this._seekAccum !== 0) {
+          this.seekBy(this._seekAccum);
+          this._seekAccum = 0;
+        }
+        this._seekAccumTimer = null;
+      }, 300);
     }
 
 
@@ -502,6 +675,7 @@
       }
       this._emit('play', this._currentTrack());
       if (this._vizAnimId == null && this._analyser) this._startViz();
+      this._startWatchedSegmentTracking();
     }
 
     _onPause() {
@@ -512,9 +686,11 @@
         this._dom.playBtn.setAttribute('aria-label', 'Play');
       }
       this._emit('pause', this._currentTrack());
+      this._saveWatchedSegment();
     }
 
     _onEnded() {
+      this._saveWatchedSegment();
       this._emit('ended', this._currentTrack());
       switch (this._state.repeat) {
         case 'one': this.seekTo(0); this.play(); break;
@@ -553,6 +729,12 @@
       const dur = this._state.duration;
       const pct = dur > 0 ? clampPct((cur / dur) * 100) : 0;
 
+      // AB loop: auto-seek to A when position >= B
+      if (this._loopA != null && this._loopB != null && cur >= this._loopB) {
+        this._media.currentTime = this._loopA;
+        return;
+      }
+
       if (this._dom) {
         this._dom.timeCur.textContent = fmt.time(cur);
         this._dom.seekFill.style.width = `${pct}%`;
@@ -560,10 +742,22 @@
         this._dom.seekTrack?.setAttribute('aria-valuenow', String(Math.round(pct)));
       }
 
+      // Update waveform progress
+      if (this._waveformScrubber && this._dom?.waveformCanvas && dur > 0) {
+        const track = this._currentTrack();
+        const cacheId = track?.id || track?.src || '';
+        this._waveformScrubber.repaintProgress(this._dom.waveformCanvas, cacheId, cur / dur);
+      }
+
       this._updateCaptionCue(cur);
       this._highlightTimedPanelItem(cur);
       this._emit('timeupdate', { currentTime: cur, duration: dur || 0, percent: pct });
       this._saveSession();
+
+      // Persist time to MediaStorage (throttled internally)
+      if (this._mediaStorage && this._currentTrack()) {
+        this._mediaStorage.set(this._mediaId(), 'time', cur);
+      }
     }
 
     _onSeeked() {
@@ -586,6 +780,12 @@
         const pct = this._state.muted ? 0 : this._state.volume * 100;
         this._dom.volFill.style.width = `${pct}%`;
         this._dom.volTrack?.setAttribute('aria-valuenow', String(Math.round(pct)));
+      }
+      // Persist to MediaStorage
+      if (this._mediaStorage && this._currentTrack()) {
+        const id = this._mediaId();
+        this._mediaStorage.set(id, 'volume', this._state.volume);
+        this._mediaStorage.set(id, 'muted', this._state.muted);
       }
     }
 
@@ -658,17 +858,38 @@
 
     /** Cycle playback speeds: 0.5 â†’ 0.75 â†’ 1 â†’ 1.25 â†’ 1.5 â†’ 2 */
     cycleSpeed() {
-      const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
-      const cur    = this._media.playbackRate;
-      const idx    = speeds.indexOf(cur);
-      const next   = speeds[(idx + 1) % speeds.length];
-      this._media.playbackRate = next;
-      if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(next);
-      this._emit('speed', next);
+      if (this._dom?.speedPanel) {
+        this._dom.speedPanel.hidden = !this._dom.speedPanel.hidden;
+      }
     }
 
     _formatSpeedLabel(rate) {
       return `${Number(rate) || 1}x`;
+    }
+
+    _initSpeedPresets() {
+      const container = this._dom?.speedPresetsContainer;
+      if (!container) return;
+      container.replaceChildren();
+      for (const rate of this._speedPresets) {
+        const btn = document.createElement('button');
+        btn.className = 'pd-btn pd-btn-sm pd-speed-preset';
+        btn.type = 'button';
+        btn.textContent = this._formatSpeedLabel(rate);
+        btn.dataset.rate = String(rate);
+        btn.addEventListener('click', () => {
+          this._media.playbackRate = rate;
+          if (this._dom.speedSlider) this._dom.speedSlider.value = String(rate);
+          if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
+          if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
+          this._emit('speed', rate);
+          this._saveSession();
+          if (this._mediaStorage && this._currentTrack()) {
+            this._mediaStorage.set(this._mediaId(), 'rate', rate);
+          }
+        });
+        container.appendChild(btn);
+      }
     }
 
 
@@ -809,6 +1030,7 @@
       const previous = this._currentTrack();
       if (previous && previous !== track) {
         this._emit('beforeTrackChange', previous);
+        this._saveWatchedSegment();
       }
 
       this._state.queueIndex = index;
@@ -829,6 +1051,15 @@
       this._updateCaptionCue(0);
       this._renderQueue();
       this._emit('trackChange', track);
+
+      // Restore per-video state from MediaStorage
+      this._restoreMediaState(track);
+      // Show resume hint if saved position exists
+      this._showResumeHint(track);
+      // Render watched overlay
+      this._renderWatchedOverlay(track);
+      // Render waveform
+      this._renderWaveform(track);
     }
 
     _updateTrackUI(track) {
@@ -855,7 +1086,7 @@
       }
 
       // Page title
-      if (track.title) document.title = `${track.title} — PlasmaDeck`;
+      if (track.title) document.title = `${track.title} — OpenCourseDeck`;
     }
 
     _buildShuffleOrder() {
@@ -1243,6 +1474,10 @@
           playbackRate: this._media.playbackRate,
         };
         sessionStorage.setItem(this._opts.storageKey, JSON.stringify(data));
+        sessionStorage.setItem(this._opts.storageKey + '-playlist', JSON.stringify({
+          shuffle: this._state.shuffle,
+          repeat: this._state.repeat,
+        }));
       } catch { /* quota exceeded or private browsing */ }
     }
 
@@ -1299,7 +1534,7 @@
 
     _emit(event, data) {
       (this._listeners[event] ?? []).forEach(h => h(data));
-      window.PlasmaDeck?.bus?.emit?.(`player:${event}`, data);
+      window.OpenCourseDeck?.bus?.emit?.(`player:${event}`, data);
     }
 
     _on(target, type, handler, options) {
@@ -1421,11 +1656,306 @@
 
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    // AB LOOP
+    setLoopA() {
+      this._loopA = this._media.currentTime;
+      this._updateABLoopUI();
+      this._emit('abloop', { a: this._loopA, b: this._loopB });
+    }
+
+    setLoopB() {
+      this._loopB = this._media.currentTime;
+      if (this._loopA != null && this._loopB <= this._loopA) {
+        this._loopB = null;
+      }
+      this._updateABLoopUI();
+      this._emit('abloop', { a: this._loopA, b: this._loopB });
+    }
+
+    clearLoop() {
+      this._loopA = null;
+      this._loopB = null;
+      this._updateABLoopUI();
+      this._emit('abloop', { a: null, b: null });
+    }
+
+    toggleLoop() {
+      if (this._loopA == null) {
+        this.setLoopA();
+      } else if (this._loopB == null) {
+        this.setLoopB();
+      } else {
+        this.clearLoop();
+      }
+    }
+
+    _updateABLoopUI() {
+      const btn = this._dom?.abLoopBtn;
+      if (btn) {
+        const active = this._loopA != null;
+        btn.classList.toggle('active', active);
+        if (this._loopA != null && this._loopB != null) {
+          btn.textContent = 'A-B';
+          btn.setAttribute('aria-label', 'AB loop: ' + fmt.time(this._loopA) + ' - ' + fmt.time(this._loopB));
+        } else if (this._loopA != null) {
+          btn.textContent = 'A-?';
+          btn.setAttribute('aria-label', 'Loop A set at ' + fmt.time(this._loopA) + ', press again for B');
+        } else {
+          btn.textContent = 'A-B';
+          btn.setAttribute('aria-label', 'AB loop');
+        }
+      }
+      const region = this._dom?.abLoopRegion;
+      if (region) {
+        if (this._loopA != null && this._loopB != null && this._state.duration > 0) {
+          const startPct = clampPct((this._loopA / this._state.duration) * 100);
+          const endPct = clampPct((this._loopB / this._state.duration) * 100);
+          region.style.left = startPct + '%';
+          region.style.width = (endPct - startPct) + '%';
+          region.style.display = '';
+        } else {
+          region.style.display = 'none';
+        }
+      }
+    }
+
+    // SCREENSHOT
+    screenshot() {
+      try {
+        const canvas = document.createElement('canvas');
+        const video = this._media;
+        if (video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        } else {
+          canvas.width = 640;
+          canvas.height = 360;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/png');
+        this._emit('screenshot', { dataUrl, track: this._currentTrack(), time: this._media.currentTime });
+        return dataUrl;
+      } catch (e) {
+        console.warn('[MediaPlayer] Screenshot failed:', e);
+        return null;
+      }
+    }
+
+    async screenshotToClipboard() {
+      try {
+        const canvas = document.createElement('canvas');
+        const video = this._media;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise(function(r) { canvas.toBlob(r, 'image/png'); });
+        if (blob && navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        }
+        return true;
+      } catch (e) {
+        console.warn('[MediaPlayer] Screenshot to clipboard failed:', e);
+        return false;
+      }
+    }
+
+    // MEDIA STORAGE INTEGRATION
+    _mediaId() {
+      var track = this._currentTrack();
+      return this._opts.mediaId || track?.id || track?.src || 'track-' + this._state.queueIndex;
+    }
+
+    async _restoreMediaState(track) {
+      if (!this._mediaStorage) return;
+      var mediaId = this._opts.mediaId || track?.id || track?.src || 'track-' + this._state.queueIndex;
+      try {
+        const state = await this._mediaStorage.get(mediaId);
+        if (state) {
+          if (Number.isFinite(state.volume) && state.volume >= 0) this.setVolume(state.volume);
+          if (typeof state.muted === 'boolean') this._media.muted = state.muted;
+          if (Number.isFinite(state.rate) && state.rate > 0) {
+            this._media.playbackRate = state.rate;
+            if (this._dom?.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(state.rate);
+            if (this._dom?.speedSlider) this._dom.speedSlider.value = String(state.rate);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    // WAVEFORM SCRUBBER INTEGRATION
+    async _renderWaveform(track) {
+      const canvas = this._dom?.waveformCanvas;
+      if (!canvas) return;
+      const ScrubberClass = window.OpenCourseDeck?.WaveformScrubber;
+      if (!ScrubberClass) {
+        canvas.style.display = 'none';
+        return;
+      }
+      if (!this._waveformScrubber) this._waveformScrubber = new ScrubberClass();
+      const audioUrl = track?.src || track?.url;
+      if (!audioUrl) {
+        canvas.style.display = 'none';
+        return;
+      }
+      canvas.style.display = '';
+      const cacheId = track?.id || audioUrl;
+      try {
+        await this._waveformScrubber.render(canvas, audioUrl, {
+          cacheId,
+          progress: this._state.duration > 0 ? this._media.currentTime / this._state.duration : 0,
+          bars: 200,
+        });
+      } catch {
+        canvas.style.display = 'none';
+      }
+    }
+
+    // WATCHED SEGMENT TRACKING
+    _startWatchedSegmentTracking() {
+      const track = this._currentTrack();
+      if (!track) return;
+      this._watchedSegStart = this._media.currentTime;
+    }
+
+    _saveWatchedSegment() {
+      if (this._watchedSegStart == null) return;
+      const track = this._currentTrack();
+      if (!track) { this._watchedSegStart = null; return; }
+      const topicId = track.topicId || track.id;
+      if (!topicId) { this._watchedSegStart = null; return; }
+      const start = this._watchedSegStart;
+      const end = this._media.currentTime;
+      this._watchedSegStart = null;
+      if (end - start < 1) return;
+
+      this._watchedIntervals = _mergeIntervals([...this._watchedIntervals, { start, end }]);
+
+      const db = window.DB;
+      if (db?.addWatchedSegment) {
+        db.addWatchedSegment({
+          topicId,
+          courseId: track.courseId || '',
+          start,
+          end,
+        }).catch(() => {});
+      }
+
+      this._renderWatchedOverlay(track);
+    }
+
+    _renderWatchedOverlay(_track) {
+      const overlay = this._dom?.watchedOverlay;
+      if (!overlay) return;
+      const dur = this._state.duration || this._media.duration || 0;
+      if (!dur || !this._watchedIntervals.length) {
+        overlay.style.display = 'none';
+        return;
+      }
+      overlay.style.display = '';
+      overlay.replaceChildren();
+      for (const seg of this._watchedIntervals) {
+        const startPct = clampPct((seg.start / dur) * 100);
+        const endPct = clampPct((seg.end / dur) * 100);
+        if (endPct <= startPct) continue;
+        const bar = document.createElement('div');
+        bar.className = 'pd-watched-bar';
+        bar.style.left = startPct + '%';
+        bar.style.width = (endPct - startPct) + '%';
+        overlay.appendChild(bar);
+      }
+    }
+
+    async _showResumeHint(track) {
+      const hint = this._dom?.resumeHint;
+      const text = this._dom?.resumeText;
+      if (!hint || !text) return;
+      hint.hidden = true;
+
+      let savedTime = 0;
+      const mediaId = this._opts.mediaId || track?.id || track?.src || '';
+      if (this._mediaStorage && mediaId) {
+        try {
+          const state = await this._mediaStorage.get(mediaId);
+          savedTime = Number(state?.time) || 0;
+        } catch { /* ignore */ }
+      }
+      if (!savedTime) {
+        const topicId = track?.topicId || track?.id;
+        const db = window.DB;
+        if (topicId && db?.getWatchedSegments) {
+          try {
+            const segments = await db.getWatchedSegments(topicId);
+            if (segments?.length) {
+              const maxEnd = segments.reduce((max, s) => Math.max(max, Number(s.end) || 0), 0);
+              if (maxEnd > 10) savedTime = maxEnd;
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      const topicId = track?.topicId || track?.id;
+      const db = window.DB;
+      if (topicId && db?.getWatchedSegments) {
+        try {
+          const segments = await db.getWatchedSegments(topicId);
+          if (segments?.length) {
+            this._watchedIntervals = segments
+              .filter(s => s.start != null && s.end != null)
+              .map(s => ({ start: Number(s.start), end: Number(s.end) }));
+          } else {
+            this._watchedIntervals = [];
+          }
+        } catch { this._watchedIntervals = []; }
+      }
+
+      if (savedTime > 10) {
+        text.textContent = 'Resume from ' + fmt.time(savedTime) + '?';
+        hint.hidden = false;
+        this._pendingResumeTime = savedTime;
+      }
+    }
+
+    _handleResumeGo() {
+      if (this._pendingResumeTime > 0) {
+        this.seekTo(this._pendingResumeTime);
+      }
+      if (this._dom?.resumeHint) this._dom.resumeHint.hidden = true;
+      this._pendingResumeTime = 0;
+    }
+
+    _handleResumeStart() {
+      this.seekTo(0);
+      if (this._dom?.resumeHint) this._dom.resumeHint.hidden = true;
+      this._pendingResumeTime = 0;
+    }
+
+    // RESTORE PLAYLIST MODE
+    _restorePlaylistMode() {
+      try {
+        const raw = sessionStorage.getItem(this._opts.storageKey + '-playlist');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.shuffle != null && data.shuffle !== this._state.shuffle) {
+          this.toggleShuffle();
+        }
+        if (data.repeat && data.repeat !== 'none' && data.repeat !== this._state.repeat) {
+          this._state.repeat = data.repeat;
+          this._media.loop = data.repeat === 'one';
+          this._updateRepeatUI();
+        }
+      } catch { /* ignore */ }
+    }
+
+
     // DESTROY
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     destroy() {
       if (this._destroyed) return;
       this._destroyed = true;
+      this._saveWatchedSegment();
       this._removeDomListeners();
       try { this._media.pause(); } catch {}
       this._media.src = '';
@@ -1439,12 +1969,25 @@
       this._vizResizeObserver?.disconnect?.();
       this._vizResizeObserver = null;
       this._resizeVisualizer = null;
+      if (this._waveformScrubber) {
+        this._waveformScrubber.destroy();
+        this._waveformScrubber = null;
+      }
+      if (this._mediaStorage) {
+        this._mediaStorage.flush();
+        this._mediaStorage = null;
+      }
+      if (this._seekAccumTimer) {
+        clearTimeout(this._seekAccumTimer);
+        this._seekAccumTimer = null;
+      }
       this._container.replaceChildren();
       this._listeners = {};
       this._dom = null;
       this._controls = null;
       this._queuePanel = null;
       sessionStorage.removeItem(this._opts.storageKey);
+      sessionStorage.removeItem(this._opts.storageKey + '-playlist');
     }
   }
 
@@ -1496,8 +2039,8 @@
   document.addEventListener('DOMContentLoaded', autoInit);
 
   // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  window.PlasmaDeck            = window.PlasmaDeck ?? {};
-  window.PlasmaDeck.MediaPlayer = MediaPlayer;
-  window.PlasmaDeck.Player      = { init: autoInit, destroyAll, getActiveSnapshot, requestActivePictureInPicture };
+  window.OpenCourseDeck            = window.OpenCourseDeck ?? {};
+  window.OpenCourseDeck.MediaPlayer = MediaPlayer;
+  window.OpenCourseDeck.Player      = { init: autoInit, destroyAll, getActiveSnapshot, requestActivePictureInPicture };
 
 })();

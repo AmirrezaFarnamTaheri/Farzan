@@ -12,8 +12,8 @@ function shouldBlock() {
 
 export function initBeforeUnloadGuard() {
   const w = window;
-  w.PlasmaDeck = w.PlasmaDeck ?? {};
-  w.PlasmaDeck.beforeUnload = {
+  w.OpenCourseDeck = w.OpenCourseDeck ?? {};
+  w.OpenCourseDeck.beforeUnload = {
     /** @param {string} [key] */
     mark(key = 'generic') {
       REASONS.add(key);

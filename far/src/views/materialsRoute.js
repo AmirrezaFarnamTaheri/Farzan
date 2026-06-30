@@ -165,7 +165,7 @@ export async function mountMaterialsView(deps = {}) {
       return;
     }
     const token = renderToken;
-    const batchSize = Math.max(1, Number(window.PlasmaDeck?.materialsRenderBatchSize) || 50);
+    const batchSize = Math.max(1, Number(window.OpenCourseDeck?.materialsRenderBatchSize) || 50);
     const status = createElement('div', {
       class: 'materials-render-status text-sm',
       'aria-live': 'polite',

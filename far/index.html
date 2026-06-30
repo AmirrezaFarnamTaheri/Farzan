@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="dark" data-accent="plasma" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="PlasmaDeck — Your personal interactive learning studio" />
+  <meta name="description" content="OpenCourseDeck — Your personal interactive learning studio" />
   <meta name="theme-color" content="#7c3aed" id="meta-theme-color" />
   <meta name="color-scheme" content="dark light" />
   <meta http-equiv="Content-Security-Policy"
@@ -21,14 +21,14 @@
 
   <!-- Open Graph / Share -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="PlasmaDeck Learning Studio" />
+  <meta property="og:title" content="OpenCourseDeck Learning Studio" />
   <meta property="og:description" content="Your personal interactive learning studio with video, PDF, notes, canvas and progress tracking." />
   <meta property="og:image" content="./assets/og-cover.svg" />
   <meta property="og:url" content="" id="og-url" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="PlasmaDeck Learning Studio" />
+  <meta name="twitter:title" content="OpenCourseDeck Learning Studio" />
   <meta name="twitter:description" content="Your personal interactive learning studio." />
 
   <!-- PWA Manifest -->
@@ -47,7 +47,7 @@
   <link rel="stylesheet" href="./style.css" />
   
 
-  <title>PlasmaDeck — Learning Studio</title>
+  <title>OpenCourseDeck — Learning Studio</title>
 
   <!-- Critical inline styles to prevent FOUC -->
   <style>
@@ -131,9 +131,9 @@
   <!-- ═══════════════════════════════════════════
        LOADING SPLASH SCREEN
   ════════════════════════════════════════════ -->
-  <div id="app-loading" role="status" aria-label="Loading PlasmaDeck">
+  <div id="app-loading" role="status" aria-label="Loading OpenCourseDeck">
     <div class="splash-logo" aria-hidden="true">⚡</div>
-    <div class="splash-label">PlasmaDeck</div>
+    <div class="splash-label">OpenCourseDeck</div>
     <div class="splash-bar-wrap">
       <div class="splash-bar"></div>
     </div>
@@ -153,13 +153,13 @@
       text-align:center;gap:1rem;padding:2rem;
       z-index:999999;">
       <div style="font-size:3rem;">⚡</div>
-      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">PlasmaDeck requires JavaScript</h1>
+      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">OpenCourseDeck requires JavaScript</h1>
       <p style="color:rgba(255,255,255,0.6);max-width:400px;line-height:1.6;margin:0;">
-        Please enable JavaScript in your browser to use PlasmaDeck.
+        Please enable JavaScript in your browser to use OpenCourseDeck.
         This application is a client-side learning studio that stores all your data locally.
       </p>
       <div style="color:rgba(255,255,255,0.6);max-width:520px;line-height:1.6;">
-        To use PlasmaDeck, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
+        To use OpenCourseDeck, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
       </div>
     </div>
   </noscript>
@@ -173,16 +173,16 @@
     <div class="orb orb-3"></div>
   </div>
 
-  <div id="plasma-app" class="plasma-app" aria-label="PlasmaDeck Learning Studio">
+  <div id="plasma-app" class="plasma-app" aria-label="OpenCourseDeck Learning Studio">
 
 
     <!-- ── SIDEBAR ─────────────────────────────── -->
     <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">
 
       <!-- Logo -->
-      <div class="sidebar-logo" aria-label="PlasmaDeck home">
+      <div class="sidebar-logo" aria-label="OpenCourseDeck home">
         <div class="sidebar-logo-icon" aria-hidden="true">⚡</div>
-        <span class="sidebar-logo-text">PlasmaDeck</span>
+        <span class="sidebar-logo-text">OpenCourseDeck</span>
         <button class="sidebar-collapse-btn" id="sidebar-collapse-btn"
           aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+B)">
           <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
@@ -729,7 +729,7 @@
   <!-- ═══════════════════════════════════════════
        SERVICE WORKER REGISTRATION
   ════════════════════════════════════════════ -->
-  <!-- Boot script imports dist/plasma.js and logs early failures -->
+  <!-- Boot script imports dist/opencoursedeck.js and logs early failures -->
 
 </body>
 </html>

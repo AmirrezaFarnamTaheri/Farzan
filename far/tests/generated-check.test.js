@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+﻿import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ describe('generated output drift checks', () => {
   });
 
   function makeTempDir() {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plasmadeck-generated-test-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-generated-test-'));
     tempDirs.push(dir);
     return dir;
   }
@@ -24,15 +24,15 @@ describe('generated output drift checks', () => {
     const actual = makeTempDir();
     fs.mkdirSync(path.join(expected, 'chunks'), { recursive: true });
     fs.mkdirSync(path.join(actual, 'chunks'), { recursive: true });
-    fs.writeFileSync(path.join(expected, 'plasma.js'), 'fresh', 'utf8');
-    fs.writeFileSync(path.join(actual, 'plasma.js'), 'stale', 'utf8');
+    fs.writeFileSync(path.join(expected, 'opencoursedeck.js'), 'fresh', 'utf8');
+    fs.writeFileSync(path.join(actual, 'opencoursedeck.js'), 'stale', 'utf8');
     fs.writeFileSync(path.join(expected, 'chunks', 'needed.js'), 'needed', 'utf8');
     fs.writeFileSync(path.join(actual, 'extra.js'), 'extra', 'utf8');
 
     const result = compareDirs(expected, actual);
 
     expect(result.clean).toBe(false);
-    expect(result.changed).toEqual(['plasma.js']);
+    expect(result.changed).toEqual(['opencoursedeck.js']);
     expect(result.missing).toEqual(['chunks/needed.js']);
     expect(result.extra).toEqual(['extra.js']);
   });
@@ -84,7 +84,7 @@ describe('generated output drift checks', () => {
 
     expect(buildScript).toContain("'index.html'");
     expect(buildScript).toContain("const staticDirs = ['assets', 'data', 'docs', 'vendor']");
-    expect(buildScript).toContain("replaceAll('./dist/plasma.js', './plasma.js')");
+    expect(buildScript).toContain("replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js')");
     expect(buildScript).toContain("throw new Error('Production build did not stage dist/index.html')");
   });
 });

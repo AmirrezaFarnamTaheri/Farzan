@@ -1,5 +1,5 @@
 // ============================================================
-// progress.js  — PlasmaDeck bulk progress & export
+// progress.js  — OpenCourseDeck bulk progress & export
 // ============================================================
 'use strict';
 
@@ -10,14 +10,14 @@ const ProgressStats = (() => {
   const fmtDate  = d => new Date(d).toLocaleDateString('fa-IR');
   /** Toast via app shell (avoid bridge App shim). */
   function pdToast(message, type = 'info') {
-    const T = window.PlasmaDeck?.Toast;
+    const T = window.OpenCourseDeck?.Toast;
     if (!T) return;
     const fn = T[type];
     if (typeof fn === 'function') return fn(String(message ?? ''));
     T.show?.({ message: String(message ?? ''), type });
   }
   async function pdConfirm(input) {
-    const pd = window.PlasmaDeck;
+    const pd = window.OpenCourseDeck;
     const fn = pd?.UI?.confirm ?? pd?.Modal?.confirmAsync;
     if (typeof fn === 'function') return fn(input);
     const message = input && typeof input === 'object' ? input.message : input;
@@ -307,7 +307,7 @@ const ProgressStats = (() => {
     let json = JSON.stringify(payload, null, 2);
     payload.meta.sizeBytes = new Blob([json]).size;
     json = JSON.stringify(payload, null, 2);
-    _downloadText(json, `plasmadeck-backup-${_isoDate()}.json`, 'application/json');
+    _downloadText(json, `opencoursedeck-backup-${_isoDate()}.json`, 'application/json');
     pdToast('فایل JSON دانلود شد ✓', 'success');
   }
 
@@ -336,7 +336,7 @@ const ProgressStats = (() => {
     });
 
     const csv = rows.map(r => r.map(_csvCell).join(',')).join('\n');
-    _downloadText(csv, `plasmadeck-progress-${_isoDate()}.csv`, 'text/csv');
+    _downloadText(csv, `opencoursedeck-progress-${_isoDate()}.csv`, 'text/csv');
     pdToast('فایل CSV دانلود شد ✓', 'success');
   }
 
@@ -346,7 +346,7 @@ const ProgressStats = (() => {
     const allTopics = DataStore.allTopics();
     const topicMap  = Object.fromEntries(allTopics.map(t => [t.topicId, t]));
 
-    const lines = [`# PlasmaDeck Notes Export\n_${new Date().toISOString()}_\n`];
+    const lines = [`# OpenCourseDeck Notes Export\n_${new Date().toISOString()}_\n`];
     allNotes.forEach(n => {
       const t = topicMap[n.topicId] || {};
       lines.push(`\n## ${n.title || t.title || n.topicId || 'Untitled note'}`);
@@ -354,7 +354,7 @@ const ProgressStats = (() => {
       lines.push(_htmlToMarkdown(n.content ?? n.html ?? '') || n.text || '');
     });
 
-    _downloadText(lines.join('\n'), `plasmadeck-notes-${_isoDate()}.md`, 'text/markdown');
+    _downloadText(lines.join('\n'), `opencoursedeck-notes-${_isoDate()}.md`, 'text/markdown');
     pdToast('یادداشت‌ها به Markdown دانلود شد ✓', 'success');
   }
 
@@ -381,7 +381,7 @@ const ProgressStats = (() => {
     const { allNotes, allTimestamps, allAnnotations, noteFiles } = await _vaultExportData();
 
     const lines = [
-      '# PlasmaDeck Vault Export',
+      '# OpenCourseDeck Vault Export',
       '',
       `Exported: ${new Date().toISOString()}`,
       `Notes: ${allNotes.length}`,
@@ -411,19 +411,19 @@ const ProgressStats = (() => {
       lines.push('', `<!-- ${filename} -->`, _noteVaultMarkdown(note, topic));
     });
 
-    _downloadText(lines.join('\n'), `plasmadeck-vault-${_isoDate()}.md`, 'text/markdown');
+    _downloadText(lines.join('\n'), `opencoursedeck-vault-${_isoDate()}.md`, 'text/markdown');
     pdToast('Vault Markdown export downloaded ✓', 'success');
   }
 
   async function exportVaultArchive() {
     const archive = await _vaultArchivePayload();
-    _downloadText(JSON.stringify(archive, null, 2), `plasmadeck-vault-archive-${_isoDate()}.json`, 'application/json');
+    _downloadText(JSON.stringify(archive, null, 2), `opencoursedeck-vault-archive-${_isoDate()}.json`, 'application/json');
     pdToast('Vault archive export downloaded ✓', 'success');
   }
 
   async function exportVaultZip() {
     const archive = await _vaultArchivePayload();
-    _downloadBlob(_zipFiles(archive.files), `plasmadeck-vault-${_isoDate()}.zip`);
+    _downloadBlob(_zipFiles(archive.files), `opencoursedeck-vault-${_isoDate()}.zip`);
     pdToast(`Vault ZIP export downloaded (${archive.files.length} files) ✓`, 'success');
   }
 
@@ -433,7 +433,7 @@ const ProgressStats = (() => {
       return exportVaultArchive();
     }
     const archive = await _vaultArchivePayload();
-    const root = await window.showDirectoryPicker({ id: 'plasmadeck-vault', mode: 'readwrite', startIn: 'documents' });
+    const root = await window.showDirectoryPicker({ id: 'opencoursedeck-vault', mode: 'readwrite', startIn: 'documents' });
     for (const file of archive.files) {
       await _writeVaultFile(root, file.path, file.content);
     }
@@ -510,8 +510,8 @@ const ProgressStats = (() => {
           preview,
         };
 
-        window.PlasmaDeck = window.PlasmaDeck ?? {};
-        window.PlasmaDeck.lastImportPreview = preview;
+        window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+        window.OpenCourseDeck.lastImportPreview = preview;
         const confirmed = await pdConfirm({
           title: 'وارد کردن پشتیبان',
           message: _formatImportPreview(preview) ||
@@ -574,7 +574,7 @@ const ProgressStats = (() => {
 
           // Nudge Notes UI to refresh if open
           try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
-          try { window.PlasmaDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
+          try { window.OpenCourseDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
         }
         if (folderRecords.length && DB.saveFolder) {
           await _forEachChunk(folderRecords, async (folder) => {
@@ -670,8 +670,8 @@ const ProgressStats = (() => {
         if (result.errors.length) {
           await _rollbackImport(rollbackSnapshot, result);
         }
-        window.PlasmaDeck = window.PlasmaDeck ?? {};
-        window.PlasmaDeck.lastImportResult = result;
+        window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+        window.OpenCourseDeck.lastImportResult = result;
         if (result.rolledBack) {
           pdToast(`Import rolled back after ${result.errors.length} error(s). No partial backup changes were kept.`, 'error');
         } else {
@@ -989,7 +989,7 @@ const ProgressStats = (() => {
     noteFiles.forEach(({ filename, note, topic }) => {
       files.push({ path: filename, type: 'text/markdown', content: _noteVaultMarkdown(note, topic) });
     });
-    return { version: 'plasmadeck-vault-archive-1', files };
+    return { version: 'opencoursedeck-vault-archive-1', files };
   }
 
   async function _writeVaultFile(root, path, content) {
@@ -1111,8 +1111,8 @@ const ProgressStats = (() => {
 document.addEventListener('DOMContentLoaded', () => ProgressStats.bindButtons());
 
 // Public init helper for SPA route injection
-window.PlasmaDeck = window.PlasmaDeck ?? {};
-window.PlasmaDeck.ProgressStatsInit = async () => {
+window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+window.OpenCourseDeck.ProgressStatsInit = async () => {
   try {
     ProgressStats.bindButtons();
     await ProgressStats.renderStatsPage();
@@ -1501,7 +1501,7 @@ window.PlasmaDeck.ProgressStatsInit = async () => {
         if (nextBtn) nextBtn.hidden   = clamped === total;
         if (doneBtn) doneBtn.hidden   = clamped !== total;
 
-        window.PlasmaDeck?.bus?.emit('steps:change', { step: clamped, total, wizard });
+        window.OpenCourseDeck?.bus?.emit('steps:change', { step: clamped, total, wizard });
       },
 
       _render(el, total, current) {
@@ -1766,12 +1766,12 @@ window.PlasmaDeck.ProgressStatsInit = async () => {
 
   })(); // end Progress IIFE
 
-  window.PlasmaDeck = window.PlasmaDeck ?? {};
-  // NOTE: app.js also defines `PlasmaDeck.Progress` for lightweight page-level progress bars.
+  window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+  // NOTE: app.js also defines `OpenCourseDeck.Progress` for lightweight page-level progress bars.
   // This module's animation/tween/reveal toolkit is exposed as `ProgressUI` to avoid collisions.
-  window.PlasmaDeck.ProgressUI = Progress;
+  window.OpenCourseDeck.ProgressUI = Progress;
   window.Progress = window.Progress ?? Progress;
 
   // Export the bulk stats/export API too (ProgressStats lives in module scope otherwise)
-  window.PlasmaDeck.ProgressStats = ProgressStats;
+  window.OpenCourseDeck.ProgressStats = ProgressStats;
   window.ProgressStats = window.ProgressStats ?? ProgressStats;

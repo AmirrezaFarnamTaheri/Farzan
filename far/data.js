@@ -1,7 +1,7 @@
 
 
 // ============================================================
-// PlasmaDeck — data.js
+// OpenCourseDeck — data.js
 // Data Layer: Fetch, Transform, Cache, Reactive Store
 // ============================================================
 
@@ -120,7 +120,7 @@
                 });
                 // refresh cache with new ts
                 this._cache.set(cacheKey, fresh, cacheTTL);
-                window.PlasmaDeck?.bus?.emit?.('data:cacheUpdate', { url: fullURL, key: cacheKey });
+                window.OpenCourseDeck?.bus?.emit?.('data:cacheUpdate', { url: fullURL, key: cacheKey });
               } catch {
                 // ignore background refresh errors
               }
@@ -765,7 +765,7 @@
           } else if (/^on/i.test(attr)) {
             el.removeAttribute(attr);
           } else if (['href', 'src', 'poster'].includes(attr)) {
-            const safeUrl = window.PlasmaDeck?.safeUrl?.(display) ?? window.PlasmaDeck?.safeImageUrl?.(display);
+            const safeUrl = window.OpenCourseDeck?.safeUrl?.(display) ?? window.OpenCourseDeck?.safeImageUrl?.(display);
             if (safeUrl || /^(?:https?:|blob:|data:image\/|\/|\.\/|#)/i.test(String(display || ''))) {
               el.setAttribute(attr, safeUrl || String(display));
             } else {
@@ -863,8 +863,8 @@
   // ══════════════════════════════════════════════════════════
   // EXPORT
   // ══════════════════════════════════════════════════════════
-  window.PlasmaDeck      = window.PlasmaDeck ?? {};
-  window.PlasmaDeck.Data = {
+  window.OpenCourseDeck      = window.OpenCourseDeck ?? {};
+  window.OpenCourseDeck.Data = {
     HttpClient,
     Store,
     Collection,
@@ -882,7 +882,7 @@
     createCollection: (items, opts) => new Collection(items, opts),
     createPipeline:   ()     => new Pipeline(),
     createQuery:      (resource, client) =>
-      new QueryBuilder(client ?? window.PlasmaDeck.Data.http, resource),
+      new QueryBuilder(client ?? window.OpenCourseDeck.Data.http, resource),
   };
 
 })();

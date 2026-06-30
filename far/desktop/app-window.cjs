@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 function browserCandidates() {
   const vars = process.env;
   return [
-    vars.PLASMADECK_BROWSER,
+    vars.OPENCOURSEDECK_BROWSER,
     path.join(vars.ProgramFiles || '', 'Microsoft/Edge/Application/msedge.exe'),
     path.join(vars['ProgramFiles(x86)'] || '', 'Microsoft/Edge/Application/msedge.exe'),
     path.join(vars.LOCALAPPDATA || '', 'Microsoft/Edge/Application/msedge.exe'),
@@ -36,14 +36,14 @@ function listen(server) {
 async function main() {
   const browser = findBrowser();
   if (!browser) {
-    console.error('[desktop] Could not find Microsoft Edge or Google Chrome. Install Electron and use `npm run desktop`, or set PLASMADECK_BROWSER to a Chromium-compatible executable.');
+    console.error('[desktop] Could not find Microsoft Edge or Google Chrome. Install Electron and use `npm run desktop`, or set OPENCOURSEDECK_BROWSER to a Chromium-compatible executable.');
     process.exit(1);
   }
 
   const server = createServer({ root });
   const address = await listen(server);
   const url = `http://127.0.0.1:${address.port}/`;
-  const userDataDir = path.join(os.tmpdir(), 'plasmadeck-app-window');
+  const userDataDir = path.join(os.tmpdir(), 'opencoursedeck-app-window');
   const child = spawn(browser, [
     `--app=${url}`,
     `--user-data-dir=${userDataDir}`,

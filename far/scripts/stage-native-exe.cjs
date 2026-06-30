@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = process.cwd();
-const sourceExe = path.join(root, 'src-tauri', 'target', 'release', 'plasmadeck.exe');
+const sourceExe = path.join(root, 'src-tauri', 'target', 'release', 'opencoursedeck.exe');
 const frontendIndex = path.join(root, 'dist', 'index.html');
-const outDir = path.join(root, 'desktop-dist', 'PlasmaDeck-Native');
-const outExe = path.join(outDir, 'PlasmaDeck.exe');
+const outDir = path.join(root, 'desktop-dist', 'OpenCourseDeck-Native');
+const outExe = path.join(outDir, 'OpenCourseDeck.exe');
 const bundleDir = path.join(root, 'src-tauri', 'target', 'release', 'bundle', 'nsis');
-const manifestPath = path.join(outDir, 'plasmadeck-native.json');
+const manifestPath = path.join(outDir, 'opencoursedeck-native.json');
 const readmePath = path.join(outDir, 'README.txt');
 
 if (!fs.existsSync(sourceExe)) {
@@ -45,9 +45,9 @@ const stagedInstallers = installers.map((installer) => {
   };
 });
 const manifest = {
-  name: 'PlasmaDeck',
+  name: 'OpenCourseDeck',
   kind: 'tauri-native-executable',
-  executable: 'PlasmaDeck.exe',
+  executable: 'OpenCourseDeck.exe',
   source: path.relative(root, sourceExe).replaceAll(path.sep, '/'),
   bytes: stats.size,
   generatedAt: new Date().toISOString(),
@@ -72,9 +72,9 @@ fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 fs.writeFileSync(
   readmePath,
   [
-    'PlasmaDeck Native Executable',
+    'OpenCourseDeck Native Executable',
     '',
-    'Run PlasmaDeck.exe to start the browserless Tauri app.',
+    'Run OpenCourseDeck.exe to start the browserless Tauri app.',
     '',
     stagedInstallers.length
       ? 'The NSIS installer is staged in this folder alongside the executable.'

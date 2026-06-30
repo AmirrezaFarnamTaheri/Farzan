@@ -1,6 +1,6 @@
 ## Backup And Restore
 
-PlasmaDeck stores user data locally in the browser. Backups are the safest way to move data between machines, browser profiles, or app origins.
+OpenCourseDeck stores user data locally in the browser. Backups are the safest way to move data between machines, browser profiles, or app origins.
 
 ### What Is Stored
 
@@ -11,7 +11,7 @@ PlasmaDeck stores user data locally in the browser. Backups are the safest way t
 
 ### Export A Backup
 
-1. Open PlasmaDeck from the same origin you normally use.
+1. Open OpenCourseDeck from the same origin you normally use.
 2. Go to Progress or Settings.
 3. Use the JSON export or backup button.
 4. Store the exported file somewhere outside the project folder if you are reinstalling.
@@ -30,7 +30,7 @@ Use the in-app reset button from Settings when possible. It clears the app-contr
 For a manual reset, use browser devtools for `http://localhost:5173`:
 
 1. Application or Storage panel.
-2. Clear IndexedDB for PlasmaDeck.
+2. Clear IndexedDB for OpenCourseDeck.
 3. Clear localStorage and sessionStorage for the same origin.
 4. Unregister the service worker if you also want to reset offline cache.
 

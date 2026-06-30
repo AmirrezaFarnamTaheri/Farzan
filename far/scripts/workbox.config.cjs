@@ -6,7 +6,7 @@ const pkg = require('../package.json');
 
 module.exports = {
   /** Bumps Workbox cache namespace whenever app version changes — avoids stale precache. */
-  cacheId: `plasmadeck-v${pkg.version}`,
+  cacheId: `opencoursedeck-v${pkg.version}`,
   globDirectory: '.',
   globPatterns: [
     'index.html',

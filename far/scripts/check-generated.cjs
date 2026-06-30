@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
@@ -56,8 +56,8 @@ function fileMap(dir) {
 }
 
 function isGeneratedBundleFile(file) {
-  return file === 'plasma.js'
-    || file === 'plasma.js.map'
+  return file === 'opencoursedeck.js'
+    || file === 'opencoursedeck.js.map'
     || file.startsWith('chunks/');
 }
 
@@ -103,7 +103,7 @@ function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
 }
 
 async function checkGenerated({ actualOutdir = outdir } = {}) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plasmadeck-generated-'));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-generated-'));
   const tempOutdir = path.join(tempRoot, 'dist');
   try {
     await esbuild.build(buildOptionsFor(tempOutdir));

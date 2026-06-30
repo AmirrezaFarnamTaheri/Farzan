@@ -135,7 +135,7 @@ function writeMissingCargoReport(packages) {
   const reportPath = rel('desktop-dist', 'native-cargo-missing.txt');
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   const lines = [
-    'PlasmaDeck missing locked Cargo registry packages',
+    'OpenCourseDeck missing locked Cargo registry packages',
     '',
     'These packages are listed in src-tauri/Cargo.lock but are not present as .crate archives or unpacked sources in the repo-root .cargo cache.',
     'Provide a complete cargo vendor directory or a Cargo registry cache generated from the same lockfile to avoid resolving them one by one.',
@@ -220,7 +220,7 @@ if (cargoToml) {
 }
 
 if (tauriConfig) {
-  add(tauriConfig.productName === 'PlasmaDeck' ? 'ok' : 'fail', 'Tauri product name is PlasmaDeck');
+  add(tauriConfig.productName === 'OpenCourseDeck' ? 'ok' : 'fail', 'Tauri product name is OpenCourseDeck');
   add(tauriConfig.build?.frontendDist === '../dist' ? 'ok' : 'fail', 'Tauri uses built dist frontend');
   add(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('nsis') ? 'ok' : 'fail', 'Tauri bundle targets Windows NSIS');
   add(tauriConfig.app?.security?.freezePrototype === true ? 'ok' : 'warn', 'Tauri freezes prototypes');
@@ -249,7 +249,7 @@ if (resolveCargo) {
 }
 
 const symbols = { ok: '[ok]', warn: '[warn]', fail: '[fail]' };
-console.log('PlasmaDeck native preflight');
+console.log('OpenCourseDeck native preflight');
 for (const check of checks) {
   const detail = check.detail ? ` - ${check.detail}` : '';
   console.log(`${symbols[check.status]} ${check.label}${detail}`);

@@ -1,5 +1,5 @@
 // ============================================================
-// PlasmaDeck â€” bridge.js
+// OpenCourseDeck — bridge.js
 // Shared globals: window.DataStore, window.DB (progress/stats/catalog).
 // ============================================================
 
@@ -7,11 +7,11 @@
   'use strict';
 
   // Ensure namespace
-  window.PlasmaDeck = window.PlasmaDeck ?? {};
+  window.OpenCourseDeck = window.OpenCourseDeck ?? {};
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // DataStore (course/topic catalog) â€” loads local JSON on demand
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────
+  // DataStore (course/topic catalog) — loads local JSON on demand
+  // ───────────────────────────────────────────────────────────
   const DataStore = (() => {
     const STATE = {
       loaded: false,
@@ -23,13 +23,13 @@
 
     const DEMO_FALLBACK = {
       "demo-course": {
-        "title": "Welcome to PlasmaDeck (Demo)",
+        "title": "Welcome to OpenCourseDeck (Demo)",
         "sources": [
           {
             "label": "Getting Started",
             "topics": [
               {
-                "title": "PlasmaDeck Tour",
+                "title": "OpenCourseDeck Tour",
                 "url": "demo-tour",
                 "videos": [{ "url": "./assets/welcome.mp4", "label": "Welcome Video" }]
               }
@@ -152,7 +152,7 @@
           STATE.courses = norm.courses;
           STATE.topics = norm.topics;
           STATE.loaded = true;
-          window.PlasmaDeck?.bus?.emit?.('data:loaded', { courses: STATE.courses.length, topics: STATE.topics.length });
+          window.OpenCourseDeck?.bus?.emit?.('data:loaded', { courses: STATE.courses.length, topics: STATE.topics.length });
           return true;
         } catch (err) {
           console.error('[DataStore] Critical failure in init:', err);
@@ -174,18 +174,18 @@
   })();
 
   window.DataStore = window.DataStore ?? DataStore;
-  window.PlasmaDeck.DataStore = window.PlasmaDeck.DataStore ?? DataStore;
+  window.OpenCourseDeck.DataStore = window.OpenCourseDeck.DataStore ?? DataStore;
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // DB (progress + timestamps + notes mirror) â€” IndexedDB preferred, localStorage fallback.
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────
+  // DB (progress + timestamps + notes mirror) — IndexedDB preferred, localStorage fallback.
+  // ───────────────────────────────────────────────────────────
   const DB = (() => {
     const KEY_PROGRESS = 'plasma_progress_v1';
     const KEY_TIMESTAMPS = 'plasma_timestamps_v1';
     const KEY_MIGRATED = 'plasma_migrated_v2';
 
-    const IDB_NAME = 'plasmadeck';
-    const IDB_VERSION = 2;
+    const IDB_NAME = 'opencoursedeck';
+    const IDB_VERSION = 3;
 
     let _idb = null;
     let _idbCtor = null;
@@ -193,25 +193,25 @@
     const _sourceId = `pd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
     function _getIdb() {
-      const PlasmaDB = window.PlasmaDeck?.DB?.PlasmaDB;
+      const PlasmaDB = window.OpenCourseDeck?.DB?.PlasmaDB;
       if (typeof PlasmaDB !== 'function') return null;
       if (_idb && _idbCtor === PlasmaDB) return _idb;
       _idbCtor = PlasmaDB;
       _idb = new PlasmaDB(IDB_NAME, IDB_VERSION, [
         { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
-        // Notes & settings (used by progress export/import and notes app)
         { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'folders', key: 'id', autoIncrement: false, indexes: [{ field: 'parentId' }] },
         { name: 'settings', key: 'key', autoIncrement: false },
-        // PDF annotations
         { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }, { field: 'page' }] },
+        { name: 'watchedSegments', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
+        { name: 'pdfBookmarks', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }, { field: 'topicId' }] },
       ]);
       return _idb;
     }
 
     function _emit(name, payload) {
-      window.PlasmaDeck?.bus?.emit?.(name, payload);
+      window.OpenCourseDeck?.bus?.emit?.(name, payload);
     }
 
     function _errorInfo(error) {
@@ -235,17 +235,21 @@
       return localStorage.getItem(KEY_MIGRATED) === 'true';
     }
 
+    // Issue 10: close BroadcastChannel on page unload
     function _broadcast(kind, action, record) {
       const payload = { kind, action, record, source: _sourceId, timestamp: Date.now() };
       try {
         if (!_sync && typeof window.BroadcastChannel === 'function') {
-          _sync = new window.BroadcastChannel('plasmadeck_sync');
+          _sync = new window.BroadcastChannel('opencoursedeck_sync');
           _sync.onmessage = (event) => {
             const message = event?.data;
             if (!message || message.source === _sourceId) return;
             _emit('sync:message', message);
             _emit(`${message.kind}:${message.action}`, message);
           };
+          if (typeof window !== 'undefined') {
+            window.addEventListener('beforeunload', () => { try { _sync?.close?.(); } catch {} });
+          }
         }
         _sync?.postMessage?.(payload);
       } catch {
@@ -258,8 +262,28 @@
       try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
       catch { return fallback; }
     }
+    // Issue: add error handling to _write
     function _write(key, value) {
-      localStorage.setItem(key, JSON.stringify(value));
+      try { localStorage.setItem(key, JSON.stringify(value)); }
+      catch (e) { console.warn('[DB] localStorage write failed:', key, e); throw e; }
+    }
+
+    // Issue 4: per-record migration tracking
+    const _migratedSections = new Set();
+    const MIGRATED_IDS_KEY = 'plasma_migrated_ids';
+    let _migratedIds = null;
+
+    function _loadMigratedIds() {
+      if (_migratedIds) return _migratedIds;
+      try {
+        const arr = JSON.parse(localStorage.getItem(MIGRATED_IDS_KEY));
+        _migratedIds = new Set(Array.isArray(arr) ? arr : []);
+      } catch { _migratedIds = new Set(); }
+      return _migratedIds;
+    }
+
+    function _persistMigratedIds() {
+      try { localStorage.setItem(MIGRATED_IDS_KEY, JSON.stringify([..._migratedIds])); } catch {}
     }
 
     async function _migrateOnce() {
@@ -267,61 +291,111 @@
       const idb = _getIdb();
       if (!idb) return false;
       const failures = [];
+      const ids = _loadMigratedIds();
+      let dirty = false;
       try {
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration starting',data:{hasLegacyProgress:!!localStorage.getItem(KEY_PROGRESS),hasLegacyTs:!!localStorage.getItem(KEY_TIMESTAMPS),hasLegacyNotes:!!localStorage.getItem('plasma-notes')},timestamp:Date.now()});
-        // Progress map -> progress store
-        const map = _read(KEY_PROGRESS, {});
-        for (const v of Object.values(map)) {
-          if (!v || !v.topicId) continue;
-          await idb.put('progress', v);
+
+        if (!_migratedSections.has('progress')) {
+          try {
+            const map = _read(KEY_PROGRESS, {});
+            for (const [key, v] of Object.entries(map)) {
+              if (!v || !v.topicId) continue;
+              const rid = `progress:${key}`;
+              if (ids.has(rid)) continue;
+              await idb.put('progress', v);
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('progress');
+          } catch (error) { failures.push({ section: 'progress', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
         }
 
-        // Timestamps list -> timestamps store
-        const list = _read(KEY_TIMESTAMPS, []);
-        for (const ts of list) {
-          if (!ts) continue;
-          const id = ts.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          await idb.put('timestamps', { ...ts, id });
+        if (!_migratedSections.has('timestamps')) {
+          try {
+            const list = _read(KEY_TIMESTAMPS, []);
+            for (const ts of list) {
+              if (!ts) continue;
+              const id = ts.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              const rid = `timestamps:${id}`;
+              if (ids.has(rid)) continue;
+              await idb.put('timestamps', { ...ts, id });
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('timestamps');
+          } catch (error) { failures.push({ section: 'timestamps', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
         }
 
-        // Notes
-        try {
-          const notes = _read('plasma-notes', []);
-          for (const n of notes) {
-            if (!n) continue;
-            const id = n.id ?? `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            await idb.put('notes', { ...n, id });
-          }
-        } catch (error) { failures.push({ section: 'notes', error: _errorInfo(error) }); }
+        if (!_migratedSections.has('notes')) {
+          try {
+            const notes = _read('plasma-notes', []);
+            for (const n of notes) {
+              if (!n) continue;
+              const id = n.id ?? `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              const rid = `notes:${id}`;
+              if (ids.has(rid)) continue;
+              await idb.put('notes', { ...n, id });
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('notes');
+          } catch (error) { failures.push({ section: 'notes', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
+        }
 
-        // Folders
-        try {
-          const folders = _read('plasma-folders', []);
-          for (const f of folders) {
-            if (!f) continue;
-            const id = f.id ?? `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            await idb.put('folders', { ...f, id });
-          }
-        } catch (error) { failures.push({ section: 'folders', error: _errorInfo(error) }); }
+        if (!_migratedSections.has('folders')) {
+          try {
+            const folders = _read('plasma-folders', []);
+            for (const f of folders) {
+              if (!f) continue;
+              const id = f.id ?? `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              const rid = `folders:${id}`;
+              if (ids.has(rid)) continue;
+              await idb.put('folders', { ...f, id });
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('folders');
+          } catch (error) { failures.push({ section: 'folders', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
+        }
 
-        // Notes settings
-        try {
-          const ns = _read('plasma-notes-settings', null);
-          if (ns && typeof ns === 'object') await idb.put('settings', { key: 'notes', value: ns });
-        } catch (error) { failures.push({ section: 'settings', error: _errorInfo(error) }); }
+        if (!_migratedSections.has('settings')) {
+          try {
+            const ns = _read('plasma-notes-settings', null);
+            const rid = 'settings:notes';
+            if (ns && typeof ns === 'object' && !ids.has(rid)) {
+              await idb.put('settings', { key: 'notes', value: ns });
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('settings');
+          } catch (error) { failures.push({ section: 'settings', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
+        }
 
-        // PDF annotations
-        try {
-          const annsRaw = _read('plasma-pdf-annotations', {});
-          const anns = Array.isArray(annsRaw)
-            ? annsRaw
-            : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
-          for (const a of anns) {
-            if (!a) continue;
-            const id = a.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            await idb.put('annotations', { ...a, id });
-          }
-        } catch (error) { failures.push({ section: 'annotations', error: _errorInfo(error) }); }
+        if (!_migratedSections.has('annotations')) {
+          try {
+            const annsRaw = _read('plasma-pdf-annotations', {});
+            const anns = Array.isArray(annsRaw)
+              ? annsRaw
+              : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
+            for (const a of anns) {
+              if (!a) continue;
+              const id = a.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              const rid = `annotations:${id}`;
+              if (ids.has(rid)) continue;
+              await idb.put('annotations', { ...a, id });
+              ids.add(rid);
+              dirty = true;
+            }
+            _migratedSections.add('annotations');
+          } catch (error) { failures.push({ section: 'annotations', error: _errorInfo(error) }); }
+          if (dirty) { _persistMigratedIds(); dirty = false; }
+        }
 
         if (failures.length) {
           _emit('storage:migration-error', { kind: 'migration', backend: 'indexedDB', failures });
@@ -329,6 +403,7 @@
         }
 
         localStorage.setItem(KEY_MIGRATED, 'true');
+        localStorage.removeItem(MIGRATED_IDS_KEY);
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration completed',data:{},timestamp:Date.now()});
         return true;
       } catch (e) {
@@ -373,7 +448,7 @@
         await _migrateOnce();
         try {
           await idb.put('progress', next);
-          window.PlasmaDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
+          window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
           _broadcast('progress', 'save', next);
           return next;
         } catch (e) {
@@ -387,7 +462,7 @@
       const map = _read(KEY_PROGRESS, {});
       map[topicId] = next;
       _write(KEY_PROGRESS, map);
-      window.PlasmaDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });    
+      window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });    
       return next;
     }
 
@@ -421,9 +496,11 @@
       return true;
     }
 
+    // Issue 7: add await _migrateOnce()
     async function deleteTimestamp(id) {
       const idb = _getIdb();
       if (idb) {
+        await _migrateOnce();
         try { await idb.delete('timestamps', id); } catch {}
       }
       const list = _read(KEY_TIMESTAMPS, []);
@@ -470,9 +547,11 @@
       return next;
     }
 
+    // Issue 7: add await _migrateOnce()
     async function deleteNote(id) {
       const idb = _getIdb();
       if (idb) {
+        await _migrateOnce();
         try { await idb.delete('notes', id); } catch {}
       }
       if (!_isMigrated()) {
@@ -618,9 +697,10 @@
       return nextArr;
     }
 
+    // Issue 2: add watchedSegments and pdfBookmarks
     async function clearAll({ includeNotes = true, includeSettings = true, includeAnnotations = true, includePrefs = true } = {}) {  
       const idb = _getIdb();
-      const stores = ['progress', 'timestamps'];
+      const stores = ['progress', 'timestamps', 'watchedSegments', 'pdfBookmarks'];
       if (includeNotes) stores.push('notes', 'folders');
       if (includeSettings) stores.push('settings');
       if (includeAnnotations) stores.push('annotations');
@@ -658,6 +738,7 @@
       return true;
     }
 
+    // Issue 2: add watchedSegments and pdfBookmarks to media scope
     async function clearUserData(scope) {
       const idb = _getIdb();
       const clearStores = async (stores) => {
@@ -676,7 +757,7 @@
         await clearStores(['progress']);
         localStorage.removeItem(KEY_PROGRESS);
       } else if (scope === 'media') {
-        await clearStores(['timestamps', 'annotations']);
+        await clearStores(['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']);
         localStorage.removeItem(KEY_TIMESTAMPS);
         localStorage.removeItem('plasma-pdf-annotations');
       } else if (scope === 'playlists') {
@@ -722,6 +803,234 @@
       return (await getAllNotes()).sort((a, b) => Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0)).slice(0, limit);
     }
 
+    // Issue 5: use IDBKeyRange + cursor instead of getAll() + filter
+    async function queryByRange(store, indexName, lower, upper, { lowerOpen = false, upperOpen = false, limit } = {}) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          const range = IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
+          if (typeof idb.queryIndex === 'function') return await idb.queryIndex(store, indexName, range, limit) ?? [];
+          const db = await idb.open();
+          const tx = db.transaction(store, 'readonly');
+          const idx = tx.objectStore(store).index(indexName);
+          return await new Promise((resolve, reject) => {
+            const out = [];
+            const req = idx.openCursor(range);
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (!cursor || (limit && out.length >= limit)) { resolve(out); return; }
+              out.push(cursor.value);
+              cursor.continue();
+            };
+            req.onerror = () => reject(req.error);
+          });
+        } catch {}
+      }
+      const all = store === 'progress'
+        ? Object.values(_read(KEY_PROGRESS, {}))
+        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'plasma-notes', []);
+      return all.filter(r => r && r[indexName] >= lower && r[indexName] <= upper).slice(0, limit);
+    }
+
+    // Issue 6: use index.count() instead of loading all records
+    async function countByIndex(store, indexName, value) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          const db = await idb.open();
+          const tx = db.transaction(store, 'readonly');
+          const idx = tx.objectStore(store).index(indexName);
+          return await new Promise((resolve, reject) => {
+            const req = idx.count(value);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+        } catch {}
+      }
+      const all = store === 'progress'
+        ? Object.values(_read(KEY_PROGRESS, {}))
+        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'plasma-notes', []);
+      return all.filter(r => r?.[indexName] === value).length;
+    }
+
+    // Issue 8: throw on save failure, return null when IDB unavailable
+    async function addWatchedSegment(segment) {
+      const id = segment?.id ?? `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const next = { ...(segment ?? {}), id, updatedAt: segment?.updatedAt ?? Date.now() };
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          await idb.put('watchedSegments', next);
+          _broadcast('watchedSegment', 'save', next);
+          return next;
+        } catch (e) {
+          _signalSaveError('watchedSegment', 'indexedDB', e);
+          throw e;
+        }
+      }
+      return null;
+    }
+
+    async function getWatchedSegments(topicId) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('watchedSegments', 'topicId', topicId) ?? [];
+          const all = await idb.getAll('watchedSegments') ?? [];
+          return all.filter(s => s.topicId === topicId);
+        } catch {}
+      }
+      return [];
+    }
+
+    async function getWatchedPercent(topicId, duration) {
+      const segments = await getWatchedSegments(topicId);
+      if (!segments.length || !duration) return 0;
+      const merged = [];
+      const sorted = segments
+        .filter(s => s.start != null && s.end != null)
+        .sort((a, b) => a.start - b.start);
+      for (const seg of sorted) {
+        if (!merged.length || seg.start > merged[merged.length - 1].end) {
+          merged.push({ start: seg.start, end: seg.end });
+        } else {
+          merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
+        }
+      }
+      const totalWatched = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
+      return Math.min(100, Math.round((totalWatched / duration) * 100));
+    }
+
+    async function addPdfBookmark(bookmark) {
+      const id = bookmark?.id ?? `bm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const next = { ...(bookmark ?? {}), id, updatedAt: bookmark?.updatedAt ?? Date.now() };
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          await idb.put('pdfBookmarks', next);
+          _broadcast('pdfBookmark', 'save', next);
+          return next;
+        } catch (e) {
+          _signalSaveError('pdfBookmark', 'indexedDB', e);
+          throw e;
+        }
+      }
+      return next;
+    }
+
+    async function getPdfBookmarks(docId) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('pdfBookmarks', 'docId', docId) ?? [];
+          const all = await idb.getAll('pdfBookmarks') ?? [];
+          return all.filter(b => b.docId === docId);
+        } catch {}
+      }
+      return [];
+    }
+
+    // Issue 9: only broadcast on success
+    async function deletePdfBookmark(id) {
+      const idb = _getIdb();
+      if (idb) {
+        await _migrateOnce();
+        try {
+          await idb.delete('pdfBookmarks', id);
+          _broadcast('pdfBookmark', 'delete', { id });
+          return true;
+        } catch (e) {
+          _signalSaveError('pdfBookmark-delete', 'indexedDB', e);
+          return false;
+        }
+      }
+      _broadcast('pdfBookmark', 'delete', { id });
+      return true;
+    }
+
+    // Issue 1: include watchedSegments and pdfBookmarks
+    async function exportBackup({ includeProgress = true, includeTimestamps = true, includeNotes = true, includeFolders = true, includeSettings = true, includeAnnotations = true, includeWatchedSegments = true, includePdfBookmarks = true } = {}) {
+      const data = {};
+      if (includeProgress) data.progress = await getAllProgress();
+      if (includeTimestamps) data.timestamps = await getAllTimestamps();
+      if (includeNotes) data.notes = await getAllNotes();
+      if (includeFolders) data.folders = await getAllFolders();
+      if (includeSettings) {
+        const idb = _getIdb();
+        if (idb) {
+          await _migrateOnce();
+          try { data.settings = await idb.getAll('settings') ?? []; } catch { data.settings = []; }
+        } else {
+          data.settings = [];
+        }
+      }
+      if (includeAnnotations) data.annotations = await getAllAnnotations();
+      if (includeWatchedSegments) {
+        const idb = _getIdb();
+        if (idb) {
+          await _migrateOnce();
+          try { data.watchedSegments = await idb.getAll('watchedSegments') ?? []; } catch { data.watchedSegments = []; }
+        } else {
+          data.watchedSegments = [];
+        }
+      }
+      if (includePdfBookmarks) {
+        const idb = _getIdb();
+        if (idb) {
+          await _migrateOnce();
+          try { data.pdfBookmarks = await idb.getAll('pdfBookmarks') ?? []; } catch { data.pdfBookmarks = []; }
+        } else {
+          data.pdfBookmarks = [];
+        }
+      }
+      data._meta = { exportedAt: Date.now(), version: 1 };
+      return data;
+    }
+
+    // Issue 3: explicit overwrite path
+    async function importBackup(data, { mode = 'merge' } = {}) {
+      if (!data || typeof data !== 'object') throw new Error('Invalid backup data');
+      const idb = _getIdb();
+      if (!idb) throw new Error('IndexedDB unavailable');
+
+      await _migrateOnce();
+
+      const isOverwrite = mode === 'overwrite';
+      const storeMap = {
+        progress: 'progress',
+        timestamps: 'timestamps',
+        notes: 'notes',
+        folders: 'folders',
+        settings: 'settings',
+        annotations: 'annotations',
+        watchedSegments: 'watchedSegments',
+        pdfBookmarks: 'pdfBookmarks',
+      };
+
+      for (const [key, store] of Object.entries(storeMap)) {
+        const records = data[key];
+        if (!Array.isArray(records) || !records.length) continue;
+        if (isOverwrite) {
+          try { await idb.clear(store); } catch {}
+        }
+        for (const record of records) {
+          if (!record) continue;
+          try { await idb.put(store, record); } catch (e) {
+            console.warn(`[DB] importBackup failed for store ${store}:`, e);
+          }
+        }
+      }
+
+      _emit('storage:import-complete', { mode, timestamp: Date.now() });
+      return true;
+    }
+
     return {
       getProgress,
       getAllProgress,
@@ -748,6 +1057,16 @@
       getAllAnnotations,
       getAnnotations,
       saveAnnotations,
+      queryByRange,
+      countByIndex,
+      addWatchedSegment,
+      getWatchedSegments,
+      getWatchedPercent,
+      addPdfBookmark,
+      getPdfBookmarks,
+      deletePdfBookmark,
+      exportBackup,
+      importBackup,
       clearAll,
       clearUserData,
     };

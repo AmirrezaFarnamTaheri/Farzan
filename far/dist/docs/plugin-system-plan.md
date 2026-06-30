@@ -1,8 +1,8 @@
-# PlasmaDeck Plugin System Plan
+# OpenCourseDeck Plugin System Plan
 
 ## Goal
 
-PlasmaDeck should support user-installed extensions without weakening the local-first privacy model, CSP posture, route lifecycle discipline, or backup/export guarantees already established in the unified audit. The plugin system must begin as a conservative capability platform, not as arbitrary code execution inside the main app.
+OpenCourseDeck should support user-installed extensions without weakening the local-first privacy model, CSP posture, route lifecycle discipline, or backup/export guarantees already established in the unified audit. The plugin system must begin as a conservative capability platform, not as arbitrary code execution inside the main app.
 
 The first production target is a **local plugin registry** that can install, enable, disable, inspect, export, and remove plugins. Plugins should be able to add focused behavior such as dashboard widgets, note actions, command-palette commands, import/export adapters, Studio tools, and AI provider connectors.
 
@@ -19,7 +19,7 @@ The first production target is a **local plugin registry** that can install, ena
 A plugin is a folder or ZIP archive with:
 
 ```text
-plasmadeck-plugin.json
+opencoursedeck-plugin.json
 main.js
 README.md
 assets/
@@ -59,12 +59,12 @@ Phase 1 extension points should be declarative and app-owned:
 - `command`: add command-palette commands.
 - `noteAction`: add actions that receive sanitized note snapshots and return patches.
 - `dashboardWidget`: render app-owned widget layouts from a JSON view model.
-- `importer`: parse a user-selected file into validated PlasmaDeck records.
-- `exporter`: create a file from validated PlasmaDeck records.
+- `importer`: parse a user-selected file into validated OpenCourseDeck records.
+- `exporter`: create a file from validated OpenCourseDeck records.
 
 Phase 2 extension points can add worker-backed scripting:
 
-- `aiProvider`: register a local or user-keyed AI provider behind `PlasmaDeck.AI`.
+- `aiProvider`: register a local or user-keyed AI provider behind `OpenCourseDeck.AI`.
 - `studioTool`: transform selected Studio elements through a constrained tool API.
 - `courseMetadata`: enrich course/topic metadata without mutating catalog source files directly.
 
@@ -129,7 +129,7 @@ Worker plugins should talk to the host through messages:
 
 ```js
 postMessage({
-  type: "plasmadeck:plugin-ready",
+  type: "opencoursedeck:plugin-ready",
   extensions: [
     { type: "command", id: "clean-note", title: "Clean current note" }
   ]
@@ -140,7 +140,7 @@ Host-to-plugin invocation:
 
 ```js
 postMessage({
-  type: "plasmadeck:invoke",
+  type: "opencoursedeck:invoke",
   invocationId: "inv-123",
   extensionPoint: "noteAction",
   payload: {
@@ -153,7 +153,7 @@ Plugin response:
 
 ```js
 postMessage({
-  type: "plasmadeck:result",
+  type: "opencoursedeck:result",
   invocationId: "inv-123",
   patch: {
     content: "<p>Sanitized by host before save.</p>"
@@ -244,7 +244,7 @@ Add a plugin details view:
 
 ### Phase 4: AI Provider Plugins
 
-- Let plugins register `aiProvider` adapters behind `PlasmaDeck.AI.registerLocalProvider()`.
+- Let plugins register `aiProvider` adapters behind `OpenCourseDeck.AI.registerLocalProvider()`.
 - Support local model adapters and user-keyed remote adapters.
 - Keep provider UI under Settings AI options and plugin details.
 
@@ -259,7 +259,7 @@ Add a plugin details view:
 - Note Cleaner: normalize headings, spacing, and pasted note fragments.
 - Markdown Importer: import Markdown folders into notes.
 - Anki Exporter: export parsed Q/A notes into flashcard CSV.
-- Local AI Provider: register an installed model runtime with `PlasmaDeck.AI`.
+- Local AI Provider: register an installed model runtime with `OpenCourseDeck.AI`.
 - Studio Template Pack: add reusable board templates without changing core Studio code.
 
 ## Acceptance Criteria

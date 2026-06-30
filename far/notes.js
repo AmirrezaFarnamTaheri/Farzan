@@ -1,5 +1,5 @@
 // ============================================================
-// PlasmaDeck — notes.js
+// OpenCourseDeck — notes.js
 // Full Rich Notes System
 // Features: Editor, Folders, Tags, Search, Autosave, Export
 // ============================================================
@@ -29,7 +29,7 @@
   }
 
   async function pdConfirm(input) {
-    const pd = window.PlasmaDeck;
+    const pd = window.OpenCourseDeck;
     const fn = pd?.UI?.confirm ?? pd?.Modal?.confirmAsync;
     if (typeof fn === 'function') return fn(input);
     const message = input && typeof input === 'object' ? input.message : input;
@@ -118,9 +118,9 @@
 
     _emitStorageIssue(type, detail) {
       const payload = { ...detail, at: Date.now() };
-      window.PlasmaDeck = window.PlasmaDeck || {};
-      window.PlasmaDeck.lastStorageIssue = payload;
-      try { window.PlasmaDeck?.bus?.emit?.(type, payload); } catch {}
+      window.OpenCourseDeck = window.OpenCourseDeck || {};
+      window.OpenCourseDeck.lastStorageIssue = payload;
+      try { window.OpenCourseDeck?.bus?.emit?.(type, payload); } catch {}
       try {
         if (typeof CustomEvent === 'function') {
           window.dispatchEvent?.(new CustomEvent(`plasma:${type}`, { detail: payload }));
@@ -241,8 +241,8 @@
         folders: { local: localFolders.length, db: Array.isArray(dbFolders) ? dbFolders.length : 0, merged: mergedFolders.length },
         settings: { merged: Object.keys(mergedSettings).length },
       };
-      window.PlasmaDeck = window.PlasmaDeck ?? {};
-      window.PlasmaDeck.lastNotesRepairResult = result;
+      window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+      window.OpenCourseDeck.lastNotesRepairResult = result;
       return result;
     },
 
@@ -311,7 +311,13 @@
       if (!note) return;
       this._cacheNote(note, fallbackNotes);
       if (window.DB?.saveNote) {
-        try { window.DB.saveNote(note).catch?.(() => {}); return; } catch { /* fallback below */ }
+        try {
+          window.DB.saveNote(note).catch?.(err => {
+            console.warn('[Notes] DB.saveNote failed', err);
+            window.OpenCourseDeck?.Toast?.error?.('Note save failed — stored locally.');
+          });
+          return;
+        } catch { /* fallback below */ }
       }
       this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
     },
@@ -546,8 +552,8 @@
       if (titleEl) titleEl.value = note.title;
 
       this._updateMeta(note);
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-body');
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-title');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
     },
 
     // ── Get current HTML ──────────────────────────────────
@@ -574,8 +580,8 @@
           this._updateMeta(updated);
           this._showSaveIndicator();
           NotesList.refreshItem(updated);
-          window.PlasmaDeck?.beforeUnload?.unmark?.('notes-body');
-          window.PlasmaDeck?.bus?.emit('note:save', { note: updated });
+          window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
+          window.OpenCourseDeck?.bus?.emit('note:save', { note: updated });
         }
       };
 
@@ -701,16 +707,33 @@
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
       const range = sel.getRangeAt(0);
-      const node  = document.createElement(tag);
-      range.surroundContents(node);
+      if (range.collapsed) return;
+      try {
+        const node = document.createElement(tag);
+        range.surroundContents(node);
+      } catch {
+        const fragment = range.extractContents();
+        const node = document.createElement(tag);
+        node.appendChild(fragment);
+        range.insertNode(node);
+        sel.removeAllRanges();
+        const newRange = document.createRange();
+        newRange.selectNodeContents(node);
+        sel.addRange(newRange);
+      }
     },
 
     _insertCodeBlock() {
+      const sel = window.getSelection();
       const pre  = document.createElement('pre');
       const code = document.createElement('code');
-      code.textContent = window.getSelection().toString() || 'code here';
+      code.textContent = sel?.toString() || 'code here';
       pre.appendChild(code);
-      const range = window.getSelection().getRangeAt(0);
+      if (!sel || !sel.rangeCount) {
+        this._el?.appendChild(pre);
+        return;
+      }
+      const range = sel.getRangeAt(0);
       range.deleteContents();
       range.insertNode(pre);
     },
@@ -846,7 +869,7 @@
 
     // ── Helpers ───────────────────────────────────────────
     _onInput() {
-      window.PlasmaDeck?.beforeUnload?.mark?.('notes-body');
+      window.OpenCourseDeck?.beforeUnload?.mark?.('notes-body');
       this.save();
     },
 
@@ -948,7 +971,9 @@
         notes.sort((a, b) => {
           let av = a[this._sortBy], bv = b[this._sortBy];
           if (this._sortBy === 'title') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
-          return this._sortDir === 'desc' ? (av < bv ? 1 : -1) : (av > bv ? 1 : -1);
+          if (av < bv) return this._sortDir === 'desc' ? 1 : -1;
+          if (av > bv) return this._sortDir === 'desc' ? -1 : 1;
+          return 0;
         });
       }
 
@@ -1462,12 +1487,12 @@
               conflicts++;
             }
           });
-          window.PlasmaDeck = window.PlasmaDeck ?? {};
-          window.PlasmaDeck.lastNotesImportResult = { imported, updated, skipped, invalid, conflicts, errors };
+          window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+          window.OpenCourseDeck.lastNotesImportResult = { imported, updated, skipped, invalid, conflicts, errors };
           NotesList.render();
-          window.PlasmaDeck?.Toast?.success(`Imported ${imported} notes, updated ${updated}.`);
+          window.OpenCourseDeck?.Toast?.success(`Imported ${imported} notes, updated ${updated}.`);
         } catch {
-          window.PlasmaDeck?.Toast?.error('Invalid JSON file.');
+          window.OpenCourseDeck?.Toast?.error('Invalid JSON file.');
         }
       };
       reader.readAsText(file);
@@ -1624,14 +1649,14 @@
       const titleInput = $('[data-note-title-input]');
       if (titleInput) {
         RouteListeners.on(titleInput, 'input', () => {
-          window.PlasmaDeck?.beforeUnload?.mark?.('notes-title');
+          window.OpenCourseDeck?.beforeUnload?.mark?.('notes-title');
           clearTimeout(titleInput._pdTitleT);
           titleInput._pdTitleT = setTimeout(() => {
             if (Editor._currentId) {
               Store.updateNote(Editor._currentId, { title: titleInput.value });
               NotesList.render();
             }
-            window.PlasmaDeck?.beforeUnload?.unmark?.('notes-title');
+            window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
           }, 500);
         });
       }
@@ -1665,7 +1690,7 @@
     },
 
     _bindSyncRefresh() {
-      const bus = window.PlasmaDeck?.bus;
+      const bus = window.OpenCourseDeck?.bus;
       if (!bus?.on || this._syncHandler) return;
       this._syncHandler = payload => {
         this.refreshFromSync(payload).catch?.(() => {});
@@ -1674,7 +1699,7 @@
     },
 
     _unbindSyncRefresh() {
-      const bus = window.PlasmaDeck?.bus;
+      const bus = window.OpenCourseDeck?.bus;
       if (this._syncHandler) bus?.off?.('sync:message', this._syncHandler);
       this._syncHandler = null;
     },
@@ -1720,7 +1745,7 @@
 
       const render = this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
       const result = { refreshed: true, kind, ...render };
-      window.PlasmaDeck?.bus?.emit?.('notes:sync-refresh', result);
+      window.OpenCourseDeck?.bus?.emit?.('notes:sync-refresh', result);
       return result;
     },
 
@@ -1728,7 +1753,7 @@
       const note = Store.createNote({ folderId });
       NotesList.render();
       this.openNote(note.id);
-      window.PlasmaDeck?.bus?.emit('note:create', { note });
+      window.OpenCourseDeck?.bus?.emit('note:create', { note });
     },
 
     openNote(id) {
@@ -1758,7 +1783,7 @@
       }
       NotesList.render();
       FoldersPanel.render();
-      window.PlasmaDeck?.bus?.emit('note:delete', { id });
+      window.OpenCourseDeck?.bus?.emit('note:delete', { id });
     },
 
     duplicateNote(id) {
@@ -1805,13 +1830,13 @@
     exportNote: NotesExport.exportNote.bind(NotesExport),
 
     async summarizeCurrentNote() {
-      const ai = window.PlasmaDeck?.AI;
+      const ai = window.OpenCourseDeck?.AI;
       if (!ai?.summarizeText) return { ok: false, reason: 'unavailable' };
       if (!Editor._currentId) return { ok: false, reason: 'no-note' };
       Editor.save(true);
       const text = plainTextFromHtml(Editor.getContent());
       if (!text) {
-        window.PlasmaDeck?.Toast?.info?.('Nothing to summarize');
+        window.OpenCourseDeck?.Toast?.info?.('Nothing to summarize');
         return { ok: false, reason: 'empty-note' };
       }
       const button = $('[data-ai-summarize]');
@@ -1819,17 +1844,17 @@
       try {
         const result = await ai.summarizeText(text, { bullets: 3 });
         if (!result?.ok || !result.text) {
-          window.PlasmaDeck?.Toast?.error?.('AI summary unavailable');
+          window.OpenCourseDeck?.Toast?.error?.('AI summary unavailable');
           return { ok: false, reason: result?.reason || 'summary-failed' };
         }
         const inserted = Editor.appendAISummary(result.text);
         if (inserted) {
           NotesList.render();
-          window.PlasmaDeck?.Toast?.success?.('Summary added');
+          window.OpenCourseDeck?.Toast?.success?.('Summary added');
         }
         return { ok: inserted, provider: result.provider, mode: result.mode };
       } catch {
-        window.PlasmaDeck?.Toast?.error?.('AI summary failed');
+        window.OpenCourseDeck?.Toast?.error?.('AI summary failed');
         return { ok: false, reason: 'summary-error' };
       } finally {
         if (button) button.disabled = false;
@@ -1837,7 +1862,7 @@
     },
 
     async rebuildSemanticIndex() {
-      const ai = window.PlasmaDeck?.AI;
+      const ai = window.OpenCourseDeck?.AI;
       if (!ai?.upsertEmbedding) return { indexed: 0, available: false };
       const notes = Store.getNotes();
       await Promise.all(notes.map(note => ai.upsertEmbedding({
@@ -1849,7 +1874,7 @@
     },
 
     async semanticSearchNotes() {
-      const ai = window.PlasmaDeck?.AI;
+      const ai = window.OpenCourseDeck?.AI;
       const query = $('[data-notes-search]')?.value?.trim();
       const status = $('[data-notes-semantic-status]');
       if (!query) {
@@ -1880,7 +1905,7 @@
       if (!button) return;
       button.hidden = true;
       try {
-        const status = await window.PlasmaDeck?.AI?.status?.();
+        const status = await window.OpenCourseDeck?.AI?.status?.();
         button.hidden = !status?.available;
       } catch {
         button.hidden = true;
@@ -1892,7 +1917,7 @@
       const searchButton = $('[data-notes-semantic-search]');
       const clearButton = $('[data-notes-semantic-clear]');
       if (!searchButton || !clearButton) return;
-      const available = Boolean(window.PlasmaDeck?.AI?.searchEmbeddings && window.PlasmaDeck?.AI?.upsertEmbedding);
+      const available = Boolean(window.OpenCourseDeck?.AI?.searchEmbeddings && window.OpenCourseDeck?.AI?.upsertEmbedding);
       searchButton.hidden = !available;
       clearButton.hidden = !available;
       if (!available) return;
@@ -1913,8 +1938,8 @@
       NotesList.destroy();
       FoldersPanel._container = null;
       this._inited = false;
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-body');
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-title');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
     },
   };
 
@@ -1929,8 +1954,8 @@
         Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
         NotesList.render();
       }
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-body');
-      window.PlasmaDeck?.beforeUnload?.unmark?.('notes-title');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
     } catch {
       /* ignore */
     }

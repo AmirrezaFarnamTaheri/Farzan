@@ -23,7 +23,7 @@ async function loadApp(html = '<div id="plasma-app"><main id="view-container"></
     this.unobserve = vi.fn();
     this.disconnect = vi.fn();
   });
-  window.PlasmaDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
+  window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
   await import('../app.js');
 }
 
@@ -42,25 +42,25 @@ describe('app shell resilience helpers', () => {
     await loadApp();
     const fn = vi.fn();
 
-    window.PlasmaDeck.bus.once('sample:event', fn);
-    window.PlasmaDeck.bus.off('sample:event', fn);
-    window.PlasmaDeck.bus.emit('sample:event');
+    window.OpenCourseDeck.bus.once('sample:event', fn);
+    window.OpenCourseDeck.bus.off('sample:event', fn);
+    window.OpenCourseDeck.bus.emit('sample:event');
 
     expect(fn).not.toHaveBeenCalled();
   });
 
   it('removes culled toasts from active toast bookkeeping', async () => {
     await loadApp();
-    window.PlasmaDeck.config.toastMaxStack = 2;
+    window.OpenCourseDeck.config.toastMaxStack = 2;
 
-    const first = window.PlasmaDeck.Toast.show({ message: 'one', duration: 0 });
-    window.PlasmaDeck.Toast.show({ message: 'two', duration: 0 });
-    window.PlasmaDeck.Toast.show({ message: 'three', duration: 0 });
+    const first = window.OpenCourseDeck.Toast.show({ message: 'one', duration: 0 });
+    window.OpenCourseDeck.Toast.show({ message: 'two', duration: 0 });
+    window.OpenCourseDeck.Toast.show({ message: 'three', duration: 0 });
 
     expect(document.querySelectorAll('.toast')).toHaveLength(2);
     expect(document.body.contains(first)).toBe(false);
-    expect(window.PlasmaDeck.state.activeToasts).toHaveLength(2);
-    expect(window.PlasmaDeck.state.activeToasts).not.toContain(first);
+    expect(window.OpenCourseDeck.state.activeToasts).toHaveLength(2);
+    expect(window.OpenCourseDeck.state.activeToasts).not.toContain(first);
   });
 
   it('recovers infinite scroll loading state when onLoad rejects', async () => {
@@ -77,7 +77,7 @@ describe('app shell resilience helpers', () => {
       .mockRejectedValueOnce(new Error('network failed'))
       .mockResolvedValueOnce(true);
 
-    window.PlasmaDeck.InfiniteScroll.init({
+    window.OpenCourseDeck.InfiniteScroll.init({
       container: document.getElementById('scroll-root'),
       onLoad,
     });
@@ -135,8 +135,8 @@ describe('app shell resilience helpers', () => {
       update: vi.fn(),
     };
 
-    window.PlasmaDeck.Charts.register('custom', chart);
-    window.PlasmaDeck.bus.emit('theme:change', { theme: 'light' });
+    window.OpenCourseDeck.Charts.register('custom', chart);
+    window.OpenCourseDeck.bus.emit('theme:change', { theme: 'light' });
 
     expect(chart.options.plugins.legend.position).toBe('bottom');
     expect(chart.options.plugins.legend.labels.usePointStyle).toBe(true);
@@ -151,14 +151,14 @@ describe('app shell resilience helpers', () => {
   it('stores modal cleanup state in weak maps', async () => {
     await loadApp();
 
-    expect(window.PlasmaDeck.Modal._cleanupFns).toBeInstanceOf(WeakMap);
-    expect(window.PlasmaDeck.Modal._previousFocus).toBeInstanceOf(WeakMap);
+    expect(window.OpenCourseDeck.Modal._cleanupFns).toBeInstanceOf(WeakMap);
+    expect(window.OpenCourseDeck.Modal._previousFocus).toBeInstanceOf(WeakMap);
   });
 
   it('resolves styled async confirmations from confirm and cancel actions', async () => {
     await loadApp();
 
-    const yes = window.PlasmaDeck.Modal.confirmAsync({
+    const yes = window.OpenCourseDeck.Modal.confirmAsync({
       title: 'Confirm delete',
       message: 'Delete this item?',
       confirmLabel: 'Delete',
@@ -169,7 +169,7 @@ describe('app shell resilience helpers', () => {
       .click();
     await expect(yes).resolves.toBe(true);
 
-    const no = window.PlasmaDeck.Modal.confirmAsync({
+    const no = window.OpenCourseDeck.Modal.confirmAsync({
       title: 'Confirm reset',
       message: 'Reset now?',
       confirmLabel: 'Reset',
@@ -179,7 +179,7 @@ describe('app shell resilience helpers', () => {
       .find(btn => btn.textContent === 'Cancel')
       .click();
     await expect(no).resolves.toBe(false);
-    expect(window.PlasmaDeck.Modal.confirm).toBeUndefined();
+    expect(window.OpenCourseDeck.Modal.confirm).toBeUndefined();
   });
 
   it('opens drawers as modal dialogs and restores focus on close', async () => {
@@ -197,14 +197,14 @@ describe('app shell resilience helpers', () => {
     const app = document.getElementById('plasma-app');
     opener.focus();
 
-    window.PlasmaDeck.Drawer.open(drawer);
+    window.OpenCourseDeck.Drawer.open(drawer);
 
     expect(drawer.getAttribute('role')).toBe('dialog');
     expect(drawer.getAttribute('aria-modal')).toBe('true');
     expect(drawer.getAttribute('aria-hidden')).toBe('false');
     expect(app.hasAttribute('inert')).toBe(true);
 
-    window.PlasmaDeck.Drawer.close(drawer);
+    window.OpenCourseDeck.Drawer.close(drawer);
     vi.runOnlyPendingTimers();
 
     expect(drawer.hasAttribute('hidden')).toBe(true);
@@ -234,9 +234,9 @@ describe('app shell resilience helpers', () => {
   it('shows a single reload prompt when IndexedDB version changes', async () => {
     await loadApp();
 
-    window.PlasmaDeck.bus.emit('db:versionchange', { name: 'plasmadeck', version: 2 });
+    window.OpenCourseDeck.bus.emit('db:versionchange', { name: 'opencoursedeck', version: 2 });
     window.dispatchEvent(new CustomEvent('plasma:db-versionchange', {
-      detail: { name: 'plasmadeck', version: 2 },
+      detail: { name: 'opencoursedeck', version: 2 },
     }));
 
     const toasts = [...document.querySelectorAll('.toast')];
@@ -261,7 +261,7 @@ describe('app shell resilience helpers', () => {
     `);
     const bar = document.getElementById('motion-progress');
 
-    window.PlasmaDeck.Progress.animate(bar, 72);
+    window.OpenCourseDeck.Progress.animate(bar, 72);
 
     expect(bar.style.getPropertyValue('--progress')).toBe('72%');
     expect(bar.getAttribute('aria-valuenow')).toBe('72');
@@ -284,13 +284,13 @@ describe('app shell resilience helpers', () => {
       unobserve: vi.fn(),
     });
     lazy.dispatchEvent(new Event('error'));
-    window.PlasmaDeck.bus.emit('theme:change', { effective: 'dark' });
+    window.OpenCourseDeck.bus.emit('theme:change', { effective: 'dark' });
     themed.dispatchEvent(new Event('error'));
 
     expect(lazy.dataset.failedSrc).toContain('missing.jpg');
     expect(themed.dataset.failedSrc).toContain('dark.jpg');
-    expect(lazy.getAttribute('src')).toBe(window.PlasmaDeck.IMAGE_FALLBACK_SRC);
-    expect(themed.getAttribute('src')).toBe(window.PlasmaDeck.IMAGE_FALLBACK_SRC);
+    expect(lazy.getAttribute('src')).toBe(window.OpenCourseDeck.IMAGE_FALLBACK_SRC);
+    expect(themed.getAttribute('src')).toBe(window.OpenCourseDeck.IMAGE_FALLBACK_SRC);
     expect(lazy.classList.contains('image-fallback')).toBe(true);
     expect(themed.classList.contains('image-fallback')).toBe(true);
   });
@@ -299,7 +299,7 @@ describe('app shell resilience helpers', () => {
     await loadApp();
 
     for (const viewName of ['tags', 'playlists', 'bookmarks', 'achievements']) {
-      await window.PlasmaDeck.Views[viewName]();
+      await window.OpenCourseDeck.Views[viewName]();
       const view = document.querySelector(`#view-container .view-${viewName}`);
       expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
       expect(view.textContent).not.toContain('planned and not yet interactive');
@@ -322,7 +322,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.tags();
+    await window.OpenCourseDeck.Views.tags();
 
     await vi.waitFor(() => expect(document.querySelectorAll('[data-tag-name]')).toHaveLength(4));
     const view = document.querySelector('#view-container .view-tags');
@@ -380,7 +380,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.home();
+    await window.OpenCourseDeck.Views.home();
 
     await vi.waitFor(() => expect(document.querySelectorAll('[data-home-widget]')).toHaveLength(3));
     const view = document.querySelector('#view-container .view-home');
@@ -401,7 +401,7 @@ describe('app shell resilience helpers', () => {
       saveSetting,
     };
 
-    await window.PlasmaDeck.Views.myCourses();
+    await window.OpenCourseDeck.Views.myCourses();
     const view = document.querySelector('#view-container .view-my-courses');
     await vi.waitFor(() => expect(view.textContent).toContain('No custom courses yet.'));
     expect(view.textContent).not.toContain('coming next');
@@ -418,7 +418,7 @@ describe('app shell resilience helpers', () => {
     }));
 
     window.DB.getSetting.mockResolvedValueOnce(savedCourses);
-    await window.PlasmaDeck.Views.myCourses();
+    await window.OpenCourseDeck.Views.myCourses();
     await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]').textContent).toContain('Cardiology review'));
     document.querySelector('[data-my-course-id] button').click();
 
@@ -449,7 +449,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.playlists();
+    await window.OpenCourseDeck.Views.playlists();
 
     await vi.waitFor(() => expect(document.querySelectorAll('[data-playlist-id]')).toHaveLength(3));
     const view = document.querySelector('#view-container .view-playlists');
@@ -483,7 +483,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.playlists();
+    await window.OpenCourseDeck.Views.playlists();
 
     await vi.waitFor(() => expect(document.querySelector('[data-playlist-id^="source-"]')).toBeTruthy());
     document.querySelector('[data-playlist-name]').value = 'Cardio queue';
@@ -513,13 +513,13 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
     const saveSetting = vi.fn(async () => true);
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async (key) => (key === 'plasma-studio-board' ? savedBoard : null)),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
 
     await vi.waitFor(() => expect(canvasApi.loadState).toHaveBeenCalledWith(savedBoard));
     document.querySelector('[data-studio-save]').click();
@@ -534,8 +534,8 @@ describe('app shell resilience helpers', () => {
 
   it('patches external Studio board sync in place while preserving canvas context', async () => {
     await loadApp();
-    const emitSpy = vi.spyOn(window.PlasmaDeck.bus, 'emit');
-    const offSpy = vi.spyOn(window.PlasmaDeck.bus, 'off');
+    const emitSpy = vi.spyOn(window.OpenCourseDeck.bus, 'emit');
+    const offSpy = vi.spyOn(window.OpenCourseDeck.bus, 'off');
     const initialBoard = {
       version: 1,
       activeLayerIdx: 0,
@@ -568,13 +568,13 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async (key) => (key === 'plasma-studio-board' ? remoteBoard : null)),
       saveSetting: vi.fn(async () => true),
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     document.querySelector('[data-inspect-element="shape-1"]').click();
 
     const result = await controller.refreshFromSync({
@@ -634,15 +634,15 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
     const saveSetting = vi.fn(async () => true);
-    window.PlasmaDeck.Canvas = canvasApi;
-    window.PlasmaDeck.UI = window.PlasmaDeck.UI || {};
-    window.PlasmaDeck.UI.confirm = vi.fn(async () => true);
+    window.OpenCourseDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.UI = window.OpenCourseDeck.UI || {};
+    window.OpenCourseDeck.UI.confirm = vi.fn(async () => true);
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     document.querySelector('[data-studio-tool="select"]').click();
     expect(canvasApi.setTool).toHaveBeenCalledWith('select');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Select tool active');
@@ -659,7 +659,7 @@ describe('app shell resilience helpers', () => {
 
     document.querySelector('[data-studio-clear]').click();
     await vi.waitFor(() => expect(canvasApi.clearBoard).toHaveBeenCalled());
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith('Clear the current Studio board?');
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith('Clear the current Studio board?');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Board cleared');
 
     controller.unmount();
@@ -684,13 +684,13 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
 
     document.querySelector('[data-studio-add-rect]').click();
     await vi.waitFor(() => expect(canvasApi.addRectangle).toHaveBeenCalled());
@@ -732,13 +732,13 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     const canvas = document.getElementById('studio-canvas');
     const drop = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(drop, 'clientX', { value: 320 });
@@ -789,21 +789,21 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg><text>Study map</text></svg>'),
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
-    window.PlasmaDeck.UI = window.PlasmaDeck.UI || {};
-    window.PlasmaDeck.UI.confirm = vi.fn(async () => true);
+    window.OpenCourseDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.UI = window.OpenCourseDeck.UI || {};
+    window.OpenCourseDeck.UI.confirm = vi.fn(async () => true);
     window.open = vi.fn(() => printWindow);
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     document.querySelector('[data-studio-template]').value = 'cornell';
     document.querySelector('[data-studio-apply-template]').click();
 
     await vi.waitFor(() => expect(canvasApi.applyTemplate).toHaveBeenCalledWith('cornell'));
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith('Replace the current Studio board with this template?');
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith('Replace the current Studio board with this template?');
     expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Template applied');
 
@@ -848,13 +848,13 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
 
     expect(document.querySelector('[data-studio-layers]').textContent).toContain('Main layer (1)');
     expect(document.querySelector('[data-studio-elements]').textContent).toContain('Clinical note');
@@ -906,13 +906,13 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     document.querySelector('[data-inspect-element="text-1"]').click();
     document.querySelector('[data-studio-prop-text]').value = 'After';
     document.querySelector('[data-studio-prop-x]').value = '42';
@@ -966,7 +966,7 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DataStore = {
       init: vi.fn(async () => {}),
       allCourses: vi.fn(() => [{ id: 'course-1', title: 'Cardiology' }]),
@@ -980,7 +980,7 @@ describe('app shell resilience helpers', () => {
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-a', page: 3 }]),
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     document.querySelector('[data-inspect-element="shape-1"]').click();
 
     await vi.waitFor(() => expect(document.querySelector('#studio-link-target-options option[value="note-1"]')).not.toBeNull());
@@ -1025,14 +1025,14 @@ describe('app shell resilience helpers', () => {
       exportPNG: vi.fn(() => 'data:image/png;base64,studio'),
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting: vi.fn(async () => true),
     };
     window.open = vi.fn();
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
 
     document.querySelector('[data-inspect-element="url-link"]').click();
     document.querySelector('[data-studio-properties] [data-open-studio-link="url-link"]').click();
@@ -1063,13 +1063,13 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
     const saveSetting = vi.fn(async () => true);
-    window.PlasmaDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.studio();
+    const controller = await window.OpenCourseDeck.Views.studio();
     const input = document.querySelector('[data-studio-import-file]');
     const file = new File([JSON.stringify(importedBoard)], 'studio.json', { type: 'application/json' });
     Object.defineProperty(input, 'files', { configurable: true, value: [file] });
@@ -1091,12 +1091,12 @@ describe('app shell resilience helpers', () => {
       },
     });
     localStorage.setItem('plasma-test-footprint', 'abc');
-    window.PlasmaDeck.lastStorageIssue = {
+    window.OpenCourseDeck.lastStorageIssue = {
       kind: 'progress',
       error: { quota: true },
     };
 
-    const controller = await window.PlasmaDeck.Views.settings();
+    const controller = await window.OpenCourseDeck.Views.settings();
 
     await vi.waitFor(() => expect(document.querySelector('[data-storage-health]').textContent).toContain('Critical'));
     const view = document.querySelector('#view-container .view-settings');
@@ -1121,16 +1121,16 @@ describe('app shell resilience helpers', () => {
     });
     const clearUserData = vi.fn(async () => ({ scope: 'notes' }));
     window.DB = { clearUserData };
-    window.PlasmaDeck.UI = {};
-    window.PlasmaDeck.UI.confirm = vi.fn(async () => true);
+    window.OpenCourseDeck.UI = {};
+    window.OpenCourseDeck.UI.confirm = vi.fn(async () => true);
     sessionStorage.setItem('plasma_pending_topic', 'topic-1');
 
-    const controller = await window.PlasmaDeck.Views.settings();
+    const controller = await window.OpenCourseDeck.Views.settings();
     document.getElementById('select-clear-scope').value = 'notes';
     document.getElementById('btn-clear-scope').click();
 
     await vi.waitFor(() => expect(clearUserData).toHaveBeenCalledWith('notes'));
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith(expect.stringContaining('notes, folders, and note settings'));
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.stringContaining('notes, folders, and note settings'));
     expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-1');
 
     controller.unmount();
@@ -1146,7 +1146,7 @@ describe('app shell resilience helpers', () => {
       saveSetting,
     };
 
-    const controller = await window.PlasmaDeck.Views.settings();
+    const controller = await window.OpenCourseDeck.Views.settings();
     await vi.waitFor(() => expect(document.querySelector('[data-ai-status]').textContent).toBe('Hidden'));
 
     document.querySelector('[data-ai-mode]').value = 'custom-api';
@@ -1165,7 +1165,7 @@ describe('app shell resilience helpers', () => {
     })));
     expect(saveSetting.mock.calls.at(-1)[1].apiKey).toBeUndefined();
     expect(sessionStorage.getItem('plasma-ai-api-key-session')).toBe('session-key');
-    expect(window.PlasmaDeck.AISettings.mode).toBe('custom-api');
+    expect(window.OpenCourseDeck.AISettings.mode).toBe('custom-api');
     expect(document.querySelector('[data-ai-summary]').textContent).toContain('Stored for this session');
 
     document.querySelector('[data-ai-key-storage]').value = 'local';
@@ -1199,7 +1199,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.bookmarks();
+    await window.OpenCourseDeck.Views.bookmarks();
 
     await vi.waitFor(() => expect(document.querySelectorAll('[data-bookmark-type]')).toHaveLength(3));
     const view = document.querySelector('#view-container .view-bookmarks');
@@ -1231,7 +1231,7 @@ describe('app shell resilience helpers', () => {
       .fn()
       .mockResolvedValueOnce([{ id: 'ts-delete', topicId: 'topic-1', title: 'Delete me', position: 12 }])
       .mockResolvedValue([]);
-    window.PlasmaDeck.UI = { confirm: vi.fn(async () => true) };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB = {
       getAllTimestamps,
       getAllNotes: vi.fn(async () => []),
@@ -1239,12 +1239,12 @@ describe('app shell resilience helpers', () => {
       deleteTimestamp,
     };
 
-    await window.PlasmaDeck.Views.bookmarks();
+    await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-delete"]')).toBeTruthy());
     document.querySelector('[data-delete-timestamp="ts-delete"]').click();
 
     await vi.waitFor(() => expect(deleteTimestamp).toHaveBeenCalledWith('ts-delete'));
-    expect(window.PlasmaDeck.UI.confirm).toHaveBeenCalledWith('Delete this timestamp bookmark?');
+    expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith('Delete this timestamp bookmark?');
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-delete"]')).toBeNull());
   });
 
@@ -1262,7 +1262,7 @@ describe('app shell resilience helpers', () => {
       saveTimestamp,
     };
 
-    await window.PlasmaDeck.Views.bookmarks();
+    await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-edit-timestamp="ts-edit"]')).toBeTruthy());
     document.querySelector('[data-edit-timestamp="ts-edit"]').click();
     await vi.waitFor(() => expect(document.querySelector('[data-timestamp-edit-form="ts-edit"]')).toBeTruthy());
@@ -1294,7 +1294,7 @@ describe('app shell resilience helpers', () => {
       refreshAnnotationsFromStorage: vi.fn(async () => [{ id: 'ann-1' }]),
     };
 
-    const controller = await window.PlasmaDeck.Views.pdf();
+    const controller = await window.OpenCourseDeck.Views.pdf();
     document.querySelector('[data-pdf-page-note-input]').value = '<b>Important rhythm page</b>';
     document.querySelector('[data-pdf-save-page-note]').click();
 
@@ -1318,7 +1318,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(window.PlasmaPDFViewer.saveSelectionToNote).toHaveBeenCalled());
     expect(document.querySelector('[data-pdf-page-note-status]').textContent).toBe('Saved selection from page 7');
 
-    window.PlasmaDeck.bus.emit('sync:message', {
+    window.OpenCourseDeck.bus.emit('sync:message', {
       kind: 'annotation',
       action: 'save',
       record: { docId: 'doc-a.pdf' },
@@ -1344,7 +1344,7 @@ describe('app shell resilience helpers', () => {
     };
     window.PlasmaPDFViewer = { goTo: vi.fn() };
 
-    await window.PlasmaDeck.Views.bookmarks();
+    await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="note-pdf"] a')).toBeTruthy());
     expect(document.querySelector('[data-bookmark-id="note-pdf"]').textContent).toContain('PDF page note');
     document.querySelector('[data-bookmark-id="note-pdf"] a').click();
@@ -1368,7 +1368,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.help();
+    await window.OpenCourseDeck.Views.help();
 
     await vi.waitFor(() => expect(document.querySelector('[data-catalog-health]').textContent).toContain('Topics'));
     const health = document.querySelector('[data-catalog-health]');
@@ -1396,11 +1396,11 @@ describe('app shell resilience helpers', () => {
         { topicId: 'topic-1', courseId: 'course-a', title: 'Loaded lecture', videos: ['https://example.test/video.mp4'] },
       ]),
     };
-    window.PlasmaDeck.AI = {
+    window.OpenCourseDeck.AI = {
       status: vi.fn(async () => ({ available: true })),
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
 
     await vi.waitFor(() => expect(document.querySelector('[data-action="summarize-course"]')).toBeTruthy());
     const view = document.querySelector('#view-container .view-courses');
@@ -1411,7 +1411,7 @@ describe('app shell resilience helpers', () => {
   it('links Help to the architecture and canonical storage documentation', async () => {
     await loadApp();
 
-    await window.PlasmaDeck.Views.help();
+    await window.OpenCourseDeck.Views.help();
 
     const storageLink = document.querySelector('.help-links a[href="docs/architecture.md"]');
     expect(storageLink).not.toBeNull();
@@ -1437,7 +1437,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.achievements();
+    await window.OpenCourseDeck.Views.achievements();
 
     await vi.waitFor(() => expect(document.querySelectorAll('[data-achievement-id]')).toHaveLength(6));
     const view = document.querySelector('#view-container .view-achievements');
@@ -1475,7 +1475,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.achievements();
+    await window.OpenCourseDeck.Views.achievements();
 
     await vi.waitFor(() => expect(document.querySelector('[data-review-topic-id="topic-old"]')).toBeTruthy());
     const view = document.querySelector('#view-container .view-achievements');
@@ -1496,9 +1496,9 @@ describe('app shell resilience helpers', () => {
     }));
     globalThis.fetch = fetchMock;
 
-    await window.PlasmaDeck.API.post('/zero', 0);
-    await window.PlasmaDeck.API.post('/false', false);
-    await window.PlasmaDeck.API.post('/empty', '');
+    await window.OpenCourseDeck.API.post('/zero', 0);
+    await window.OpenCourseDeck.API.post('/false', false);
+    await window.OpenCourseDeck.API.post('/empty', '');
 
     expect(fetchMock.mock.calls[0][1].body).toBe('0');
     expect(fetchMock.mock.calls[1][1].body).toBe('false');
@@ -1535,28 +1535,28 @@ describe('app shell resilience helpers', () => {
   it('exposes central media URL validation for catalog actions', async () => {
     await loadApp();
 
-    expect(window.PlasmaDeck.safeMediaUrl('https://plasmato.net/video.mp4')).toBe('https://plasmato.net/video.mp4');
-    expect(window.PlasmaDeck.safeMediaUrl('https://media.example.test/video.mp4')).toBe('https://media.example.test/video.mp4');
-    expect(window.PlasmaDeck.safeMediaUrl('http://media.example.test/video.mp4')).toBe('http://media.example.test/video.mp4');
-    expect(window.PlasmaDeck.safeMediaUrl('/media/local.pdf')).toContain('/media/local.pdf');
-    expect(window.PlasmaDeck.safeMediaUrl('blob:https://example.test/id')).toBe('blob:https://example.test/id');
-    expect(window.PlasmaDeck.safeMediaUrl('javascript:alert(1)')).toBeNull();
-    expect(window.PlasmaDeck.safeMediaUrl('vbscript:msgbox(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeMediaUrl('https://plasmato.net/video.mp4')).toBe('https://plasmato.net/video.mp4');
+    expect(window.OpenCourseDeck.safeMediaUrl('https://media.example.test/video.mp4')).toBe('https://media.example.test/video.mp4');
+    expect(window.OpenCourseDeck.safeMediaUrl('http://media.example.test/video.mp4')).toBe('http://media.example.test/video.mp4');
+    expect(window.OpenCourseDeck.safeMediaUrl('/media/local.pdf')).toContain('/media/local.pdf');
+    expect(window.OpenCourseDeck.safeMediaUrl('blob:https://example.test/id')).toBe('blob:https://example.test/id');
+    expect(window.OpenCourseDeck.safeMediaUrl('javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeMediaUrl('vbscript:msgbox(1)')).toBeNull();
   });
 
   it('exposes image and frame URL validation helpers', async () => {
     await loadApp();
 
-    expect(window.PlasmaDeck.safeImageUrl('https://cdn.example.test/image.png')).toBe('https://cdn.example.test/image.png');
-    expect(window.PlasmaDeck.safeImageUrl('/assets/cover.svg')).toContain('/assets/cover.svg');
-    expect(window.PlasmaDeck.safeImageUrl('data:image/png;base64,abc')).toBe('data:image/png;base64,abc');
-    expect(window.PlasmaDeck.safeImageUrl('javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeImageUrl('https://cdn.example.test/image.png')).toBe('https://cdn.example.test/image.png');
+    expect(window.OpenCourseDeck.safeImageUrl('/assets/cover.svg')).toContain('/assets/cover.svg');
+    expect(window.OpenCourseDeck.safeImageUrl('data:image/png;base64,abc')).toBe('data:image/png;base64,abc');
+    expect(window.OpenCourseDeck.safeImageUrl('javascript:alert(1)')).toBeNull();
 
-    expect(window.PlasmaDeck.safeFrameUrl('blob:https://example.test/pdf')).toBe('blob:https://example.test/pdf');
-    expect(window.PlasmaDeck.safeFrameUrl('https://docs.example.test/viewer')).toBe('https://docs.example.test/viewer');
-    expect(window.PlasmaDeck.safeFrameUrl('http://docs.example.test/viewer')).toBe('http://docs.example.test/viewer');
-    expect(window.PlasmaDeck.safeFrameUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
-    expect(window.PlasmaDeck.safeFrameUrl('javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeFrameUrl('blob:https://example.test/pdf')).toBe('blob:https://example.test/pdf');
+    expect(window.OpenCourseDeck.safeFrameUrl('https://docs.example.test/viewer')).toBe('https://docs.example.test/viewer');
+    expect(window.OpenCourseDeck.safeFrameUrl('http://docs.example.test/viewer')).toBe('http://docs.example.test/viewer');
+    expect(window.OpenCourseDeck.safeFrameUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(window.OpenCourseDeck.safeFrameUrl('javascript:alert(1)')).toBeNull();
   });
 
   it('searches catalog, notes, timestamps, and PDF annotations from the topbar', async () => {
@@ -1602,7 +1602,7 @@ describe('app shell resilience helpers', () => {
   it('shows a resumable mini-player snapshot and routes back to the active topic', async () => {
     await loadApp();
 
-    window.PlasmaDeck.MiniPlayer.show({
+    window.OpenCourseDeck.MiniPlayer.show({
       queue: [
         { title: 'Loaded lecture', topicId: 'topic-1', courseId: 'course-a', courseTitle: 'Cardiology', src: 'https://example.test/a.mp4' },
         { title: 'Second lecture', topicId: 'topic-2', courseId: 'course-a', courseTitle: 'Cardiology', src: 'https://example.test/b.mp4' },
@@ -1643,7 +1643,7 @@ describe('app shell resilience helpers', () => {
       getAllAnnotations: vi.fn(async () => []),
     };
 
-    await window.PlasmaDeck.Views.bookmarks();
+    await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
     document.querySelector('[data-bookmark-id="ts-1"] a').click();
 
@@ -1658,7 +1658,7 @@ describe('app shell resilience helpers', () => {
     const seekTo = vi.fn();
     const loadPlaylist = vi.fn();
     const media = { addEventListener: vi.fn() };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = {
           loadPlaylist,
@@ -1692,7 +1692,7 @@ describe('app shell resilience helpers', () => {
     sessionStorage.setItem('plasma_pending_topic', 'topic-1');
     sessionStorage.setItem('plasma_pending_position', '95');
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     await vi.advanceTimersByTimeAsync(140);
 
     expect(loadPlaylist).toHaveBeenCalledWith([
@@ -1713,7 +1713,7 @@ describe('app shell resilience helpers', () => {
   it('restores pending full course sessions before falling back to single-topic autoplay', async () => {
     await loadApp();
     const restoreSnapshot = vi.fn(() => true);
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = {
           restoreSnapshot,
@@ -1745,7 +1745,7 @@ describe('app shell resilience helpers', () => {
       track: { title: 'Second lecture', topicId: 'topic-2', courseId: 'course-a' },
     }));
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     await vi.advanceTimersByTimeAsync(140);
 
     expect(restoreSnapshot).toHaveBeenCalledWith(expect.objectContaining({
@@ -1771,17 +1771,17 @@ describe('app shell resilience helpers', () => {
       duration: 40,
       track: { title: 'Leaving lecture', topicId: 'topic-leave' },
     };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(),
       getActiveSnapshot: vi.fn(() => snapshot),
       destroyAll: vi.fn(),
     };
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
     controller.unmount();
 
-    expect(window.PlasmaDeck.Player.getActiveSnapshot).toHaveBeenCalled();
-    expect(window.PlasmaDeck.Player.destroyAll).toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Player.getActiveSnapshot).toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Player.destroyAll).toHaveBeenCalled();
     expect(document.querySelector('[data-mini-player]').textContent).toContain('Leaving lecture');
   });
 
@@ -1801,7 +1801,7 @@ describe('app shell resilience helpers', () => {
       allTopics: vi.fn(() => [{ topicId: 'topic-live', courseId: 'course-a', title: 'Live lecture', videos: ['https://example.test/live.mp4'] }]),
     };
     window.DB = { getProgress: vi.fn(async () => null), saveProgress: vi.fn(async () => true) };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = {
           destroy,
@@ -1814,12 +1814,12 @@ describe('app shell resilience helpers', () => {
       destroyAll: vi.fn(),
     };
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
     const livePlayer = document.getElementById('course-player');
 
     controller.unmount();
 
-    expect(window.PlasmaDeck.Player.destroyAll).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Player.destroyAll).not.toHaveBeenCalled();
     expect(destroy).not.toHaveBeenCalled();
     expect(document.querySelector('[data-mini-player-live] #course-player')).toBe(livePlayer);
     expect(document.querySelector('[data-mini-player]').textContent).toContain('Live lecture');
@@ -1843,26 +1843,26 @@ describe('app shell resilience helpers', () => {
     };
     const dispose = vi.fn();
     livePlayer.dataset.pdProgressBound = 'true';
-    window.PlasmaDeck.MiniPlayer.adoptPlayer(livePlayer, livePlayer._pdPlayer.snapshot(), { dispose });
+    window.OpenCourseDeck.MiniPlayer.adoptPlayer(livePlayer, livePlayer._pdPlayer.snapshot(), { dispose });
     window.DataStore = {
       init: vi.fn(async () => {}),
       allCourses: vi.fn(() => [{ id: 'course-a', title: 'Cardiology' }]),
       allTopics: vi.fn(() => [{ topicId: 'topic-live', courseId: 'course-a', title: 'Live lecture', videos: ['https://example.test/live.mp4'] }]),
     };
     window.DB = { getProgress: vi.fn(async () => null), saveProgress: vi.fn(async () => true) };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(),
       destroyAll: vi.fn(),
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
 
     expect(document.getElementById('course-player')).toBe(livePlayer);
     expect(document.querySelector('[data-mini-player]')).toBeNull();
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(livePlayer.dataset.pdProgressBound).toBe('true');
     expect(livePlayer._pdPlayer.on).toHaveBeenCalled();
-    expect(window.PlasmaDeck.Player.init).toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Player.init).toHaveBeenCalled();
   });
 
   it('exposes compact live mini-player queue and transport controls', async () => {
@@ -1894,7 +1894,7 @@ describe('app shell resilience helpers', () => {
       hideQueue: vi.fn(() => { queuePanel.hidden = true; }),
     };
 
-    window.PlasmaDeck.MiniPlayer.adoptPlayer(livePlayer, livePlayer._pdPlayer.snapshot());
+    window.OpenCourseDeck.MiniPlayer.adoptPlayer(livePlayer, livePlayer._pdPlayer.snapshot());
 
     document.querySelector('[data-mini-next]').click();
     await vi.advanceTimersByTimeAsync(0);
@@ -1925,7 +1925,7 @@ describe('app shell resilience helpers', () => {
       allTopics: vi.fn(() => [{ topicId: 'topic-live', courseId: 'course-a', title: 'Live lecture', videos: ['https://example.test/live.mp4'] }]),
     };
     window.DB = { getProgress: vi.fn(async () => null), saveProgress: vi.fn(async () => true) };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = {
           snapshot: vi.fn(() => ({
@@ -1943,7 +1943,7 @@ describe('app shell resilience helpers', () => {
       requestActivePictureInPicture,
     };
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
     const player = document.getElementById('course-player');
     expect(window.IntersectionObserver).toHaveBeenCalled();
 
@@ -1971,7 +1971,7 @@ describe('app shell resilience helpers', () => {
       allTopics: vi.fn(() => [{ topicId: 'topic-live', courseId: 'course-a', title: 'Live lecture', videos: ['https://example.test/live.mp4'] }]),
     };
     window.DB = { getProgress: vi.fn(async () => null), saveProgress: vi.fn(async () => true) };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = {
           snapshot: vi.fn(() => ({
@@ -1985,7 +1985,7 @@ describe('app shell resilience helpers', () => {
       requestActivePictureInPicture,
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     const player = document.getElementById('course-player');
     intersectionCallbacks.at(-1)([{ target: player, isIntersecting: false, intersectionRatio: 0 }]);
     await Promise.resolve();
@@ -2010,7 +2010,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     const player = document.getElementById('course-player');
     player._pdPlayer = {
       snapshot: vi.fn(() => ({
@@ -2071,7 +2071,7 @@ describe('app shell resilience helpers', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     const activeTrack = {
       title: 'Loaded lecture',
       topicId: 'topic-1',
@@ -2200,7 +2200,7 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-learning-marker-status]').textContent).toContain('time clamped');
     expect(document.querySelector('[data-learning-marker-status]').textContent).toContain('invalid cue skipped');
 
-    window.PlasmaDeck.bus.emit('sync:message', {
+    window.OpenCourseDeck.bus.emit('sync:message', {
       kind: 'setting',
       action: 'save',
       record: {
@@ -2243,9 +2243,9 @@ describe('app shell resilience helpers', () => {
       ]),
     };
     const syncEvents = [];
-    window.PlasmaDeck.bus.on('player:sync-refresh', payload => syncEvents.push(payload));
+    window.OpenCourseDeck.bus.on('player:sync-refresh', payload => syncEvents.push(payload));
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
     await vi.waitFor(() => expect(document.querySelector('[data-topic-id="topic-1"] [data-status]').textContent).toBe('Not started'));
 
     const track = { title: 'Loaded lecture', topicId: 'topic-1', courseId: 'course-a' };
@@ -2269,7 +2269,7 @@ describe('app shell resilience helpers', () => {
     };
     progressByTopic['topic-1'] = { topicId: 'topic-1', courseId: 'course-a', status: 'done', percent: 100 };
 
-    window.PlasmaDeck.bus.emit('sync:message', {
+    window.OpenCourseDeck.bus.emit('sync:message', {
       kind: 'progress',
       action: 'save',
       record: progressByTopic['topic-1'],
@@ -2296,7 +2296,7 @@ describe('app shell resilience helpers', () => {
     };
     await loadApp();
 
-    await window.PlasmaDeck.Views.help();
+    await window.OpenCourseDeck.Views.help();
 
     const options = window.DOMPurify.sanitize.mock.calls.at(-1)[1];
     expect(options.ADD_TAGS).toContain('canvas');
@@ -2309,7 +2309,7 @@ describe('app shell resilience helpers', () => {
   it('uses a defensive route sanitizer when DOMPurify is unavailable', async () => {
     await loadApp();
 
-    window.PlasmaDeck.Views.notFound(
+    window.OpenCourseDeck.Views.notFound(
       '<img src=x onerror="window.__fallbackXss = true"><a href="javascript:alert(1)">bad</a><script>window.__scriptXss = true</script>'
     );
 
@@ -2352,11 +2352,11 @@ describe('app shell resilience helpers', () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock;
 
-    await expect(window.PlasmaDeck.API.get('javascript:alert(1)')).rejects.toThrow('Unsafe fetch URL');
+    await expect(window.OpenCourseDeck.API.get('javascript:alert(1)')).rejects.toThrow('Unsafe fetch URL');
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(window.PlasmaDeck.safeFetchUrl('', '/api/courses')).toContain('/api/courses');
-    expect(window.PlasmaDeck.safeFetchUrl('', 'javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeFetchUrl('', '/api/courses')).toContain('/api/courses');
+    expect(window.OpenCourseDeck.safeFetchUrl('', 'javascript:alert(1)')).toBeNull();
   });
 });
 

@@ -91,7 +91,7 @@ describe('notes route filters', () => {
         return Promise.resolve(value);
       }),
     };
-    window.PlasmaDeck = {
+    window.OpenCourseDeck = {
       bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },
       beforeUnload: { mark: vi.fn(), unmark: vi.fn() },
       Toast: { success: vi.fn(), error: vi.fn() },
@@ -349,7 +349,7 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-notes-list]').textContent).toContain('Remote only note');
     expect(titleInput.value).toBe('Local draft title');
     expect(editor.textContent).toContain('Local draft body');
-    expect(window.PlasmaDeck.bus.emit).toHaveBeenCalledWith('notes:sync-refresh', expect.objectContaining({
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('notes:sync-refresh', expect.objectContaining({
       refreshed: true,
       kind: 'note',
       editorReloaded: false,
@@ -415,7 +415,7 @@ describe('notes route filters', () => {
       expect.objectContaining({ id: 'repair-local' }),
       expect.objectContaining({ id: 'repair-db' }),
     ]));
-    expect(window.PlasmaDeck.lastNotesRepairResult).toEqual(result);
+    expect(window.OpenCourseDeck.lastNotesRepairResult).toEqual(result);
   });
 
   it('keeps localStorage as a bridge-less notes, folders, and settings fallback', () => {
@@ -441,7 +441,7 @@ describe('notes route filters', () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('notes storage full'), { name: 'QuotaExceededError' });
     const originalSetItem = Storage.prototype.setItem;
-    window.PlasmaDeck.bus.emit = emit;
+    window.OpenCourseDeck.bus.emit = emit;
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
       if (key === 'plasma-notes') throw quotaError;
       return originalSetItem.call(this, key, value);
@@ -454,7 +454,7 @@ describe('notes route filters', () => {
       ok: false,
       error: expect.objectContaining({ quota: true, name: 'QuotaExceededError' }),
     }));
-    expect(window.PlasmaDeck.lastStorageIssue).toEqual(expect.objectContaining({
+    expect(window.OpenCourseDeck.lastStorageIssue).toEqual(expect.objectContaining({
       kind: 'note-list',
       backend: 'localStorage',
       key: 'plasma-notes',
@@ -613,7 +613,7 @@ describe('notes route filters', () => {
 
     window.PlasmaNotesExport.importJSON(file);
 
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastNotesImportResult).toEqual(expect.objectContaining({
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
       imported: 1,
       updated: 0,
       skipped: 0,
@@ -627,7 +627,7 @@ describe('notes route filters', () => {
     expect(imported.content).not.toContain('onerror');
     expect(localStorage.getItem('plasma-notes')).toBe(localNotesBefore);
     expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'import-xss' }));
-    expect(window.PlasmaDeck.lastNotesImportResult.errors).toEqual([
+    expect(window.OpenCourseDeck.lastNotesImportResult.errors).toEqual([
       expect.objectContaining({ message: 'Note record must be an object.' }),
     ]);
     expect(window.__importTitleXss).toBeUndefined();
@@ -661,7 +661,7 @@ describe('notes route filters', () => {
 
     window.PlasmaNotesExport.importJSON(file);
 
-    await vi.waitFor(() => expect(window.PlasmaDeck.lastNotesImportResult).toEqual(expect.objectContaining({
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
       imported: 0,
       updated: 1,
       skipped: 1,
@@ -683,7 +683,7 @@ describe('notes route filters', () => {
 
   it('reveals enabled AI note summaries and appends the generated summary to the current note', async () => {
     window.PlasmaNotesApp.destroy();
-    window.PlasmaDeck.AI = {
+    window.OpenCourseDeck.AI = {
       status: vi.fn(async () => ({ available: true, mode: 'local-gemma' })),
       summarizeText: vi.fn(async () => ({
         ok: true,
@@ -699,7 +699,7 @@ describe('notes route filters', () => {
 
     button.click();
 
-    await vi.waitFor(() => expect(window.PlasmaDeck.AI.summarizeText).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.summarizeText).toHaveBeenCalledWith(
       'Important',
       { bullets: 3 }
     ));
@@ -709,12 +709,12 @@ describe('notes route filters', () => {
       id: 'pinned-note',
       content: expect.stringContaining('data-ai-summary-block'),
     }));
-    expect(window.PlasmaDeck.Toast.success).toHaveBeenCalledWith('Summary added');
+    expect(window.OpenCourseDeck.Toast.success).toHaveBeenCalledWith('Summary added');
   });
 
   it('keeps AI summaries hidden when AI is disabled', async () => {
     window.PlasmaNotesApp.destroy();
-    window.PlasmaDeck.AI = {
+    window.OpenCourseDeck.AI = {
       status: vi.fn(async () => ({ available: false, reason: 'disabled' })),
       summarizeText: vi.fn(),
     };
@@ -722,15 +722,15 @@ describe('notes route filters', () => {
     window.PlasmaNotesApp.init();
 
     const button = document.querySelector('[data-ai-summarize]');
-    await vi.waitFor(() => expect(window.PlasmaDeck.AI.status).toHaveBeenCalled());
+    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.status).toHaveBeenCalled());
     expect(button.hidden).toBe(true);
-    expect(window.PlasmaDeck.AI.summarizeText).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.AI.summarizeText).not.toHaveBeenCalled();
   });
 
   it('indexes notes and renders semantic search results', async () => {
     window.PlasmaNotesApp.destroy();
     const embeddings = new Map();
-    window.PlasmaDeck.AI = {
+    window.OpenCourseDeck.AI = {
       status: vi.fn(async () => ({ available: true })),
       upsertEmbedding: vi.fn(async ({ id, text, metadata }) => {
         embeddings.set(id, { id, text, metadata });
@@ -743,8 +743,8 @@ describe('notes route filters', () => {
     input.value = 'memory';
     document.querySelector('[data-notes-semantic-search]').click();
 
-    await vi.waitFor(() => expect(window.PlasmaDeck.AI.searchEmbeddings).toHaveBeenCalledWith('memory', { limit: 25 }));
-    expect(window.PlasmaDeck.AI.upsertEmbedding).toHaveBeenCalled();
+    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.searchEmbeddings).toHaveBeenCalledWith('memory', { limit: 25 }));
+    expect(window.OpenCourseDeck.AI.upsertEmbedding).toHaveBeenCalled();
     expect(embeddings.get('regular-note').text).toContain('Regular note');
     const list = document.querySelector('[data-notes-list]');
     expect(list.textContent).toContain('Regular note');

@@ -1,4 +1,4 @@
-## Contributing
+﻿## Contributing
 
 ### Setup
 
@@ -10,7 +10,7 @@ npm run vendor
 ### Common Commands
 
 - `npm start`: serve locally on `http://localhost:5173/`.
-- `npm run build`: build `dist/plasma.js`.
+- `npm run build`: build `dist/opencoursedeck.js`.
 - `npm run build:sw`: generate `sw.js`.
 - `npm run lint`: lint `src/`, `scripts/`, tests, and config.
 - `npm test`: run Vitest.
@@ -51,5 +51,5 @@ npm run vendor
 
 - Opening with `file://` breaks module/fetch/service worker behavior.
 - Changing the dev port changes the browser storage origin.
-- Updating source files without `npm run build` leaves `dist/plasma.js` stale.
+- Updating source files without `npm run build` leaves `dist/opencoursedeck.js` stale.
 - `getAll()` storage queries are easy but can become slow at scale; prefer indexed/cursor paths for new hot queries.

@@ -10,8 +10,8 @@ describe('bridge DB safety helpers', () => {
     localStorage.clear();
     delete window.DB;
     delete window.DataStore;
-    window.PlasmaDeck = {};
-    await indexedDB.deleteDatabase('plasmadeck');
+    window.OpenCourseDeck = {};
+    await indexedDB.deleteDatabase('opencoursedeck');
     await import('../db.js');
     await import('../bridge.js');
   });
@@ -198,8 +198,8 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Quota exceeded'), { name: 'QuotaExceededError' });
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async get() { return null; }
       async put() { throw quotaError; }
     };
@@ -218,8 +218,8 @@ describe('bridge DB safety helpers', () => {
   it('signals transient progress write failures before using localStorage fallback', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async get() { return null; }
       async put() { throw new Error('Temporary IDB failure'); }
     };
@@ -245,8 +245,8 @@ describe('bridge DB safety helpers', () => {
       { id: 'legacy-note', title: 'Legacy note', updatedAt: 10 },
     ]));
     const emit = vi.fn();
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async put(store) {
         if (store === 'notes') throw new Error('notes migration failed');
       }
@@ -294,8 +294,8 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Persistent storage full'), { name: 'QuotaExceededError' });
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async put() { throw quotaError; }
     };
 
@@ -313,8 +313,8 @@ describe('bridge DB safety helpers', () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('localStorage quota exceeded'), { name: 'QuotaExceededError' });
     const originalSetItem = Storage.prototype.setItem;
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = null;
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = null;
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
       if (key === 'plasma-notes') throw quotaError;
       return originalSetItem.call(this, key, value);
@@ -334,8 +334,8 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('canonical quota exceeded'), { name: 'QuotaExceededError' });
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async put() { throw quotaError; }
     };
 
@@ -353,8 +353,8 @@ describe('bridge DB safety helpers', () => {
   it('signals and rejects canonical IndexedDB setting failures after migration completes', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async put() { throw new Error('settings canonical failed'); }
     };
 
@@ -372,8 +372,8 @@ describe('bridge DB safety helpers', () => {
   it('signals and rejects canonical IndexedDB annotation failures after migration completes', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
-    window.PlasmaDeck.bus = { emit };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async getAllByIndex() { return []; }
       async put() { throw new Error('annotation canonical failed'); }
       async delete() {}
@@ -403,19 +403,19 @@ describe('bridge DB safety helpers', () => {
       }
     }
     window.BroadcastChannel = BroadcastChannelMock;
-    window.PlasmaDeck.bus = { emit: vi.fn() };
+    window.OpenCourseDeck.bus = { emit: vi.fn() };
 
     const note = await window.DB.saveNote({ id: 'note-sync', title: 'Synced note' });
 
     expect(channels).toHaveLength(1);
-    expect(channels[0].name).toBe('plasmadeck_sync');
+    expect(channels[0].name).toBe('opencoursedeck_sync');
     expect(channels[0].postMessage).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'note',
       action: 'save',
       record: expect.objectContaining({ id: 'note-sync', title: 'Synced note' }),
       source: expect.any(String),
     }));
-    expect(window.PlasmaDeck.bus.emit).toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
       kind: 'note',
       action: 'save',
       record: note,
@@ -430,12 +430,12 @@ describe('bridge DB safety helpers', () => {
       },
     });
 
-    expect(window.PlasmaDeck.bus.emit).toHaveBeenCalledWith('sync:message', expect.objectContaining({
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('sync:message', expect.objectContaining({
       kind: 'progress',
       action: 'save',
       source: 'external-tab',
     }));
-    expect(window.PlasmaDeck.bus.emit).toHaveBeenCalledWith('progress:save', expect.objectContaining({
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('progress:save', expect.objectContaining({
       kind: 'progress',
       action: 'save',
     }));
@@ -547,7 +547,7 @@ describe('bridge DB safety helpers', () => {
         { id: 'ts-b', topicId: 'topic-b', courseId: 'course-b', position: 30 },
       ],
     };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async getAllByIndex(store, indexName, value) {
         calls.push([store, indexName, value]);
         return stores[store].filter(record => record?.[indexName] === value);
@@ -585,7 +585,7 @@ describe('bridge DB safety helpers', () => {
         { id: 'folder-c', name: 'Top level' },
       ],
     };
-    window.PlasmaDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.PlasmaDB = class {
       async getAll(store) {
         calls.push([store, 'getAll']);
         return stores[store] ?? [];
@@ -630,7 +630,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('falls back to localStorage for indexed helpers when IndexedDB is unavailable', async () => {
-    window.PlasmaDeck.DB.PlasmaDB = null;
+    window.OpenCourseDeck.DB.PlasmaDB = null;
     localStorage.setItem('plasma_progress_v1', JSON.stringify({
       'topic-a': { topicId: 'topic-a', courseId: 'course-a' },
       'topic-b': { topicId: 'topic-b', courseId: 'course-b' },

@@ -62,10 +62,10 @@ export function mountProgressView({ setView } = {}) {
     </section>
   `);
 
-  window.PlasmaDeck?.ProgressStatsInit?.();
+  window.OpenCourseDeck?.ProgressStatsInit?.();
   return {
     unmount() {
-      try { window.PlasmaDeck?.ProgressStats?.destroy?.(); } catch {}
+      try { window.OpenCourseDeck?.ProgressStats?.destroy?.(); } catch {}
     },
   };
 }

@@ -44,7 +44,7 @@ function validateGitignore() {
     'workbox-*.js',
     'debug.log',
     'server-*.log',
-    'plasmadeck-server.pid',
+    'opencoursedeck-server.pid',
   ];
   for (const pattern of required) requirePattern('.gitignore', pattern);
 }

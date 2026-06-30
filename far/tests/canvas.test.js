@@ -43,18 +43,18 @@ describe('Canvas renderer scheduling', () => {
     Object.defineProperty(canvas, 'offsetWidth', { value: 320, configurable: true });
     Object.defineProperty(canvas, 'offsetHeight', { value: 180, configurable: true });
 
-    window.PlasmaDeck.Canvas.init(canvas);
-    window.PlasmaDeck.Canvas._pause();
+    window.OpenCourseDeck.Canvas.init(canvas);
+    window.OpenCourseDeck.Canvas._pause();
 
-    expect(() => window.PlasmaDeck.Canvas._scheduleRender()).not.toThrow();
+    expect(() => window.OpenCourseDeck.Canvas._scheduleRender()).not.toThrow();
     expect(window.requestAnimationFrame).toHaveBeenCalled();
 
-    window.PlasmaDeck.Canvas.destroy();
+    window.OpenCourseDeck.Canvas.destroy();
   });
 
   it('does not schedule a render every time a cached image is drawn', () => {
     const img = { width: 200, height: 100 };
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
     const safeSrc = new URL('cached.png', document.baseURI).href;
     canvas._imageCache.set(safeSrc, img);
     canvas._scheduleRender = vi.fn();
@@ -82,7 +82,7 @@ describe('Canvas renderer scheduling', () => {
     };
 
     try {
-      window.PlasmaDeck.Canvas._drawImage(ctx, {
+      window.OpenCourseDeck.Canvas._drawImage(ctx, {
         src: 'data:text/html,<script>window.__canvasXss = true</script>',
         x: 0,
         y: 0,
@@ -102,7 +102,7 @@ describe('Canvas renderer scheduling', () => {
     const OriginalImage = window.Image;
     const safeImageUrl = vi.fn(() => 'https://cdn.example.test/safe.png');
     const setSrc = vi.fn();
-    window.PlasmaDeck.safeImageUrl = safeImageUrl;
+    window.OpenCourseDeck.safeImageUrl = safeImageUrl;
     window.Image = class {
       set src(value) {
         setSrc(value);
@@ -110,7 +110,7 @@ describe('Canvas renderer scheduling', () => {
     };
 
     try {
-      window.PlasmaDeck.Canvas._drawImage(ctx, {
+      window.OpenCourseDeck.Canvas._drawImage(ctx, {
         src: 'https://cdn.example.test/raw.png',
         x: 0,
         y: 0,
@@ -119,7 +119,7 @@ describe('Canvas renderer scheduling', () => {
       });
     } finally {
       window.Image = OriginalImage;
-      delete window.PlasmaDeck.safeImageUrl;
+      delete window.OpenCourseDeck.safeImageUrl;
     }
 
     expect(safeImageUrl).toHaveBeenCalledWith('https://cdn.example.test/raw.png');
@@ -127,7 +127,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('serializes and reloads board state for Studio persistence', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     const loaded = canvas.loadState({
       version: 1,
@@ -156,7 +156,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('can reload synced Studio board state while preserving local viewport, tool, and valid selection', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     canvas.loadState({
       version: 1,
@@ -202,7 +202,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('adds Studio text and card elements, then clears board elements', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     const text = canvas.addText('Clinical sketch');
     const card = canvas.addCard({ x: 140, y: 160 });
@@ -217,7 +217,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('adds Studio shape and image elements with safe image URL validation', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     const rect = canvas.addRectangle({ width: 260 });
     const circle = canvas.addCircle({ radius: 42 });
@@ -235,7 +235,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('manages Studio layers and removes elements by id', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     const layer = canvas.addLayer('Second layer');
     expect(layer.name).toBe('Second layer');
@@ -257,7 +257,7 @@ describe('Canvas renderer scheduling', () => {
   });
 
   it('updates Studio element properties by id', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
     const text = canvas.addText('Before', { width: 120, height: 40 });
 
     const updated = canvas.updateElement(text.id, {
@@ -294,22 +294,22 @@ describe('Canvas renderer scheduling', () => {
     const changeSpy = vi.fn();
     canvasEl.addEventListener('plasma:studio-board-change', changeSpy);
 
-    window.PlasmaDeck.Canvas.loadState({ layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] }] });
-    window.PlasmaDeck.Canvas.init(canvasEl);
-    window.PlasmaDeck.Canvas.setTool('pen');
+    window.OpenCourseDeck.Canvas.loadState({ layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] }] });
+    window.OpenCourseDeck.Canvas.init(canvasEl);
+    window.OpenCourseDeck.Canvas.setTool('pen');
 
     canvasEl.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20 }));
     canvasEl.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 16, clientY: 26 }));
     canvasEl.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 24, clientY: 32 }));
     canvasEl.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 24, clientY: 32 }));
 
-    const board = window.PlasmaDeck.Canvas.serialize();
+    const board = window.OpenCourseDeck.Canvas.serialize();
     expect(board.layers[0].elements).toHaveLength(1);
     expect(board.layers[0].elements[0]).toEqual(expect.objectContaining({ type: 'polyline', stroke: '#6366f1' }));
     expect(board.layers[0].elements[0].points.length).toBeGreaterThanOrEqual(3);
     expect(changeSpy).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.objectContaining({ action: 'draw' }) }));
 
-    window.PlasmaDeck.Canvas.destroy();
+    window.OpenCourseDeck.Canvas.destroy();
   });
 
   it('selects, drags, zooms, and deletes Studio elements with canvas input', () => {
@@ -318,7 +318,7 @@ describe('Canvas renderer scheduling', () => {
     Object.defineProperty(canvasEl, 'offsetHeight', { value: 180, configurable: true });
     canvasEl.getBoundingClientRect = vi.fn(() => ({ left: 0, top: 0, width: 320, height: 180 }));
 
-    window.PlasmaDeck.Canvas.loadState({
+    window.OpenCourseDeck.Canvas.loadState({
       layers: [{
         id: 'layer-1',
         name: 'Layer 1',
@@ -327,29 +327,29 @@ describe('Canvas renderer scheduling', () => {
         elements: [{ id: 'rect-1', type: 'rect', x: 20, y: 20, width: 80, height: 50, fill: '#ffffff' }],
       }],
     });
-    window.PlasmaDeck.Canvas.init(canvasEl);
-    window.PlasmaDeck.Canvas.setTool('select');
+    window.OpenCourseDeck.Canvas.init(canvasEl);
+    window.OpenCourseDeck.Canvas.setTool('select');
 
     canvasEl.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 30, clientY: 30 }));
     canvasEl.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 45, clientY: 48 }));
     canvasEl.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 45, clientY: 48 }));
 
-    let board = window.PlasmaDeck.Canvas.serialize();
+    let board = window.OpenCourseDeck.Canvas.serialize();
     expect(board.layers[0].elements[0]).toEqual(expect.objectContaining({ x: 35, y: 38 }));
-    expect(window.PlasmaDeck.Canvas.getState().selectedIds).toEqual(['rect-1']);
+    expect(window.OpenCourseDeck.Canvas.getState().selectedIds).toEqual(['rect-1']);
 
     canvasEl.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 100, clientY: 80, deltaY: -100 }));
-    expect(window.PlasmaDeck.Canvas.getState().zoom).toBeGreaterThan(1);
+    expect(window.OpenCourseDeck.Canvas.getState().zoom).toBeGreaterThan(1);
 
     canvasEl.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Delete' }));
-    board = window.PlasmaDeck.Canvas.serialize();
+    board = window.OpenCourseDeck.Canvas.serialize();
     expect(board.layers[0].elements).toEqual([]);
 
-    window.PlasmaDeck.Canvas.destroy();
+    window.OpenCourseDeck.Canvas.destroy();
   });
 
   it('applies Studio board templates as normalized scenes', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
 
     const studyMap = canvas.applyTemplate('study-map');
     expect(studyMap.layers[0].name).toBe('Study map');
@@ -368,16 +368,16 @@ describe('Canvas renderer scheduling', () => {
     Object.defineProperty(canvasEl, 'offsetHeight', { value: 180, configurable: true });
     canvasEl.toDataURL = vi.fn(() => 'data:image/png;base64,studio');
 
-    window.PlasmaDeck.Canvas.init(canvasEl);
+    window.OpenCourseDeck.Canvas.init(canvasEl);
 
-    expect(window.PlasmaDeck.Canvas.exportPNG()).toBe('data:image/png;base64,studio');
+    expect(window.OpenCourseDeck.Canvas.exportPNG()).toBe('data:image/png;base64,studio');
     expect(canvasEl.toDataURL).toHaveBeenCalledWith('image/png');
 
-    window.PlasmaDeck.Canvas.destroy();
+    window.OpenCourseDeck.Canvas.destroy();
   });
 
   it('exports portable SVG for common Studio scene elements', () => {
-    const canvas = window.PlasmaDeck.Canvas;
+    const canvas = window.OpenCourseDeck.Canvas;
     canvas.loadState({
       version: 1,
       viewport: { offsetX: 4, offsetY: 8, zoom: 1 },
@@ -411,15 +411,15 @@ describe('Canvas renderer scheduling', () => {
     Object.defineProperty(canvasEl, 'offsetHeight', { value: 180, configurable: true });
     const removeSpy = vi.spyOn(window, 'removeEventListener');
 
-    window.PlasmaDeck.Canvas.init(canvasEl);
+    window.OpenCourseDeck.Canvas.init(canvasEl);
     expect(canvasEl.dataset.pdCanvasInited).toBe('true');
 
-    window.PlasmaDeck.Canvas.destroy();
+    window.OpenCourseDeck.Canvas.destroy();
 
     expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1);
     expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function), undefined);
     expect(canvasEl.dataset.pdCanvasInited).toBeUndefined();
-    expect(window.PlasmaDeck.Canvas._canvas).toBeNull();
-    expect(window.PlasmaDeck.Canvas._ctx).toBeNull();
+    expect(window.OpenCourseDeck.Canvas._canvas).toBeNull();
+    expect(window.OpenCourseDeck.Canvas._ctx).toBeNull();
   });
 });

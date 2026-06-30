@@ -53,18 +53,18 @@ async function loadApp() {
   window.DOMPurify = { sanitize: (s) => s };
 
   await import('../app.js');
-  await vi.waitFor(() => expect(window.PlasmaDeck.Router).toBeTruthy());
+  await vi.waitFor(() => expect(window.OpenCourseDeck.Router).toBeTruthy());
 }
 
 async function navigate(hash) {
   const ready = new Promise(resolve => {
     const handler = (data) => {
       if (data.hash === hash) {
-        window.PlasmaDeck.bus.off('route:ready', handler);
+        window.OpenCourseDeck.bus.off('route:ready', handler);
         resolve();
       }
     };
-    window.PlasmaDeck.bus.on('route:ready', handler);
+    window.OpenCourseDeck.bus.on('route:ready', handler);
   });
   
   window.location.hash = hash;

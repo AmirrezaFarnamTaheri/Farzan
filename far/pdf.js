@@ -1,5 +1,5 @@
-﻿// ============================================================
-// PlasmaDeck â€” pdf.js
+// ============================================================
+// OpenCourseDeck â€” pdf.js
 // Full PDF Viewer with Thumbnails, Annotations, Search
 // Requires: PDF.js library (pdfjs-dist)
 //   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -31,7 +31,7 @@
   };
 
   async function pdConfirm(input) {
-    const pd = window.PlasmaDeck;
+    const pd = window.OpenCourseDeck;
     const fn = pd?.UI?.confirm ?? pd?.Modal?.confirmAsync;
     if (typeof fn === 'function') return fn(input);
     const message = input && typeof input === 'object' ? input.message : input;
@@ -232,7 +232,7 @@
      */
     async load(source) {
       if (typeof pdfjsLib === 'undefined') {
-        console.error('[PlasmaDeck PDF] PDF.js not loaded. Add pdfjs-dist script.');
+        console.error('[OpenCourseDeck PDF] PDF.js not loaded. Add pdfjs-dist script.');
         this._showError('PDF.js library not loaded.');
         return;
       }
@@ -280,12 +280,12 @@
         this._applyPendingPage();
         await this._buildThumbnails();
 
-        window.PlasmaDeck?.bus?.emit('pdf:load', {
+        window.OpenCourseDeck?.bus?.emit('pdf:load', {
           pages: State.totalPages,
           source: typeof source === 'string' ? source : '[file]',
         });
       } catch (err) {
-        console.error('[PlasmaDeck PDF] Load error:', err);
+        console.error('[OpenCourseDeck PDF] Load error:', err);
         this._showError(`Failed to load PDF: ${err.message}`);
       } finally {
         this._showLoading(false);
@@ -361,12 +361,12 @@
         this._updatePageUI();
         this._highlightThumbnail(State.currentPage);
 
-        window.PlasmaDeck?.bus?.emit('pdf:pageRender', {
+        window.OpenCourseDeck?.bus?.emit('pdf:pageRender', {
           page: State.currentPage,
           scale: State.scale,
         });
       } catch (err) {
-        console.error('[PlasmaDeck PDF] Render error:', err);
+        console.error('[OpenCourseDeck PDF] Render error:', err);
       } finally {
         State.renderingPage = false;
         if (token === State.renderToken && State.queuedRender) {
@@ -857,7 +857,7 @@
         this.goTo(State.searchResults[0].page);
       }
 
-      window.PlasmaDeck?.bus?.emit('pdf:search', {
+      window.OpenCourseDeck?.bus?.emit('pdf:search', {
         query,
         count: State.searchResults.length,
       });
@@ -980,7 +980,7 @@
       const data   = await State.pdfDoc.getData();
       const blob   = new Blob([data], { type: 'application/pdf' });
       const objectUrl = URL.createObjectURL(blob);
-      const validateFrameUrl = window.PlasmaDeck?.safeFrameUrl;
+      const validateFrameUrl = window.OpenCourseDeck?.safeFrameUrl;
       const frameUrl = typeof validateFrameUrl === 'function'
         ? validateFrameUrl(objectUrl)
         : objectUrl;
@@ -1178,7 +1178,7 @@
       const vp = { width: rect.width, height: rect.height };
       PDFViewer._renderAnnotationLayer(State.currentPage, vp);
 
-      window.PlasmaDeck?.bus?.emit('pdf:annotate', { annot, page: State.currentPage });
+      window.OpenCourseDeck?.bus?.emit('pdf:annotate', { annot, page: State.currentPage });
     },
 
     delete(pageNum, annotId) {

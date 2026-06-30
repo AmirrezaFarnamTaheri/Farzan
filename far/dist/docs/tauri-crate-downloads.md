@@ -1,4 +1,4 @@
-# PlasmaDeck Tauri Cargo Crate Download List
+# OpenCourseDeck Tauri Cargo Crate Download List
 
 Generated from tauri-dev/tauri-dev/Cargo.lock. Count: 1062
 

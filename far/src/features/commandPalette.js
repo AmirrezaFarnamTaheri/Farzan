@@ -1,7 +1,7 @@
 import { debounce, eventTargetEl, restoreFocus, setAppInert, trapFocus } from '../lib/dom.js';
 
 export function initCommandPalette() {
-  const PlasmaDeck = window.PlasmaDeck ?? {};
+  const OpenCourseDeck = window.OpenCourseDeck ?? {};
 
   const cpOverlay = document.getElementById('command-palette-overlay');
   const cpInput = document.getElementById('cp-input');
@@ -19,7 +19,7 @@ export function initCommandPalette() {
   let cpSelectedIdx = -1;
   let cpActiveCat = 'all';
 
-  const app = () => window.PlasmaDeck ?? PlasmaDeck;
+  const app = () => window.OpenCourseDeck ?? OpenCourseDeck;
   const applyTheme = (theme) => {
     const manager = app().ThemeManager;
     if (typeof manager?.apply === 'function') manager.apply(theme);
@@ -98,7 +98,7 @@ export function initCommandPalette() {
     { label: 'UI: Density spacious', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'spacious'), cat: 'tools' },
     // Actions
     { label: 'Export backup', action: () => window.ProgressStats?.exportJSON?.(), cat: 'action' },
-    { label: 'Show keyboard shortcuts', action: () => window.PlasmaDeck?.KeyboardShortcuts?._showHelp?.(), cat: 'action' },
+    { label: 'Show keyboard shortcuts', action: () => window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.(), cat: 'action' },
     { label: 'Open first-run guide', hash: '#/help', cat: 'action' },
     { label: 'Reload app', action: () => window.location.reload(), cat: 'action' },
   ];
@@ -243,10 +243,10 @@ export function initCommandPalette() {
   renderResults('');
 
   // Expose open/close + register shortcut button hookup stays in app.js shortcuts system
-  PlasmaDeck.CommandPalette = {
+  OpenCourseDeck.CommandPalette = {
     open: cpOpen,
     close: cpClose,
     refresh: () => renderResults(cpInput.value ?? ''),
   };
-  window.PlasmaDeck = PlasmaDeck;
+  window.OpenCourseDeck = OpenCourseDeck;
 }

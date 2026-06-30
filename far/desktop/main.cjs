@@ -29,7 +29,7 @@ async function createMainWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 720,
-    title: 'PlasmaDeck',
+    title: 'OpenCourseDeck',
     backgroundColor: '#111827',
     autoHideMenuBar: true,
     webPreferences: {
@@ -59,8 +59,8 @@ async function createMainWindow() {
   return win;
 }
 
-app.setName('PlasmaDeck');
-app.setPath('userData', path.join(app.getPath('appData'), 'PlasmaDeck'));
+app.setName('OpenCourseDeck');
+app.setPath('userData', path.join(app.getPath('appData'), 'OpenCourseDeck'));
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
 else {

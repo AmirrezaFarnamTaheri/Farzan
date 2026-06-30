@@ -11,7 +11,7 @@ describe('dev server range handling', () => {
 
   beforeEach(async () => {
     ({ createServer } = await import('../scripts/dev-server.cjs'));
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'plasmadeck-dev-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-dev-'));
     fs.writeFileSync(path.join(root, 'sample.txt'), '0123456789', 'utf8');
     fs.writeFileSync(
       path.join(root, 'index.html'),

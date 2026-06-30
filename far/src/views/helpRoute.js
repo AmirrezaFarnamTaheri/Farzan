@@ -1,7 +1,7 @@
 export function mountHelpView(deps = {}) {
   const {
     setView,
-    Toast = window.PlasmaDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast,
   } = deps;
 
   setView(`
@@ -39,7 +39,7 @@ export function mountHelpView(deps = {}) {
         <section class="card card-filled help-card">
           <div class="card-body">
             <h2 class="help-card-title">Where your data lives</h2>
-            <p>PlasmaDeck stores your data in this browser profile for this exact origin. Changing from <code>localhost:5173</code> to another port creates a different storage bucket.</p>
+            <p>OpenCourseDeck stores your data in this browser profile for this exact origin. Changing from <code>localhost:5173</code> to another port creates a different storage bucket.</p>
             <dl class="help-facts">
               <div><dt>Progress</dt><dd>IndexedDB</dd></div>
               <div><dt>Preferences</dt><dd>localStorage</dd></div>
@@ -119,7 +119,7 @@ export function mountHelpView(deps = {}) {
     catch { Toast.error('Export failed'); }
   });
   document.getElementById('help-shortcuts-btn')?.addEventListener('click', () => {
-    window.PlasmaDeck?.KeyboardShortcuts?._showHelp?.();
+    window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.();
   });
 }
 

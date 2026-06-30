@@ -14,7 +14,7 @@ npm start
 
 Open `http://localhost:5173/`. Keep the terminal running while you use the app.
 
-Windows users can also use `Run-PlasmaDeck.vbs` or `Run-PlasmaDeck.cmd`.
+Windows users can also use `Run-OpenCourseDeck.vbs` or `Run-OpenCourseDeck.cmd`.
 
 ### First Tour
 
@@ -70,7 +70,7 @@ Use `npm run ci` for the combined audit plus HTTP smoke check.
 **Can I open `index.html` directly?**  
 No. Use `npm start` or the Windows launcher. Browser security rules block core features on `file://`.
 
-**Does PlasmaDeck upload my notes or progress?**  
+**Does OpenCourseDeck upload my notes or progress?**  
 No. The app is local-first and does not upload by default.
 
 **Why did my data disappear after changing ports?**  

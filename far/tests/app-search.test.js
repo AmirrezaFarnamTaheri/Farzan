@@ -19,7 +19,7 @@ describe('app topbar search rendering', () => {
       this.unobserve = vi.fn();
       this.disconnect = vi.fn();
     });
-    window.PlasmaDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
+    window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
     window.location.hash = '#/help';
     document.body.innerHTML = `
       <div id="plasma-app">
@@ -35,7 +35,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('renders search result fields as text and blocks unsafe navigation URLs', async () => {
-    window.PlasmaDeck.TopbarSearch.setData([
+    window.OpenCourseDeck.TopbarSearch.setData([
       {
         label: '<img src=x onerror="window.__searchXss = true">',
         description: '<script>window.__searchDescXss = true</script>',
@@ -65,25 +65,25 @@ describe('app topbar search rendering', () => {
   });
 
   it('central URL helpers allow expected URLs and reject executable schemes', () => {
-    expect(window.PlasmaDeck.safeExternalUrl('https://plasmato.net/course')).toBe('https://plasmato.net/course');
-    expect(window.PlasmaDeck.safeExternalUrl('http://example.test/course')).toBe('http://example.test/course');
-    expect(window.PlasmaDeck.safeExternalUrl('/relative-course')).toContain('/relative-course');
-    expect(window.PlasmaDeck.safeExternalUrl('javascript:alert(1)')).toBeNull();
-    expect(window.PlasmaDeck.safeExternalUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(window.OpenCourseDeck.safeExternalUrl('https://plasmato.net/course')).toBe('https://plasmato.net/course');
+    expect(window.OpenCourseDeck.safeExternalUrl('http://example.test/course')).toBe('http://example.test/course');
+    expect(window.OpenCourseDeck.safeExternalUrl('/relative-course')).toContain('/relative-course');
+    expect(window.OpenCourseDeck.safeExternalUrl('javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeExternalUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
 
-    expect(window.PlasmaDeck.safeNavigationUrl('#/courses')).toBe('#/courses');
-    expect(window.PlasmaDeck.safeNavigationUrl('/docs/getting-started.md')).toContain('/docs/getting-started.md');
-    expect(window.PlasmaDeck.safeNavigationUrl('javascript:alert(1)')).toBeNull();
-    expect(window.PlasmaDeck.safeNavigationUrl('vbscript:msgbox(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeNavigationUrl('#/courses')).toBe('#/courses');
+    expect(window.OpenCourseDeck.safeNavigationUrl('/docs/getting-started.md')).toContain('/docs/getting-started.md');
+    expect(window.OpenCourseDeck.safeNavigationUrl('javascript:alert(1)')).toBeNull();
+    expect(window.OpenCourseDeck.safeNavigationUrl('vbscript:msgbox(1)')).toBeNull();
 
-    expect(window.PlasmaDeck.safeImageUrl('data:image/png;base64,AAAA')).toContain('data:image/png');
-    expect(window.PlasmaDeck.safeImageUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
-    expect(window.PlasmaDeck.safeMediaUrl('data:video/mp4;base64,AAAA')).toContain('data:video/mp4');
-    expect(window.PlasmaDeck.safeMediaUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(window.OpenCourseDeck.safeImageUrl('data:image/png;base64,AAAA')).toContain('data:image/png');
+    expect(window.OpenCourseDeck.safeImageUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(window.OpenCourseDeck.safeMediaUrl('data:video/mp4;base64,AAAA')).toContain('data:video/mp4');
+    expect(window.OpenCourseDeck.safeMediaUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
   });
 
   it('renders empty search state as text even for malicious queries', async () => {
-    window.PlasmaDeck.TopbarSearch.setData([]);
+    window.OpenCourseDeck.TopbarSearch.setData([]);
     const input = document.querySelector('[data-search-input]');
     input.value = '<img src=x onerror="window.__emptySearchXss = true">';
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -108,7 +108,7 @@ describe('app topbar search rendering', () => {
       allCourses: vi.fn(() => []),
       allTopics: vi.fn(() => []),
     };
-    window.PlasmaDeck.AI = {
+    window.OpenCourseDeck.AI = {
       upsertEmbedding: vi.fn(async () => true),
       searchEmbeddings: vi.fn(async () => [{ id: 'note-memory', score: 0.82 }]),
     };
@@ -118,8 +118,8 @@ describe('app topbar search rendering', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.advanceTimersByTimeAsync(350);
 
-    await vi.waitFor(() => expect(window.PlasmaDeck.AI.searchEmbeddings).toHaveBeenCalledWith('recall', { limit: 4 }));
-    expect(window.PlasmaDeck.AI.upsertEmbedding).toHaveBeenCalledWith(expect.objectContaining({
+    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.searchEmbeddings).toHaveBeenCalledWith('recall', { limit: 4 }));
+    expect(window.OpenCourseDeck.AI.upsertEmbedding).toHaveBeenCalledWith(expect.objectContaining({
       id: 'note-memory',
       text: expect.stringContaining('Long term memory'),
     }));
@@ -152,9 +152,9 @@ describe('app topbar search rendering', () => {
       ]),
     };
     window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
-    window.PlasmaDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
+    window.OpenCourseDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
 
     const courseButton = document.querySelector('[data-course-id="course-xss"]');
     expect(courseButton.textContent).toContain('<img');
@@ -179,7 +179,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('renders large Courses topic detail lists incrementally and cancels queued batches', async () => {
-    window.PlasmaDeck.courseDetailRenderBatchSize = 25;
+    window.OpenCourseDeck.courseDetailRenderBatchSize = 25;
     window.DataStore = {
       init: vi.fn().mockResolvedValue(true),
       allCourses: vi.fn(() => [{ id: 'course-large', title: 'Large course' }]),
@@ -195,9 +195,9 @@ describe('app topbar search rendering', () => {
       }))),
     };
     window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
-    window.PlasmaDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
+    window.OpenCourseDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
     document.querySelector('[data-course-id="course-large"]').click();
 
     await Promise.resolve();
@@ -229,7 +229,7 @@ describe('app topbar search rendering', () => {
       ]),
     };
 
-    await window.PlasmaDeck.Views.materials();
+    await window.OpenCourseDeck.Views.materials();
 
     const list = document.getElementById('materials-list');
     expect(list.textContent).toContain('<svg');
@@ -244,7 +244,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('renders Materials rows incrementally and binds route-level filters', async () => {
-    window.PlasmaDeck.materialsRenderBatchSize = 20;
+    window.OpenCourseDeck.materialsRenderBatchSize = 20;
     window.DataStore = {
       init: vi.fn().mockResolvedValue(true),
       allTopics: vi.fn(() => Array.from({ length: 60 }, (_, index) => ({
@@ -258,7 +258,7 @@ describe('app topbar search rendering', () => {
       }))),
     };
 
-    const controller = await window.PlasmaDeck.Views.materials();
+    const controller = await window.OpenCourseDeck.Views.materials();
     const list = document.getElementById('materials-list');
 
     expect(list.querySelectorAll('[data-topic-id]')).toHaveLength(20);
@@ -304,9 +304,9 @@ describe('app topbar search rendering', () => {
       ]),
     };
     window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
-    window.PlasmaDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
+    window.OpenCourseDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
 
     const renderedCourses = document.getElementById('courses-list');
     expect(renderedCourses.textContent).not.toContain('[object HTMLSpanElement]');
@@ -352,7 +352,7 @@ describe('app topbar search rendering', () => {
     };
     window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
     const loadPlaylist = vi.fn();
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn((el) => {
         el._pdPlayer = { loadPlaylist, on: vi.fn(), off: vi.fn(), getCurrentTrack: vi.fn() };
         return el._pdPlayer;
@@ -360,7 +360,7 @@ describe('app topbar search rendering', () => {
       destroyAll: vi.fn(),
     };
 
-    await window.PlasmaDeck.Views.courses();
+    await window.OpenCourseDeck.Views.courses();
     vi.advanceTimersByTime(150);
 
     expect(loadPlaylist).not.toHaveBeenCalled();
@@ -369,7 +369,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('renders toast action strings as text while allowing node actions', () => {
-    const toast = window.PlasmaDeck.Toast.show({
+    const toast = window.OpenCourseDeck.Toast.show({
       title: '<img src=x onerror="window.__toastTitleXss = true">',
       message: '<script>window.__toastMessageXss = true</script>',
       action: '<button onclick="window.__toastActionXss = true">Run</button>',
@@ -386,7 +386,7 @@ describe('app topbar search rendering', () => {
     const button = document.createElement('button');
     button.dataset.safeAction = 'true';
     button.textContent = 'Safe';
-    const actionable = window.PlasmaDeck.Toast.show({ message: 'Node action', action: button, duration: 0 });
+    const actionable = window.OpenCourseDeck.Toast.show({ message: 'Node action', action: button, duration: 0 });
     expect(actionable.querySelector('[data-safe-action="true"]')).toBe(button);
 
     expect(window.__toastTitleXss).toBeUndefined();
@@ -395,7 +395,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('renders modal body and footer strings as text', () => {
-    const modal = window.PlasmaDeck.Modal.create({
+    const modal = window.OpenCourseDeck.Modal.create({
       title: '<img src=x onerror="window.__modalTitleXss = true">',
       body: '<img src=x onerror="window.__modalBodyXss = true">',
       footer: '<script>window.__modalFooterXss = true</script>',
@@ -412,7 +412,7 @@ describe('app topbar search rendering', () => {
 
   it('does not trigger global keyboard shortcuts from editable fields', () => {
     const open = vi.fn();
-    window.PlasmaDeck.CommandPalette = { open };
+    window.OpenCourseDeck.CommandPalette = { open };
     const editor = document.createElement('div');
     editor.setAttribute('contenteditable', 'true');
     document.body.appendChild(editor);
@@ -479,14 +479,14 @@ describe('app topbar search rendering', () => {
       getProgress: vi.fn().mockResolvedValue(null),
       saveProgress: vi.fn().mockResolvedValue(true),
     };
-    window.PlasmaDeck.Player = {
+    window.OpenCourseDeck.Player = {
       init: vi.fn(() => {
         document.getElementById('course-player')._pdPlayer = fakePlayer;
       }),
       destroyAll: vi.fn(),
     };
 
-    const controller = await window.PlasmaDeck.Views.courses();
+    const controller = await window.OpenCourseDeck.Views.courses();
 
     await handlers.pause(track);
     await handlers.seeked({ track, currentTime: 50, duration: 100, percent: 50 });

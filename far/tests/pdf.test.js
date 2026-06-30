@@ -9,7 +9,7 @@ describe('PDF viewer safe messages', () => {
       <div data-pdf-thumbnails></div>
       <div data-pdf-search-results></div>
     `;
-    window.PlasmaDeck = { bus: { emit: vi.fn() } };
+    window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     globalThis.IntersectionObserver = vi.fn(function IntersectionObserverMock() {
       this.observe = vi.fn();
       this.disconnect = vi.fn();
@@ -164,7 +164,7 @@ describe('PDF viewer safe messages', () => {
 
   it('routes print iframe object URLs through central frame URL validation', async () => {
     const objectUrl = 'blob:https://example.test/pdf';
-    window.PlasmaDeck.safeFrameUrl = vi.fn(() => null);
+    window.OpenCourseDeck.safeFrameUrl = vi.fn(() => null);
     window.PlasmaPDFState.pdfDoc = {
       getData: vi.fn(async () => new Uint8Array([1, 2, 3])),
     };
@@ -173,7 +173,7 @@ describe('PDF viewer safe messages', () => {
 
     await window.PlasmaPDFViewer.print();
 
-    expect(window.PlasmaDeck.safeFrameUrl).toHaveBeenCalledWith(objectUrl);
+    expect(window.OpenCourseDeck.safeFrameUrl).toHaveBeenCalledWith(objectUrl);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl);
     expect(document.querySelector('iframe')).toBeNull();
   });

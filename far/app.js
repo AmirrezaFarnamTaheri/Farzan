@@ -1,5 +1,5 @@
 // ============================================================
-// PlasmaDeck UI â€” app.js
+// OpenCourseDeck UI â€” app.js
 // Complete JavaScript Interaction Layer
 // Version 1.1.2 (keep aligned with package.json)
 // ============================================================
@@ -19,6 +19,22 @@ import {
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
+import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
+import { chartGauge as GaugePlugin } from './src/features/chartPlugins/gauge.js';
+import { chartHeatmap as HeatmapPlugin } from './src/features/chartPlugins/heatmap.js';
+import { chartSparkline as SparklinePlugin } from './src/features/chartPlugins/sparkline.js';
+import { CanvasAreaChart } from './src/features/canvasCharts/area.js';
+import { CanvasGauge } from './src/features/canvasCharts/gauge.js';
+import { CanvasHeatmap } from './src/features/canvasCharts/heatmap.js';
+import { CanvasTreemap } from './src/features/canvasCharts/treemap.js';
+import { CanvasZoom } from './src/features/canvasZoom.js';
+import './src/features/canvasTools/index.js';
+import { CourseGraph } from './src/features/courseGraph.js';
+import { KnowledgeGraph } from './src/features/knowledgeGraph.js';
+import * as ContextMenu from './src/ui/contextMenu.js';
+import * as CanvasExport from './src/lib/canvasExport.js';
+import { Clipboard as ClipboardBridge } from './src/lib/clipboard.js';
+import { Pointer } from './src/lib/pointer.js';
 
 (() => {
   'use strict';
@@ -26,9 +42,9 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 0. NAMESPACE & GLOBAL STATE
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // IMPORTANT: merge into any existing window.PlasmaDeck so earlier modules
+  // IMPORTANT: merge into any existing window.OpenCourseDeck so earlier modules
   // (e.g. data.js, db.js) are not clobbered.
-  const PlasmaDeck = window.PlasmaDeck ?? {};
+  const OpenCourseDeck = window.OpenCourseDeck ?? {};
 
   const defaultState = {
     theme: 'dark',           // 'dark' | 'light' | 'system'
@@ -55,24 +71,24 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     },
   };
 
-  PlasmaDeck.version = PlasmaDeck.version ?? '1.1.2';
-  PlasmaDeck.state = {
+  OpenCourseDeck.version = OpenCourseDeck.version ?? '1.1.2';
+  OpenCourseDeck.state = {
     ...defaultState,
-    ...(PlasmaDeck.state ?? {}),
+    ...(OpenCourseDeck.state ?? {}),
     // Keep Set instances if they already exist
-    openDropdowns: PlasmaDeck.state?.openDropdowns instanceof Set ? PlasmaDeck.state.openDropdowns : defaultState.openDropdowns,
-    openAccordions: PlasmaDeck.state?.openAccordions instanceof Set ? PlasmaDeck.state.openAccordions : defaultState.openAccordions,
+    openDropdowns: OpenCourseDeck.state?.openDropdowns instanceof Set ? OpenCourseDeck.state.openDropdowns : defaultState.openDropdowns,
+    openAccordions: OpenCourseDeck.state?.openAccordions instanceof Set ? OpenCourseDeck.state.openAccordions : defaultState.openAccordions,
   };
-  PlasmaDeck.config = {
+  OpenCourseDeck.config = {
     ...defaultConfig,
-    ...(PlasmaDeck.config ?? {}),
+    ...(OpenCourseDeck.config ?? {}),
     breakpoints: {
       ...defaultConfig.breakpoints,
-      ...((PlasmaDeck.config ?? {}).breakpoints ?? {}),
+      ...((OpenCourseDeck.config ?? {}).breakpoints ?? {}),
     },
   };
-  PlasmaDeck.plugins = PlasmaDeck.plugins ?? {};
-  PlasmaDeck.dom = {
+  OpenCourseDeck.plugins = OpenCourseDeck.plugins ?? {};
+  OpenCourseDeck.dom = {
     $,
     $$,
     debounce,
@@ -85,7 +101,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   };
 
   // Expose globally (without clobbering)
-  window.PlasmaDeck = PlasmaDeck;
+  window.OpenCourseDeck = OpenCourseDeck;
 
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -472,7 +488,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     };
   })();
 
-  PlasmaDeck.MiniPlayer = MiniPlayer;
+  OpenCourseDeck.MiniPlayer = MiniPlayer;
 
   function localStorageFootprint() {
     try {
@@ -507,7 +523,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     return true;
   }
 
-  function printStudioBoardPdf({ title = 'PlasmaDeck Studio board', svg = '', png = '' } = {}) {
+  function printStudioBoardPdf({ title = 'OpenCourseDeck Studio board', svg = '', png = '' } = {}) {
     const media = svg || (png ? `<img src="${String(png).replace(/"/g, '&quot;')}" alt="Studio board" />` : '');
     if (!media) return false;
     const win = window.open?.('', '_blank', 'noopener,noreferrer');
@@ -604,7 +620,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   }
 
   // Global event bus
-  PlasmaDeck.bus = new EventEmitter();
+  OpenCourseDeck.bus = new EventEmitter();
 
   /**
    * Animate element height from 0 â†’ auto (or auto â†’ 0)
@@ -613,7 +629,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
    * @param {number} duration ms
    * @returns {Promise<void>}
    */
-  function animateHeight(el, open, duration = PlasmaDeck.config.animationDuration) {
+  function animateHeight(el, open, duration = OpenCourseDeck.config.animationDuration) {
     return new Promise(resolve => {
       const startHeight = open ? 0 : el.scrollHeight;
       const endHeight   = open ? el.scrollHeight : 0;
@@ -702,11 +718,11 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     },
 
     toggle() {
-      this._setCollapsed(!PlasmaDeck.state.sidebarCollapsed);
+      this._setCollapsed(!OpenCourseDeck.state.sidebarCollapsed);
     },
 
     _setCollapsed(collapsed) {
-      PlasmaDeck.state.sidebarCollapsed = collapsed;
+      OpenCourseDeck.state.sidebarCollapsed = collapsed;
       localStorage.setItem(this.STORAGE_KEY, String(collapsed));
 
       this.el.classList.toggle('sidebar-collapsed', collapsed);
@@ -726,7 +742,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         }
       });
 
-      PlasmaDeck.bus.emit('sidebar:toggle', { collapsed });
+      OpenCourseDeck.bus.emit('sidebar:toggle', { collapsed });
     },
 
     openMobile() {
@@ -803,12 +819,12 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
     _handleResize() {
       const w = window.innerWidth;
-      if (w < PlasmaDeck.config.breakpoints.lg) {
+      if (w < OpenCourseDeck.config.breakpoints.lg) {
         // Mobile: remove desktop collapsed, use mobile open/close
         this.el.classList.remove('sidebar-collapsed');
       } else {
         this.closeMobile();
-        if (PlasmaDeck.state.sidebarCollapsed) {
+        if (OpenCourseDeck.state.sidebarCollapsed) {
           this.el.classList.add('sidebar-collapsed');
         }
       }
@@ -881,7 +897,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       if (!q) return [];
       const data = await this._loadUniversalData();
       const eventPayload = { value, setResults: r => { if (Array.isArray(r)) data.push(...r); } };
-      PlasmaDeck.bus.emit('search:query', eventPayload);
+      OpenCourseDeck.bus.emit('search:query', eventPayload);
       const lexical = data
         .filter((item) => {
           const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
@@ -902,7 +918,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     },
 
     async _querySemanticNotes(value, data = []) {
-      const ai = window.PlasmaDeck?.AI;
+      const ai = window.OpenCourseDeck?.AI;
       if (!ai?.upsertEmbedding || !ai?.searchEmbeddings) return [];
       const notes = data.filter(item => item.sourceType === 'note' && item.sourceId);
       if (!notes.length) return [];
@@ -1058,7 +1074,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
             el.appendChild(createElement('span', { class: 'search-result-cat' }, item.category));
           }
           el.addEventListener('click', () => {
-            PlasmaDeck.bus.emit('search:select', item);
+            OpenCourseDeck.bus.emit('search:select', item);
             if (typeof item.action === 'function') {
               try { item.action(item); } catch (e) { console.warn('[TopbarSearch] select action failed', e); }
             }
@@ -1140,7 +1156,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
   const Ripple = {
     init() {
       document.addEventListener('pointerdown', e => {
-        if (!PlasmaDeck.state.rippleEnabled) return;
+        if (!OpenCourseDeck.state.rippleEnabled) return;
         const target = eventTargetEl(e);
         if (!target) return;
         const btn = target.closest('.btn, [data-ripple]');
@@ -1212,7 +1228,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       });
 
       document.body.style.overflow = 'hidden';
-      PlasmaDeck.state.openModals.push(modal);
+      OpenCourseDeck.state.openModals.push(modal);
       this._previousFocus.set(modal, document.activeElement);
       setAppInert(true);
 
@@ -1236,7 +1252,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         btn.addEventListener('click', () => this.close(modal), { once: true });
       });
 
-      PlasmaDeck.bus.emit('modal:open', { modal, opts });
+      OpenCourseDeck.bus.emit('modal:open', { modal, opts });
     },
 
     /**
@@ -1261,11 +1277,11 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         if (backdrop?.classList.contains('modal-backdrop')) {
           backdrop.remove();
         }
-      }, PlasmaDeck.config.animationDuration);
+      }, OpenCourseDeck.config.animationDuration);
 
-      PlasmaDeck.state.openModals = PlasmaDeck.state.openModals.filter(m => m !== modal);
+      OpenCourseDeck.state.openModals = OpenCourseDeck.state.openModals.filter(m => m !== modal);
 
-      if (!PlasmaDeck.state.openModals.length) {
+      if (!OpenCourseDeck.state.openModals.length) {
         document.body.style.overflow = '';
       }
 
@@ -1277,7 +1293,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       this._previousFocus.delete(modal);
 
       modal.dispatchEvent(new CustomEvent('modal:close', { detail: { modal } }));
-      PlasmaDeck.bus.emit('modal:close', { modal });
+      OpenCourseDeck.bus.emit('modal:close', { modal });
     },
 
     /**
@@ -1337,7 +1353,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       document.body.appendChild(modal);
 
       // Auto-remove from DOM after closing
-      PlasmaDeck.bus.on('modal:close', ({ modal: m }) => {
+      OpenCourseDeck.bus.on('modal:close', ({ modal: m }) => {
         if (m === modal) setTimeout(() => modal.remove(), 400);
       });
 
@@ -1371,7 +1387,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           settle(true);
           this.close(modal);
         });
-        PlasmaDeck.bus.once('modal:close', ({ modal: closed }) => {
+        OpenCourseDeck.bus.once('modal:close', ({ modal: closed }) => {
           if (closed === modal) settle(false);
         });
         footer.append(cancelBtn, confirmBtn);
@@ -1437,7 +1453,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       setAppInert(true);
       this._cleanupFns.set(drawer, trapFocus(drawer));
 
-      PlasmaDeck.bus.emit('drawer:open', { drawer });
+      OpenCourseDeck.bus.emit('drawer:open', { drawer });
     },
 
     close(target) {
@@ -1452,12 +1468,12 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         drawer.setAttribute('hidden', '');
         drawer.setAttribute('aria-hidden', 'true');
         drawer.removeAttribute('aria-modal');
-      }, PlasmaDeck.config.animationDuration);
+      }, OpenCourseDeck.config.animationDuration);
 
       const backdrop = $('.drawer-backdrop');
       if (backdrop) {
         backdrop.classList.remove('open');
-        setTimeout(() => backdrop.remove(), PlasmaDeck.config.animationDuration);
+        setTimeout(() => backdrop.remove(), OpenCourseDeck.config.animationDuration);
       }
 
       document.body.style.overflow = '';
@@ -1466,7 +1482,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       setAppInert(false);
       restoreFocus(this._previousFocus.get(drawer));
       this._previousFocus.delete(drawer);
-      PlasmaDeck.bus.emit('drawer:close', { drawer });
+      OpenCourseDeck.bus.emit('drawer:close', { drawer });
     },
 
     closeAll() {
@@ -1565,7 +1581,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       const firstItem = $('.dropdown-item:not(.disabled)', menu);
       firstItem?.focus();
 
-      PlasmaDeck.bus.emit('dropdown:open', { menu });
+      OpenCourseDeck.bus.emit('dropdown:open', { menu });
     },
 
     close(menu) {
@@ -1578,7 +1594,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
       if (this._active === menu) this._active = null;
 
-      PlasmaDeck.bus.emit('dropdown:close', { menu });
+      OpenCourseDeck.bus.emit('dropdown:close', { menu });
     },
 
     closeAll() {
@@ -1687,7 +1703,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         panel.classList.add('active');
       }
 
-      PlasmaDeck.bus.emit('tab:change', { tab, panel });
+      OpenCourseDeck.bus.emit('tab:change', { tab, panel });
     },
 
     /**
@@ -1759,7 +1775,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         animateHeight(body, true);
       }
 
-      PlasmaDeck.bus.emit('accordion:toggle', { item, open: !isOpen });
+      OpenCourseDeck.bus.emit('accordion:toggle', { item, open: !isOpen });
     },
   };
 
@@ -1786,7 +1802,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     show({
       message     = '',
       type        = 'info',
-      duration    = PlasmaDeck.config.toastDuration,
+      duration    = OpenCourseDeck.config.toastDuration,
       position    = 'top-right',
       dismissible = true,
       title       = '',
@@ -1796,10 +1812,10 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
       // Enforce max stack
       const stack = $$('.toast', container);
-      if (stack.length >= PlasmaDeck.config.toastMaxStack) {
+      if (stack.length >= OpenCourseDeck.config.toastMaxStack) {
         const oldest = stack[0];
         oldest.remove();
-        PlasmaDeck.state.activeToasts = PlasmaDeck.state.activeToasts.filter(t => t !== oldest);
+        OpenCourseDeck.state.activeToasts = OpenCourseDeck.state.activeToasts.filter(t => t !== oldest);
       }
 
       const id   = uid('toast');
@@ -1854,8 +1870,8 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
       startDismiss();
 
-      PlasmaDeck.state.activeToasts.push(toast);
-      PlasmaDeck.bus.emit('toast:show', { toast, type, message });
+      OpenCourseDeck.state.activeToasts.push(toast);
+      OpenCourseDeck.bus.emit('toast:show', { toast, type, message });
 
       return toast;
     },
@@ -1865,13 +1881,13 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       toast.classList.add('hide');
       toast.addEventListener('animationend', () => {
         toast.remove();
-        PlasmaDeck.state.activeToasts = PlasmaDeck.state.activeToasts.filter(t => t !== toast);
-        PlasmaDeck.bus.emit('toast:dismiss', { toast });
+        OpenCourseDeck.state.activeToasts = OpenCourseDeck.state.activeToasts.filter(t => t !== toast);
+        OpenCourseDeck.bus.emit('toast:dismiss', { toast });
       }, { once: true });
     },
 
     dismissAll() {
-      [...PlasmaDeck.state.activeToasts].forEach(t => this.dismiss(t));
+      [...OpenCourseDeck.state.activeToasts].forEach(t => this.dismiss(t));
     },
 
     // Convenience shortcuts
@@ -1955,7 +1971,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           type: 'error',
           duration: 0,
           title: 'Storage full',
-          message: 'PlasmaDeck cannot save this change because browser storage is full. Export your data, then clear browser storage before continuing.',
+          message: 'OpenCourseDeck cannot save this change because browser storage is full. Export your data, then clear browser storage before continuing.',
         });
       };
 
@@ -1968,7 +1984,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           type: 'warning',
           duration: 8000,
           title: 'Storage fallback used',
-          message: 'IndexedDB did not accept a save, so PlasmaDeck used the browser fallback. Export a backup soon if this repeats.',
+          message: 'IndexedDB did not accept a save, so OpenCourseDeck used the browser fallback. Export a backup soon if this repeats.',
         });
       };
 
@@ -1982,21 +1998,21 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           type: 'warning',
           duration: 0,
           title: 'Refresh required',
-          message: 'Another PlasmaDeck tab upgraded the local database. Reload this tab before saving more changes.',
+          message: 'Another OpenCourseDeck tab upgraded the local database. Reload this tab before saving more changes.',
           action: reloadWrap,
         });
         toast?.querySelector?.('[data-db-reload]')?.addEventListener?.('click', () => window.location.reload());
       };
 
-      PlasmaDeck.bus.on?.('storage:save-error', showSaveError);
-      PlasmaDeck.bus.on?.('storage:fallback', showFallback);
-      PlasmaDeck.bus.on?.('db:versionchange', showDbVersionChange);
+      OpenCourseDeck.bus.on?.('storage:save-error', showSaveError);
+      OpenCourseDeck.bus.on?.('storage:fallback', showFallback);
+      OpenCourseDeck.bus.on?.('db:versionchange', showDbVersionChange);
       if (window.__pdDbVersionChangeHandler) {
         window.removeEventListener?.('plasma:db-versionchange', window.__pdDbVersionChangeHandler);
       }
       window.__pdDbVersionChangeHandler = showDbVersionChange;
       window.addEventListener?.('plasma:db-versionchange', showDbVersionChange);
-      if (window.PlasmaDeck?.lastStorageIssue) showSaveError(window.PlasmaDeck.lastStorageIssue);
+      if (window.OpenCourseDeck?.lastStorageIssue) showSaveError(window.OpenCourseDeck.lastStorageIssue);
     },
   };
 
@@ -2138,7 +2154,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           const names = [...input.files].map(f => f.name).join(', ');
           if (label) label.textContent = names || 'No file chosen';
           wrapper.classList.toggle('has-file', input.files.length > 0);
-          PlasmaDeck.bus.emit('file:select', { files: [...input.files] });
+          OpenCourseDeck.bus.emit('file:select', { files: [...input.files] });
         });
 
         // Drag & drop
@@ -2223,7 +2239,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         });
 
         rows.forEach(row => tbody.appendChild(row));
-        PlasmaDeck.bus.emit('table:sort', { col, dir });
+        OpenCourseDeck.bus.emit('table:sort', { col, dir });
       });
     },
 
@@ -2256,7 +2272,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         }
 
         const selected = $$('tr.row-selected', table);
-        PlasmaDeck.bus.emit('table:select', { count: selected.length, rows: selected });
+        OpenCourseDeck.bus.emit('table:select', { count: selected.length, rows: selected });
         this._updateBulkBar(table, selected.length);
       });
     },
@@ -2290,7 +2306,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
             row.hidden = i < (page - 1) * perPage || i >= page * perPage;
           });
           this._renderPageButtons(nav, pages, current, render);
-          PlasmaDeck.bus.emit('table:page', { page, pages });
+          OpenCourseDeck.bus.emit('table:page', { page, pages });
         };
 
         render(1);
@@ -2652,6 +2668,29 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
   const Charts = {
     _instances: new Map(),
+    _pluginsRegistered: false,
+
+    plugins: {
+      HeatmapPlugin,
+      SparklinePlugin,
+      ArcPlugin,
+      GaugePlugin,
+    },
+
+    registerPlugins() {
+      const Chart = window.Chart;
+      if (!Chart || typeof Chart.register !== 'function' || this._pluginsRegistered) return false;
+      const globalSet = Chart.__openCourseDeckRegisteredPlugins ??= new Set();
+      const plugins = [HeatmapPlugin, SparklinePlugin, ArcPlugin, GaugePlugin].filter(plugin => plugin?.id && !globalSet.has(plugin.id));
+      if (!plugins.length) {
+        this._pluginsRegistered = true;
+        return false;
+      }
+      Chart.register(...plugins);
+      plugins.forEach(plugin => globalSet.add(plugin.id));
+      this._pluginsRegistered = true;
+      return true;
+    },
 
     /**
      * Register a chart instance for later updates
@@ -2687,7 +2726,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
      * Base theme-aware options for Chart.js
      */
     themeOptions(override = {}) {
-      const isDark = PlasmaDeck.state.theme !== 'light';
+      const isDark = OpenCourseDeck.state.theme !== 'light';
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -2740,7 +2779,8 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
      * Re-render all charts when theme changes
      */
     init() {
-      PlasmaDeck.bus.on('theme:change', () => {
+      this.registerPlugins();
+      OpenCourseDeck.bus.on('theme:change', () => {
         this._instances.forEach(chart => {
           if (!chart?.options) return;
           this._mergeOptions(chart.options, this.themeOptions());
@@ -2833,7 +2873,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         }
       });
 
-      PlasmaDeck.bus.on('notification:new', data => this._onNew(data));
+      OpenCourseDeck.bus.on('notification:new', data => this._onNew(data));
     },
 
     setCount(n) {
@@ -2906,7 +2946,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         try {
           await navigator.clipboard.writeText(text);
           this._feedback(btn, true);
-          PlasmaDeck.bus.emit('clipboard:copy', { text });
+          OpenCourseDeck.bus.emit('clipboard:copy', { text });
         } catch {
           this._feedback(btn, false);
         }
@@ -2931,7 +2971,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
 
   const ThemeImages = {
     init() {
-      PlasmaDeck.bus.on('theme:change', ({ effective }) => {
+      OpenCourseDeck.bus.on('theme:change', ({ effective }) => {
         $$('[data-src-dark][data-src-light]').forEach(img => {
           const nextSrc = effective === 'dark' ? img.dataset.srcDark : img.dataset.srcLight;
           const url = safeImageUrl(nextSrc);
@@ -3008,7 +3048,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         try {
           hasMore = await onLoad(++page);
         } catch (err) {
-          PlasmaDeck.bus.emit('infinite-scroll:error', { err, page });
+          OpenCourseDeck.bus.emit('infinite-scroll:error', { err, page });
         } finally {
           loading = false;
           if (loader) loader.setAttribute('hidden', '');
@@ -3047,25 +3087,25 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       '#/help': 'Help',
       '#/achievements': 'Achievements',
       '#/settings': 'Settings',
-    }[hash] ?? 'PlasmaDeck';
+    }[hash] ?? 'OpenCourseDeck';
   }
 
   const Router = createRouter({
     $$,
     Progress,
-    bus: PlasmaDeck.bus,
-    getNotFoundView: () => PlasmaDeck.Views?.notFound,
+    bus: OpenCourseDeck.bus,
+    getNotFoundView: () => OpenCourseDeck.Views?.notFound,
     getRouteLabel: hash => routeTitle(hash),
   });
 
   async function loadRouteFeatures(...names) {
     if (!names.length) return;
-    const loader = PlasmaDeck.loadFeatures;
+    const loader = OpenCourseDeck.loadFeatures;
     if (typeof loader === 'function') {
       await loader(...names);
       return;
     }
-    await Promise.all(names.map(name => PlasmaDeck.loadFeature?.(name)).filter(Boolean));
+    await Promise.all(names.map(name => OpenCourseDeck.loadFeature?.(name)).filter(Boolean));
   }
 
   const SyncRouteRefresh = (() => {
@@ -3106,14 +3146,14 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         const currentHash = window.location.hash || '#/';
         if (!affectsRoute(pending, currentHash)) return;
         const detail = { source: 'sync', payload: pending };
-        PlasmaDeck.bus.emit?.('sync:route-refresh', { hash: currentHash, payload: pending });
+        OpenCourseDeck.bus.emit?.('sync:route-refresh', { hash: currentHash, payload: pending });
         Router.refresh?.(detail);
       }, 80);
     };
 
     return {
       init() {
-        PlasmaDeck.bus.on?.('sync:message', schedule);
+        OpenCourseDeck.bus.on?.('sync:message', schedule);
       },
     };
   })();
@@ -3129,7 +3169,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
      */
     current() {
       const w  = window.innerWidth;
-      const bp = PlasmaDeck.config.breakpoints;
+      const bp = OpenCourseDeck.config.breakpoints;
       if (w < bp.sm)   return 'xs';
       if (w < bp.md)   return 'sm';
       if (w < bp.lg)   return 'md';
@@ -3138,13 +3178,13 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       return '2xl';
     },
 
-    isMobile()  { return window.innerWidth < PlasmaDeck.config.breakpoints.md; },
-    isTablet()  { const w = window.innerWidth; const bp = PlasmaDeck.config.breakpoints; return w >= bp.md && w < bp.lg; },
-    isDesktop() { return window.innerWidth >= PlasmaDeck.config.breakpoints.lg; },
+    isMobile()  { return window.innerWidth < OpenCourseDeck.config.breakpoints.md; },
+    isTablet()  { const w = window.innerWidth; const bp = OpenCourseDeck.config.breakpoints; return w >= bp.md && w < bp.lg; },
+    isDesktop() { return window.innerWidth >= OpenCourseDeck.config.breakpoints.lg; },
 
     init() {
       const onResize = throttle(() => {
-        PlasmaDeck.bus.emit('responsive:change', { breakpoint: this.current() });
+        OpenCourseDeck.bus.emit('responsive:change', { breakpoint: this.current() });
       }, 200);
       window.addEventListener('resize', onResize);
     },
@@ -3415,7 +3455,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
           const reader = new FileReader();
           reader.onload = ev => {
             preview.src = ev.target.result;
-            PlasmaDeck.bus.emit('avatar:change', { file, dataUrl: ev.target.result });
+            OpenCourseDeck.bus.emit('avatar:change', { file, dataUrl: ev.target.result });
           };
           reader.readAsDataURL(file);
         });
@@ -3436,7 +3476,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         const save = debounce(async () => {
           const data = Object.fromEntries(new FormData(form));
           try {
-            PlasmaDeck.bus.emit('settings:save', { data });
+            OpenCourseDeck.bus.emit('settings:save', { data });
             if (saveIndicator) {
               saveIndicator.textContent = 'âœ… Saved';
               setTimeout(() => { saveIndicator.textContent = ''; }, 2000);
@@ -3461,7 +3501,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
             cancelLabel: 'Cancel',
           });
           if (!confirmed) return;
-          PlasmaDeck.bus.emit('account:delete');
+          OpenCourseDeck.bus.emit('account:delete');
           Toast.error('Account deletion initiated.');
         });
       }
@@ -3497,7 +3537,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       });
 
       // Expose so dynamically added images can be observed
-      PlasmaDeck.lazy = img => {
+      OpenCourseDeck.lazy = img => {
         applyImageFallback(img);
         observer.observe(img);
       };
@@ -3543,7 +3583,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
         return json;
       } catch (err) {
         Progress.pageBar.fail();
-        PlasmaDeck.bus.emit('api:error', { err, path, method });
+        OpenCourseDeck.bus.emit('api:error', { err, path, method });
         throw err;
       }
     },
@@ -3610,7 +3650,7 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     // Breadcrumb updates from router events
     const breadcrumbList = document.getElementById('breadcrumb-list');
     if (breadcrumbList) {
-      PlasmaDeck.bus.on?.('route:change', ({ hash }) => {
+      OpenCourseDeck.bus.on?.('route:change', ({ hash }) => {
         const home = createElement('li', { class: 'breadcrumb-item' },
           createElement('a', { href: '#/home', class: 'breadcrumb-link' }, 'Home')
         );
@@ -3628,11 +3668,11 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
       const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent')?.trim();
       if (accent) metaTheme.setAttribute('content', accent);
     };
-    PlasmaDeck.bus.on?.('theme:change', syncThemeColor);
+    OpenCourseDeck.bus.on?.('theme:change', syncThemeColor);
     syncThemeColor();
 
     // Command palette (extracted to an ES module under src/)
-    const cpOpen = () => window.PlasmaDeck?.CommandPalette?.open?.();
+    const cpOpen = () => window.OpenCourseDeck?.CommandPalette?.open?.();
     KeyboardShortcuts.register('ctrl+k', () => cpOpen(), 'Open command palette');
     const btn = document.getElementById('command-palette-btn');
     if (btn && !btn.dataset.pdBound) {
@@ -3726,37 +3766,47 @@ import { mountNotFoundView } from './src/views/notFoundRoute.js';
     Router.init();
 
     // Expose utilities globally
-    PlasmaDeck.Toast      = Toast;
-    PlasmaDeck.StorageAlerts = StorageAlerts;
-    PlasmaDeck.Modal      = Modal;
-    PlasmaDeck.Drawer     = Drawer;
-    PlasmaDeck.Dropdown   = Dropdown;
-    PlasmaDeck.Progress   = Progress;
-    PlasmaDeck.API        = API;
-    PlasmaDeck.Router     = Router;
-    PlasmaDeck.SyncRouteRefresh = SyncRouteRefresh;
+    OpenCourseDeck.Toast      = Toast;
+    OpenCourseDeck.StorageAlerts = StorageAlerts;
+    OpenCourseDeck.Modal      = Modal;
+    OpenCourseDeck.Drawer     = Drawer;
+    OpenCourseDeck.Dropdown   = Dropdown;
+    OpenCourseDeck.Progress   = Progress;
+    OpenCourseDeck.API        = API;
+    OpenCourseDeck.Router     = Router;
+    OpenCourseDeck.SyncRouteRefresh = SyncRouteRefresh;
     // Core preferences + theming (used by ES modules in src/)
-    PlasmaDeck.ThemeManager = ThemeManager;
-    PlasmaDeck.Prefs        = Prefs;
-    PlasmaDeck.FontScale    = FontScale;
-    PlasmaDeck.KeyboardShortcuts = KeyboardShortcuts;
-    PlasmaDeck.Heatmap    = Heatmap;
-    PlasmaDeck.Skeleton   = Skeleton;
-    PlasmaDeck.InfiniteScroll = InfiniteScroll;
-    PlasmaDeck.Charts     = Charts;
-    PlasmaDeck.Views      = Views;
-    PlasmaDeck.TopbarSearch = TopbarSearch;
-    PlasmaDeck.safeExternalUrl = safeExternalUrl;
-    PlasmaDeck.safeNavigationUrl = safeNavigationUrl;
-    PlasmaDeck.safeMediaUrl = safeMediaUrl;
-    PlasmaDeck.safeImageUrl = safeImageUrl;
-    PlasmaDeck.safeFrameUrl = safeFrameUrl;
-    PlasmaDeck.safeFetchUrl = safeFetchUrl;
-    PlasmaDeck.applyImageFallback = applyImageFallback;
-    PlasmaDeck.IMAGE_FALLBACK_SRC = IMAGE_FALLBACK_SRC;
+    OpenCourseDeck.ThemeManager = ThemeManager;
+    OpenCourseDeck.Prefs        = Prefs;
+    OpenCourseDeck.FontScale    = FontScale;
+    OpenCourseDeck.KeyboardShortcuts = KeyboardShortcuts;
+    OpenCourseDeck.Heatmap    = Heatmap;
+    OpenCourseDeck.ChartPlugins = Charts.plugins;
+    OpenCourseDeck.CanvasCharts = { CanvasGauge, CanvasTreemap, CanvasAreaChart, CanvasHeatmap };
+    OpenCourseDeck.CanvasZoom = CanvasZoom;
+    OpenCourseDeck.CourseGraph = CourseGraph;
+    OpenCourseDeck.KnowledgeGraph = KnowledgeGraph;
+    OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph };
+    OpenCourseDeck.ContextMenu = OpenCourseDeck.ContextMenu ?? ContextMenu;
+    OpenCourseDeck.CanvasExport = OpenCourseDeck.CanvasExport ?? CanvasExport;
+    OpenCourseDeck.Clipboard = OpenCourseDeck.Clipboard ?? ClipboardBridge;
+    OpenCourseDeck.Pointer = OpenCourseDeck.Pointer ?? Pointer;
+    OpenCourseDeck.Skeleton   = Skeleton;
+    OpenCourseDeck.InfiniteScroll = InfiniteScroll;
+    OpenCourseDeck.Charts     = Charts;
+    OpenCourseDeck.Views      = Views;
+    OpenCourseDeck.TopbarSearch = TopbarSearch;
+    OpenCourseDeck.safeExternalUrl = safeExternalUrl;
+    OpenCourseDeck.safeNavigationUrl = safeNavigationUrl;
+    OpenCourseDeck.safeMediaUrl = safeMediaUrl;
+    OpenCourseDeck.safeImageUrl = safeImageUrl;
+    OpenCourseDeck.safeFrameUrl = safeFrameUrl;
+    OpenCourseDeck.safeFetchUrl = safeFetchUrl;
+    OpenCourseDeck.applyImageFallback = applyImageFallback;
+    OpenCourseDeck.IMAGE_FALLBACK_SRC = IMAGE_FALLBACK_SRC;
 
     // Fire ready event
-    PlasmaDeck.bus.emit('app:ready');
+    OpenCourseDeck.bus.emit('app:ready');
     window.__pdMark?.('pd:app:ready');
     window.__pdMeasure?.('pd:bundle_to_ready', 'pd:bundle:evaluated', 'pd:app:ready');
     window.__pdMeasure?.('pd:app:init', 'pd:app:init:start', 'pd:app:ready');

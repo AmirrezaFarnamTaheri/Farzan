@@ -4,12 +4,12 @@ describe('UI component safe rendering', () => {
   beforeEach(async () => {
     vi.resetModules();
     document.body.innerHTML = '';
-    window.PlasmaDeck = {};
+    window.OpenCourseDeck = {};
     await import('../ui.js');
   });
 
   it('renders card body and footer strings as text instead of HTML', () => {
-    const card = window.PlasmaDeck.UI.Card.create({
+    const card = window.OpenCourseDeck.UI.Card.create({
       title: '<img src=x onerror="window.__cardTitleXss = true">',
       subtitle: '<svg onload="window.__cardSubtitleXss = true"></svg>',
       body: '<img src=x onerror="window.__cardBodyXss = true">',
@@ -28,16 +28,16 @@ describe('UI component safe rendering', () => {
   });
 
   it('validates card and avatar image URLs before assigning src', () => {
-    const card = window.PlasmaDeck.UI.Card.create({
+    const card = window.OpenCourseDeck.UI.Card.create({
       title: 'Unsafe image',
       image: 'javascript:window.__cardImageXss = true',
       imageAlt: 'Unsafe',
     });
-    const avatar = window.PlasmaDeck.UI.Avatar.create({
+    const avatar = window.OpenCourseDeck.UI.Avatar.create({
       src: 'data:text/html,<script>window.__avatarImageXss = true</script>',
       initials: 'PX',
     });
-    const safeCard = window.PlasmaDeck.UI.Card.create({
+    const safeCard = window.OpenCourseDeck.UI.Card.create({
       title: 'Safe image',
       image: 'https://cdn.example.test/image.png',
       imageAlt: 'Safe',
@@ -52,7 +52,7 @@ describe('UI component safe rendering', () => {
   });
 
   it('renders alert action strings as text and node actions as controls', () => {
-    const alert = window.PlasmaDeck.UI.Alert.create({
+    const alert = window.OpenCourseDeck.UI.Alert.create({
       title: '<img src=x onerror="window.__alertTitleXss = true">',
       message: '<script>window.__alertMessageXss = true</script>',
       actions: '<button onclick="window.__alertActionXss = true">Run</button>',
@@ -68,7 +68,7 @@ describe('UI component safe rendering', () => {
     const button = document.createElement('button');
     button.dataset.safeAction = 'true';
     button.textContent = 'Safe';
-    const actionable = window.PlasmaDeck.UI.Alert.create({ message: 'Node action', actions: button });
+    const actionable = window.OpenCourseDeck.UI.Alert.create({ message: 'Node action', actions: button });
     expect(actionable.querySelector('[data-safe-action="true"]')).toBe(button);
 
     expect(window.__alertTitleXss).toBeUndefined();
@@ -77,7 +77,7 @@ describe('UI component safe rendering', () => {
   });
 
   it('renders button labels and string icons without executing HTML', () => {
-    const button = window.PlasmaDeck.UI.Button.create({
+    const button = window.OpenCourseDeck.UI.Button.create({
       label: '<img src=x onerror="window.__buttonLabelXss = true">',
       icon: '<svg onload="window.__buttonIconXss = true"></svg>',
     });
@@ -96,13 +96,13 @@ describe('UI component safe rendering', () => {
     icon.textContent = 'Icon';
     button.append(icon, document.createTextNode(' Save'));
 
-    window.PlasmaDeck.UI.Button.setLoading(button, true);
+    window.OpenCourseDeck.UI.Button.setLoading(button, true);
 
     expect(button.getAttribute('aria-busy')).toBe('true');
     expect(button.querySelector('.btn-spinner')).not.toBeNull();
     expect(button.textContent).toContain('Loading');
 
-    window.PlasmaDeck.UI.Button.setLoading(button, false);
+    window.OpenCourseDeck.UI.Button.setLoading(button, false);
 
     expect(button.querySelector('[data-icon="safe"]')).toBe(icon);
     expect(button.textContent).toContain('Save');
@@ -118,7 +118,7 @@ describe('UI component safe rendering', () => {
       </div>
     `;
 
-    window.PlasmaDeck.UI.TagsInput.init();
+    window.OpenCourseDeck.UI.TagsInput.init();
 
     const tagList = document.querySelector('[data-tag-list]');
     expect(tagList.textContent).toContain('<img');
@@ -141,7 +141,7 @@ describe('UI component safe rendering', () => {
       </div>
     `;
 
-    window.PlasmaDeck.UI.Select.init();
+    window.OpenCourseDeck.UI.Select.init();
     const wrapper = document.querySelector('[data-custom-select]');
     const select = wrapper.querySelector('select');
     const trigger = wrapper.querySelector('[data-select-trigger]');
@@ -160,7 +160,7 @@ describe('UI component safe rendering', () => {
 
   it('hides UI tooltips when their anchor is removed', async () => {
     document.body.innerHTML = '<button id="tip-anchor" data-tooltip="Tooltip text">Hover</button>';
-    window.PlasmaDeck.UI.Tooltip.init();
+    window.OpenCourseDeck.UI.Tooltip.init();
 
     const anchor = document.getElementById('tip-anchor');
     anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
@@ -173,7 +173,7 @@ describe('UI component safe rendering', () => {
   });
 
   it('updates dynamically added range sliders through delegated events', () => {
-    window.PlasmaDeck.bus = { emit: vi.fn() };
+    window.OpenCourseDeck.bus = { emit: vi.fn() };
     document.body.innerHTML = `
       <label>
         <input id="dynamic-range" type="range" min="0" max="100" value="25" data-output="range-output" data-range-format="{v}%" />
@@ -182,7 +182,7 @@ describe('UI component safe rendering', () => {
       </label>
     `;
 
-    window.PlasmaDeck.UI.Range.init();
+    window.OpenCourseDeck.UI.Range.init();
     const range = document.getElementById('dynamic-range');
     range.value = '75';
     range.dispatchEvent(new Event('input', { bubbles: true }));
@@ -191,15 +191,15 @@ describe('UI component safe rendering', () => {
     expect(range._enhanced).toBe(true);
     expect(range.style.getPropertyValue('--range-fill')).toBe('75%');
     expect(document.getElementById('range-output').textContent).toBe('75%');
-    expect(window.PlasmaDeck.bus.emit).toHaveBeenCalledWith('range:change', { el: range, value: 75 });
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('range:change', { el: range, value: 75 });
   });
 
   it('routes confirmations through the styled modal adapter when available', async () => {
     const confirmAsync = vi.fn(async () => true);
     const nativeConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    window.PlasmaDeck.Modal = { confirmAsync };
+    window.OpenCourseDeck.Modal = { confirmAsync };
 
-    await expect(window.PlasmaDeck.UI.confirm({
+    await expect(window.OpenCourseDeck.UI.confirm({
       title: 'Delete note',
       message: 'Delete this note permanently?',
       confirmLabel: 'Delete',
@@ -217,9 +217,9 @@ describe('UI component safe rendering', () => {
 
   it('uses native confirm only when the modal adapter is unavailable', async () => {
     const nativeConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    delete window.PlasmaDeck.Modal;
+    delete window.OpenCourseDeck.Modal;
 
-    await expect(window.PlasmaDeck.UI.confirm('Fallback question?')).resolves.toBe(true);
+    await expect(window.OpenCourseDeck.UI.confirm('Fallback question?')).resolves.toBe(true);
 
     expect(nativeConfirm).toHaveBeenCalledWith('Fallback question?');
   });
@@ -232,7 +232,7 @@ describe('UI component safe rendering', () => {
       </div>
     `;
 
-    window.PlasmaDeck.UI.DatePicker.init();
+    window.OpenCourseDeck.UI.DatePicker.init();
 
     const popup = document.querySelector('[data-datepicker-popup]');
     const title = popup.querySelector('.dp-title').textContent;
@@ -265,7 +265,7 @@ describe('UI component safe rendering', () => {
       </div>
     `;
 
-    window.PlasmaDeck.UI.DatePicker.init();
+    window.OpenCourseDeck.UI.DatePicker.init();
 
     const popup = document.querySelector('[data-datepicker-popup]');
     expect(popup.textContent).toContain('<img');

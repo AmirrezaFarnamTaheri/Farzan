@@ -1,6 +1,6 @@
 ## Content And Catalog
 
-PlasmaDeck separates the app shell from the learning catalog. The app reads `data/catalog.json` to find the active catalog file.
+OpenCourseDeck separates the app shell from the learning catalog. The app reads `data/catalog.json` to find the active catalog file.
 
 ### Active Catalog Pointer
 

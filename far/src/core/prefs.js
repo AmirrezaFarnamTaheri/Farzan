@@ -26,8 +26,8 @@ export const Prefs = {
     root.style.setProperty('--font-scale', String(fontScale));
   },
   init({ ThemeManager, bus } = {}) {
-    const effectiveBus = bus ?? window.PlasmaDeck?.bus;
-    const effectiveTheme = ThemeManager ?? window.PlasmaDeck?.ThemeManager;
+    const effectiveBus = bus ?? window.OpenCourseDeck?.bus;
+    const effectiveTheme = ThemeManager ?? window.OpenCourseDeck?.ThemeManager;
     // Ensure DOM reflects persisted settings (in case preboot ran with blocked storage earlier)
     this.applyAll();
 
@@ -62,7 +62,7 @@ export const FontScale = {
     return Number.isFinite(v) ? v : 1;
   },
   set(v, bus) {
-    const effectiveBus = bus ?? window.PlasmaDeck?.bus;
+    const effectiveBus = bus ?? window.OpenCourseDeck?.bus;
     const val = this.clamp(v);
     document.documentElement.style.setProperty('--font-scale', String(val));
     Prefs.set(Prefs.KEYS.fontScale, String(val));

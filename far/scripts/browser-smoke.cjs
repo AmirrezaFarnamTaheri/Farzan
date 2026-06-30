@@ -121,7 +121,7 @@ async function main() {
   };
   window.PlasmaPDFInit = () => {};
   window.PlasmaPDFDestroy = () => {};
-  window.PlasmaDeck = {
+  window.OpenCourseDeck = {
     bus: {
       emit() {},
       on() {},
@@ -182,7 +182,7 @@ async function main() {
     throw new Error(`Timed out waiting for ${label}; hash=${window.location.hash}; title=${currentTitle}; announcer=${announcerText}; main=${String(routeRoot?.innerHTML || '').slice(0, 400)}`);
   };
 
-  await waitFor(() => window.PlasmaDeck?.Router, 'router');
+  await waitFor(() => window.OpenCourseDeck?.Router, 'router');
 
   const navigate = async (hash, expectedTitle, selector = '.page-title') => {
     window.location.hash = hash;

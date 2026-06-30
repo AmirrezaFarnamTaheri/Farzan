@@ -1,6 +1,6 @@
 {
-  "name": "PlasmaDeck",
-  "short_name": "PlasmaDeck",
+  "name": "OpenCourseDeck",
+  "short_name": "OpenCourseDeck",
   "id": "./index.html",
   "scope": "./",
   "start_url": "./index.html",

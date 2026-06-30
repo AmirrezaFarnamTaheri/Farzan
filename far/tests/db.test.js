@@ -8,7 +8,7 @@ describe('PlasmaDB helper', () => {
   });
 
   it('rejects failed bulk transactions instead of hanging', async () => {
-    const { PlasmaDB } = window.PlasmaDeck.DB;
+    const { PlasmaDB } = window.OpenCourseDeck.DB;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false },
     ]);
@@ -17,7 +17,7 @@ describe('PlasmaDB helper', () => {
   });
 
   it('can read records by an IndexedDB index', async () => {
-    const { PlasmaDB } = window.PlasmaDeck.DB;
+    const { PlasmaDB } = window.OpenCourseDeck.DB;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false, indexes: [{ field: 'kind' }] },
     ]);

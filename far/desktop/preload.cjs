@@ -1,6 +1,6 @@
 const { contextBridge } = require('electron');
 
-contextBridge.exposeInMainWorld('PlasmaDeckDesktop', {
+contextBridge.exposeInMainWorld('OpenCourseDeckDesktop', {
   platform: process.platform,
   shell: 'electron',
 });

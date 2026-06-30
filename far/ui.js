@@ -128,7 +128,7 @@
         if (image) {
           const img = document.createElement('img');
           // Only apply src if it is a safe url
-          const url = window.PlasmaDeck?.safeImageUrl?.(image) || (image.startsWith('https://') || image.startsWith('http://') ? image : '');
+          const url = window.OpenCourseDeck?.safeImageUrl?.(image) || (image.startsWith('https://') || image.startsWith('http://') ? image : '');
           if (url) {
             img.src = url; img.alt = imageAlt;
             img.className = 'card-image';
@@ -232,7 +232,7 @@
         if (color) el.style.setProperty('--avatar-color', color);
 
         if (src) {
-          const url = window.PlasmaDeck?.safeImageUrl?.(src) || (src.startsWith('https://') || src.startsWith('http://') || src.startsWith('data:image/') ? src : '');
+          const url = window.OpenCourseDeck?.safeImageUrl?.(src) || (src.startsWith('https://') || src.startsWith('http://') || src.startsWith('data:image/') ? src : '');
           if (url) {
             const img = document.createElement('img');
             img.src = url; img.alt = alt ?? initials;
@@ -324,14 +324,14 @@
           : container;
         const alert = this.create(opts);
         el?.appendChild(alert);
-        const fade = window.PlasmaDeck?.ProgressUI?.tween?.fade;
+        const fade = window.OpenCourseDeck?.ProgressUI?.tween?.fade;
         if (typeof fade === 'function') fade(alert, 1, 300);
         else alert.style.opacity = '1';
         return alert;
       },
 
       dismiss(alertEl) {
-        const fade = window.PlasmaDeck?.ProgressUI?.tween?.fade;
+        const fade = window.OpenCourseDeck?.ProgressUI?.tween?.fade;
         if (typeof fade === 'function') fade(alertEl, 0, 250);
         else alertEl.style.opacity = '0';
         setTimeout(() => alertEl.remove(), 260);
@@ -353,7 +353,7 @@
               ? (toggle.dataset.labelOn  ?? 'On')
               : (toggle.dataset.labelOff ?? 'Off');
           }
-          window.PlasmaDeck?.bus?.emit('toggle:change', {
+          window.OpenCourseDeck?.bus?.emit('toggle:change', {
             el:      toggle,
             checked: toggle.checked,
             name:    toggle.name ?? toggle.id,
@@ -420,7 +420,7 @@
         range.addEventListener('mouseup',  () => {
           const tip = range.parentElement?.querySelector('[data-range-tip]');
           if (tip) setTimeout(() => { tip.style.display = 'none'; }, 600);
-          window.PlasmaDeck?.bus?.emit('range:change', { el: range, value: +range.value });
+          window.OpenCourseDeck?.bus?.emit('range:change', { el: range, value: +range.value });
         });
         update();
       },
@@ -903,7 +903,7 @@
 
     /** Async confirm used where a modal is not wired (stats/import flows). */
     async function confirm(message) {
-      const modalConfirm = window.PlasmaDeck?.Modal?.confirmAsync;
+      const modalConfirm = window.OpenCourseDeck?.Modal?.confirmAsync;
       if (typeof modalConfirm === 'function') {
         if (message && typeof message === 'object') return modalConfirm(message);
         return modalConfirm({
@@ -936,8 +936,8 @@
 
   })();
 
-  window.PlasmaDeck = window.PlasmaDeck ?? {};
-  window.PlasmaDeck.UI = UI;
+  window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+  window.OpenCourseDeck.UI = UI;
 
 
 
@@ -946,6 +946,6 @@
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  window.PlasmaDeck?.Progress?.init?.();
-  window.PlasmaDeck?.UI?.init?.();
+  window.OpenCourseDeck?.Progress?.init?.();
+  window.OpenCourseDeck?.UI?.init?.();
 });

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * End-to-end HTTP smoke test for the local dev server.
  * Starts the dev server in-process, probes critical URLs, then terminates it.
  */
@@ -37,7 +37,7 @@ function getStatus(url) {
   return request('GET', url);
 }
 
-function extractChunkPaths(source, basePath = '/dist/plasma.js') {
+function extractChunkPaths(source, basePath = '/dist/opencoursedeck.js') {
   const paths = new Set();
   const baseDir = path.posix.dirname(basePath);
   for (const match of String(source || '').matchAll(/import\(\s*["']([^"']+)["']\s*\)/g)) {
@@ -73,7 +73,7 @@ async function defaultFetchText(url) {
   });
 }
 
-async function collectChunkPaths(origin, entrySource, fetchText = defaultFetchText, entryPath = '/dist/plasma.js') {
+async function collectChunkPaths(origin, entrySource, fetchText = defaultFetchText, entryPath = '/dist/opencoursedeck.js') {
   const seen = new Set();
   const queue = extractChunkPaths(entrySource, entryPath);
   while (queue.length) {
@@ -120,7 +120,7 @@ async function main() {
       '/style.css',
       '/manifest.json',
       '/boot.js',
-      '/dist/plasma.js',
+      '/dist/opencoursedeck.js',
       '/sw.js',
       '/vendor/purify.min.js',
       '/vendor/marked.min.js',
@@ -130,7 +130,7 @@ async function main() {
       if (code !== 200) throw new Error(`${p} -> HTTP ${code}`);
     }
 
-    const entry = await defaultFetchText(`http://127.0.0.1:${port}/dist/plasma.js`);
+    const entry = await defaultFetchText(`http://127.0.0.1:${port}/dist/opencoursedeck.js`);
     const chunks = await collectChunkPaths(`http://127.0.0.1:${port}`, entry.body);
     for (const p of chunks) {
       const code = await getStatus(`http://127.0.0.1:${port}${p}`);

@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'plasma-my-courses';
 
-export function mountMyCoursesView({ setView, Toast = window.PlasmaDeck?.Toast } = {}) {
+export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toast } = {}) {
   setView(`
     <section class="view view-my-courses">
       <div class="page-header">

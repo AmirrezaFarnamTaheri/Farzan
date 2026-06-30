@@ -11,7 +11,7 @@ export function mountHomeView(deps = {}) {
         <div class="home-hero-copy">
           <span class="eyebrow">Local-first learning studio</span>
           <h1 class="home-title">Your study command deck is ready.</h1>
-          <p class="home-subtitle">Open a course, capture notes, mark progress, and keep backups close. PlasmaDeck stores your work on this device unless you export it.</p>
+          <p class="home-subtitle">Open a course, capture notes, mark progress, and keep backups close. OpenCourseDeck stores your work on this device unless you export it.</p>
           <div class="home-actions">
             <a class="btn btn-primary" href="#/courses">
               <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>

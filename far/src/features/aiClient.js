@@ -1,6 +1,6 @@
 const AI_SETTINGS_KEY = 'plasma-ai-settings';
 const AI_SESSION_KEY = 'plasma-ai-api-key-session';
-const AI_MODEL_DB = 'plasmadeck-ai-models';
+const AI_MODEL_DB = 'opencoursedeck-ai-models';
 const AI_MODEL_DB_VERSION = 2;
 const AI_MODEL_STORE = 'models';
 const AI_EMBEDDING_STORE = 'embeddings';
@@ -216,7 +216,7 @@ export function createAIClient(root = window) {
   function registerLocalProvider(provider) {
     if (typeof provider !== 'function') throw new TypeError('Local AI provider must be a function');
     localProvider = provider;
-    root.PlasmaDeck?.bus?.emit?.('ai:provider-ready', { provider: 'local' });
+    root.OpenCourseDeck?.bus?.emit?.('ai:provider-ready', { provider: 'local' });
     return () => {
       if (localProvider === provider) localProvider = null;
     };
@@ -392,7 +392,7 @@ export function createAIClient(root = window) {
 }
 
 export function initAIClient(root = window) {
-  const pd = root.PlasmaDeck = root.PlasmaDeck || {};
+  const pd = root.OpenCourseDeck = root.OpenCourseDeck || {};
   if (!pd.AI) pd.AI = createAIClient(root);
   return pd.AI;
 }

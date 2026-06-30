@@ -1,4 +1,4 @@
-## Troubleshooting
+﻿## Troubleshooting
 
 ### App Stays On `Initializing...`
 
@@ -9,7 +9,7 @@ Most causes are a missing or stale bundle.
 3. Open `http://localhost:5173/?debug=1`.
 4. Check `debug.log` for boot errors and timing entries.
 
-If `dist/plasma.js` is missing, the boot script cannot import the app.
+If `dist/opencoursedeck.js` is missing, the boot script cannot import the app.
 
 ### Fonts Or Icons Are Missing
 

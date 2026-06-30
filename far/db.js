@@ -1,6 +1,6 @@
 // ============================================================
-// PlasmaDeck — db.js
-// IndexedDB database engine for PlasmaDeck
+// OpenCourseDeck — db.js
+// IndexedDB database engine for OpenCourseDeck
 // ============================================================
 (() => {
 'use strict';
@@ -398,9 +398,9 @@ return data;
 // ------------------------------------------------------------
 // Export
 // ------------------------------------------------------------
-window.PlasmaDeck = window.PlasmaDeck || {};
+window.OpenCourseDeck = window.OpenCourseDeck || {};
 
-window.PlasmaDeck.DB = {
+window.OpenCourseDeck.DB = {
 PlasmaDB,
 DBQuery
 };

@@ -7,3 +7,8 @@
 /far/tauri-dev
 /far/vendor
 /far/src-tauri
+/.cargo
+/far/.npm-cache
+/far/.npm-cache
+/far/.npm-cache/_cacache
+/far/.npm-cache

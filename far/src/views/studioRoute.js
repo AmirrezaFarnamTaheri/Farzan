@@ -6,7 +6,7 @@ safeMediaUrl,
 safeFrameUrl,
 setPendingCourseMedia,
 Router,
-Toast = window.PlasmaDeck?.Toast,
+Toast = window.OpenCourseDeck?.Toast,
 downloadTextFile,
 downloadDataUrl,
 printStudioBoardPdf,
@@ -178,7 +178,7 @@ printStudioBoardPdf,
     renderInspector();
   };
   const renderInspector = () => {
-    const board = window.PlasmaDeck?.Canvas?.serialize?.();
+    const board = window.OpenCourseDeck?.Canvas?.serialize?.();
     const layersRoot = document.querySelector('[data-studio-layers]');
     const elementsRoot = document.querySelector('[data-studio-elements]');
     const propertiesRoot = document.querySelector('[data-studio-properties]');
@@ -360,13 +360,13 @@ printStudioBoardPdf,
     // Give it a size; canvas.js reads offsetWidth/Height
     canvas.style.width = '100%';
     canvas.style.height = '70vh';
-    try { window.PlasmaDeck?.Canvas?.init?.(canvas); } catch (e) { console.warn('[Studio view] init failed', e); }
+    try { window.OpenCourseDeck?.Canvas?.init?.(canvas); } catch (e) { console.warn('[Studio view] init failed', e); }
   }
   const loadSavedBoard = async (quiet = false) => {
     try {
       const board = await window.DB?.getSetting?.(boardKey);
       if (board && typeof board === 'object') {
-        window.PlasmaDeck?.Canvas?.loadState?.(board);
+        window.OpenCourseDeck?.Canvas?.loadState?.(board);
         setStatus('Saved board loaded');
         renderInspector();
       } else if (!quiet) {
@@ -378,7 +378,7 @@ printStudioBoardPdf,
   };
   const saveBoard = async () => {
     try {
-      const board = window.PlasmaDeck?.Canvas?.serialize?.();
+      const board = window.OpenCourseDeck?.Canvas?.serialize?.();
       if (!board || !window.DB?.saveSetting) throw new Error('Studio storage unavailable');
       await window.DB.saveSetting(boardKey, board);
       setStatus(`Saved ${new Date().toLocaleTimeString()}`);
@@ -390,7 +390,7 @@ printStudioBoardPdf,
   };
   const persistBoardChange = async (statusText) => {
     try {
-      const board = window.PlasmaDeck?.Canvas?.serialize?.();
+      const board = window.OpenCourseDeck?.Canvas?.serialize?.();
       if (board && window.DB?.saveSetting) await window.DB.saveSetting(boardKey, board);
       setStatus(statusText);
       renderInspector();
@@ -418,7 +418,7 @@ printStudioBoardPdf,
       if (!board || typeof board !== 'object' || Array.isArray(board)) {
         return { refreshed: false, reason: 'missing-board' };
       }
-      const loaded = window.PlasmaDeck?.Canvas?.loadState?.(board, {
+      const loaded = window.OpenCourseDeck?.Canvas?.loadState?.(board, {
         preserveSelection: true,
         preserveTool: true,
         preserveViewport: true,
@@ -428,14 +428,14 @@ printStudioBoardPdf,
       renderInspector();
       updateToolButtons();
       setStatus('Studio board synced');
-      const selectedIds = window.PlasmaDeck?.Canvas?.getState?.()?.selectedIds || [];
+      const selectedIds = window.OpenCourseDeck?.Canvas?.getState?.()?.selectedIds || [];
       const result = {
         refreshed: true,
         key: boardKey,
         selectedIds,
         inspectedElementId,
       };
-      window.PlasmaDeck?.bus?.emit?.('studio:sync-refresh', result);
+      window.OpenCourseDeck?.bus?.emit?.('studio:sync-refresh', result);
       return result;
     } catch {
       setStatus('Studio sync failed');
@@ -443,7 +443,7 @@ printStudioBoardPdf,
     }
   };
   const bindSyncRefresh = () => {
-    const bus = window.PlasmaDeck?.bus;
+    const bus = window.OpenCourseDeck?.bus;
     if (!bus?.on || syncHandler) return;
     syncHandler = (payload) => {
       refreshFromSync(payload).catch?.(() => {});
@@ -451,7 +451,7 @@ printStudioBoardPdf,
     bus.on('sync:message', syncHandler);
   };
   const unbindSyncRefresh = () => {
-    if (syncHandler) window.PlasmaDeck?.bus?.off?.('sync:message', syncHandler);
+    if (syncHandler) window.OpenCourseDeck?.bus?.off?.('sync:message', syncHandler);
     syncHandler = null;
   };
   const readDroppedImageFile = (file) => new Promise((resolve, reject) => {
@@ -473,7 +473,7 @@ printStudioBoardPdf,
     return String(uri || text || '').split(/\r?\n/).find((line) => line.trim() && !line.trim().startsWith('#'))?.trim() || '';
   };
   const updateToolButtons = () => {
-    const tool = window.PlasmaDeck?.Canvas?.getState?.()?.tool || 'pen';
+    const tool = window.OpenCourseDeck?.Canvas?.getState?.()?.tool || 'pen';
     document.querySelectorAll('[data-studio-tool]').forEach((button) => {
       const active = button.dataset.studioTool === tool;
       button.classList.toggle('active', active);
@@ -489,7 +489,7 @@ printStudioBoardPdf,
   });
   document.querySelectorAll('[data-studio-tool]').forEach((button) => {
     on(button, 'click', () => {
-      const selected = window.PlasmaDeck?.Canvas?.setTool?.(button.dataset.studioTool);
+      const selected = window.OpenCourseDeck?.Canvas?.setTool?.(button.dataset.studioTool);
       setStatus(`${selected === 'pen' ? 'Pen' : 'Select'} tool active`);
       updateToolButtons();
     });
@@ -502,8 +502,8 @@ printStudioBoardPdf,
     event.preventDefault();
     try {
       const source = await getDropImageSource(event);
-      const point = window.PlasmaDeck?.Canvas?.screenToWorld?.(event.clientX, event.clientY) || { x: 120, y: 120 };
-      const element = window.PlasmaDeck?.Canvas?.addImage?.(source, {
+      const point = window.OpenCourseDeck?.Canvas?.screenToWorld?.(event.clientX, event.clientY) || { x: 120, y: 120 };
+      const element = window.OpenCourseDeck?.Canvas?.addImage?.(source, {
         x: Math.max(0, point.x - 140),
         y: Math.max(0, point.y - 80),
       });
@@ -518,7 +518,7 @@ printStudioBoardPdf,
   on(document.querySelector('[data-studio-add-text]'), 'click', async () => {
     const input = document.querySelector('[data-studio-text]');
     const text = String(input?.value || 'New note').trim() || 'New note';
-    const element = window.PlasmaDeck?.Canvas?.addText?.(text);
+    const element = window.OpenCourseDeck?.Canvas?.addText?.(text);
     if (!element) {
       setStatus('Add note failed');
       return;
@@ -527,7 +527,7 @@ printStudioBoardPdf,
     await persistBoardChange('Note added');
   });
   on(document.querySelector('[data-studio-add-card]'), 'click', async () => {
-    const element = window.PlasmaDeck?.Canvas?.addCard?.();
+    const element = window.OpenCourseDeck?.Canvas?.addCard?.();
     if (!element) {
       setStatus('Add card failed');
       return;
@@ -535,7 +535,7 @@ printStudioBoardPdf,
     await persistBoardChange('Card added');
   });
   on(document.querySelector('[data-studio-add-rect]'), 'click', async () => {
-    const element = window.PlasmaDeck?.Canvas?.addRectangle?.();
+    const element = window.OpenCourseDeck?.Canvas?.addRectangle?.();
     if (!element) {
       setStatus('Add rectangle failed');
       return;
@@ -543,7 +543,7 @@ printStudioBoardPdf,
     await persistBoardChange('Rectangle added');
   });
   on(document.querySelector('[data-studio-add-circle]'), 'click', async () => {
-    const element = window.PlasmaDeck?.Canvas?.addCircle?.();
+    const element = window.OpenCourseDeck?.Canvas?.addCircle?.();
     if (!element) {
       setStatus('Add circle failed');
       return;
@@ -551,7 +551,7 @@ printStudioBoardPdf,
     await persistBoardChange('Circle added');
   });
   on(document.querySelector('[data-studio-add-arrow]'), 'click', async () => {
-    const element = window.PlasmaDeck?.Canvas?.addArrow?.();
+    const element = window.OpenCourseDeck?.Canvas?.addArrow?.();
     if (!element) {
       setStatus('Add arrow failed');
       return;
@@ -561,7 +561,7 @@ printStudioBoardPdf,
   on(document.querySelector('[data-studio-add-image]'), 'click', async () => {
     const input = document.querySelector('[data-studio-image-url]');
     const src = String(input?.value || '').trim();
-    const element = window.PlasmaDeck?.Canvas?.addImage?.(src);
+    const element = window.OpenCourseDeck?.Canvas?.addImage?.(src);
     if (!element) {
       setStatus('Add image failed');
       Toast.error('Studio image URL rejected');
@@ -572,9 +572,9 @@ printStudioBoardPdf,
   });
   on(document.querySelector('[data-studio-apply-template]'), 'click', async () => {
     const value = document.querySelector('[data-studio-template]')?.value || 'study-map';
-    const ok = await window.PlasmaDeck?.UI?.confirm?.('Replace the current Studio board with this template?');
+    const ok = await window.OpenCourseDeck?.UI?.confirm?.('Replace the current Studio board with this template?');
     if (!ok) return;
-    const board = window.PlasmaDeck?.Canvas?.applyTemplate?.(value);
+    const board = window.OpenCourseDeck?.Canvas?.applyTemplate?.(value);
     if (!board) {
       setStatus('Template failed');
       return;
@@ -585,9 +585,9 @@ printStudioBoardPdf,
     renderInspector();
   });
   on(document.querySelector('[data-studio-clear]'), 'click', async () => {
-    const ok = await window.PlasmaDeck?.UI?.confirm?.('Clear the current Studio board?');
+    const ok = await window.OpenCourseDeck?.UI?.confirm?.('Clear the current Studio board?');
     if (!ok) return;
-    const board = window.PlasmaDeck?.Canvas?.clearBoard?.();
+    const board = window.OpenCourseDeck?.Canvas?.clearBoard?.();
     if (!board) {
       setStatus('Clear failed');
       return;
@@ -599,7 +599,7 @@ printStudioBoardPdf,
   on(document.querySelector('[data-studio-add-layer]'), 'click', async () => {
     const input = document.querySelector('[data-studio-layer-name]');
     const name = String(input?.value || '').trim();
-    const layer = window.PlasmaDeck?.Canvas?.addLayer?.(name);
+    const layer = window.OpenCourseDeck?.Canvas?.addLayer?.(name);
     if (!layer) {
       setStatus('Add layer failed');
       return;
@@ -611,10 +611,10 @@ printStudioBoardPdf,
     const target = event.target?.closest?.('button');
     if (!target) return;
     if (target.dataset.setLayer != null) {
-      window.PlasmaDeck?.Canvas?.setActiveLayer?.(Number(target.dataset.setLayer));
+      window.OpenCourseDeck?.Canvas?.setActiveLayer?.(Number(target.dataset.setLayer));
       await persistBoardChange('Active layer changed');
     } else if (target.dataset.deleteLayer) {
-      const removed = window.PlasmaDeck?.Canvas?.removeLayer?.(target.dataset.deleteLayer);
+      const removed = window.OpenCourseDeck?.Canvas?.removeLayer?.(target.dataset.deleteLayer);
       if (removed) await persistBoardChange('Layer deleted');
     }
   });
@@ -627,7 +627,7 @@ printStudioBoardPdf,
     }
     const openTarget = event.target?.closest?.('[data-open-studio-link]');
     if (openTarget) {
-      const board = window.PlasmaDeck?.Canvas?.serialize?.();
+      const board = window.OpenCourseDeck?.Canvas?.serialize?.();
       const element = (board?.layers || [])
         .flatMap((layer) => Array.isArray(layer.elements) ? layer.elements : [])
         .find((item) => item?.id === openTarget.dataset.openStudioLink);
@@ -636,7 +636,7 @@ printStudioBoardPdf,
     }
     const target = event.target?.closest?.('[data-delete-element]');
     if (!target) return;
-    const removed = window.PlasmaDeck?.Canvas?.removeElement?.(target.dataset.deleteElement);
+    const removed = window.OpenCourseDeck?.Canvas?.removeElement?.(target.dataset.deleteElement);
     if (removed) {
       if (inspectedElementId === target.dataset.deleteElement) inspectedElementId = null;
       await persistBoardChange('Element deleted');
@@ -645,7 +645,7 @@ printStudioBoardPdf,
   on(document.querySelector('[data-studio-properties]'), 'click', async (event) => {
     const openTarget = event.target?.closest?.('[data-open-studio-link]');
     if (openTarget) {
-      const board = window.PlasmaDeck?.Canvas?.serialize?.();
+      const board = window.OpenCourseDeck?.Canvas?.serialize?.();
       const element = (board?.layers || [])
         .flatMap((layer) => Array.isArray(layer.elements) ? layer.elements : [])
         .find((item) => item?.id === openTarget.dataset.openStudioLink);
@@ -669,7 +669,7 @@ printStudioBoardPdf,
       linkTarget: root?.querySelector?.('[data-studio-prop-link-target]')?.value ?? '',
       linkLabel: root?.querySelector?.('[data-studio-prop-link-label]')?.value ?? '',
     };
-    const updated = window.PlasmaDeck?.Canvas?.updateElement?.(target.dataset.studioApplyProps, patch);
+    const updated = window.OpenCourseDeck?.Canvas?.updateElement?.(target.dataset.studioApplyProps, patch);
     if (updated) await persistBoardChange('Properties updated');
   });
   on(document.querySelector('[data-studio-save]'), 'click', saveBoard);
@@ -683,7 +683,7 @@ printStudioBoardPdf,
       const text = await file.text();
       const board = JSON.parse(text);
       if (!board || typeof board !== 'object' || Array.isArray(board)) throw new Error('Invalid Studio board');
-      const loaded = window.PlasmaDeck?.Canvas?.loadState?.(board);
+      const loaded = window.OpenCourseDeck?.Canvas?.loadState?.(board);
       if (!loaded) throw new Error('Studio import unavailable');
       if (window.DB?.saveSetting) await window.DB.saveSetting(boardKey, loaded);
       setStatus('JSON imported');
@@ -698,9 +698,9 @@ printStudioBoardPdf,
   });
   on(document.querySelector('[data-studio-export-json]'), 'click', () => {
     try {
-      const board = window.PlasmaDeck?.Canvas?.serialize?.();
+      const board = window.OpenCourseDeck?.Canvas?.serialize?.();
       if (!board) throw new Error('Studio export unavailable');
-      downloadTextFile(JSON.stringify(board, null, 2), `plasmadeck-studio-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+      downloadTextFile(JSON.stringify(board, null, 2), `opencoursedeck-studio-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
       setStatus('JSON exported');
     } catch {
       setStatus('JSON export failed');
@@ -709,9 +709,9 @@ printStudioBoardPdf,
   });
   on(document.querySelector('[data-studio-export-svg]'), 'click', () => {
     try {
-      const svg = window.PlasmaDeck?.Canvas?.exportSVG?.();
+      const svg = window.OpenCourseDeck?.Canvas?.exportSVG?.();
       if (!svg) throw new Error('Studio SVG export unavailable');
-      downloadTextFile(svg, `plasmadeck-studio-${new Date().toISOString().slice(0, 10)}.svg`, 'image/svg+xml');
+      downloadTextFile(svg, `opencoursedeck-studio-${new Date().toISOString().slice(0, 10)}.svg`, 'image/svg+xml');
       setStatus('SVG exported');
     } catch {
       setStatus('SVG export failed');
@@ -720,8 +720,8 @@ printStudioBoardPdf,
   });
   on(document.querySelector('[data-studio-export-png]'), 'click', () => {
     try {
-      const dataUrl = window.PlasmaDeck?.Canvas?.exportPNG?.();
-      if (!downloadDataUrl(dataUrl, `plasmadeck-studio-${new Date().toISOString().slice(0, 10)}.png`)) throw new Error('Studio PNG export unavailable');
+      const dataUrl = window.OpenCourseDeck?.Canvas?.exportPNG?.();
+      if (!downloadDataUrl(dataUrl, `opencoursedeck-studio-${new Date().toISOString().slice(0, 10)}.png`)) throw new Error('Studio PNG export unavailable');
       setStatus('PNG exported');
     } catch {
       setStatus('PNG export failed');
@@ -730,8 +730,8 @@ printStudioBoardPdf,
   });
   on(document.querySelector('[data-studio-export-pdf]'), 'click', () => {
     try {
-      const svg = window.PlasmaDeck?.Canvas?.exportSVG?.();
-      const png = svg ? '' : window.PlasmaDeck?.Canvas?.exportPNG?.();
+      const svg = window.OpenCourseDeck?.Canvas?.exportSVG?.();
+      const png = svg ? '' : window.OpenCourseDeck?.Canvas?.exportPNG?.();
       if (!printStudioBoardPdf({ svg, png })) throw new Error('Studio PDF export unavailable');
       setStatus('PDF export opened');
     } catch {
@@ -751,7 +751,7 @@ printStudioBoardPdf,
       routeListeners.forEach(({ target, type, handler, options }) => {
         try { target.removeEventListener(type, handler, options); } catch {}
       });
-      try { window.PlasmaDeck?.Canvas?.destroy?.(); } catch {}
+      try { window.OpenCourseDeck?.Canvas?.destroy?.(); } catch {}
     },
   };
 }

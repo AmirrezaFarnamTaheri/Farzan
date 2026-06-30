@@ -3,7 +3,7 @@ export function mountBookmarksView(deps = {}) {
     setView,
     createElement,
     Router,
-    Toast = window.PlasmaDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast,
     setPendingCourseMedia,
     setPendingPdfPage,
     sanitizeHtml,
@@ -289,7 +289,7 @@ export function mountBookmarksView(deps = {}) {
       }
       const deleteButton = event.target?.closest?.('[data-delete-timestamp]');
       if (deleteButton) {
-        const ok = await window.PlasmaDeck?.UI?.confirm?.('Delete this timestamp bookmark?');
+        const ok = await window.OpenCourseDeck?.UI?.confirm?.('Delete this timestamp bookmark?');
         if (!ok) return;
         try {
           await window.DB?.deleteTimestamp?.(deleteButton.dataset.deleteTimestamp);

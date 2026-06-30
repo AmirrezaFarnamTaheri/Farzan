@@ -1,7 +1,7 @@
 export function mountPlaylistsView({
   setView,
   safeMediaUrl,
-  Toast = window.PlasmaDeck?.Toast,
+  Toast = window.OpenCourseDeck?.Toast,
 } = {}) {
   setView(`
     <section class="view view-playlists">
@@ -62,7 +62,7 @@ function sanitizeSavedPlaylists(value) {
 }
 
 async function renderPlaylists(deps) {
-  const { safeMediaUrl, Toast = window.PlasmaDeck?.Toast } = deps;
+  const { safeMediaUrl, Toast = window.OpenCourseDeck?.Toast } = deps;
   const metricsRoot = document.querySelector('[data-playlist-metrics]');
   const listRoot = document.querySelector('[data-playlist-list]');
   if (!metricsRoot || !listRoot) return;
