@@ -155,6 +155,7 @@
     renderingPage: false,
     renderToken:   0,
     queuedRender:  null,
+    renderTask:    null,
     searchQuery:   '',
     searchResults: [],          // [{page, items}]
     searchIdx:     -1,
@@ -347,8 +348,21 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
 
+        // Cancel any in-flight render before starting a new one
+        if (State.renderTask) {
+          try { State.renderTask.cancel(); } catch {}
+          State.renderTask = null;
+        }
         // Render
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        State.renderTask = page.render({ canvasContext: ctx, viewport });
+        try {
+          await State.renderTask.promise;
+        } catch (err) {
+          if (err?.name !== 'RenderingCancelledException') throw err;
+          return;
+        } finally {
+          if (State.renderTask) State.renderTask = null;
+        }
         if (token !== State.renderToken || !State.pdfDoc) return;
 
         // Text layer
@@ -1417,6 +1431,11 @@
     PDFInput.destroy();
     PDFViewer._thumbnailObserver?.disconnect?.();
     PDFViewer._thumbnailObserver = null;
+    // Cancel any in-flight render before destroying the document
+    if (State.renderTask) {
+      try { State.renderTask.cancel(); } catch {}
+      State.renderTask = null;
+    }
     try { State.pdfDoc?.destroy?.(); } catch {}
     Object.assign(State, {
       pdfDoc: null,

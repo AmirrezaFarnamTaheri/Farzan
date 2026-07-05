@@ -7,7 +7,8 @@ const ProgressStats = (() => {
 
   /* ── helpers ────────────────────────────────────────────── */
   const q  = s => document.querySelector(s);
-  const fmtDate  = d => new Date(d).toLocaleDateString('fa-IR');
+  function _locale() { return window.OpenCourseDeck?.Locale?.getCurrentLang?.() ?? undefined; }
+  const fmtDate  = d => new Date(d).toLocaleDateString(_locale());
   /** Toast via app shell (avoid bridge App shim). */
   function pdToast(message, type = 'info') {
     const T = window.OpenCourseDeck?.Toast;
@@ -138,8 +139,8 @@ const ProgressStats = (() => {
     _setText('#stat-in-progress',       stats.inProgress);
     _setText('#stat-completion-pct',    `${stats.completionPct}%`);
     _setText('#stat-watched-time',      stats.watchedFmt);
-    _setText('#stat-streak',            `${stats.streak} روز`);
-    _setText('#stat-active-days',       `${stats.activeDays} روز`);
+    _setText('#stat-streak',            `${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`);
+    _setText('#stat-active-days',       `${stats.activeDays} ${stats.activeDays === 1 ? 'day' : 'days'}`);
 
     // overall progress bar
     const bar = q('#stat-overall-bar');
@@ -181,7 +182,7 @@ const ProgressStats = (() => {
       window.__plasmaCharts.overall = new Chart(dCtx, {
         type: 'doughnut',
         data: {
-          labels: ['تمام‌شده', 'در حال یادگیری', 'شروع‌نشده'],
+          labels: ['Completed', 'In Progress', 'Not Started'],
           datasets: [{
             data: [stats.doneTopics, stats.inProgress, stats.notStarted],
             backgroundColor: [chartPalette.done, chartPalette.active, chartPalette.idle],
@@ -203,7 +204,7 @@ const ProgressStats = (() => {
         data: {
           labels  : stats.byCourse.map(c => c.title),
           datasets: [{
-            label           : 'درصد تکمیل',
+            label           : 'Completion %',
             data            : stats.byCourse.map(c => c.pct),
             backgroundColor : chartPalette.active,
             borderColor     : '#0f172a',
@@ -235,16 +236,16 @@ const ProgressStats = (() => {
         updatedAt : Date.now(),
       })
     ));
-    pdToast(`تمام سرفصل‌های دوره «تمام‌شده» علامت زده شد ✓`, 'success');
+    pdToast('All topics in this course marked as complete ✓', 'success');
   }
 
   /** Reset all progress for a course */
   async function resetCourseProgress(courseId) {
     const confirmed = await pdConfirm({
-      title: 'پاک کردن پیشرفت دوره',
-      message: 'تمام پیشرفت این دوره پاک شود؟',
-      confirmLabel: 'پاک کردن',
-      cancelLabel: 'انصراف',
+      title: 'Reset Course Progress',
+      message: 'This will clear all progress for this course.',
+      confirmLabel: 'Reset',
+      cancelLabel: 'Cancel',
     });
     if (!confirmed) return;
     const topics = DataStore.allTopics().filter(t => t.courseId === courseId);
@@ -256,7 +257,7 @@ const ProgressStats = (() => {
         updatedAt: Date.now(),
       })
     ));
-    pdToast('پیشرفت دوره ریست شد', 'info');
+    pdToast('Course progress reset.', 'info');
   }
 
   /** Toggle a single topic's done status */
@@ -308,7 +309,7 @@ const ProgressStats = (() => {
     payload.meta.sizeBytes = new Blob([json]).size;
     json = JSON.stringify(payload, null, 2);
     _downloadText(json, `opencoursedeck-backup-${_isoDate()}.json`, 'application/json');
-    pdToast('فایل JSON دانلود شد ✓', 'success');
+    pdToast('JSON backup downloaded ✓', 'success');
   }
 
   /** Export progress as CSV */
@@ -337,7 +338,7 @@ const ProgressStats = (() => {
 
     const csv = rows.map(r => r.map(_csvCell).join(',')).join('\n');
     _downloadText(csv, `opencoursedeck-progress-${_isoDate()}.csv`, 'text/csv');
-    pdToast('فایل CSV دانلود شد ✓', 'success');
+    pdToast('CSV export downloaded ✓', 'success');
   }
 
   /** Export notes as Markdown */
@@ -355,7 +356,7 @@ const ProgressStats = (() => {
     });
 
     _downloadText(lines.join('\n'), `opencoursedeck-notes-${_isoDate()}.md`, 'text/markdown');
-    pdToast('یادداشت‌ها به Markdown دانلود شد ✓', 'success');
+    pdToast('Notes exported as Markdown ✓', 'success');
   }
 
   /** Export a vault-style Markdown manifest with portable note files */
@@ -453,11 +454,11 @@ const ProgressStats = (() => {
         const text    = await file.text();
         const payload = JSON.parse(text);
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-          throw new Error('فرمت فایل نادرست');
+        throw new Error('Invalid file format');
         }
         const storage = await _storageEstimate();
         if (storage?.available != null && file.size > storage.available) {
-          throw new Error('فضای ذخیره‌سازی کافی برای وارد کردن این فایل وجود ندارد');
+          throw new Error('Insufficient storage to import this file');
         }
         const rawProgress = _asArray(payload.progress);
         const progressRecords = rawProgress.filter(_isProgressRecord);
@@ -513,11 +514,11 @@ const ProgressStats = (() => {
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportPreview = preview;
         const confirmed = await pdConfirm({
-          title: 'وارد کردن پشتیبان',
+          title: 'Import Backup',
           message: _formatImportPreview(preview) ||
-            `${progressRecords.length} رکورد پیشرفت و ${noteRecords.length} یادداشت وارد شود؟`,
-          confirmLabel: 'وارد کردن',
-          cancelLabel: 'انصراف',
+            `Import ${progressRecords.length} progress records and ${noteRecords.length} notes?`,
+          confirmLabel: 'Import',
+          cancelLabel: 'Cancel',
         });
         if (!confirmed) return;
 
@@ -679,7 +680,7 @@ const ProgressStats = (() => {
         }
       } catch (err) {
         console.error('[Progress] import error', err);
-        pdToast('خطا در وارد کردن: ' + err.message, 'error');
+        pdToast('Import error: ' + err.message, 'error');
       }
     };
     input.click();
@@ -706,14 +707,14 @@ const ProgressStats = (() => {
     on('#btn-import-json',  'click', importJSON);
     on('#btn-reset-all',    'click', async () => {
       const ok = await pdConfirm({
-        title: 'پاک کردن همه داده‌ها',
-        message: 'تمام پیشرفت‌ها، یادداشت‌ها و تایم‌استمپ‌ها پاک شوند؟',
-        confirmLabel: 'پاک کردن همه',
-        cancelLabel: 'انصراف',
+        title: 'Reset All Data',
+        message: 'All progress, notes, and timestamps will be permanently deleted. This cannot be undone.',
+        confirmLabel: 'Reset All',
+        cancelLabel: 'Cancel',
       });
       if (!ok) return;
       await DB.clearAll();
-      pdToast('تمام داده‌ها پاک شد', 'info');
+      pdToast('All data has been cleared.', 'info');
       renderStatsPage();
     });
     return true;

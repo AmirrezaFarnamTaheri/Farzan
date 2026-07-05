@@ -285,6 +285,10 @@ describe('MediaPlayer queue rendering', () => {
       get destination() { return {}; }
     };
     window.matchMedia = vi.fn(() => ({ matches: true }));
+    // Ensure rAF exists before spying (jsdom may not expose it as configurable)
+    if (typeof window.requestAnimationFrame !== 'function') {
+      window.requestAnimationFrame = vi.fn();
+    }
     const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
     const clearRect = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({

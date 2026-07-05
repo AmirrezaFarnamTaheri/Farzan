@@ -406,9 +406,9 @@ describe('progress backup exports', () => {
     }));
     expect(window.OpenCourseDeck.lastImportPreview).toEqual(window.OpenCourseDeck.lastImportResult.preview);
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'وارد کردن پشتیبان',
-      confirmLabel: 'وارد کردن',
-      cancelLabel: 'انصراف',
+      title: 'Import Backup',
+      confirmLabel: 'Import',
+      cancelLabel: 'Cancel',
       message: expect.stringContaining('Progress records: 2'),
     }));
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
@@ -511,7 +511,7 @@ describe('progress backup exports', () => {
       totalValid: 6,
     }));
     expect(window.OpenCourseDeck.UI.confirm.mock.calls[0][0]).toEqual(expect.objectContaining({
-      title: 'وارد کردن پشتیبان',
+      title: 'Import Backup',
       message: expect.stringContaining('Import backup "cancelled-backup.json"?'),
     }));
     expect(window.OpenCourseDeck.UI.confirm.mock.calls[0][0].message).toContain('PDF annotations: 1');
