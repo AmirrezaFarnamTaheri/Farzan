@@ -23,6 +23,8 @@ module.exports = {
   maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
   clientsClaim: true,
   skipWaiting: true,
+  // Offline fallback: serve the app shell for any navigation to an uncached route.
+  navigateFallback: '/index.html',
   cleanupOutdatedCaches: true,
   // In case older builds referenced removed files (e.g. dist/index.js),
   // don't keep them cached forever.
