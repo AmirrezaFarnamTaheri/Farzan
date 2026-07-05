@@ -1,3 +1,4 @@
+# far/ subtree ignores (build output, deps, native targets)
 /far/.npm-cache
 /far/desktop-dist/nsis-extract
 /far/dist/vendor
@@ -8,7 +9,9 @@
 /far/vendor
 /far/src-tauri
 /.cargo
-/far/.npm-cache
-/far/.npm-cache
-/far/.npm-cache/_cacache
-/far/.npm-cache
+
+# Root-level debris (downloaded tooling, test artifacts)
+*.nupkg
+*.crate
+crates.io-index
+test.txt

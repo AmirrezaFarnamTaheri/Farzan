@@ -10,3 +10,10 @@ desktop-dist/
 *.nupkg
 *.zip
 *.crate
+src-tauri/target/
+tauri-dev/
+electron-builder-master/
+Electron.NET-main/
+debug.log
+server-*.log
+opencoursedeck-server.pid
