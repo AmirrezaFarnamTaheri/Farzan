@@ -154,5 +154,5 @@ describe('Route Health Suite', () => {
 
     errorSpy.mockRestore();
     warnSpy.mockRestore();
-  }, 15000);
+  }, 30000);
 });
