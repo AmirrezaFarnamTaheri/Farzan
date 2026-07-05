@@ -145,6 +145,9 @@
     _dirty:    true,
     _paused:   false,
     _listeners: [],
+    _autosaveTimer: null,
+    _autosaveKey: 'plasma-canvas-board',
+    _autosaveDebounceMs: 1500,
     _pointerId: null,
     _spaceDown: false,
     _panning:   false,
@@ -179,7 +182,11 @@
         else this._resume();
       });
 
+      // Flush autosave on page unload
+      this._listen(window, 'beforeunload', () => this._flushAutosave());
+
       this._loop();
+      this.restoreBoard();
     },
 
     serialize() {
@@ -627,6 +634,7 @@
     },
 
     destroy() {
+      this._flushAutosave();
       this._pause();
       for (const { target, type, handler, options } of this._listeners) {
         try { target.removeEventListener(type, handler, options); } catch {}
@@ -994,6 +1002,59 @@
         bubbles: true,
         detail: { action, board: this.serialize() },
       }));
+      this._scheduleAutosave();
+    },
+
+    // ── Autosave (debounced IndexedDB) ────────────────────
+    _scheduleAutosave() {
+      if (this._autosaveTimer) clearTimeout(this._autosaveTimer);
+      this._autosaveTimer = setTimeout(() => this._autosave(), this._autosaveDebounceMs);
+    },
+
+    _autosave() {
+      this._autosaveTimer = null;
+      if (!window.DB?.saveSetting && !window.localStorage) return;
+      try {
+        const board = this.serialize();
+        if (window.DB?.saveSetting) {
+          window.DB.saveSetting(this._autosaveKey, board).catch?.(() => {});
+        } else {
+          try { window.localStorage.setItem(this._autosaveKey, JSON.stringify(board)); } catch {}
+        }
+      } catch {}
+    },
+
+    _flushAutosave() {
+      if (this._autosaveTimer) {
+        clearTimeout(this._autosaveTimer);
+        this._autosaveTimer = null;
+        this._autosave();
+      }
+    },
+
+    restoreBoard() {
+      const doRestore = (board) => {
+        if (!board || typeof board !== 'object') return false;
+        this.loadState(board, { preserveViewport: true });
+        return true;
+      };
+      if (window.DB?.getSetting) {
+        window.DB.getSetting(this._autosaveKey).then(doRestore).catch?.(() => {});
+      } else {
+        try {
+          const raw = window.localStorage?.getItem(this._autosaveKey);
+          if (raw) doRestore(JSON.parse(raw));
+        } catch {}
+      }
+    },
+
+    clearAutosave() {
+      this._flushAutosave();
+      if (window.DB?.saveSetting) {
+        window.DB.saveSetting(this._autosaveKey, null).catch?.(() => {});
+      } else {
+        try { window.localStorage?.removeItem(this._autosaveKey); } catch {}
+      }
     },
 
     // ── Shape factory from tool name ──────────────────────

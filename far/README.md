@@ -17,6 +17,7 @@ It is designed for private study libraries and offline-friendly use. The app run
 - Node.js and npm.
 - A modern browser with IndexedDB support.
 - An HTTP(S) origin. Do not open `index.html` with `file://`; service workers, module loading, and `fetch()` need a server.
+- **Native App**: A browserless Tauri app build is available for desktop use. See [desktop/NATIVE_STRATEGY.md](desktop/NATIVE_STRATEGY.md) for details.
 
 ### First Run
 

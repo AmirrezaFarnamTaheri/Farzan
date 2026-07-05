@@ -30,9 +30,14 @@ for (const f of ['index.html', 'boot.js', 'manifest.json']) {
   }
 }
 
+const ignoreDirs = new Set(['node_modules', 'vendor', 'dist', 'desktop-dist', 'src-tauri', 'src-tauri/target', 'tauri-dev', 'electron-builder-master', 'Electron.NET-main']);
 const jsFiles = fs
   .readdirSync(root)
-  .filter((n) => n.endsWith('.js') && !n.startsWith('.'));
+  .filter((n) => n.endsWith('.js') && !n.startsWith('.'))
+  .filter((n) => {
+    try { return !ignoreDirs.has(n) && fs.statSync(path.join(root, n)).isFile(); }
+    catch { return true; }
+  });
 
 for (const f of jsFiles) {
   const p = path.join(root, f);

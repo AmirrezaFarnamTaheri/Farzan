@@ -1,11 +1,12 @@
 /* eslint-disable no-undef */
+// Local vendor first for offline-first design; CDN fallback for updates
 try {
-  importScripts('https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js');
+  importScripts('../../vendor/fuse.min.js');
 } catch {
   try {
-    importScripts('../../vendor/fuse.min.js');
+    importScripts('https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js');
   } catch (e2) {
-    console.warn('[SearchWorker] Failed to load Fuse.js from CDN and vendor:', e2);
+    console.warn('[SearchWorker] Failed to load Fuse.js from vendor and CDN:', e2);
   }
 }
 
