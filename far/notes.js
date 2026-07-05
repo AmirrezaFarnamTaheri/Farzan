@@ -284,6 +284,14 @@
     // ── Notes ─────────────────────────────────────────────
     getNotes() {
       if (Array.isArray(this._notes)) return this._notes.slice();
+      // Hydrate from DB (bridge/IndexedDB) if not yet hydrated, then use cached data
+      if (!this._hydrated) {
+        // Defer to the async hydration path; return localStorage data as fallback
+        this._notes = this._readArray(STORAGE_KEY);
+        return this._notes.slice();
+      }
+      // After hydration, prefer IndexedDB data from this._notes
+      if (Array.isArray(this._notes)) return this._notes.slice();
       this._notes = this._readArray(STORAGE_KEY);
       return this._notes.slice();
     },
@@ -528,9 +536,13 @@
       RouteListeners.on(this._el, 'paste', e => this._onPaste(e));
 
       // Update toolbar state on selection change
+      // Guard against stale listener from destroyed/mounted editor instances
+      const mountId = this._mountId = (this._mountId || 0) + 1;
       RouteListeners.on(document, 'selectionchange', debounce(() => {
         const editor = this._el;
         if (!editor || !editor.isConnected) return;
+        // If this editor instance has been superseded by a newer mount, skip
+        if (this._mountId !== mountId) return;
         if (document.activeElement === editor || editor.contains(document.activeElement)) {
           this._updateToolbar();
         }

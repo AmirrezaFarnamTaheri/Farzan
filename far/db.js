@@ -36,9 +36,21 @@ autoIncrement: store.autoIncrement ?? true
 });
 
 (store.indexes || []).forEach(i => {
+// Only create index if it does not already exist
+if (!os.indexNames.contains(i.field)) {
 os.createIndex(i.field, i.field, { unique: !!i.unique });
+}
 });
 
+} else {
+  // Ensure existing store has all required indexes
+  const tx = e.target.transaction;
+  const os = tx.objectStore(store.name);
+  (store.indexes || []).forEach(i => {
+    if (!os.indexNames.contains(i.field)) {
+      os.createIndex(i.field, i.field, { unique: !!i.unique });
+    }
+  });
 }
 
 });

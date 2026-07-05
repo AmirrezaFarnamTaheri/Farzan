@@ -728,7 +728,10 @@
         const prefKeys = [
           'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
           'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
-          'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir'
+          'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
+          'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
+          'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists',
+          'plasma-studio-board', 'plasma_migrated_ids'
         ];
         prefKeys.forEach(k => localStorage.removeItem(k));
       }
