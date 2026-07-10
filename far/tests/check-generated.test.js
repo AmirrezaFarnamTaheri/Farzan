@@ -20,6 +20,19 @@ function write(root, relativePath, content) {
   fs.writeFileSync(file, content);
 }
 
+function writeBundle(root, {
+  entryChunk = 'chunk-AAAA1111.js',
+  secondaryChunk = 'chunk-BBBB2222.js',
+  includeSecondaryMap = true,
+} = {}) {
+  write(root, 'opencoursedeck.js', `import "./chunks/${entryChunk}";`);
+  write(root, 'opencoursedeck.js.map', '{"sources":["../src/index.js"]}');
+  write(root, `chunks/${entryChunk}`, `import "./${secondaryChunk}"; export const a = 1;`);
+  write(root, `chunks/${entryChunk}.map`, '{}');
+  write(root, `chunks/${secondaryChunk}`, 'export const b = 2;');
+  if (includeSecondaryMap) write(root, `chunks/${secondaryChunk}.map`, '{}');
+}
+
 afterEach(() => {
   for (const dir of tempRoots.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -27,25 +40,17 @@ afterEach(() => {
 });
 
 describe('generated artifact verification', () => {
-  it('treats multiple hashed chunks as distinct deterministic files', () => {
+  it('matches equivalent content-addressed chunks even when hashes differ', () => {
     const expected = makeDir();
     const actual = makeDir();
-    const files = {
-      'opencoursedeck.js': 'import "./chunks/chunk-AAAA1111.js";',
-      'chunks/chunk-AAAA1111.js': 'export const a = 1;',
-      'chunks/chunk-BBBB2222.js': 'export const b = 2;',
-    };
-
-    for (const [file, content] of Object.entries(files)) {
-      write(expected, file, content);
-      write(actual, file, content);
-    }
-    write(expected, 'opencoursedeck.js.map', '{"sources":["../../src/index.js"]}');
-    write(actual, 'opencoursedeck.js.map', '{"sources":["../src/index.js"]}');
-    write(expected, 'chunks/chunk-AAAA1111.js.map', '{"sources":["../../../src/a.js"]}');
-    write(actual, 'chunks/chunk-AAAA1111.js.map', '{"sources":["../../src/a.js"]}');
-    write(expected, 'chunks/chunk-BBBB2222.js.map', '{}');
-    write(actual, 'chunks/chunk-BBBB2222.js.map', '{}');
+    writeBundle(expected, {
+      entryChunk: 'chunk-AAAA1111.js',
+      secondaryChunk: 'chunk-BBBB2222.js',
+    });
+    writeBundle(actual, {
+      entryChunk: 'chunk-CCCC3333.js',
+      secondaryChunk: 'chunk-DDDD4444.js',
+    });
 
     expect(compareDirs(expected, actual, { filter: isGeneratedBundleFile })).toEqual({
       clean: true,
@@ -60,12 +65,39 @@ describe('generated artifact verification', () => {
     const expected = makeDir();
     const actual = makeDir();
     write(expected, 'opencoursedeck.js', 'export {};');
+    write(expected, 'opencoursedeck.js.map', '{}');
     write(actual, 'opencoursedeck.js', 'export {};');
+    write(actual, 'opencoursedeck.js.map', '{}');
     write(actual, 'chunks/chunk-STALE999.js', 'export const stale = true;');
+    write(actual, 'chunks/chunk-STALE999.js.map', '{}');
 
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
     expect(result.duplicate).toEqual([]);
     expect(result.extra).toEqual(['chunks/chunk-STALE999.js']);
+  });
+
+  it('reports missing source maps for generated JavaScript', () => {
+    const expected = makeDir();
+    const actual = makeDir();
+    writeBundle(expected);
+    writeBundle(actual, { includeSecondaryMap: false });
+
+    const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
+    expect(result.clean).toBe(false);
+    expect(result.missing).toContain('chunks/chunk-BBBB2222.js.map');
+  });
+
+  it('reports changed entry content', () => {
+    const expected = makeDir();
+    const actual = makeDir();
+    write(expected, 'opencoursedeck.js', 'export const version = 1;');
+    write(expected, 'opencoursedeck.js.map', '{}');
+    write(actual, 'opencoursedeck.js', 'export const version = 2;');
+    write(actual, 'opencoursedeck.js.map', '{}');
+
+    const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
+    expect(result.clean).toBe(false);
+    expect(result.changed).toEqual(['opencoursedeck.js']);
   });
 });
