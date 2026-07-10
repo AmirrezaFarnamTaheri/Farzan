@@ -476,8 +476,8 @@ export function createAIClient(root = window) {
       });
       return importLocalModelFile(file, { maxBytes });
     } catch (error) {
-      if (timed.didTimeout()) throw new Error('Model download timed out');
-      if (signal?.aborted || error?.name === 'AbortError') throw new Error('Model download was cancelled');
+      if (timed.didTimeout()) throw new Error('Model download timed out', { cause: error });
+      if (signal?.aborted || error?.name === 'AbortError') throw new Error('Model download was cancelled', { cause: error });
       throw error;
     } finally {
       timed.cleanup();
