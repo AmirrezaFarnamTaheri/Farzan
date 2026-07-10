@@ -1,8 +1,15 @@
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
+
+function resetCanvasSingleton() {
+  const canvas = window.OpenCourseDeck?.Canvas;
+  try { canvas?.destroy?.(); } catch {}
+  try { delete window.OpenCourseDeck?.Canvas; } catch {}
+}
+
+beforeEach(() => {
+  resetCanvasSingleton();
+});
 
 afterEach(() => {
-  const canvas = window.OpenCourseDeck?.Canvas;
-  if (!vi.isMockFunction(canvas?._scheduleRender)) return;
-  try { canvas.destroy?.(); } catch {}
-  try { delete window.OpenCourseDeck.Canvas; } catch {}
+  resetCanvasSingleton();
 });
