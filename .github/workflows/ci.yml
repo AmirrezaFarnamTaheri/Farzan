@@ -46,7 +46,18 @@ jobs:
         run: npm run validate
 
       - name: Lint source
-        run: npm run lint
+        run: |
+          mkdir -p reports
+          npm run lint -- --format json --output-file reports/eslint.json
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report-${{ github.run_number }}
+          path: far/reports/eslint.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Build release
         run: npm run build:release
