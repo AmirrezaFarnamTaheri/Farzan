@@ -115,13 +115,34 @@ describe('AI client', () => {
   });
 
   it('downloads a remote model file into the local model cache', async () => {
+    const bytes = new TextEncoder().encode('remote-model!');
+    let delivered = false;
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
       sessionStorage,
-      fetch: vi.fn(async () => new Response(new Blob(['remote-model']), {
+      fetch: vi.fn(async () => ({
+        ok: true,
         status: 200,
-        headers: { 'content-type': 'application/octet-stream', 'content-length': '13' },
+        headers: {
+          get(name) {
+            const key = String(name).toLowerCase();
+            if (key === 'content-type') return 'application/octet-stream';
+            if (key === 'content-length') return String(bytes.byteLength);
+            return null;
+          },
+        },
+        body: {
+          getReader() {
+            return {
+              async read() {
+                if (delivered) return { done: true, value: undefined };
+                delivered = true;
+                return { done: false, value: bytes };
+              },
+            };
+          },
+        },
       })),
     };
     const client = createAIClient(root);
@@ -130,7 +151,7 @@ describe('AI client', () => {
     const downloaded = await client.downloadLocalModel('https://models.example.test/gemma.task', { onProgress: progress });
     expect(downloaded).toMatchObject({ name: 'gemma.task', size: 13, type: 'application/octet-stream' });
     expect(root.fetch).toHaveBeenCalledWith('https://models.example.test/gemma.task');
-    expect(progress).toHaveBeenCalled();
+    expect(progress).toHaveBeenCalledWith({ loaded: 13, total: 13, percent: 100 });
     await expect(client.getLocalModelFile()).resolves.toMatchObject({ name: 'gemma.task', size: 13 });
   });
 
