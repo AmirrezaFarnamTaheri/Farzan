@@ -72,6 +72,7 @@ function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
   const extra = [...actualFiles].filter(file => !expectedFiles.has(file));
   const changed = [...expectedFiles]
     .filter(file => actualFiles.has(file))
+    .filter(file => !file.endsWith('.map'))
     .filter(file => hashGeneratedFile(path.join(expectedDir, file)) !== hashGeneratedFile(path.join(actualDir, file)));
 
   return {
