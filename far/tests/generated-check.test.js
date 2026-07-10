@@ -18,16 +18,24 @@ describe('generated output drift checks', () => {
     return dir;
   }
 
+  function write(root, relativePath, content) {
+    const file = path.join(root, relativePath);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content, 'utf8');
+  }
+
   it('detects missing, extra, and changed generated files', async () => {
     const { compareDirs } = await import('../scripts/check-generated.cjs');
     const expected = makeTempDir();
     const actual = makeTempDir();
-    fs.mkdirSync(path.join(expected, 'chunks'), { recursive: true });
-    fs.mkdirSync(path.join(actual, 'chunks'), { recursive: true });
-    fs.writeFileSync(path.join(expected, 'opencoursedeck.js'), 'fresh', 'utf8');
-    fs.writeFileSync(path.join(actual, 'opencoursedeck.js'), 'stale', 'utf8');
-    fs.writeFileSync(path.join(expected, 'chunks', 'needed.js'), 'needed', 'utf8');
-    fs.writeFileSync(path.join(actual, 'extra.js'), 'extra', 'utf8');
+    write(expected, 'opencoursedeck.js', 'fresh');
+    write(expected, 'opencoursedeck.js.map', '{}');
+    write(actual, 'opencoursedeck.js', 'stale');
+    write(actual, 'opencoursedeck.js.map', '{}');
+    write(expected, 'chunks/needed.js', 'needed');
+    write(expected, 'chunks/needed.js.map', '{}');
+    write(actual, 'extra.js', 'extra');
+    write(actual, 'extra.js.map', '{}');
 
     const result = compareDirs(expected, actual);
 
@@ -37,22 +45,23 @@ describe('generated output drift checks', () => {
     expect(result.extra).toEqual(['extra.js']);
   });
 
-  it('normalizes hashed chunk names while detecting duplicate stale bundles', async () => {
+  it('normalizes hashed chunk names while reporting stale content as extra', async () => {
     const { compareDirs } = await import('../scripts/check-generated.cjs');
     const expected = makeTempDir();
     const actual = makeTempDir();
-    fs.mkdirSync(path.join(expected, 'chunks'), { recursive: true });
-    fs.mkdirSync(path.join(actual, 'chunks'), { recursive: true });
-    fs.writeFileSync(path.join(expected, 'chunks', 'app-ABCDEFGH.js'), 'import "./notes-HASH.js";\n//# sourceMappingURL=app-HASH.js.map', 'utf8');
-    fs.writeFileSync(path.join(actual, 'chunks', 'app-IJKLMNOP.js'), 'import "./notes-HASH.js";\n//# sourceMappingURL=app-DIFF.js.map', 'utf8');
-    fs.writeFileSync(path.join(actual, 'chunks', 'app-QRSTUVWX.js'), 'stale duplicate', 'utf8');
+    write(expected, 'chunks/app-ABCDEFGH.js', 'import "./notes-ABCDEFGH.js";\n//# sourceMappingURL=app-ABCDEFGH.js.map');
+    write(expected, 'chunks/app-ABCDEFGH.js.map', '{}');
+    write(actual, 'chunks/app-IJKLMNOP.js', 'import "./notes-IJKLMNOP.js";\n//# sourceMappingURL=app-IJKLMNOP.js.map');
+    write(actual, 'chunks/app-IJKLMNOP.js.map', '{}');
+    write(actual, 'chunks/app-QRSTUVWX.js', 'stale duplicate');
+    write(actual, 'chunks/app-QRSTUVWX.js.map', '{}');
 
     const result = compareDirs(expected, actual);
 
     expect(result.clean).toBe(false);
     expect(result.missing).toEqual([]);
-    expect(result.extra).toEqual([]);
-    expect(result.duplicate).toEqual(['chunks/app-HASH.js']);
+    expect(result.extra).toEqual(['chunks/app-QRSTUVWX.js']);
+    expect(result.duplicate).toEqual([]);
   });
 
   it('keeps generated drift checks in the package CI script', async () => {
@@ -62,13 +71,13 @@ describe('generated output drift checks', () => {
     expect(packageJson.scripts.ci).toContain('npm run check:generated');
   });
 
-  it('keeps CI service-worker generation before generated-file and service-worker tests', async () => {
+  it('keeps release generation before generated-file and service-worker tests', async () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
     const steps = packageJson.scripts.ci.split('&&').map(step => step.trim());
 
-    expect(steps.indexOf('npm run build')).toBeLessThan(steps.indexOf('npm run build:sw'));
-    expect(steps.indexOf('npm run build:sw')).toBeLessThan(steps.indexOf('npm run check:generated'));
-    expect(steps.indexOf('npm run build:sw')).toBeLessThan(steps.indexOf('npm test'));
+    expect(steps.indexOf('npm run build:release')).toBeGreaterThan(-1);
+    expect(steps.indexOf('npm run build:release')).toBeLessThan(steps.indexOf('npm run check:generated'));
+    expect(steps.indexOf('npm run build:release')).toBeLessThan(steps.indexOf('npm test'));
   });
 
   it('keeps production builds warning-free without changing watch diagnostics', () => {

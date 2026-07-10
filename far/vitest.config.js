@@ -5,6 +5,7 @@ export default {
   test: {
     environment: 'jsdom',
     include: ['tests/**/*.test.js'],
+    setupFiles: ['tests/setup.js'],
     // Isolate each test file in its own worker so global-state mutations
     // (window.OpenCourseDeck, window.DB, rAF loops) cannot bleed between files.
     isolate: true,
@@ -13,4 +14,3 @@ export default {
     clearMocks: true,
   },
 };
-

@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: far
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Vendor browser dependencies
+        run: npm run vendor
+
+      - name: Check encoding
+        run: npm run check:encoding
+
+      - name: Validate repository
+        run: npm run validate
+
+      - name: Lint source
+        run: |
+          mkdir -p reports
+          npm run lint -- --format json --output-file reports/eslint.json
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report-${{ github.run_number }}
+          path: far/reports/eslint.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build release
+        run: npm run build:release
+
+      - name: Verify generated artifacts
+        run: npm run check:generated
+
+      - name: Run tests
+        run: |
+          mkdir -p reports
+          npm test -- --reporter=json --outputFile=reports/vitest.json
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-report-${{ github.run_number }}
+          path: far/reports/vitest.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Audit dependencies and project rules
+        run: npm run audit
+
+      - name: Generate bundle report
+        run: npm run report:bundle
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          npm run smoke 2>&1 | tee reports/smoke.log
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report-${{ github.run_number }}
+          path: far/reports/smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Run browser smoke tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
+
+      - name: Upload browser smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-report-${{ github.run_number }}
+          path: far/reports/browser-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

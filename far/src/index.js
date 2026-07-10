@@ -8,7 +8,6 @@ import '../ui.js';
 import '../bridge.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
-// ── Orphaned module integration: expose all src/ utilities on OpenCourseDeck namespace ──
 import * as easing from './lib/easing.js';
 import { HElement, h } from './lib/hElement.js';
 import { RAFLoop } from './lib/rafLoop.js';
@@ -33,7 +32,6 @@ import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
-// ── Expose all integrated modules on OpenCourseDeck namespace ──
 pd.easing = easing;
 pd.HElement = HElement;
 pd.h = h;
@@ -46,7 +44,6 @@ pd.VirtualList = VirtualList;
 pd.WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
 pd.ThemeBuilder = { buildUserThemeVars };
 pd.locale = { ...locale, messages: { 'en-US': enUS, 'fa-IR': faIR } };
-// Register locale messages
 locale.locale('en-US', enUS);
 locale.locale('fa-IR', faIR);
 pd.TranslatorRegistry = TranslatorRegistry;
@@ -78,35 +75,26 @@ const featurePromises = new Map();
 pd.loadFeature = (name) => {
   const loader = featureLoaders[name];
   if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
-  if (!featurePromises.has(name)) {
-    featurePromises.set(name, loader());
-  }
+  if (!featurePromises.has(name)) featurePromises.set(name, loader());
   return featurePromises.get(name);
 };
 
 pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature(name)));
 
-// Theme + layout pre-boot (FOUC) — runs after migration module, before async init().
 (() => {
   try {
-    const theme  = localStorage.getItem('plasma_theme')  || 'dark';
+    const theme = localStorage.getItem('plasma_theme') || 'dark';
     const accent = localStorage.getItem('plasma_accent') || 'plasma';
-    const dir    = localStorage.getItem('plasma_dir')    || 'ltr';
-    const root   = document.documentElement;
+    const dir = localStorage.getItem('plasma_dir') || 'ltr';
+    const root = document.documentElement;
     root.setAttribute('data-theme', theme);
     root.setAttribute('data-accent', accent);
     root.setAttribute('dir', dir);
-
-    const fontScale = localStorage.getItem('plasma_font_scale') || '1';
-    root.style.setProperty('--font-scale', fontScale);
-
-    const sidebarCollapsed = localStorage.getItem('plasma_sidebar_collapsed') === 'true';
-    if (sidebarCollapsed) root.classList.add('sidebar-collapsed');
-
-    const density = localStorage.getItem('plasma_density') || 'comfortable';
-    root.setAttribute('data-density', density);
+    root.style.setProperty('--font-scale', localStorage.getItem('plasma_font_scale') || '1');
+    if (localStorage.getItem('plasma_sidebar_collapsed') === 'true') root.classList.add('sidebar-collapsed');
+    root.setAttribute('data-density', localStorage.getItem('plasma_density') || 'comfortable');
   } catch {
-    // localStorage might be blocked
+    // Storage can be unavailable in hardened or embedded browsers.
   }
 })();
 
@@ -114,36 +102,31 @@ initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
 
-try { performance.mark?.('pd:bundle:evaluated'); } catch {
-  // Performance API may be unavailable in unusual embedded browsers.
-}
+try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 
-const __pdDebugEnabled = (() => {
+const isLocalHost = (() => {
   try {
-    const isLocal =
-      location.hostname === 'localhost' ||
-      location.hostname === '127.0.0.1' ||
-      location.hostname === '[::1]';
-    const qs = new URLSearchParams(location.search);
-    return isLocal && qs.get('debug') === '1';
+    return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
+  } catch {
+    return false;
+  }
+})();
+
+const debugEnabled = (() => {
+  try {
+    return isLocalHost && new URLSearchParams(location.search).get('debug') === '1';
   } catch {
     return false;
   }
 })();
 
 window.__pdDebug = (payload) => {
-  if (!__pdDebugEnabled) return;
-  try {
-    navigator.sendBeacon?.('/__debug?debug=1', JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
+  if (!debugEnabled) return;
+  try { navigator.sendBeacon?.('/__debug?debug=1', JSON.stringify(payload)); } catch {}
 };
 
 window.__pdMark = (name) => {
-  try { performance.mark?.(name); } catch {
-    // Timing marks are best-effort debug signals.
-  }
+  try { performance.mark?.(name); } catch {}
 };
 
 window.__pdMeasure = (name, start, end) => {
@@ -156,53 +139,52 @@ window.__pdMeasure = (name, start, end) => {
       data: { name, duration: entry?.duration ?? null },
       timestamp: Date.now(),
     });
-  } catch {
-    // Timing measures are best-effort debug signals.
-  }
+  } catch {}
 };
 
-window.addEventListener('error', (e) => {
+window.addEventListener('error', (event) => {
   window.__pdDebug?.({
     location: 'window:error',
     message: 'Unhandled error',
-    data: { msg: String(e?.message || ''), file: String(e?.filename || ''), line: e?.lineno, col: e?.colno },
+    data: {
+      msg: String(event?.message || ''),
+      file: String(event?.filename || ''),
+      line: event?.lineno,
+      col: event?.colno,
+    },
     timestamp: Date.now(),
   });
 });
-window.addEventListener('unhandledrejection', (e) => {
+
+window.addEventListener('unhandledrejection', (event) => {
   window.__pdDebug?.({
     location: 'window:unhandledrejection',
     message: 'Unhandled rejection',
-    data: { reason: String(e?.reason || '') },
+    data: { reason: String(event?.reason || '') },
     timestamp: Date.now(),
   });
 });
 
 if ('serviceWorker' in navigator) {
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (isLocal) {
+  if (isLocalHost) {
     try {
       const key = 'pd_dev_sw_disabled_once';
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, '1');
         navigator.serviceWorker.getRegistrations()
-          .then((regs) => Promise.allSettled(regs.map((r) => r.unregister())))
-          .then(() => {
-            location.reload();
-          })
+          .then((registrations) => Promise.allSettled(registrations.map((registration) => registration.unregister())))
+          .then(() => location.reload())
           .catch(() => {});
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   window.addEventListener('load', () => {
-    if (isLocal) return;
+    if (isLocalHost) return;
     navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then((reg) => {
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
+      .then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -211,21 +193,29 @@ if ('serviceWorker' in navigator) {
           });
         });
       })
-      .catch(() => {});
+      .catch((error) => {
+        window.__pdDebug?.({
+          location: 'service-worker',
+          message: 'Registration failed',
+          data: { reason: String(error?.message || error || '') },
+          timestamp: Date.now(),
+        });
+      });
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (window.__plasmaSwReloading) return;
     window.__plasmaSwReloading = true;
+    location.reload();
   });
 }
 
 import('../app.js')
   .then(() => {
-    try { initCommandPalette(); } catch (e) { console.warn('[OpenCourseDeck] initCommandPalette failed', e); }
+    try { initCommandPalette(); } catch (error) {
+      console.warn('[OpenCourseDeck] initCommandPalette failed', error);
+    }
   })
-  .catch((e) => {
-    console.error('[OpenCourseDeck] app shell failed to load', e);
+  .catch((error) => {
+    console.error('[OpenCourseDeck] app shell failed to load', error);
   });
-
-
