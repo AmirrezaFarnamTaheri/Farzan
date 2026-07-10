@@ -76,7 +76,7 @@ describe('static assets and service worker precache', () => {
     expect(csp).not.toContain('https://plasmato.s3.ir-thr-at1.arvanstorage.ir');
   });
 
-  it('precache includes boot and active catalog files in the release directory', () => {
+  it('precache includes boot and the active catalog file in the release directory', () => {
     const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
     const urls = [...sw.matchAll(/\{url:"([^"]+)",revision:"[^"]+"\}/g)]
       .map((match) => normalizeLocalRef(match[1]))
@@ -86,7 +86,9 @@ describe('static assets and service worker precache', () => {
 
     expect(releaseExists('sw.js')).toBe(true);
     expect(urls).toContain('boot.js');
-    expect(urls).toContain(`data/${activeCatalog}`);
+    expect(activeCatalog).toBeTruthy();
+    expect(urls).toContain(activeCatalog);
+    expect(releaseExists(activeCatalog)).toBe(true);
     expect(urls.filter((rel) => !releaseExists(rel))).toEqual([]);
   });
 
