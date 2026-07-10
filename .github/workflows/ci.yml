@@ -39,5 +39,32 @@ jobs:
       - name: Vendor browser dependencies
         run: npm run vendor
 
-      - name: Run quality gate
-        run: npm run ci
+      - name: Check encoding
+        run: npm run check:encoding
+
+      - name: Validate repository
+        run: npm run validate
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Build release
+        run: npm run build:release
+
+      - name: Verify generated artifacts
+        run: npm run check:generated
+
+      - name: Run tests
+        run: npm test
+
+      - name: Audit dependencies and project rules
+        run: npm run audit
+
+      - name: Generate bundle report
+        run: npm run report:bundle
+
+      - name: Run smoke tests
+        run: npm run smoke
+
+      - name: Run browser smoke tests
+        run: npm run smoke:browser
