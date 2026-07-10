@@ -32,17 +32,20 @@ describe('generated artifact verification', () => {
     const actual = makeDir();
     const files = {
       'opencoursedeck.js': 'import "./chunks/chunk-AAAA1111.js";',
-      'opencoursedeck.js.map': '{}',
       'chunks/chunk-AAAA1111.js': 'export const a = 1;',
-      'chunks/chunk-AAAA1111.js.map': '{}',
       'chunks/chunk-BBBB2222.js': 'export const b = 2;',
-      'chunks/chunk-BBBB2222.js.map': '{}',
     };
 
     for (const [file, content] of Object.entries(files)) {
       write(expected, file, content);
       write(actual, file, content);
     }
+    write(expected, 'opencoursedeck.js.map', '{"sources":["../../src/index.js"]}');
+    write(actual, 'opencoursedeck.js.map', '{"sources":["../src/index.js"]}');
+    write(expected, 'chunks/chunk-AAAA1111.js.map', '{"sources":["../../../src/a.js"]}');
+    write(actual, 'chunks/chunk-AAAA1111.js.map', '{"sources":["../../src/a.js"]}');
+    write(expected, 'chunks/chunk-BBBB2222.js.map', '{}');
+    write(actual, 'chunks/chunk-BBBB2222.js.map', '{}');
 
     expect(compareDirs(expected, actual, { filter: isGeneratedBundleFile })).toEqual({
       clean: true,
