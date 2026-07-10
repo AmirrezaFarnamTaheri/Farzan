@@ -1,36 +1,41 @@
 const fs = require('fs');
 const path = require('path');
-const { generateSW } = require('workbox-build');
-const config = require('./workbox-dist.config.cjs');
+const { spawnSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
 const dist = path.join(root, 'dist');
+const indexPath = path.join(dist, 'index.html');
+const swPath = path.join(dist, 'sw.js');
+const cliPath = path.join(root, 'node_modules', 'workbox-cli', 'build', 'bin.js');
+const configPath = path.join('scripts', 'workbox-dist.config.cjs');
 
-async function main() {
-  const indexPath = path.join(dist, 'index.html');
+function main() {
   if (!fs.existsSync(indexPath)) {
     throw new Error('Cannot generate production service worker: dist/index.html is missing');
   }
-
-  const { count, size, warnings } = await generateSW({
-    ...config,
-    globDirectory: path.join(root, config.globDirectory),
-    swDest: path.join(root, config.swDest),
-  });
-
-  for (const warning of warnings) {
-    console.warn(`[build:sw:dist] ${warning}`);
+  if (!fs.existsSync(cliPath)) {
+    throw new Error('Cannot generate production service worker: workbox-cli is not installed');
   }
 
-  const swPath = path.join(dist, 'sw.js');
+  const result = spawnSync(process.execPath, [cliPath, 'generateSW', configPath], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`workbox-cli exited with status ${result.status ?? 'unknown'}`);
+  }
   if (!fs.existsSync(swPath) || fs.statSync(swPath).size === 0) {
     throw new Error('Production service worker was not generated at dist/sw.js');
   }
 
-  console.log(`[build:sw:dist] precached ${count} files (${size} bytes)`);
+  console.log(`[build:sw:dist] generated ${path.relative(root, swPath)}`);
 }
 
-main().catch((error) => {
+try {
+  main();
+} catch (error) {
   console.error('[build:sw:dist] failed', error);
   process.exitCode = 1;
-});
+}
