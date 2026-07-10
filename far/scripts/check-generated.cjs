@@ -62,7 +62,7 @@ function inventory(dir, { filter = null } = {}) {
   const jsFiles = files.filter(file => file.endsWith('.js') && !file.endsWith('.js.map'));
   const mapFiles = new Set(files.filter(file => file.endsWith('.js.map')));
   const chunks = jsFiles
-    .filter(file => file.startsWith('chunks/'))
+    .filter(file => file !== 'opencoursedeck.js')
     .map(file => ({ file, hash: hashGeneratedFile(path.join(dir, file)) }));
 
   return {
