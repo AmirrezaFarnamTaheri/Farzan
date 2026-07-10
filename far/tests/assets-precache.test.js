@@ -4,9 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const releaseRoot = path.join(root, 'dist');
 
 function exists(rel) {
   return fs.existsSync(path.join(root, rel));
+}
+
+function releaseExists(rel) {
+  return fs.existsSync(path.join(releaseRoot, rel));
 }
 
 function normalizeLocalRef(ref) {
@@ -17,15 +22,20 @@ function normalizeLocalRef(ref) {
 }
 
 describe('static assets and service worker precache', () => {
-  it('cleans stale Workbox helpers before generating a new service worker', () => {
+  it('keeps development and portable release service-worker commands configured', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    const config = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
+    const developmentConfig = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
+    const releaseConfig = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
 
     expect(exists('scripts/clean-workbox.cjs')).toBe(true);
     expect(pkg.scripts['build:sw']).toContain('scripts/clean-workbox.cjs');
     expect(pkg.scripts['build:sw']).toContain('generateSW scripts/workbox.config.cjs');
-    expect(config).toContain('cleanupOutdatedCaches: true');
-    expect(config).toContain('cacheId: `opencoursedeck-v${pkg.version}`');
+    expect(pkg.scripts['build:release']).toContain('scripts/build-sw-dist.cjs');
+    expect(developmentConfig).toContain('cleanupOutdatedCaches: true');
+    expect(releaseConfig).toContain('cleanupOutdatedCaches: true');
+    expect(releaseConfig).toContain("globDirectory: 'dist'");
+    expect(releaseConfig).toContain("swDest: 'dist/sw.js'");
+    expect(releaseConfig).toContain('cacheId: `opencoursedeck-v${pkg.version}`');
   });
 
   it('keeps index.html local script/link references present on disk', () => {
@@ -66,30 +76,31 @@ describe('static assets and service worker precache', () => {
     expect(csp).not.toContain('https://plasmato.s3.ir-thr-at1.arvanstorage.ir');
   });
 
-  it('precache includes boot and active catalog files that exist', () => {
-    const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  it('precache includes boot and active catalog files in the release directory', () => {
+    const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
     const urls = [...sw.matchAll(/\{url:"([^"]+)",revision:"[^"]+"\}/g)]
       .map((match) => normalizeLocalRef(match[1]))
       .filter(Boolean);
     const pointer = JSON.parse(fs.readFileSync(path.join(root, 'data/catalog.json'), 'utf8'));
     const activeCatalog = normalizeLocalRef(pointer.currentCatalog);
 
+    expect(releaseExists('sw.js')).toBe(true);
     expect(urls).toContain('boot.js');
-    expect(urls).toContain(activeCatalog);
-    expect(urls.filter((rel) => !exists(rel))).toEqual([]);
+    expect(urls).toContain(`data/${activeCatalog}`);
+    expect(urls.filter((rel) => !releaseExists(rel))).toEqual([]);
   });
 
   it('uses offline-friendly runtime caching for catalog data and app bundles', () => {
-    const config = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
-    const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+    const config = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
+    const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
 
-    expect(config).toContain("cacheName: 'plasma-data'");
+    expect(config).toContain("cacheName: 'opencoursedeck-data'");
     expect(config).toContain("handler: 'NetworkFirst'");
-    expect(config).toContain("cacheName: 'plasma-dist'");
+    expect(config).toContain("cacheName: 'opencoursedeck-app-bundle'");
     expect(config).toContain("handler: 'StaleWhileRevalidate'");
-    expect(sw).toContain('plasma-data');
+    expect(sw).toContain('opencoursedeck-data');
     expect(sw).toContain('NetworkFirst');
-    expect(sw).toContain('plasma-dist');
+    expect(sw).toContain('opencoursedeck-app-bundle');
     expect(sw).toContain('StaleWhileRevalidate');
   });
 
@@ -126,7 +137,7 @@ describe('static assets and service worker precache', () => {
 
     expect(catalogDocs).toContain("cache: 'no-cache'");
     expect(catalogDocs).toContain('Do not switch catalog fetches back to `no-store`');
-    expect(catalogDocs).toContain('Run `npm run build:sw` after changing `data/catalog.json`');
+    expect(catalogDocs).toContain('Run `npm run build:release` after changing `data/catalog.json`');
   });
 
   it('keeps Windows launchers identity-safe and free of stale debug timestamp placeholders', () => {
