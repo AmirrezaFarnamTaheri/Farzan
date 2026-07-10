@@ -1,14 +1,13 @@
 ﻿/**
- * End-to-end HTTP smoke test for the local dev server.
- * Starts the dev server in-process, probes critical URLs, then terminates it.
+ * End-to-end HTTP smoke test for both the source development root and the
+ * portable release root. Each server binds to an ephemeral port.
  */
 const http = require('http');
 const path = require('path');
 const { createServer } = require('./dev-server.cjs');
 
 const root = path.join(__dirname, '..');
-const port = 52000 + Math.floor(Math.random() * 2000);
-const server = createServer({ root });
+const releaseRoot = path.join(root, 'dist');
 
 function request(method, url) {
   return new Promise((resolve, reject) => {
@@ -89,31 +88,43 @@ async function collectChunkPaths(origin, entrySource, fetchText = defaultFetchTe
   return [...seen].sort();
 }
 
-async function waitForReady() {
-  const url = `http://127.0.0.1:${port}/`;
-  for (let i = 0; i < 80; i++) {
-    try {
-      const code = await getStatus(url);
-      if (code === 200) return;
-    } catch {
-      // still starting
-    }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`Server did not respond 200 at ${url}`);
+async function listen(server) {
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off?.('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Server did not expose an address');
+  return `http://127.0.0.1:${address.port}`;
 }
 
-async function main() {
-  try {
-    await new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(port, '127.0.0.1', () => {
-        server.off?.('error', reject);
-        resolve();
-      });
-    });
+async function close(server) {
+  if (!server?.listening) return;
+  await new Promise((resolve) => server.close(resolve));
+}
 
-    await waitForReady();
+async function assertPaths(origin, paths) {
+  for (const resourcePath of paths) {
+    const code = await getStatus(`${origin}${resourcePath}`);
+    if (code !== 200) throw new Error(`${resourcePath} -> HTTP ${code}`);
+  }
+}
+
+async function assertChunks(origin, entryPath) {
+  const entry = await defaultFetchText(`${origin}${entryPath}`);
+  if (entry.status !== 200) throw new Error(`${entryPath} -> HTTP ${entry.status}`);
+  const chunks = await collectChunkPaths(origin, entry.body, defaultFetchText, entryPath);
+  await assertPaths(origin, chunks);
+  return chunks.length;
+}
+
+async function smokeSourceRoot() {
+  const server = createServer({ root });
+  try {
+    const origin = await listen(server);
     const paths = [
       '/',
       '/index.html',
@@ -121,41 +132,64 @@ async function main() {
       '/manifest.json',
       '/boot.js',
       '/dist/opencoursedeck.js',
-      '/sw.js',
+      '/dist/sw.js',
       '/vendor/purify.min.js',
       '/vendor/marked.min.js',
+      '/data/catalog.json',
+      '/data/opencoursedeck-starter.json',
     ];
-    for (const p of paths) {
-      const code = await getStatus(`http://127.0.0.1:${port}${p}`);
-      if (code !== 200) throw new Error(`${p} -> HTTP ${code}`);
-    }
+    await assertPaths(origin, paths);
+    const chunkCount = await assertChunks(origin, '/dist/opencoursedeck.js');
 
-    const entry = await defaultFetchText(`http://127.0.0.1:${port}/dist/opencoursedeck.js`);
-    const chunks = await collectChunkPaths(`http://127.0.0.1:${port}`, entry.body);
-    for (const p of chunks) {
-      const code = await getStatus(`http://127.0.0.1:${port}${p}`);
-      if (code !== 200) throw new Error(`${p} -> HTTP ${code}`);
-    }
-
-    const headCss = await request('HEAD', `http://127.0.0.1:${port}/style.css`);
+    const headCss = await request('HEAD', `${origin}/style.css`);
     if (headCss !== 200) throw new Error(`HEAD /style.css -> HTTP ${headCss}`);
 
-    const missing = await getStatus(`http://127.0.0.1:${port}/__pd_smoke_missing_file_404`);
+    const missing = await getStatus(`${origin}/__pd_smoke_missing_file_404`);
     if (missing !== 404) throw new Error(`missing asset -> expected 404, got ${missing}`);
 
-    const badDebug = await request('GET', `http://127.0.0.1:${port}/__debug`);
+    const badDebug = await request('GET', `${origin}/__debug`);
     if (badDebug !== 405) throw new Error(`GET /__debug -> expected 405, got ${badDebug}`);
 
-    console.log('[smoke] OK —', paths.length + 4, 'checks on port', port);
+    return paths.length + chunkCount + 3;
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await close(server);
   }
 }
 
+async function smokeReleaseRoot() {
+  const server = createServer({ root: releaseRoot });
+  try {
+    const origin = await listen(server);
+    const paths = [
+      '/',
+      '/index.html',
+      '/style.css',
+      '/manifest.json',
+      '/boot.js',
+      '/opencoursedeck.js',
+      '/sw.js',
+      '/vendor/purify.min.js',
+      '/vendor/marked.min.js',
+      '/data/catalog.json',
+      '/data/opencoursedeck-starter.json',
+    ];
+    await assertPaths(origin, paths);
+    const chunkCount = await assertChunks(origin, '/opencoursedeck.js');
+    return paths.length + chunkCount;
+  } finally {
+    await close(server);
+  }
+}
+
+async function main() {
+  const sourceChecks = await smokeSourceRoot();
+  const releaseChecks = await smokeReleaseRoot();
+  console.log('[smoke] OK —', sourceChecks + releaseChecks, 'development and release checks passed.');
+}
+
 if (require.main === module) {
-  main().catch((err) => {
-    console.error('[smoke] FAIL:', err?.message || err);
-    try { server.close(); } catch { /* ignore */ }
+  main().catch((error) => {
+    console.error('[smoke] FAIL:', error?.message || error);
     process.exit(1);
   });
 }
@@ -164,4 +198,6 @@ module.exports = {
   collectChunkPaths,
   extractChunkPaths,
   main,
+  smokeReleaseRoot,
+  smokeSourceRoot,
 };
