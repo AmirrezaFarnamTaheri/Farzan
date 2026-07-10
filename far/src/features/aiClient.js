@@ -6,6 +6,10 @@ const AI_MODEL_STORE = 'models';
 const AI_EMBEDDING_STORE = 'embeddings';
 const ACTIVE_MODEL_ID = 'active-local-model';
 const EMBEDDING_DIMS = 64;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_MODEL_DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+const MAX_MODEL_BYTES = 2 * 1024 * 1024 * 1024;
+
 export const GEMMA_MODEL_OPTIONS = [
   {
     id: 'gemma-4-local',
@@ -25,6 +29,7 @@ const DEFAULT_SETTINGS = {
   endpoint: '',
   keyStorage: 'session',
   hasKey: false,
+  approvedEndpointOrigin: '',
   localModelStatus: 'not-installed',
   localModelSource: GEMMA_MODEL_OPTIONS[0].url,
   localModelFile: null,
@@ -34,26 +39,30 @@ function normalizeSettings(settings = {}) {
   const mode = ['hidden', 'disabled', 'local-gemma', 'custom-api'].includes(settings.mode)
     ? settings.mode
     : DEFAULT_SETTINGS.mode;
-  const keyStorage = settings.keyStorage === 'local' ? 'local' : 'session';
+  const localModelFile = settings.localModelFile && typeof settings.localModelFile === 'object'
+    ? {
+        name: String(settings.localModelFile.name || '').slice(0, 200),
+        size: Math.max(0, Number(settings.localModelFile.size) || 0),
+        type: String(settings.localModelFile.type || ''),
+        lastModified: Math.max(0, Number(settings.localModelFile.lastModified) || 0),
+        importedAt: Math.max(0, Number(settings.localModelFile.importedAt) || 0),
+      }
+    : null;
+
   return {
     ...DEFAULT_SETTINGS,
-    ...settings,
     mode,
-    keyStorage,
     model: String(settings.model || DEFAULT_SETTINGS.model).trim() || DEFAULT_SETTINGS.model,
     endpoint: String(settings.endpoint || '').trim(),
-    hasKey: Boolean(settings.hasKey || settings.apiKey),
-    localModelStatus: ['installed', 'imported'].includes(settings.localModelStatus) ? settings.localModelStatus : 'not-installed',
-    localModelSource: String(settings.localModelSource || DEFAULT_SETTINGS.localModelSource).trim() || DEFAULT_SETTINGS.localModelSource,
-    localModelFile: settings.localModelFile && typeof settings.localModelFile === 'object'
-      ? {
-          name: String(settings.localModelFile.name || '').slice(0, 200),
-          size: Math.max(0, Number(settings.localModelFile.size) || 0),
-          type: String(settings.localModelFile.type || ''),
-          lastModified: Math.max(0, Number(settings.localModelFile.lastModified) || 0),
-          importedAt: Math.max(0, Number(settings.localModelFile.importedAt) || 0),
-        }
-      : null,
+    keyStorage: 'session',
+    hasKey: Boolean(settings.hasKey),
+    approvedEndpointOrigin: String(settings.approvedEndpointOrigin || '').trim(),
+    localModelStatus: ['installed', 'imported'].includes(settings.localModelStatus)
+      ? settings.localModelStatus
+      : 'not-installed',
+    localModelSource: String(settings.localModelSource || DEFAULT_SETTINGS.localModelSource).trim()
+      || DEFAULT_SETTINGS.localModelSource,
+    localModelFile,
   };
 }
 
@@ -138,6 +147,82 @@ function cosine(a = [], b = []) {
   return score;
 }
 
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+  return normalized === 'localhost'
+    || normalized === '::1'
+    || normalized === '127.0.0.1'
+    || normalized.startsWith('127.');
+}
+
+function parseSecureHttpUrl(value, root, label = 'URL') {
+  const source = String(value || '').trim();
+  if (!/^https?:\/\//i.test(source)) throw new TypeError(`${label} must be an absolute HTTP or HTTPS URL`);
+  let parsed;
+  try {
+    parsed = new URL(source);
+  } catch {
+    throw new TypeError(`${label} is invalid`);
+  }
+  if (parsed.username || parsed.password) throw new TypeError(`${label} must not contain embedded credentials`);
+  if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
+    throw new TypeError(`${label} must use HTTPS unless it targets localhost`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new TypeError(`${label} must use HTTP or HTTPS`);
+  const currentOrigin = root?.location?.origin;
+  return {
+    href: parsed.href,
+    origin: parsed.origin,
+    sameOrigin: Boolean(currentOrigin && parsed.origin === currentOrigin),
+  };
+}
+
+function createTimedSignal(root, externalSignal, timeoutMs) {
+  const Controller = root?.AbortController || globalThis.AbortController;
+  if (typeof Controller !== 'function') {
+    return { signal: externalSignal, didTimeout: () => false, cleanup() {} };
+  }
+
+  const controller = new Controller();
+  let timedOut = false;
+  const onAbort = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) onAbort();
+  else externalSignal?.addEventListener?.('abort', onAbort, { once: true });
+
+  const timeout = Math.max(1, Number(timeoutMs) || DEFAULT_REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeout);
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    cleanup() {
+      clearTimeout(timer);
+      externalSignal?.removeEventListener?.('abort', onAbort);
+    },
+  };
+}
+
+function safeFilename(source) {
+  const raw = new URL(source).pathname.split('/').filter(Boolean).pop() || 'local-model.bin';
+  try {
+    return decodeURIComponent(raw).slice(0, 200);
+  } catch {
+    return raw.slice(0, 200);
+  }
+}
+
+function assertModelSize(size, maxBytes = MAX_MODEL_BYTES) {
+  const value = Math.max(0, Number(size) || 0);
+  const limit = Math.max(1, Number(maxBytes) || MAX_MODEL_BYTES);
+  if (value > limit) {
+    throw new RangeError(`Model file exceeds the ${Math.round(limit / (1024 * 1024))} MB safety limit`);
+  }
+  return value;
+}
+
 function openModelDb(root) {
   const indexedDB = root.indexedDB;
   if (!indexedDB) return Promise.resolve(null);
@@ -182,9 +267,7 @@ export function createAIClient(root = window) {
     return normalizeSettings(saved);
   }
 
-  async function getApiKey(settings = null) {
-    const current = settings || await getSettings();
-    if (current.keyStorage === 'local') return String(current.apiKey || '').trim();
+  async function getApiKey() {
     return String(root.sessionStorage?.getItem?.(AI_SESSION_KEY) || '').trim();
   }
 
@@ -203,12 +286,30 @@ export function createAIClient(root = window) {
         settings,
       };
     }
-    const hasKey = Boolean(await getApiKey(settings));
-    const hasEndpoint = Boolean(settings.endpoint);
+
+    if (!settings.endpoint) return { available: false, mode: settings.mode, reason: 'missing-endpoint', settings };
+    let endpoint;
+    try {
+      endpoint = parseSecureHttpUrl(settings.endpoint, root, 'AI endpoint');
+    } catch (error) {
+      return { available: false, mode: settings.mode, reason: 'invalid-endpoint', error: error.message, settings };
+    }
+    const approved = endpoint.sameOrigin || settings.approvedEndpointOrigin === endpoint.origin;
+    if (!approved) {
+      return {
+        available: false,
+        mode: settings.mode,
+        reason: 'unapproved-endpoint',
+        endpointOrigin: endpoint.origin,
+        settings,
+      };
+    }
+    const hasKey = Boolean(await getApiKey());
     return {
-      available: hasKey && hasEndpoint,
+      available: hasKey,
       mode: settings.mode,
-      reason: hasEndpoint ? (hasKey ? 'ready' : 'missing-api-key') : 'missing-endpoint',
+      reason: hasKey ? 'ready' : 'missing-api-key',
+      endpointOrigin: endpoint.origin,
       settings,
     };
   }
@@ -222,37 +323,58 @@ export function createAIClient(root = window) {
     };
   }
 
-  async function complete({ prompt, system = '', messages = [], temperature = 0.2 } = {}) {
+  async function complete({
+    prompt,
+    system = '',
+    messages = [],
+    temperature = 0.2,
+    signal,
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  } = {}) {
     const current = await status();
     if (!current.available) return { ok: false, reason: current.reason, text: '' };
     if (current.mode === 'local-gemma') {
       if (localProvider) {
-        const result = await localProvider({ prompt, system, messages, temperature, model: current.settings.model });
+        const result = await localProvider({ prompt, system, messages, temperature, model: current.settings.model, signal });
         return { ok: true, mode: current.mode, provider: 'registered-local-runtime', text: String(result?.text ?? result ?? '').trim() };
       }
       return { ok: true, mode: current.mode, provider: 'private-local-extractive', text: localSummary(prompt || messages.map(item => item.content).join(' ')) };
     }
 
-    const key = await getApiKey(current.settings);
-    const response = await root.fetch(current.settings.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: current.settings.model,
-        temperature,
-        messages: [
-          ...(system ? [{ role: 'system', content: system }] : []),
-          ...messages,
-          ...(prompt ? [{ role: 'user', content: prompt }] : []),
-        ],
-      }),
-    });
-    if (!response?.ok) return { ok: false, reason: `http-${response?.status || 0}`, text: '' };
-    const payload = await response.json();
-    return { ok: true, mode: current.mode, provider: 'custom-api', text: extractMessage(payload) };
+    const endpoint = parseSecureHttpUrl(current.settings.endpoint, root, 'AI endpoint');
+    const key = await getApiKey();
+    const timed = createTimedSignal(root, signal, timeoutMs);
+    try {
+      const response = await root.fetch(endpoint.href, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+        },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: timed.signal,
+        body: JSON.stringify({
+          model: current.settings.model,
+          temperature,
+          messages: [
+            ...(system ? [{ role: 'system', content: system }] : []),
+            ...messages,
+            ...(prompt ? [{ role: 'user', content: prompt }] : []),
+          ],
+        }),
+      });
+      if (!response?.ok) return { ok: false, reason: `http-${response?.status || 0}`, text: '' };
+      const payload = await response.json();
+      return { ok: true, mode: current.mode, provider: 'custom-api', text: extractMessage(payload) };
+    } catch (error) {
+      if (timed.didTimeout()) return { ok: false, reason: 'request-timeout', text: '' };
+      if (signal?.aborted || error?.name === 'AbortError') return { ok: false, reason: 'request-aborted', text: '' };
+      return { ok: false, reason: 'network-error', text: '' };
+    } finally {
+      timed.cleanup();
+    }
   }
 
   async function summarizeText(text, options = {}) {
@@ -265,6 +387,8 @@ export function createAIClient(root = window) {
       system: 'Summarize the supplied learning material into concise, faithful bullets without adding facts that are not present.',
       prompt: plainText(text),
       temperature: 0.1,
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
     });
   }
 
@@ -283,12 +407,13 @@ export function createAIClient(root = window) {
     return record;
   }
 
-  async function importLocalModelFile(file) {
+  async function importLocalModelFile(file, { maxBytes = MAX_MODEL_BYTES } = {}) {
     if (!file || typeof file !== 'object') throw new TypeError('Model file is required');
+    const size = assertModelSize(file.size, maxBytes);
     const record = {
       id: ACTIVE_MODEL_ID,
-      name: String(file.name || 'local-model'),
-      size: Math.max(0, Number(file.size) || 0),
+      name: String(file.name || 'local-model').slice(0, 200),
+      size,
       type: String(file.type || 'application/octet-stream'),
       lastModified: Math.max(0, Number(file.lastModified) || 0),
       importedAt: Date.now(),
@@ -298,31 +423,65 @@ export function createAIClient(root = window) {
     return { ...record, blob: undefined };
   }
 
-  async function downloadLocalModel(url, { onProgress } = {}) {
-    const source = String(url || '').trim();
-    if (!/^https?:\/\//i.test(source)) throw new TypeError('Model download URL must be HTTP or HTTPS');
-    const response = await root.fetch(source);
-    if (!response?.ok) throw new Error(`Model download failed: ${response?.status || 0}`);
-    const total = Math.max(0, Number(response.headers?.get?.('content-length')) || 0);
-    let loaded = 0;
-    let blob;
-    if (response.body?.getReader) {
-      const reader = response.body.getReader();
-      const chunks = [];
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value?.byteLength || 0;
-        onProgress?.({ loaded, total, percent: total ? Math.round((loaded / total) * 100) : 0 });
+  async function downloadLocalModel(url, {
+    onProgress,
+    signal,
+    timeoutMs = DEFAULT_MODEL_DOWNLOAD_TIMEOUT_MS,
+    maxBytes = MAX_MODEL_BYTES,
+  } = {}) {
+    const source = parseSecureHttpUrl(url, root, 'Model download URL').href;
+    const timed = createTimedSignal(root, signal, timeoutMs);
+    try {
+      const response = await root.fetch(source, {
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: timed.signal,
+      });
+      if (!response?.ok) throw new Error(`Model download failed: ${response?.status || 0}`);
+      const total = Math.max(0, Number(response.headers?.get?.('content-length')) || 0);
+      if (total) assertModelSize(total, maxBytes);
+
+      let loaded = 0;
+      let blob;
+      if (response.body?.getReader) {
+        const reader = response.body.getReader();
+        const chunks = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          loaded += value?.byteLength || 0;
+          if (loaded > maxBytes) {
+            await reader.cancel?.('Model exceeds safety limit');
+            assertModelSize(loaded, maxBytes);
+          }
+          chunks.push(value);
+          onProgress?.({
+            loaded,
+            total,
+            percent: total ? Math.min(100, Math.round((loaded / total) * 100)) : 0,
+          });
+        }
+        blob = new Blob(chunks, { type: response.headers?.get?.('content-type') || 'application/octet-stream' });
+      } else {
+        blob = await response.blob();
+        loaded = blob.size;
+        assertModelSize(loaded, maxBytes);
+        onProgress?.({ loaded, total: total || loaded, percent: 100 });
       }
-      blob = new Blob(chunks, { type: response.headers?.get?.('content-type') || 'application/octet-stream' });
-    } else {
-      blob = await response.blob();
+
+      const file = new File([blob], safeFilename(source), {
+        type: blob.type || 'application/octet-stream',
+        lastModified: Date.now(),
+      });
+      return importLocalModelFile(file, { maxBytes });
+    } catch (error) {
+      if (timed.didTimeout()) throw new Error('Model download timed out');
+      if (signal?.aborted || error?.name === 'AbortError') throw new Error('Model download was cancelled');
+      throw error;
+    } finally {
+      timed.cleanup();
     }
-    const name = decodeURIComponent(new URL(source).pathname.split('/').filter(Boolean).pop() || 'local-model.bin').slice(0, 200);
-    const file = new File([blob], name, { type: blob.type || 'application/octet-stream', lastModified: Date.now() });
-    return importLocalModelFile(file);
   }
 
   async function getLocalModelFile() {
@@ -387,6 +546,11 @@ export function createAIClient(root = window) {
     searchEmbeddings,
     clearEmbeddings,
     gemmaModelOptions: GEMMA_MODEL_OPTIONS,
+    limits: {
+      requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+      modelDownloadTimeoutMs: DEFAULT_MODEL_DOWNLOAD_TIMEOUT_MS,
+      maxModelBytes: MAX_MODEL_BYTES,
+    },
     _localSummary: localSummary,
   };
 }
