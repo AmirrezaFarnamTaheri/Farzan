@@ -14,6 +14,7 @@
 @import './elevation.css' layer(elevation);
 @import './enhancements.css' layer(enhancements);
 @import './progress-enhancements.css' layer(enhancements);
+@import './notes-enhancements.css' layer(enhancements);
 
 @media (prefers-reduced-motion: reduce) {
   *,
