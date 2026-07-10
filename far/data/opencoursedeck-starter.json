@@ -1,0 +1,45 @@
+{
+  "getting-started": {
+    "title": "Getting Started with OpenCourseDeck",
+    "productUrl": "",
+    "sources": [
+      {
+        "label": "OpenCourseDeck Starter",
+        "entryUrl": "#/help",
+        "curriculum": "A practical introduction to the local-first learning workflow.",
+        "topics": [
+          {
+            "title": "Build your learning library",
+            "url": "starter-library",
+            "videos": [],
+            "pdfs": [],
+            "iframes": [],
+            "raw": [
+              "Browse courses, collect materials, and keep stable topic IDs so progress and notes remain connected."
+            ]
+          },
+          {
+            "title": "Capture notes and learning cues",
+            "url": "starter-notes",
+            "videos": [],
+            "pdfs": [],
+            "iframes": [],
+            "raw": [
+              "Create notes, timestamps, and review cues while studying. Everything remains stored on this device until you export it."
+            ]
+          },
+          {
+            "title": "Review progress and export backups",
+            "url": "starter-progress",
+            "videos": [],
+            "pdfs": [],
+            "iframes": [],
+            "raw": [
+              "Use the Progress workspace to review completion and export a portable backup before changing browsers, profiles, or devices."
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

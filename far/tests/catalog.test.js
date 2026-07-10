@@ -3,40 +3,40 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 describe('catalog normalization', () => {
   beforeEach(async () => {
     vi.resetModules();
+    try { delete window.DataStore; } catch {}
+    try { delete window.DB; } catch {}
     window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     globalThis.fetch = vi.fn(async (url) => {
       const requested = String(url);
-      if (requested.includes('data/catalog.json')) {
-        return new Response(JSON.stringify({ currentCatalog: 'catalog-test.json' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify({
-        courseA: {
-          title: 'Course A',
-          sources: [
-            {
-              label: 'Source One',
-              entryUrl: 'https://example.test/source-1',
-              curriculum: 'Curriculum 1',
-              topics: [{ title: 'Topic 1', url: 'topic-1', videos: ['video-1.mp4'] }],
-            },
-            {
-              label: 'Source Two',
-              entryUrl: 'https://example.test/source-2',
-              curriculum: 'Curriculum 2',
-              topics: [
-                { title: 'Topic 2', url: 'topic-2', pdfs: ['doc-2.pdf'] },
-                { title: '', error: 'HTTP 503', videos: [], pdfs: [] },
+      const body = requested.includes('data/catalog.json')
+        ? { currentCatalog: 'catalog-test.json' }
+        : {
+            courseA: {
+              title: 'Course A',
+              sources: [
+                {
+                  label: 'Source One',
+                  entryUrl: 'https://example.test/source-1',
+                  curriculum: 'Curriculum 1',
+                  topics: [{ title: 'Topic 1', url: 'topic-1', videos: ['video-1.mp4'] }],
+                },
+                {
+                  label: 'Source Two',
+                  entryUrl: 'https://example.test/source-2',
+                  curriculum: 'Curriculum 2',
+                  topics: [
+                    { title: 'Topic 2', url: 'topic-2', pdfs: ['doc-2.pdf'] },
+                    { title: '', error: 'HTTP 503', videos: [], pdfs: [] },
+                  ],
+                },
               ],
             },
-          ],
-        },
-      }), {
+          };
+      return {
+        ok: true,
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+        json: async () => body,
+      };
     });
     await import('../bridge.js');
   });

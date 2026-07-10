@@ -1,8 +1,7 @@
 /**
- * Workbox configuration for deployable production output in `dist/`.
- * This intentionally differs from the root-level development configuration:
- * the generated service worker and every precached URL live under the same
- * deployment root, so static hosts such as Vercel can serve the app offline.
+ * Workbox configuration for portable production output in `dist/`.
+ * The generated service worker and all precached assets share the same
+ * deployment root so the release can be served by any static host.
  */
 const pkg = require('../package.json');
 
@@ -14,6 +13,7 @@ module.exports = {
     'boot.js',
     'manifest.json',
     'style.css',
+    'src/styles/**',
     'opencoursedeck.js',
     'opencoursedeck.js.map',
     'chunks/**',
@@ -26,15 +26,15 @@ module.exports = {
   maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
   clientsClaim: true,
   skipWaiting: true,
-  navigateFallback: '/index.html',
+  navigateFallback: './index.html',
   cleanupOutdatedCaches: true,
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
   runtimeCaching: [
     {
-      urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
+      urlPattern: ({ url }) => url.pathname.includes('/data/'),
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'plasma-data',
+        cacheName: 'opencoursedeck-data',
         networkTimeoutSeconds: 3,
         expiration: {
           maxEntries: 50,
@@ -43,10 +43,10 @@ module.exports = {
       },
     },
     {
-      urlPattern: ({ url }) => url.pathname.startsWith('/vendor/'),
+      urlPattern: ({ url }) => url.pathname.includes('/vendor/'),
       handler: 'CacheFirst',
       options: {
-        cacheName: 'plasma-vendor',
+        cacheName: 'opencoursedeck-vendor',
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -55,10 +55,10 @@ module.exports = {
     },
     {
       urlPattern: ({ url }) =>
-        url.pathname === '/opencoursedeck.js' || url.pathname.startsWith('/chunks/'),
+        url.pathname.endsWith('/opencoursedeck.js') || url.pathname.includes('/chunks/'),
       handler: 'StaleWhileRevalidate',
       options: {
-        cacheName: 'plasma-app-bundle',
+        cacheName: 'opencoursedeck-app-bundle',
         expiration: {
           maxEntries: 50,
           maxAgeSeconds: 24 * 60 * 60,

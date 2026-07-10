@@ -63,7 +63,6 @@ function cacheControlForPath(relPath) {
   const ext = path.extname(relPath).toLowerCase();
   if (ext === '.html') return 'no-store';
   if (ext === '.js' || ext === '.css' || ext === '.map') return 'no-store';
-  // Fonts/media can be cached a bit even in dev.
   if (ext === '.woff' || ext === '.woff2' || ext === '.ttf') return 'public, max-age=3600';
   if (ext === '.mp4' || ext === '.webm' || ext === '.mp3' || ext === '.ogg' || ext === '.wav' || ext === '.pdf') {
     return 'public, max-age=3600';
@@ -71,9 +70,18 @@ function cacheControlForPath(relPath) {
   return 'no-store';
 }
 
-/** Reduce MIME sniffing risk on static responses */
 function withNoSniff(headers) {
   return { ...headers, 'X-Content-Type-Options': 'nosniff' };
+}
+
+function extractCsp(filePath) {
+  try {
+    const html = fs.readFileSync(filePath, 'utf8');
+    const value = html.match(/Content-Security-Policy"[\s\S]*?content="([^"]+)"/)?.[1];
+    return value ? value.replace(/\s+/g, ' ').trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function streamFile(req, res, filePath, type, relPath) {
@@ -87,7 +95,6 @@ function streamFile(req, res, filePath, type, relPath) {
     ...(cspHeader ? { 'Content-Security-Policy': cspHeader } : {}),
   };
 
-  // HEAD: just metadata
   if (req.method === 'HEAD') {
     res.writeHead(200, withNoSniff({
       ...baseHeaders,
@@ -139,15 +146,6 @@ function streamFile(req, res, filePath, type, relPath) {
   return 200;
 }
 
-function extractCsp(filePath) {
-  try {
-    const html = fs.readFileSync(filePath, 'utf8');
-    return html.match(/Content-Security-Policy"[\s\S]*?content="([^"]+)"/)?.[1] || null;
-  } catch {
-    return null;
-  }
-}
-
 function createServer(options = {}) {
   const serverRoot = options.root ? path.resolve(options.root) : root;
   const debugLogPath = options.debugLogPath
@@ -155,80 +153,79 @@ function createServer(options = {}) {
     : path.join(serverRoot, 'debug.log');
 
   return http.createServer((req, res) => {
-  const u = new URL(req.url, `http://${req.headers.host}`);
-  const started = Date.now();
-  const finish = (status) => {
-    try {
-      const ms = Date.now() - started;
-      console.log(`[opencoursedeck] ${req.method} ${u.pathname} -> ${status} (${ms}ms)`);
-    } catch {
-      // ignore
-    }
-  };
+    const u = new URL(req.url, `http://${req.headers.host}`);
+    const started = Date.now();
+    const finish = (status) => {
+      try {
+        const ms = Date.now() - started;
+        console.log(`[opencoursedeck] ${req.method} ${u.pathname} -> ${status} (${ms}ms)`);
+      } catch {
+        // Logging is best effort.
+      }
+    };
 
-  if (u.pathname === '/__debug') {
-    if (req.method !== 'POST') {
+    if (u.pathname === '/__debug') {
+      if (req.method !== 'POST') {
+        finish(405);
+        return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+      }
+      if (!isDebugEnabled(u)) {
+        finish(204);
+        return send(res, 204, { 'Content-Type': 'text/plain' }, '');
+      }
+      let raw = '';
+      let tooLarge = false;
+      req.on('data', (chunk) => {
+        raw += chunk;
+        if (raw.length > 256 * 1024) {
+          tooLarge = true;
+          try { req.destroy(); } catch {}
+        }
+      });
+      req.on('end', () => {
+        if (tooLarge) {
+          finish(413);
+          return send(res, 413, { 'Content-Type': 'text/plain' }, 'Payload Too Large');
+        }
+        try {
+          const line = raw.includes('\n') ? raw.trim().split('\n').filter(Boolean)[0] : raw.trim();
+          if (line) fs.appendFileSync(debugLogPath, line + '\n', 'utf8');
+        } catch {
+          // Debug logging must not affect the app response.
+        }
+        finish(204);
+        send(res, 204, { 'Content-Type': 'text/plain' }, '');
+      });
+      return;
+    }
+
+    const rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.replace(/^\//, ''));
+    const filePath = safeJoin(serverRoot, rel);
+    if (!filePath) {
+      finish(403);
+      return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
+    }
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
       finish(405);
       return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
     }
-    if (!isDebugEnabled(u)) {
-      finish(204);
-      return send(res, 204, { 'Content-Type': 'text/plain' }, '');
+
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      finish(404);
+      return send(res, 404, { 'Content-Type': 'text/plain' }, 'Not found');
     }
-    let raw = '';
-    let tooLarge = false;
-    req.on('data', (c) => {
-      raw += c;
-      if (raw.length > 256 * 1024) {
-        tooLarge = true;
-        try { req.destroy(); } catch { /* ignore */ }
-      }
-    });
-    req.on('end', () => {
-      if (tooLarge) {
-        finish(413);
-        return send(res, 413, { 'Content-Type': 'text/plain' }, 'Payload Too Large');
-      }
-      try {
-        // Expect NDJSON or JSON; normalize to one-line NDJSON.
-        const line = raw.includes('\n') ? raw.trim().split('\n').filter(Boolean)[0] : raw.trim();
-        if (line) fs.appendFileSync(debugLogPath, line + '\n', 'utf8');
-      } catch {
-        // ignore
-      }
-      finish(204);
-      send(res, 204, { 'Content-Type': 'text/plain' }, '');
-    });
-    return;
-  }
 
-  // Static
-  const rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.replace(/^\//, ''));
-  const filePath = safeJoin(serverRoot, rel);
-  if (!filePath) {
-    finish(403);
-    return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
-  }
-
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    finish(405);
-    return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
-  }
-
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    finish(404);
-    return send(res, 404, { 'Content-Type': 'text/plain' }, 'Not found');
-  }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const type = mime[ext] || 'application/octet-stream';
-  try {
-    const status = streamFile(req, res, filePath, type, rel);
-    finish(status);
-  } catch {
-    finish(500);
-    send(res, 500, { 'Content-Type': 'text/plain' }, 'Server error');
-  }
+    const ext = path.extname(filePath).toLowerCase();
+    const type = mime[ext] || 'application/octet-stream';
+    try {
+      const status = streamFile(req, res, filePath, type, rel);
+      finish(status);
+    } catch (error) {
+      console.error(`[opencoursedeck] Failed to serve ${u.pathname}:`, error?.message || error);
+      finish(500);
+      send(res, 500, { 'Content-Type': 'text/plain' }, 'Server error');
+    }
   });
 }
 
@@ -251,5 +248,5 @@ module.exports = {
   startServer,
   safeJoin,
   cacheControlForPath,
+  extractCsp,
 };
-

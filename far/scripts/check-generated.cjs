@@ -22,7 +22,7 @@ function buildOptionsFor(outputDir) {
     pure: ['console.warn', 'console.error'],
     assetNames: 'assets/[name]-[hash]',
     chunkNames: 'chunks/[name]-[hash]',
-    entryNames: 'plasma',
+    entryNames: 'opencoursedeck',
     logLevel: 'silent',
   };
 }
@@ -40,21 +40,6 @@ function walkFiles(dir, base = dir, files = []) {
   return files.sort();
 }
 
-function canonicalPath(file) {
-  return file.replace(/-[A-Z0-9]{8}(?=\.(?:js|css)(?:\.map)?$|\.map$)/g, '-HASH');
-}
-
-function fileMap(dir) {
-  const map = new Map();
-  const duplicates = [];
-  for (const file of walkFiles(dir)) {
-    const canonical = canonicalPath(file);
-    if (map.has(canonical)) duplicates.push(canonical);
-    map.set(canonical, file);
-  }
-  return { map, duplicates: [...new Set(duplicates)].sort() };
-}
-
 function isGeneratedBundleFile(file) {
   return file === 'opencoursedeck.js'
     || file === 'opencoursedeck.js.map'
@@ -62,9 +47,9 @@ function isGeneratedBundleFile(file) {
 }
 
 function normalizeGeneratedText(text) {
-  return text
-    .replace(/-[A-Z0-9]{8}(?=\.(?:js|css)(?:\.map)?\b|\.map\b)/g, '-HASH')
-    .replace(/sourceMappingURL=.*$/gm, 'sourceMappingURL=HASH.map');
+  return String(text)
+    .replace(/-[a-z0-9]{8}(?=\.js(?:\.map)?\b)/gi, '-HASH')
+    .replace(/sourceMappingURL=[^\s]+/g, 'sourceMappingURL=HASH.map');
 }
 
 function hashGeneratedFile(file) {
@@ -72,33 +57,90 @@ function hashGeneratedFile(file) {
   return crypto.createHash('sha256').update(normalizeGeneratedText(content)).digest('hex');
 }
 
-function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
-  const expected = fileMap(expectedDir);
-  const actual = fileMap(actualDir);
-  if (typeof filter === 'function') {
-    for (const key of [...expected.map.keys()]) {
-      if (!filter(key)) expected.map.delete(key);
-    }
-    for (const key of [...actual.map.keys()]) {
-      if (!filter(key)) actual.map.delete(key);
-    }
-    actual.duplicates = actual.duplicates.filter(filter);
-  }
-  const expectedFiles = new Set(expected.map.keys());
-  const actualFiles = new Set(actual.map.keys());
-  const missing = [...expectedFiles].filter(file => !actualFiles.has(file));
-  const extra = [...actualFiles].filter(file => !expectedFiles.has(file));
-  const duplicate = actual.duplicates;
-  const changed = [...expectedFiles]
-    .filter(file => actualFiles.has(file))
-    .filter(file => !file.endsWith('.map'))
-    .filter(file => hashGeneratedFile(path.join(expectedDir, expected.map.get(file))) !== hashGeneratedFile(path.join(actualDir, actual.map.get(file))));
+function inventory(dir, { filter = null } = {}) {
+  const files = walkFiles(dir).filter(file => typeof filter !== 'function' || filter(file));
+  const jsFiles = files.filter(file => file.endsWith('.js') && !file.endsWith('.js.map'));
+  const mapFiles = new Set(files.filter(file => file.endsWith('.js.map')));
+  const chunks = jsFiles
+    .filter(file => file !== 'opencoursedeck.js')
+    .map(file => ({ file, hash: hashGeneratedFile(path.join(dir, file)) }));
+
   return {
-    clean: missing.length === 0 && extra.length === 0 && duplicate.length === 0 && changed.length === 0,
-    missing,
-    extra,
-    duplicate,
+    files,
+    entry: jsFiles.includes('opencoursedeck.js')
+      ? { file: 'opencoursedeck.js', hash: hashGeneratedFile(path.join(dir, 'opencoursedeck.js')) }
+      : null,
+    chunks,
+    missingMaps: jsFiles.filter(file => !mapFiles.has(`${file}.map`)),
+    orphanMaps: [...mapFiles].filter(file => !jsFiles.includes(file.slice(0, -4))),
+  };
+}
+
+function matchByContent(expectedRecords, actualRecords) {
+  const actualByHash = new Map();
+  for (const record of actualRecords) {
+    const list = actualByHash.get(record.hash) || [];
+    list.push(record);
+    actualByHash.set(record.hash, list);
+  }
+
+  const missing = [];
+  for (const record of expectedRecords) {
+    const matches = actualByHash.get(record.hash);
+    if (matches?.length) {
+      matches.shift();
+      continue;
+    }
+    missing.push(record.file);
+  }
+
+  const extra = [];
+  for (const records of actualByHash.values()) {
+    for (const record of records) extra.push(record.file);
+  }
+  return { missing, extra };
+}
+
+function coalesceChangedFiles(missing, extra) {
+  const extraSet = new Set(extra);
+  const changed = missing.filter(file => extraSet.has(file));
+  if (!changed.length) return { missing, extra, changed };
+  const changedSet = new Set(changed);
+  return {
+    missing: missing.filter(file => !changedSet.has(file)),
+    extra: extra.filter(file => !changedSet.has(file)),
     changed,
+  };
+}
+
+function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
+  const expected = inventory(expectedDir, { filter });
+  const actual = inventory(actualDir, { filter });
+  const missing = [];
+  const extra = [];
+  const changed = [];
+
+  if (expected.entry && !actual.entry) {
+    missing.push(expected.entry.file);
+  } else if (!expected.entry && actual.entry) {
+    extra.push(actual.entry.file);
+  } else if (expected.entry && actual.entry && expected.entry.hash !== actual.entry.hash) {
+    changed.push(expected.entry.file);
+  }
+
+  const chunks = matchByContent(expected.chunks, actual.chunks);
+  missing.push(...chunks.missing, ...actual.missingMaps.map(file => `${file}.map`));
+  extra.push(...chunks.extra, ...actual.orphanMaps);
+
+  const coalesced = coalesceChangedFiles(missing, extra);
+  changed.push(...coalesced.changed);
+
+  return {
+    clean: coalesced.missing.length === 0 && coalesced.extra.length === 0 && changed.length === 0,
+    missing: [...new Set(coalesced.missing)].sort(),
+    extra: [...new Set(coalesced.extra)].sort(),
+    duplicate: [],
+    changed: [...new Set(changed)].sort(),
   };
 }
 
@@ -126,7 +168,6 @@ async function main() {
   console.error('[check-generated] dist/ is stale. Run npm run build.');
   if (result.missing.length) console.error(`  Missing: ${result.missing.join(', ')}`);
   if (result.extra.length) console.error(`  Extra: ${result.extra.join(', ')}`);
-  if (result.duplicate.length) console.error(`  Duplicate: ${result.duplicate.join(', ')}`);
   if (result.changed.length) console.error(`  Changed: ${result.changed.join(', ')}`);
   process.exit(1);
 }
@@ -143,4 +184,5 @@ module.exports = {
   checkGenerated,
   compareDirs,
   isGeneratedBundleFile,
+  normalizeGeneratedText,
 };

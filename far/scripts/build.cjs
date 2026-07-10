@@ -26,21 +26,26 @@ const options = {
   logLevel: 'info',
 };
 
-async function main() {
-  if (isWatch) {
-    const ctx = await esbuild.context(options);
-    await ctx.watch();
-    console.log('[build] watching...');
-    return;
-  }
+function resetOutputDirectory() {
+  fs.rmSync(outdir, { recursive: true, force: true });
+  fs.mkdirSync(outdir, { recursive: true });
+}
 
-  await esbuild.build(options);
+function copyDirectory(from, to) {
+  if (!fs.existsSync(from)) return;
+  fs.cpSync(from, to, { recursive: true, force: true });
+}
+
+function stageStaticAssets() {
   const staticDirs = ['assets', 'data', 'docs', 'vendor'];
   for (const dir of staticDirs) {
-    const from = path.join(root, dir);
-    const to = path.join(outdir, dir);
-    if (fs.existsSync(from)) fs.cpSync(from, to, { recursive: true, force: true });
+    copyDirectory(path.join(root, dir), path.join(outdir, dir));
   }
+
+  // style.css imports the modular stylesheet tree at ./src/styles/index.css.
+  // Stage that tree so the release is actually self-contained.
+  copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
+
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
     const from = path.join(root, file);
     const to = path.join(outdir, file);
@@ -53,8 +58,33 @@ async function main() {
     }
     fs.writeFileSync(to, content, 'utf8');
   }
+}
+
+async function main() {
+  resetOutputDirectory();
+
+  if (isWatch) {
+    const ctx = await esbuild.context(options);
+    await ctx.watch();
+    console.log('[build] watching...');
+    return;
+  }
+
+  await esbuild.build(options);
+  stageStaticAssets();
+
   if (!fs.existsSync(path.join(outdir, 'index.html'))) {
     throw new Error('Production build did not stage dist/index.html');
+  }
+
+  const requiredReleaseFiles = [
+    'opencoursedeck.js',
+    'style.css',
+    path.join('src', 'styles', 'index.css'),
+  ];
+  const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
+  if (missing.length) {
+    throw new Error(`Production build is missing required release files: ${missing.join(', ')}`);
   }
   console.log('[build] done');
 }
@@ -63,4 +93,3 @@ main().catch((err) => {
   console.error('[build] failed', err);
   process.exit(1);
 });
-
