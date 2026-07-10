@@ -114,7 +114,19 @@ describe('AI client', () => {
     await expect(client.getLocalModelFile()).resolves.toBeUndefined();
   });
 
-  it('downloads a remote model file into the local model cache', async () => {
+  it('rejects model files beyond the configured safety limit', async () => {
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
+      indexedDB,
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+    const file = new File(['too-large'], 'oversized.task', { type: 'application/octet-stream' });
+
+    await expect(client.importLocalModelFile(file, { maxBytes: 4 })).rejects.toThrow('safety limit');
+  });
+
+  it('downloads a remote model file into the local model cache with private request options', async () => {
     const bytes = new TextEncoder().encode('remote-model!');
     let delivered = false;
     const root = {
@@ -150,9 +162,31 @@ describe('AI client', () => {
 
     const downloaded = await client.downloadLocalModel('https://models.example.test/gemma.task', { onProgress: progress });
     expect(downloaded).toMatchObject({ name: 'gemma.task', size: 13, type: 'application/octet-stream' });
-    expect(root.fetch).toHaveBeenCalledWith('https://models.example.test/gemma.task');
+    expect(root.fetch).toHaveBeenCalledWith('https://models.example.test/gemma.task', expect.objectContaining({
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      signal: expect.anything(),
+    }));
     expect(progress).toHaveBeenCalledWith({ loaded: 13, total: 13, percent: 100 });
     await expect(client.getLocalModelFile()).resolves.toMatchObject({ name: 'gemma.task', size: 13 });
+  });
+
+  it('rejects insecure remote model URLs and oversized downloads', async () => {
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
+      indexedDB,
+      sessionStorage,
+      fetch: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: name => String(name).toLowerCase() === 'content-length' ? '100' : null },
+      })),
+    };
+    const client = createAIClient(root);
+
+    await expect(client.downloadLocalModel('http://models.example.test/model.bin')).rejects.toThrow('HTTPS');
+    await expect(client.downloadLocalModel('https://models.example.test/model.bin', { maxBytes: 10 })).rejects.toThrow('safety limit');
   });
 
   it('indexes and searches lightweight local embeddings', async () => {
@@ -202,7 +236,33 @@ describe('AI client', () => {
     expect(localProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('calls an own OpenAI-compatible API endpoint with a session key', async () => {
+  it('requires explicit approval before sending a session key to a custom endpoint', async () => {
+    sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({
+        mode: 'custom-api',
+        model: 'user-model',
+        endpoint: 'https://ai.example.test/v1/chat/completions',
+        hasKey: true,
+      })) },
+      fetch: vi.fn(),
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+
+    await expect(client.status()).resolves.toMatchObject({
+      available: false,
+      reason: 'unapproved-endpoint',
+      endpointOrigin: 'https://ai.example.test',
+    });
+    await expect(client.complete({ prompt: 'Do not send this.' })).resolves.toMatchObject({
+      ok: false,
+      reason: 'unapproved-endpoint',
+    });
+    expect(root.fetch).not.toHaveBeenCalled();
+  });
+
+  it('calls an approved OpenAI-compatible API endpoint with a session-only key', async () => {
     sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
     const fetch = vi.fn(async () => ({
       ok: true,
@@ -213,7 +273,9 @@ describe('AI client', () => {
         mode: 'custom-api',
         model: 'user-model',
         endpoint: 'https://ai.example.test/v1/chat/completions',
-        keyStorage: 'session',
+        approvedEndpointOrigin: 'https://ai.example.test',
+        keyStorage: 'local',
+        apiKey: 'persisted-key-must-be-ignored',
         hasKey: true,
       })) },
       fetch,
@@ -226,12 +288,44 @@ describe('AI client', () => {
     expect(result).toEqual({ ok: true, mode: 'custom-api', provider: 'custom-api', text: 'Remote summary' });
     expect(fetch).toHaveBeenCalledWith('https://ai.example.test/v1/chat/completions', expect.objectContaining({
       method: 'POST',
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
       headers: expect.objectContaining({ Authorization: 'Bearer sk-session' }),
     }));
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
       model: 'user-model',
       messages: [{ role: 'user', content: 'Summarize this note.' }],
     });
+    await expect(client.getSettings()).resolves.toMatchObject({ keyStorage: 'session' });
+    await expect(client.getApiKey()).resolves.toBe('sk-session');
+  });
+
+  it('rejects insecure or credential-bearing custom endpoints', async () => {
+    sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
+    const root = {
+      DB: { getSetting: vi.fn() },
+      fetch: vi.fn(),
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+
+    root.DB.getSetting.mockResolvedValueOnce({
+      mode: 'custom-api',
+      endpoint: 'http://ai.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'http://ai.example.test',
+      hasKey: true,
+    });
+    await expect(client.status()).resolves.toMatchObject({ available: false, reason: 'invalid-endpoint' });
+
+    root.DB.getSetting.mockResolvedValueOnce({
+      mode: 'custom-api',
+      endpoint: 'https://user:secret@ai.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://ai.example.test',
+      hasKey: true,
+    });
+    await expect(client.status()).resolves.toMatchObject({ available: false, reason: 'invalid-endpoint' });
+    expect(root.fetch).not.toHaveBeenCalled();
   });
 
   it('installs the client on OpenCourseDeck once', () => {
