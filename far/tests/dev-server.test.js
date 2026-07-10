@@ -40,7 +40,10 @@ describe('dev server range handling', () => {
     fs.writeFileSync(path.join(root, 'sample.txt'), '0123456789', 'utf8');
     fs.writeFileSync(
       path.join(root, 'index.html'),
-      `<meta http-equiv="Content-Security-Policy" content="script-src 'self'; media-src 'self' http: https:;"><main>ok</main>`,
+      `<meta http-equiv="Content-Security-Policy"
+        content="script-src 'self';
+                 media-src 'self' http: https:;">
+       <main>ok</main>`,
       'utf8',
     );
     server = createServer({ root });
@@ -92,7 +95,7 @@ describe('dev server range handling', () => {
     expect(res.headers.get('content-range')).toBe('bytes */10');
   });
 
-  it('serves the app CSP as an HTTP header for HTML responses', async () => {
+  it('normalizes multiline app CSP before sending it as an HTTP header', async () => {
     const res = await request(`${baseUrl}/`);
 
     expect(res.status).toBe(200);
