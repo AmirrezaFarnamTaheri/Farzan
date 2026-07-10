@@ -33,11 +33,10 @@ export function throttle(fn, limit = 100) {
   };
 }
 
-// Some click targets can be Text nodes; normalize to an Element for closest().
 export function eventTargetEl(e) {
   const t = e?.target;
   if (!t) return null;
-  if (t.nodeType === 1) return t; // Element
+  if (t.nodeType === 1) return t;
   return t.parentElement ?? null;
 }
 
@@ -70,16 +69,19 @@ export function restoreFocus(target, fallback = document.getElementById('main-co
   }
 }
 
-let appInertDepth = 0;
+const appInertDepths = new WeakMap();
 
 export function setAppInert(active, root = document.getElementById('plasma-app')) {
   if (!root) return;
-  appInertDepth = Math.max(0, appInertDepth + (active ? 1 : -1));
-  const shouldInert = appInertDepth > 0;
+  const currentDepth = appInertDepths.get(root) || 0;
+  const nextDepth = Math.max(0, currentDepth + (active ? 1 : -1));
+  if (nextDepth > 0) appInertDepths.set(root, nextDepth);
+  else appInertDepths.delete(root);
+  const shouldInert = nextDepth > 0;
 
   root.toggleAttribute('inert', shouldInert);
-  root.setAttribute('aria-hidden', shouldInert ? 'true' : 'false');
-  if (!shouldInert) root.removeAttribute('aria-hidden');
+  if (shouldInert) root.setAttribute('aria-hidden', 'true');
+  else root.removeAttribute('aria-hidden');
 
   try {
     root.inert = shouldInert;
@@ -88,12 +90,6 @@ export function setAppInert(active, root = document.getElementById('plasma-app')
   }
 }
 
-/**
- * Trap focus inside a container (for modals, drawers, palette).
- * Returns a cleanup function.
- * @param {HTMLElement} container
- * @param {{ initialFocus?: boolean }} options
- */
 export function trapFocus(container, { initialFocus = true } = {}) {
   function onKeyDown(e) {
     if (e.key !== 'Tab') return;
@@ -111,11 +107,9 @@ export function trapFocus(container, { initialFocus = true } = {}) {
         e.preventDefault();
         last.focus();
       }
-    } else {
-      if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
     }
   }
 
@@ -170,4 +164,3 @@ export const esc = s => {
   return String(s).replace(/[&<>"']/g, m =>
     ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 };
-
