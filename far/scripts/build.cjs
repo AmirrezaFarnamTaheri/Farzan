@@ -73,8 +73,11 @@ async function main() {
   await esbuild.build(options);
   stageStaticAssets();
 
+  if (!fs.existsSync(path.join(outdir, 'index.html'))) {
+    throw new Error('Production build did not stage dist/index.html');
+  }
+
   const requiredReleaseFiles = [
-    'index.html',
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
