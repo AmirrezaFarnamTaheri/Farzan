@@ -40,48 +40,109 @@ function walkFiles(dir, base = dir, files = []) {
   return files.sort();
 }
 
-function fileMap(dir) {
-  return new Map(walkFiles(dir).map(file => [file, file]));
-}
-
 function isGeneratedBundleFile(file) {
   return file === 'opencoursedeck.js'
     || file === 'opencoursedeck.js.map'
     || file.startsWith('chunks/');
 }
 
+function normalizeGeneratedText(text) {
+  return String(text)
+    .replace(/chunk-[a-z0-9]{8}/gi, 'chunk-HASH')
+    .replace(/sourceMappingURL=[^\s]+/g, 'sourceMappingURL=HASH.map');
+}
+
 function hashGeneratedFile(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  const content = fs.readFileSync(file, 'utf8');
+  return crypto.createHash('sha256').update(normalizeGeneratedText(content)).digest('hex');
+}
+
+function inventory(dir, { filter = null } = {}) {
+  const files = walkFiles(dir).filter(file => typeof filter !== 'function' || filter(file));
+  const jsFiles = files.filter(file => file.endsWith('.js') && !file.endsWith('.js.map'));
+  const mapFiles = new Set(files.filter(file => file.endsWith('.js.map')));
+  const chunks = jsFiles
+    .filter(file => file.startsWith('chunks/'))
+    .map(file => ({ file, hash: hashGeneratedFile(path.join(dir, file)) }));
+
+  return {
+    files,
+    entry: jsFiles.includes('opencoursedeck.js')
+      ? { file: 'opencoursedeck.js', hash: hashGeneratedFile(path.join(dir, 'opencoursedeck.js')) }
+      : null,
+    chunks,
+    missingMaps: jsFiles.filter(file => !mapFiles.has(`${file}.map`)),
+    orphanMaps: [...mapFiles].filter(file => !jsFiles.includes(file.slice(0, -4))),
+  };
+}
+
+function matchByContent(expectedRecords, actualRecords) {
+  const actualByHash = new Map();
+  for (const record of actualRecords) {
+    const list = actualByHash.get(record.hash) || [];
+    list.push(record);
+    actualByHash.set(record.hash, list);
+  }
+
+  const missing = [];
+  for (const record of expectedRecords) {
+    const matches = actualByHash.get(record.hash);
+    if (matches?.length) {
+      matches.shift();
+      continue;
+    }
+    missing.push(record.file);
+  }
+
+  const extra = [];
+  for (const records of actualByHash.values()) {
+    for (const record of records) extra.push(record.file);
+  }
+  return { missing, extra };
+}
+
+function coalesceChangedFiles(missing, extra) {
+  const extraSet = new Set(extra);
+  const changed = missing.filter(file => extraSet.has(file));
+  if (!changed.length) return { missing, extra, changed };
+  const changedSet = new Set(changed);
+  return {
+    missing: missing.filter(file => !changedSet.has(file)),
+    extra: extra.filter(file => !changedSet.has(file)),
+    changed,
+  };
 }
 
 function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
-  const expected = fileMap(expectedDir);
-  const actual = fileMap(actualDir);
-  if (typeof filter === 'function') {
-    for (const key of [...expected.keys()]) {
-      if (!filter(key)) expected.delete(key);
-    }
-    for (const key of [...actual.keys()]) {
-      if (!filter(key)) actual.delete(key);
-    }
+  const expected = inventory(expectedDir, { filter });
+  const actual = inventory(actualDir, { filter });
+  const missing = [];
+  const extra = [];
+  const changed = [];
+
+  if (expected.entry && !actual.entry) {
+    missing.push(expected.entry.file);
+  } else if (!expected.entry && actual.entry) {
+    extra.push(actual.entry.file);
+  } else if (expected.entry && actual.entry && expected.entry.hash !== actual.entry.hash) {
+    changed.push(expected.entry.file);
   }
 
-  const expectedFiles = new Set(expected.keys());
-  const actualFiles = new Set(actual.keys());
-  const missing = [...expectedFiles].filter(file => !actualFiles.has(file));
-  const extra = [...actualFiles].filter(file => !expectedFiles.has(file));
-  const changed = [...expectedFiles]
-    .filter(file => actualFiles.has(file))
-    .filter(file => !file.endsWith('.map'))
-    .filter(file => hashGeneratedFile(path.join(expectedDir, file)) !== hashGeneratedFile(path.join(actualDir, file)));
+  const chunks = matchByContent(expected.chunks, actual.chunks);
+  missing.push(...chunks.missing, ...actual.missingMaps.map(file => `${file}.map`));
+  extra.push(...chunks.extra, ...actual.orphanMaps);
 
-  return {
-    clean: missing.length === 0 && extra.length === 0 && changed.length === 0,
-    missing,
-    extra,
+  const coalesced = coalesceChangedFiles(missing, extra);
+  changed.push(...coalesced.changed);
+
+  const result = {
+    clean: coalesced.missing.length === 0 && coalesced.extra.length === 0 && changed.length === 0,
+    missing: [...new Set(coalesced.missing)].sort(),
+    extra: [...new Set(coalesced.extra)].sort(),
     duplicate: [],
-    changed,
+    changed: [...new Set(changed)].sort(),
   };
+  return result;
 }
 
 async function checkGenerated({ actualOutdir = outdir } = {}) {
@@ -124,4 +185,5 @@ module.exports = {
   checkGenerated,
   compareDirs,
   isGeneratedBundleFile,
+  normalizeGeneratedText,
 };
