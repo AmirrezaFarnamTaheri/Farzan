@@ -48,7 +48,7 @@ function isGeneratedBundleFile(file) {
 
 function normalizeGeneratedText(text) {
   return String(text)
-    .replace(/chunk-[a-z0-9]{8}/gi, 'chunk-HASH')
+    .replace(/-[a-z0-9]{8}(?=\.js(?:\.map)?\b)/gi, '-HASH')
     .replace(/sourceMappingURL=[^\s]+/g, 'sourceMappingURL=HASH.map');
 }
 
@@ -135,14 +135,13 @@ function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
   const coalesced = coalesceChangedFiles(missing, extra);
   changed.push(...coalesced.changed);
 
-  const result = {
+  return {
     clean: coalesced.missing.length === 0 && coalesced.extra.length === 0 && changed.length === 0,
     missing: [...new Set(coalesced.missing)].sort(),
     extra: [...new Set(coalesced.extra)].sort(),
     duplicate: [],
     changed: [...new Set(changed)].sort(),
   };
-  return result;
 }
 
 async function checkGenerated({ actualOutdir = outdir } = {}) {
