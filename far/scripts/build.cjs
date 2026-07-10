@@ -26,21 +26,19 @@ const options = {
   logLevel: 'info',
 };
 
-async function main() {
-  if (isWatch) {
-    const ctx = await esbuild.context(options);
-    await ctx.watch();
-    console.log('[build] watching...');
-    return;
-  }
+function resetOutputDirectory() {
+  fs.rmSync(outdir, { recursive: true, force: true });
+  fs.mkdirSync(outdir, { recursive: true });
+}
 
-  await esbuild.build(options);
+function stageStaticAssets() {
   const staticDirs = ['assets', 'data', 'docs', 'vendor'];
   for (const dir of staticDirs) {
     const from = path.join(root, dir);
     const to = path.join(outdir, dir);
     if (fs.existsSync(from)) fs.cpSync(from, to, { recursive: true, force: true });
   }
+
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
     const from = path.join(root, file);
     const to = path.join(outdir, file);
@@ -53,6 +51,21 @@ async function main() {
     }
     fs.writeFileSync(to, content, 'utf8');
   }
+}
+
+async function main() {
+  resetOutputDirectory();
+
+  if (isWatch) {
+    const ctx = await esbuild.context(options);
+    await ctx.watch();
+    console.log('[build] watching...');
+    return;
+  }
+
+  await esbuild.build(options);
+  stageStaticAssets();
+
   if (!fs.existsSync(path.join(outdir, 'index.html'))) {
     throw new Error('Production build did not stage dist/index.html');
   }
@@ -63,4 +76,3 @@ main().catch((err) => {
   console.error('[build] failed', err);
   process.exit(1);
 });
-
