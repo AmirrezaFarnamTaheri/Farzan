@@ -40,19 +40,8 @@ function walkFiles(dir, base = dir, files = []) {
   return files.sort();
 }
 
-function canonicalPath(file) {
-  return file.replace(/-[A-Z0-9]{8}(?=\.(?:js|css)(?:\.map)?$|\.map$)/g, '-HASH');
-}
-
 function fileMap(dir) {
-  const map = new Map();
-  const duplicates = [];
-  for (const file of walkFiles(dir)) {
-    const canonical = canonicalPath(file);
-    if (map.has(canonical)) duplicates.push(canonical);
-    map.set(canonical, file);
-  }
-  return { map, duplicates: [...new Set(duplicates)].sort() };
+  return new Map(walkFiles(dir).map(file => [file, file]));
 }
 
 function isGeneratedBundleFile(file) {
@@ -61,43 +50,35 @@ function isGeneratedBundleFile(file) {
     || file.startsWith('chunks/');
 }
 
-function normalizeGeneratedText(text) {
-  return text
-    .replace(/-[A-Z0-9]{8}(?=\.(?:js|css)(?:\.map)?\b|\.map\b)/g, '-HASH')
-    .replace(/sourceMappingURL=.*$/gm, 'sourceMappingURL=HASH.map');
-}
-
 function hashGeneratedFile(file) {
-  const content = fs.readFileSync(file, 'utf8');
-  return crypto.createHash('sha256').update(normalizeGeneratedText(content)).digest('hex');
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
   const expected = fileMap(expectedDir);
   const actual = fileMap(actualDir);
   if (typeof filter === 'function') {
-    for (const key of [...expected.map.keys()]) {
-      if (!filter(key)) expected.map.delete(key);
+    for (const key of [...expected.keys()]) {
+      if (!filter(key)) expected.delete(key);
     }
-    for (const key of [...actual.map.keys()]) {
-      if (!filter(key)) actual.map.delete(key);
+    for (const key of [...actual.keys()]) {
+      if (!filter(key)) actual.delete(key);
     }
-    actual.duplicates = actual.duplicates.filter(filter);
   }
-  const expectedFiles = new Set(expected.map.keys());
-  const actualFiles = new Set(actual.map.keys());
+
+  const expectedFiles = new Set(expected.keys());
+  const actualFiles = new Set(actual.keys());
   const missing = [...expectedFiles].filter(file => !actualFiles.has(file));
   const extra = [...actualFiles].filter(file => !expectedFiles.has(file));
-  const duplicate = actual.duplicates;
   const changed = [...expectedFiles]
     .filter(file => actualFiles.has(file))
-    .filter(file => !file.endsWith('.map'))
-    .filter(file => hashGeneratedFile(path.join(expectedDir, expected.map.get(file))) !== hashGeneratedFile(path.join(actualDir, actual.map.get(file))));
+    .filter(file => hashGeneratedFile(path.join(expectedDir, file)) !== hashGeneratedFile(path.join(actualDir, file)));
+
   return {
-    clean: missing.length === 0 && extra.length === 0 && duplicate.length === 0 && changed.length === 0,
+    clean: missing.length === 0 && extra.length === 0 && changed.length === 0,
     missing,
     extra,
-    duplicate,
+    duplicate: [],
     changed,
   };
 }
@@ -126,7 +107,6 @@ async function main() {
   console.error('[check-generated] dist/ is stale. Run npm run build.');
   if (result.missing.length) console.error(`  Missing: ${result.missing.join(', ')}`);
   if (result.extra.length) console.error(`  Extra: ${result.extra.join(', ')}`);
-  if (result.duplicate.length) console.error(`  Duplicate: ${result.duplicate.join(', ')}`);
   if (result.changed.length) console.error(`  Changed: ${result.changed.join(', ')}`);
   process.exit(1);
 }
