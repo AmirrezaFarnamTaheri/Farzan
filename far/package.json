@@ -12,6 +12,7 @@
     "build": "node scripts/build.cjs",
     "build:watch": "node scripts/build.cjs --watch",
     "build:sw": "node scripts/clean-workbox.cjs && node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
+    "build:vercel": "npm run build && node scripts/build-sw-dist.cjs",
     "desktop": "npm run build && node desktop/launch.cjs",
     "desktop:app-window": "npm run build && node desktop/app-window.cjs",
     "desktop:package": "npm run build && node desktop/package-portable.cjs",
