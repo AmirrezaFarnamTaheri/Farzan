@@ -17,7 +17,7 @@ OpenCourseDeck separates the app shell from the learning catalog. The app reads 
 
 `currentCatalog` is resolved relative to the app root unless the data loader says otherwise. Keep catalog files inside the project if you want offline-friendly behavior.
 
-Catalog fetches intentionally use `cache: 'no-cache'` so the browser can revalidate without breaking offline-friendly runtime caching. Do not switch catalog fetches back to `no-store`; that prevents the service worker from helping with catalog availability. Run `npm run build:sw` after changing `data/catalog.json` so the generated service worker precache reflects the active catalog pointer.
+Catalog fetches intentionally use `cache: 'no-cache'` so the browser can revalidate without breaking offline-friendly runtime caching. Do not switch catalog fetches back to `no-store`; that prevents the service worker from helping with catalog availability. Run `npm run build:release` after changing `data/catalog.json` so the portable release directory and generated service worker precache both reflect the active catalog pointer.
 
 ### Safe Editing Workflow
 
@@ -25,7 +25,8 @@ Catalog fetches intentionally use `cache: 'no-cache'` so the browser can revalid
 2. Copy the existing catalog JSON before changing it.
 3. Update `data/catalog.json` to point at the new file.
 4. Run `npm run validate` if the catalog validator covers the changed shape.
-5. Run `npm start` and check Courses, Materials, and search.
+5. Run `npm run build:release` to stage a clean, self-contained release under `dist/`.
+6. Run `npm start` and check Courses, Materials, search, and offline behavior.
 
 ### Catalog Tips
 
@@ -43,3 +44,4 @@ Switching catalog files does not erase browser data, but it can orphan progress 
 - **Courses list is empty:** confirm `currentCatalog` points to an existing JSON file.
 - **Media does not load:** confirm the path is reachable from the app origin and the dev server serves that file type.
 - **Progress appears mismatched:** check whether course or lesson IDs changed between catalogs.
+- **Offline catalog is stale:** run `npm run build:release`, then clear the old service worker and reload.
