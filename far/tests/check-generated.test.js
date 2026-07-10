@@ -21,8 +21,8 @@ function write(root, relativePath, content) {
 }
 
 function writeBundle(root, {
-  entryChunk = 'chunk-AAAA1111.js',
-  secondaryChunk = 'chunk-BBBB2222.js',
+  entryChunk = 'player-AAAA1111.js',
+  secondaryChunk = 'notes-BBBB2222.js',
   includeSecondaryMap = true,
 } = {}) {
   write(root, 'opencoursedeck.js', `import "./chunks/${entryChunk}";`);
@@ -40,16 +40,16 @@ afterEach(() => {
 });
 
 describe('generated artifact verification', () => {
-  it('matches equivalent content-addressed chunks even when hashes differ', () => {
+  it('matches equivalent named content-addressed chunks when hashes differ', () => {
     const expected = makeDir();
     const actual = makeDir();
     writeBundle(expected, {
-      entryChunk: 'chunk-AAAA1111.js',
-      secondaryChunk: 'chunk-BBBB2222.js',
+      entryChunk: 'player-AAAA1111.js',
+      secondaryChunk: 'notes-BBBB2222.js',
     });
     writeBundle(actual, {
-      entryChunk: 'chunk-CCCC3333.js',
-      secondaryChunk: 'chunk-DDDD4444.js',
+      entryChunk: 'player-CCCC3333.js',
+      secondaryChunk: 'notes-DDDD4444.js',
     });
 
     expect(compareDirs(expected, actual, { filter: isGeneratedBundleFile })).toEqual({
@@ -85,7 +85,7 @@ describe('generated artifact verification', () => {
 
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
-    expect(result.missing).toContain('chunks/chunk-BBBB2222.js.map');
+    expect(result.missing).toContain('chunks/notes-BBBB2222.js.map');
   });
 
   it('reports changed entry content', () => {
