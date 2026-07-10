@@ -13,6 +13,7 @@ module.exports = {
     'boot.js',
     'manifest.json',
     'style.css',
+    'src/styles/**',
     'opencoursedeck.js',
     'opencoursedeck.js.map',
     'chunks/**',
