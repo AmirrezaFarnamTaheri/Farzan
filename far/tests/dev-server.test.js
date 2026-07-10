@@ -1,7 +1,32 @@
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+function request(url, { headers = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(url, { method: 'GET', headers }, (response) => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const values = response.headers;
+        resolve({
+          status: response.statusCode,
+          headers: {
+            get(name) {
+              const value = values[String(name).toLowerCase()];
+              return Array.isArray(value) ? value.join(', ') : value ?? null;
+            },
+          },
+          text: async () => Buffer.concat(chunks).toString('utf8'),
+        });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 describe('dev server range handling', () => {
   let createServer;
@@ -19,7 +44,13 @@ describe('dev server range handling', () => {
       'utf8',
     );
     server = createServer({ root });
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        server.off('error', reject);
+        resolve();
+      });
+    });
     const address = server.address();
     baseUrl = `http://127.0.0.1:${address.port}`;
   });
@@ -30,7 +61,7 @@ describe('dev server range handling', () => {
   });
 
   it('serves suffix byte ranges from the end of the file', async () => {
-    const res = await fetch(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=-4' } });
+    const res = await request(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=-4' } });
 
     expect(res.status).toBe(206);
     expect(res.headers.get('content-range')).toBe('bytes 6-9/10');
@@ -39,7 +70,7 @@ describe('dev server range handling', () => {
   });
 
   it('rejects invalid zero-length suffix ranges', async () => {
-    const res = await fetch(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=-0' } });
+    const res = await request(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=-0' } });
 
     expect(res.status).toBe(416);
     expect(res.headers.get('content-range')).toBe('bytes */10');
@@ -48,21 +79,21 @@ describe('dev server range handling', () => {
   it('serves URL-decoded file paths inside the project root', async () => {
     fs.writeFileSync(path.join(root, 'space file.txt'), 'ok', 'utf8');
 
-    const res = await fetch(`${baseUrl}/space%20file.txt`);
+    const res = await request(`${baseUrl}/space%20file.txt`);
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('ok');
   });
 
   it('rejects multiple byte ranges instead of falling back to full content', async () => {
-    const res = await fetch(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=0-1,3-4' } });
+    const res = await request(`${baseUrl}/sample.txt`, { headers: { Range: 'bytes=0-1,3-4' } });
 
     expect(res.status).toBe(416);
     expect(res.headers.get('content-range')).toBe('bytes */10');
   });
 
   it('serves the app CSP as an HTTP header for HTML responses', async () => {
-    const res = await fetch(`${baseUrl}/`);
+    const res = await request(`${baseUrl}/`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toBe("script-src 'self'; media-src 'self' http: https:;");
@@ -70,7 +101,7 @@ describe('dev server range handling', () => {
   });
 
   it('does not attach CSP headers to non-HTML assets', async () => {
-    const res = await fetch(`${baseUrl}/sample.txt`);
+    const res = await request(`${baseUrl}/sample.txt`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toBeNull();
