@@ -22,7 +22,7 @@ function buildOptionsFor(outputDir) {
     pure: ['console.warn', 'console.error'],
     assetNames: 'assets/[name]-[hash]',
     chunkNames: 'chunks/[name]-[hash]',
-    entryNames: 'plasma',
+    entryNames: 'opencoursedeck',
     logLevel: 'silent',
   };
 }
