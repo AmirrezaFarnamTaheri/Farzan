@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -80,12 +80,13 @@ describe('generated output drift checks', () => {
     expect(steps.indexOf('npm run build:release')).toBeLessThan(steps.indexOf('npm test'));
   });
 
-  it('keeps production builds warning-free without changing watch diagnostics', () => {
+  it('preserves production diagnostics while keeping watch source maps inline', () => {
     const buildScript = fs.readFileSync(path.join(process.cwd(), 'scripts', 'build.cjs'), 'utf8');
     const generatedCheckScript = fs.readFileSync(path.join(process.cwd(), 'scripts', 'check-generated.cjs'), 'utf8');
 
-    expect(buildScript).toContain("pure: isWatch ? [] : ['console.warn', 'console.error']");
-    expect(generatedCheckScript).toContain("pure: ['console.warn', 'console.error']");
+    expect(buildScript).toContain("sourcemap: watch ? 'inline' : false");
+    expect(buildScript).toContain('pure: []');
+    expect(generatedCheckScript).toContain("logLevel: 'silent'");
   });
 
   it('stages a self-contained static shell for native and production builds', () => {
@@ -94,6 +95,6 @@ describe('generated output drift checks', () => {
     expect(buildScript).toContain("'index.html'");
     expect(buildScript).toContain("const staticDirs = ['assets', 'data', 'docs', 'vendor']");
     expect(buildScript).toContain("replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js')");
-    expect(buildScript).toContain("throw new Error('Production build did not stage dist/index.html')");
+    expect(buildScript).toContain('Production build is missing required release files');
   });
 });
