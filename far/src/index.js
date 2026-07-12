@@ -8,6 +8,7 @@ import '../ui.js';
 import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
 import { installDataHardening } from './core/dataHardening.js';
+import { enforceProductReadiness } from './core/productReadiness.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
 import * as easing from './lib/easing.js';
@@ -108,6 +109,7 @@ pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature
 initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
+pd.ProductReadiness = enforceProductReadiness(document);
 
 try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 
