@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { initEndpointApprovalGuard } from '../src/core/endpointApprovalGuard.js';
 
 let intersectionCallbacks;
 
@@ -24,6 +25,7 @@ async function loadApp(html = '<div id="plasma-app"><main id="view-container"></
     this.disconnect = vi.fn();
   });
   window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
+  initEndpointApprovalGuard(document);
   await import('../app.js');
 }
 
@@ -1102,7 +1104,7 @@ describe('app shell resilience helpers', () => {
     const view = document.querySelector('#view-container .view-settings');
 
     expect(view.querySelector('[data-storage-status]').textContent).toBe('Critical');
-    expect(view.querySelector('[data-storage-summary]').textContent).toContain('90%');
+    expect(view.querySelector('[data-storage-percent]').textContent).toBe('90%');
     expect(view.querySelector('[data-storage-health]').textContent).toContain('Available space');
     expect(view.querySelector('[data-storage-health]').textContent).toContain('localStorage footprint');
     expect(view.querySelector('[data-storage-health]').textContent).toContain('Quota error');
@@ -1151,9 +1153,14 @@ describe('app shell resilience helpers', () => {
 
     document.querySelector('[data-ai-mode]').value = 'custom-api';
     document.querySelector('[data-ai-model]').value = 'user-model';
-    document.querySelector('[data-ai-endpoint]').value = 'https://api.example.test/v1/chat/completions';
+    const endpoint = document.querySelector('[data-ai-endpoint]');
+    const approval = document.querySelector('[data-ai-approve-endpoint]');
+    endpoint.value = 'https://api.example.test/v1/chat/completions';
+    endpoint.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('[data-ai-key-storage]').value = 'session';
     document.querySelector('[data-ai-key]').value = 'session-key';
+    approval.checked = true;
+    approval.dispatchEvent(new Event('change', { bubbles: true }));
     document.querySelector('[data-ai-save]').click();
 
     await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-ai-settings', expect.objectContaining({
@@ -1166,17 +1173,9 @@ describe('app shell resilience helpers', () => {
     expect(saveSetting.mock.calls.at(-1)[1].apiKey).toBeUndefined();
     expect(sessionStorage.getItem('plasma-ai-api-key-session')).toBe('session-key');
     expect(window.OpenCourseDeck.AISettings.mode).toBe('custom-api');
-    expect(document.querySelector('[data-ai-summary]').textContent).toContain('Stored for this session');
-
-    document.querySelector('[data-ai-key-storage]').value = 'local';
-    document.querySelector('[data-ai-key]').value = 'local-key';
-    document.querySelector('[data-ai-save]').click();
-
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('plasma-ai-settings', expect.objectContaining({
-      keyStorage: 'local',
-      apiKey: 'local-key',
-      hasKey: true,
-    })));
+    expect(document.querySelector('[data-ai-summary]').textContent).toContain('Available for this session');
+    expect(document.querySelector('[data-ai-key-storage]').disabled).toBe(true);
+    expect(document.querySelector('[data-ai-key-storage]').value).toBe('session');
 
     document.querySelector('[data-ai-clear-key]').click();
     await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('plasma-ai-settings', expect.objectContaining({ hasKey: false })));
