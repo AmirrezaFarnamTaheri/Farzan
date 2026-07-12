@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: codex/full-audit-remediation
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
@@ -35,18 +35,10 @@ jobs:
                   raise SystemExit(f'{path}: expected one match, found {count}')
               p.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-          replace_once(
-              'far/index.html',
-              '  <!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->\n  <script id="lib-pdfjs"\n    src="./vendor/pdf.min.js"\n    defer></script>',
-              '  <!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>',
-          )
+          replace_once('far/index.html', '  <!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->\n  <script id="lib-pdfjs"\n    src="./vendor/pdf.min.js"\n    defer></script>', '  <!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>')
           replace_once('far/pdf.js', './vendor/pdf.worker.min.js', './vendor/pdf.worker.min.mjs')
           replace_once('far/pdf.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', './pdf-runtime.js')
-          replace_once(
-              'far/src/views/settingsRoute.js',
-              "    } catch {\n      Toast?.error?.('Clear failed');\n    }",
-              "    } catch (error) {\n      const failures = Array.isArray(error?.failures)\n        ? error.failures.map(item => item?.name || item?.message).filter(Boolean).join(', ')\n        : '';\n      const detail = failures || error?.message || 'Unknown storage error';\n      Toast?.error?.(`Clear failed: ${detail}`);\n    }",
-          )
+          replace_once('far/src/views/settingsRoute.js', "    } catch {\n      Toast?.error?.('Clear failed');\n    }", "    } catch (error) {\n      const failures = Array.isArray(error?.failures)\n        ? error.failures.map(item => item?.name || item?.message).filter(Boolean).join(', ')\n        : '';\n      const detail = failures || error?.message || 'Unknown storage error';\n      Toast?.error?.(`Clear failed: ${detail}`);\n    }")
 
           assets = Path('far/tests/assets-precache.test.js')
           text = assets.read_text(encoding='utf-8')
@@ -72,20 +64,12 @@ jobs:
   });
 """
           if 'surfaces structured blocked-deletion failures' not in text:
-              marker = '\n});\n'
-              pos = text.rfind(marker)
+              pos = text.rfind('\n});\n')
               if pos < 0: raise SystemExit('settings-test terminator missing')
               settings.write_text(text[:pos] + test + text[pos:], encoding='utf-8')
           PY
-          rm -f .github/workflows/finish-pdf-esm-loader.yml \
-            .github/workflows/migrate-pdf-source.yml \
-            .github/workflows/patch-pdf-large-files.yml \
-            .github/workflows/sync-pdf-lock-vendor.yml \
-            far/reports-pdf-4.10.38.txt \
-            far/reports-pdf-migration.txt \
-            far/reports-pdf-replacements.txt
+          rm -f .github/workflows/finish-pdf-esm-loader.yml .github/workflows/migrate-pdf-source.yml .github/workflows/patch-pdf-large-files.yml .github/workflows/sync-pdf-lock-vendor.yml far/reports-pdf-4.10.38.txt far/reports-pdf-migration.txt far/reports-pdf-replacements.txt
       - name: Verify complete remediation
-        shell: bash
         run: |
           cd far
           npm ci --ignore-scripts --legacy-peer-deps
@@ -102,9 +86,8 @@ jobs:
           npm run smoke
           npm run smoke:browser
       - name: Commit verified fixes and restore CI
-        shell: bash
         run: |
-          git show HEAD^:.github/workflows/ci.yml > .github/workflows/ci.yml
+          git show 8beb0f0fc877cd05b13a188f2ec6bbf5dd79e067:.github/workflows/ci.yml > .github/workflows/ci.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
