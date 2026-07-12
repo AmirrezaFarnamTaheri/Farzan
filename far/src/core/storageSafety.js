@@ -36,6 +36,7 @@ const AUXILIARY_DATABASES = [
   'opencoursedeck-media',
   'opencoursedeck-translations',
   'opencoursedeck-ai-models',
+  'opencoursedeck-note-templates',
   'opencoursedeck-waveforms',
 ];
 
@@ -46,13 +47,13 @@ function removeKeys(storage, keys) {
   }
 }
 
-function deleteDatabase(name) {
+function deleteDatabase(factory, name) {
   return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
+    if (!factory) {
       resolve(false);
       return;
     }
-    const request = indexedDB.deleteDatabase(name);
+    const request = factory.deleteDatabase(name);
     request.onsuccess = () => resolve(true);
     request.onerror = () => reject(request.error || new Error(`Failed to delete ${name}`));
     request.onblocked = () => reject(new Error(`Deletion of ${name} is blocked by another open tab`));
@@ -91,7 +92,7 @@ export function installStorageSafety(root = window) {
 
     const failures = [];
     for (const name of AUXILIARY_DATABASES) {
-      try { await deleteDatabase(name); }
+      try { await deleteDatabase(root.indexedDB, name); }
       catch (error) { failures.push({ name, message: error?.message || String(error) }); }
     }
 
@@ -107,6 +108,7 @@ export function installStorageSafety(root = window) {
   root.OpenCourseDeck = root.OpenCourseDeck || {};
   root.OpenCourseDeck.StorageSafety = {
     validScopes: Object.freeze([...VALID_SCOPES]),
+    preferenceKeys: Object.freeze([...PREFERENCE_KEYS]),
     auxiliaryDatabases: Object.freeze([...AUXILIARY_DATABASES]),
   };
   return db;
