@@ -14,6 +14,8 @@ export function createRouter({
     _currentController: null,
     _navSeq: 0,
     _currentAbortController: null,
+    _hashChangeHandler: null,
+    _handlePromise: Promise.resolve(),
 
     on(path, handler) {
       this._routes[path] = handler;
@@ -28,7 +30,16 @@ export function createRouter({
       return this._handle?.({ force: true, detail });
     },
 
+    destroy() {
+      this._currentAbortController?.abort?.();
+      if (this._hashChangeHandler) window.removeEventListener('hashchange', this._hashChangeHandler);
+      this._hashChangeHandler = null;
+      this._currentController = null;
+      this._current = null;
+    },
+
     init() {
+      if (this._hashChangeHandler) return;
       const handle = async ({ force = false, detail = null } = {}) => {
         const hash = window.location.hash || '#/';
         const handler = this._routes[hash];
@@ -57,11 +68,12 @@ export function createRouter({
         const beforeEvent = force ? { from, to: hash, refresh: true, detail } : { from, to: hash };
         bus?.emit?.('route:beforechange', beforeEvent);
         if (previousController) {
-          try { await previousController.beforeLeave?.({ from, to: hash }); } catch (err) { console.warn('[OpenCourseDeck Router] beforeLeave failed', err); }
-          try { await previousController.unmount?.({ from, to: hash }); } catch (err) { console.warn('[OpenCourseDeck Router] unmount failed', err); }
+          try { await previousController.beforeLeave?.({ from, to: hash, signal: abortController?.signal ?? null }); } catch (err) { console.warn('[OpenCourseDeck Router] beforeLeave failed', err); }
+          if (!isCurrent()) return;
+          try { await previousController.unmount?.({ from, to: hash, signal: abortController?.signal ?? null }); } catch (err) { console.warn('[OpenCourseDeck Router] unmount failed', err); }
+          if (!isCurrent()) return;
         }
 
-        // Update active nav (match the actual <a href="#/..."> in index.html)
         if (typeof $$ === 'function') {
           $$('.nav-item').forEach((item) => {
             const href = item.getAttribute('href') || '';
@@ -108,28 +120,30 @@ export function createRouter({
           }
         };
 
+        if (!isCurrent()) return;
         if (handler) {
-          Promise.resolve()
-            .then(() => handler(hash, routeContext))
-            .then((controller) => {
-              if (!isCurrent()) return;
-              if (typeof controller === 'function') {
-                this._currentController = { unmount: controller };
-              } else if (controller && typeof controller === 'object') {
-                this._currentController = controller;
-              }
-            })
-            .catch(showRouteError)
-            .finally(() => {
-              if (!isCurrent()) return;
-              Progress?.pageBar?.finish?.();
-              announce();
-              bus?.emit?.('route:change', routeEvent);
-              bus?.emit?.('route:ready', routeEvent);
-            });
+          try {
+            const controller = await handler(hash, routeContext);
+            if (!isCurrent()) {
+              if (typeof controller === 'function') await controller();
+              else await controller?.unmount?.({ from: hash, to: this._current, stale: true });
+              return;
+            }
+            if (typeof controller === 'function') this._currentController = { unmount: controller };
+            else if (controller && typeof controller === 'object') this._currentController = controller;
+          } catch (error) {
+            showRouteError(error);
+          } finally {
+            if (!isCurrent()) return;
+            Progress?.pageBar?.finish?.();
+            announce();
+            bus?.emit?.('route:change', routeEvent);
+            bus?.emit?.('route:ready', routeEvent);
+          }
         } else {
           console.warn(`[OpenCourseDeck Router] No handler for "${hash}"`);
           try { getNotFoundView?.()?.(hash); } catch { /* ignore */ }
+          if (!isCurrent()) return;
           Progress?.pageBar?.finish?.();
           announce();
           bus?.emit?.('route:change', routeEvent);
@@ -137,9 +151,14 @@ export function createRouter({
         }
       };
 
-      this._handle = handle;
-      window.addEventListener('hashchange', () => handle());
-      handle();
+      this._handle = (options) => {
+        const run = () => handle(options);
+        this._handlePromise = this._handlePromise.then(run, run);
+        return this._handlePromise;
+      };
+      this._hashChangeHandler = () => this._handle();
+      window.addEventListener('hashchange', this._hashChangeHandler);
+      return this._handle();
     },
   };
 }
