@@ -3,28 +3,13 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const esbuild = require('esbuild');
+const { createBuildOptions } = require('./build.cjs');
 
 const root = path.join(__dirname, '..');
-const srcEntry = path.join(root, 'src', 'index.js');
 const outdir = path.join(root, 'dist');
 
 function buildOptionsFor(outputDir) {
-  return {
-    entryPoints: [srcEntry],
-    outdir: outputDir,
-    bundle: true,
-    format: 'esm',
-    splitting: true,
-    sourcemap: false,
-    minify: true,
-    target: ['es2020'],
-    platform: 'browser',
-    pure: [],
-    assetNames: 'assets/[name]-[hash]',
-    chunkNames: 'chunks/[name]-[hash]',
-    entryNames: 'opencoursedeck',
-    logLevel: 'silent',
-  };
+  return { ...createBuildOptions(outputDir, false), logLevel: 'silent' };
 }
 
 function walkFiles(dir, base = dir, files = []) {
@@ -113,13 +98,9 @@ function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
   const extra = [];
   const changed = [];
 
-  if (expected.entry && !actual.entry) {
-    missing.push(expected.entry.file);
-  } else if (!expected.entry && actual.entry) {
-    extra.push(actual.entry.file);
-  } else if (expected.entry && actual.entry && expected.entry.hash !== actual.entry.hash) {
-    changed.push(expected.entry.file);
-  }
+  if (expected.entry && !actual.entry) missing.push(expected.entry.file);
+  else if (!expected.entry && actual.entry) extra.push(actual.entry.file);
+  else if (expected.entry && actual.entry && expected.entry.hash !== actual.entry.hash) changed.push(expected.entry.file);
 
   const chunks = matchByContent(expected.chunks, actual.chunks);
   missing.push(...chunks.missing);
