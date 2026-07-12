@@ -18,7 +18,7 @@ function walkFiles(dir, base = dir, files = []) {
 }
 
 function isGeneratedBundleFile(file) {
-  return file === 'opencoursedeck.js' || file.startsWith('chunks/') || file === 'extra.js';
+  return file === 'opencoursedeck.js' || file.startsWith('chunks/');
 }
 
 function normalizeGeneratedText(text) {
@@ -66,11 +66,64 @@ function compareInventories(expected, actual) {
   };
 }
 
-function compareDirs(expectedDir, actualDir, { filter = isGeneratedBundleFile } = {}) {
-  return compareInventories(
-    inventoryDirectory(expectedDir, { filter }),
-    inventoryDirectory(actualDir, { filter }),
-  );
+function contentMatch(expectedRecords, actualRecords) {
+  const available = new Map();
+  for (const record of actualRecords) {
+    const records = available.get(record.hash) || [];
+    records.push(record.file);
+    available.set(record.hash, records);
+  }
+  const missing = [];
+  for (const record of expectedRecords) {
+    const matches = available.get(record.hash);
+    if (matches?.length) matches.shift();
+    else missing.push(record.file);
+  }
+  const extra = [];
+  for (const matches of available.values()) extra.push(...matches);
+  return { missing, extra };
+}
+
+function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.js') } = {}) {
+  const expectedFiles = walkFiles(expectedDir).filter(filter);
+  const actualFiles = walkFiles(actualDir).filter(filter);
+  const expected = expectedFiles.map(file => ({ file, hash: hashText(fs.readFileSync(path.join(expectedDir, file), 'utf8')) }));
+  const actual = actualFiles.map(file => ({ file, hash: hashText(fs.readFileSync(path.join(actualDir, file), 'utf8')) }));
+  const missing = [];
+  const extra = [];
+  const changed = [];
+
+  const expectedEntry = expected.find(record => record.file === 'opencoursedeck.js');
+  const actualEntry = actual.find(record => record.file === 'opencoursedeck.js');
+  if (expectedEntry && !actualEntry) missing.push(expectedEntry.file);
+  else if (!expectedEntry && actualEntry) extra.push(actualEntry.file);
+  else if (expectedEntry && actualEntry && expectedEntry.hash !== actualEntry.hash) changed.push(expectedEntry.file);
+
+  const expectedChunks = expected.filter(record => record.file.startsWith('chunks/') && record.file.endsWith('.js'));
+  const actualChunks = actual.filter(record => record.file.startsWith('chunks/') && record.file.endsWith('.js'));
+  const chunks = contentMatch(expectedChunks, actualChunks);
+  missing.push(...chunks.missing);
+  extra.push(...chunks.extra);
+
+  const handled = new Set([
+    'opencoursedeck.js',
+    ...expectedChunks.map(record => record.file),
+    ...actualChunks.map(record => record.file),
+  ]);
+  const expectedOther = new Map(expected.filter(record => !handled.has(record.file)).map(record => [record.file, record.hash]));
+  const actualOther = new Map(actual.filter(record => !handled.has(record.file)).map(record => [record.file, record.hash]));
+  const others = compareInventories(expectedOther, actualOther);
+  missing.push(...others.missing);
+  extra.push(...others.extra);
+  changed.push(...others.changed);
+
+  return {
+    clean: missing.length === 0 && extra.length === 0 && changed.length === 0,
+    missing: [...new Set(missing)].sort(),
+    extra: [...new Set(extra)].sort(),
+    duplicate: [],
+    changed: [...new Set(changed)].sort(),
+  };
 }
 
 async function checkGenerated({ actualOutdir = outdir } = {}) {
