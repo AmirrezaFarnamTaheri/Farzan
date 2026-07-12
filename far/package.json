@@ -26,7 +26,7 @@
     "check:generated": "node scripts/check-generated.cjs",
     "check:encoding": "node scripts/check-encoding.cjs",
     "dev": "npm run build:watch",
-    "lint": "node node_modules/eslint/bin/eslint.js src scripts tests eslint.config.js vitest.config.js",
+    "lint": "node node_modules/eslint/bin/eslint.js src scripts tests app.js bridge.js db.js data.js notes.js player.js pdf.js progress.js canvas.js ui.js boot.js eslint.config.js vitest.config.js",
     "test": "node node_modules/vitest/vitest.mjs run --passWithNoTests --configLoader runner --pool vmThreads",
     "audit": "node scripts/audit.cjs",
     "report:bundle": "node scripts/bundle-report.cjs",
