@@ -35,19 +35,16 @@ const __pdMeasure = (name, start, end) => {
 
 async function initializeRuntimeCapabilities() {
   const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
-
-  const [{ installStorageSafety }, { initAIClient }] = await Promise.all([
-    import('./src/core/storageSafety.js'),
-    import('./src/features/aiClient.js'),
-  ]);
-
-  installStorageSafety(window);
-  initAIClient(window);
+  if (!pd.StorageSafety) throw new Error('Storage safety failed to initialize');
+  if (!pd.AI) throw new Error('AI capability failed to initialize');
 
   // Settings and the command palette expose backup controls in a fresh session.
   // Load this capability before the shell becomes interactive so those controls
   // cannot degrade into optional-chaining no-ops based on route history.
   await pd.loadFeature?.('progress');
+  if (!window.ProgressStats?.exportJSON || !window.ProgressStats?.importJSON) {
+    throw new Error('Backup capability failed to initialize');
+  }
 }
 
 __pdMark('pd:boot:start');
