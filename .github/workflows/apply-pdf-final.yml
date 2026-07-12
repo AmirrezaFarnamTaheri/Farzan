@@ -1,0 +1,67 @@
+name: Apply final PDF.js migration
+
+on:
+  push:
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/apply-pdf-final.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Apply migration
+        shell: bash
+        run: |
+          cd far
+          npm install pdfjs-dist@4.10.38 --save-exact --package-lock-only --ignore-scripts --legacy-peer-deps
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def sub(path, pattern, replacement):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8-sig')
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+              if count != 1:
+                  raise SystemExit(f'{path}: pattern matched {count} times: {pattern}')
+              p.write_text(text, encoding='utf-8')
+
+          sub('scripts/vendor-libs.cjs', r"from: 'pdfjs-dist/build/pdf\.min\.js',\s*to: 'pdf\.min\.js',", "from: 'pdfjs-dist/build/pdf.min.mjs',\n    to: 'pdf.min.mjs',")
+          sub('scripts/vendor-libs.cjs', r"from: 'pdfjs-dist/build/pdf\.worker\.min\.js',\s*to: 'pdf\.worker\.min\.js',", "from: 'pdfjs-dist/build/pdf.worker.min.mjs',\n    to: 'pdf.worker.min.mjs',")
+          sub('index.html', r'<!-- PDF\.js \(vendored from pdfjs-dist@3\.11\.174\) -->\s*<script id="lib-pdfjs"\s*src="\./vendor/pdf\.min\.js"\s*defer></script>', '<!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>')
+          sub('pdf.js', r'https://cdnjs\.cloudflare\.com/ajax/libs/pdf\.js/3\.11\.174/pdf\.min\.js', './pdf-runtime.js')
+          sub('pdf.js', r'\./vendor/pdf\.worker\.min\.js', './vendor/pdf.worker.min.mjs')
+          sub('scripts/build.cjs', r"for \(const file of \['index\.html', 'manifest\.json', 'style\.css', 'boot\.js'\]\)", "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'])")
+          sub('scripts/build.cjs', r"('manifest\.json',\s*)('opencoursedeck\.js',)", r"\1'pdf-runtime.js',\n    \2")
+          for config in ('scripts/workbox.config.cjs', 'scripts/workbox-dist.config.cjs'):
+              sub(config, r"('boot\.js',\s*)('manifest\.json',)", r"\1'pdf-runtime.js',\n    \2")
+
+          Path('pdf-runtime.js').write_text("""import * as pdfjsLib from './vendor/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', import.meta.url).href;
+window.pdfjsLib = pdfjsLib;
+window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
+""", encoding='utf-8')
+          PY
+          npm ci --ignore-scripts --legacy-peer-deps
+          rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
+          npm run vendor
+      - name: Commit migration
+        shell: bash
+        run: |
+          rm .github/workflows/apply-pdf-final.yml
+          rm -f far/reports-pdf-migration.txt far/reports-pdf-4.10.38.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A far .github/workflows/apply-pdf-final.yml
+          git commit -m "fix: upgrade PDF.js and clear production audit"
+          git push origin HEAD:codex/full-audit-remediation
