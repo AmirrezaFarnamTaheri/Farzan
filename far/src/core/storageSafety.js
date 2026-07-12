@@ -108,6 +108,8 @@ export function installStorageSafety(root = window) {
       const error = new Error('Some auxiliary OpenCourseDeck databases could not be cleared');
       error.failures = failures;
       error.cleared = cleared;
+      const detail = failures.map(({ name, message }) => `${name}: ${message}`).join('; ');
+      root.OpenCourseDeck?.Toast?.error?.(`Clear partially failed: ${detail}`);
       throw error;
     }
     return { result, committed: true, clearedDatabases: cleared, clearedSessionKeys: [...SESSION_KEYS] };
