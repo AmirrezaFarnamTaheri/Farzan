@@ -15,7 +15,7 @@ function createRoot() {
   const clearUserData = vi.fn(async (scope) => ({ scope }));
   return {
     DB: { clearAll, clearUserData },
-    OpenCourseDeck: {},
+    OpenCourseDeck: { Toast: { error: vi.fn() } },
     localStorage: createStorage(),
     sessionStorage: createStorage(),
   };
@@ -56,5 +56,32 @@ describe('storage safety', () => {
 
     await expect(root.DB.clearUserData('notes')).resolves.toEqual({ scope: 'notes' });
     expect(originalClearUserData).toHaveBeenCalledWith('notes');
+  });
+
+  it('surfaces blocked auxiliary database details before rejecting a full reset', async () => {
+    const root = createRoot();
+    root.indexedDB = {
+      deleteDatabase: vi.fn((name) => {
+        const request = {};
+        queueMicrotask(() => {
+          if (name === 'opencoursedeck-templates') request.onblocked?.();
+          else request.onsuccess?.();
+        });
+        return request;
+      }),
+    };
+    installStorageSafety(root);
+
+    const error = await root.DB.clearAll().catch(value => value);
+
+    expect(error.failures).toEqual([
+      expect.objectContaining({ name: 'opencoursedeck-templates' }),
+    ]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('opencoursedeck-templates'),
+    );
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('blocked by another open tab'),
+    );
   });
 });
