@@ -16,6 +16,12 @@ class LegacyHttpClient {
     this._interceptors = { request: [], response: [], error: [] };
     this._pendingRequests = new Map();
   }
+
+  get(url, options = {}) { return this.request('GET', url, options); }
+  post(url, options = {}) { return this.request('POST', url, options); }
+  put(url, options = {}) { return this.request('PUT', url, options); }
+  patch(url, options = {}) { return this.request('PATCH', url, options); }
+  delete(url, options = {}) { return this.request('DELETE', url, options); }
 }
 
 class LegacyRealtimeClient {
