@@ -2,10 +2,8 @@ name: Complete PR remediation
 
 on:
   push:
-    branches:
-      - codex/full-audit-remediation
-    paths:
-      - .github/workflows/complete-pr-remediation.yml
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/complete-pr-remediation.yml]
 
 permissions:
   contents: write
@@ -15,9 +13,55 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out remediation branch
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: codex/full-audit-remediation
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+      - name: Upgrade PDF.js and migrate release assets
+        shell: bash
+        run: |
+          cd far
+          npm install pdfjs-dist@4.2.67 --save-exact --package-lock-only --ignore-scripts --legacy-peer-deps
+          python3 - <<'PY'
+          from pathlib import Path
 
-      - name: Set
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8-sig')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected one match, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace('scripts/vendor-libs.cjs', "from: 'pdfjs-dist/build/pdf.min.js',\n    to: 'pdf.min.js',", "from: 'pdfjs-dist/legacy/build/pdf.min.mjs',\n    to: 'pdf.min.mjs',")
+          replace('scripts/vendor-libs.cjs', "from: 'pdfjs-dist/build/pdf.worker.min.js',\n    to: 'pdf.worker.min.js',", "from: 'pdfjs-dist/legacy/build/pdf.worker.min.mjs',\n    to: 'pdf.worker.min.mjs',")
+          replace('index.html', '<!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->\n  <script id="lib-pdfjs"\n    src="./vendor/pdf.min.js"\n    defer></script>', '<!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>')
+          replace('pdf.js', './vendor/pdf.worker.min.js', './vendor/pdf.worker.min.mjs')
+          replace('pdf.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', './pdf-runtime.js')
+          replace('scripts/build.cjs', "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js'])", "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'])")
+          replace('scripts/build.cjs', "    'manifest.json',\n    'opencoursedeck.js',", "    'manifest.json',\n    'pdf-runtime.js',\n    'opencoursedeck.js',")
+          replace('scripts/workbox-dist.config.cjs', "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
+          replace('scripts/workbox.config.cjs', "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
+
+          Path('pdf-runtime.js').write_text("""import * as pdfjsLib from './vendor/pdf.min.mjs';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', import.meta.url).href;
+window.pdfjsLib = pdfjsLib;
+window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
+""", encoding='utf-8')
+          PY
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm run vendor
+          npm run ci
+      - name: Commit validated remediation
+        shell: bash
+        run: |
+          rm .github/workflows/complete-pr-remediation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/package.json far/package-lock.json far/pdf-runtime.js far/pdf.js far/index.html far/scripts/vendor-libs.cjs far/scripts/build.cjs far/scripts/workbox.config.cjs far/scripts/workbox-dist.config.cjs .github/workflows/complete-pr-remediation.yml
+          git commit -m "fix: upgrade PDF.js and clear production audit"
+          git push origin HEAD:codex/full-audit-remediation
