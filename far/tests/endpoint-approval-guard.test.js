@@ -37,4 +37,8 @@ describe('endpoint approval guard', () => {
     expect(isValidEndpoint('http://api.example.test/v1/chat/completions')).toBe(false);
     expect(isValidEndpoint('http://127.0.0.1:8080/v1/chat/completions')).toBe(true);
   });
+
+  it('rejects endpoints containing embedded credentials', () => {
+    expect(isValidEndpoint('https://user:secret@api.example.test/v1/chat/completions')).toBe(false);
+  });
 });
