@@ -86,7 +86,20 @@ jobs:
         run: npm run audit
 
       - name: Generate bundle report
-        run: npm run report:bundle
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          npm run report:bundle 2>&1 | tee reports/bundle-report.log
+
+      - name: Upload bundle diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bundle-report-${{ github.run_number }}
+          path: far/reports/bundle-report.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Run smoke tests
         shell: bash
