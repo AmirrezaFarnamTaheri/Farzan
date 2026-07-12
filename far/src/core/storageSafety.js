@@ -1,4 +1,5 @@
 import { installBackupEngine } from './backupEngine.js';
+import { installPdfSecurity } from './pdfSecurity.js';
 
 const VALID_SCOPES = new Set([
   'progress',
@@ -121,5 +122,6 @@ export function installStorageSafety(root = window) {
     auxiliaryDatabases: Object.freeze([...AUXILIARY_DATABASES]),
   };
   installBackupEngine(root);
+  installPdfSecurity(root);
   return db;
 }
