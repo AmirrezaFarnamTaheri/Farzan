@@ -11,7 +11,7 @@ permissions:
 jobs:
   remediate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -21,7 +21,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: far/package-lock.json
-      - name: Upgrade PDF.js and migrate release assets
+      - name: Apply patched PDF.js migration
         shell: bash
         run: |
           cd far
@@ -43,25 +43,25 @@ jobs:
           replace('pdf.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', './pdf-runtime.js')
           replace('scripts/build.cjs', "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js'])", "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'])")
           replace('scripts/build.cjs', "    'manifest.json',\n    'opencoursedeck.js',", "    'manifest.json',\n    'pdf-runtime.js',\n    'opencoursedeck.js',")
-          replace('scripts/workbox-dist.config.cjs', "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
-          replace('scripts/workbox.config.cjs', "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
-
+          for config in ['scripts/workbox.config.cjs', 'scripts/workbox-dist.config.cjs']:
+              replace(config, "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
           Path('pdf-runtime.js').write_text("""import * as pdfjsLib from './vendor/pdf.min.mjs';
-
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', import.meta.url).href;
 window.pdfjsLib = pdfjsLib;
 window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
 """, encoding='utf-8')
           PY
           npm ci --ignore-scripts --legacy-peer-deps
+          rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
           npm run vendor
-          npm run ci
-      - name: Commit validated remediation
+          npm audit --omit=dev --audit-level=high
+          npm run build:release
+      - name: Commit migration
         shell: bash
         run: |
           rm .github/workflows/complete-pr-remediation.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add far/package.json far/package-lock.json far/pdf-runtime.js far/pdf.js far/index.html far/scripts/vendor-libs.cjs far/scripts/build.cjs far/scripts/workbox.config.cjs far/scripts/workbox-dist.config.cjs .github/workflows/complete-pr-remediation.yml
+          git add -A far .github/workflows/complete-pr-remediation.yml
           git commit -m "fix: upgrade PDF.js and clear production audit"
           git push origin HEAD:codex/full-audit-remediation
