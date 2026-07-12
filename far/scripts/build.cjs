@@ -5,30 +5,26 @@ const esbuild = require('esbuild');
 const root = path.join(__dirname, '..');
 const srcEntry = path.join(root, 'src', 'index.js');
 const outdir = path.join(root, 'dist');
-
 const isWatch = process.argv.includes('--watch');
 
-/** @type {import('esbuild').BuildOptions} */
-const options = {
-  entryPoints: [srcEntry],
-  outdir,
-  bundle: true,
-  format: 'esm',
-  splitting: true,
-  // Inline maps remain useful during local watch mode. Production maps are
-  // intentionally disabled so private source is not published or precached.
-  sourcemap: isWatch ? 'inline' : false,
-  minify: !isWatch,
-  target: ['es2020'],
-  platform: 'browser',
-  // Production failures must remain observable. Do not erase warning/error
-  // calls during minification; the diagnostics layer can redact them instead.
-  pure: [],
-  assetNames: 'assets/[name]-[hash]',
-  chunkNames: 'chunks/[name]-[hash]',
-  entryNames: 'opencoursedeck',
-  logLevel: 'info',
-};
+function createBuildOptions(outputDir = outdir, watch = false) {
+  return {
+    entryPoints: [srcEntry],
+    outdir: outputDir,
+    bundle: true,
+    format: 'esm',
+    splitting: true,
+    sourcemap: watch ? 'inline' : false,
+    minify: !watch,
+    target: ['es2020'],
+    platform: 'browser',
+    pure: [],
+    assetNames: 'assets/[name]-[hash]',
+    chunkNames: 'chunks/[name]-[hash]',
+    entryNames: 'opencoursedeck',
+    logLevel: watch ? 'info' : 'info',
+  };
+}
 
 function resetOutputDirectory() {
   fs.rmSync(outdir, { recursive: true, force: true });
@@ -73,8 +69,6 @@ function stageStaticAssets() {
   for (const dir of staticDirs) {
     copyDirectory(path.join(root, dir), path.join(outdir, dir));
   }
-
-  // style.css imports the modular stylesheet tree at ./src/styles/index.css.
   copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
 
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
@@ -119,6 +113,7 @@ function assertReleaseGraph() {
 
 async function main() {
   resetOutputDirectory();
+  const options = createBuildOptions(outdir, isWatch);
 
   if (isWatch) {
     const ctx = await esbuild.context(options);
@@ -143,6 +138,7 @@ if (require.main === module) {
 
 module.exports = {
   assertReleaseGraph,
+  createBuildOptions,
   main,
   removeProductionSourceMaps,
   rewriteReleaseStaticFile,
