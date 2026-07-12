@@ -15,11 +15,15 @@ const options = {
   bundle: true,
   format: 'esm',
   splitting: true,
-  sourcemap: isWatch ? 'inline' : true,
+  // Inline maps remain useful during local watch mode. Production maps are
+  // intentionally disabled so private source is not published or precached.
+  sourcemap: isWatch ? 'inline' : false,
   minify: !isWatch,
   target: ['es2020'],
   platform: 'browser',
-  pure: isWatch ? [] : ['console.warn', 'console.error'],
+  // Production failures must remain observable. Do not erase warning/error
+  // calls during minification; the diagnostics layer can redact them instead.
+  pure: [],
   assetNames: 'assets/[name]-[hash]',
   chunkNames: 'chunks/[name]-[hash]',
   entryNames: 'opencoursedeck',
@@ -36,6 +40,18 @@ function copyDirectory(from, to) {
   fs.cpSync(from, to, { recursive: true, force: true });
 }
 
+function rewriteReleaseStaticFile(file, content) {
+  if (file === 'index.html') {
+    return content
+      .replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js')
+      .replaceAll('dist/opencoursedeck.js', './opencoursedeck.js');
+  }
+  if (file === 'boot.js') {
+    return content.replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js');
+  }
+  return content;
+}
+
 function stageStaticAssets() {
   const staticDirs = ['assets', 'data', 'docs', 'vendor'];
   for (const dir of staticDirs) {
@@ -50,13 +66,31 @@ function stageStaticAssets() {
     const from = path.join(root, file);
     const to = path.join(outdir, file);
     if (!fs.existsSync(from)) continue;
-    let content = fs.readFileSync(from, 'utf8');
-    if (file === 'index.html') {
-      content = content
-        .replaceAll('./dist/opencoursedeck.js', './opencoursedeck.js')
-        .replaceAll('dist/opencoursedeck.js', './opencoursedeck.js');
-    }
+    const content = rewriteReleaseStaticFile(file, fs.readFileSync(from, 'utf8'));
     fs.writeFileSync(to, content, 'utf8');
+  }
+}
+
+function assertReleaseGraph() {
+  const requiredReleaseFiles = [
+    'index.html',
+    'boot.js',
+    'manifest.json',
+    'opencoursedeck.js',
+    'style.css',
+    path.join('src', 'styles', 'index.css'),
+  ];
+  const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
+  if (missing.length) {
+    throw new Error(`Production build is missing required release files: ${missing.join(', ')}`);
+  }
+
+  const bootSource = fs.readFileSync(path.join(outdir, 'boot.js'), 'utf8');
+  if (!bootSource.includes("./opencoursedeck.js")) {
+    throw new Error('Production boot file does not reference ./opencoursedeck.js');
+  }
+  if (bootSource.includes("./dist/opencoursedeck.js")) {
+    throw new Error('Production boot file still references the source-root bundle path');
   }
 }
 
@@ -72,20 +106,7 @@ async function main() {
 
   await esbuild.build(options);
   stageStaticAssets();
-
-  if (!fs.existsSync(path.join(outdir, 'index.html'))) {
-    throw new Error('Production build did not stage dist/index.html');
-  }
-
-  const requiredReleaseFiles = [
-    'opencoursedeck.js',
-    'style.css',
-    path.join('src', 'styles', 'index.css'),
-  ];
-  const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
-  if (missing.length) {
-    throw new Error(`Production build is missing required release files: ${missing.join(', ')}`);
-  }
+  assertReleaseGraph();
   console.log('[build] done');
 }
 
@@ -93,3 +114,8 @@ main().catch((err) => {
   console.error('[build] failed', err);
   process.exit(1);
 });
+
+module.exports = {
+  assertReleaseGraph,
+  rewriteReleaseStaticFile,
+};
