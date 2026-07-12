@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload lint diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: eslint-report-${{ github.run_number }}
           path: far/reports/eslint.json
@@ -72,14 +72,17 @@ jobs:
 
       - name: Upload test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: vitest-report-${{ github.run_number }}
           path: far/reports/vitest.json
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Audit dependencies and project rules
+      - name: Audit production dependency advisories
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit project rules
         run: npm run audit
 
       - name: Generate bundle report
@@ -94,7 +97,7 @@ jobs:
 
       - name: Upload smoke diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: smoke-report-${{ github.run_number }}
           path: far/reports/smoke.log
@@ -109,7 +112,7 @@ jobs:
 
       - name: Upload browser smoke diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: browser-smoke-report-${{ github.run_number }}
           path: far/reports/browser-smoke.log
