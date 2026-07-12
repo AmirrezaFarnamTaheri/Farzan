@@ -28,10 +28,11 @@ describe('storage safety', () => {
 
   it('rejects unknown scopes instead of falling through to a full wipe', async () => {
     const root = createRoot();
+    const originalClearAll = root.DB.clearAll;
     installStorageSafety(root);
 
     await expect(root.DB.clearUserData('typo')).rejects.toThrow('Unknown deletion scope');
-    expect(root.DB.clearAll).not.toHaveBeenCalled();
+    expect(originalClearAll).not.toHaveBeenCalled();
   });
 
   it('clears only preference keys for the preferences scope', async () => {
