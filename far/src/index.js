@@ -7,6 +7,7 @@ import '../db.js';
 import '../ui.js';
 import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
+import { installDataHardening } from './core/dataHardening.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
 import * as easing from './lib/easing.js';
@@ -33,6 +34,7 @@ import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
 installStorageSafety(window);
+installDataHardening(window);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
