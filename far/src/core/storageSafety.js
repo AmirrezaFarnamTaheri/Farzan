@@ -36,7 +36,7 @@ const AUXILIARY_DATABASES = [
   'opencoursedeck-media',
   'opencoursedeck-translations',
   'opencoursedeck-ai-models',
-  'opencoursedeck-note-templates',
+  'opencoursedeck-templates',
   'opencoursedeck-waveforms',
 ];
 
@@ -79,7 +79,7 @@ export function installStorageSafety(root = window) {
 
     if (normalized === 'preferences') {
       removeKeys(root.localStorage, PREFERENCE_KEYS);
-      return { scope: normalized, cleared: [...PREFERENCE_KEYS] };
+      return { scope: normalized, cleared: [...PREFERENCE_KEYS], committed: true };
     }
 
     if (normalized === 'all') return db.clearAll();
@@ -91,17 +91,23 @@ export function installStorageSafety(root = window) {
     removeKeys(root.sessionStorage, SESSION_KEYS);
 
     const failures = [];
+    const cleared = [];
     for (const name of AUXILIARY_DATABASES) {
-      try { await deleteDatabase(root.indexedDB, name); }
-      catch (error) { failures.push({ name, message: error?.message || String(error) }); }
+      try {
+        await deleteDatabase(root.indexedDB, name);
+        cleared.push(name);
+      } catch (error) {
+        failures.push({ name, message: error?.message || String(error) });
+      }
     }
 
     if (failures.length) {
       const error = new Error('Some auxiliary OpenCourseDeck databases could not be cleared');
       error.failures = failures;
+      error.cleared = cleared;
       throw error;
     }
-    return result;
+    return { result, committed: true, clearedDatabases: cleared, clearedSessionKeys: [...SESSION_KEYS] };
   };
 
   Object.defineProperty(db, '__storageSafetyInstalled', { value: true });
@@ -109,6 +115,7 @@ export function installStorageSafety(root = window) {
   root.OpenCourseDeck.StorageSafety = {
     validScopes: Object.freeze([...VALID_SCOPES]),
     preferenceKeys: Object.freeze([...PREFERENCE_KEYS]),
+    sessionKeys: Object.freeze([...SESSION_KEYS]),
     auxiliaryDatabases: Object.freeze([...AUXILIARY_DATABASES]),
   };
   return db;
