@@ -1,0 +1,23 @@
+name: Complete PR remediation
+
+on:
+  push:
+    branches:
+      - codex/full-audit-remediation
+    paths:
+      - .github/workflows/complete-pr-remediation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out remediation branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+
+      - name: Set
