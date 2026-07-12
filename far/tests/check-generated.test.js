@@ -23,14 +23,11 @@ function write(root, relativePath, content) {
 function writeBundle(root, {
   entryChunk = 'player-AAAA1111.js',
   secondaryChunk = 'notes-BBBB2222.js',
-  includeSecondaryMap = true,
+  includeSecondary = true,
 } = {}) {
   write(root, 'opencoursedeck.js', `import "./chunks/${entryChunk}";`);
-  write(root, 'opencoursedeck.js.map', '{"sources":["../src/index.js"]}');
   write(root, `chunks/${entryChunk}`, `import "./${secondaryChunk}"; export const a = 1;`);
-  write(root, `chunks/${entryChunk}.map`, '{}');
-  write(root, `chunks/${secondaryChunk}`, 'export const b = 2;');
-  if (includeSecondaryMap) write(root, `chunks/${secondaryChunk}.map`, '{}');
+  if (includeSecondary) write(root, `chunks/${secondaryChunk}`, 'export const b = 2;');
 }
 
 afterEach(() => {
@@ -65,11 +62,8 @@ describe('generated artifact verification', () => {
     const expected = makeDir();
     const actual = makeDir();
     write(expected, 'opencoursedeck.js', 'export {};');
-    write(expected, 'opencoursedeck.js.map', '{}');
     write(actual, 'opencoursedeck.js', 'export {};');
-    write(actual, 'opencoursedeck.js.map', '{}');
     write(actual, 'chunks/chunk-STALE999.js', 'export const stale = true;');
-    write(actual, 'chunks/chunk-STALE999.js.map', '{}');
 
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
@@ -77,24 +71,22 @@ describe('generated artifact verification', () => {
     expect(result.extra).toEqual(['chunks/chunk-STALE999.js']);
   });
 
-  it('reports missing source maps for generated JavaScript', () => {
+  it('reports missing generated JavaScript chunks', () => {
     const expected = makeDir();
     const actual = makeDir();
     writeBundle(expected);
-    writeBundle(actual, { includeSecondaryMap: false });
+    writeBundle(actual, { includeSecondary: false });
 
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
-    expect(result.missing).toContain('chunks/notes-BBBB2222.js.map');
+    expect(result.missing).toContain('chunks/notes-BBBB2222.js');
   });
 
   it('reports changed entry content', () => {
     const expected = makeDir();
     const actual = makeDir();
     write(expected, 'opencoursedeck.js', 'export const version = 1;');
-    write(expected, 'opencoursedeck.js.map', '{}');
     write(actual, 'opencoursedeck.js', 'export const version = 2;');
-    write(actual, 'opencoursedeck.js.map', '{}');
 
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
