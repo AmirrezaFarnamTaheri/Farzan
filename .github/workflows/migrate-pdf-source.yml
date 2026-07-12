@@ -1,0 +1,59 @@
+name: Migrate PDF.js source references
+
+on:
+  push:
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/migrate-pdf-source.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+      - name: Update runtime and release references
+        shell: bash
+        run: |
+          cd far
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def sub(path, pattern, replacement):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8-sig')
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+              if count != 1:
+                  raise SystemExit(f'{path}: pattern matched {count} times')
+              p.write_text(text, encoding='utf-8')
+
+          sub('scripts/vendor-libs.cjs', r"from: 'pdfjs-dist/build/pdf\.min\.js',\s*to: 'pdf\.min\.js',", "from: 'pdfjs-dist/build/pdf.min.mjs',\n    to: 'pdf.min.mjs',")
+          sub('scripts/vendor-libs.cjs', r"from: 'pdfjs-dist/build/pdf\.worker\.min\.js',\s*to: 'pdf\.worker\.min\.js',", "from: 'pdfjs-dist/build/pdf.worker.min.mjs',\n    to: 'pdf.worker.min.mjs',")
+          sub('index.html', r'<!-- PDF\.js \(vendored from pdfjs-dist@3\.11\.174\) -->\s*<script id="lib-pdfjs"\s*src="\./vendor/pdf\.min\.js"\s*defer></script>', '<!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>')
+          sub('pdf.js', r'https://cdnjs\.cloudflare\.com/ajax/libs/pdf\.js/3\.11\.174/pdf\.min\.js', './pdf-runtime.js')
+          sub('pdf.js', r'\./vendor/pdf\.worker\.min\.js', './vendor/pdf.worker.min.mjs')
+          sub('scripts/build.cjs', r"for \(const file of \['index\.html', 'manifest\.json', 'style\.css', 'boot\.js'\]\)", "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'])")
+          sub('scripts/build.cjs', r"('manifest\.json',\s*)('opencoursedeck\.js',)", r"\g<1>'pdf-runtime.js',\n    \g<2>")
+          for config in ('scripts/workbox.config.cjs', 'scripts/workbox-dist.config.cjs'):
+              sub(config, r"('boot\.js',\s*)('manifest\.json',)", r"\g<1>'pdf-runtime.js',\n    \g<2>")
+          Path('pdf-runtime.js').write_text("""import * as pdfjsLib from './vendor/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', import.meta.url).href;
+window.pdfjsLib = pdfjsLib;
+window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
+""", encoding='utf-8')
+          PY
+      - name: Commit source migration
+        shell: bash
+        run: |
+          rm .github/workflows/migrate-pdf-source.yml
+          rm -f far/reports-pdf-replacements.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/pdf-runtime.js far/pdf.js far/index.html far/scripts/vendor-libs.cjs far/scripts/build.cjs far/scripts/workbox.config.cjs far/scripts/workbox-dist.config.cjs far/reports-pdf-replacements.txt .github/workflows/migrate-pdf-source.yml
+          git commit -m "fix: migrate PDF.js runtime to patched ESM build"
+          git push origin HEAD:codex/full-audit-remediation
