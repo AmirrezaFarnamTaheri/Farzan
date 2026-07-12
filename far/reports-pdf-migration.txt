@@ -1,0 +1,342 @@
+
+up to date, audited 835 packages in 2s
+
+236 packages are looking for funding
+  run `npm fund` for details
+
+8 vulnerabilities (3 low, 5 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn deprecated whatwg-encoding@2.0.0: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated npmlog@5.0.1: This package is no longer supported.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated gauge@3.0.2: This package is no longer supported.
+npm warn deprecated source-map@0.8.0-beta.0: The work that was done in this beta branch won't be included in future versions
+npm warn deprecated are-we-there-yet@2.0.0: This package is no longer supported.
+npm warn deprecated tar@6.2.1: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@11.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@11.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 739 packages, and audited 740 packages in 12s
+
+206 packages are looking for funding
+  run `npm fund` for details
+
+8 vulnerabilities (3 low, 5 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+--- pdfjs-dist files ---
+node_modules/pdfjs-dist/CODE_OF_CONDUCT.md
+node_modules/pdfjs-dist/LICENSE
+node_modules/pdfjs-dist/README.md
+node_modules/pdfjs-dist/build/pdf.min.mjs
+node_modules/pdfjs-dist/build/pdf.mjs
+node_modules/pdfjs-dist/build/pdf.mjs.map
+node_modules/pdfjs-dist/build/pdf.sandbox.min.mjs
+node_modules/pdfjs-dist/build/pdf.sandbox.mjs
+node_modules/pdfjs-dist/build/pdf.sandbox.mjs.map
+node_modules/pdfjs-dist/build/pdf.worker.min.mjs
+node_modules/pdfjs-dist/build/pdf.worker.mjs
+node_modules/pdfjs-dist/build/pdf.worker.mjs.map
+node_modules/pdfjs-dist/cmaps/78-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/78-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/78-H.bcmap
+node_modules/pdfjs-dist/cmaps/78-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/78-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/78-V.bcmap
+node_modules/pdfjs-dist/cmaps/78ms-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/78ms-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/83pv-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/90ms-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/90ms-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/90msp-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/90msp-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/90pv-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/90pv-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/Add-H.bcmap
+node_modules/pdfjs-dist/cmaps/Add-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/Add-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/Add-V.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-0.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-1.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-3.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-4.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-5.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-6.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-CNS1-UCS2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-0.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-1.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-3.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-4.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-5.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-GB1-UCS2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-0.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-1.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-3.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-4.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-5.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-6.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Japan1-UCS2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Korea1-0.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Korea1-1.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Korea1-2.bcmap
+node_modules/pdfjs-dist/cmaps/Adobe-Korea1-UCS2.bcmap
+node_modules/pdfjs-dist/cmaps/B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/B5pc-H.bcmap
+node_modules/pdfjs-dist/cmaps/B5pc-V.bcmap
+node_modules/pdfjs-dist/cmaps/CNS-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/CNS-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/CNS1-H.bcmap
+node_modules/pdfjs-dist/cmaps/CNS1-V.bcmap
+node_modules/pdfjs-dist/cmaps/CNS2-H.bcmap
+node_modules/pdfjs-dist/cmaps/CNS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/ETHK-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/ETHK-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/ETen-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/ETen-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/ETenms-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/ETenms-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/Ext-H.bcmap
+node_modules/pdfjs-dist/cmaps/Ext-RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/Ext-RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/Ext-V.bcmap
+node_modules/pdfjs-dist/cmaps/GB-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GB-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/GB-H.bcmap
+node_modules/pdfjs-dist/cmaps/GB-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBK-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBK-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBK2K-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBK2K-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBKp-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBKp-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBT-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBT-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBT-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBT-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBTpc-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBTpc-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/GBpc-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/GBpc-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/H.bcmap
+node_modules/pdfjs-dist/cmaps/HKdla-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKdla-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/HKdlb-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKdlb-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/HKgccs-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKgccs-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/HKm314-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKm314-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/HKm471-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKm471-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/HKscs-B5-H.bcmap
+node_modules/pdfjs-dist/cmaps/HKscs-B5-V.bcmap
+node_modules/pdfjs-dist/cmaps/Hankaku.bcmap
+node_modules/pdfjs-dist/cmaps/Hiragana.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-Johab-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-Johab-V.bcmap
+node_modules/pdfjs-dist/cmaps/KSC-V.bcmap
+node_modules/pdfjs-dist/cmaps/KSCms-UHC-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSCms-UHC-HW-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSCms-UHC-HW-V.bcmap
+node_modules/pdfjs-dist/cmaps/KSCms-UHC-V.bcmap
+node_modules/pdfjs-dist/cmaps/KSCpc-EUC-H.bcmap
+node_modules/pdfjs-dist/cmaps/KSCpc-EUC-V.bcmap
+node_modules/pdfjs-dist/cmaps/Katakana.bcmap
+node_modules/pdfjs-dist/cmaps/LICENSE
+node_modules/pdfjs-dist/cmaps/NWP-H.bcmap
+node_modules/pdfjs-dist/cmaps/NWP-V.bcmap
+node_modules/pdfjs-dist/cmaps/RKSJ-H.bcmap
+node_modules/pdfjs-dist/cmaps/RKSJ-V.bcmap
+node_modules/pdfjs-dist/cmaps/Roman.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UCS2-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UCS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF16-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF16-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF8-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniCNS-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UCS2-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UCS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF16-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF16-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF8-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniGB-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UCS2-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UCS2-HW-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UCS2-HW-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UCS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF16-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF16-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF8-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF16-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF16-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF8-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJIS2004-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISPro-UCS2-HW-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISPro-UCS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISPro-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISX0213-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISX0213-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISX02132004-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniJISX02132004-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UCS2-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UCS2-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF16-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF16-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF32-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF32-V.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF8-H.bcmap
+node_modules/pdfjs-dist/cmaps/UniKS-UTF8-V.bcmap
+node_modules/pdfjs-dist/cmaps/V.bcmap
+node_modules/pdfjs-dist/cmaps/WP-Symbol.bcmap
+node_modules/pdfjs-dist/image_decoders/pdf.image_decoders.min.mjs
+node_modules/pdfjs-dist/image_decoders/pdf.image_decoders.mjs
+node_modules/pdfjs-dist/image_decoders/pdf.image_decoders.mjs.map
+node_modules/pdfjs-dist/legacy/build/pdf.d.mts
+node_modules/pdfjs-dist/legacy/build/pdf.min.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.mjs.map
+node_modules/pdfjs-dist/legacy/build/pdf.sandbox.min.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.sandbox.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.sandbox.mjs.map
+node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs
+node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs.map
+node_modules/pdfjs-dist/legacy/image_decoders/pdf.image_decoders.min.mjs
+node_modules/pdfjs-dist/legacy/image_decoders/pdf.image_decoders.mjs
+node_modules/pdfjs-dist/legacy/image_decoders/pdf.image_decoders.mjs.map
+node_modules/pdfjs-dist/legacy/web/pdf_viewer.css
+node_modules/pdfjs-dist/legacy/web/pdf_viewer.d.mts
+node_modules/pdfjs-dist/legacy/web/pdf_viewer.mjs
+node_modules/pdfjs-dist/legacy/web/pdf_viewer.mjs.map
+node_modules/pdfjs-dist/package.json
+node_modules/pdfjs-dist/standard_fonts/FoxitDingbats.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitFixed.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitFixedBold.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitFixedBoldItalic.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitFixedItalic.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitSerif.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitSerifBold.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitSerifBoldItalic.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitSerifItalic.pfb
+node_modules/pdfjs-dist/standard_fonts/FoxitSymbol.pfb
+node_modules/pdfjs-dist/standard_fonts/LICENSE_FOXIT
+node_modules/pdfjs-dist/standard_fonts/LICENSE_LIBERATION
+node_modules/pdfjs-dist/standard_fonts/LiberationSans-Bold.ttf
+node_modules/pdfjs-dist/standard_fonts/LiberationSans-BoldItalic.ttf
+node_modules/pdfjs-dist/standard_fonts/LiberationSans-Italic.ttf
+node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf
+node_modules/pdfjs-dist/types/src/interfaces.d.ts
+node_modules/pdfjs-dist/types/src/pdf.d.ts
+node_modules/pdfjs-dist/types/web/annotation_editor_layer_builder.d.ts
+node_modules/pdfjs-dist/types/web/annotation_layer_builder.d.ts
+node_modules/pdfjs-dist/types/web/app_options.d.ts
+node_modules/pdfjs-dist/types/web/download_manager.d.ts
+node_modules/pdfjs-dist/types/web/draw_layer_builder.d.ts
+node_modules/pdfjs-dist/types/web/event_utils.d.ts
+node_modules/pdfjs-dist/types/web/generic_scripting.d.ts
+node_modules/pdfjs-dist/types/web/genericl10n.d.ts
+node_modules/pdfjs-dist/types/web/interfaces.d.ts
+node_modules/pdfjs-dist/types/web/l10n.d.ts
+node_modules/pdfjs-dist/types/web/pdf_find_controller.d.ts
+node_modules/pdfjs-dist/types/web/pdf_find_utils.d.ts
+node_modules/pdfjs-dist/types/web/pdf_history.d.ts
+node_modules/pdfjs-dist/types/web/pdf_link_service.d.ts
+node_modules/pdfjs-dist/types/web/pdf_page_view.d.ts
+node_modules/pdfjs-dist/types/web/pdf_rendering_queue.d.ts
+node_modules/pdfjs-dist/types/web/pdf_scripting_manager.component.d.ts
+node_modules/pdfjs-dist/types/web/pdf_scripting_manager.d.ts
+node_modules/pdfjs-dist/types/web/pdf_single_page_viewer.d.ts
+node_modules/pdfjs-dist/types/web/pdf_thumbnail_view.d.ts
+node_modules/pdfjs-dist/types/web/pdf_thumbnail_viewer.d.ts
+node_modules/pdfjs-dist/types/web/pdf_viewer.component.d.ts
+node_modules/pdfjs-dist/types/web/pdf_viewer.d.ts
+node_modules/pdfjs-dist/types/web/struct_tree_layer_builder.d.ts
+node_modules/pdfjs-dist/types/web/text_accessibility.d.ts
+node_modules/pdfjs-dist/types/web/text_highlighter.d.ts
+node_modules/pdfjs-dist/types/web/text_layer_builder.d.ts
+node_modules/pdfjs-dist/types/web/ui_utils.d.ts
+node_modules/pdfjs-dist/types/web/xfa_layer_builder.d.ts
+node_modules/pdfjs-dist/web/images/altText_add.svg
+node_modules/pdfjs-dist/web/images/altText_done.svg
+node_modules/pdfjs-dist/web/images/annotation-check.svg
+node_modules/pdfjs-dist/web/images/annotation-comment.svg
+node_modules/pdfjs-dist/web/images/annotation-help.svg
+node_modules/pdfjs-dist/web/images/annotation-insert.svg
+node_modules/pdfjs-dist/web/images/annotation-key.svg
+node_modules/pdfjs-dist/web/images/annotation-newparagraph.svg
+node_modules/pdfjs-dist/web/images/annotation-noicon.svg
+node_modules/pdfjs-dist/web/images/annotation-note.svg
+node_modules/pdfjs-dist/web/images/annotation-paperclip.svg
+node_modules/pdfjs-dist/web/images/annotation-paragraph.svg
+node_modules/pdfjs-dist/web/images/annotation-pushpin.svg
+node_modules/pdfjs-dist/web/images/cursor-editorFreeHighlight.svg
+node_modules/pdfjs-dist/web/images/cursor-editorFreeText.svg
+node_modules/pdfjs-dist/web/images/cursor-editorInk.svg
+node_modules/pdfjs-dist/web/images/cursor-editorTextHighlight.svg
+node_modules/pdfjs-dist/web/images/editor-toolbar-delete.svg
+node_modules/pdfjs-dist/web/images/loading-icon.gif
+node_modules/pdfjs-dist/web/images/toolbarButton-editorHighlight.svg
+node_modules/pdfjs-dist/web/images/toolbarButton-menuArrow.svg
+node_modules/pdfjs-dist/web/pdf_viewer.css
+node_modules/pdfjs-dist/web/pdf_viewer.d.mts
+node_modules/pdfjs-dist/web/pdf_viewer.mjs
+node_modules/pdfjs-dist/web/pdf_viewer.mjs.map
+node_modules/pdfjs-dist/webpack.mjs
+
+--- production audit ---
+# npm audit report
+
+tar  <=7.5.15
+Severity: high
+node-tar Vulnerable to Arbitrary File Creation/Overwrite via Hardlink Path Traversal - https://github.com/advisories/GHSA-34x7-hfp2-rc4v
+node-tar is Vulnerable to Arbitrary File Overwrite and Symlink Poisoning via Insufficient Path Sanitization - https://github.com/advisories/GHSA-8qq5-rm4j-mr97
+Arbitrary File Read/Write via Hardlink Target Escape Through Symlink Chain in node-tar Extraction - https://github.com/advisories/GHSA-83g3-92jg-28cx
+tar has Hardlink Path Traversal via Drive-Relative Linkpath - https://github.com/advisories/GHSA-qffp-2rhf-9h96
+node-tar Symlink Path Traversal via Drive-Relative Linkpath - https://github.com/advisories/GHSA-9ppj-qmqm-q256
+Race Condition in node-tar Path Reservations via Unicode Ligature Collisions on macOS APFS - https://github.com/advisories/GHSA-r6q2-hw4h-h46w
+node-tar applies PAX size override to intermediary GNU long-name/long-link headers, causing tar parser interpretation differential (file smuggling) - https://github.com/advisories/GHSA-vmf3-w455-68vh
+fix available via `npm audit fix --force`
+Will install pdfjs-dist@4.10.38, which is outside the stated dependency range
+node_modules/tar
+  @mapbox/node-pre-gyp  <=1.0.11
+  Depends on vulnerable versions of tar
+  node_modules/@mapbox/node-pre-gyp
+    canvas  2.8.0 - 2.11.2
+    Depends on vulnerable versions of @mapbox/node-pre-gyp
+    node_modules/canvas
+      pdfjs-dist  3.0.279 - 4.7.76
+      Depends on vulnerable versions of canvas
+      node_modules/pdfjs-dist
+
+4 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix --force
