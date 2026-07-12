@@ -1108,7 +1108,7 @@ describe('app shell resilience helpers', () => {
     expect(view.querySelector('[data-storage-health]').textContent).toContain('Available space');
     expect(view.querySelector('[data-storage-health]').textContent).toContain('localStorage footprint');
     expect(view.querySelector('[data-storage-health]').textContent).toContain('Quota error');
-    expect(view.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('90');
+    expect(view.querySelector('[data-storage-bar]').closest('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('90');
 
     controller.unmount();
   });
