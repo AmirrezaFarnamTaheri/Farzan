@@ -29,7 +29,7 @@ describe('product readiness gating', () => {
     enforceProductReadiness(document);
 
     addVideo.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).not.toHaveBeenCalled();
     expect(addVideo.disabled).toBe(true);
   });
 });
