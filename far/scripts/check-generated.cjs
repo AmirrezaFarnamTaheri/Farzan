@@ -15,11 +15,11 @@ function buildOptionsFor(outputDir) {
     bundle: true,
     format: 'esm',
     splitting: true,
-    sourcemap: true,
+    sourcemap: false,
     minify: true,
     target: ['es2020'],
     platform: 'browser',
-    pure: ['console.warn', 'console.error'],
+    pure: [],
     assetNames: 'assets/[name]-[hash]',
     chunkNames: 'chunks/[name]-[hash]',
     entryNames: 'opencoursedeck',
@@ -41,15 +41,11 @@ function walkFiles(dir, base = dir, files = []) {
 }
 
 function isGeneratedBundleFile(file) {
-  return file === 'opencoursedeck.js'
-    || file === 'opencoursedeck.js.map'
-    || file.startsWith('chunks/');
+  return file === 'opencoursedeck.js' || file.startsWith('chunks/');
 }
 
 function normalizeGeneratedText(text) {
-  return String(text)
-    .replace(/-[a-z0-9]{8}(?=\.js(?:\.map)?\b)/gi, '-HASH')
-    .replace(/sourceMappingURL=[^\s]+/g, 'sourceMappingURL=HASH.map');
+  return String(text).replace(/-[a-z0-9]{8}(?=\.js\b)/gi, '-HASH');
 }
 
 function hashGeneratedFile(file) {
@@ -59,8 +55,7 @@ function hashGeneratedFile(file) {
 
 function inventory(dir, { filter = null } = {}) {
   const files = walkFiles(dir).filter(file => typeof filter !== 'function' || filter(file));
-  const jsFiles = files.filter(file => file.endsWith('.js') && !file.endsWith('.js.map'));
-  const mapFiles = new Set(files.filter(file => file.endsWith('.js.map')));
+  const jsFiles = files.filter(file => file.endsWith('.js'));
   const chunks = jsFiles
     .filter(file => file !== 'opencoursedeck.js')
     .map(file => ({ file, hash: hashGeneratedFile(path.join(dir, file)) }));
@@ -71,8 +66,6 @@ function inventory(dir, { filter = null } = {}) {
       ? { file: 'opencoursedeck.js', hash: hashGeneratedFile(path.join(dir, 'opencoursedeck.js')) }
       : null,
     chunks,
-    missingMaps: jsFiles.filter(file => !mapFiles.has(`${file}.map`)),
-    orphanMaps: [...mapFiles].filter(file => !jsFiles.includes(file.slice(0, -4))),
   };
 }
 
@@ -129,8 +122,8 @@ function compareDirs(expectedDir, actualDir, { filter = null } = {}) {
   }
 
   const chunks = matchByContent(expected.chunks, actual.chunks);
-  missing.push(...chunks.missing, ...actual.missingMaps.map(file => `${file}.map`));
-  extra.push(...chunks.extra, ...actual.orphanMaps);
+  missing.push(...chunks.missing);
+  extra.push(...chunks.extra);
 
   const coalesced = coalesceChangedFiles(missing, extra);
   changed.push(...coalesced.changed);
@@ -158,6 +151,11 @@ async function checkGenerated({ actualOutdir = outdir } = {}) {
 async function main() {
   if (!fs.existsSync(outdir)) {
     console.error('[check-generated] dist/ is missing. Run npm run build.');
+    process.exit(1);
+  }
+  const sourceMaps = walkFiles(outdir).filter(file => file.endsWith('.map'));
+  if (sourceMaps.length) {
+    console.error(`[check-generated] production source maps are not allowed: ${sourceMaps.join(', ')}`);
     process.exit(1);
   }
   const result = await checkGenerated();
