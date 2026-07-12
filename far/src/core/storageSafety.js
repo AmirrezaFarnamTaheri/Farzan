@@ -1,3 +1,5 @@
+import { installBackupEngine } from './backupEngine.js';
+
 const VALID_SCOPES = new Set([
   'progress',
   'notes',
@@ -118,5 +120,6 @@ export function installStorageSafety(root = window) {
     sessionKeys: Object.freeze([...SESSION_KEYS]),
     auxiliaryDatabases: Object.freeze([...AUXILIARY_DATABASES]),
   };
+  installBackupEngine(root);
   return db;
 }
