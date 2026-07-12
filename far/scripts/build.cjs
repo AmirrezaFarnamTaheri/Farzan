@@ -40,6 +40,14 @@ function copyDirectory(from, to) {
   fs.cpSync(from, to, { recursive: true, force: true });
 }
 
+function copyFile(relativePath) {
+  const from = path.join(root, relativePath);
+  const to = path.join(outdir, relativePath);
+  if (!fs.existsSync(from)) throw new Error(`Required release source is missing: ${relativePath}`);
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.copyFileSync(from, to);
+}
+
 function rewriteReleaseStaticFile(file, content) {
   if (file === 'index.html') {
     return content
@@ -59,8 +67,16 @@ function stageStaticAssets() {
   }
 
   // style.css imports the modular stylesheet tree at ./src/styles/index.css.
-  // Stage that tree so the release is actually self-contained.
   copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
+
+  // These small ESM modules are intentionally loaded by boot.js after the main
+  // bundle so safety and capability initialization is explicit and testable.
+  for (const file of [
+    path.join('src', 'core', 'storageSafety.js'),
+    path.join('src', 'features', 'aiClient.js'),
+  ]) {
+    copyFile(file);
+  }
 
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
     const from = path.join(root, file);
@@ -79,6 +95,8 @@ function assertReleaseGraph() {
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
+    path.join('src', 'core', 'storageSafety.js'),
+    path.join('src', 'features', 'aiClient.js'),
   ];
   const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
   if (missing.length) {
