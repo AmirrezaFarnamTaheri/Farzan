@@ -54,10 +54,11 @@ describe('worker pool generation isolation', () => {
   it('rejects only the crashed generation and restarts on the next request', async () => {
     const pool = await loadPool();
     const first = pool.runInWorker('search', { type: 'query', data: { q: 'a' } });
+    const firstRejection = expect(first).rejects.toThrow('crashed');
     const oldWorker = FakeWorker.instances[0];
     oldWorker.crash('crashed');
 
-    await expect(first).rejects.toThrow('crashed');
+    await firstRejection;
     expect(oldWorker.terminated).toBe(true);
 
     const second = pool.runInWorker('search', { type: 'query', data: { q: 'b' } });
@@ -71,10 +72,11 @@ describe('worker pool generation isolation', () => {
   it('ignores late messages from an old generation even when ids are reused externally', async () => {
     const pool = await loadPool();
     const first = pool.runInWorker('search', { type: 'query' });
+    const firstRejection = expect(first).rejects.toThrow('restart');
     const oldWorker = FakeWorker.instances[0];
     const oldId = oldWorker.messages[0].id;
     oldWorker.crash('restart');
-    await expect(first).rejects.toThrow('restart');
+    await firstRejection;
 
     const second = pool.runInWorker('search', { type: 'query' });
     const newWorker = FakeWorker.instances[1];
@@ -102,11 +104,12 @@ describe('worker pool generation isolation', () => {
   it('terminates a timed-out generation and ignores its late response', async () => {
     const pool = await loadPool();
     const request = pool.runInWorker('search', { type: 'query' }, { timeout: 25 });
+    const rejection = expect(request).rejects.toThrow('timed out');
     const worker = FakeWorker.instances[0];
     const id = worker.messages[0].id;
 
     await vi.advanceTimersByTimeAsync(25);
-    await expect(request).rejects.toThrow('timed out');
+    await rejection;
     expect(worker.terminated).toBe(true);
     worker.respond({ type: 'result', id });
     expect(pool.getWorkerStatus().search.pending).toBe(0);
