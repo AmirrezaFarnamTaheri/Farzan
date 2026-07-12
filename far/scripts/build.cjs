@@ -40,14 +40,6 @@ function copyDirectory(from, to) {
   fs.cpSync(from, to, { recursive: true, force: true });
 }
 
-function copyFile(relativePath) {
-  const from = path.join(root, relativePath);
-  const to = path.join(outdir, relativePath);
-  if (!fs.existsSync(from)) throw new Error(`Required release source is missing: ${relativePath}`);
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.copyFileSync(from, to);
-}
-
 function rewriteReleaseStaticFile(file, content) {
   if (file === 'index.html') {
     return content
@@ -69,15 +61,6 @@ function stageStaticAssets() {
   // style.css imports the modular stylesheet tree at ./src/styles/index.css.
   copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
 
-  // These small ESM modules are intentionally loaded by boot.js after the main
-  // bundle so safety and capability initialization is explicit and testable.
-  for (const file of [
-    path.join('src', 'core', 'storageSafety.js'),
-    path.join('src', 'features', 'aiClient.js'),
-  ]) {
-    copyFile(file);
-  }
-
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
     const from = path.join(root, file);
     const to = path.join(outdir, file);
@@ -95,8 +78,6 @@ function assertReleaseGraph() {
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
-    path.join('src', 'core', 'storageSafety.js'),
-    path.join('src', 'features', 'aiClient.js'),
   ];
   const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
   if (missing.length) {
@@ -109,6 +90,9 @@ function assertReleaseGraph() {
   }
   if (bootSource.includes("./dist/opencoursedeck.js")) {
     throw new Error('Production boot file still references the source-root bundle path');
+  }
+  if (/import\(['"]\.\/src\//.test(bootSource)) {
+    throw new Error('Production boot file references unstaged source modules');
   }
 }
 
@@ -128,12 +112,15 @@ async function main() {
   console.log('[build] done');
 }
 
-main().catch((err) => {
-  console.error('[build] failed', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[build] failed', err);
+    process.exit(1);
+  });
+}
 
 module.exports = {
   assertReleaseGraph,
+  main,
   rewriteReleaseStaticFile,
 };
