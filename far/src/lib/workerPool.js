@@ -1,148 +1,172 @@
 const IDLE_TIMEOUT = 30000;
+const IDLE_CHECK_INTERVAL = 10000;
 
 const workerDefs = {
-  search: { url: new URL('../workers/search.worker.js', import.meta.url).href, instance: null, busy: false, lastUsed: 0 },
-  catalog: { url: new URL('../workers/catalog.worker.js', import.meta.url).href, instance: null, busy: false, lastUsed: 0 },
+  search: createDefinition(new URL('../workers/search.worker.js', import.meta.url).href),
+  catalog: createDefinition(new URL('../workers/catalog.worker.js', import.meta.url).href),
 };
 
-let _messageId = 0;
-const _pending = new Map();
+let messageId = 0;
+let idleTimer = null;
 
-function _getWorker(name) {
+function createDefinition(url) {
+  return {
+    url,
+    instance: null,
+    generation: 0,
+    pending: new Map(),
+    lastUsed: 0,
+  };
+}
+
+function isBusy(def) {
+  return def.pending.size > 0;
+}
+
+function rejectGeneration(def, generation, error) {
+  for (const [id, pending] of def.pending) {
+    if (pending.generation !== generation) continue;
+    def.pending.delete(id);
+    pending.reject(error);
+  }
+}
+
+function destroyWorker(def, error = null) {
+  const generation = def.generation;
+  const worker = def.instance;
+  def.instance = null;
+  def.generation += 1;
+  if (worker) {
+    try { worker.terminate(); } catch { /* best effort */ }
+  }
+  if (error) rejectGeneration(def, generation, error);
+}
+
+function getWorker(name) {
   const def = workerDefs[name];
   if (!def) return null;
 
   if (def.instance) {
     def.lastUsed = Date.now();
-    return def.instance;
+    return { worker: def.instance, generation: def.generation, def };
   }
 
   try {
+    const generation = def.generation;
     const worker = new Worker(def.url, { type: 'classic' });
-    worker.onmessage = (e) => {
-      const { type, id, ...data } = e.data || {};
-      const pending = _pending.get(id);
-      if (pending) {
-        _pending.delete(id);
-        def.busy = false;
-        def.lastUsed = Date.now();
-        if (type === 'error') {
-          pending.reject(new Error(data.error || 'Worker error'));
-        } else {
-          pending.resolve({ type, ...data });
-        }
-      }
+
+    worker.onmessage = (event) => {
+      const { type, id, ...data } = event.data || {};
+      const pending = def.pending.get(id);
+      if (!pending || pending.generation !== generation) return;
+      def.pending.delete(id);
+      def.lastUsed = Date.now();
+      if (type === 'error') pending.reject(new Error(data.error || 'Worker error'));
+      else pending.resolve({ type, ...data });
     };
-    worker.onerror = (e) => {
-      def.busy = false;
-      def.instance = null;
-      for (const [id, pending] of _pending) {
-        _pending.delete(id);
-        pending.reject(new Error(`Worker "${name}" crashed: ${e.message || 'unknown error'}`));
-      }
-      console.warn(`[WorkerPool] Worker "${name}" error:`, e.message);
+
+    worker.onerror = (event) => {
+      const error = new Error(`Worker "${name}" crashed: ${event.message || 'unknown error'}`);
+      destroyWorker(def, error);
+      console.warn(`[WorkerPool] Worker "${name}" error:`, event.message);
     };
+
     def.instance = worker;
     def.lastUsed = Date.now();
-    return worker;
+    return { worker, generation, def };
   } catch (error) {
     console.warn(`[WorkerPool] Failed to create worker "${name}":`, error);
     return null;
   }
 }
 
-function _terminateIdle() {
+function terminateIdleWorkers() {
   const now = Date.now();
   for (const def of Object.values(workerDefs)) {
-    if (def.instance && !def.busy && now - def.lastUsed > IDLE_TIMEOUT) {
-      try { def.instance.terminate(); } catch { /* */ }
-      def.instance = null;
-      def.busy = false;
+    if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) {
+      destroyWorker(def);
     }
   }
 }
 
-let _idleTimer = null;
-function _startIdleCheck() {
-  if (_idleTimer) return;
-  _idleTimer = setInterval(_terminateIdle, 10000);
+function startIdleCheck() {
+  if (idleTimer) return;
+  idleTimer = setInterval(terminateIdleWorkers, IDLE_CHECK_INTERVAL);
 }
 
 export function runInWorker(workerName, message, { transfer = [], timeout = 30000 } = {}) {
   return new Promise((resolve, reject) => {
-    const worker = _getWorker(workerName);
-    if (!worker) {
+    const handle = getWorker(workerName);
+    if (!handle) {
       reject(new Error(`Worker "${workerName}" not available`));
       return;
     }
 
-    const def = workerDefs[workerName];
-    if (def.busy) {
+    const { worker, generation, def } = handle;
+    if (isBusy(def)) {
       reject(new Error(`Worker "${workerName}" is busy`));
       return;
     }
 
-    const id = ++_messageId;
-    def.busy = true;
-
+    const id = ++messageId;
     let timer = null;
+
+    const settle = (fn) => (value) => {
+      if (timer) clearTimeout(timer);
+      fn(value);
+    };
+
+    def.pending.set(id, {
+      generation,
+      resolve: settle(resolve),
+      reject: settle(reject),
+    });
+
     if (timeout > 0) {
       timer = setTimeout(() => {
-        _pending.delete(id);
-        def.busy = false;
-        reject(new Error(`Worker "${workerName}" timed out after ${timeout}ms`));
+        const pending = def.pending.get(id);
+        if (!pending || pending.generation !== generation) return;
+        def.pending.delete(id);
+        const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
+        // A timed-out worker may still emit a late response or be stuck in a CPU
+        // loop. Terminate that generation rather than returning it to the pool.
+        destroyWorker(def, error);
+        pending.reject(error);
       }, timeout);
     }
-
-    _pending.set(id, {
-      resolve: (result) => {
-        if (timer) clearTimeout(timer);
-        resolve(result);
-      },
-      reject: (error) => {
-        if (timer) clearTimeout(timer);
-        reject(error);
-      },
-    });
 
     try {
       worker.postMessage({ type: message.type, id, data: message.data || {} }, transfer);
     } catch (error) {
-      _pending.delete(id);
-      def.busy = false;
+      def.pending.delete(id);
       if (timer) clearTimeout(timer);
       reject(error);
     }
 
-    _startIdleCheck();
+    startIdleCheck();
   });
 }
 
 export function terminateAll() {
-  for (const [id, pending] of _pending) {
-    _pending.delete(id);
-    pending.reject(new Error('Worker pool terminated'));
+  for (const [name, def] of Object.entries(workerDefs)) {
+    const error = new Error(`Worker pool terminated: ${name}`);
+    destroyWorker(def, error);
   }
-  for (const def of Object.values(workerDefs)) {
-    if (def.instance) {
-      try { def.instance.terminate(); } catch { /* */ }
-      def.instance = null;
-      def.busy = false;
-    }
-  }
-  if (_idleTimer) {
-    clearInterval(_idleTimer);
-    _idleTimer = null;
+  if (idleTimer) {
+    clearInterval(idleTimer);
+    idleTimer = null;
   }
 }
 
 export function getWorkerStatus() {
   return Object.fromEntries(
     Object.entries(workerDefs).map(([name, def]) => [name, {
-      available: !!def.instance,
-      busy: def.busy,
+      available: Boolean(def.instance),
+      busy: isBusy(def),
+      pending: def.pending.size,
+      generation: def.generation,
       lastUsed: def.lastUsed || null,
-    }])
+    }]),
   );
 }
 

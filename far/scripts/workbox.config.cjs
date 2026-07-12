@@ -5,12 +5,12 @@
 const pkg = require('../package.json');
 
 module.exports = {
-  /** Bumps Workbox cache namespace whenever app version changes — avoids stale precache. */
   cacheId: `opencoursedeck-v${pkg.version}`,
   globDirectory: '.',
   globPatterns: [
     'index.html',
     'boot.js',
+    'pdf-runtime.js',
     'manifest.json',
     'style.css',
     'plasmato_full_*.json',
@@ -21,15 +21,13 @@ module.exports = {
   ],
   swDest: 'sw.js',
   maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-  clientsClaim: true,
-  skipWaiting: true,
-  // Offline fallback: serve the app shell for any navigation to an uncached route.
+  // Do not take over an active editing session. A new worker remains waiting
+  // until clients close/reload and can be activated through the update UI.
+  clientsClaim: false,
+  skipWaiting: false,
   navigateFallback: '/index.html',
   cleanupOutdatedCaches: true,
-  // In case older builds referenced removed files (e.g. dist/index.js),
-  // don't keep them cached forever.
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
-  // Leave runtimeCaching minimal for now; Phase 7 will finalize.
   runtimeCaching: [
     {
       urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
@@ -39,7 +37,7 @@ module.exports = {
         networkTimeoutSeconds: 3,
         expiration: {
           maxEntries: 50,
-          maxAgeSeconds: 24 * 60 * 60, // 1 day
+          maxAgeSeconds: 24 * 60 * 60,
         },
       },
     },
@@ -50,22 +48,20 @@ module.exports = {
         cacheName: 'plasma-vendor',
         expiration: {
           maxEntries: 200,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          maxAgeSeconds: 30 * 24 * 60 * 60,
         },
       },
     },
     {
-      // Ensure app bundle updates reflect quickly in production.
       urlPattern: ({ url }) => url.pathname.startsWith('/dist/'),
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'plasma-dist',
         expiration: {
           maxEntries: 20,
-          maxAgeSeconds: 24 * 60 * 60, // 1 day
+          maxAgeSeconds: 24 * 60 * 60,
         },
       },
     },
   ],
 };
-

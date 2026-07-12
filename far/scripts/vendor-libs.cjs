@@ -13,12 +13,12 @@ const copies = [
     to: 'chart.umd.js',
   },
   {
-    from: 'pdfjs-dist/build/pdf.min.js',
-    to: 'pdf.min.js',
+    from: 'pdfjs-dist/build/pdf.min.mjs',
+    to: 'pdf.min.mjs',
   },
   {
-    from: 'pdfjs-dist/build/pdf.worker.min.js',
-    to: 'pdf.worker.min.js',
+    from: 'pdfjs-dist/build/pdf.worker.min.mjs',
+    to: 'pdf.worker.min.mjs',
   },
   {
     from: 'marked/marked.min.js',
@@ -71,6 +71,21 @@ function main() {
     copyFileFromNodeModules(from, to);
     ok += 1;
   }
+
+  // Keep legacy script URLs operational while loading the patched ESM build.
+  // The mutable facade is required because the PDF security layer wraps getDocument.
+  writeText('pdf.min.js', `void import('./pdf.min.mjs').then((module) => {
+  const pdfjsLib = { ...module };
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', document.baseURI).href;
+  window.pdfjsLib = pdfjsLib;
+  window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
+}).catch((error) => {
+  console.error('[OpenCourseDeck PDF] Failed to load the patched PDF.js module', error);
+});
+`);
+  writeText('pdf.worker.min.js', `void import('./pdf.worker.min.mjs');
+`);
+  ok += 2;
 
   // Font Awesome (CSS + webfonts)
   copyFileFromNodeModules(

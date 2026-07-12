@@ -33,10 +33,34 @@ module.exports = [
     },
   },
   {
+    files: ['pdf.js'],
+    languageOptions: {
+      globals: {
+        pdfjsLib: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['progress.js'],
+    languageOptions: {
+      globals: {
+        Chart: 'readonly',
+        DataStore: 'readonly',
+        DB: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['notes.js'],
+    rules: {
+      // The filename sanitizer intentionally rejects the complete ASCII control range.
+      'no-control-regex': 'off',
+    },
+  },
+  {
     files: ['scripts/**/*.cjs', 'eslint.config.js'],
     languageOptions: {
       sourceType: 'commonjs',
     },
   },
 ];
-

@@ -8,6 +8,7 @@ const CHUNK_LOAD_RE = /Loading chunk|Failed to fetch|ChunkLoadError|Loading CSS 
 
 let _container = null;
 let _retryCount = 0;
+let _initialized = false;
 const MAX_RETRIES = 3;
 
 function isChunkLoadError(error) {
@@ -17,7 +18,7 @@ function isChunkLoadError(error) {
 
 function showErrorUI({ message, showRetry, showReload, showHome }) {
   if (!_container) return;
-  _container.innerHTML = '';
+  _container.replaceChildren();
   const box = document.createElement('div');
   box.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:2rem;text-align:center;';
 
@@ -45,20 +46,42 @@ function showErrorUI({ message, showRetry, showReload, showHome }) {
   if (showReload) btnRow.appendChild(makeBtn('Reload Page', () => location.reload()));
   if (showHome) btnRow.appendChild(makeBtn('Go Home', () => { location.hash = '#/'; location.reload(); }));
 
-  box.appendChild(heading);
-  box.appendChild(desc);
-  box.appendChild(btnRow);
+  box.append(heading, desc, btnRow);
   _container.appendChild(box);
 }
 
-function retryApp() {
-  _retryCount++;
+async function retryApp() {
+  _retryCount += 1;
   if (_retryCount > MAX_RETRIES) {
     showErrorUI({ message: 'Multiple retries failed. Please reload the page.', showRetry: false, showReload: true, showHome: true });
     return;
   }
-  _container.innerHTML = '';
-  window.dispatchEvent(new CustomEvent('pd:app-retry', { detail: { attempt: _retryCount } }));
+
+  const router = window.OpenCourseDeck?.Router || window.Router;
+  const retryEvent = new CustomEvent('pd:app-retry', {
+    detail: { attempt: _retryCount, handled: false },
+    cancelable: true,
+  });
+  window.dispatchEvent(retryEvent);
+
+  try {
+    if (typeof router?.refresh === 'function') {
+      await router.refresh({ source: 'error-boundary', attempt: _retryCount });
+      _retryCount = 0;
+      return;
+    }
+    if (typeof router?._handle === 'function') {
+      await router._handle({ force: true, detail: { source: 'error-boundary', attempt: _retryCount } });
+      _retryCount = 0;
+      return;
+    }
+  } catch (error) {
+    console.error('[ErrorBoundary] retry failed', error);
+  }
+
+  // There is no safe generic way to reconstruct an unknown failed module
+  // graph in place. Reload is the explicit final recovery action.
+  location.reload();
 }
 
 function onError(event) {
@@ -98,6 +121,8 @@ function onUnhandledRejection(event) {
  */
 export function initErrorBoundary({ container } = {}) {
   _container = container ?? document.getElementById('plasma-app') ?? document.body;
+  if (_initialized) return;
+  _initialized = true;
   window.addEventListener('error', onError);
   window.addEventListener('unhandledrejection', onUnhandledRejection);
 }

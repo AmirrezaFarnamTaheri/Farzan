@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -12,7 +12,7 @@ describe('bundle and CSP reporting', () => {
     expect(csp['media-src']).toEqual(["'self'", 'http:', 'https:']);
   });
 
-  it('fails reports that exceed size budgets or weaken critical CSP rules', async () => {
+  it('fails reports that exceed raw or compressed size budgets or weaken critical CSP rules', async () => {
     const { evaluateReport } = await import('../scripts/bundle-report.cjs');
 
     const failures = evaluateReport({
@@ -20,6 +20,7 @@ describe('bundle and CSP reporting', () => {
         totalJsBytes: 999999,
         largestJsBytes: 999999,
         entryBytes: 999999,
+        entryGzipBytes: 999999,
       },
       csp: {
         'script-src': ["'self'", "'unsafe-inline'"],
@@ -33,6 +34,7 @@ describe('bundle and CSP reporting', () => {
       expect.stringContaining('total JS'),
       expect.stringContaining('largest JS'),
       expect.stringContaining('entry JS'),
+      expect.stringContaining('entry gzip JS'),
       'CSP script-src must not include unsafe-inline',
       'CSP media-src must keep remote http:/https: support',
     ]));

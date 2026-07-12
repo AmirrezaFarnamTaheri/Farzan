@@ -2,10 +2,14 @@
 import './core/storageMigrate.js';
 
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
+import { initEndpointApprovalGuard } from './core/endpointApprovalGuard.js';
 import '../data.js';
 import '../db.js';
 import '../ui.js';
 import '../bridge.js';
+import { installStorageSafety } from './core/storageSafety.js';
+import { installDataHardening } from './core/dataHardening.js';
+import { enforceProductReadiness } from './core/productReadiness.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
 import * as easing from './lib/easing.js';
@@ -24,11 +28,16 @@ import faIR from './locales/fa-IR.js';
 import { TranslatorRegistry, BaseTranslator, GoogleTranslator, OpenAITranslator, CustomAPITranslator, LANGUAGES, getLanguageName } from './features/translator.js';
 import * as translationCache from './features/translationCache.js';
 import { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems } from './features/noteTemplates.js';
+import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
 import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';
+
+installStorageSafety(window);
+installDataHardening(window);
+initEndpointApprovalGuard(document);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
@@ -55,6 +64,7 @@ pd.LANGUAGES = LANGUAGES;
 pd.getLanguageName = getLanguageName;
 pd.TranslationCache = translationCache;
 pd.NoteTemplates = { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems };
+pd.AI = initAIClient(window);
 pd.CanvasZoom = CanvasZoom;
 pd.CourseGraph = CourseGraph;
 pd.KnowledgeGraph = KnowledgeGraph;
@@ -101,6 +111,7 @@ pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature
 initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
+pd.ProductReadiness = enforceProductReadiness(document);
 
 try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 
@@ -188,7 +199,7 @@ if ('serviceWorker' in navigator) {
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              document.dispatchEvent(new CustomEvent('plasma:sw-update-ready'));
+              document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration } }));
             }
           });
         });
@@ -204,7 +215,7 @@ if ('serviceWorker' in navigator) {
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (window.__plasmaSwReloading) return;
+    if (!window.__plasmaSwUpdateAccepted || window.__plasmaSwReloading) return;
     window.__plasmaSwReloading = true;
     location.reload();
   });

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { initEndpointApprovalGuard } from '../src/core/endpointApprovalGuard.js';
 import { mountSettingsView } from '../src/views/settingsRoute.js';
+
+initEndpointApprovalGuard(document);
 
 function mountSettings(saved = null) {
   document.body.innerHTML = '<main id="main-content"></main>';

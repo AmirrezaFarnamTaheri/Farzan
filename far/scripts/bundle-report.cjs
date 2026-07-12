@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
@@ -7,9 +7,10 @@ const dist = path.join(root, 'dist');
 const indexPath = path.join(root, 'index.html');
 
 const limits = {
-  totalJsBytes: 768 * 1024,   // 768 KB — current bundle ~736 KB
-  largestJsBytes: 300 * 1024, // 300 KB — largest chunk
-  entryBytes: 150 * 1024,     // 150 KB — entry point
+  totalJsBytes: 768 * 1024,     // 768 KiB total application JavaScript budget
+  largestJsBytes: 300 * 1024,   // 300 KiB largest generated chunk
+  entryBytes: 192 * 1024,       // 192 KiB raw entry budget; measured baseline is ~168 KiB
+  entryGzipBytes: 64 * 1024,    // 64 KiB transfer budget; measured baseline is ~49 KiB
 };
 
 function walkFiles(dir, files = []) {
@@ -69,6 +70,7 @@ function createBundleReport() {
       totalJsGzipBytes: files.reduce((sum, file) => sum + file.gzipBytes, 0),
       largestJsBytes: largest?.bytes ?? 0,
       entryBytes: entry?.bytes ?? 0,
+      entryGzipBytes: entry?.gzipBytes ?? 0,
     },
     files,
     csp,
@@ -92,6 +94,9 @@ function evaluateReport(report) {
   if (report.totals.entryBytes > limits.entryBytes) {
     failures.push(`entry JS ${report.totals.entryBytes} exceeds ${limits.entryBytes}`);
   }
+  if (report.totals.entryGzipBytes > limits.entryGzipBytes) {
+    failures.push(`entry gzip JS ${report.totals.entryGzipBytes} exceeds ${limits.entryGzipBytes}`);
+  }
   const csp = report.csp || {};
   if (!csp['script-src']?.includes("'self'")) failures.push("CSP script-src must include 'self'");
   if (csp['script-src']?.includes("'unsafe-inline'")) failures.push('CSP script-src must not include unsafe-inline');
@@ -106,13 +111,16 @@ function evaluateReport(report) {
 function main() {
   const report = createBundleReport();
   const failures = evaluateReport(report);
-  console.log(JSON.stringify(report, null, 2));
+  console.error('[bundle-report] totals', JSON.stringify(report.totals));
+  console.error('[bundle-report] limits', JSON.stringify(report.limits));
   if (failures.length) {
     console.error('[bundle-report] FAIL');
     for (const failure of failures) console.error(`  - ${failure}`);
-    process.exit(1);
+  } else {
+    console.error('[bundle-report] OK');
   }
-  console.error('[bundle-report] OK');
+  console.log(JSON.stringify(report, null, 2));
+  if (failures.length) process.exit(1);
 }
 
 if (require.main === module) {

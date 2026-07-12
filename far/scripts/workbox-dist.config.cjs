@@ -11,11 +11,13 @@ module.exports = {
   globPatterns: [
     'index.html',
     'boot.js',
+    'pdf-runtime.js',
     'manifest.json',
     'style.css',
     'src/styles/**',
+    'src/core/storageSafety.js',
+    'src/features/aiClient.js',
     'opencoursedeck.js',
-    'opencoursedeck.js.map',
     'chunks/**',
     'assets/**',
     'vendor/**',
@@ -24,8 +26,11 @@ module.exports = {
   ],
   swDest: 'dist/sw.js',
   maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-  clientsClaim: true,
-  skipWaiting: true,
+  // Keep a new worker waiting until existing clients naturally release it.
+  // This prevents an update from taking control and reloading a page while a
+  // note, canvas mutation, backup import, or playback checkpoint is in flight.
+  clientsClaim: false,
+  skipWaiting: false,
   navigateFallback: './index.html',
   cleanupOutdatedCaches: true,
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],

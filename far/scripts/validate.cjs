@@ -8,8 +8,8 @@ const espree = require('espree');
 const root = path.join(__dirname, '..');
 const requiredVendor = [
   'chart.umd.js',
-  'pdf.min.js',
-  'pdf.worker.min.js',
+  'pdf.min.mjs',
+  'pdf.worker.min.mjs',
   'marked.min.js',
   'purify.min.js',
   'fuse.min.js',
