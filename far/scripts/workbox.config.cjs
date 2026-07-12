@@ -10,6 +10,7 @@ module.exports = {
   globPatterns: [
     'index.html',
     'boot.js',
+    'pdf-runtime.js',
     'manifest.json',
     'style.css',
     'plasmato_full_*.json',
