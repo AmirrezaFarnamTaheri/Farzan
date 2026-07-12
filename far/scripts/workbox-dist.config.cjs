@@ -11,6 +11,7 @@ module.exports = {
   globPatterns: [
     'index.html',
     'boot.js',
+    'pdf-runtime.js',
     'manifest.json',
     'style.css',
     'src/styles/**',
