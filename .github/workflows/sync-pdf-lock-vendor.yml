@@ -1,0 +1,41 @@
+name: Sync patched PDF lock and vendor assets
+
+on:
+  push:
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/sync-pdf-lock-vendor.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Regenerate lock and vendor PDF assets
+        shell: bash
+        run: |
+          cd far
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+          npm ci --ignore-scripts --legacy-peer-deps
+          cp node_modules/pdfjs-dist/build/pdf.min.mjs vendor/pdf.min.mjs
+          cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs vendor/pdf.worker.min.mjs
+          rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
+          npm audit --omit=dev --audit-level=high
+      - name: Commit synchronized files
+        shell: bash
+        run: |
+          rm .github/workflows/sync-pdf-lock-vendor.yml
+          rm -f far/reports-pdf-migration.txt far/reports-pdf-4.10.38.txt far/reports-pdf-replacements.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/package-lock.json far/vendor/pdf.min.mjs far/vendor/pdf.worker.min.mjs far/vendor/pdf.min.js far/vendor/pdf.worker.min.js far/reports-pdf-migration.txt far/reports-pdf-4.10.38.txt far/reports-pdf-replacements.txt .github/workflows/sync-pdf-lock-vendor.yml
+          git commit -m "build: sync patched PDF.js assets"
+          git push origin HEAD:codex/full-audit-remediation
