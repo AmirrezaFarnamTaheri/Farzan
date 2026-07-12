@@ -1,4 +1,4 @@
-name: Stage patched PDF.js ESM assets
+name: Diagnose PDF vendor synchronization
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  sync:
+  diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -19,17 +19,25 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - run: |
+      - name: Capture vendor command results
+        shell: bash
+        run: |
           cd far
-          npm ci --ignore-scripts --legacy-peer-deps
-          cp node_modules/pdfjs-dist/build/pdf.min.mjs vendor/pdf.min.mjs
-          cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs vendor/pdf.worker.min.mjs
-          rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
-      - name: Commit vendor assets
+          set +e
+          log=reports-pdf-vendor.txt
+          : > "$log"
+          run() { printf '\n=== %s ===\n' "$*" >> "$log"; "$@" >> "$log" 2>&1; printf 'exit=%s\n' "$?" >> "$log"; }
+          run npm ci --ignore-scripts --legacy-peer-deps
+          run cp node_modules/pdfjs-dist/build/pdf.min.mjs vendor/pdf.min.mjs
+          run cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs vendor/pdf.worker.min.mjs
+          run rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
+          run ls -lh vendor/pdf.min.mjs vendor/pdf.worker.min.mjs
+          run git status --short vendor
+      - name: Commit diagnostics
         run: |
           rm .github/workflows/sync-pdf-vendor-only.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A far/vendor .github/workflows/sync-pdf-vendor-only.yml
-          git commit -m "build: stage patched PDF.js ESM assets"
+          git add far/reports-pdf-vendor.txt .github/workflows/sync-pdf-vendor-only.yml
+          git commit -m "chore: diagnose PDF vendor synchronization"
           git push origin HEAD:codex/full-audit-remediation
