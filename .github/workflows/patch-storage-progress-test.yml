@@ -1,0 +1,48 @@
+name: One-shot storage progress test patch
+
+on:
+  push:
+    branches:
+      - codex/full-audit-remediation
+    paths:
+      - .github/workflows/patch-storage-progress-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+
+      - name: Apply exact selector update
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('far/tests/app-core.test.js')
+          text = path.read_text(encoding='utf-8')
+          old = "expect(view.querySelector('[role=\"progressbar\"]').getAttribute('aria-valuenow')).toBe('90');"
+          if old not in text:
+              old = "expect(view.querySelector('[role=\'progressbar\']').getAttribute('aria-valuenow')).toBe('90');"
+          new = "expect(view.querySelector('[data-storage-bar]').closest('[role=\"progressbar\"]').getAttribute('aria-valuenow')).toBe('90');"
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected exactly one progressbar assertion, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          Path('.github/workflows/patch-storage-progress-test.yml').unlink()
+          PY
+
+      - name: Commit patch and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/tests/app-core.test.js .github/workflows/patch-storage-progress-test.yml
+          git commit -m "test(settings): target storage progress meter"
+          git push origin HEAD:codex/full-audit-remediation
