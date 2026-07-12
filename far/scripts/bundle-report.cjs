@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
@@ -106,13 +106,16 @@ function evaluateReport(report) {
 function main() {
   const report = createBundleReport();
   const failures = evaluateReport(report);
-  console.log(JSON.stringify(report, null, 2));
+  console.error('[bundle-report] totals', JSON.stringify(report.totals));
+  console.error('[bundle-report] limits', JSON.stringify(report.limits));
   if (failures.length) {
     console.error('[bundle-report] FAIL');
     for (const failure of failures) console.error(`  - ${failure}`);
-    process.exit(1);
+  } else {
+    console.error('[bundle-report] OK');
   }
-  console.error('[bundle-report] OK');
+  console.log(JSON.stringify(report, null, 2));
+  if (failures.length) process.exit(1);
 }
 
 if (require.main === module) {
