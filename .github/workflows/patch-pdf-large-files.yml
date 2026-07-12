@@ -1,0 +1,57 @@
+name: Patch PDF.js loader references
+
+on:
+  push:
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/patch-pdf-large-files.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+      - name: Apply exact loader replacements
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          index = Path('far/index.html')
+          text = index.read_text(encoding='utf-8-sig')
+          old = '''<!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->
+  <script id="lib-pdfjs"
+    src="./vendor/pdf.min.js"
+    defer></script>'''
+          new = '''<!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->
+  <script type="module" src="./pdf-runtime.js"></script>'''
+          if text.count(old) != 1:
+              raise SystemExit(f'index.html PDF loader matches: {text.count(old)}')
+          index.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          pdf = Path('far/pdf.js')
+          text = pdf.read_text(encoding='utf-8-sig')
+          replacements = {
+              './vendor/pdf.worker.min.js': './vendor/pdf.worker.min.mjs',
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js': './pdf-runtime.js',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'pdf.js {old} matches: {text.count(old)}')
+              text = text.replace(old, new, 1)
+          pdf.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit loader migration
+        run: |
+          rm .github/workflows/patch-pdf-large-files.yml
+          rm -f far/reports-pdf-replacements.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/index.html far/pdf.js far/reports-pdf-replacements.txt .github/workflows/patch-pdf-large-files.yml
+          git commit -m "fix: load patched PDF.js ESM runtime"
+          git push origin HEAD:codex/full-audit-remediation
