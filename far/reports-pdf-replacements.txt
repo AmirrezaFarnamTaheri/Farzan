@@ -1,0 +1,9 @@
+scripts/vendor-libs.cjs "from: 'pdfjs-dist/build/pdf\\.min\\.js',\\s*to: 'pdf\\.min\\.js'," matches= 1
+scripts/vendor-libs.cjs "from: 'pdfjs-dist/build/pdf\\.worker\\.min\\.js',\\s*to: 'pdf\\.worker\\.min\\.js'," matches= 1
+index.html '<!-- PDF\\.js \\(vendored from pdfjs-dist@3\\.11\\.174\\) -->\\s*<script id="lib-pdfjs"\\s*src="\\./vendor/pdf\\.min\\.js"\\s*defer></script>' matches= 1
+pdf.js 'https://cdnjs\\.cloudflare\\.com/ajax/libs/pdf\\.js/3\\.11\\.174/pdf\\.min\\.js' matches= 1
+pdf.js '\\./vendor/pdf\\.worker\\.min\\.js' matches= 1
+scripts/build.cjs "for \\(const file of \\['index\\.html', 'manifest\\.json', 'style\\.css', 'boot\\.js'\\]\\)" matches= 1
+scripts/build.cjs "('manifest\\.json',\\s*)('opencoursedeck\\.js',)" matches= 1
+scripts/workbox.config.cjs "('boot\\.js',\\s*)('manifest\\.json',)" matches= 1
+scripts/workbox-dist.config.cjs "('boot\\.js',\\s*)('manifest\\.json',)" matches= 1
