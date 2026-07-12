@@ -71,7 +71,7 @@ function stageStaticAssets() {
   }
   copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
 
-  for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js']) {
+  for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js']) {
     const from = path.join(root, file);
     const to = path.join(outdir, file);
     if (!fs.existsSync(from)) continue;
@@ -85,6 +85,7 @@ function assertReleaseGraph() {
     'index.html',
     'boot.js',
     'manifest.json',
+    'pdf-runtime.js',
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
