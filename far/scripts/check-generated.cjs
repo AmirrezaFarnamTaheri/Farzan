@@ -99,8 +99,8 @@ function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.
   else if (!expectedEntry && actualEntry) extra.push(actualEntry.file);
   else if (expectedEntry && actualEntry && expectedEntry.hash !== actualEntry.hash) changed.push(expectedEntry.file);
 
-  const expectedChunks = expected.filter(record => record.file.startsWith('chunks/') && record.file.endsWith('.js'));
-  const actualChunks = actual.filter(record => record.file.startsWith('chunks/') && record.file.endsWith('.js'));
+  const expectedChunks = expected.filter(record => record.file.startsWith('chunks/'));
+  const actualChunks = actual.filter(record => record.file.startsWith('chunks/'));
   const chunks = contentMatch(expectedChunks, actualChunks);
   missing.push(...chunks.missing);
   extra.push(...chunks.extra);
