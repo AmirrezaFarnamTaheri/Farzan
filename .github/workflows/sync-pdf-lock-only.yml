@@ -1,0 +1,30 @@
+name: Regenerate patched PDF lockfile
+
+on:
+  push:
+    branches: [codex/full-audit-remediation]
+    paths: [.github/workflows/sync-pdf-lock-only.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/full-audit-remediation
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - run: cd far && npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+      - name: Commit lockfile
+        run: |
+          rm .github/workflows/sync-pdf-lock-only.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add far/package-lock.json .github/workflows/sync-pdf-lock-only.yml
+          git commit -m "build: regenerate patched PDF.js lockfile"
+          git push origin HEAD:codex/full-audit-remediation
