@@ -123,5 +123,6 @@ export function installStorageSafety(root = window) {
   };
   installBackupEngine(root);
   installPdfSecurity(root);
+  root.addEventListener?.('opencoursedeck:pdfjs-ready', () => installPdfSecurity(root), { once: true });
   return db;
 }
