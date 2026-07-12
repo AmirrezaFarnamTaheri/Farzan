@@ -13,12 +13,12 @@ const copies = [
     to: 'chart.umd.js',
   },
   {
-    from: 'pdfjs-dist/build/pdf.min.js',
-    to: 'pdf.min.js',
+    from: 'pdfjs-dist/build/pdf.min.mjs',
+    to: 'pdf.min.mjs',
   },
   {
-    from: 'pdfjs-dist/build/pdf.worker.min.js',
-    to: 'pdf.worker.min.js',
+    from: 'pdfjs-dist/build/pdf.worker.min.mjs',
+    to: 'pdf.worker.min.mjs',
   },
   {
     from: 'marked/marked.min.js',
