@@ -19,15 +19,4 @@ export function createRouter({
 
     on(path, handler) {
       this._routes[path] = handler;
-      return this;
-    },
-
-    navigate(path) {
-      window.location.hash = path;
-    },
-
-    refresh(detail = {}) {
-      return this._handle?.({ force: true, detail });
-    },
-
-    destroy()
+      return
