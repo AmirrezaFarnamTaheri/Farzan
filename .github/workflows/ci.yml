@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -23,4 +23,98 @@ jobs:
         working-directory: far
 
     steps:
-      -
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Vendor browser dependencies
+        run: npm run vendor
+
+      - name: Check encoding
+        run: npm run check:encoding
+
+      - name: Validate repository
+        run: npm run validate
+
+      - name: Lint source
+        run: |
+          mkdir -p reports
+          npm run lint -- --format json --output-file reports/eslint.json
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eslint-report-${{ github.run_number }}
+          path: far/reports/eslint.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build release
+        run: npm run build:release
+
+      - name: Verify generated artifacts
+        run: npm run check:generated
+
+      - name: Run tests
+        run: |
+          mkdir -p reports
+          npm test -- --reporter=json --outputFile=reports/vitest.json
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vitest-report-${{ github.run_number }}
+          path: far/reports/vitest.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Audit production dependency advisories
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit project rules
+        run: npm run audit
+
+      - name: Generate bundle report
+        run: npm run report:bundle
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          npm run smoke 2>&1 | tee reports/smoke.log
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: smoke-report-${{ github.run_number }}
+          path: far/reports/smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Run browser smoke tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
+
+      - name: Upload browser smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: browser-smoke-report-${{ github.run_number }}
+          path: far/reports/browser-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
