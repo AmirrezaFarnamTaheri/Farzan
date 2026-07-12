@@ -44,7 +44,7 @@
     "dompurify": "^3.4.0",
     "fuse.js": "7.0.0",
     "marked": "9.1.6",
-    "pdfjs-dist": "3.11.174"
+    "pdfjs-dist": "4.10.38"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
