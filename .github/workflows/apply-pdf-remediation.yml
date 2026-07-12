@@ -1,4 +1,4 @@
-name: Apply confirmed PDF.js remediation
+name: Diagnose confirmed PDF.js remediation
 
 on:
   push:
@@ -9,9 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -19,50 +19,26 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: far/package-lock.json
-      - name: Upgrade and validate PDF.js
+      - name: Capture exact migration failure
         shell: bash
         run: |
           cd far
-          npm install pdfjs-dist@4.10.38 --save-exact --package-lock-only --ignore-scripts --legacy-peer-deps
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace(path, old, new):
-              p = Path(path)
-              text = p.read_text(encoding='utf-8-sig')
-              if text.count(old) != 1:
-                  raise SystemExit(f'{path}: expected one match, found {text.count(old)}')
-              p.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          replace('scripts/vendor-libs.cjs', "from: 'pdfjs-dist/build/pdf.min.js',\n    to: 'pdf.min.js',", "from: 'pdfjs-dist/build/pdf.min.mjs',\n    to: 'pdf.min.mjs',")
-          replace('scripts/vendor-libs.cjs', "from: 'pdfjs-dist/build/pdf.worker.min.js',\n    to: 'pdf.worker.min.js',", "from: 'pdfjs-dist/build/pdf.worker.min.mjs',\n    to: 'pdf.worker.min.mjs',")
-          replace('index.html', '<!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->\n  <script id="lib-pdfjs"\n    src="./vendor/pdf.min.js"\n    defer></script>', '<!-- PDF.js ESM runtime (vendored from patched pdfjs-dist) -->\n  <script type="module" src="./pdf-runtime.js"></script>')
-          replace('pdf.js', './vendor/pdf.worker.min.js', './vendor/pdf.worker.min.mjs')
-          replace('pdf.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', './pdf-runtime.js')
-          replace('scripts/build.cjs', "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js'])", "for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'])")
-          replace('scripts/build.cjs', "    'manifest.json',\n    'opencoursedeck.js',", "    'manifest.json',\n    'pdf-runtime.js',\n    'opencoursedeck.js',")
-          for config in ['scripts/workbox.config.cjs', 'scripts/workbox-dist.config.cjs']:
-              replace(config, "    'boot.js',\n    'manifest.json',", "    'boot.js',\n    'pdf-runtime.js',\n    'manifest.json',")
-          Path('pdf-runtime.js').write_text("""import * as pdfjsLib from './vendor/pdf.min.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', import.meta.url).href;
-window.pdfjsLib = pdfjsLib;
-window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
-""", encoding='utf-8')
-          PY
-          npm ci --ignore-scripts --legacy-peer-deps
-          rm -f vendor/pdf.min.js vendor/pdf.worker.min.js
-          npm run vendor
-          npm audit --omit=dev --audit-level=high
-          npm run build:release
-      - name: Commit upgrade
+          set +e
+          log=reports-pdf-4.10.38.txt
+          : > "$log"
+          run() { printf '\n=== %s ===\n' "$*" >> "$log"; "$@" >> "$log" 2>&1; printf 'exit=%s\n' "$?" >> "$log"; }
+          run npm install pdfjs-dist@4.10.38 --save-exact --package-lock-only --ignore-scripts --legacy-peer-deps
+          run npm ci --ignore-scripts --legacy-peer-deps
+          run find node_modules/pdfjs-dist/build -maxdepth 1 -type f
+          run npm audit --omit=dev --audit-level=high
+          run test -f node_modules/pdfjs-dist/build/pdf.min.mjs
+          run test -f node_modules/pdfjs-dist/build/pdf.worker.min.mjs
+      - name: Commit diagnostics
         shell: bash
         run: |
           rm .github/workflows/apply-pdf-remediation.yml
-          rm -f far/reports-pdf-migration.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A far .github/workflows/apply-pdf-remediation.yml
-          git commit -m "fix: upgrade PDF.js and clear production audit"
+          git add far/reports-pdf-4.10.38.txt .github/workflows/apply-pdf-remediation.yml
+          git commit -m "chore: capture confirmed PDF migration failure"
           git push origin HEAD:codex/full-audit-remediation
