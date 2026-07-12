@@ -2,6 +2,7 @@
 import './core/storageMigrate.js';
 
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
+import { initEndpointApprovalGuard } from './core/endpointApprovalGuard.js';
 import '../data.js';
 import '../db.js';
 import '../ui.js';
@@ -36,6 +37,7 @@ import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
 installStorageSafety(window);
 installDataHardening(window);
+initEndpointApprovalGuard(document);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
