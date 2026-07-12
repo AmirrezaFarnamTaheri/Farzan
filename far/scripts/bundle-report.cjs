@@ -7,7 +7,7 @@ const dist = path.join(root, 'dist');
 const indexPath = path.join(root, 'index.html');
 
 const limits = {
-  totalJsBytes: 768 * 1024,   // 768 KB — current bundle ~736 KB
+  totalJsBytes: 768 * 1024,   // 768 KB total application JavaScript budget
   largestJsBytes: 300 * 1024, // 300 KB — largest chunk
   entryBytes: 150 * 1024,     // 150 KB — entry point
 };
