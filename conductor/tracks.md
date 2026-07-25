@@ -12,3 +12,4 @@
 - [x] **Track 09**: Advanced Offline AI Text Summarization, Flashcard Generation & Keyword Extraction (`far/src/features/aiClient.js`, `far/tests/ai-client-ext.test.js`)
 - [x] **Track 10**: PWA Offline Storage & Multi-Device LWW State Sync Pipeline (`far/src/features/offlineSync.js`, `far/tests/offline-sync.test.js`)
 - [x] **Track 11**: Full Root Layout Promotion, CI/CD Pipeline Hardening & Zero-Warning ESLint Hygiene (`.github/workflows/ci.yml`, `db.js`, `ui.js`)
+- [x] **Track 14**: Cross-Platform Native Tauri v2 Desktop Packaging & NSIS Staging (`src-tauri/`, `desktop-dist/`)
