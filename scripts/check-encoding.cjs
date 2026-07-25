@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const ignored = new Set(['node_modules', 'dist', '.git', '.npm-cache', 'src-tauri', 'tauri-dev', 'electron-builder-master', 'Electron.NET-main']);
+const ignored = new Set(['node_modules', 'dist', '.git', '.npm-cache', 'src-tauri', 'tauri-dev', 'electron-builder-master', 'Electron.NET-main', 'far']);
 const pattern = /(?:ðŸ|Ã¢â‚¬|Ã°)/;
 const extensions = new Set(['.js', '.cjs', '.css', '.html', '.md', '.json']);
 const failures = [];
