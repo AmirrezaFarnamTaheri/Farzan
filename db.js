@@ -17,19 +17,32 @@ this.encryptionPassphrase = null;
 
 setPassphrase(passphrase) {
   this.encryptionPassphrase = passphrase;
+  this._cryptoKey = null;
+}
+
+_getCrypto() {
+  if (globalThis.crypto && globalThis.crypto.subtle) return globalThis.crypto;
+  if (globalThis.webcrypto && globalThis.webcrypto.subtle) return globalThis.webcrypto;
+  try {
+    const nodeCrypto = (typeof require !== 'undefined') ? require('node:crypto') : null;
+    if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) return nodeCrypto.webcrypto;
+  } catch {
+  }
+  return null;
 }
 
 async _deriveKey(passphrase, saltStr = 'opencoursedeck-salt') {
-  if (typeof crypto === 'undefined' || !crypto.subtle) return null;
+  const cryptoObj = this._getCrypto();
+  if (!cryptoObj || !cryptoObj.subtle) return null;
   const encoder = new TextEncoder();
-  const baseKey = await crypto.subtle.importKey(
+  const baseKey = await cryptoObj.subtle.importKey(
     'raw',
     encoder.encode(passphrase),
     'PBKDF2',
     false,
     ['deriveKey']
   );
-  return crypto.subtle.deriveKey(
+  return cryptoObj.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: encoder.encode(saltStr),
@@ -44,12 +57,14 @@ async _deriveKey(passphrase, saltStr = 'opencoursedeck-salt') {
 }
 
 async encryptPayload(data) {
-  if (!this.encryptionPassphrase || typeof crypto === 'undefined' || !crypto.subtle) return data;
+  if (!this.encryptionPassphrase) return data;
+  const cryptoObj = this._getCrypto();
+  if (!cryptoObj || !cryptoObj.subtle) return data;
   const key = await this._deriveKey(this.encryptionPassphrase);
   if (!key) return data;
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iv = cryptoObj.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(data));
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  const ciphertext = await cryptoObj.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
   return {
     __encrypted: true,
     iv: Array.from(iv),
@@ -58,14 +73,17 @@ async encryptPayload(data) {
 }
 
 async decryptPayload(data) {
-  if (!data || !data.__encrypted || !this.encryptionPassphrase || typeof crypto === 'undefined' || !crypto.subtle) return data;
+  if (!data || !data.__encrypted || !this.encryptionPassphrase) return data;
+  const cryptoObj = this._getCrypto();
+  if (!cryptoObj || !cryptoObj.subtle) return data;
   const key = await this._deriveKey(this.encryptionPassphrase);
   if (!key) return data;
   const iv = new Uint8Array(data.iv);
   const ciphertext = new Uint8Array(data.ciphertext);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  const decrypted = await cryptoObj.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
   return JSON.parse(new TextDecoder().decode(decrypted));
 }
+
 
 async open() {
 if (this.db) return this.db;
@@ -269,76 +287,6 @@ r.onerror=()=>rej(r.error);
 r.onblocked=()=>rej(new Error(`Deletion of IndexedDB database "${name}" was blocked`));
 });
 }
-
-  // ── Encryption helpers (AES-256-GCM via PBKDF2 key derivation) ───────────
-  /** Resolve the Web Crypto API across browser, jsdom, and Node.js. */
-  _getCrypto() {
-    // Browser / modern jsdom with Crypto implementation
-    if (globalThis.crypto && globalThis.crypto.subtle) return globalThis.crypto;
-    // Node.js 15+ global webcrypto
-    if (globalThis.webcrypto && globalThis.webcrypto.subtle) return globalThis.webcrypto;
-    // Node.js 15+ via require – works in CommonJS and ESM with createRequire
-    try {
-      // eslint-disable-next-line no-undef
-      const nodeCrypto = (typeof require !== 'undefined')
-        ? require('node:crypto')
-        : null;
-      if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) return nodeCrypto.webcrypto;
-    } catch (_) {}
-    throw new Error('Web Crypto API (crypto.subtle) is not available in this environment.');
-  }
-
-  setPassphrase(passphrase) {
-    this._passphrase = passphrase;
-    this._cryptoKey = null;
-  }
-
-  async _deriveKey() {
-    if (this._cryptoKey) return this._cryptoKey;
-    if (!this._passphrase) throw new Error('No passphrase set. Call setPassphrase() first.');
-    const crypto = this._getCrypto();
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey(
-      'raw', enc.encode(this._passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
-    );
-    this._cryptoKey = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: enc.encode('opencoursedeck-salt'), iterations: 100_000, hash: 'SHA-256' },
-      baseKey,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
-    return this._cryptoKey;
-  }
-
-  async encryptPayload(data) {
-    const crypto = this._getCrypto();
-    const key = await this._deriveKey();
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipherbuf = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      new TextEncoder().encode(JSON.stringify(data))
-    );
-    return {
-      __encrypted: true,
-      ciphertext: Array.from(new Uint8Array(cipherbuf)),
-      iv: Array.from(iv),
-    };
-  }
-
-  async decryptPayload(envelope) {
-    if (!envelope || !envelope.__encrypted) return envelope;
-    const crypto = this._getCrypto();
-    const key = await this._deriveKey();
-    const plainbuf = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: new Uint8Array(envelope.iv) },
-      key,
-      new Uint8Array(envelope.ciphertext)
-    );
-    return JSON.parse(new TextDecoder().decode(plainbuf));
-  }
-  // ─────────────────────────────────────────────────────────────────────────
 }
 
 class DBQuery {

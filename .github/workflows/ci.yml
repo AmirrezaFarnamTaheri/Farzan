@@ -18,9 +18,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: far
 
     steps:
       - name: Check out repository
@@ -31,7 +28,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: far/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
@@ -55,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: eslint-report-${{ github.run_number }}
-          path: far/reports/eslint.json
+          path: reports/eslint.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -75,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: vitest-report-${{ github.run_number }}
-          path: far/reports/vitest.json
+          path: reports/vitest.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -97,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: bundle-report-${{ github.run_number }}
-          path: far/reports/bundle-report.log
+          path: reports/bundle-report.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -113,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: smoke-report-${{ github.run_number }}
-          path: far/reports/smoke.log
+          path: reports/smoke.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -128,6 +125,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: browser-smoke-report-${{ github.run_number }}
-          path: far/reports/browser-smoke.log
+          path: reports/browser-smoke.log
           if-no-files-found: ignore
           retention-days: 7
+

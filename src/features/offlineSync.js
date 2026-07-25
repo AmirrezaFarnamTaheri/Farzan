@@ -3,7 +3,7 @@
  * Handles multi-device state synchronization via exportable encrypted payloads and LWW timestamp resolution.
  */
 
-export function createSyncPackage(cards = [], notes = [], { passphrase = '' } = {}) {
+export function createSyncPackage(cards = [], notes = [], { _passphrase = '' } = {}) {
   const payload = {
     version: 1,
     exportedAt: Date.now(),

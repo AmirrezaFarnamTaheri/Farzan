@@ -17,3 +17,7 @@ Electron.NET-main/
 debug.log
 server-*.log
 opencoursedeck-server.pid
+.cargo/
+.smart-coding-cache/
+.code-review-graph/
+plasmato_downloads/

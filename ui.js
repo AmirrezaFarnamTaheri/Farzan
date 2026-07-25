@@ -10,7 +10,8 @@
     // ── Shared micro-utilities ────────────────────────────
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-    const uid = (p = 'ui') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
+    // eslint-disable-next-line no-unused-vars
+    const _uid = (p = 'ui') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
     const esc = s => {
       if (s == null) return '';
       if (s instanceof Node) return s.outerHTML || '';
@@ -18,7 +19,8 @@
         ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     };
 
-    function animH(el, open, dur = 250) {
+    // eslint-disable-next-line no-unused-vars
+    function _animH(el, open, dur = 250) {
       return new Promise(resolve => {
         el.style.overflow   = 'hidden';
         el.style.transition = `height ${dur}ms ease`;
