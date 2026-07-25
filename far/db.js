@@ -12,6 +12,59 @@ this.name = name;
 this.version = version;
 this.schema = schema;
 this.db = null;
+this.encryptionPassphrase = null;
+}
+
+setPassphrase(passphrase) {
+  this.encryptionPassphrase = passphrase;
+}
+
+async _deriveKey(passphrase, saltStr = 'opencoursedeck-salt') {
+  if (typeof crypto === 'undefined' || !crypto.subtle) return null;
+  const encoder = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode(saltStr),
+      iterations: 10000,
+      hash: 'SHA-256'
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async encryptPayload(data) {
+  if (!this.encryptionPassphrase || typeof crypto === 'undefined' || !crypto.subtle) return data;
+  const key = await this._deriveKey(this.encryptionPassphrase);
+  if (!key) return data;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(JSON.stringify(data));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  return {
+    __encrypted: true,
+    iv: Array.from(iv),
+    ciphertext: Array.from(new Uint8Array(ciphertext))
+  };
+}
+
+async decryptPayload(data) {
+  if (!data || !data.__encrypted || !this.encryptionPassphrase || typeof crypto === 'undefined' || !crypto.subtle) return data;
+  const key = await this._deriveKey(this.encryptionPassphrase);
+  if (!key) return data;
+  const iv = new Uint8Array(data.iv);
+  const ciphertext = new Uint8Array(data.ciphertext);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return JSON.parse(new TextDecoder().decode(decrypted));
 }
 
 async open() {

@@ -1,19 +1,19 @@
-# far/ subtree ignores (build output, deps, native targets)
-/far/.npm-cache
-/far/desktop-dist/nsis-extract
-/far/dist/vendor
-/far/electron-builder-master
-/far/Electron.NET-main
-/far/src-tauri/target
-/far/tauri-dev
-/far/vendor/*
-!/far/vendor/pdf.min.mjs
-!/far/vendor/pdf.worker.min.mjs
-/far/src-tauri
-/.cargo
-
-# Root-level debris (downloaded tooling, test artifacts)
+node_modules/
+.npm-cache/
+dist/
+sw.js
+sw.js.map
+workbox-*.js
+workbox-*.js.map
+desktop-dist/
+*.exe
 *.nupkg
+*.zip
 *.crate
-crates.io-index
-test.txt
+src-tauri/target/
+tauri-dev/
+electron-builder-master/
+Electron.NET-main/
+debug.log
+server-*.log
+opencoursedeck-server.pid
