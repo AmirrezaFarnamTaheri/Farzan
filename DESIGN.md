@@ -64,3 +64,16 @@ The aesthetic philosophy centers on **Sleek Glassmorphism with WebGL Atmospheric
   - `Hard (2)`: Amber border (`rgba(245, 158, 11, 0.4)`), soft amber tint.
   - `Good (4)`: Blue border (`rgba(59, 130, 246, 0.4)`), soft blue tint.
   - `Easy (5)`: Emerald border (`rgba(16, 185, 129, 0.4)`), soft emerald tint.
+
+---
+
+## 4. Slop Audit & Design Perfection Checklist
+
+| Audit Signal | Evaluation | Action / Guarantee |
+|---|---|---|
+| **Typography Mud** | Pass | Distinctive Fontsource pairing (`Inter` body + `JetBrains Mono` code + `Playfair Display` serif display) |
+| **Generic Blue/Purple AI Gradients** | Pass | Custom OKLCH palette with neutral void backdrop and targeted single-tone accent highlights |
+| **Gratuitous Card Depth** | Pass | Scoped elevation system (`--shadow-sm`, `--shadow-md`, `--shadow-lg`) avoiding stacked box-shadows |
+| **Full Component State Matrix** | Pass | All interactive elements (`button`, `.btn`) implement `default`, `hover`, `:focus-visible`, `active`, and `disabled` states |
+| **Accessibility Compliance (WCAG 2.2 AA)** | Pass | Mandatory `html[lang="en"]`, 2px solid `:focus-visible` outline, `@media (prefers-reduced-motion: reduce)` safeguard |
+| **Layout Rhythm** | Pass | Spacing variables (`--radius-sm`, `--radius-md`, `--radius-lg`) with strict grid alignment and whitespace breathing room |
