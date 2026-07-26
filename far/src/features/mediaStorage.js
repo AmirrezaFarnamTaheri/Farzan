@@ -68,10 +68,24 @@ export class MediaStorage {
     this._flushThrottled = throttle(() => this.flush(), THROTTLE_MS);
 
     // Best-effort final flush when the tab goes away, so the last position
-    // write survives a close without player teardown.
+    // write survives a close without player teardown. Named handler so
+    // destroy() can unregister it — players create per-instance storages,
+    // and an anonymous listener would pin every destroyed instance.
+    this._onPagehide = () => { this.flush(); };
     if (typeof window !== 'undefined') {
-      window.addEventListener('pagehide', () => { this.flush(); });
+      window.addEventListener('pagehide', this._onPagehide);
     }
+  }
+
+  /**
+   * Flush pending writes and release the pagehide listener. Call when the
+   * owning player is destroyed.
+   */
+  destroy() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', this._onPagehide);
+    }
+    return this.flush();
   }
 
   /**

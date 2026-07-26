@@ -1,0 +1,6 @@
+/* Spin keyframes: referenced by components.css .btn.loading / .spinner-circle
+   (var(--duration-spin)). This file was previously empty, so loading
+   spinners rendered as a static, non-rotating arc. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

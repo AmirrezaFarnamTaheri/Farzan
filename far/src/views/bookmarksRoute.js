@@ -3,7 +3,11 @@ export function mountBookmarksView(deps = {}) {
     setView,
     createElement,
     Router,
-    Toast = window.OpenCourseDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast
+      // Fall back to no-ops: Toast may be unregistered during partial
+      // init or in test harnesses, and a bare Toast.success() then threw
+      // mid-handler, skipping the post-mutation UI refresh.
+      ?? { success() {}, error() {}, info() {}, warning() {} },
     setPendingCourseMedia,
     setPendingPdfPage,
     sanitizeHtml,

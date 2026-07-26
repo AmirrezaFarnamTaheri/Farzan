@@ -193,6 +193,12 @@
     const _sourceId = `pd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
     function _getIdb() {
+      // Subscribe on ANY database access, not just writes: the channel used
+      // to be created lazily inside _broadcast(), so a tab that had only
+      // read data never attached an onmessage handler and silently showed
+      // stale content (then clobbered the other tab's edits on its first
+      // write). Every read path goes through here.
+      _ensureSyncChannel();
       const PlasmaDB = window.OpenCourseDeck?.DB?.PlasmaDB;
       if (typeof PlasmaDB !== 'function') return null;
       if (_idb && _idbCtor === PlasmaDB) return _idb;
@@ -236,8 +242,7 @@
     }
 
     // Issue 10: close BroadcastChannel on page unload
-    function _broadcast(kind, action, record) {
-      const payload = { kind, action, record, source: _sourceId, timestamp: Date.now() };
+    function _ensureSyncChannel() {
       try {
         if (!_sync && typeof window.BroadcastChannel === 'function') {
           _sync = new window.BroadcastChannel('opencoursedeck_sync');
@@ -251,7 +256,15 @@
             window.addEventListener('beforeunload', () => { try { _sync?.close?.(); } catch {} });
           }
         }
-        _sync?.postMessage?.(payload);
+      } catch {
+        // BroadcastChannel is optional.
+      }
+      return _sync;
+    }
+    function _broadcast(kind, action, record) {
+      const payload = { kind, action, record, source: _sourceId, timestamp: Date.now() };
+      try {
+        _ensureSyncChannel()?.postMessage?.(payload);
       } catch {
         // BroadcastChannel is optional.
       }
@@ -286,127 +299,125 @@
       try { localStorage.setItem(MIGRATED_IDS_KEY, JSON.stringify([..._migratedIds])); } catch {}
     }
 
+    let _migrating = null;
+    let _lastMigrateFailureAt = 0;
+    const MIGRATE_RETRY_BACKOFF_MS = 5000;
+
     async function _migrateOnce() {
       if (localStorage.getItem(KEY_MIGRATED) === 'true') return true;
+      // Memoize the in-flight run: concurrent DB calls before the migrated
+      // flag is set must share one migration, not start parallel runs that
+      // race each other (and any concurrent deletes) with duplicate puts.
+      if (_migrating) return _migrating;
+      // Back off after a failure so a persistently failing section does not
+      // turn every subsequent DB call into a full migration attempt.
+      if (_lastMigrateFailureAt && Date.now() - _lastMigrateFailureAt < MIGRATE_RETRY_BACKOFF_MS) return false;
+      _migrating = _runMigration().finally(() => { _migrating = null; });
+      return _migrating;
+    }
+
+    // Migrate one section: read legacy records, batch-insert the not-yet
+    // migrated ones in a single transaction, then persist the id ledger.
+    // Records without an id get a DETERMINISTIC id derived from their array
+    // index so a retried run (after another section failed) matches the
+    // ledger instead of re-inserting duplicates under fresh random ids.
+    async function _migrateSection(idb, ids, failures, section, store, buildRecords) {
+      if (_migratedSections.has(section)) return;
+      try {
+        const pending = [];
+        for (const [rid, record] of buildRecords()) {
+          if (ids.has(rid)) continue;
+          pending.push([rid, record]);
+        }
+        if (pending.length) {
+          const records = pending.map(([, record]) => record);
+          // One transaction for the whole section instead of one per record
+          // (PlasmaDB.put opens a fresh readwrite transaction each call, so
+          // a few thousand legacy records meant a multi-second stall on
+          // first load). Fall back to sequential puts for DB adapters that
+          // do not implement bulkPut.
+          if (typeof idb.bulkPut === 'function') {
+            await idb.bulkPut(store, records);
+          } else {
+            for (const record of records) await idb.put(store, record);
+          }
+          for (const [rid] of pending) ids.add(rid);
+          _persistMigratedIds();
+        }
+        _migratedSections.add(section);
+      } catch (error) { failures.push({ section, error: _errorInfo(error) }); }
+    }
+
+    async function _runMigration() {
       const idb = _getIdb();
       if (!idb) return false;
       const failures = [];
       const ids = _loadMigratedIds();
-      let dirty = false;
       try {
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration starting',data:{hasLegacyProgress:!!localStorage.getItem(KEY_PROGRESS),hasLegacyTs:!!localStorage.getItem(KEY_TIMESTAMPS),hasLegacyNotes:!!localStorage.getItem('plasma-notes')},timestamp:Date.now()});
 
-        if (!_migratedSections.has('progress')) {
-          try {
-            const map = _read(KEY_PROGRESS, {});
-            for (const [key, v] of Object.entries(map)) {
-              if (!v || !v.topicId) continue;
-              const rid = `progress:${key}`;
-              if (ids.has(rid)) continue;
-              await idb.put('progress', v);
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('progress');
-          } catch (error) { failures.push({ section: 'progress', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'progress', 'progress', () => {
+          const map = _read(KEY_PROGRESS, {});
+          return Object.entries(map)
+            .filter(([, v]) => v && v.topicId)
+            .map(([key, v]) => [`progress:${key}`, v]);
+        });
 
-        if (!_migratedSections.has('timestamps')) {
-          try {
-            const list = _read(KEY_TIMESTAMPS, []);
-            for (const ts of list) {
-              if (!ts) continue;
-              const id = ts.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-              const rid = `timestamps:${id}`;
-              if (ids.has(rid)) continue;
-              await idb.put('timestamps', { ...ts, id });
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('timestamps');
-          } catch (error) { failures.push({ section: 'timestamps', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'timestamps', 'timestamps', () => {
+          const list = _read(KEY_TIMESTAMPS, []);
+          return list
+            .map((ts, i) => (ts ? [ts, ts.id ?? `ts-migrated-${i}`] : null))
+            .filter(Boolean)
+            .map(([ts, id]) => [`timestamps:${id}`, { ...ts, id }]);
+        });
 
-        if (!_migratedSections.has('notes')) {
-          try {
-            const notes = _read('plasma-notes', []);
-            for (const n of notes) {
-              if (!n) continue;
-              const id = n.id ?? `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-              const rid = `notes:${id}`;
-              if (ids.has(rid)) continue;
-              await idb.put('notes', { ...n, id });
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('notes');
-          } catch (error) { failures.push({ section: 'notes', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'notes', 'notes', () => {
+          const notes = _read('plasma-notes', []);
+          return notes
+            .map((n, i) => (n ? [n, n.id ?? `note-migrated-${i}`] : null))
+            .filter(Boolean)
+            .map(([n, id]) => [`notes:${id}`, { ...n, id }]);
+        });
 
-        if (!_migratedSections.has('folders')) {
-          try {
-            const folders = _read('plasma-folders', []);
-            for (const f of folders) {
-              if (!f) continue;
-              const id = f.id ?? `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-              const rid = `folders:${id}`;
-              if (ids.has(rid)) continue;
-              await idb.put('folders', { ...f, id });
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('folders');
-          } catch (error) { failures.push({ section: 'folders', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'folders', 'folders', () => {
+          const folders = _read('plasma-folders', []);
+          return folders
+            .map((f, i) => (f ? [f, f.id ?? `folder-migrated-${i}`] : null))
+            .filter(Boolean)
+            .map(([f, id]) => [`folders:${id}`, { ...f, id }]);
+        });
 
-        if (!_migratedSections.has('settings')) {
-          try {
-            const ns = _read('plasma-notes-settings', null);
-            const rid = 'settings:notes';
-            if (ns && typeof ns === 'object' && !ids.has(rid)) {
-              await idb.put('settings', { key: 'notes', value: ns });
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('settings');
-          } catch (error) { failures.push({ section: 'settings', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'settings', 'settings', () => {
+          const ns = _read('plasma-notes-settings', null);
+          return ns && typeof ns === 'object'
+            ? [['settings:notes', { key: 'notes', value: ns }]]
+            : [];
+        });
 
-        if (!_migratedSections.has('annotations')) {
-          try {
-            const annsRaw = _read('plasma-pdf-annotations', {});
-            const anns = Array.isArray(annsRaw)
-              ? annsRaw
-              : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
-            for (const a of anns) {
-              if (!a) continue;
-              const id = a.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-              const rid = `annotations:${id}`;
-              if (ids.has(rid)) continue;
-              await idb.put('annotations', { ...a, id });
-              ids.add(rid);
-              dirty = true;
-            }
-            _migratedSections.add('annotations');
-          } catch (error) { failures.push({ section: 'annotations', error: _errorInfo(error) }); }
-          if (dirty) { _persistMigratedIds(); dirty = false; }
-        }
+        await _migrateSection(idb, ids, failures, 'annotations', 'annotations', () => {
+          const annsRaw = _read('plasma-pdf-annotations', {});
+          const anns = Array.isArray(annsRaw)
+            ? annsRaw
+            : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
+          return anns
+            .map((a, i) => (a ? [a, a.id ?? `ann-migrated-${i}`] : null))
+            .filter(Boolean)
+            .map(([a, id]) => [`annotations:${id}`, { ...a, id }]);
+        });
 
         if (failures.length) {
+          _lastMigrateFailureAt = Date.now();
           _emit('storage:migration-error', { kind: 'migration', backend: 'indexedDB', failures });
           return false;
         }
 
         localStorage.setItem(KEY_MIGRATED, 'true');
         localStorage.removeItem(MIGRATED_IDS_KEY);
+        _lastMigrateFailureAt = 0;
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration completed',data:{},timestamp:Date.now()});
         return true;
       } catch (e) {
+        _lastMigrateFailureAt = Date.now();
         console.warn('[DB] migration failed:', e);
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration failed',data:{err:String(e&&e.message||e)},timestamp:Date.now()});
         return false;
@@ -462,7 +473,10 @@
       const map = _read(KEY_PROGRESS, {});
       map[topicId] = next;
       _write(KEY_PROGRESS, map);
-      window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });    
+      window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
+      // BroadcastChannel works regardless of backend — fallback writes must
+      // sync across tabs too.
+      _broadcast('progress', 'save', next);
       return next;
     }
 
@@ -493,6 +507,7 @@
       if (idx >= 0) list[idx] = next;
       else list.push(next);
       _write(KEY_TIMESTAMPS, list);
+      _broadcast('timestamp', 'save', next);
       return true;
     }
 
@@ -544,22 +559,28 @@
         _signalSaveError('note', 'localStorage', e, { key: 'plasma-notes' });
         throw e;
       }
+      _broadcast('note', 'save', next);
       return next;
     }
 
     // Issue 7: add await _migrateOnce()
     async function deleteNote(id) {
       const idb = _getIdb();
+      let idbDeleted = false;
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('notes', id); } catch {}
+        try { await idb.delete('notes', id); idbDeleted = true; } catch {}
       }
-      if (!_isMigrated()) {
+      if (idbDeleted && _isMigrated()) {
+        // Post-migration the localStorage mirror is stale; clear it only when
+        // the canonical IndexedDB delete actually happened. If IDB is gone,
+        // the mirror may be the only live store — wiping it would erase
+        // EVERY note, so fall through to a targeted filter instead.
+        localStorage.removeItem('plasma-notes');
+      } else {
         const list = _read('plasma-notes', []);
         const next = list.filter(n => n?.id !== id);
         _write('plasma-notes', next);
-      } else {
-        localStorage.removeItem('plasma-notes');
       }
       _broadcast('note', 'delete', { id });
     }
@@ -591,20 +612,25 @@
       if (idx >= 0) list[idx] = next;
       else list.push(next);
       _write('plasma-folders', list);
+      _broadcast('folder', 'save', next);
       return next;
     }
 
     async function deleteFolder(id) {
       const idb = _getIdb();
+      let idbDeleted = false;
       if (idb) {
-        try { await idb.delete('folders', id); } catch {}
+        // Pre-migration, deleting from IDB alone is a no-op and a later
+        // migration would resurrect the folder from localStorage.
+        await _migrateOnce();
+        try { await idb.delete('folders', id); idbDeleted = true; } catch {}
       }
-      if (!_isMigrated()) {
+      if (idbDeleted && _isMigrated()) {
+        localStorage.removeItem('plasma-folders');
+      } else {
         const list = _read('plasma-folders', []);
         const next = list.filter(f => f?.id !== id);
         _write('plasma-folders', next);
-      } else {
-        localStorage.removeItem('plasma-folders');
       }
       _broadcast('folder', 'delete', { id });
     }

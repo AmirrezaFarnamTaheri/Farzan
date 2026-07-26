@@ -96,21 +96,35 @@ export function createEaseOutBack(s = c1) {
   return (t) => 1 + (s + 1) * (t - 1) ** 3 + s * (t - 1) ** 2;
 }
 
+/**
+ * Standard Penner amplitude/period guard: for an amplitude below 1,
+ * `Math.asin(1 / a)` has |argument| > 1 and returns NaN, which poisons every
+ * frame of the animation. Amplitudes < 1 are clamped to 1 with the phase
+ * shift set to p/4 instead.
+ * @param {number} a amplitude
+ * @param {number} p period
+ * @returns {{ amplitude: number, shift: number }}
+ */
+function elasticParams(a, p) {
+  if (!(a >= 1)) return { amplitude: 1, shift: p / 4 };
+  return { amplitude: a, shift: (p / (2 * PI)) * Math.asin(1 / a) };
+}
+
 export function createEaseInElastic(a = 1, p = 0.3) {
-  const s = (p / (2 * PI)) * Math.asin(1 / (a || 1));
+  const { amplitude, shift } = elasticParams(a, p);
   return (t) => {
     if (t === 0) return 0;
     if (t === 1) return 1;
-    return -(a * 2 ** (10 * (t - 1))) * Math.sin(((t - 1) - s) * (2 * PI) / p);
+    return -(amplitude * 2 ** (10 * (t - 1))) * Math.sin(((t - 1) - shift) * (2 * PI) / p);
   };
 }
 
 export function createEaseOutElastic(a = 1, p = 0.3) {
-  const s = (p / (2 * PI)) * Math.asin(1 / (a || 1));
+  const { amplitude, shift } = elasticParams(a, p);
   return (t) => {
     if (t === 0) return 0;
     if (t === 1) return 1;
-    return a * 2 ** (-10 * t) * Math.sin((t - s) * (2 * PI) / p) + 1;
+    return amplitude * 2 ** (-10 * t) * Math.sin((t - shift) * (2 * PI) / p) + 1;
   };
 }
 

@@ -21,10 +21,6 @@ const copies = [
     to: 'pdf.worker.min.mjs',
   },
   {
-    from: 'marked/marked.min.js',
-    to: 'marked.min.js',
-  },
-  {
     from: 'dompurify/dist/purify.min.js',
     to: 'purify.min.js',
   },

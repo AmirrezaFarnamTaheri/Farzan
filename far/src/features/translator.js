@@ -33,12 +33,16 @@ export function validateTranslatorEndpoint(value, label = 'Translator endpoint')
   try {
     parsed = new URL(source);
   } catch {
-    throw new TypeError(`${label} is invalid`);
+    throw new TypeError(`${label} is invalid — provide an absolute URL such as https://api.example.com/v1/translate`);
   }
-  if (parsed.username || parsed.password) throw new TypeError(`${label} must not contain embedded credentials`);
-  if (!['http:', 'https:'].includes(parsed.protocol)) throw new TypeError(`${label} must use HTTP or HTTPS`);
+  if (parsed.username || parsed.password) {
+    throw new TypeError(`${label} must not contain embedded credentials — remove the user:password@ part and supply the API key via the API-key field instead`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new TypeError(`${label} must use HTTP or HTTPS — got "${parsed.protocol}"; use an https:// URL`);
+  }
   if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
-    throw new TypeError(`${label} must use HTTPS unless it targets localhost`);
+    throw new TypeError(`${label} must use HTTPS unless it targets localhost — change the URL to https:// or run the service on 127.0.0.1/localhost`);
   }
   return parsed.href;
 }

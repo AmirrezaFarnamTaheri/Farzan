@@ -6,7 +6,13 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const ignored = new Set(['node_modules', 'dist', '.git', '.npm-cache', 'src-tauri', 'tauri-dev', 'electron-builder-master', 'Electron.NET-main']);
-const pattern = /(?:ðŸ|Ã¢â‚¬|Ã°)/;
+// Detects UTF-8 text that was re-decoded as Latin-1/Windows-1252 (mojibake).
+// NOTE: this pattern must itself stay single-round-corrupted-text-free —
+// a previous revision matched "Ã¢â‚¬" (mojibake OF mojibake) instead of the
+// actual single-round signature "â€" that appears in real corrupted files,
+// so it silently passed while app.js/pdf.js/player.js shipped garbled
+// dashes/quotes/em-dashes to users.
+const pattern = /(?:ðŸ|â€|Ã¢|Ã°)/;
 const extensions = new Set(['.js', '.cjs', '.css', '.html', '.md', '.json']);
 const failures = [];
 

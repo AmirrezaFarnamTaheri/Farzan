@@ -217,7 +217,8 @@ function createServer(options = {}) {
     } catch {
       // Malformed percent-encoding must not crash the process.
       finish(400);
-      return send(res, 400, { 'Content-Type': 'text/plain' }, 'Bad Request');
+      return send(res, 400, { 'Content-Type': 'text/plain' },
+        'Bad Request: the URL path contains malformed percent-encoding. Remove stray "%" characters or encode them as "%25".');
     }
     const filePath = safeJoin(serverRoot, rel);
     if (!filePath) {

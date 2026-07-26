@@ -55,13 +55,26 @@ export const chartArc = {
       const t = Math.min(1, elapsed / (chart._arcDuration || 800));
       chart._arcProgress = easeOutCubic(t);
       if (t < 1) {
-        requestAnimationFrame(() => {
+        // Store the id and re-check the chart is still alive before the
+        // next draw: a route unmount can call chart.destroy() (nulling
+        // chart.ctx) while this frame is pending, and drawing into a
+        // destroyed chart throws.
+        chart._arcRaf = requestAnimationFrame(() => {
+          chart._arcRaf = null;
+          if (!chart.ctx) return;
           chart.draw();
           chart._arcDrawing = false;
         });
       } else {
         chart._arcDrawing = false;
       }
+    }
+  },
+
+  afterDestroy(chart) {
+    if (chart._arcRaf) {
+      cancelAnimationFrame(chart._arcRaf);
+      chart._arcRaf = null;
     }
   },
 

@@ -674,4 +674,81 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ id: 'folder-b' }),
     ]);
   });
+  it('gives id-less legacy records deterministic ids so a retried migration cannot duplicate them', async () => {
+    // Records without an id previously got a fresh random id on every run,
+    // so the dedupe ledger never matched and each retry re-inserted them.
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { topicId: 't1', time: 12 },
+      { topicId: 't2', time: 34 },
+    ]));
+
+    await window.DB.getAllTimestamps();
+    const first = await window.DB.getAllTimestamps();
+    expect(first).toHaveLength(2);
+    const ids = first.map((ts) => ts.id).sort();
+    expect(ids).toEqual(['ts-migrated-0', 'ts-migrated-1']);
+
+    // Force another migration pass over the same legacy payload.
+    localStorage.removeItem('plasma_migrated_v2');
+    await window.DB.getAllTimestamps();
+    const second = await window.DB.getAllTimestamps();
+
+    expect(second).toHaveLength(2);
+    expect(second.map((ts) => ts.id).sort()).toEqual(ids);
+  });
+
+  it('shares one in-flight migration across concurrent DB calls', async () => {
+    localStorage.setItem('plasma-notes', JSON.stringify([
+      { id: 'concurrent-note', title: 'Legacy', updatedAt: 1 },
+    ]));
+
+    const [a, b, c] = await Promise.all([
+      window.DB.getAllNotes(),
+      window.DB.getAllNotes(),
+      window.DB.getAllNotes(),
+    ]);
+
+    // No duplicate inserts from parallel migration runs.
+    for (const result of [a, b, c]) {
+      expect(result.filter((n) => n.id === 'concurrent-note')).toHaveLength(1);
+    }
+  });
+
+  it('keeps the localStorage note mirror intact when the IndexedDB delete cannot run', async () => {
+    // Post-migration but with IndexedDB unavailable, the mirror is the only
+    // live store -- removing the whole key would erase every note.
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma-notes', JSON.stringify([
+      { id: 'keep-me', title: 'Survivor' },
+      { id: 'drop-me', title: 'Doomed' },
+    ]));
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+
+    await window.DB.deleteNote('drop-me');
+
+    const remaining = JSON.parse(localStorage.getItem('plasma-notes'));
+    expect(remaining).toEqual([expect.objectContaining({ id: 'keep-me' })]);
+  });
+
+  it('broadcasts localStorage-fallback writes so cross-tab sync works without IndexedDB', async () => {
+    const channels = [];
+    class BroadcastChannelMock {
+      constructor(name) {
+        this.name = name;
+        this.postMessage = vi.fn();
+        this.close = vi.fn();
+        channels.push(this);
+      }
+    }
+    window.BroadcastChannel = BroadcastChannelMock;
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+
+    await window.DB.saveNote({ id: 'fallback-note', title: 'No IDB' });
+
+    expect(channels.length).toBeGreaterThanOrEqual(1);
+    const posted = channels.flatMap((ch) => ch.postMessage.mock.calls.map(([msg]) => msg));
+    expect(posted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'note', action: 'save' }),
+    ]));
+  });
 });

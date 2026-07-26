@@ -74,9 +74,44 @@ export function installDataHardening(root = window) {
       const isSWR = cache === 'swr';
 
       if (allowCache) {
-        const hit = isSWR ? this._cache.peek(cacheKey) : null;
-        if (!isSWR && this._cache.has(cacheKey)) return this._cache.get(cacheKey);
-        if (isSWR && hit?.value !== undefined && !hit.stale) return hit.value;
+        if (!isSWR) {
+          // Single get(): has()+get() races TTL expiry and can resolve
+          // the request with undefined.
+          const cached = this._cache.get(cacheKey);
+          if (cached !== undefined) return cached;
+        } else {
+          const hit = this._cache.peek(cacheKey);
+          if (hit?.value !== undefined) {
+            // Preserve stale-while-revalidate semantics: return the stale
+            // value immediately and refresh in the background (deduped via
+            // _pendingRequests). Blocking on the network here would defeat
+            // the offline-first contract of QueryBuilder.swr().
+            if (hit.stale && !this._pendingRequests.has(cacheKey)) {
+              // Must resolve to data: concurrent GETs dedupe onto this
+              // promise via _pendingRequests and would otherwise receive
+              // undefined.
+              const refresh = (async () => {
+                try {
+                  const fresh = await this.request(normalizedMethod, url, {
+                    ...options,
+                    cache: false,
+                  });
+                  this._cache.set(cacheKey, fresh, cacheTTL);
+                  root.OpenCourseDeck?.bus?.emit?.('data:cacheUpdate', { url: fullURL, key: cacheKey });
+                  return fresh;
+                } catch {
+                  // Background refresh failures keep serving the stale value.
+                  return hit.value;
+                }
+              })();
+              this._pendingRequests.set(cacheKey, refresh);
+              refresh.finally(() => {
+                if (this._pendingRequests.get(cacheKey) === refresh) this._pendingRequests.delete(cacheKey);
+              });
+            }
+            return hit.value;
+          }
+        }
       }
 
       if (normalizedMethod === 'GET' && this._pendingRequests.has(cacheKey)) {

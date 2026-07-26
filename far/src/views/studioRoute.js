@@ -6,7 +6,10 @@ safeMediaUrl,
 safeFrameUrl,
 setPendingCourseMedia,
 Router,
-Toast = window.OpenCourseDeck?.Toast,
+// Fall back to no-ops: Toast may be unregistered during partial init or in
+// test harnesses, and a bare Toast.success() then threw mid-handler,
+// skipping the post-mutation UI refresh.
+Toast = window.OpenCourseDeck?.Toast ?? { success() {}, error() {}, info() {}, warning() {} },
 downloadTextFile,
 downloadDataUrl,
 printStudioBoardPdf,

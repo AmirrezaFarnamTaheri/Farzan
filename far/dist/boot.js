@@ -35,15 +35,19 @@ const __pdMeasure = (name, start, end) => {
 
 async function initializeRuntimeCapabilities() {
   const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
-  if (!pd.StorageSafety) throw new Error('Storage safety failed to initialize');
-  if (!pd.AI) throw new Error('AI capability failed to initialize');
+  if (!pd.StorageSafety) {
+    throw new Error('Storage safety failed to initialize — reload the app; if it persists, run "npm run build:release" to regenerate the bundle and hard-refresh (Ctrl+Shift+R) to clear a stale service worker.');
+  }
+  if (!pd.AI) {
+    throw new Error('AI capability failed to initialize — reload the app; if it persists, regenerate the bundle with "npm run build:release" and hard-refresh to clear cached scripts.');
+  }
 
   // Settings and the command palette expose backup controls in a fresh session.
   // Load this capability before the shell becomes interactive so those controls
   // cannot degrade into optional-chaining no-ops based on route history.
   await pd.loadFeature?.('progress');
   if (!window.ProgressStats?.exportJSON || !window.ProgressStats?.importJSON) {
-    throw new Error('Backup capability failed to initialize');
+    throw new Error('Backup capability failed to initialize — the progress module did not load; reload the app, and if it persists rebuild with "npm run build:release" and confirm dist/chunks/ contains the progress chunk.');
   }
 }
 
