@@ -52,10 +52,26 @@ jobs:
       - name: Build release
         run: npm run build:release
 
-      - name: Compare generated artifacts
+      - name: Verify deterministic generated output
         id: generated
         continue-on-error: true
         run: npm run check:generated
+
+      - name: Compare committed artifacts
+        id: committed
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/generated-diff
+          git status --porcelain=v1 --untracked-files=all -- dist vendor > reports/generated-diff/status.txt
+          if [[ -s reports/generated-diff/status.txt ]]; then
+            git diff --stat -- dist vendor > reports/generated-diff/stat.txt
+            git diff --binary -- dist vendor > reports/generated-diff/generated.patch
+            tar -czf reports/generated-diff/generated-files.tar.gz dist vendor
+            exit 1
+          fi
+          rm -f reports/generated-diff/status.txt
 
       - name: Upload generated bundle comparison
         if: always()
@@ -68,5 +84,5 @@ jobs:
           retention-days: 7
 
       - name: Fail when generated output differs
-        if: steps.generated.outcome == 'failure'
+        if: steps.generated.outcome == 'failure' || steps.committed.outcome == 'failure'
         run: exit 1
