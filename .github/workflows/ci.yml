@@ -65,6 +65,9 @@ jobs:
       - name: Verify generated artifacts
         run: npm run check:generated
 
+      - name: Verify committed artifacts are current
+        run: git diff --exit-code --stat -- dist vendor
+
       - name: Run tests
         run: |
           mkdir -p reports

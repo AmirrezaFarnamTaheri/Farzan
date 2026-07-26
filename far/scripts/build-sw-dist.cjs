@@ -26,12 +26,16 @@ function walkFiles(directory, files = []) {
   return files;
 }
 
+function stripSourceMapText(source) {
+  return String(source)
+    .replace(/\r?\n?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n|$)/g, '\n')
+    .replace(/\r?\n?\/\*# sourceMappingURL=[\s\S]*?\*\/\s*$/g, '\n');
+}
+
 function stripSourceMapReferences(filePath) {
   if (!fs.existsSync(filePath)) return false;
   const source = fs.readFileSync(filePath, 'utf8');
-  const cleaned = source
-    .replace(/\r?\n?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n|$)/g, '\n')
-    .replace(/\r?\n?\/\*# sourceMappingURL=[\s\S]*?\*\/\s*$/g, '\n');
+  const cleaned = stripSourceMapText(source);
   if (cleaned === source) return false;
   fs.writeFileSync(filePath, cleaned, 'utf8');
   return true;
@@ -93,4 +97,5 @@ module.exports = {
   finalizeServiceWorkerArtifacts,
   main,
   stripSourceMapReferences,
+  stripSourceMapText,
 };

@@ -10,30 +10,12 @@
     // ── Shared micro-utilities ────────────────────────────
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-    const uid = (p = 'ui') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
     const esc = s => {
       if (s == null) return '';
       if (s instanceof Node) return s.outerHTML || '';
       return String(s).replace(/[&<>"']/g, m =>
         ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     };
-
-    function animH(el, open, dur = 250) {
-      return new Promise(resolve => {
-        el.style.overflow   = 'hidden';
-        el.style.transition = `height ${dur}ms ease`;
-        el.style.height     = open ? '0px' : `${el.scrollHeight}px`;
-        requestAnimationFrame(() => {
-          el.style.height = open ? `${el.scrollHeight}px` : '0px';
-          setTimeout(() => {
-            el.style.height     = open ? '' : '0px';
-            el.style.overflow   = open ? '' : 'hidden';
-            el.style.transition = '';
-            resolve();
-          }, dur);
-        });
-      });
-    }
 
     // ════════════════════════════════════════════════════
     // COMPONENT: BUTTON

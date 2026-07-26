@@ -135,7 +135,7 @@
           try {
             updateStatus('Loading catalog pointer...');
             const pointer = await fetchWithRetry(path);
-            const targetCatalog = pointer.currentCatalog || 'plasmato_full_2026-04-11.json';
+            const targetCatalog = pointer.currentCatalog || 'data/opencoursedeck-starter.json';
             _activeCatalogPath = targetCatalog.startsWith('./') ? targetCatalog : `./${targetCatalog}`;
             
             updateStatus('Loading catalog content...');

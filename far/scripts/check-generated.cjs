@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const esbuild = require('esbuild');
-const { createBuildOptions } = require('./build.cjs');
+const { createBuildOptions, rewriteReleaseStaticFile } = require('./build.cjs');
+const { stripSourceMapText } = require('./build-sw-dist.cjs');
 
 const root = path.join(__dirname, '..');
 const outdir = path.join(root, 'dist');
@@ -126,6 +127,59 @@ function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.
   };
 }
 
+const STATIC_ROOT_FILES = ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'];
+const STATIC_DIRS = ['assets', 'data', 'docs', 'vendor'];
+
+function hashBuffer(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
+  const missing = [];
+  const changed = [];
+
+  for (const file of STATIC_ROOT_FILES) {
+    const from = path.join(rootDir, file);
+    if (!fs.existsSync(from)) continue;
+    const to = path.join(actualOutdir, file);
+    if (!fs.existsSync(to)) {
+      missing.push(file);
+      continue;
+    }
+    const normalize = (text) => (file.endsWith('.js') ? stripSourceMapText(text) : text);
+    const expected = normalize(rewriteReleaseStaticFile(file, fs.readFileSync(from, 'utf8')));
+    if (expected !== normalize(fs.readFileSync(to, 'utf8'))) changed.push(file);
+  }
+
+  const dirPairs = STATIC_DIRS.map((dir) => [path.join(rootDir, dir), path.join(actualOutdir, dir), dir]);
+  dirPairs.push([path.join(rootDir, 'src', 'styles'), path.join(actualOutdir, 'src', 'styles'), 'src/styles']);
+  for (const [from, to, label] of dirPairs) {
+    for (const rel of walkFiles(from)) {
+      const relLabel = `${label}/${rel}`;
+      const target = path.join(to, ...rel.split('/'));
+      if (!fs.existsSync(target)) {
+        missing.push(relLabel);
+        continue;
+      }
+      const source = fs.readFileSync(path.join(from, ...rel.split('/')));
+      const staged = fs.readFileSync(target);
+      if (rel.endsWith('.js')) {
+        if (stripSourceMapText(source.toString('utf8')) !== stripSourceMapText(staged.toString('utf8'))) {
+          changed.push(relLabel);
+        }
+      } else if (hashBuffer(source) !== hashBuffer(staged)) {
+        changed.push(relLabel);
+      }
+    }
+  }
+
+  return {
+    clean: missing.length === 0 && changed.length === 0,
+    missing: missing.sort(),
+    changed: changed.sort(),
+  };
+}
+
 async function checkGenerated({ actualOutdir = outdir } = {}) {
   const options = {
     ...createBuildOptions(outdir, false),
@@ -149,7 +203,8 @@ async function main() {
   }
 
   const result = await checkGenerated();
-  if (result.clean) {
+  const staticResult = checkStaticArtifacts();
+  if (result.clean && staticResult.clean) {
     console.log('[check-generated] dist/ matches a fresh production build.');
     return;
   }
@@ -158,6 +213,8 @@ async function main() {
   if (result.missing.length) console.error(`  Missing: ${result.missing.join(', ')}`);
   if (result.extra.length) console.error(`  Extra: ${result.extra.join(', ')}`);
   if (result.changed.length) console.error(`  Changed: ${result.changed.join(', ')}`);
+  if (staticResult.missing.length) console.error(`  Missing static: ${staticResult.missing.join(', ')}`);
+  if (staticResult.changed.length) console.error(`  Stale static: ${staticResult.changed.join(', ')}`);
   process.exit(1);
 }
 
@@ -170,6 +227,7 @@ if (require.main === module) {
 
 module.exports = {
   checkGenerated,
+  checkStaticArtifacts,
   compareDirs,
   compareInventories,
   inventoryDirectory,
