@@ -782,9 +782,29 @@ const ProgressStats = (() => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
+  /**
+   * Characters that make a spreadsheet treat a cell as a formula rather than
+   * text. TAB and CR are included because Excel strips leading whitespace
+   * before deciding, so "\t=cmd|..." is still evaluated.
+   */
+  const CSV_FORMULA_LEAD = /^[=+\-@\t\r]/;
+
   function _csvCell(val) {
-    const s = String(val ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n')
+    let s = String(val ?? '');
+
+    // CSV injection (a.k.a. formula injection). Course titles, topic names,
+    // note titles and tags all reach this function, and all of them are
+    // user-supplied or come from imported catalog JSON. A title beginning with
+    // "=" is evaluated as a formula the moment the exported file is opened in
+    // Excel, LibreOffice or Sheets -- which is remote code execution against
+    // the person the export was shared with, not against us. Prefixing a
+    // single quote is the OWASP-recommended neutralisation: spreadsheets treat
+    // the rest as literal text and hide the quote in the cell display.
+    if (CSV_FORMULA_LEAD.test(s)) s = `'${s}`;
+
+    // \r was missing from the quote trigger, so a lone carriage return inside
+    // a title split the row and shifted every following column.
+    return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')
       ? `"${s.replace(/"/g, '""')}"`
       : s;
   }
@@ -1604,7 +1624,11 @@ window.OpenCourseDeck.ProgressStatsInit = async () => {
         const start   = {};
         for (const k of Object.keys(props)) start[k] = target[k] ?? 0;
         const startTs = performance.now();
+        const active  = this._active;
         let cancelled = false;
+        let frame     = 0;
+        /** @type {{ cancel: () => void }} */
+        let handle;
 
         const step = ts => {
           if (cancelled) return;
@@ -1614,18 +1638,43 @@ window.OpenCourseDeck.ProgressStatsInit = async () => {
             target[k] = start[k] + (end - start[k]) * t;
           }
           onUpdate?.(target, pct);
-          if (pct < 1) requestAnimationFrame(step);
-          else {
-            // Snap to exact end values
-            for (const [k, end] of Object.entries(props)) target[k] = end;
-            onComplete?.(target);
+          if (pct < 1) {
+            frame = requestAnimationFrame(step);
+            return;
           }
+          // Snap to exact end values
+          for (const [k, end] of Object.entries(props)) target[k] = end;
+          // Release before the callback: onComplete commonly starts the next
+          // tween, and holding a finished handle keeps `target` -- often a DOM
+          // element or a chart model -- reachable for the life of the page.
+          // Nothing ever removed from this set, so it grew by one entry per
+          // animation, forever, while serving no purpose at all.
+          active.delete(handle);
+          onComplete?.(target);
         };
-        requestAnimationFrame(step);
-
-        const handle = { cancel: () => { cancelled = true; } };
-        this._active.add(handle);
+        handle = {
+          cancel: () => {
+            if (cancelled) return;
+            cancelled = true;
+            cancelAnimationFrame(frame);
+            active.delete(handle);
+          },
+        };
+        active.add(handle);
+        frame = requestAnimationFrame(step);
         return handle;
+      },
+
+      /**
+       * Cancel every in-flight tween. Called on route teardown so animations
+       * targeting removed DOM do not keep running.
+       * @returns {number} how many were cancelled
+       */
+      cancelAll() {
+        const handles = [...this._active];
+        for (const handle of handles) handle.cancel();
+        this._active.clear();
+        return handles.length;
       },
 
       /**

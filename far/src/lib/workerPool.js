@@ -66,6 +66,13 @@ function getWorker(name) {
     };
 
     worker.onerror = (event) => {
+      // An error can arrive from a worker that has already been replaced --
+      // termination is asynchronous, and a crash is exactly the situation that
+      // produces a late event. Without this guard the handler for the DEAD
+      // worker called destroyWorker() on the shared def, terminating its live
+      // successor and rejecting every request in flight on it. onmessage above
+      // already checks the generation; onerror did not.
+      if (def.instance !== worker || def.generation !== generation) return;
       const error = new Error(`Worker "${name}" crashed: ${event.message || 'unknown error'}`);
       destroyWorker(def, error);
       console.warn(`[WorkerPool] Worker "${name}" error:`, event.message);

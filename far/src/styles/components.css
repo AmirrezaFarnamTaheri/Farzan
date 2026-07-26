@@ -3282,3 +3282,33 @@
       text-align: left;
     }
   }
+  /* Ripple
+   *
+   * The JS in app.js has spawned `.ripple-wave` spans since the feature was
+   * added, but no rule ever matched them: they were invisible, and because the
+   * cleanup was bound to `animationend`, each one stayed in the DOM forever.
+   * A long session accumulated one orphan span per click, per button.
+   */
+  .ripple-wave {
+    position: absolute;
+    border-radius: var(--radius-full);
+    background: currentColor;
+    opacity: 0.28;
+    pointer-events: none;
+    transform: scale(0);
+    animation: ripple-wave var(--duration-slow, 480ms) var(--ease-out, ease-out) forwards;
+    will-change: transform, opacity;
+  }
+
+  @keyframes ripple-wave {
+    from { transform: scale(0);   opacity: 0.28; }
+    to   { transform: scale(1);   opacity: 0; }
+  }
+
+  /* Clip the wave to the control, but only while one is in flight, so a
+   * button that anchors an overflowing child is unaffected the rest of the
+   * time. */
+  .btn:has(> .ripple-wave),
+  [data-ripple]:has(> .ripple-wave) {
+    overflow: hidden;
+  }

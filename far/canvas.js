@@ -1466,8 +1466,42 @@
       this._loop();
     },
 
+    /**
+     * Log a per-element draw failure once per element, so a single bad shape
+     * does not produce one console line per frame at 60fps.
+     * @param {{ id?: string }} el
+     * @param {unknown} error
+     */
+    _reportElementError(el, error) {
+      this._elementErrors = this._elementErrors || new Set();
+      const key = el?.id ?? '(anonymous)';
+      if (this._elementErrors.has(key)) return;
+      this._elementErrors.add(key);
+      console.error(`[Canvas] element ${key} failed to draw; skipping it`, error);
+    },
+
     _render() {
       const ctx = this._ctx;
+      if (!ctx || !this._canvas) return;
+      try {
+        this._renderFrame(ctx);
+      } catch (error) {
+        console.error('[Canvas] frame render failed', error);
+      } finally {
+        // Guarantee a balanced context state regardless of how the frame
+        // exited. Canvas2D exposes no save-stack depth, and restore() on an
+        // empty stack is a specified no-op, so popping past the base is safe.
+        // Leaving the stack unbalanced is not: the next frame would start
+        // inside the previous frame's world transform and clip.
+        for (let i = 0; i < 8; i += 1) ctx.restore();
+        const dpr = window.devicePixelRatio ?? 1;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.setLineDash([]);
+      }
+    },
+
+    _renderFrame(ctx) {
       const w   = this._canvas.offsetWidth;
       const h   = this._canvas.offsetHeight;
 
@@ -1493,13 +1527,27 @@
         ctx.save();
         ctx.globalAlpha = layer.opacity ?? 1;
         for (const el of layer.elements) {
-          this._drawElement(ctx, el);
+          // One malformed element must not take down the frame. Board data
+          // arrives from imported .json and from cross-tab sync, so a missing
+          // points array or a bad font string is reachable without any bug on
+          // our side. An escaping throw skipped the ctx.restore() calls below,
+          // leaving the world transform applied and the save stack unbalanced,
+          // so every later frame compounded the corruption and the canvas
+          // froze permanently.
+          try {
+            this._drawElement(ctx, el);
+          } catch (error) {
+            this._reportElementError(el, error);
+          }
         }
         // Selection handles
         if (!layer.locked) {
           for (const el of layer.elements) {
-            if (State.selectedIds.has(el.id)) {
+            if (!State.selectedIds.has(el.id)) continue;
+            try {
               this._drawSelectionHandle(ctx, el);
+            } catch (error) {
+              this._reportElementError(el, error);
             }
           }
         }
@@ -1565,7 +1613,14 @@
       ctx.fillStyle   = 'rgba(15,23,42,0.8)';
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth   = 1;
-      ctx.roundRect?.(mmX, mmY, mmW, mmH, 6);
+      // roundRect APPENDS to the current path, it does not start one. Without
+      // beginPath() the fill/stroke below also painted every subpath left over
+      // from drawing the board's elements, smeared across the minimap corner.
+      ctx.beginPath();
+      // roundRect is not in older Safari/Firefox; a plain rect keeps the
+      // minimap correct rather than filling a stale path.
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(mmX, mmY, mmW, mmH, 6);
+      else ctx.rect(mmX, mmY, mmW, mmH);
       ctx.fill(); ctx.stroke();
 
       // Viewport indicator

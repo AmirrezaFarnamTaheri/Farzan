@@ -473,6 +473,116 @@
 
 
   // ──────────────────────────────────────────────────────────
+  // 1b. FALLBACK SANITIZER
+  // ──────────────────────────────────────────────────────────
+
+  /*
+   * Used only when DOMPurify is unavailable (blocked CDN, subresource-integrity
+   * failure). DOMPurify is vendored and preloaded, so this is a genuine last
+   * resort -- but it is the resort for *note content*, which is the most
+   * attacker-reachable data in the app (imported .json bundles, pasted markup,
+   * synced notes), so it is written as an allowlist and not a denylist.
+   *
+   * It deliberately does not delegate to app.js's sanitizeHtml. Root modules
+   * are loaded through boot.js in an order this file cannot assume, and the
+   * scheme policy differs: note bodies legitimately contain mailto: and tel:
+   * links, which app.js's navigation policy (an app-shell policy) rejects.
+   *
+   * The previous implementation here was a denylist of exactly two schemes
+   * (javascript:, data:text/html) applied to four attributes, and it parsed
+   * into a live <div> -- which issues a network request for every <img> in the
+   * untrusted markup as a side effect of "sanitizing" it.
+   */
+
+  const SANITIZE_FORBIDDEN = 'script, style, meta, link, base, iframe, object, embed, form, template, noscript';
+  /** Executes, navigates, or beacons; no note needs any of them. */
+  const SANITIZE_DROP_ATTRS = new Set(['srcdoc', 'ping', 'srcset', 'sizes', 'http-equiv', 'formaction']);
+
+  function safeUrl(value, schemes, dataPattern) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return false;
+    if (raw.startsWith('#')) return true;
+    let url;
+    try {
+      url = new URL(raw, document.baseURI);
+    } catch {
+      return false;
+    }
+    if (url.protocol === 'data:') return Boolean(dataPattern) && dataPattern.test(raw);
+    return schemes.includes(url.protocol);
+  }
+
+  const NAV_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'];
+  const MEDIA_SCHEMES = ['http:', 'https:', 'blob:'];
+
+  /**
+   * Scrub a parsed fragment in place. Extracted so the mutation-XSS check can
+   * run the identical pass on the re-parsed output.
+   * @param {DocumentFragment} fragment
+   */
+  function scrubFragment(fragment) {
+    fragment.querySelectorAll(SANITIZE_FORBIDDEN).forEach(node => node.remove());
+    fragment.querySelectorAll('*').forEach(node => {
+      const tag = node.tagName.toLowerCase();
+      for (const attr of [...node.attributes]) {
+        const name = attr.name.toLowerCase();
+        const value = attr.value;
+        if (name.startsWith('on') || SANITIZE_DROP_ATTRS.has(name)) {
+          node.removeAttribute(attr.name);
+          continue;
+        }
+        if (name === 'xlink:href') {
+          // Same-document references only; an external one pulls in a foreign
+          // document fragment through <use>.
+          if (!String(value).trim().startsWith('#')) node.removeAttribute(attr.name);
+          continue;
+        }
+        if (name === 'href' || name === 'action') {
+          if (!safeUrl(value, NAV_SCHEMES, null)) node.removeAttribute(attr.name);
+          continue;
+        }
+        if (name === 'poster' || name === 'background' || (name === 'src' && (tag === 'img' || tag === 'image'))) {
+          // data:image/ is how a pasted screenshot survives a round trip.
+          if (!safeUrl(value, MEDIA_SCHEMES, /^data:image\//i)) node.removeAttribute(attr.name);
+          continue;
+        }
+        if (name === 'src' && !safeUrl(value, MEDIA_SCHEMES, /^data:(?:video|audio|application\/pdf)\//i)) {
+          node.removeAttribute(attr.name);
+        }
+      }
+    });
+  }
+
+  /**
+   * @param {unknown} html
+   * @returns {string} sanitized markup, or escaped text if the markup is not
+   *   stable under re-parsing
+   */
+  function fallbackSanitize(html) {
+    // <template> content is inert: parsing it loads no resources and runs no
+    // script, unlike the <div> this used to build.
+    const template = document.createElement('template');
+    template.innerHTML = String(html ?? '');
+    scrubFragment(template.content);
+    const once = template.innerHTML;
+
+    // Mutation-XSS guard. Serializing a parsed tree and re-parsing it can yield
+    // a different tree (foreign-content and table-scope confusion are the usual
+    // culprits), so markup that inspected as safe can become dangerous when the
+    // caller assigns this string to innerHTML. If the pass is not a fixed
+    // point, refuse to emit markup at all.
+    const verify = document.createElement('template');
+    verify.innerHTML = once;
+    scrubFragment(verify.content);
+    if (verify.innerHTML !== once) {
+      return String(verify.content.textContent ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[char]));
+    }
+    return once;
+  }
+
+  // ──────────────────────────────────────────────────────────
   // 2. EDITOR (ContentEditable Rich Text)
   // ──────────────────────────────────────────────────────────
 
@@ -579,11 +689,22 @@
       clearTimeout(this._saveTimer);
 
       const doSave = () => {
+        // Clearing the handle is what makes _hasPendingLocalEdit() honest.
+        // clearTimeout alone leaves the numeric id in place, so after the very
+        // first debounced save the editor looked permanently dirty and the
+        // cross-tab sync refresh stopped reloading it, forever.
+        this._saveTimer = null;
+        // The editor can be torn down between scheduling and firing (route
+        // change, tab close). Writing then would persist the empty content of
+        // a detached node over a real note.
+        if (!this._el) return;
         const content  = this.getContent();
         const text     = this._el.innerText ?? '';
         const words    = text.trim().split(/\s+/).filter(Boolean).length;
         const chars    = text.length;
-        const title    = $('[data-note-title-input]')?.value.trim() ?? 'Untitled';
+        // `?? ` does not catch the empty string, so clearing the title field
+        // used to persist '' and render as a blank row in the notes list.
+        const title    = $('[data-note-title-input]')?.value.trim() || 'Untitled';
 
         const updated = Store.updateNote(this._currentId, {
           content, title, wordCount: words, charCount: chars,
@@ -681,21 +802,7 @@
         });
       }
 
-      // Fallback sanitizer (best-effort; DOMPurify is preferred)
-      const tmp = document.createElement('div');
-      tmp.innerHTML = String(html ?? '');
-      $$('script, style, meta, link, iframe, object, embed, form', tmp).forEach(el => el.remove());
-      $$('*', tmp).forEach(el => {
-        [...el.attributes].forEach(attr => {
-          const n = attr.name;
-          const v = attr.value ?? '';
-          if (/^on/i.test(n)) el.removeAttribute(n);
-          if (n === 'href' || n === 'src' || n === 'xlink:href' || n === 'formaction') {
-            if (/^\s*javascript:/i.test(v) || /^\s*data:text\/html/i.test(v)) el.removeAttribute(n);
-          }
-        });
-      });
-      return tmp.innerHTML;
+      return fallbackSanitize(html);
     },
 
     // ── Toolbar state sync ────────────────────────────────
@@ -1668,8 +1775,9 @@
           window.OpenCourseDeck?.beforeUnload?.mark?.('notes-title');
           clearTimeout(titleInput._pdTitleT);
           titleInput._pdTitleT = setTimeout(() => {
+            titleInput._pdTitleT = null;
             if (Editor._currentId) {
-              Store.updateNote(Editor._currentId, { title: titleInput.value });
+              Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
               NotesList.render();
             }
             window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
@@ -1956,9 +2064,22 @@
       ContextMenu.hide();
       Editor._hideSlashMenu?.();
       clearTimeout(Editor._saveTimer);
+      Editor._saveTimer = null;
       const titleInput = $('[data-note-title-input]');
-      if (titleInput?._pdTitleT) clearTimeout(titleInput._pdTitleT);
+      if (titleInput?._pdTitleT) {
+        clearTimeout(titleInput._pdTitleT);
+        titleInput._pdTitleT = null;
+      }
       Editor._el = null;
+      // Drop the note binding along with the DOM it was bound to. Leaving it
+      // set survives the route unmount, so a later remount that does not reach
+      // a load() -- an IndexedDB-only account whose localStorage mirror is
+      // empty, so init() finds no notes to open -- leaves the stale id pointing
+      // at a real note behind a brand new, empty editor. The first keystroke or
+      // title edit then writes that empty content over it.
+      Editor._currentId = null;
+      Editor._history = [];
+      Editor._historyIdx = -1;
       NotesList.destroy();
       FoldersPanel._container = null;
       this._inited = false;

@@ -94,8 +94,15 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           } catch (error) {
             console.warn('[OpenCourseDeck Router] beforeLeave failed', error);
           }
-          if (!isCurrent()) return;
-
+          // Deliberately NOT gated on isCurrent(). unmount() is teardown, and
+          // teardown of a route we have already committed to leaving is always
+          // correct. Returning early here (as this did) stranded the previous
+          // controller: each navigation captures previousController from
+          // this._currentController and immediately nulls it, so a navigation
+          // that supersedes this one during beforeLeave sees null and can never
+          // unmount it either. The route's listeners, timers and media players
+          // stayed live for the rest of the session while its replacement
+          // mounted on top.
           try {
             await previousController.unmount?.(context);
           } catch (error) {

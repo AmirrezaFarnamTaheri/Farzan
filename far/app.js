@@ -579,30 +579,79 @@ import { Pointer } from './src/lib/pointer.js';
     }
   }
 
-  function fallbackSanitizeHtml(html) {
-    const template = document.createElement('template');
-    // Intentional parser boundary: route templates are sanitized before insertion.
-    template.innerHTML = String(html ?? '');
-    const forbiddenSelector = 'script, style, meta, link, iframe, object, embed, form, template';
-    template.content.querySelectorAll(forbiddenSelector).forEach(node => node.remove());
-    template.content.querySelectorAll('*').forEach(node => {
+  const SANITIZE_FORBIDDEN_TAGS = 'script, style, meta, link, base, iframe, object, embed, form, template, noscript';
+
+  /**
+   * Attributes that are dropped outright: they either execute script, load a
+   * document, or beacon to a third party, and no value of theirs is needed by
+   * any markup this fallback is asked to render.
+   */
+  const SANITIZE_DROP_ATTRS = new Set(['srcdoc', 'ping', 'srcset', 'sizes', 'http-equiv']);
+
+  /**
+   * Scrub one parsed fragment in place. Split out from fallbackSanitizeHtml so
+   * the mutation-XSS re-parse check below can run the identical pass twice.
+   * @param {DocumentFragment} fragment
+   */
+  function scrubFragment(fragment) {
+    fragment.querySelectorAll(SANITIZE_FORBIDDEN_TAGS).forEach(node => node.remove());
+    fragment.querySelectorAll('*').forEach(node => {
+      const tag = node.tagName.toLowerCase();
       [...node.attributes].forEach(attr => {
         const name = attr.name.toLowerCase();
         const value = attr.value;
-        if (name.startsWith('on') || name === 'srcdoc') {
+        // Event handlers, and the attributes above, are never salvageable.
+        if (name.startsWith('on') || SANITIZE_DROP_ATTRS.has(name)) {
           node.removeAttribute(attr.name);
           return;
         }
-        if (['href', 'action'].includes(name) && !safeNavigationUrl(value)) {
+        // `formaction` overrides a form's target and is a navigation sink in
+        // its own right; `xlink:href` is the SVG navigation sink that the
+        // plain `href` check misses entirely.
+        if (['href', 'action', 'formaction'].includes(name) && !safeNavigationUrl(value)) {
           node.removeAttribute(attr.name);
           return;
         }
-        if (['src', 'poster'].includes(name) && !safeMediaUrl(value)) {
+        if (name === 'xlink:href') {
+          // Same-document references only. An external xlink:href on <use>
+          // pulls in a foreign document fragment.
+          if (!String(value).trim().startsWith('#')) node.removeAttribute(attr.name);
+          return;
+        }
+        // Images and posters legitimately carry `data:image/` payloads -- that
+        // is how a pasted screenshot survives a round trip. Routing them
+        // through safeMediaUrl (which allows only video/audio/pdf data URIs)
+        // silently deleted every inline image.
+        if (name === 'background' || name === 'poster' || (name === 'src' && (tag === 'img' || tag === 'image'))) {
+          if (!safeImageUrl(value)) node.removeAttribute(attr.name);
+          return;
+        }
+        if (name === 'src' && !safeMediaUrl(value)) {
           node.removeAttribute(attr.name);
         }
       });
     });
-    return template.innerHTML;
+  }
+
+  function fallbackSanitizeHtml(html) {
+    const template = document.createElement('template');
+    // Intentional parser boundary: <template> content is inert, so nothing here
+    // loads a resource or runs during parsing.
+    template.innerHTML = String(html ?? '');
+    scrubFragment(template.content);
+    const once = template.innerHTML;
+
+    // Mutation-XSS guard. Serializing a parsed tree and re-parsing it can yield
+    // a DIFFERENT tree (foreign-content and table-scope confusion are the usual
+    // culprits), which means markup that was safe when we inspected it can
+    // become dangerous when the caller assigns our string to innerHTML. Run the
+    // identical pass on the re-parsed form; if the result is not a fixed point,
+    // the markup mutates under re-parsing and we refuse to emit it as HTML.
+    const verify = document.createElement('template');
+    verify.innerHTML = once;
+    scrubFragment(verify.content);
+    if (verify.innerHTML !== once) return escapeHtmlText(verify.content.textContent ?? '');
+    return once;
   }
 
   const IMAGE_FALLBACK_SRC = './assets/og-cover.svg';
@@ -1236,7 +1285,20 @@ import { Pointer } from './src/lib/pointer.js';
       if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
 
       el.appendChild(ripple);
-      ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+      // `.ripple-wave` previously had no stylesheet rule at all, so no
+      // animation ran, animationend never fired, and one orphan <span> stayed
+      // inside the button on every single click. The rule now exists in
+      // components.css; the timeout remains because DOM cleanup must not
+      // depend on a paint event firing.
+      let removed = false;
+      const drop = () => {
+        if (removed) return;
+        removed = true;
+        clearTimeout(timer);
+        ripple.remove();
+      };
+      const timer = setTimeout(drop, 1200);
+      ripple.addEventListener('animationend', drop, { once: true });
     },
   };
 
@@ -1248,6 +1310,9 @@ import { Pointer } from './src/lib/pointer.js';
   const Modal = {
     _cleanupFns: new WeakMap(),
     _previousFocus: new WeakMap(),
+    // Pending deferred-teardown timers from close(), keyed by modal, so a
+    // reopen inside the animation window can cancel the one still in flight.
+    _teardownTimers: new WeakMap(),
 
     /**
      * Open a modal by its ID or element reference
@@ -1260,6 +1325,18 @@ import { Pointer } from './src/lib/pointer.js';
         : target;
       if (!modal) return;
       if (modal.classList.contains('open')) return;
+
+      // Cancel a teardown still pending from a close() moments ago. Without
+      // this, reopening inside the animation window let the stale timer fire
+      // against the newly-opened modal: it set `hidden` and removed the
+      // backdrop, while openModals, body overflow and app inertness all stayed
+      // in the open state. The result was an invisible dialog holding the page
+      // inert and unscrollable, with no way out but a reload.
+      const pendingTeardown = this._teardownTimers.get(modal);
+      if (pendingTeardown !== undefined) {
+        clearTimeout(pendingTeardown);
+        this._teardownTimers.delete(modal);
+      }
 
       // Backdrop
       let backdrop = modal.previousElementSibling;
@@ -1290,8 +1367,15 @@ import { Pointer } from './src/lib/pointer.js';
       // Close on backdrop click
       backdrop.addEventListener('click', () => this.close(modal), { once: true });
 
-      // Close on Escape
-      const onEsc = e => { if (e.key === 'Escape') this.close(modal); };
+      // Close on Escape. Only the topmost modal responds: every open modal
+      // registers its own document-level handler, so without this guard one
+      // Escape collapsed the entire stack at once.
+      const onEsc = e => {
+        if (e.key !== 'Escape') return;
+        const stack = OpenCourseDeck.state.openModals;
+        if (stack[stack.length - 1] !== modal) return;
+        this.close(modal);
+      };
       document.addEventListener('keydown', onEsc);
       this._cleanupFns.set(modal, () => {
         cleanup();
@@ -1322,13 +1406,18 @@ import { Pointer } from './src/lib/pointer.js';
         backdrop.classList.remove('open');
       }
 
-      setTimeout(() => {
+      const teardown = setTimeout(() => {
+        this._teardownTimers.delete(modal);
+        // Re-check: open() cancels this timer, but a close/open/close sequence
+        // can still land here with the modal legitimately open again.
+        if (modal.classList.contains('open')) return;
         modal.setAttribute('hidden', '');
         modal.removeAttribute('aria-modal');
         if (backdrop?.classList.contains('modal-backdrop')) {
           backdrop.remove();
         }
       }, OpenCourseDeck.config.animationDuration);
+      this._teardownTimers.set(modal, teardown);
 
       OpenCourseDeck.state.openModals = OpenCourseDeck.state.openModals.filter(m => m !== modal);
 
@@ -1339,6 +1428,11 @@ import { Pointer } from './src/lib/pointer.js';
       // Cleanup focus trap
       const cleanup = this._cleanupFns.get(modal);
       if (cleanup) { cleanup(); this._cleanupFns.delete(modal); }
+      // setAppInert is depth-counted, not a boolean setter: `true` pushes a
+      // level and `false` pops one, and the app stays inert while the depth is
+      // above zero. So this must stay `false` even with modals still open --
+      // passing a computed boolean here would push a second level on close and
+      // the page could never become interactive again.
       setAppInert(false);
       restoreFocus(this._previousFocus.get(modal));
       this._previousFocus.delete(modal);
@@ -1939,13 +2033,29 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     dismiss(toast) {
+      if (!toast || toast.dataset.pdDismissing === 'true') return;
+      toast.dataset.pdDismissing = 'true';
       toast.classList.remove('show');
-      toast.classList.add('hide');
-      toast.addEventListener('animationend', () => {
+      // The exit class is `out` -- that is what components.css styles. This
+      // used to add `hide`, which matches no rule, so no animation ever
+      // started, `animationend` never fired, and the toast stayed in the DOM
+      // and in activeToasts permanently. Every toast ever shown accumulated.
+      toast.classList.add('out');
+
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
         toast.remove();
         OpenCourseDeck.state.activeToasts = OpenCourseDeck.state.activeToasts.filter(t => t !== toast);
         OpenCourseDeck.bus.emit('toast:dismiss', { toast });
-      }, { once: true });
+      };
+      // animationend is not guaranteed: the stylesheet may not have loaded, the
+      // toast may be display:none in a background tab, or a future restyle may
+      // drop the animation. Removal must not depend on a paint event.
+      const timer = setTimeout(finish, 1000);
+      toast.addEventListener('animationend', finish, { once: true });
     },
 
     dismissAll() {
@@ -3907,6 +4017,12 @@ import { Pointer } from './src/lib/pointer.js';
     OpenCourseDeck.safeMediaUrl = safeMediaUrl;
     OpenCourseDeck.safeImageUrl = safeImageUrl;
     OpenCourseDeck.safeFrameUrl = safeFrameUrl;
+    // The hardened fallback sanitizer was only ever threaded into route
+    // modules as an argument, so anything outside that call graph that needed
+    // it wrote its own weaker copy instead. Publish it alongside the URL
+    // policies it is built on.
+    OpenCourseDeck.sanitizeHtml = fallbackSanitizeHtml;
+    OpenCourseDeck.escapeHtmlText = escapeHtmlText;
     OpenCourseDeck.safeFetchUrl = safeFetchUrl;
     OpenCourseDeck.applyImageFallback = applyImageFallback;
     OpenCourseDeck.IMAGE_FALLBACK_SRC = IMAGE_FALLBACK_SRC;
