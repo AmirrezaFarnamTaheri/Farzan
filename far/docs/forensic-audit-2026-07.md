@@ -24,8 +24,15 @@ that CI could not see. Three findings were severity-defining:
    3.4.11. **T1**
 2. **The mojibake detector was itself mojibake-corrupted** and matched the
    *double*-encoded signature, so it passed while `app.js`, `pdf.js`, and
-   `player.js` shipped garbled em dashes, ellipses, and literal `â€¹`/`â€º`
-   pagination glyphs to users. **T1 (verified by executing the checker)**
+   `player.js` shipped garbled em dashes, ellipses, and pagination chevrons
+   to users — the single-guillemet characters `U+2039`/`U+203A` had each been
+   re-decoded into the three-codepoint sequence `U+00E2 U+20AC U+00B9`.
+   **T1 (verified by executing the checker)**
+
+   *Note: this document deliberately spells those sequences as Unicode
+   codepoints rather than literal characters. `scripts/check-encoding.cjs`
+   scans `.md` files too, so embedding the raw bytes here would (correctly)
+   fail the very gate this finding describes.*
 3. **A malformed URL killed the dev server process** — `decodeURIComponent`
    sat outside the request try/catch, so `GET /%` terminated Node. The same
    server backs the Electron desktop shell. **T1 (reproduced)**
