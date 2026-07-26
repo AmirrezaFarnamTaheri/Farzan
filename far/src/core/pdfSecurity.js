@@ -19,7 +19,7 @@ export function installPdfSecurity(root = window) {
     return originalGetDocument({
       ...options,
       isEvalSupported: false,
-      stopEvent: true,
+      stopAtErrors: true,
       useSystemFonts: false,
     });
   };

@@ -26,6 +26,22 @@ describe('dom utils', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it('throttle invokes immediately and replays the trailing call', async () => {
+    const { throttle } = await import('../src/lib/dom.js');
+    const fn = vi.fn();
+    const t = throttle(fn, 100);
+    t('a');
+    t('b');
+    t('c');
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenLastCalledWith('a');
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenLastCalledWith('c');
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it('eventTargetEl returns element for Element targets', () => {
     const el = document.createElement('button');
     const ev = { target: el };

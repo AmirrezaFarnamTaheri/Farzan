@@ -35,6 +35,10 @@ export class Transition {
       this._resolve = resolve;
       this._reject = reject;
     });
+    // Fire-and-forget users never attach a rejection handler; without this,
+    // cancel() would surface a global unhandledrejection. Explicit consumers
+    // still observe the rejection through then/catch/finally on _promise.
+    this._promise.catch(() => {});
 
     this._onVisibilityChange = () => {
       if (document.hidden) {
@@ -147,6 +151,10 @@ export class Transition {
       cancelAnimationFrame(this._rafId);
       this._rafId = 0;
     }
+    // Drop the rAF time anchor so the next tick re-anchors from
+    // _currentTime; otherwise resume would include paused wall time
+    // and fast-forward the transition.
+    this._startTime = 0;
   }
 
   /** @internal */

@@ -91,24 +91,15 @@ export function downloadCanvas(canvas, format = 'png', filename = 'export.png', 
  */
 export function exportToPDF(canvases, filename = 'export.pdf', options = {}) {
   const quality = options.quality || 0.92;
-  const usePNG = options.format === 'png';
+  // Pages are always embedded as JPEG (DCTDecode): PDF's FlateDecode filter
+  // expects raw deflated pixel samples, not a PNG container, so canvas PNG
+  // output cannot be embedded directly.
   const pages = canvases.map((canvas) => {
     const w = canvas.width;
     const h = canvas.height;
-    let dataUrl, filter, colorSpace, bitsPerComponent;
-    if (usePNG) {
-      dataUrl = canvas.toDataURL('image/png');
-      filter = 'FlateDecode';
-      colorSpace = 'DeviceRGB';
-      bitsPerComponent = 8;
-    } else {
-      dataUrl = canvas.toDataURL('image/jpeg', quality);
-      filter = 'DCTDecode';
-      colorSpace = 'DeviceRGB';
-      bitsPerComponent = 8;
-    }
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
     const binary = atob(dataUrl.split(',')[1]);
-    return { w, h, binary, filter, colorSpace, bitsPerComponent };
+    return { w, h, binary, filter: 'DCTDecode', colorSpace: 'DeviceRGB', bitsPerComponent: 8 };
   });
 
   const objects = [];
@@ -151,7 +142,7 @@ export function exportToPDF(canvases, filename = 'export.pdf', options = {}) {
     offsets.push(offset);
     write(`${pageObj} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Contents ${contentObj} 0 R /Resources << /XObject << /Img${i} ${imgObj} 0 R >> >> >>\nendobj\n`);
 
-    const stream = `q ${w} 0 0 ${h} 0 0 /Img${i} Do Q`;
+    const stream = `q ${w} 0 0 ${h} 0 0 cm /Img${i} Do Q`;
     offsets.push(offset);
     write(`${contentObj} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`);
   }

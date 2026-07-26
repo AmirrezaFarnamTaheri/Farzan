@@ -1,13 +1,12 @@
 /* eslint-disable no-undef */
-// Local vendor first for offline-first design; CDN fallback for updates
+// Vendored copy only: a CDN fallback would execute remote code without
+// integrity pinning and contradicts the offline-first security posture.
+// If the vendored library is missing, searches fail soft with an error
+// message posted back to the caller.
 try {
   importScripts('../../vendor/fuse.min.js');
-} catch {
-  try {
-    importScripts('https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js');
-  } catch (e2) {
-    console.warn('[SearchWorker] Failed to load Fuse.js from vendor and CDN:', e2);
-  }
+} catch (error) {
+  console.warn('[SearchWorker] Failed to load vendored Fuse.js:', error);
 }
 
 const state = {

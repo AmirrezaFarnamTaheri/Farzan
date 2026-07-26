@@ -772,16 +772,6 @@ describe('app shell resilience helpers', () => {
       layers: [{ id: 'layer-template', name: 'Study map', visible: true, locked: false, elements: [] }],
     };
     const saveSetting = vi.fn(async () => true);
-    const printDocument = {
-      open: vi.fn(),
-      write: vi.fn(),
-      close: vi.fn(),
-    };
-    const printWindow = {
-      document: printDocument,
-      focus: vi.fn(),
-      print: vi.fn(),
-    };
     const canvasApi = {
       init: vi.fn(),
       destroy: vi.fn(),
@@ -794,7 +784,6 @@ describe('app shell resilience helpers', () => {
     window.OpenCourseDeck.Canvas = canvasApi;
     window.OpenCourseDeck.UI = window.OpenCourseDeck.UI || {};
     window.OpenCourseDeck.UI.confirm = vi.fn(async () => true);
-    window.open = vi.fn(() => printWindow);
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
@@ -810,9 +799,12 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Template applied');
 
     document.querySelector('[data-studio-export-pdf]').click();
-    expect(window.open).toHaveBeenCalledWith('', '_blank', 'noopener,noreferrer');
-    expect(printDocument.write.mock.calls[0][0]).toContain('<svg><text>Study map</text></svg>');
-    expect(printWindow.print).toHaveBeenCalled();
+    // Printing goes through a hidden same-origin iframe: window.open with
+    // the noopener feature returns null in real browsers, so a popup shell
+    // can never be written to.
+    const printFrame = document.querySelector('iframe[aria-hidden="true"]');
+    expect(printFrame).toBeTruthy();
+    expect(printFrame.contentDocument.body.innerHTML).toContain('Study map');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('PDF export opened');
 
     controller.unmount();

@@ -18,8 +18,11 @@ function parseCatalog(raw) {
       title = `Catalog issue: ${topic.error}`;
       catalogIssue = true;
     }
+    // Fallback ids thread the parent's id through so URL-less topics at the
+    // same local index on different levels can never collide.
+    const topicId = url || `${lineage.at(-1)?.topicId || `${courseId}-${srcIdx}`}-${topicIdx}`;
     topics.push({
-      topicId: url || `${courseId}-${srcIdx}-${topicIdx}`,
+      topicId,
       courseId,
       courseTitle,
       url,
@@ -43,7 +46,7 @@ function parseCatalog(raw) {
       if (!Array.isArray(group)) return;
       group.forEach((child, childIdx) => processTopic(child, childIdx, courseId, courseTitle, srcIdx, src, [
         ...lineage,
-        { topicId: url || `${courseId}-${srcIdx}-${topicIdx}`, title },
+        { topicId, title },
       ]));
     });
   };

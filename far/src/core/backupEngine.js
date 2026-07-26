@@ -18,12 +18,26 @@ function openDatabase(root) {
       return;
     }
     const request = root.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Unable to open OpenCourseDeck storage'));
-    request.onblocked = () => reject(new Error('OpenCourseDeck storage is blocked by another tab'));
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
+    request.onsuccess = () => {
+      if (settled) {
+        // The promise already rejected (e.g. onblocked); close the late
+        // connection or it lingers and blocks future schema upgrades.
+        try { request.result.close(); } catch { /* already closed */ }
+        return;
+      }
+      settle(resolve, request.result);
+    };
+    request.onerror = () => settle(reject, request.error || new Error('Unable to open OpenCourseDeck storage'));
+    request.onblocked = () => settle(reject, new Error('OpenCourseDeck storage is blocked by another tab'));
     request.onupgradeneeded = () => {
       request.transaction?.abort?.();
-      reject(new Error('Backup engine cannot create or upgrade the application schema'));
+      settle(reject, new Error('Backup engine cannot create or upgrade the application schema'));
     };
   });
 }

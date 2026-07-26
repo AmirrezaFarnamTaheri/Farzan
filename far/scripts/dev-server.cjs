@@ -13,6 +13,8 @@ const root = path.join(__dirname, '..');
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.cjs': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
@@ -134,7 +136,7 @@ function streamFile(req, res, filePath, type, relPath) {
       'Content-Length': end - start + 1,
       'Content-Range': `bytes ${start}-${end}/${stat.size}`,
     }));
-    fs.createReadStream(filePath, { start, end }).pipe(res);
+    pipeFile(filePath, res, { start, end });
     return 206;
   }
 
@@ -142,8 +144,18 @@ function streamFile(req, res, filePath, type, relPath) {
     ...baseHeaders,
     'Content-Length': stat.size,
   }));
-  fs.createReadStream(filePath).pipe(res);
+  pipeFile(filePath, res);
   return 200;
+}
+
+function pipeFile(filePath, res, streamOptions) {
+  const stream = fs.createReadStream(filePath, streamOptions);
+  stream.on('error', (error) => {
+    // Headers are already sent; destroying the response is all we can do.
+    console.error(`[opencoursedeck] Read stream failed for ${filePath}:`, error?.message || error);
+    res.destroy(error);
+  });
+  stream.pipe(res);
 }
 
 function createServer(options = {}) {
@@ -199,7 +211,14 @@ function createServer(options = {}) {
       return;
     }
 
-    const rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.replace(/^\//, ''));
+    let rel;
+    try {
+      rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.replace(/^\//, ''));
+    } catch {
+      // Malformed percent-encoding must not crash the process.
+      finish(400);
+      return send(res, 400, { 'Content-Type': 'text/plain' }, 'Bad Request');
+    }
     const filePath = safeJoin(serverRoot, rel);
     if (!filePath) {
       finish(403);

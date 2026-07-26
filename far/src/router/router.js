@@ -38,8 +38,18 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
       if (this._hashChangeHandler) return this._handlePromise;
 
       const handle = async ({ force = false, detail = null } = {}) => {
-        const hash = window.location.hash || '#/';
-        const handler = this._routes[hash];
+        const rawHash = window.location.hash || '#/';
+        if (!rawHash.startsWith('#/') && this._current) {
+          // In-page anchor (e.g. #settings-appearance): let the browser
+          // scroll to it instead of tearing down the mounted view for a
+          // hash that can never match a route.
+          return;
+        }
+        const hash = rawHash.startsWith('#/') ? rawHash : '#/';
+        // Routes are registered as bare paths; anything after '?' is data
+        // for the view, exposed via context.query.
+        const [path, queryString = ''] = hash.split('?');
+        const handler = this._routes[path];
         if (!force && this._current === hash) return;
 
         const from = this._current;
@@ -64,6 +74,8 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           from,
           to: hash,
           hash,
+          path,
+          query: new URLSearchParams(queryString),
           refresh: force,
           detail,
           signal: abortController?.signal ?? null,
@@ -95,7 +107,7 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
         if (typeof $$ === 'function') {
           $$('.nav-item').forEach((item) => {
             const href = item.getAttribute('href') || '';
-            item.classList.toggle('active', href === hash);
+            item.classList.toggle('active', href === path || href === hash);
           });
         }
 
@@ -172,6 +184,10 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           }
         } catch (error) {
           showRouteError(error);
+          // Do not announce success or emit route:change/route:ready for a
+          // failed navigation; just stop the progress bar.
+          Progress?.pageBar?.finish?.();
+          return;
         }
 
         finish();

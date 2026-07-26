@@ -526,10 +526,20 @@ import { Pointer } from './src/lib/pointer.js';
   function printStudioBoardPdf({ title = 'OpenCourseDeck Studio board', svg = '', png = '' } = {}) {
     const media = svg || (png ? `<img src="${String(png).replace(/"/g, '&quot;')}" alt="Studio board" />` : '');
     if (!media) return false;
-    const win = window.open?.('', '_blank', 'noopener,noreferrer');
-    if (!win?.document) return false;
-    win.document.open();
-    win.document.write([
+    // window.open with the `noopener` feature returns null per spec, so a
+    // popup shell cannot be written to. Print through a hidden same-origin
+    // iframe instead (same approach as the PDF viewer's print path).
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    if (!doc) {
+      frame.remove();
+      return false;
+    }
+    doc.open();
+    doc.write([
       '<!doctype html><html><head><meta charset="utf-8">',
       `<title>${String(title).replace(/[<>&"]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch])}</title>`,
       '<style>html,body{margin:0;background:#fff;color:#111;font:14px system-ui,sans-serif}main{padding:24px}svg,img{display:block;max-width:100%;height:auto;border:1px solid #ddd}@media print{main{padding:0}svg,img{border:0}}</style>',
@@ -537,9 +547,18 @@ import { Pointer } from './src/lib/pointer.js';
       media,
       '</main></body></html>',
     ].join(''));
-    win.document.close();
-    try { win.focus?.(); } catch {}
-    try { win.print?.(); } catch {}
+    doc.close();
+    const win = frame.contentWindow;
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      frame.remove();
+    };
+    win?.addEventListener?.('afterprint', () => setTimeout(cleanup, 100), { once: true });
+    setTimeout(cleanup, 60_000);
+    try { win?.focus?.(); } catch {}
+    try { win?.print?.(); } catch {}
     return true;
   }
 
@@ -864,6 +883,20 @@ import { Pointer } from './src/lib/pointer.js';
         if (!target) return;
         if (!target.closest('.topbar-search')) this._close();
       });
+
+      // The universal index caches notes/timestamps/annotations; drop it
+      // whenever any of them change so new content is searchable without a
+      // reload. TopbarSearch is an app-lifetime singleton, so these
+      // subscriptions intentionally live until the page unloads.
+      const invalidate = () => { this._universalData = null; };
+      const bus = OpenCourseDeck?.bus;
+      for (const event of [
+        'note:create', 'note:save', 'note:delete',
+        'pdf:annotate', 'sync:message', 'sync:local-change',
+        'storage:import-complete', 'data:loaded',
+      ]) {
+        bus?.on?.(event, invalidate);
+      }
     },
 
     /**
@@ -1352,10 +1385,15 @@ import { Pointer } from './src/lib/pointer.js';
 
       document.body.appendChild(modal);
 
-      // Auto-remove from DOM after closing
-      OpenCourseDeck.bus.on('modal:close', ({ modal: m }) => {
-        if (m === modal) setTimeout(() => modal.remove(), 400);
-      });
+      // Auto-remove from DOM after closing. Self-removing listener: a
+      // permanent bus subscription per created modal would retain every
+      // closed modal element for the page lifetime.
+      const onModalClose = ({ modal: m }) => {
+        if (m !== modal) return;
+        OpenCourseDeck.bus.off('modal:close', onModalClose);
+        setTimeout(() => modal.remove(), 400);
+      };
+      OpenCourseDeck.bus.on('modal:close', onModalClose);
 
       this.open(modal);
       return modal;
@@ -1387,9 +1425,15 @@ import { Pointer } from './src/lib/pointer.js';
           settle(true);
           this.close(modal);
         });
-        OpenCourseDeck.bus.once('modal:close', ({ modal: closed }) => {
-          if (closed === modal) settle(false);
-        });
+        // Not bus.once(): once() is consumed by the FIRST modal:close of ANY
+        // modal, which would strand this promise if an unrelated modal closes
+        // before ours is dismissed via Escape/backdrop.
+        const onAnyClose = ({ modal: closed }) => {
+          if (closed !== modal) return;
+          OpenCourseDeck.bus.off('modal:close', onAnyClose);
+          settle(false);
+        };
+        OpenCourseDeck.bus.on('modal:close', onAnyClose);
         footer.append(cancelBtn, confirmBtn);
       });
     },
@@ -2606,7 +2650,9 @@ import { Pointer } from './src/lib/pointer.js';
         this.set(el, target);
         return;
       }
-      const start    = parseFloat(el.style.getPropertyValue('--progress') ?? '0');
+      // getPropertyValue returns '' (never null) when unset, so `?? '0'`
+      // would keep the empty string and parseFloat('') is NaN.
+      const start    = parseFloat(el.style.getPropertyValue('--progress')) || 0;
       const startTs  = performance.now();
 
       const step = ts => {
@@ -3622,7 +3668,8 @@ import { Pointer } from './src/lib/pointer.js';
         for (let d = 0; d < 7; d++) {
           const date = new Date(today);
           date.setDate(today.getDate() - (w * 7 + (6 - d)));
-          const key   = date.toISOString().slice(0, 10);
+          // Key by local day: toISOString() shifts the date for non-UTC users.
+          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
           const count = data[key] ?? 0;
           const level = count === 0 ? 0 : Math.ceil((count / maxCount) * 4);
 

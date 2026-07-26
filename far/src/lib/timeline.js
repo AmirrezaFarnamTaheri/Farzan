@@ -128,9 +128,20 @@ export class Timeline {
     if (this._playing) return this;
     this._playing = true;
     this._paused = false;
-    this._direction = 1;
     this._startTime = 0;
-    this._firedCalls.clear();
+    if (this._currentTime === 0 || this._currentTime >= this._duration) {
+      // Fresh start (or replay after completion): rewind and re-arm
+      // call/set entries. A resume from pause must NOT clear
+      // _firedCalls, or every call() entry before the pause point
+      // would fire a second time.
+      this._direction = 1;
+      this._currentTime = 0;
+      this._firedCalls.clear();
+    } else if (this._direction < 0) {
+      // Resuming a paused reverse playback: re-anchor the reverse
+      // origin at the pause position.
+      this._reverseStartPosition = this._currentTime;
+    }
     this._rafId = requestAnimationFrame((ts) => this._tick(ts));
     return this;
   }

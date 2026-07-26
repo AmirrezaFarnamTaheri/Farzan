@@ -16,6 +16,10 @@
       return String(s).replace(/[&<>"']/g, m =>
         ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     };
+    // Local-day YYYY-MM-DD. toISOString() converts to UTC, which shifts the
+    // date by one day for users in positive-offset timezones.
+    const localISODate = date =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
     // ════════════════════════════════════════════════════
     // COMPONENT: BUTTON
@@ -656,7 +660,7 @@
                 const isToday = date.toDateString() === today.toDateString();
                 const isSel   = selected && date.toDateString() === selected.toDateString();
                 return `<button class="dp-day ${isToday ? 'today' : ''} ${isSel ? 'selected' : ''}"
-                                data-date="${date.toISOString().slice(0,10)}">${d}</button>`;
+                                data-date="${localISODate(date)}">${d}</button>`;
               }).join('')}
             </div>
           `;

@@ -63,7 +63,7 @@ export function installDataHardening(root = window) {
         for (const [key, value] of Object.entries(params)) {
           if (value != null) parsed.searchParams.set(key, String(value));
         }
-        fullURL = url.startsWith('http') ? parsed.href : `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        fullURL = /^https?:/i.test(fullURL) ? parsed.href : `${parsed.pathname}${parsed.search}${parsed.hash}`;
       }
 
       const mergedHeaders = { 'Content-Type': 'application/json', ...this._headers, ...headers };
@@ -124,7 +124,8 @@ export function installDataHardening(root = window) {
             && error?.name !== 'TimeoutError'
             && (!error?.status || RETRYABLE_STATUS.has(error.status));
           if (canRetry) {
-            const retryAfter = Number(error.response?.headers?.get?.('retry-after'));
+            const retryAfterRaw = error.response?.headers?.get?.('retry-after');
+            const retryAfter = retryAfterRaw == null || retryAfterRaw === '' ? NaN : Number(retryAfterRaw);
             const delay = Number.isFinite(retryAfter) && retryAfter >= 0
               ? retryAfter * 1000
               : retryDelay * (2 ** attempt) + Math.floor(Math.random() * Math.max(1, retryDelay));

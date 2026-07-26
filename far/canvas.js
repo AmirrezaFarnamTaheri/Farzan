@@ -1084,22 +1084,19 @@
     },
 
     undo() {
-      if (State.historyIdx <= 0) {
-        if (State.historyIdx === 0 && State.undoStack.length) {
-          const entry = State.undoStack[0];
-          State.layers = normalizeLayers(cloneJSON(entry.layers, []));
-          State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
-          State.selectedIds = new Set();
-          State.historyIdx = -1;
-          this._scheduleRender();
-          this._emitInteractiveChange('undo');
-        }
-        return;
-      }
-      State.historyIdx--;
+      // undoStack[i] holds the snapshot taken BEFORE the change at step i,
+      // so undoing must restore undoStack[historyIdx] (not historyIdx - 1)
+      // and stash the LIVE state — which exists nowhere on the undo stack —
+      // onto the redo stack first, or the newest change is unrecoverable.
+      if (State.historyIdx < 0 || !State.undoStack.length) return;
       const entry = State.undoStack[State.historyIdx];
       if (!entry) return;
-      State.redoStack.push(State.undoStack[State.historyIdx + 1]);
+      State.redoStack.push({
+        action: entry.action,
+        layers: cloneJSON(State.layers, []),
+        activeLayerIdx: State.activeLayerIdx,
+      });
+      State.historyIdx--;
       State.layers = normalizeLayers(cloneJSON(entry.layers, []));
       State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
       State.selectedIds = new Set();
@@ -1467,9 +1464,10 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      // Background
+      // Background. getPropertyValue returns '' (never null) when the
+      // variable is unset, so `??` could not apply the fallback color.
       ctx.fillStyle = getComputedStyle(document.documentElement)
-        .getPropertyValue('--canvas-bg') ?? '#1e1e2e';
+        .getPropertyValue('--canvas-bg').trim() || '#1e1e2e';
       ctx.fillRect(0, 0, w, h);
 
       // Grid
@@ -1936,7 +1934,6 @@
     _drawText(ctx, el) {
       const {
         x, y, text = '',
-        font       = '14px Inter, sans-serif',
         fill       = '#f1f5f9',
         stroke     = null,
         strokeWidth = 1,
@@ -1948,7 +1945,14 @@
         wrapWidth  = 200,
       } = el;
 
-      ctx.font         = font;
+      // Elements created by this module store fontSize/fontFamily rather
+      // than a composed `font` string; without this, every text element
+      // rendered at the 14px default while hit-testing and SVG export used
+      // the real size.
+      const composedFont = el.font
+        || `${finiteNumber(el.fontSize, State.fontSize)}px ${el.fontFamily || State.fontFamily || 'Inter, sans-serif'}`;
+
+      ctx.font         = composedFont;
       ctx.textAlign    = align;
       ctx.textBaseline = baseline;
 

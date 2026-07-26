@@ -1080,9 +1080,15 @@
     async refreshAnnotationsFromStorage() {
       await this._loadAnnotations();
       const canvas = DOM.pageCanvas;
+      // The annotation layer is styled in CSS pixels; canvas.width/height are
+      // device pixels (scaled by devicePixelRatio in renderPage), so prefer
+      // the CSS-pixel bounding rect and only fall back to device pixels
+      // divided by the current ratio.
+      const rect = canvas?.getBoundingClientRect?.();
+      const dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
       const viewport = {
-        width: Math.max(1, Number(canvas?.width || canvas?.getBoundingClientRect?.().width || 0)),
-        height: Math.max(1, Number(canvas?.height || canvas?.getBoundingClientRect?.().height || 0)),
+        width: Math.max(1, Number(rect?.width || (canvas?.width ?? 0) / dpr)),
+        height: Math.max(1, Number(rect?.height || (canvas?.height ?? 0) / dpr)),
       };
       this._renderAnnotationLayer(State.currentPage, viewport);
       return this.getAnnotations();
@@ -1235,6 +1241,11 @@
         const root = DOM.viewerContainer?.closest('.view-pdf') ?? DOM.viewerContainer;
         const target = e.target?.nodeType === 1 ? e.target : document.activeElement;
         if (!root?.contains(target) && !root?.contains(document.activeElement)) {
+          return;
+        }
+        // Never hijack typing in the PDF search box, page-number input,
+        // or any other editable control inside the viewer.
+        if (target?.matches?.('input, textarea, select, [contenteditable], [contenteditable] *')) {
           return;
         }
         switch (e.key) {
