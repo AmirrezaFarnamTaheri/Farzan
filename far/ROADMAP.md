@@ -216,7 +216,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Throttled saves (batch writes every 2s instead of every frame) | `src/features/mediaStorage.js` | Vidstack |
 | IndexedDB-backed (not just sessionStorage) | `bridge.js` (extend timestamps store) | — |
 
-> **Status: PARTIAL** — the module is implemented and hardened, but nothing imports it: `src/index.js` does not load it, so `player.js` always takes its `window.OpenCourseDeck?.MediaStorage` fallback branch and per-video persistence is inert at runtime.
+> **Status: DONE** — `src/features/mediaStorage.js` is imported by `src/index.js` and self-registers as `OpenCourseDeck.MediaStorage`; `player.js` uses it at 13 call sites for per-video volume, muted, time, and rate. Reads are de-duplicated per media id, writes are throttled, and `destroy()` releases the pagehide listener on player teardown.
 
 ### 3.2 Keyboard Controller
 | Item | Target | Ported From |
@@ -263,7 +263,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | DPR-aware rendering | `src/features/waveformScrubber.js` | Splayer |
 | Theme-aware colors (CSS `--accent`) | `src/features/waveformScrubber.js` | Splayer |
 
-> **Status: PARTIAL** — the module is implemented (and now uses its own `opencoursedeck-waveforms` database), but it is not imported by `src/index.js`, so `player.js` never receives a `WaveformScrubber` and no waveform renders.
+> **Status: PARTIAL — deliberately not wired.** The module works and now has its own `opencoursedeck-waveforms` database and a 60 MB source ceiling, but it is intentionally NOT imported by `src/index.js`. Building a waveform requires fetching and PCM-decoding the entire media file — a second full download on top of the streaming element. Before enabling it, add a cheaper path (precomputed peaks shipped with the catalog, ranged requests, or a decode in a worker) so opening a long lecture video does not download it twice.
 
 ### 3.7 Frequency Visualizer
 | Item | Target | Ported From |

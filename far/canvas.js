@@ -1414,11 +1414,20 @@
       if (element.type === 'text') {
         return { x: finiteNumber(element.x, 0), y: finiteNumber(element.y, 0) - finiteNumber(element.fontSize, State.fontSize), width: finiteNumber(element.width, String(element.text || '').length * 10 || 80), height: finiteNumber(element.height, finiteNumber(element.fontSize, State.fontSize) + 12) };
       }
+      // Normalize rather than clamp: a shape dragged right-to-left or
+      // bottom-to-top has negative width/height, and clamping those to 0
+      // made the caller's `bounds.width > 2` size check fail, silently
+      // discarding every shape drawn in the -X/-Y direction. Take the
+      // absolute extent and move the origin to the top-left corner.
+      const rawX = finiteNumber(element.x, finiteNumber(element.x1, 0));
+      const rawY = finiteNumber(element.y, finiteNumber(element.y1, 0));
+      const rawWidth = finiteNumber(element.width, finiteNumber(element.x2, 0) - finiteNumber(element.x1, 0));
+      const rawHeight = finiteNumber(element.height, finiteNumber(element.y2, 0) - finiteNumber(element.y1, 0));
       return {
-        x: finiteNumber(element.x, finiteNumber(element.x1, 0)),
-        y: finiteNumber(element.y, finiteNumber(element.y1, 0)),
-        width: Math.max(0, finiteNumber(element.width, finiteNumber(element.x2, 0) - finiteNumber(element.x1, 0))),
-        height: Math.max(0, finiteNumber(element.height, finiteNumber(element.y2, 0) - finiteNumber(element.y1, 0))),
+        x: rawWidth < 0 ? rawX + rawWidth : rawX,
+        y: rawHeight < 0 ? rawY + rawHeight : rawY,
+        width: Math.abs(rawWidth),
+        height: Math.abs(rawHeight),
       };
     },
 

@@ -31,6 +31,11 @@ import { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTem
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
+// Side-effect import: mediaStorage.js registers window.OpenCourseDeck.MediaStorage
+// itself. player.js has 13 guarded call sites for it (per-video volume, time,
+// rate, muted persistence) that all silently no-opped because nothing imported
+// this module, leaving the advertised resume-per-video behavior inert.
+import './features/mediaStorage.js';
 import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';

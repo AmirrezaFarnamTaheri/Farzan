@@ -2349,5 +2349,44 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.safeFetchUrl('', '/api/courses')).toContain('/api/courses');
     expect(window.OpenCourseDeck.safeFetchUrl('', 'javascript:alert(1)')).toBeNull();
   });
+  it('service worker update prompt tells the waiting worker to take over', async () => {
+    delete document.documentElement.dataset.pdSwBound;
+    delete window.__plasmaSwUpdateAccepted;
+    delete window.__plasmaSwReloading;
+    await loadApp();
+
+    const postMessage = vi.fn();
+    const registration = { waiting: { postMessage } };
+    document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration } }));
+
+    const reloadBtn = document.querySelector('[data-sw-reload]');
+    expect(reloadBtn).toBeTruthy();
+
+    reloadBtn.click();
+
+    // The worker is generated with skipWaiting:false, so a bare
+    // location.reload() would keep the OLD worker in control and the user
+    // would reload straight back into the stale build. The click must post
+    // SKIP_WAITING and arm the controllerchange reload gate.
+    expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    expect(window.__plasmaSwUpdateAccepted).toBe(true);
+  });
+
+  it('does not arm the reload gate when there is no waiting worker', async () => {
+    delete document.documentElement.dataset.pdSwBound;
+    delete window.__plasmaSwUpdateAccepted;
+    delete window.__plasmaSwReloading;
+    await loadApp();
+
+    // registration.waiting is absent (update already activated, or the
+    // registration went away): the handler must not claim an update was
+    // accepted, or the controllerchange gate in src/index.js would reload on
+    // an unrelated controller change.
+    document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration: {} } }));
+    const reloadBtn = document.querySelector('[data-sw-reload]');
+    expect(reloadBtn).toBeTruthy();
+
+    expect(window.__plasmaSwUpdateAccepted).toBeFalsy();
+  });
 });
 

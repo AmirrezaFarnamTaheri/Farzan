@@ -7,7 +7,10 @@ const ProgressStats = (() => {
 
   /* ── helpers ────────────────────────────────────────────── */
   const q  = s => document.querySelector(s);
-  function _locale() { return window.OpenCourseDeck?.Locale?.getCurrentLang?.() ?? undefined; }
+  // Namespace key is lowercase `locale` (src/index.js). The previous
+  // `Locale` lookup was always undefined, so every date/number in the
+  // progress views silently ignored the user's chosen language.
+  function _locale() { return window.OpenCourseDeck?.locale?.getCurrentLang?.() ?? undefined; }
   const fmtDate  = d => new Date(d).toLocaleDateString(_locale());
   /** Toast via app shell (avoid bridge App shim). */
   function pdToast(message, type = 'info') {
@@ -922,8 +925,17 @@ const ProgressStats = (() => {
     const a    = document.createElement('a');
     a.href     = url;
     a.download = filename;
+    // Anchor must be in the document for Firefox to honor the click, and the
+    // object URL must outlive the download fetch. Revoking on the same tick
+    // (as this did) produced zero-byte or missing files — silently, on the
+    // only path used by every JSON backup, CSV, notes, and vault export.
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
   }
 
   function _zipFiles(files) {

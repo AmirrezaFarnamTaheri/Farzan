@@ -757,7 +757,10 @@
           'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
           'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
           'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists',
-          'plasma-studio-board', 'plasma_migrated_ids'
+          'plasma-studio-board', 'plasma_migrated_ids',
+          // canvas.js autosaves the whiteboard under its own key; without
+          // this, "delete all local data" left a full serialized board behind.
+          'plasma-canvas-board'
         ];
         prefKeys.forEach(k => localStorage.removeItem(k));
       }
@@ -795,6 +798,9 @@
       } else if (scope === 'studio') {
         if (idb) try { await idb.delete('settings', 'plasma-studio-board'); } catch {}
         localStorage.removeItem('plasma-studio-board');
+        // canvas.js autosaves the same board under a second key.
+        if (idb) try { await idb.delete('settings', 'plasma-canvas-board'); } catch {}
+        localStorage.removeItem('plasma-canvas-board');
       } else {
         await clearAll();
       }

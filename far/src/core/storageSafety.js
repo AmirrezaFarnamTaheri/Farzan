@@ -33,6 +33,11 @@ const SESSION_KEYS = [
   'plasma_pending_pdf_doc',
   'plasma_pending_pdf_page',
   'plasma-ai-api-key-session',
+  // player.js persists playback position and playlist mode here
+  // (MediaPlayer._opts.storageKey). Without these, "clear all local data"
+  // left the user's last watched position behind.
+  'pd-player',
+  'pd-player-playlist',
 ];
 
 const AUXILIARY_DATABASES = [

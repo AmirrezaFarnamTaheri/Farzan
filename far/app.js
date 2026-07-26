@@ -510,8 +510,16 @@ import { Pointer } from './src/lib/pointer.js';
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    // See progress.js _downloadBlob: the anchor must be in the document and
+    // the object URL must outlive the download fetch, or Firefox/Safari
+    // silently produce no file.
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
   }
 
   function downloadDataUrl(dataUrl, filename) {
@@ -3424,6 +3432,12 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     init() {
+      // Idempotent: a second init() used to re-register all eight built-ins
+      // and stack another anonymous, unremovable document keydown listener,
+      // so _shortcuts grew without bound and each combo ran twice.
+      if (this._inited) return;
+      this._inited = true;
+
       // Built-in shortcuts
       this.register('ctrl+shift+f', () => {
         const input = $('.topbar-search input');
@@ -3483,7 +3497,7 @@ import { Pointer } from './src/lib/pointer.js';
       table.appendChild(tbody);
 
       Modal.create({
-        title: 'âŒ¨ï¸ Keyboard Shortcuts',
+        title: '⌨️ Keyboard Shortcuts',
         body:  table,
         size:  'sm',
       });
@@ -3557,7 +3571,7 @@ import { Pointer } from './src/lib/pointer.js';
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
           const confirmed = await Modal.confirmAsync({
-            title:     'âš ï¸ Delete Account',
+            title:     '⚠️ Delete Account',
             message:   'This action is <strong>irreversible</strong>. All your data will be permanently deleted. Are you absolutely sure?',
             confirmLabel: 'Delete account',
             cancelLabel: 'Cancel',
@@ -3746,7 +3760,8 @@ import { Pointer } from './src/lib/pointer.js';
     // Service worker update prompt (index.html dispatches plasma:sw-update-ready)
     if (!document.documentElement.dataset.pdSwBound) {
       document.documentElement.dataset.pdSwBound = 'true';
-      document.addEventListener('plasma:sw-update-ready', () => {
+      document.addEventListener('plasma:sw-update-ready', (event) => {
+        const registration = event?.detail?.registration;
         const reloadWrap = createElement('div', { style: { marginTop: '8px' } });
         const reloadBtn = createElement('button', { class: 'btn btn-primary btn-sm', 'data-sw-reload': '' }, 'Reload');
         reloadWrap.appendChild(reloadBtn);
@@ -3757,7 +3772,35 @@ import { Pointer } from './src/lib/pointer.js';
           duration: 8000,
         });
         const btn = t?.querySelector?.('[data-sw-reload]');
-        btn?.addEventListener?.('click', () => window.location.reload());
+        btn?.addEventListener?.('click', () => {
+          // The service worker is generated with skipWaiting:false so an
+          // update can never interrupt an in-flight note/canvas/backup write.
+          // A bare location.reload() therefore does NOT activate the waiting
+          // worker (the client survives the navigation and keeps the old one
+          // in control), so the user would reload straight back into the
+          // stale version and the update would only land once every tab is
+          // closed. Tell the waiting worker to take over, then let the
+          // controllerchange handler in src/index.js perform the reload.
+          const waiting = registration?.waiting;
+          if (waiting) {
+            window.__plasmaSwUpdateAccepted = true;
+            try {
+              waiting.postMessage({ type: 'SKIP_WAITING' });
+              // Safety net: if controllerchange never fires (worker failed to
+              // activate), still honor the user's click.
+              setTimeout(() => {
+                if (!window.__plasmaSwReloading) {
+                  window.__plasmaSwReloading = true;
+                  window.location.reload();
+                }
+              }, 3000);
+              return;
+            } catch {
+              window.__plasmaSwUpdateAccepted = false;
+            }
+          }
+          window.location.reload();
+        });
       });
     }
   }

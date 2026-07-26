@@ -12,6 +12,12 @@
 const CACHE_DB = 'opencoursedeck-waveforms';
 const CACHE_STORE = 'waveforms';
 
+/**
+ * Ceiling on the media file size this module will download and decode to
+ * build a waveform. See the fetch in render() for why the cost is high.
+ */
+const MAX_WAVEFORM_SOURCE_BYTES = 60 * 1024 * 1024;
+
 function openCacheDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(CACHE_DB, 1);
@@ -149,8 +155,18 @@ export class WaveformScrubber {
 
     if (!bars) {
       try {
+        // Building a waveform requires the WHOLE media file: this is a second,
+        // complete download on top of the streaming <audio>/<video> element,
+        // followed by a full in-memory PCM decode. Refuse anything above the
+        // size ceiling rather than pulling a multi-hundred-MB lecture video
+        // twice and decoding it. Content-Length is checked first so an
+        // oversized file is rejected before the body is buffered.
         const resp = await fetch(audioUrl);
+        if (!resp.ok) return;
+        const declaredLength = Number(resp.headers?.get?.('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_WAVEFORM_SOURCE_BYTES) return;
         const buffer = await resp.arrayBuffer();
+        if (buffer.byteLength > MAX_WAVEFORM_SOURCE_BYTES) return;
         const audioCtx = this._getAudioContext();
         bars = await decodeToBars(audioCtx, buffer, barCount);
         this._cache.set(cacheId, bars);
