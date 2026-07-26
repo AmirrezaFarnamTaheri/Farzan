@@ -9,6 +9,40 @@
 
 import { translationCache } from './translationCache.js';
 
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || '').toLowerCase();
+  return normalized === 'localhost'
+    || normalized === '::1'
+    || normalized === '[::1]'
+    || normalized === '127.0.0.1'
+    || normalized.startsWith('127.');
+}
+
+/**
+ * Validate a translator endpoint with the same floor the AI client
+ * enforces: absolute HTTP(S), HTTPS unless loopback, and no embedded
+ * credentials — API keys and note text must never go out over cleartext.
+ * @param {string} value
+ * @param {string} [label]
+ * @returns {string} normalized href, or '' when value is empty
+ */
+export function validateTranslatorEndpoint(value, label = 'Translator endpoint') {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  let parsed;
+  try {
+    parsed = new URL(source);
+  } catch {
+    throw new TypeError(`${label} is invalid`);
+  }
+  if (parsed.username || parsed.password) throw new TypeError(`${label} must not contain embedded credentials`);
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new TypeError(`${label} must use HTTP or HTTPS`);
+  if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
+    throw new TypeError(`${label} must use HTTPS unless it targets localhost`);
+  }
+  return parsed.href;
+}
+
 /**
  * Base translator class with cache integration.
  * Subclasses implement doTranslate().
@@ -96,12 +130,12 @@ export class OpenAITranslator extends BaseTranslator {
   constructor(options = {}) {
     super();
     this.name = options.name || 'openai';
-    this._endpoint = options.endpoint || '';
+    this._endpoint = validateTranslatorEndpoint(options.endpoint, 'OpenAI translator endpoint');
     this._apiKey = options.apiKey || '';
     this._model = options.model || 'gpt-3.5-turbo';
   }
 
-  setEndpoint(endpoint) { this._endpoint = endpoint; }
+  setEndpoint(endpoint) { this._endpoint = validateTranslatorEndpoint(endpoint, 'OpenAI translator endpoint'); }
   setApiKey(key) { this._apiKey = key; }
   setModel(model) { this._model = model; }
 
@@ -158,12 +192,12 @@ export class CustomAPITranslator extends BaseTranslator {
   constructor(options = {}) {
     super();
     this.name = options.name || 'custom';
-    this._endpoint = options.endpoint || '';
+    this._endpoint = validateTranslatorEndpoint(options.endpoint, 'Custom translator endpoint');
     this._apiKey = options.apiKey || '';
     this._headers = options.headers || {};
   }
 
-  setEndpoint(endpoint) { this._endpoint = endpoint; }
+  setEndpoint(endpoint) { this._endpoint = validateTranslatorEndpoint(endpoint, 'Custom translator endpoint'); }
   setApiKey(key) { this._apiKey = key; }
 
   async doTranslate(text, from, to) {

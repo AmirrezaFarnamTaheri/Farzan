@@ -484,6 +484,10 @@ printStudioBoardPdf,
     renderInspector();
     clearTimeout(interactiveSaveTimer);
     interactiveSaveTimer = setTimeout(() => {
+      // Reset before persisting: refreshFromSync treats a truthy timer id
+      // as "local change pending" and would otherwise drop every future
+      // cross-tab sync message for this board.
+      interactiveSaveTimer = null;
       persistBoardChange('Board updated');
     }, 120);
   });

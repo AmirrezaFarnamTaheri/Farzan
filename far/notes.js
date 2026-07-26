@@ -1097,8 +1097,12 @@
         item.appendChild(tagsEl);
       }
 
-        RouteListeners.on(item, 'click', () => NotesApp.openNote(note.id));
-        RouteListeners.on(item, 'keydown', (event) => {
+      // Listeners are attached directly (not via RouteListeners): items are
+      // rebuilt on every render/refresh, and registry entries would pin each
+      // generation of detached nodes until route unmount. Direct listeners
+      // are garbage-collected with their node.
+      item.addEventListener('click', () => NotesApp.openNote(note.id));
+      item.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           NotesApp.openNote(note.id);
@@ -1111,7 +1115,7 @@
       });
 
       // Context menu
-        RouteListeners.on(item, 'contextmenu', e => {
+      item.addEventListener('contextmenu', e => {
         e.preventDefault();
         ContextMenu.show(e.clientX, e.clientY, [
           { label: note.pinned ? '📌 Unpin' : '📌 Pin',
@@ -1689,16 +1693,24 @@
         }
       });
 
-      // Open first note or create one
+      // Open the first locally known note immediately, but defer the
+      // "create a starter note" decision until IndexedDB hydration: for
+      // users whose notes live only in the DB the localStorage mirror is
+      // empty, and creating here would persist a spurious "Untitled Note"
+      // on every page load.
       const notes = Store.getNotes();
       if (notes.length) this.openNote(notes[0].id);
-      else this.newNote();
 
       this._bindSyncRefresh();
       Store.hydrateFromDB().then((changed) => {
-        if (!changed || !this._inited) return;
-        this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
-      }).catch(() => {});
+        if (!this._inited) return;
+        if (changed) this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
+        const hydrated = Store.getNotes();
+        if (!hydrated.length) this.newNote();
+        else if (!notes.length) this.openNote(hydrated[0].id);
+      }).catch(() => {
+        if (this._inited && !Store.getNotes().length) this.newNote();
+      });
     },
 
     _bindSyncRefresh() {

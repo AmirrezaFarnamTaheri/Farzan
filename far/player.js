@@ -488,7 +488,7 @@
           if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
           if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
           this._emit('speed', rate);
-          this._saveSession();
+          this._saveSession(true);
           if (this._mediaStorage && this._currentTrack()) {
             this._mediaStorage.set(this._mediaId(), 'rate', rate);
           }
@@ -770,7 +770,8 @@
         duration: dur,
         percent: pct,
       });
-      this._saveSession();
+      // Forced: seeks are explicit user actions worth persisting immediately.
+      this._saveSession(true);
     }
 
     _onVolumeChange() {
@@ -883,7 +884,7 @@
           if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
           if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
           this._emit('speed', rate);
-          this._saveSession();
+          this._saveSession(true);
           if (this._mediaStorage && this._currentTrack()) {
             this._mediaStorage.set(this._mediaId(), 'rate', rate);
           }
@@ -1462,7 +1463,13 @@
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SESSION PERSISTENCE
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    _saveSession() {
+    _saveSession(force = false) {
+      // timeupdate fires ~4x/s; without throttling that is ~8 synchronous
+      // storage writes per second for the whole playback session. Explicit
+      // user actions (seek, speed change, teardown) pass force=true.
+      const now = Date.now();
+      if (!force && now - (this._lastSessionSaveAt || 0) < 1000) return;
+      this._lastSessionSaveAt = now;
       try {
         const data = {
           volume:      this._state.volume,
@@ -1474,10 +1481,16 @@
           playbackRate: this._media.playbackRate,
         };
         sessionStorage.setItem(this._opts.storageKey, JSON.stringify(data));
-        sessionStorage.setItem(this._opts.storageKey + '-playlist', JSON.stringify({
-          shuffle: this._state.shuffle,
-          repeat: this._state.repeat,
-        }));
+        // The playlist-mode key only changes with shuffle/repeat; skip the
+        // redundant write otherwise.
+        const playlistSig = `${this._state.shuffle}|${this._state.repeat}`;
+        if (playlistSig !== this._lastPlaylistSig) {
+          this._lastPlaylistSig = playlistSig;
+          sessionStorage.setItem(this._opts.storageKey + '-playlist', JSON.stringify({
+            shuffle: this._state.shuffle,
+            repeat: this._state.repeat,
+          }));
+        }
       } catch { /* quota exceeded or private browsing */ }
     }
 
@@ -1874,6 +1887,12 @@
       if (!hint || !text) return;
       hint.hidden = true;
 
+      // Staleness guard: rapid track changes can leave an older call
+      // resolving after a newer one; without this token the previous
+      // track's resume state would overwrite the current track's.
+      const requestToken = (this._resumeHintToken = (this._resumeHintToken || 0) + 1);
+      const isStale = () => requestToken !== this._resumeHintToken || this._currentTrack() !== track;
+
       let savedTime = 0;
       const mediaId = this._opts.mediaId || track?.id || track?.src || '';
       if (this._mediaStorage && mediaId) {
@@ -1881,34 +1900,30 @@
           const state = await this._mediaStorage.get(mediaId);
           savedTime = Number(state?.time) || 0;
         } catch { /* ignore */ }
-      }
-      if (!savedTime) {
-        const topicId = track?.topicId || track?.id;
-        const db = window.DB;
-        if (topicId && db?.getWatchedSegments) {
-          try {
-            const segments = await db.getWatchedSegments(topicId);
-            if (segments?.length) {
-              const maxEnd = segments.reduce((max, s) => Math.max(max, Number(s.end) || 0), 0);
-              if (maxEnd > 10) savedTime = maxEnd;
-            }
-          } catch { /* ignore */ }
-        }
+        if (isStale()) return;
       }
 
+      // One segments read serves both the fallback resume time and the
+      // watched-intervals overlay.
       const topicId = track?.topicId || track?.id;
       const db = window.DB;
+      let segments = null;
       if (topicId && db?.getWatchedSegments) {
-        try {
-          const segments = await db.getWatchedSegments(topicId);
-          if (segments?.length) {
-            this._watchedIntervals = segments
+        try { segments = await db.getWatchedSegments(topicId); } catch { /* ignore */ }
+        if (isStale()) return;
+      }
+
+      if (!savedTime && segments?.length) {
+        const maxEnd = segments.reduce((max, s) => Math.max(max, Number(s.end) || 0), 0);
+        if (maxEnd > 10) savedTime = maxEnd;
+      }
+
+      if (segments) {
+        this._watchedIntervals = segments.length
+          ? segments
               .filter(s => s.start != null && s.end != null)
-              .map(s => ({ start: Number(s.start), end: Number(s.end) }));
-          } else {
-            this._watchedIntervals = [];
-          }
-        } catch { this._watchedIntervals = []; }
+              .map(s => ({ start: Number(s.start), end: Number(s.end) }))
+          : [];
       }
 
       if (savedTime > 10) {

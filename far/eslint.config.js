@@ -58,7 +58,7 @@ module.exports = [
     },
   },
   {
-    files: ['scripts/**/*.cjs', 'eslint.config.js'],
+    files: ['scripts/**/*.cjs', 'desktop/**/*.cjs', 'eslint.config.js'],
     languageOptions: {
       sourceType: 'commonjs',
     },

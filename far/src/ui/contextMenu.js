@@ -173,7 +173,10 @@ export function show(items, x, y, onSelect) {
     _outsideHandler = (e) => {
       if (!el.contains(e.target)) hide();
     };
-    document.addEventListener('mousedown', _outsideHandler, { once: true });
+    // Persistent (not {once:true}): a mousedown inside the menu on a
+    // divider or disabled item would consume a once-listener and leave the
+    // menu impossible to dismiss by clicking outside. hide() removes it.
+    document.addEventListener('mousedown', _outsideHandler);
   }, 0);
 
   if (_keyHandler) {

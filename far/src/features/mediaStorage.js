@@ -62,8 +62,16 @@ export class MediaStorage {
     this._cache = new Map();
     /** @type {Map<string, Object>} */
     this._dirty = new Map();
+    /** @type {Map<string, Promise<Object>>} */
+    this._loading = new Map();
 
     this._flushThrottled = throttle(() => this.flush(), THROTTLE_MS);
+
+    // Best-effort final flush when the tab goes away, so the last position
+    // write survives a close without player teardown.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', () => { this.flush(); });
+    }
   }
 
   /**
@@ -73,24 +81,37 @@ export class MediaStorage {
    */
   async get(mediaId) {
     if (this._cache.has(mediaId)) return { ...this._cache.get(mediaId) };
-    try {
-      const record = await dbGet(mediaId);
-      const state = record
-        ? {
-            volume: Number(record.volume) || 0.8,
-            muted: Boolean(record.muted),
-            time: Number(record.time) || 0,
-            rate: Number(record.rate) || 1,
-            quality: String(record.quality || ''),
-            lang: String(record.lang || ''),
-            captions: Boolean(record.captions),
-          }
-        : { volume: 0.8, muted: false, time: 0, rate: 1, quality: '', lang: '', captions: false };
-      this._cache.set(mediaId, state);
-      return { ...state };
-    } catch {
-      return { volume: 0.8, muted: false, time: 0, rate: 1, quality: '', lang: '', captions: false };
+    // Share one in-flight read per mediaId: at player init volume/rate/time
+    // restore concurrently, and without this the later resolver would
+    // overwrite state (including pending set() writes) with stale DB data.
+    let loading = this._loading.get(mediaId);
+    if (!loading) {
+      loading = (async () => {
+        try {
+          const record = await dbGet(mediaId);
+          const state = record
+            ? {
+                volume: Number(record.volume) || 0.8,
+                muted: Boolean(record.muted),
+                time: Number(record.time) || 0,
+                rate: Number(record.rate) || 1,
+                quality: String(record.quality || ''),
+                lang: String(record.lang || ''),
+                captions: Boolean(record.captions),
+              }
+            : { volume: 0.8, muted: false, time: 0, rate: 1, quality: '', lang: '', captions: false };
+          if (!this._cache.has(mediaId)) this._cache.set(mediaId, state);
+          return { ...this._cache.get(mediaId) };
+        } catch {
+          return { volume: 0.8, muted: false, time: 0, rate: 1, quality: '', lang: '', captions: false };
+        } finally {
+          this._loading.delete(mediaId);
+        }
+      })();
+      this._loading.set(mediaId, loading);
     }
+    const state = await loading;
+    return { ...state };
   }
 
   /**
