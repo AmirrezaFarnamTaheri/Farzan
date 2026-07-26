@@ -257,6 +257,6 @@ Defined in `src/styles/index.css`.
 - `#aria-announcer` live region for route changes
 - Focus trap in modals/drawers/command palette
 - `OpenCourseDeck.state` tracks open overlays for restore
-- `data-inert` on `#plasma-app` when overlay is open
-- Keyboard shortcuts cheatsheet (Shift+?)
+- native `inert` attribute on `#plasma-app` when an overlay is open (see `src/lib/dom.js` `setAppInert`)
+- Keyboard shortcuts cheatsheet (`Ctrl+/`)
 - All interactive elements keyboard-accessible

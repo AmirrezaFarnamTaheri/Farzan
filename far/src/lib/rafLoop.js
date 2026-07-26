@@ -51,8 +51,17 @@ export class RAFLoop {
     this._cancelFrame();
     this._rafId = requestAnimationFrame((ts) => {
       if (!this._running) return;
-      this._callback(ts);
-      this._requestFrame();
+      try {
+        this._callback(ts);
+      } catch (error) {
+        // A throwing callback used to skip the re-arm below, leaving the loop
+        // dead while _running stayed true: `running` lied, start() was a
+        // no-op, and a tab hide/show cycle silently resurrected it.
+        console.error('[RAFLoop] frame callback failed', error);
+      }
+      // Re-check: the callback may have called stop(), and re-arming then
+      // would schedule one extra dead frame.
+      if (this._running) this._requestFrame();
     });
   }
 

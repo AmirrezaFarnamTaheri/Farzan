@@ -1074,9 +1074,19 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _plainText(value) {
-      const div = document.createElement('div');
-      div.innerHTML = String(value || '');
-      return (div.textContent || div.innerText || String(value || '')).replace(/\s+/g, ' ').trim();
+      // DOMParser, not innerHTML: assigning innerHTML — even on a detached
+      // element — still triggers resource loads and inline handlers, so
+      // indexing a note containing <img src=x onerror=...> would execute it.
+      const source = String(value || '');
+      if (!source.includes('<') && !source.includes('&')) {
+        return source.replace(/\s+/g, ' ').trim();
+      }
+      try {
+        const doc = new DOMParser().parseFromString(source, 'text/html');
+        return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+      } catch {
+        return source.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
     },
 
     _render(results, query) {
@@ -3434,10 +3444,16 @@ import { Pointer } from './src/lib/pointer.js';
 
       document.addEventListener('keydown', e => {
         const target = eventTargetEl(e);
-        if (target?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
-        if (target?.closest?.('[contenteditable],[contenteditable="true"]')) return;
+        // `[contenteditable]` alone also matches contenteditable="false"
+        // (read-only islands inside an editor), which suppressed every
+        // shortcut there — the inverse of the intent.
+        if (target?.matches?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+        if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) return;
         const combo = [
           e.ctrlKey  ? 'ctrl'  : '',
+          // Held Meta must disqualify a Ctrl-only match, or Cmd+Ctrl+K fires
+          // 'ctrl+k' and preventDefault() hijacks the browser's Cmd shortcut.
+          e.metaKey  ? 'meta'  : '',
           e.altKey   ? 'alt'   : '',
           e.shiftKey ? 'shift' : '',
           e.key.toLowerCase(),

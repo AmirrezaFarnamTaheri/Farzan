@@ -27,10 +27,14 @@ export class RequestQueue {
    */
   start() {
     this._started = true;
-    for (const [key, callback] of this._queue) {
+    // Snapshot before flushing: iterating the live Map meant a callback that
+    // called reset() cleared it mid-iteration, silently dropping every
+    // remaining queued callback without an error.
+    const entries = [...this._queue];
+    this._queue.clear();
+    for (const [key, callback] of entries) {
       try { callback(); } catch (e) { console.error('[RequestQueue]', key, e); }
     }
-    this._queue.clear();
   }
 
   /**

@@ -1,5 +1,18 @@
 # PlasmaDeck Learning Studio: The Unified Perfection Audit & Roadmap
 
+> **ARCHIVED — superseded snapshot (do not treat as current state).**
+>
+> This document is a point-in-time audit that predates the current tree. Most
+> of its P0 findings have since been fixed; spot-checks confirm, among others:
+> pdfjs-dist is 4.10.38 (not the vulnerable 3.11.x it cites), the CSP
+> preload/onload conflict is gone (stylesheets are plain blocking links), the
+> monolithic `style.css` is now a one-line shim over 17 split files under
+> `src/styles/`, `/__debug` is opt-in gated with a size cap, `src/index.js`
+> lazy-loads features, and the bundle is `dist/opencoursedeck.js`.
+>
+> Verify any claim here against the source tree before acting on it. For the
+> current, code-verified status of planned work see `far/ROADMAP.md`.
+
 ## 1. Executive Summary & Vision
 PlasmaDeck (identified as PlasmaDeck Learning Studio) is a local-first learning studio for videos, PDFs, notes, and more. While it has a strong foundation and privacy posture, it is currently "CI-stable but not product-polished." To reach the "Perfection" standard, the project must move from a functional prototype to an intentional, durable, and emotionally satisfying product where every character, pixel, and function is high-signal.
 
