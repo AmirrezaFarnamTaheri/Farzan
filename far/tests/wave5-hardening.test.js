@@ -622,3 +622,150 @@ describe('workerPool.js generation guard', () => {
     expect(onerror.indexOf('return;')).toBeLessThan(onerror.indexOf('destroyWorker'));
   });
 });
+
+// ───────────────────────────────────────────────────────────
+// Accessibility and lifecycle: dialog naming, keyboard formatting,
+// chart re-registration, settings persistence scope
+// ───────────────────────────────────────────────────────────
+
+describe('app.js dialog accessible name', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+  it('labels the dialog from its title (WCAG 4.1.2)', async () => {
+    const pd = await loadApp();
+    const modal = document.createElement('div');
+    modal.setAttribute('hidden', '');
+    modal.innerHTML = '<h3 class="modal-title">Delete course</h3>';
+    document.body.appendChild(modal);
+
+    pd.Modal.open(modal);
+
+    // Without a name a screen reader announces only "dialog" and the user has
+    // to explore the subtree to find out what it is.
+    const labelledBy = modal.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    expect(document.getElementById(labelledBy).textContent).toBe('Delete course');
+  });
+
+  it('reuses an id the title already has', async () => {
+    const pd = await loadApp();
+    const modal = document.createElement('div');
+    modal.setAttribute('hidden', '');
+    modal.innerHTML = '<h3 class="modal-title" id="preset-title">Preset</h3>';
+    document.body.appendChild(modal);
+
+    pd.Modal.open(modal);
+
+    expect(modal.getAttribute('aria-labelledby')).toBe('preset-title');
+  });
+
+  it('never overrides an author-supplied name', async () => {
+    const pd = await loadApp();
+    const modal = document.createElement('div');
+    modal.setAttribute('hidden', '');
+    modal.setAttribute('aria-label', 'Author wins');
+    modal.innerHTML = '<h3 class="modal-title">Ignored</h3>';
+    document.body.appendChild(modal);
+
+    pd.Modal.open(modal);
+
+    expect(modal.getAttribute('aria-labelledby')).toBeNull();
+    expect(modal.getAttribute('aria-label')).toBe('Author wins');
+  });
+
+  it('falls back to an explicit label when there is no title element', async () => {
+    const pd = await loadApp();
+    const modal = document.createElement('div');
+    modal.setAttribute('hidden', '');
+    document.body.appendChild(modal);
+
+    pd.Modal.open(modal, { label: 'Bare dialog' });
+
+    expect(modal.getAttribute('aria-label')).toBe('Bare dialog');
+  });
+});
+
+describe('app.js chart registry', () => {
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('destroys the chart it is replacing', async () => {
+    const pd = await loadApp();
+    const first = { destroy: vi.fn() };
+    const second = { destroy: vi.fn() };
+
+    pd.Charts.register('stats', first);
+    pd.Charts.register('stats', second);
+
+    // Overwriting the map entry dropped the only reference to the previous
+    // chart without destroying it: its canvas, resize listeners and animation
+    // loop stayed live and invisible for the rest of the session.
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    expect(second.destroy).not.toHaveBeenCalled();
+    expect(pd.Charts.get('stats')).toBe(second);
+  });
+
+  it('re-registering the identical instance is a no-op', async () => {
+    const pd = await loadApp();
+    const chart = { destroy: vi.fn() };
+
+    pd.Charts.register('stats', chart);
+    pd.Charts.register('stats', chart);
+
+    expect(chart.destroy).not.toHaveBeenCalled();
+    expect(pd.Charts.get('stats')).toBe(chart);
+  });
+
+  it('survives a chart whose destroy throws', async () => {
+    const pd = await loadApp();
+    const bad = { destroy: () => { throw new Error('boom'); } };
+    const next = { destroy: vi.fn() };
+
+    expect(() => {
+      pd.Charts.register('stats', bad);
+      pd.Charts.register('stats', next);
+    }).not.toThrow();
+    expect(pd.Charts.get('stats')).toBe(next);
+  });
+});
+
+describe('notes.js toolbar keyboard access', () => {
+  it('handles both pointer and keyboard activation', () => {
+    const src = read('notes.js');
+    const toolbar = src.slice(src.indexOf('  const Toolbar = {'), src.indexOf('  const Toolbar = {') + 2200);
+
+    // Enter and Space on a focused button dispatch `click`, never `mousedown`,
+    // so a mousedown-only toolbar made every formatting control -- bold,
+    // headings, lists, links -- unreachable without a mouse.
+    expect(toolbar).toContain("'mousedown'");
+    expect(toolbar).toContain("'click'");
+    // detail 0 marks a keyboard-synthesised click and keeps the two paths from
+    // both firing for one pointer press.
+    expect(toolbar).toContain('e.detail !== 0');
+    // execCommand acts on the focused editable, and focus is on the button.
+    expect(toolbar).toContain('Editor._el?.focus()');
+  });
+});
+
+describe('settingsRoute.js persistence scope', () => {
+  it('only the save handler commits the AI mode', () => {
+    const src = read('src/views/settingsRoute.js');
+    // Anchor on the handler, not the button markup -- the attribute name also
+    // appears in the template string that renders the control.
+    const at = src.indexOf("on(document.querySelector('[data-ai-mark-local-installed]'), 'click'");
+    expect(at).toBeGreaterThan(-1);
+    const markInstalled = src.slice(at, src.indexOf("on(document.querySelector('[data-ai-clear-local-model]')"));
+
+    // Only Save runs the endpoint approval gate that must accompany a switch
+    // to custom-api. Marking a local model installed is unrelated, and reading
+    // the live select here silently persisted an unsaved mode change.
+    expect(markInstalled).not.toMatch(/^\s*mode: mode\.value,/m);
+    expect(markInstalled).toContain('...current');
+  });
+
+  it('the save handler still gates custom-api on approval', () => {
+    const src = read('src/views/settingsRoute.js');
+    expect(src).toContain('if (!approval.checked)');
+    expect(src).toContain('next.approvedEndpointOrigin = parsed.origin;');
+  });
+});

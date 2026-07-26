@@ -1350,6 +1350,21 @@ import { Pointer } from './src/lib/pointer.js';
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('tabindex', '-1');
 
+      // Give the dialog an accessible name. Without one, a screen reader
+      // announces only "dialog" on open and the user has to explore the
+      // subtree to learn what it is -- WCAG 4.1.2. Done here rather than in
+      // create() so modals declared in static markup are covered too. An
+      // author-supplied aria-label or aria-labelledby always wins.
+      if (!modal.hasAttribute('aria-label') && !modal.hasAttribute('aria-labelledby')) {
+        const titleEl = modal.querySelector('.modal-title');
+        if (titleEl) {
+          if (!titleEl.id) titleEl.id = uid('modal-title');
+          modal.setAttribute('aria-labelledby', titleEl.id);
+        } else if (opts.label) {
+          modal.setAttribute('aria-label', String(opts.label));
+        }
+      }
+
       requestAnimationFrame(() => {
         backdrop.classList.add('open');
         modal.classList.add('open');
@@ -2870,6 +2885,16 @@ import { Pointer } from './src/lib/pointer.js';
      * Register a chart instance for later updates
      */
     register(id, instance) {
+      // Re-registering the same id happens on every route remount. Overwriting
+      // the map entry dropped the only reference to the previous chart without
+      // destroying it, so its canvas, resize listeners and animation loop
+      // stayed live and invisible for the rest of the session.
+      const existing = this._instances.get(id);
+      if (existing && existing !== instance) {
+        try { existing.destroy?.(); } catch (error) {
+          console.warn(`[Charts] failed to destroy the previous "${id}" chart`, error);
+        }
+      }
       this._instances.set(id, instance);
     },
 

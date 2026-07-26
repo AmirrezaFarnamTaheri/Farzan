@@ -692,7 +692,12 @@ export function mountSettingsView(deps = {}) {
     on(document.querySelector('[data-ai-mark-local-installed]'), 'click', async () => {
       const stored = {
         ...current,
-        mode: mode.value,
+        // `mode` is deliberately NOT read from the live select here. Only the
+        // Save handler may commit it, because only Save runs the endpoint
+        // approval gate that must accompany a switch to custom-api. Marking a
+        // local model installed is an unrelated action, and picking up the
+        // live value made it silently persist whatever mode the user had
+        // changed the select to without saving.
         model: model.value.trim() || selectedModelOption()?.id || current.model,
         keyStorage: 'session',
         hasKey: Boolean(sessionStorage.getItem(keyName)),

@@ -1688,16 +1688,37 @@
   const Toolbar = {
     init(toolbarEl) {
       if (!toolbarEl) return;
+      const runCommand = btn => {
+        if (btn.dataset.cmdBlock) Editor.COMMANDS[btn.dataset.cmdBlock]?.();
+        else Editor.COMMANDS[btn.dataset.cmd]?.();
+      };
+
+      // Pointer activation. mousedown (not click) with preventDefault is
+      // deliberate: it stops the button from taking focus, which would collapse
+      // the editor's selection before execCommand could act on it.
       RouteListeners.on(toolbarEl, 'mousedown', e => {
         const btn = e.target.closest('[data-cmd], [data-cmd-block]');
         if (!btn) return;
         e.preventDefault(); // prevent blur
+        runCommand(btn);
+      });
 
-        if (btn.dataset.cmdBlock) {
-          Editor.COMMANDS[btn.dataset.cmdBlock]?.();
-        } else {
-          Editor.COMMANDS[btn.dataset.cmd]?.();
-        }
+      // Keyboard activation. Enter and Space on a focused button dispatch
+      // `click`, never `mousedown`, so with only the handler above every
+      // formatting control -- bold, headings, lists, links, the lot -- was
+      // completely unreachable without a mouse. A keyboard-synthesised click
+      // reports detail 0, which distinguishes it from the pointer path above
+      // and stops the command running twice.
+      RouteListeners.on(toolbarEl, 'click', e => {
+        if (e.detail !== 0) return;
+        const btn = e.target.closest('[data-cmd], [data-cmd-block]');
+        if (!btn) return;
+        e.preventDefault();
+        // Focus must go back to the editable before execCommand: it acts on
+        // the focused editable, and focus is currently on the button. A
+        // contenteditable restores its previous selection when refocused.
+        Editor._el?.focus();
+        runCommand(btn);
       });
 
       // Font size
