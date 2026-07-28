@@ -9,12 +9,13 @@ export const AUXILIARY_DATABASES = Object.freeze([
 const AUXILIARY_SET = new Set(AUXILIARY_DATABASES);
 const managers = new WeakMap();
 
-function safeClose(db) {
-  try { db?.close?.(); } catch {}
-}
-
 function makeId(prefix = 'db-lifecycle') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function normalizeNames(names) {
+  const values = Array.isArray(names) ? names : [names];
+  return [...new Set(values.map(String).filter(name => AUXILIARY_SET.has(name)))];
 }
 
 export function installAuxiliaryDbLifecycle(root = window) {
@@ -31,10 +32,15 @@ export function installAuxiliaryDbLifecycle(root = window) {
   const track = (name, db) => {
     if (!AUXILIARY_SET.has(name) || !db) return db;
     tracked.get(name).add(db);
+    const onClose = () => forget(name, db);
     const onVersionChange = () => {
-      safeClose(db);
-      forget(name, db);
+      try {
+        db.close();
+      } finally {
+        forget(name, db);
+      }
     };
+    try { db.addEventListener?.('close', onClose, { once: true }); } catch {}
     try { db.addEventListener?.('versionchange', onVersionChange, { once: true }); } catch {}
     return db;
   };
@@ -42,11 +48,11 @@ export function installAuxiliaryDbLifecycle(root = window) {
   const closeLocal = async (names = AUXILIARY_DATABASES, reason = 'requested') => {
     const closed = [];
     const failures = [];
-    for (const name of names) {
+    for (const name of normalizeNames(names)) {
       const connections = [...(tracked.get(name) || [])];
       for (const db of connections) {
         try {
-          safeClose(db);
+          db.close();
           forget(name, db);
           closed.push(name);
         } catch (error) {
@@ -108,7 +114,7 @@ export function installAuxiliaryDbLifecycle(root = window) {
     reason = 'storage-reset',
     settleMs = 75,
   } = {}) => {
-    const normalized = [...new Set(names.filter(name => AUXILIARY_SET.has(name)))];
+    const normalized = normalizeNames(names);
     const requestId = makeId('close');
     const acknowledgements = [];
     const onMessage = (event) => {
