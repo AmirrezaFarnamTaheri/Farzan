@@ -164,7 +164,7 @@ function atomicReplaceDirectory(stagedDirectory, targetDirectory, { root } = {})
     }
   }
 
-  ensureDirectory(path.dirname(target), { root });
+  const parent = ensureDirectory(path.dirname(target), { root });
   const backup = `${target}.previous-${process.pid}-${Date.now()}`;
   assertContained(backup, root, { allowRoot: false });
   let movedPrevious = false;
@@ -174,9 +174,6 @@ function atomicReplaceDirectory(stagedDirectory, targetDirectory, { root } = {})
       movedPrevious = true;
     }
     fs.renameSync(staged, target);
-    syncDirectory(path.dirname(target));
-    if (movedPrevious) removeTree(backup, { root });
-    return target;
   } catch (error) {
     try {
       if (!fs.existsSync(target) && movedPrevious && fs.existsSync(backup)) fs.renameSync(backup, target);
@@ -185,6 +182,20 @@ function atomicReplaceDirectory(stagedDirectory, targetDirectory, { root } = {})
     }
     throw error;
   }
+
+  syncDirectory(parent);
+  if (movedPrevious && fs.existsSync(backup)) {
+    try {
+      removeTree(backup, { root });
+    } catch (error) {
+      error.code = error.code || 'ATOMIC_REPLACE_CLEANUP_FAILED';
+      error.replacementSucceeded = true;
+      error.backup = backup;
+      error.message = `Atomic directory replacement succeeded, but backup cleanup failed at ${backup}: ${error.message}`;
+      throw error;
+    }
+  }
+  return target;
 }
 
 module.exports = {
