@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { createManifest, verifyManifest } = require('./releaseManifest.cjs');
-const { atomicWrite } = require('./fsSafe.cjs');
+const { atomicReplaceDirectory, atomicWrite } = require('./fsSafe.cjs');
 
 function tempDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-release-test-'));
@@ -28,12 +28,8 @@ try {
   });
 
   assert.equal(verifyManifest(manifest, { root: path.join(root, 'dist'), expectedCommit: commit }).verified, true);
-
-  expectFailure(() => createManifest({
-    root: path.join(root, 'dist'),
-    version: 'test',
-    commit: 'deadbeef',
-  }), 'short commit must fail');
+  expectFailure(() => createManifest({ root: path.join(root, 'dist'), version: 'test', commit: 'deadbeef' }), 'short commit must fail');
+  expectFailure(() => verifyManifest(manifest, { root: path.join(root, 'dist'), expectedCommit: 'deadbeef' }), 'short expected commit must fail');
 
   fs.writeFileSync(path.join(root, 'dist', 'app.js'), 'tampered');
   expectFailure(() => verifyManifest(manifest, { root: path.join(root, 'dist') }), 'tampered bytes must fail');
@@ -46,6 +42,21 @@ try {
   fs.mkdirSync(path.join(root, 'outside'));
   fs.symlinkSync(path.join(root, 'outside'), path.join(root, 'dist', 'escape'));
   expectFailure(() => createManifest({ root: path.join(root, 'dist'), version: 'test', commit }), 'symlink artifact must fail');
+  fs.rmSync(path.join(root, 'dist', 'escape'));
+
+  fs.symlinkSync(path.join(root, 'outside'), path.join(root, 'linked-dist'));
+  expectFailure(() => createManifest({ root: path.join(root, 'linked-dist'), version: 'test', commit }), 'symlink root must fail');
+  fs.rmSync(path.join(root, 'linked-dist'));
+
+  const staged = path.join(root, 'staged');
+  const target = path.join(root, 'target');
+  fs.mkdirSync(staged);
+  fs.mkdirSync(target);
+  atomicWrite(path.join(staged, 'app.js'), 'new', { root });
+  atomicWrite(path.join(target, 'app.js'), 'old', { root });
+  const replacement = atomicReplaceDirectory(staged, target, { root });
+  assert.equal(replacement, target);
+  assert.equal(fs.readFileSync(path.join(target, 'app.js'), 'utf8'), 'new');
 
   console.log('[adversarial-release-test] all negative paths passed');
 } finally {
