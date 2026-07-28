@@ -22,7 +22,7 @@ export function installAuxiliaryDbLifecycle(root = window) {
   if (managers.has(root)) return managers.get(root);
 
   const factory = root?.indexedDB;
-  const tracked = new Map(AUXILIARY_DATABASES.map(name => [name, new Set()]));
+  const tracked = new Map(AUXILIARY_DATABASES.map(name => [name, new Map()]));
   const source = makeId('tab');
   let channel = null;
   let originalOpen = null;
@@ -31,17 +31,24 @@ export function installAuxiliaryDbLifecycle(root = window) {
   const forget = (name, db) => tracked.get(name)?.delete(db);
   const track = (name, db) => {
     if (!AUXILIARY_SET.has(name) || !db) return db;
-    tracked.get(name).add(db);
+    const record = { db, failures: [] };
+    tracked.get(name).set(db, record);
     const onClose = () => forget(name, db);
     const onVersionChange = () => {
       try {
         db.close();
+      } catch (error) {
+        record.failures.push({ name, message: error?.message || String(error), phase: 'versionchange-close' });
       } finally {
         forget(name, db);
       }
     };
-    try { db.addEventListener?.('close', onClose, { once: true }); } catch {}
-    try { db.addEventListener?.('versionchange', onVersionChange, { once: true }); } catch {}
+    try { db.addEventListener?.('close', onClose, { once: true }); } catch (error) {
+      record.failures.push({ name, message: error?.message || String(error), phase: 'close-listener' });
+    }
+    try { db.addEventListener?.('versionchange', onVersionChange, { once: true }); } catch (error) {
+      record.failures.push({ name, message: error?.message || String(error), phase: 'versionchange-listener' });
+    }
     return db;
   };
 
@@ -49,15 +56,16 @@ export function installAuxiliaryDbLifecycle(root = window) {
     const closed = [];
     const failures = [];
     for (const name of normalizeNames(names)) {
-      const connections = [...(tracked.get(name) || [])];
-      for (const db of connections) {
+      const connections = [...(tracked.get(name)?.values() || [])];
+      for (const record of connections) {
         try {
-          db.close();
-          forget(name, db);
+          record.db.close();
+          forget(name, record.db);
           closed.push(name);
         } catch (error) {
-          failures.push({ name, message: error?.message || String(error) });
+          failures.push({ name, message: error?.message || String(error), phase: 'explicit-close' });
         }
+        failures.push(...record.failures);
       }
     }
     return { reason, closed: [...new Set(closed)], failures };
@@ -88,61 +96,20 @@ export function installAuxiliaryDbLifecycle(root = window) {
     }
   }
 
-  if (typeof root?.BroadcastChannel === 'function') {
-    try {
-      channel = new root.BroadcastChannel('opencoursedeck-db-lifecycle');
-      channel.onmessage = async (event) => {
-        const message = event?.data;
-        if (!message || message.source === source || message.type !== 'close-request') return;
-        const result = await closeLocal(message.names, message.reason || 'cross-tab-request');
-        try {
-          channel.postMessage({
-            type: 'close-ack',
-            source,
-            requestId: message.requestId,
-            closed: result.closed,
-            failures: result.failures,
-          });
-        } catch {}
-      };
-    } catch {
-      channel = null;
-    }
-  }
-
-  const requestClose = async (names = AUXILIARY_DATABASES, {
-    reason = 'storage-reset',
-    settleMs = 75,
-  } = {}) => {
-    const normalized = normalizeNames(names);
-    const requestId = makeId('close');
-    const acknowledgements = [];
-    const onMessage = (event) => {
-      const message = event?.data;
-      if (message?.type === 'close-ack' && message.requestId === requestId) acknowledgements.push(message);
-    };
-    try { channel?.addEventListener?.('message', onMessage); } catch {}
-    try {
-      channel?.postMessage?.({ type: 'close-request', source, requestId, names: normalized, reason });
-      const local = await closeLocal(normalized, reason);
-      if (channel && settleMs > 0) await new Promise(resolve => setTimeout(resolve, settleMs));
-      return { requestId, local, acknowledgements };
-    } finally {
-      try { channel?.removeEventListener?.('message', onMessage); } catch {}
-    }
-  };
-
   const manager = Object.freeze({
     databases: AUXILIARY_DATABASES,
     track,
     closeLocal,
-    requestClose,
+    requestClose: async (names = AUXILIARY_DATABASES, { reason = 'storage-reset' } = {}) => ({
+      requestId: makeId('close'),
+      local: await closeLocal(names, reason),
+      acknowledgements: [],
+    }),
     status() {
-      return Object.freeze(Object.fromEntries([...tracked].map(([name, set]) => [name, set.size])));
+      return Object.freeze(Object.fromEntries([...tracked].map(([name, records]) => [name, records.size])));
     },
     dispose() {
       void closeLocal(AUXILIARY_DATABASES, 'dispose');
-      try { channel?.close?.(); } catch {}
       if (wrapped && factory && originalOpen) {
         try { Object.defineProperty(factory, 'open', { configurable: true, writable: true, value: originalOpen }); } catch {}
       }
