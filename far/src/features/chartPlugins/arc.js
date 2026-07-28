@@ -43,44 +43,40 @@ export const chartArc = {
       chart._arcStartTime = null;
       chart._arcDuration = opts.duration || 800;
       chart._arcTargetPercent = chart.data?.datasets?.[0]?.data?.[0] || 0;
+      chart._arcDestroyed = false;
     }
   },
 
-  beforeDraw(chart, _args, _options) {
-    if (chart._arcProgress !== undefined && chart._arcProgress < 1) {
-      if (chart._arcDrawing) return;
-      chart._arcDrawing = true;
-      if (!chart._arcStartTime) chart._arcStartTime = performance.now();
-      const elapsed = performance.now() - chart._arcStartTime;
-      const t = Math.min(1, elapsed / (chart._arcDuration || 800));
-      chart._arcProgress = easeOutCubic(t);
-      if (t < 1) {
-        // Store the id and re-check the chart is still alive before the
-        // next draw: a route unmount can call chart.destroy() (nulling
-        // chart.ctx) while this frame is pending, and drawing into a
-        // destroyed chart throws.
-        chart._arcRaf = requestAnimationFrame(() => {
-          chart._arcRaf = null;
-          if (!chart.ctx) return;
-          chart.draw();
-          chart._arcDrawing = false;
-        });
-      } else {
-        chart._arcDrawing = false;
-      }
+  beforeDraw(chart) {
+    if (chart._arcDestroyed || chart._arcProgress === undefined || chart._arcProgress >= 1) return;
+
+    if (!chart._arcStartTime) chart._arcStartTime = performance.now();
+    const elapsed = performance.now() - chart._arcStartTime;
+    const t = Math.min(1, elapsed / (chart._arcDuration || 800));
+    chart._arcProgress = easeOutCubic(t);
+
+    if (t < 1 && chart._arcRaf == null) {
+      chart._arcRaf = requestAnimationFrame(() => {
+        chart._arcRaf = null;
+        // Chart.js clears ctx during destroy. The explicit lifecycle bit also
+        // protects test doubles and future Chart.js versions that retain it.
+        if (chart._arcDestroyed || !chart.ctx) return;
+        chart.draw();
+      });
     }
   },
 
   afterDestroy(chart) {
-    if (chart._arcRaf) {
+    chart._arcDestroyed = true;
+    if (chart._arcRaf != null) {
       cancelAnimationFrame(chart._arcRaf);
       chart._arcRaf = null;
     }
   },
 
-  afterDatasetDraw(chart, args, options) {
+  afterDatasetDraw(chart, _args, options) {
     const { ctx, chartArea } = chart;
-    if (!chartArea) return;
+    if (!ctx || !chartArea) return;
 
     const lineWidth = options.lineWidth || 12;
     const color = options.color || '#6366f1';
@@ -90,14 +86,17 @@ export const chartArc = {
     const showText = options.showText !== false;
 
     const data = chart.data?.datasets?.[0]?.data || [];
-    const total = data.reduce((s, v) => s + Math.max(0, Number(v) || 0), 0) || 100;
+    const total = data.reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0) || 100;
     const targetPercent = Math.min(100, Math.max(0, (Number(data[0]) || 0) / total * 100));
     const progress = chart._arcProgress !== undefined ? chart._arcProgress : 1;
     const currentPercent = targetPercent * progress;
 
     const cx = (chartArea.left + chartArea.right) / 2;
     const cy = (chartArea.top + chartArea.bottom) / 2;
-    const radius = Math.min(chartArea.right - chartArea.left, chartArea.bottom - chartArea.top) / 2 - lineWidth / 2;
+    const radius = Math.max(0, Math.min(
+      chartArea.right - chartArea.left,
+      chartArea.bottom - chartArea.top,
+    ) / 2 - lineWidth / 2);
 
     ctx.save();
 
