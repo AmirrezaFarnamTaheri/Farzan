@@ -50,15 +50,6 @@ jobs:
           mkdir -p reports
           npm run lint -- --format json --output-file reports/eslint.json
 
-      - name: Upload lint diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: eslint-report-${{ github.run_number }}
-          path: far/reports/eslint.json
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Build release
         run: npm run build:release
 
@@ -68,19 +59,14 @@ jobs:
       - name: Verify committed artifacts are current
         run: git diff --exit-code --stat -- dist vendor
 
-      - name: Run tests
-        run: |
-          mkdir -p reports
-          npm test -- --reporter=json --outputFile=reports/vitest.json
+      - name: Generate and verify release attestation
+        run: npm run release:attest
 
-      - name: Upload test diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: vitest-report-${{ github.run_number }}
-          path: far/reports/vitest.json
-          if-no-files-found: ignore
-          retention-days: 7
+      - name: Run adversarial release integrity tests
+        run: node scripts/adversarial-release-test.cjs
+
+      - name: Run tests
+        run: npm test
 
       - name: Audit production dependency advisories
         run: npm audit --omit=dev --audit-level=high
@@ -88,49 +74,8 @@ jobs:
       - name: Audit project rules
         run: npm run audit
 
-      - name: Generate bundle report
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p reports
-          npm run report:bundle 2>&1 | tee reports/bundle-report.log
-
-      - name: Upload bundle diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: bundle-report-${{ github.run_number }}
-          path: far/reports/bundle-report.log
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Run smoke tests
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p reports
-          npm run smoke 2>&1 | tee reports/smoke.log
-
-      - name: Upload smoke diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: smoke-report-${{ github.run_number }}
-          path: far/reports/smoke.log
-          if-no-files-found: ignore
-          retention-days: 7
+        run: npm run smoke
 
       - name: Run browser smoke tests
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
-
-      - name: Upload browser smoke diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: browser-smoke-report-${{ github.run_number }}
-          path: far/reports/browser-smoke.log
-          if-no-files-found: ignore
-          retention-days: 7
+        run: npm run smoke:browser
