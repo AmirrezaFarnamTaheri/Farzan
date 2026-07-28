@@ -1,9 +1,13 @@
 'use strict';
 
 /**
- * Narrow filesystem boundary helpers for build/release tooling.
+ * Filesystem mutation boundary for build and release tooling.
  *
- * Policy: validate containment before mutation and promote through atomic rename.
+ * Invariants:
+ * - every destructive target is contained by a caller-supplied trusted root;
+ * - existing symlink ancestors are resolved before mutation;
+ * - files are written/copies are promoted by same-directory rename;
+ * - directory promotion preserves the previous output until the new tree is ready.
  */
 
 const fs = require('node:fs');
@@ -13,22 +17,144 @@ function canonical(value) {
   return fs.realpathSync.native(path.resolve(value));
 }
 
-function assertContained(target, root) {
-  const resolvedTarget = path.resolve(target);
-  const resolvedRoot = path.resolve(root);
-  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
-    throw new Error(`Unsafe filesystem target outside root: ${resolvedTarget}`);
+function nearestExisting(value) {
+  let current = path.resolve(value);
+  for (;;) {
+    if (fs.existsSync(current)) return current;
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error(`No existing ancestor for path: ${value}`);
+    current = parent;
   }
 }
 
-function atomicWrite(file, content) {
-  const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(temp, content);
-  fs.renameSync(temp, file);
+function isInside(target, root, allowRoot = true) {
+  const relative = path.relative(root, target);
+  return (allowRoot && relative === '')
+    || (relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function assertContained(target, root, { allowRoot = true, mustExist = false } = {}) {
+  const resolvedTarget = path.resolve(target);
+  const resolvedRoot = canonical(root);
+  if (mustExist && !fs.existsSync(resolvedTarget)) throw new Error(`Filesystem target does not exist: ${resolvedTarget}`);
+
+  if (!isInside(resolvedTarget, path.resolve(root), allowRoot)) {
+    throw new Error(`Unsafe filesystem target outside root: ${resolvedTarget}`);
+  }
+
+  const existingAncestor = nearestExisting(resolvedTarget);
+  const canonicalAncestor = canonical(existingAncestor);
+  if (!isInside(canonicalAncestor, resolvedRoot, allowRoot)) {
+    throw new Error(`Unsafe filesystem target traverses outside root through a symlink: ${resolvedTarget}`);
+  }
+
+  if (fs.existsSync(resolvedTarget)) {
+    const canonicalTarget = canonical(resolvedTarget);
+    if (!isInside(canonicalTarget, resolvedRoot, allowRoot)) {
+      throw new Error(`Unsafe canonical filesystem target outside root: ${canonicalTarget}`);
+    }
+  }
+  return resolvedTarget;
+}
+
+function ensureDirectory(directory, { root = path.dirname(directory), mode = 0o755 } = {}) {
+  const safeDirectory = assertContained(directory, root);
+  fs.mkdirSync(safeDirectory, { recursive: true, mode });
+  assertContained(safeDirectory, root, { mustExist: true });
+  return safeDirectory;
+}
+
+function syncDirectory(directory) {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(directory, 'r');
+    fs.fsyncSync(descriptor);
+  } catch {
+    // Directory fsync is not supported by every platform/filesystem.
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+}
+
+function atomicWrite(file, content, {
+  root = path.dirname(file),
+  encoding = typeof content === 'string' ? 'utf8' : undefined,
+  mode = 0o644,
+} = {}) {
+  const safeFile = assertContained(file, root);
+  const parent = ensureDirectory(path.dirname(safeFile), { root });
+  const temp = path.join(parent, `.${path.basename(safeFile)}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  assertContained(temp, root);
+  let descriptor;
+  try {
+    descriptor = fs.openSync(temp, 'wx', mode);
+    fs.writeFileSync(descriptor, content, encoding ? { encoding } : undefined);
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    fs.renameSync(temp, safeFile);
+    syncDirectory(parent);
+    return safeFile;
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try { fs.closeSync(descriptor); } catch {}
+    }
+    try { fs.rmSync(temp, { force: true }); } catch {}
+    throw error;
+  }
+}
+
+function atomicCopy(source, destination, { root = path.dirname(destination), mode } = {}) {
+  const safeSource = path.resolve(source);
+  if (!fs.existsSync(safeSource) || !fs.statSync(safeSource).isFile()) {
+    throw new Error(`Copy source is not a file: ${safeSource}`);
+  }
+  const data = fs.readFileSync(safeSource);
+  const sourceMode = mode ?? (fs.statSync(safeSource).mode & 0o777);
+  return atomicWrite(destination, data, { root, mode: sourceMode });
+}
+
+function removeTree(target, { root, allowRoot = false } = {}) {
+  if (!root) throw new TypeError('removeTree requires a trusted root');
+  const safeTarget = assertContained(target, root, { allowRoot });
+  fs.rmSync(safeTarget, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+}
+
+function atomicReplaceDirectory(stagedDirectory, targetDirectory, { root } = {}) {
+  if (!root) throw new TypeError('atomicReplaceDirectory requires a trusted root');
+  const staged = assertContained(stagedDirectory, root, { allowRoot: false, mustExist: true });
+  const target = assertContained(targetDirectory, root, { allowRoot: false });
+  if (!fs.statSync(staged).isDirectory()) throw new Error(`Staged output is not a directory: ${staged}`);
+
+  ensureDirectory(path.dirname(target), { root });
+  const backup = `${target}.previous-${process.pid}-${Date.now()}`;
+  assertContained(backup, root, { allowRoot: false });
+  let movedPrevious = false;
+  try {
+    if (fs.existsSync(target)) {
+      fs.renameSync(target, backup);
+      movedPrevious = true;
+    }
+    fs.renameSync(staged, target);
+    syncDirectory(path.dirname(target));
+    if (movedPrevious) removeTree(backup, { root });
+    return target;
+  } catch (error) {
+    try {
+      if (!fs.existsSync(target) && movedPrevious && fs.existsSync(backup)) fs.renameSync(backup, target);
+    } catch (rollbackError) {
+      error.rollbackError = rollbackError;
+    }
+    throw error;
+  }
 }
 
 module.exports = {
-  canonical,
   assertContained,
+  atomicCopy,
+  atomicReplaceDirectory,
   atomicWrite,
+  canonical,
+  ensureDirectory,
+  removeTree,
 };
