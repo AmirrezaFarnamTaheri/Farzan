@@ -7,6 +7,7 @@ export const AUXILIARY_DATABASES = Object.freeze([
 ]);
 
 const AUXILIARY_SET = new Set(AUXILIARY_DATABASES);
+const MAX_FAILURES_PER_CONNECTION = 32;
 const managers = new WeakMap();
 
 function makeId(prefix = 'db-lifecycle') {
@@ -18,39 +19,58 @@ function normalizeNames(names) {
   return [...new Set(values.map(String).filter(name => AUXILIARY_SET.has(name)))];
 }
 
+function failureRecord(name, error, phase) {
+  return Object.freeze({
+    name,
+    message: error?.message || String(error),
+    phase,
+  });
+}
+
+function rememberFailure(record, failure) {
+  record.failures.push(failure);
+  if (record.failures.length > MAX_FAILURES_PER_CONNECTION) {
+    record.failures.splice(0, record.failures.length - MAX_FAILURES_PER_CONNECTION);
+  }
+}
+
 export function installAuxiliaryDbLifecycle(root = window) {
   if (managers.has(root)) return managers.get(root);
 
   const factory = root?.indexedDB;
   const tracked = new Map(AUXILIARY_DATABASES.map(name => [name, new Map()]));
-  const source = makeId('tab');
-  let channel = null;
   let originalOpen = null;
   let wrapped = false;
 
   const forget = (name, db) => tracked.get(name)?.delete(db);
   const track = (name, db) => {
     if (!AUXILIARY_SET.has(name) || !db) return db;
+    const existing = tracked.get(name).get(db);
+    if (existing) return db;
+
     const record = { db, failures: [] };
     tracked.get(name).set(db, record);
     const onClose = () => forget(name, db);
     const onVersionChange = () => {
       try {
         db.close();
-      } catch (error) {
-        record.failures.push({ name, message: error?.message || String(error), phase: 'versionchange-close' });
-      } finally {
         forget(name, db);
+      } catch (error) {
+        rememberFailure(record, failureRecord(name, error, 'versionchange-close'));
       }
     };
     try { db.addEventListener?.('close', onClose, { once: true }); } catch (error) {
-      record.failures.push({ name, message: error?.message || String(error), phase: 'close-listener' });
+      rememberFailure(record, failureRecord(name, error, 'close-listener'));
     }
-    try { db.addEventListener?.('versionchange', onVersionChange, { once: true }); } catch (error) {
-      record.failures.push({ name, message: error?.message || String(error), phase: 'versionchange-listener' });
+    try { db.addEventListener?.('versionchange', onVersionChange); } catch (error) {
+      rememberFailure(record, failureRecord(name, error, 'versionchange-listener'));
     }
     return db;
   };
+
+  const status = () => Object.freeze(Object.fromEntries(
+    [...tracked].map(([name, records]) => [name, records.size]),
+  ));
 
   const closeLocal = async (names = AUXILIARY_DATABASES, reason = 'requested') => {
     const closed = [];
@@ -58,17 +78,34 @@ export function installAuxiliaryDbLifecycle(root = window) {
     for (const name of normalizeNames(names)) {
       const connections = [...(tracked.get(name)?.values() || [])];
       for (const record of connections) {
+        failures.push(...record.failures);
         try {
           record.db.close();
           forget(name, record.db);
           closed.push(name);
         } catch (error) {
-          failures.push({ name, message: error?.message || String(error), phase: 'explicit-close' });
+          const failure = failureRecord(name, error, 'explicit-close');
+          rememberFailure(record, failure);
+          failures.push(failure);
         }
-        failures.push(...record.failures);
       }
     }
-    return { reason, closed: [...new Set(closed)], failures };
+    const remaining = status();
+    const remainingNames = Object.entries(remaining)
+      .filter(([, count]) => count > 0)
+      .map(([name]) => name);
+    for (const name of remainingNames) {
+      if (!failures.some(failure => failure.name === name)) {
+        failures.push(Object.freeze({ name, phase: 'still-open', message: 'Auxiliary database connection remained open after close request' }));
+      }
+    }
+    return Object.freeze({
+      reason,
+      closed: [...new Set(closed)],
+      failures,
+      remaining,
+      committed: failures.length === 0 && remainingNames.length === 0,
+    });
   };
 
   if (factory && typeof factory.open === 'function') {
@@ -100,20 +137,30 @@ export function installAuxiliaryDbLifecycle(root = window) {
     databases: AUXILIARY_DATABASES,
     track,
     closeLocal,
-    requestClose: async (names = AUXILIARY_DATABASES, { reason = 'storage-reset' } = {}) => ({
-      requestId: makeId('close'),
-      local: await closeLocal(names, reason),
-      acknowledgements: [],
-    }),
-    status() {
-      return Object.freeze(Object.fromEntries([...tracked].map(([name, records]) => [name, records.size])));
+    requestClose: async (names = AUXILIARY_DATABASES, { reason = 'storage-reset' } = {}) => {
+      const local = await closeLocal(names, reason);
+      return Object.freeze({
+        requestId: makeId('close'),
+        local,
+        acknowledgements: [],
+        committed: local.committed,
+      });
     },
-    dispose() {
-      void closeLocal(AUXILIARY_DATABASES, 'dispose');
+    status,
+    failures() {
+      return Object.freeze(Object.fromEntries(
+        [...tracked].map(([name, records]) => [name, Object.freeze(
+          [...records.values()].flatMap(record => record.failures),
+        )]),
+      ));
+    },
+    async dispose() {
+      const result = await closeLocal(AUXILIARY_DATABASES, 'dispose');
       if (wrapped && factory && originalOpen) {
         try { Object.defineProperty(factory, 'open', { configurable: true, writable: true, value: originalOpen }); } catch {}
       }
       managers.delete(root);
+      return result;
     },
   });
 
