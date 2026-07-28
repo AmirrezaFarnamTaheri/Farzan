@@ -1,9 +1,10 @@
 /**
  * MediaStorage — throttled per-media state persistence via IndexedDB.
- * Based on Vidstack LocalMediaStorage pattern.
- * Stores: volume, muted, time, rate, quality, lang, captions per mediaId.
+ * Stores volume, muted, time, rate, quality, language, and captions per media.
  */
 
+import { createOperationContext } from '../core/operationContext.js';
+import { committedReceipt, failedReceipt } from '../core/mutationReceipt.js';
 import { throttle } from '../lib/dom.js';
 
 const DB_NAME = 'opencoursedeck-media';
@@ -21,6 +22,16 @@ const DEFAULT_STATE = Object.freeze({
 
 let _cachedDB = null;
 let _openingDB = null;
+let _nextOwnerId = 0;
+let _nextGeneration = 0;
+const _activeGeneration = new Map();
+
+function staleMediaError(mediaId) {
+  const error = new Error(`Stale media operation rejected for "${mediaId}"`);
+  error.code = 'STALE_MEDIA_OPERATION';
+  error.mediaId = mediaId;
+  return error;
+}
 
 function finiteNumber(value, fallback) {
   const number = Number(value);
@@ -30,8 +41,6 @@ function finiteNumber(value, fallback) {
 function normalizeState(record) {
   if (!record) return { ...DEFAULT_STATE };
   return {
-    // `|| 0.8` incorrectly converted a deliberately persisted volume of 0
-    // back to 0.8. Preserve zero and bound malformed imported records.
     volume: Math.max(0, Math.min(1, finiteNumber(record.volume, DEFAULT_STATE.volume))),
     muted: Boolean(record.muted),
     time: Math.max(0, finiteNumber(record.time, DEFAULT_STATE.time)),
@@ -49,7 +58,6 @@ function openDB() {
   _openingDB = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 3);
     let settled = false;
-
     const fail = (error) => {
       if (settled) return;
       settled = true;
@@ -65,8 +73,6 @@ function openDB() {
     req.onsuccess = () => {
       const db = req.result;
       if (settled) {
-        // A blocked request can succeed after its promise has already been
-        // rejected. Do not leak that late connection and block future upgrades.
         db.close();
         return;
       }
@@ -91,10 +97,9 @@ async function dbGet(mediaId) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get(mediaId);
+    const req = tx.objectStore(STORE_NAME).get(mediaId);
     req.onsuccess = () => resolve(req.result ?? null);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error || new Error('Media storage read failed'));
   });
 }
 
@@ -105,104 +110,140 @@ async function dbPut(record) {
     const req = tx.objectStore(STORE_NAME).put(record);
     let requestError = null;
     req.onerror = () => { requestError = req.error; };
-    // Request success only means the write was accepted by the transaction.
-    // Resolve after transaction completion so callers never clear dirty state
-    // for a transaction that later aborts.
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || requestError || new Error('Media storage transaction failed'));
     tx.onabort = () => reject(tx.error || requestError || new Error('Media storage transaction aborted'));
   });
 }
 
-window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+if (typeof window !== 'undefined') window.OpenCourseDeck = window.OpenCourseDeck ?? {};
 
 export class MediaStorage {
   constructor() {
-    /** @type {Map<string, Object>} */
+    this._ownerId = `media-owner-${++_nextOwnerId}`;
     this._cache = new Map();
-    /** @type {Map<string, Object>} */
     this._dirty = new Map();
-    /** @type {Map<string, Promise<Object>>} */
     this._loading = new Map();
-    /** @type {Map<string, Promise<void>>} */
     this._updates = new Map();
+    this._ownership = new Map();
+    this._revisions = new Map();
+    this._flushPromise = null;
     this._destroyed = false;
 
     this._flushThrottled = throttle(() => this.flush(), THROTTLE_MS);
+    this._onPagehide = () => { void this.flush(); };
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', this._onPagehide);
+  }
 
-    // Best-effort final flush when the tab goes away, so the last position
-    // write survives a close without player teardown. Named handler so
-    // destroy() can unregister it — players create per-instance storages,
-    // and an anonymous listener would pin every destroyed instance.
-    this._onPagehide = () => { this.flush(); };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pagehide', this._onPagehide);
+  _claim(mediaId) {
+    if (this._destroyed) throw staleMediaError(mediaId);
+    if (!this._ownership.has(mediaId)) {
+      const generation = ++_nextGeneration;
+      _activeGeneration.set(mediaId, generation);
+      this._ownership.set(mediaId, generation);
+    }
+    const generation = this._ownership.get(mediaId);
+    if (_activeGeneration.get(mediaId) !== generation) throw staleMediaError(mediaId);
+    return generation;
+  }
+
+  _context(mediaId, revision = this._revisions.get(mediaId) || 0) {
+    const generation = this._claim(mediaId);
+    const context = createOperationContext({
+      resource: mediaId,
+      generation,
+      revision,
+      authority: Object.freeze({ capability: 'media-state-write', ownerId: this._ownerId }),
+    });
+    const baseIsCurrent = context.isCurrent.bind(context);
+    context.isCurrent = () => baseIsCurrent()
+      && !this._destroyed
+      && this._ownership.get(mediaId) === generation
+      && _activeGeneration.get(mediaId) === generation;
+    return context;
+  }
+
+  _assertOwned(mediaId, generation) {
+    if (this._destroyed
+      || this._ownership.get(mediaId) !== generation
+      || _activeGeneration.get(mediaId) !== generation) {
+      throw staleMediaError(mediaId);
     }
   }
 
-  /**
-   * Flush pending writes and release the pagehide listener. Call when the
-   * owning player is destroyed.
-   */
-  destroy() {
-    if (this._destroyed) return this.flush();
-    this._destroyed = true;
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pagehide', this._onPagehide);
+  async destroy() {
+    if (this._destroyed) return this._flushPromise || committedReceipt({ backend: 'indexedDB', operation: 'media-destroy' });
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this._onPagehide);
+    let receipt;
+    try {
+      receipt = await this.flush();
+    } finally {
+      this._destroyed = true;
+      for (const [mediaId, generation] of this._ownership) {
+        if (_activeGeneration.get(mediaId) === generation) _activeGeneration.delete(mediaId);
+      }
+      this._ownership.clear();
+      this._loading.clear();
+      this._updates.clear();
     }
-    return this.flush();
+    return receipt;
   }
 
-  /**
-   * Get full state for a media ID.
-   * @param {string} mediaId
-   * @returns {Promise<Object>}
-   */
   async get(mediaId) {
+    const context = this._context(mediaId);
     if (this._cache.has(mediaId)) return { ...this._cache.get(mediaId) };
-    // Share one in-flight read per mediaId: at player init volume/rate/time
-    // restore concurrently, and without this the later resolver would
-    // overwrite state (including pending set() writes) with stale DB data.
+
     let loading = this._loading.get(mediaId);
     if (!loading) {
       loading = (async () => {
         try {
           const state = normalizeState(await dbGet(mediaId));
+          context.assertCurrent();
           if (!this._cache.has(mediaId)) this._cache.set(mediaId, state);
           return { ...this._cache.get(mediaId) };
-        } catch {
+        } catch (error) {
+          if (error?.code === 'STALE_OPERATION' || error?.code === 'STALE_MEDIA_OPERATION') throw staleMediaError(mediaId);
+          context.assertCurrent();
           const state = { ...DEFAULT_STATE };
           if (!this._cache.has(mediaId)) this._cache.set(mediaId, state);
           return { ...this._cache.get(mediaId) };
         } finally {
-          this._loading.delete(mediaId);
+          if (this._loading.get(mediaId) === loading) this._loading.delete(mediaId);
         }
       })();
       this._loading.set(mediaId, loading);
     }
     const state = await loading;
+    context.assertCurrent();
     return { ...state };
   }
 
-  /**
-   * Set a single key for a media ID (throttled write).
-   * Updates for the same media ID are serialized so back-to-back writes such
-   * as volume + muted cannot each clone the same stale state and erase one
-   * another when their async get() calls resume.
-   * @param {string} mediaId
-   * @param {string} key
-   * @param {*} value
-   */
   set(mediaId, key, value) {
+    let generation;
+    try {
+      generation = this._claim(mediaId);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
     const previous = this._updates.get(mediaId) || Promise.resolve();
     const update = previous
       .catch(() => {})
       .then(async () => {
+        this._assertOwned(mediaId, generation);
         const state = await this.get(mediaId);
+        this._assertOwned(mediaId, generation);
+        const revision = (this._revisions.get(mediaId) || 0) + 1;
         const next = { ...state, [key]: value };
+        this._revisions.set(mediaId, revision);
         this._cache.set(mediaId, next);
-        this._dirty.set(mediaId, { ...next, mediaId });
+        this._dirty.set(mediaId, {
+          generation,
+          revision,
+          record: { ...next, mediaId, _ownerId: this._ownerId, _generation: generation, _revision: revision },
+        });
         this._flushThrottled();
+        return committedReceipt({ revision, backend: 'memory', operation: `media-set:${key}` });
       });
 
     this._updates.set(mediaId, update);
@@ -211,29 +252,66 @@ export class MediaStorage {
     });
   }
 
-  /**
-   * Force immediate write of all dirty records.
-   */
-  async flush() {
-    // A pagehide/destroy flush may race an async get() inside set(). Wait for
-    // the currently queued updates before taking the dirty snapshot.
-    const pending = [...this._updates.values()];
-    if (pending.length) await Promise.allSettled(pending);
-    if (this._dirty.size === 0) return;
-
+  async _flushPass() {
+    const pendingUpdates = [...this._updates.values()];
+    if (pendingUpdates.length) await Promise.allSettled(pendingUpdates);
     const entries = [...this._dirty.entries()];
-    this._dirty.clear();
-    for (const [mediaId, record] of entries) {
+    if (!entries.length) return { attempted: 0, committed: 0, failed: 0, newer: false };
+
+    let committed = 0;
+    let failed = 0;
+    for (const [mediaId, entry] of entries) {
       try {
-        await dbPut(record);
-      } catch (e) {
-        console.warn('[MediaStorage] flush failed for', mediaId, e);
-        // Preserve a newer write that arrived while this older record was in
-        // flight; only restore the failed record when nothing newer is dirty.
-        if (!this._dirty.has(mediaId)) this._dirty.set(mediaId, record);
+        this._assertOwned(mediaId, entry.generation);
+        const context = this._context(mediaId, entry.revision);
+        await dbPut(entry.record);
+        context.assertCurrent();
+        const current = this._dirty.get(mediaId);
+        if (current?.generation === entry.generation && current?.revision === entry.revision) {
+          this._dirty.delete(mediaId);
+        }
+        committed += 1;
+      } catch (error) {
+        failed += 1;
+        if (error?.code !== 'STALE_MEDIA_OPERATION' && error?.code !== 'STALE_OPERATION') {
+          console.warn('[MediaStorage] flush failed for', mediaId, error);
+        }
       }
     }
+
+    const newer = [...this._dirty.values()].some(current =>
+      !entries.some(([, attempted]) => attempted.generation === current.generation && attempted.revision === current.revision));
+    return { attempted: entries.length, committed, failed, newer };
+  }
+
+  flush() {
+    if (this._flushPromise) return this._flushPromise;
+    this._flushPromise = (async () => {
+      let totalCommitted = 0;
+      let totalFailed = 0;
+      let lastRevision = null;
+      do {
+        const pass = await this._flushPass();
+        totalCommitted += pass.committed;
+        totalFailed += pass.failed;
+        lastRevision = Math.max(lastRevision || 0, ...[...this._revisions.values(), 0]);
+        if (!pass.newer) break;
+      } while (!this._destroyed);
+
+      if (totalFailed) {
+        return failedReceipt({
+          revision: lastRevision,
+          backend: 'indexedDB',
+          operation: 'media-flush',
+          error: `${totalFailed} media write(s) failed or became stale`,
+        });
+      }
+      return committedReceipt({ revision: lastRevision, backend: 'indexedDB', operation: 'media-flush' });
+    })().finally(() => {
+      this._flushPromise = null;
+    });
+    return this._flushPromise;
   }
 }
 
-window.OpenCourseDeck.MediaStorage = MediaStorage;
+if (typeof window !== 'undefined') window.OpenCourseDeck.MediaStorage = MediaStorage;
