@@ -37,5 +37,29 @@
     "smoke:browser": "node scripts/browser-smoke.cjs",
     "ci": "npm run check:encoding && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser",
     "offline": "npm ci --offline"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/playfair-display": "^5.2.8",
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "chart.js": "^4.5.1",
+    "dompurify": "^3.4.12",
+    "fuse.js": "7.0.0",
+    "pdfjs-dist": "4.10.38"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.1",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.2.1",
+    "espree": "^11.2.0",
+    "fake-indexeddb": "^6.2.5",
+    "globals": "^17.5.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^29.0.2",
+    "sharp": "^0.34.5",
+    "vitest": "^4.1.4",
+    "workbox-cli": "^7.4.1"
   }
 }
