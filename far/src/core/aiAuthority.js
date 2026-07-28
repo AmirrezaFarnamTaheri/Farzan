@@ -99,16 +99,17 @@ export function installAIAuthority(root = window) {
     throw new Error('AI authority requires DB.getSetting() and DB.saveSetting()');
   }
 
+  let saveChain = Promise.resolve();
+
   db.getSetting = async (key) => {
     const value = await originalGet(key);
     return key === AI_SETTINGS_KEY ? sanitiseRead(root, value) : value;
   };
 
-  db.saveSetting = async (key, value) => {
-    if (key !== AI_SETTINGS_KEY) return originalSave(key, value);
-
+  const saveAIAuthority = async (value) => {
     const previousSettings = await originalGet(AI_SETTINGS_KEY).catch(() => null);
     const previousBinding = root.sessionStorage?.getItem?.(AI_BINDING_KEY) ?? null;
+    const previousKey = root.sessionStorage?.getItem?.(AI_SESSION_KEY) ?? null;
     const candidate = normalizeCandidate(value);
     let endpoint = null;
     let sessionKey = '';
@@ -137,6 +138,12 @@ export function installAIAuthority(root = window) {
 
     try {
       await originalSave(AI_SETTINGS_KEY, persisted);
+      const verifiedSettings = await originalGet(AI_SETTINGS_KEY);
+      if (Number(verifiedSettings?.authorityRevision) !== authorityRevision
+        || verifiedSettings?.authorityTransactionId !== transactionId) {
+        throw new Error('AI authority persistence verification failed');
+      }
+
       if (sessionKey && endpoint) {
         root.sessionStorage.setItem(AI_BINDING_KEY, JSON.stringify({
           version: BINDING_VERSION,
@@ -167,6 +174,10 @@ export function installAIAuthority(root = window) {
       const rollbackErrors = [];
       try { await originalSave(AI_SETTINGS_KEY, previousSettings || stripPortableAIAuthority()); } catch (rollbackError) { rollbackErrors.push(rollbackError); }
       try {
+        if (previousKey === null) root.sessionStorage?.removeItem?.(AI_SESSION_KEY);
+        else root.sessionStorage?.setItem?.(AI_SESSION_KEY, previousKey);
+      } catch (rollbackError) { rollbackErrors.push(rollbackError); }
+      try {
         if (previousBinding === null) root.sessionStorage?.removeItem?.(AI_BINDING_KEY);
         else root.sessionStorage?.setItem?.(AI_BINDING_KEY, previousBinding);
       } catch (rollbackError) { rollbackErrors.push(rollbackError); }
@@ -175,6 +186,13 @@ export function installAIAuthority(root = window) {
       error.rollbackErrors = rollbackErrors;
       throw error;
     }
+  };
+
+  db.saveSetting = (key, value) => {
+    if (key !== AI_SETTINGS_KEY) return originalSave(key, value);
+    const operation = saveChain.catch(() => {}).then(() => saveAIAuthority(value));
+    saveChain = operation.catch(() => {});
+    return operation;
   };
 
   Object.defineProperty(db, '__aiAuthorityInstalled', { value: true });
