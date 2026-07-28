@@ -3,6 +3,35 @@ const state = {
   courses: [],
   topics: [],
 };
+const cancelled = new Set();
+
+function requestMeta(payload) {
+  const meta = {
+    id: payload?.id,
+    requestId: payload?.requestId,
+    generation: payload?.generation,
+    resource: payload?.resource ?? null,
+    revision: payload?.revision ?? null,
+    authority: payload?.authority ?? null,
+  };
+  if (!Number.isInteger(meta.id) || meta.id <= 0 || meta.requestId !== meta.id) {
+    const error = new TypeError('Invalid worker request identity');
+    error.code = 'INVALID_WORKER_REQUEST';
+    throw error;
+  }
+  return meta;
+}
+
+function post(type, meta, data = {}) {
+  self.postMessage({ type, ...meta, ...data });
+}
+
+function stableTopicId({ courseId, sourceId, lineage, topic, index }) {
+  const declared = topic?.id || topic?.topicId;
+  if (declared) return `${courseId}:${sourceId}:${declared}`;
+  const path = lineage.map(item => item.index).join('.');
+  return `${courseId}:${sourceId}:${path || 'root'}:${index}`;
+}
 
 function parseCatalog(raw) {
   const courses = [];
@@ -18,9 +47,15 @@ function parseCatalog(raw) {
       title = `Catalog issue: ${topic.error}`;
       catalogIssue = true;
     }
-    // Fallback ids thread the parent's id through so URL-less topics at the
-    // same local index on different levels can never collide.
-    const topicId = url || `${lineage.at(-1)?.topicId || `${courseId}-${srcIdx}`}-${topicIdx}`;
+
+    const topicId = stableTopicId({
+      courseId,
+      sourceId: src?.id || src?.label || srcIdx,
+      lineage,
+      topic,
+      index: topicIdx,
+    });
+
     topics.push({
       topicId,
       courseId,
@@ -42,11 +77,11 @@ function parseCatalog(raw) {
     });
 
     const childGroups = [topic?.topics, topic?.children, topic?.lessons, topic?.items];
-    childGroups.forEach((group) => {
+    childGroups.forEach(group => {
       if (!Array.isArray(group)) return;
       group.forEach((child, childIdx) => processTopic(child, childIdx, courseId, courseTitle, srcIdx, src, [
         ...lineage,
-        { topicId, title },
+        { topicId, index: topicIdx, title },
       ]));
     });
   };
@@ -62,68 +97,71 @@ function parseCatalog(raw) {
 
     const sources = Array.isArray(course?.sources) ? course.sources : [];
     sources.forEach((src, srcIdx) => {
-      const t = Array.isArray(src?.topics) ? src.topics : [];
-      t.forEach((topic, tIdx) => processTopic(topic, tIdx, courseId, courseTitle, srcIdx, src));
+      (src?.topics || []).forEach((topic, idx) => processTopic(topic, idx, courseId, courseTitle, srcIdx, src));
     });
-
     if (Array.isArray(course?.topics)) {
-      course.topics.forEach((topic, tIdx) => processTopic(topic, tIdx, courseId, courseTitle, -1, { label: 'Direct Topics' }));
+      course.topics.forEach((topic, idx) => processTopic(topic, idx, courseId, courseTitle, -1, { label: 'Direct Topics' }));
     }
   }
 
   return { courses, topics };
 }
 
-self.onmessage = function(e) {
-  const { type, id, data } = e.data;
+self.onmessage = function(event) {
+  const payload = event?.data;
+  if (payload?.type === 'cancel') {
+    if (Number.isInteger(payload.requestId)) cancelled.add(payload.requestId);
+    return;
+  }
 
+  let meta;
   try {
-    switch (type) {
+    meta = requestMeta(payload);
+    const data = payload.data ?? {};
+    if (cancelled.has(meta.requestId)) throw Object.assign(new Error('Worker request cancelled'), { code: 'WORKER_CANCELLED' });
+
+    switch (payload.type) {
       case 'parse': {
         const result = parseCatalog(data.catalogJson);
         state.catalog = data.catalogJson;
         state.courses = result.courses;
         state.topics = result.topics;
-        self.postMessage({ type: 'parse:done', id, ...result });
+        post('parse:done', meta, result);
         break;
       }
       case 'filter': {
-        const { predicate } = data;
-        let filtered;
-        if (predicate === 'hasVideo') {
-          filtered = state.topics.filter(t => (Array.isArray(t.videos) && t.videos.length) || t.url);
-        } else if (predicate === 'hasPdf') {
-          filtered = state.topics.filter(t => Array.isArray(t.pdfs) && t.pdfs.length);
-        } else if (predicate === 'hasError') {
-          filtered = state.topics.filter(t => !!t.error);
-        } else if (predicate === 'noMedia') {
-          filtered = state.topics.filter(t => {
-            const hasVideo = (Array.isArray(t.videos) && t.videos.length) || t.url;
-            const hasPdf = Array.isArray(t.pdfs) && t.pdfs.length;
-            return !hasVideo && !hasPdf;
-          });
-        } else {
-          filtered = [];
-        }
-        self.postMessage({ type: 'filter:done', id, topics: filtered });
+        const predicate = data.predicate;
+        let filtered = [];
+        if (predicate === 'hasVideo') filtered = state.topics.filter(t => t.videos.length || t.url);
+        else if (predicate === 'hasPdf') filtered = state.topics.filter(t => t.pdfs.length);
+        else if (predicate === 'hasError') filtered = state.topics.filter(t => !!t.error);
+        else if (predicate === 'noMedia') filtered = state.topics.filter(t => !(t.videos.length || t.url || t.pdfs.length));
+        post('filter:done', meta, { topics: filtered });
         break;
       }
       case 'search': {
-        const query = (data.query || '').toLowerCase();
-        if (!query) {
-          self.postMessage({ type: 'search:done', id, results: [] });
-          break;
-        }
-        const results = state.topics
-          .filter(t => (t.title || '').toLowerCase().includes(query))
-          .slice(0, data.limit || 25);
-        self.postMessage({ type: 'search:done', id, results });
+        const query = String(data.query ?? '').toLowerCase();
+        post('search:done', meta, {
+          results: query ? state.topics.filter(t => t.title.toLowerCase().includes(query)).slice(0, data.limit ?? 25) : [],
+        });
         break;
       }
       default:
-        self.postMessage({ type: 'error', id, error: `Unknown message type: ${type}` });
+        throw Object.assign(new Error(`Unknown message type: ${payload.type}`), { code: 'UNKNOWN_WORKER_MESSAGE' });
     }
   } catch (error) {
-    self.postMessage({ type: 'error', id, error: error.message || String(error) });
+    post('error', meta || {
+      id: payload?.id ?? null,
+      requestId: payload?.requestId ?? payload?.id ?? null,
+      generation: payload?.generation ?? null,
+      resource: payload?.resource ?? null,
+      revision: payload?.revision ?? null,
+      authority: payload?.authority ?? null,
+    }, {
+      code: error?.code || 'CATALOG_WORKER_ERROR',
+      error: error?.message || String(error),
+    });
+  } finally {
+    if (meta) cancelled.delete(meta.requestId);
   }
 };
