@@ -10,6 +10,7 @@ import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
 import { installDataHardening } from './core/dataHardening.js';
 import { installStoreHardening } from './core/storeHardening.js';
+import { installAIAuthority } from './core/aiAuthority.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
@@ -40,6 +41,7 @@ import { KnowledgeGraph } from './features/knowledgeGraph.js';
 installStorageSafety(window);
 installDataHardening(window);
 installStoreHardening(window);
+installAIAuthority(window);
 initEndpointApprovalGuard(document);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
