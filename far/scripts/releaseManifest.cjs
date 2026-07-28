@@ -6,6 +6,7 @@ const path = require('node:path');
 const { assertContained } = require('./fsSafe.cjs');
 
 const SCHEMA_VERSION = 1;
+const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 
 function hashBytes(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -19,8 +20,25 @@ function portablePath(value) {
   return value.split(path.sep).join('/');
 }
 
+function normalizeCommit(commit, label = 'Release manifest commit') {
+  const normalized = String(commit || '').trim().toLowerCase();
+  if (!FULL_COMMIT_PATTERN.test(normalized)) {
+    throw new Error(`${label} must be a full 40-character SHA-1`);
+  }
+  return normalized;
+}
+
+function resolveArtifactRoot(root) {
+  const resolvedRoot = path.resolve(root);
+  const stat = fs.lstatSync(resolvedRoot);
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    throw new Error(`Release artifact root is not a regular directory: ${resolvedRoot}`);
+  }
+  return fs.realpathSync.native(resolvedRoot);
+}
+
 function collectArtifactFiles(root) {
-  const canonicalRoot = fs.realpathSync.native(path.resolve(root));
+  const canonicalRoot = resolveArtifactRoot(root);
   const files = [];
   const visit = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -36,7 +54,7 @@ function collectArtifactFiles(root) {
 }
 
 function createArtifactRecord(file, { root = path.dirname(file) } = {}) {
-  const artifactRoot = fs.realpathSync.native(path.resolve(root));
+  const artifactRoot = resolveArtifactRoot(root);
   const safeFile = assertContained(file, artifactRoot, { allowRoot: false, mustExist: true });
   const stat = fs.lstatSync(safeFile);
   if (stat.isSymbolicLink() || !stat.isFile()) {
@@ -76,6 +94,7 @@ function createManifest({
   artifacts,
 } = {}) {
   if (!root) throw new TypeError('createManifest requires an artifact root');
+  const normalizedCommit = normalizeCommit(commit);
   const artifactFiles = artifacts || collectArtifactFiles(root);
   const records = artifactFiles
     .map(file => createArtifactRecord(file, { root }))
@@ -86,7 +105,7 @@ function createManifest({
     schemaVersion: SCHEMA_VERSION,
     product,
     version: String(version || ''),
-    commit: String(commit || ''),
+    commit: normalizedCommit,
     artifactRoot: portablePath(String(artifactRoot || 'dist')),
     generatedAt,
     artifactCount: records.length,
@@ -94,13 +113,24 @@ function createManifest({
   };
 }
 
-function verifyManifest(manifest, { root, exact = true } = {}) {
+function verifyManifest(manifest, { root, exact = true, expectedCommit } = {}) {
   if (!root) throw new TypeError('verifyManifest requires an artifact root');
   if (!manifest || manifest.schemaVersion !== SCHEMA_VERSION) throw new Error('Unsupported release manifest schema');
   if (!Array.isArray(manifest.artifacts)) throw new Error('Release manifest artifacts must be an array');
   if (manifest.artifactCount !== manifest.artifacts.length) throw new Error('Release manifest artifactCount is incorrect');
 
-  const artifactRoot = fs.realpathSync.native(path.resolve(root));
+  const manifestCommit = normalizeCommit(manifest.commit);
+  if (manifest.commit !== manifestCommit) {
+    throw new Error('Release manifest commit must use canonical lowercase hexadecimal');
+  }
+  if (expectedCommit !== undefined) {
+    const normalizedExpected = normalizeCommit(expectedCommit, 'Expected release commit');
+    if (manifestCommit !== normalizedExpected) {
+      throw new Error(`Release manifest commit mismatch: expected ${normalizedExpected}, got ${manifestCommit}`);
+    }
+  }
+
+  const artifactRoot = resolveArtifactRoot(root);
   const seen = new Set();
   const verified = [];
   for (const expected of manifest.artifacts) {
@@ -148,5 +178,6 @@ module.exports = {
   createManifest,
   hashFile,
   manifestDigest,
+  normalizeCommit,
   verifyManifest,
 };
