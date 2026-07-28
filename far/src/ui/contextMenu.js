@@ -14,7 +14,11 @@ let _activeItems = [];
 let _focusIdx = -1;
 let _onSelect = null;
 let _outsideHandler = null;
+let _outsideInstallTimer = null;
 let _keyHandler = null;
+let _positionRaf = null;
+let _returnFocus = null;
+const _keyboardBindings = new WeakMap();
 
 function createMenu() {
   if (_menuEl) return _menuEl;
@@ -37,6 +41,7 @@ function renderItems(items) {
     if (item.divider) {
       const div = document.createElement('div');
       div.className = DIVIDER_CLASS;
+      div.setAttribute('role', 'separator');
       div.style.cssText = 'height:1px;background:var(--border,#334155);margin:4px 8px;';
       el.appendChild(div);
       continue;
@@ -47,7 +52,6 @@ function renderItems(items) {
     btn.type = 'button';
     btn.setAttribute('role', 'menuitem');
     btn.dataset.key = item.key || '';
-
     btn.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;padding:6px 12px;border:none;background:none;color:var(--text,#e2e8f0);font:inherit;font-size:13px;cursor:pointer;text-align:left;white-space:nowrap;';
 
     if (item.icon) {
@@ -74,15 +78,27 @@ function renderItems(items) {
 
     if (item.disabled) {
       btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
       btn.style.opacity = '0.4';
       btn.style.cursor = 'default';
     }
 
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!item.disabled) {
-        hide();
-        _onSelect?.(item.key || item.title || '', item);
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (item.disabled) return;
+
+      // hide() clears module state. Capture the callback first so selection is
+      // dispatched exactly once after the menu has been dismissed.
+      const onSelect = _onSelect;
+      const key = item.key || item.title || '';
+      hide();
+      try {
+        const result = onSelect?.(key, item);
+        if (result && typeof result.catch === 'function') {
+          result.catch((error) => console.error('[ContextMenu] selection failed', error));
+        }
+      } catch (error) {
+        console.error('[ContextMenu] selection failed', error);
       }
     });
 
@@ -95,12 +111,16 @@ function renderItems(items) {
   }
 }
 
-function setFocus(idx) {
+function setFocus(index) {
   if (_focusIdx >= 0 && _activeItems[_focusIdx]) {
     _activeItems[_focusIdx].classList.remove(ACTIVE_CLASS);
     _activeItems[_focusIdx].style.background = '';
   }
-  _focusIdx = Math.max(0, Math.min(idx, _activeItems.length - 1));
+  if (!_activeItems.length) {
+    _focusIdx = -1;
+    return;
+  }
+  _focusIdx = Math.max(0, Math.min(index, _activeItems.length - 1));
   const el = _activeItems[_focusIdx];
   if (el) {
     el.classList.add(ACTIVE_CLASS);
@@ -109,28 +129,38 @@ function setFocus(idx) {
   }
 }
 
-function handleKey(e) {
+function handleKey(event) {
   if (!_menuEl || _menuEl.style.display === 'none') return;
-  switch (e.key) {
+  switch (event.key) {
     case 'ArrowDown':
-      e.preventDefault();
+      event.preventDefault();
       setFocus(_focusIdx + 1);
       break;
     case 'ArrowUp':
-      e.preventDefault();
+      event.preventDefault();
       setFocus(_focusIdx - 1);
+      break;
+    case 'Home':
+      event.preventDefault();
+      setFocus(0);
+      break;
+    case 'End':
+      event.preventDefault();
+      setFocus(_activeItems.length - 1);
       break;
     case 'Enter':
     case ' ':
-      e.preventDefault();
-      if (_activeItems[_focusIdx]) _activeItems[_focusIdx].click();
+      event.preventDefault();
+      _activeItems[_focusIdx]?.click();
       break;
     case 'Escape':
-      e.preventDefault();
+      event.preventDefault();
       hide();
       break;
     case 'Tab':
       hide();
+      break;
+    default:
       break;
   }
 }
@@ -143,54 +173,56 @@ function handleKey(e) {
  * @param {function} onSelect — called with (key, item)
  */
 export function show(items, x, y, onSelect) {
-  _onSelect = onSelect || null;
-  renderItems(items);
+  hide({ restoreFocus: false });
+  _returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  _onSelect = typeof onSelect === 'function' ? onSelect : null;
+  renderItems(Array.isArray(items) ? items : []);
 
   const el = createMenu();
   el.style.display = 'block';
   el.setAttribute('aria-hidden', 'false');
 
-  // Position with edge-flip
-  requestAnimationFrame(() => {
+  _positionRaf = requestAnimationFrame(() => {
+    _positionRaf = null;
+    if (el.style.display === 'none') return;
     const rect = el.getBoundingClientRect();
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
-    let left = x;
-    let top = y;
-    if (x + rect.width > vpW) left = Math.max(0, vpW - rect.width - 8);
-    if (y + rect.height > vpH) top = Math.max(0, vpH - rect.height - 8);
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
+    let left = Number.isFinite(Number(x)) ? Number(x) : 0;
+    let top = Number.isFinite(Number(y)) ? Number(y) : 0;
+    if (left + rect.width > vpW) left = Math.max(0, vpW - rect.width - 8);
+    if (top + rect.height > vpH) top = Math.max(0, vpH - rect.height - 8);
+    el.style.left = `${Math.max(0, left)}px`;
+    el.style.top = `${Math.max(0, top)}px`;
     if (_activeItems.length) setFocus(0);
   });
 
-  // Click outside to close
-  if (_outsideHandler) {
-    document.removeEventListener('mousedown', _outsideHandler);
-    _outsideHandler = null;
-  }
-  setTimeout(() => {
-    _outsideHandler = (e) => {
-      if (!el.contains(e.target)) hide();
+  _outsideInstallTimer = setTimeout(() => {
+    _outsideInstallTimer = null;
+    if (el.style.display === 'none') return;
+    _outsideHandler = (event) => {
+      if (!el.contains(event.target)) hide();
     };
-    // Persistent (not {once:true}): a mousedown inside the menu on a
-    // divider or disabled item would consume a once-listener and leave the
-    // menu impossible to dismiss by clicking outside. hide() removes it.
     document.addEventListener('mousedown', _outsideHandler);
   }, 0);
 
-  if (_keyHandler) {
-    document.removeEventListener('keydown', _keyHandler);
-    _keyHandler = null;
-  }
   _keyHandler = handleKey;
   document.addEventListener('keydown', _keyHandler);
 }
 
 /**
  * Hide the context menu.
+ * @param {{restoreFocus?: boolean}} [options]
  */
-export function hide() {
+export function hide({ restoreFocus = true } = {}) {
+  if (_positionRaf != null) {
+    cancelAnimationFrame(_positionRaf);
+    _positionRaf = null;
+  }
+  if (_outsideInstallTimer != null) {
+    clearTimeout(_outsideInstallTimer);
+    _outsideInstallTimer = null;
+  }
   if (_menuEl) {
     _menuEl.style.display = 'none';
     _menuEl.setAttribute('aria-hidden', 'true');
@@ -203,30 +235,49 @@ export function hide() {
     document.removeEventListener('keydown', _keyHandler);
     _keyHandler = null;
   }
+
+  const focusTarget = _returnFocus;
   _activeItems = [];
   _focusIdx = -1;
   _onSelect = null;
+  _returnFocus = null;
+
+  if (restoreFocus && focusTarget?.isConnected) {
+    focusTarget.focus({ preventScroll: true });
+  }
 }
 
 /**
- * Bind Shift+F10 keyboard trigger.
- * @param {HTMLElement} [root=document]
+ * Bind Shift+F10 keyboard trigger. Repeated calls for the same root are
+ * idempotent and return the same disposer.
+ * @param {HTMLElement|Document} [root=document]
+ * @returns {() => void}
  */
 export function bindKeyboardTrigger(root = document) {
-  root.addEventListener('keydown', (e) => {
-    if (e.shiftKey && e.key === 'F10') {
-      e.preventDefault();
-      const target = e.target;
-      const rect = target.getBoundingClientRect?.();
-      if (rect) {
-        target.dispatchEvent(new MouseEvent('contextmenu', {
-          clientX: rect.left + 8,
-          clientY: rect.top + 8,
-          bubbles: true,
-        }));
-      }
-    }
-  });
+  const existing = _keyboardBindings.get(root);
+  if (existing) return existing.dispose;
+
+  const handler = (event) => {
+    if (!event.shiftKey || event.key !== 'F10') return;
+    event.preventDefault();
+    const target = event.target;
+    const rect = target?.getBoundingClientRect?.();
+    if (!rect) return;
+    target.dispatchEvent(new MouseEvent('contextmenu', {
+      clientX: rect.left + 8,
+      clientY: rect.top + 8,
+      bubbles: true,
+    }));
+  };
+
+  const dispose = () => {
+    root.removeEventListener('keydown', handler);
+    _keyboardBindings.delete(root);
+  };
+
+  root.addEventListener('keydown', handler);
+  _keyboardBindings.set(root, { handler, dispose });
+  return dispose;
 }
 
 if (typeof window !== 'undefined') {
