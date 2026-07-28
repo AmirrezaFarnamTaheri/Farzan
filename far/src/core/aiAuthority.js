@@ -2,7 +2,8 @@ import { committedReceipt, failedReceipt } from './mutationReceipt.js';
 
 export const AI_SETTINGS_KEY = 'plasma-ai-settings';
 export const AI_SESSION_KEY = 'plasma-ai-api-key-session';
-const CREDENTIAL_VERSION = 1;
+export const AI_BINDING_KEY = 'plasma-ai-authority-session';
+const BINDING_VERSION = 1;
 
 function isLoopback(hostname) {
   const value = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
@@ -14,59 +15,79 @@ function validateEndpoint(value) {
   if (!/^https?:\/\//i.test(source)) throw new TypeError('AI endpoint must be an absolute HTTP or HTTPS URL');
   const parsed = new URL(source);
   if (parsed.username || parsed.password) throw new TypeError('AI endpoint must not contain embedded credentials');
-  if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) {
-    throw new TypeError('Remote AI endpoints must use HTTPS');
-  }
+  if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) throw new TypeError('Remote AI endpoints must use HTTPS');
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new TypeError('AI endpoint must use HTTP or HTTPS');
   return { href: parsed.href, origin: parsed.origin };
 }
 
-function readEnvelope(storage) {
-  const raw = String(storage?.getItem?.(AI_SESSION_KEY) || '').trim();
-  if (!raw) return { raw: '', envelope: null, key: '' };
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.version === CREDENTIAL_VERSION && typeof parsed.key === 'string') {
-      return { raw, envelope: parsed, key: parsed.key.trim() };
-    }
-  } catch {
-    // A legacy raw key is accepted only as transaction input. Consumers never
-    // receive it until it has been wrapped and bound to persisted authority.
+function keyFingerprint(value) {
+  const text = String(value || '');
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
   }
-  return { raw, envelope: null, key: raw };
+  return `${text.length}:${(hash >>> 0).toString(36)}`;
 }
 
-export function getBoundAICredential(root, settings = {}) {
-  const { envelope } = readEnvelope(root?.sessionStorage);
-  if (!envelope?.key) return '';
-  if (settings.mode !== 'custom-api') return '';
-  let endpoint;
-  try { endpoint = validateEndpoint(settings.endpoint); } catch { return ''; }
-  const revision = Number(settings.authorityRevision) || 0;
-  return envelope.origin === endpoint.origin
-    && envelope.endpoint === endpoint.href
-    && envelope.model === String(settings.model || '')
-    && envelope.authorityRevision === revision
-    && envelope.transactionId === settings.authorityTransactionId
-    ? envelope.key
-    : '';
+function readBinding(storage) {
+  const raw = String(storage?.getItem?.(AI_BINDING_KEY) || '').trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed?.version === BINDING_VERSION ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeCandidate(value = {}) {
   const next = { ...value };
   delete next.apiKey;
+  delete next.receipt;
   next.keyStorage = 'session';
   next.hasKey = false;
   return next;
 }
 
 export function stripPortableAIAuthority(value = {}) {
-  const next = normalizeCandidate(value);
-  next.approvedEndpointOrigin = '';
-  next.authorityRevision = 0;
-  next.authorityTransactionId = '';
-  next.hasKey = false;
-  return next;
+  return {
+    ...normalizeCandidate(value),
+    approvedEndpointOrigin: '',
+    authorityRevision: 0,
+    authorityTransactionId: '',
+    hasKey: false,
+  };
+}
+
+export function getBoundAICredential(root, settings = {}) {
+  if (settings.mode !== 'custom-api') return '';
+  const key = String(root?.sessionStorage?.getItem?.(AI_SESSION_KEY) || '').trim();
+  const binding = readBinding(root?.sessionStorage);
+  if (!key || !binding) return '';
+  let endpoint;
+  try { endpoint = validateEndpoint(settings.endpoint); } catch { return ''; }
+  const revision = Number(settings.authorityRevision) || 0;
+  return binding.origin === endpoint.origin
+    && binding.endpoint === endpoint.href
+    && binding.model === String(settings.model || '')
+    && binding.authorityRevision === revision
+    && binding.transactionId === settings.authorityTransactionId
+    && binding.keyFingerprint === keyFingerprint(key)
+    ? key
+    : '';
+}
+
+function sanitiseRead(root, settings) {
+  if (!settings || typeof settings !== 'object') return settings;
+  const next = normalizeCandidate(settings);
+  if (next.mode !== 'custom-api') return next;
+  const key = getBoundAICredential(root, next);
+  if (key) return { ...next, hasKey: true };
+  return {
+    ...next,
+    approvedEndpointOrigin: '',
+    hasKey: false,
+  };
 }
 
 export function installAIAuthority(root = window) {
@@ -78,15 +99,19 @@ export function installAIAuthority(root = window) {
     throw new Error('AI authority requires DB.getSetting() and DB.saveSetting()');
   }
 
+  db.getSetting = async (key) => {
+    const value = await originalGet(key);
+    return key === AI_SETTINGS_KEY ? sanitiseRead(root, value) : value;
+  };
+
   db.saveSetting = async (key, value) => {
     if (key !== AI_SETTINGS_KEY) return originalSave(key, value);
 
     const previousSettings = await originalGet(AI_SETTINGS_KEY).catch(() => null);
-    const previousCredential = root.sessionStorage?.getItem?.(AI_SESSION_KEY) ?? null;
+    const previousBinding = root.sessionStorage?.getItem?.(AI_BINDING_KEY) ?? null;
     const candidate = normalizeCandidate(value);
-    const credential = readEnvelope(root.sessionStorage);
     let endpoint = null;
-    let keyValue = '';
+    let sessionKey = '';
 
     if (candidate.mode === 'custom-api') {
       endpoint = validateEndpoint(candidate.endpoint);
@@ -95,7 +120,7 @@ export function installAIAuthority(root = window) {
       }
       candidate.endpoint = endpoint.href;
       candidate.approvedEndpointOrigin = endpoint.origin;
-      keyValue = credential.key;
+      sessionKey = String(root.sessionStorage?.getItem?.(AI_SESSION_KEY) || '').trim();
     } else {
       candidate.approvedEndpointOrigin = '';
     }
@@ -107,33 +132,29 @@ export function installAIAuthority(root = window) {
       ...candidate,
       authorityRevision,
       authorityTransactionId: transactionId,
-      hasKey: Boolean(keyValue && endpoint),
+      hasKey: Boolean(sessionKey && endpoint),
     };
 
     try {
       await originalSave(AI_SETTINGS_KEY, persisted);
-      if (keyValue && endpoint) {
-        const envelope = {
-          version: CREDENTIAL_VERSION,
-          key: keyValue,
+      if (sessionKey && endpoint) {
+        root.sessionStorage.setItem(AI_BINDING_KEY, JSON.stringify({
+          version: BINDING_VERSION,
           origin: endpoint.origin,
           endpoint: endpoint.href,
           model: String(persisted.model || ''),
           authorityRevision,
           transactionId,
+          keyFingerprint: keyFingerprint(sessionKey),
           committedAt: Date.now(),
-        };
-        root.sessionStorage.setItem(AI_SESSION_KEY, JSON.stringify(envelope));
+        }));
         if (!getBoundAICredential(root, persisted)) throw new Error('Credential authority verification failed');
       } else {
         root.sessionStorage?.removeItem?.(AI_SESSION_KEY);
+        root.sessionStorage?.removeItem?.(AI_BINDING_KEY);
       }
 
-      const receipt = committedReceipt({
-        revision: authorityRevision,
-        backend: 'indexedDB+sessionStorage',
-        operation: 'ai-authority-commit',
-      });
+      const receipt = committedReceipt({ revision: authorityRevision, backend: 'indexedDB+sessionStorage', operation: 'ai-authority-commit' });
       root.OpenCourseDeck?.bus?.emit?.('ai:authority-committed', {
         transactionId,
         authorityRevision,
@@ -146,16 +167,10 @@ export function installAIAuthority(root = window) {
       const rollbackErrors = [];
       try { await originalSave(AI_SETTINGS_KEY, previousSettings || stripPortableAIAuthority()); } catch (rollbackError) { rollbackErrors.push(rollbackError); }
       try {
-        if (previousCredential === null) root.sessionStorage?.removeItem?.(AI_SESSION_KEY);
-        else root.sessionStorage?.setItem?.(AI_SESSION_KEY, previousCredential);
+        if (previousBinding === null) root.sessionStorage?.removeItem?.(AI_BINDING_KEY);
+        else root.sessionStorage?.setItem?.(AI_BINDING_KEY, previousBinding);
       } catch (rollbackError) { rollbackErrors.push(rollbackError); }
-
-      const receipt = failedReceipt({
-        revision: previousRevision,
-        backend: 'indexedDB+sessionStorage',
-        operation: 'ai-authority-commit',
-        error: String(error?.message || error),
-      });
+      const receipt = failedReceipt({ revision: previousRevision, backend: 'indexedDB+sessionStorage', operation: 'ai-authority-commit', error: String(error?.message || error) });
       error.receipt = receipt;
       error.rollbackErrors = rollbackErrors;
       throw error;
@@ -167,6 +182,7 @@ export function installAIAuthority(root = window) {
   root.OpenCourseDeck.AIAuthority = Object.freeze({
     settingsKey: AI_SETTINGS_KEY,
     sessionKey: AI_SESSION_KEY,
+    bindingKey: AI_BINDING_KEY,
     getCredential: settings => getBoundAICredential(root, settings),
     stripPortableAuthority: stripPortableAIAuthority,
   });
