@@ -29,6 +29,12 @@ function staleWorkerError(workerName, requestId = null, generation = null) {
   return error;
 }
 
+function busyWorkerError(workerName) {
+  const error = new Error(`Worker "${workerName}" is busy`);
+  error.code = 'WORKER_BUSY';
+  return error;
+}
+
 function supersededWorkerError(workerName, supersedeKey) {
   const error = new Error(`Worker "${workerName}" request was superseded`);
   error.code = 'WORKER_SUPERSEDED';
@@ -129,8 +135,6 @@ function getWorker(name) {
     const worker = new Worker(def.url, { type: 'classic' });
 
     worker.onmessage = (event) => {
-      // A terminated/replaced Worker can still dispatch a queued message.
-      // Never let an obsolete instance inspect or settle the new generation.
       if (def.instance !== worker || def.generation !== generation) return;
 
       const payload = event.data ?? {};
@@ -221,6 +225,10 @@ export function runInWorker(workerName, message, {
 
     const { worker, generation, def } = handle;
     supersedePending(def, workerName, supersedeKey);
+    if (isBusy(def)) {
+      reject(busyWorkerError(workerName));
+      return;
+    }
 
     const id = ++messageId;
     const operationContext = createOperationContext({
@@ -279,7 +287,7 @@ export function runInWorker(workerName, message, {
         const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
         error.code = 'WORKER_TIMEOUT';
         current.reject(error);
-        maybeStopIdleCheck();
+        destroyWorker(def);
       }, timeout);
     }
 
