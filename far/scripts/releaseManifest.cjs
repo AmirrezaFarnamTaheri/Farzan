@@ -38,8 +38,10 @@ function collectArtifactFiles(root) {
 function createArtifactRecord(file, { root = path.dirname(file) } = {}) {
   const artifactRoot = fs.realpathSync.native(path.resolve(root));
   const safeFile = assertContained(file, artifactRoot, { allowRoot: false, mustExist: true });
-  const stat = fs.statSync(safeFile);
-  if (!stat.isFile()) throw new Error(`Release artifact is not a regular file: ${safeFile}`);
+  const stat = fs.lstatSync(safeFile);
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw new Error(`Release artifact is not a regular file: ${safeFile}`);
+  }
   return {
     path: portablePath(path.relative(artifactRoot, safeFile)),
     size: stat.size,
