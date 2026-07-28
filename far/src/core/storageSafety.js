@@ -40,16 +40,14 @@ function notifyDeletionFailure(root, failures) {
   const guidance = blocked
     ? 'Deletion is blocked by another open tab or process. Close other OpenCourseDeck tabs and retry.'
     : 'Close other OpenCourseDeck tabs, check browser storage permissions, and retry.';
-  const message = `Local data reset incomplete for: ${names}. ${guidance}`;
-  try { root.OpenCourseDeck?.Toast?.error?.(message); } catch {}
+  try { root.OpenCourseDeck?.Toast?.error?.(`Local data reset incomplete for: ${names}. ${guidance}`); } catch {}
 }
 
 function deletionFailure(error, receipt) {
   const failure = error instanceof Error ? error : new Error(String(error || 'Local data reset failed'));
   failure.code = failure.code || 'STORAGE_RESET_INCOMPLETE';
+  Object.assign(failure, receipt);
   failure.receipt = receipt;
-  failure.failures = receipt.failures;
-  failure.cleared = receipt.cleared;
   return failure;
 }
 
@@ -82,9 +80,7 @@ export function installStorageSafety(root = window) {
       removeKeys(root.sessionStorage, SESSION_KEYS);
       receipt.auxiliary = await lifecycle.requestClose(AUXILIARY_DATABASES, { reason: 'clear-all' });
       failures.push(...(receipt.auxiliary?.local?.failures || []));
-      for (const acknowledgement of receipt.auxiliary?.acknowledgements || []) {
-        failures.push(...(acknowledgement.failures || []));
-      }
+      for (const acknowledgement of receipt.auxiliary?.acknowledgements || []) failures.push(...(acknowledgement.failures || []));
       for (const name of AUXILIARY_DATABASES) {
         try { await deleteDatabase(root.indexedDB, name); }
         catch (error) { failures.push({ name, message: error?.message || String(error) }); }
