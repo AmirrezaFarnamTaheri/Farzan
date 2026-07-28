@@ -106,12 +106,41 @@ function atomicWrite(file, content, {
 
 function atomicCopy(source, destination, { root = path.dirname(destination), mode } = {}) {
   const safeSource = path.resolve(source);
-  if (!fs.existsSync(safeSource) || !fs.statSync(safeSource).isFile()) {
-    throw new Error(`Copy source is not a file: ${safeSource}`);
+  const sourceStat = fs.lstatSync(safeSource);
+  if (sourceStat.isSymbolicLink() || !sourceStat.isFile()) {
+    throw new Error(`Copy source is not a regular file: ${safeSource}`);
   }
-  const data = fs.readFileSync(safeSource);
-  const sourceMode = mode ?? (fs.statSync(safeSource).mode & 0o777);
-  return atomicWrite(destination, data, { root, mode: sourceMode });
+  return atomicWrite(destination, fs.readFileSync(safeSource), {
+    root,
+    mode: mode ?? (sourceStat.mode & 0o777),
+  });
+}
+
+function copyTree(source, destination, { root } = {}) {
+  if (!root) throw new TypeError('copyTree requires a trusted destination root');
+  const sourceRoot = path.resolve(source);
+  const sourceStat = fs.lstatSync(sourceRoot);
+  if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory()) {
+    throw new Error(`Copy source is not a regular directory: ${sourceRoot}`);
+  }
+  const safeDestination = ensureDirectory(destination, { root });
+  const visit = (from, to) => {
+    for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+      const sourcePath = path.join(from, entry.name);
+      const destinationPath = path.join(to, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`Copy source tree contains a symlink: ${sourcePath}`);
+      if (entry.isDirectory()) {
+        ensureDirectory(destinationPath, { root });
+        visit(sourcePath, destinationPath);
+      } else if (entry.isFile()) {
+        atomicCopy(sourcePath, destinationPath, { root });
+      } else {
+        throw new Error(`Copy source tree contains an unsupported entry: ${sourcePath}`);
+      }
+    }
+  };
+  visit(sourceRoot, safeDestination);
+  return safeDestination;
 }
 
 function removeTree(target, { root, allowRoot = false } = {}) {
@@ -155,6 +184,7 @@ module.exports = {
   atomicReplaceDirectory,
   atomicWrite,
   canonical,
+  copyTree,
   ensureDirectory,
   removeTree,
 };
