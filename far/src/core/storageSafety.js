@@ -44,6 +44,15 @@ function notifyDeletionFailure(root, failures) {
   try { root.OpenCourseDeck?.Toast?.error?.(message); } catch {}
 }
 
+function deletionFailure(error, receipt) {
+  const failure = error instanceof Error ? error : new Error(String(error || 'Local data reset failed'));
+  failure.code = failure.code || 'STORAGE_RESET_INCOMPLETE';
+  failure.receipt = receipt;
+  failure.failures = receipt.failures;
+  failure.cleared = receipt.cleared;
+  return failure;
+}
+
 export function installStorageSafety(root = window) {
   const db = root.DB;
   if (!db || db.__storageSafetyInstalled) return db;
@@ -72,6 +81,10 @@ export function installStorageSafety(root = window) {
       receipt.session = true;
       removeKeys(root.sessionStorage, SESSION_KEYS);
       receipt.auxiliary = await lifecycle.requestClose(AUXILIARY_DATABASES, { reason: 'clear-all' });
+      failures.push(...(receipt.auxiliary?.local?.failures || []));
+      for (const acknowledgement of receipt.auxiliary?.acknowledgements || []) {
+        failures.push(...(acknowledgement.failures || []));
+      }
       for (const name of AUXILIARY_DATABASES) {
         try { await deleteDatabase(root.indexedDB, name); }
         catch (error) { failures.push({ name, message: error?.message || String(error) }); }
@@ -80,7 +93,8 @@ export function installStorageSafety(root = window) {
       return withCompatibility(committedReceipt({ backend: 'indexedDB', operation: 'clear-all', details: receipt }), { cleared: AUXILIARY_DATABASES });
     } catch (error) {
       notifyDeletionFailure(root, failures);
-      return withCompatibility(failedReceipt({ backend: 'indexedDB', operation: 'clear-all', error: error?.message || String(error), details: { ...receipt, failures } }), { failures });
+      const failed = withCompatibility(failedReceipt({ backend: 'indexedDB', operation: 'clear-all', error: error?.message || String(error), details: { ...receipt, failures } }), { failures });
+      throw deletionFailure(error, failed);
     }
   };
 
