@@ -43,18 +43,38 @@ describe('storage safety', () => {
 
     const result = await root.DB.clearUserData('preferences');
 
-    expect(result.scope).toBe('preferences');
+    expect(result).toMatchObject({
+      scope: 'preferences',
+      committed: true,
+      durable: true,
+      status: 'committed',
+      operation: 'clear-preferences',
+    });
     expect(root.localStorage.removeItem).toHaveBeenCalledWith('plasma_theme');
     expect(originalClearUserData).not.toHaveBeenCalled();
     expect(originalClearAll).not.toHaveBeenCalled();
   });
 
-  it('delegates known non-destructive scopes unchanged', async () => {
+  it('wraps known non-destructive scopes in a durable mutation receipt', async () => {
     const root = createRoot();
     const originalClearUserData = root.DB.clearUserData;
     installStorageSafety(root);
 
-    await expect(root.DB.clearUserData('notes')).resolves.toEqual({ scope: 'notes' });
+    const result = await root.DB.clearUserData('notes');
+
+    expect(result).toMatchObject({
+      scope: 'notes',
+      committed: true,
+      durable: true,
+      degraded: false,
+      status: 'committed',
+      operation: 'clear-notes',
+      backend: 'indexedDB',
+      details: { scope: 'notes' },
+      failures: [],
+      cleared: [],
+    });
+    expect(result.id).toMatch(/^mutation-/);
     expect(originalClearUserData).toHaveBeenCalledWith('notes');
   });
 
@@ -74,6 +94,12 @@ describe('storage safety', () => {
 
     const error = await root.DB.clearAll().catch(value => value);
 
+    expect(error).toMatchObject({
+      committed: false,
+      durable: false,
+      status: 'failed',
+      operation: 'clear-all',
+    });
     expect(error.failures).toEqual([
       expect.objectContaining({ name: 'opencoursedeck-templates' }),
     ]);
