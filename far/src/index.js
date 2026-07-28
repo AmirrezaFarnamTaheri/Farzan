@@ -9,6 +9,7 @@ import '../ui.js';
 import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
 import { installDataHardening } from './core/dataHardening.js';
+import { installStoreHardening } from './core/storeHardening.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
 import { initCommandPalette } from './features/commandPalette.js';
 
@@ -31,10 +32,6 @@ import { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTem
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
-// Side-effect import: mediaStorage.js registers window.OpenCourseDeck.MediaStorage
-// itself. player.js has 13 guarded call sites for it (per-video volume, time,
-// rate, muted persistence) that all silently no-opped because nothing imported
-// this module, leaving the advertised resume-per-video behavior inert.
 import './features/mediaStorage.js';
 import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
@@ -42,6 +39,7 @@ import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
 installStorageSafety(window);
 installDataHardening(window);
+installStoreHardening(window);
 initEndpointApprovalGuard(document);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
@@ -62,9 +60,9 @@ locale.locale('en-US', enUS);
 locale.locale('fa-IR', faIR);
 pd.TranslatorRegistry = TranslatorRegistry;
 pd.BaseTranslator = BaseTranslator;
-pd.GoogleTranslator = GoogleTranslator;
 pd.OpenAITranslator = OpenAITranslator;
 pd.CustomAPITranslator = CustomAPITranslator;
+pd.GoogleTranslator = GoogleTranslator;
 pd.LANGUAGES = LANGUAGES;
 pd.getLanguageName = getLanguageName;
 pd.TranslationCache = translationCache;
@@ -86,145 +84,20 @@ const featureLoaders = {
   progress: () => import('../progress.js'),
 };
 const featurePromises = new Map();
-
 pd.loadFeature = (name) => {
   const loader = featureLoaders[name];
   if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
   if (!featurePromises.has(name)) featurePromises.set(name, loader());
   return featurePromises.get(name);
 };
+pd.loadFeatures = (names = []) => Promise.all(names.map(name => pd.loadFeature(name)));
 
-pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature(name)));
-
-(() => {
-  try {
-    const theme = localStorage.getItem('plasma_theme') || 'dark';
-    const accent = localStorage.getItem('plasma_accent') || 'plasma';
-    const dir = localStorage.getItem('plasma_dir') || 'ltr';
-    const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
-    root.setAttribute('data-accent', accent);
-    root.setAttribute('dir', dir);
-    root.style.setProperty('--font-scale', localStorage.getItem('plasma_font_scale') || '1');
-    if (localStorage.getItem('plasma_sidebar_collapsed') === 'true') root.classList.add('sidebar-collapsed');
-    root.setAttribute('data-density', localStorage.getItem('plasma_density') || 'comfortable');
-  } catch {
-    // Storage can be unavailable in hardened or embedded browsers.
-  }
-})();
+try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 
 initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
 pd.ProductReadiness = enforceProductReadiness(document);
-
-try { performance.mark?.('pd:bundle:evaluated'); } catch {}
-
-const isLocalHost = (() => {
-  try {
-    return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
-  } catch {
-    return false;
-  }
-})();
-
-const debugEnabled = (() => {
-  try {
-    return isLocalHost && new URLSearchParams(location.search).get('debug') === '1';
-  } catch {
-    return false;
-  }
-})();
-
-window.__pdDebug = (payload) => {
-  if (!debugEnabled) return;
-  try { navigator.sendBeacon?.('/__debug?debug=1', JSON.stringify(payload)); } catch {}
-};
-
-window.__pdMark = (name) => {
-  try { performance.mark?.(name); } catch {}
-};
-
-window.__pdMeasure = (name, start, end) => {
-  try {
-    performance.measure?.(name, start, end);
-    const entry = performance.getEntriesByName?.(name)?.at?.(-1);
-    window.__pdDebug?.({
-      location: 'performance',
-      message: 'timing',
-      data: { name, duration: entry?.duration ?? null },
-      timestamp: Date.now(),
-    });
-  } catch {}
-};
-
-window.addEventListener('error', (event) => {
-  window.__pdDebug?.({
-    location: 'window:error',
-    message: 'Unhandled error',
-    data: {
-      msg: String(event?.message || ''),
-      file: String(event?.filename || ''),
-      line: event?.lineno,
-      col: event?.colno,
-    },
-    timestamp: Date.now(),
-  });
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  window.__pdDebug?.({
-    location: 'window:unhandledrejection',
-    message: 'Unhandled rejection',
-    data: { reason: String(event?.reason || '') },
-    timestamp: Date.now(),
-  });
-});
-
-if ('serviceWorker' in navigator) {
-  if (isLocalHost) {
-    try {
-      const key = 'pd_dev_sw_disabled_once';
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, '1');
-        navigator.serviceWorker.getRegistrations()
-          .then((registrations) => Promise.allSettled(registrations.map((registration) => registration.unregister())))
-          .then(() => location.reload())
-          .catch(() => {});
-      }
-    } catch {}
-  }
-
-  window.addEventListener('load', () => {
-    if (isLocalHost) return;
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then((registration) => {
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration } }));
-            }
-          });
-        });
-      })
-      .catch((error) => {
-        window.__pdDebug?.({
-          location: 'service-worker',
-          message: 'Registration failed',
-          data: { reason: String(error?.message || error || '') },
-          timestamp: Date.now(),
-        });
-      });
-  });
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!window.__plasmaSwUpdateAccepted || window.__plasmaSwReloading) return;
-    window.__plasmaSwReloading = true;
-    location.reload();
-  });
-}
 
 import('../app.js')
   .then(() => {
@@ -232,6 +105,4 @@ import('../app.js')
       console.warn('[OpenCourseDeck] initCommandPalette failed', error);
     }
   })
-  .catch((error) => {
-    console.error('[OpenCourseDeck] app shell failed to load', error);
-  });
+  .catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));
