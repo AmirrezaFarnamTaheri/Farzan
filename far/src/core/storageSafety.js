@@ -33,6 +33,17 @@ function deleteDatabase(factory, name) {
   });
 }
 
+function notifyDeletionFailure(root, failures) {
+  if (!failures.length) return;
+  const names = failures.map(failure => failure.name).join(', ');
+  const blocked = failures.some(failure => /blocked/i.test(failure.message));
+  const guidance = blocked
+    ? 'Deletion is blocked by another open tab or process. Close other OpenCourseDeck tabs and retry.'
+    : 'Close other OpenCourseDeck tabs, check browser storage permissions, and retry.';
+  const message = `Local data reset incomplete for: ${names}. ${guidance}`;
+  try { root.OpenCourseDeck?.Toast?.error?.(message); } catch {}
+}
+
 export function installStorageSafety(root = window) {
   const db = root.DB;
   if (!db || db.__storageSafetyInstalled) return db;
@@ -68,6 +79,7 @@ export function installStorageSafety(root = window) {
       if (failures.length) throw new Error('Auxiliary database deletion incomplete');
       return withCompatibility(committedReceipt({ backend: 'indexedDB', operation: 'clear-all', details: receipt }), { cleared: AUXILIARY_DATABASES });
     } catch (error) {
+      notifyDeletionFailure(root, failures);
       return withCompatibility(failedReceipt({ backend: 'indexedDB', operation: 'clear-all', error: error?.message || String(error), details: { ...receipt, failures } }), { failures });
     }
   };
