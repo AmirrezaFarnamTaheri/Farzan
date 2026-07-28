@@ -21,6 +21,7 @@ jobs:
     defaults:
       run:
         working-directory: far
+        shell: bash
 
     steps:
       - name: Check out repository
@@ -33,49 +34,83 @@ jobs:
           cache: npm
           cache-dependency-path: far/package-lock.json
 
+      - name: Prepare diagnostics
+        run: mkdir -p reports
+
       - name: Install dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        run: npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee reports/npm-ci.log
 
       - name: Vendor browser dependencies
-        run: npm run vendor
+        run: npm run vendor 2>&1 | tee reports/vendor.log
 
       - name: Check encoding
-        run: npm run check:encoding
+        run: npm run check:encoding 2>&1 | tee reports/encoding.log
 
       - name: Validate repository
-        run: npm run validate
+        run: npm run validate 2>&1 | tee reports/validate.log
 
       - name: Lint source
         run: |
-          mkdir -p reports
+          set +e
           npm run lint -- --format json --output-file reports/eslint.json
+          status=$?
+          if [[ -s reports/eslint.json ]]; then
+            node -e '
+              const fs = require("node:fs");
+              const reports = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              let errors = 0;
+              let warnings = 0;
+              for (const report of reports) {
+                errors += report.errorCount || 0;
+                warnings += report.warningCount || 0;
+                for (const message of report.messages || []) {
+                  const level = message.severity === 2 ? "error" : "warning";
+                  console.log(`${report.filePath}:${message.line || 0}:${message.column || 0} ${level} ${message.message} (${message.ruleId || "parse"})`);
+                }
+              }
+              console.log(`ESLint summary: ${errors} error(s), ${warnings} warning(s)`);
+            ' reports/eslint.json | tee reports/eslint-summary.log
+          fi
+          exit "$status"
 
       - name: Build release
-        run: npm run build:release
+        run: npm run build:release 2>&1 | tee reports/build-release.log
 
       - name: Verify generated artifacts
-        run: npm run check:generated
+        run: npm run check:generated 2>&1 | tee reports/check-generated.log
 
       - name: Verify committed artifacts are current
-        run: git diff --exit-code --stat -- dist vendor
+        run: git diff --exit-code --stat -- dist vendor 2>&1 | tee reports/artifact-diff.log
 
       - name: Generate and verify release attestation
-        run: npm run release:attest
+        run: npm run release:attest 2>&1 | tee reports/release-attestation.log
 
       - name: Run adversarial release integrity tests
-        run: node scripts/adversarial-release-test.cjs
+        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/adversarial-release.log
 
       - name: Run tests
-        run: npm test
+        run: npm test 2>&1 | tee reports/tests.log
 
       - name: Audit production dependency advisories
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/npm-audit.log
 
       - name: Audit project rules
-        run: npm run audit
+        run: npm run audit 2>&1 | tee reports/project-audit.log
+
+      - name: Generate bundle report
+        run: npm run report:bundle 2>&1 | tee reports/bundle-report.log
 
       - name: Run smoke tests
-        run: npm run smoke
+        run: npm run smoke 2>&1 | tee reports/smoke.log
 
       - name: Run browser smoke tests
-        run: npm run smoke:browser
+        run: npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
+
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ci-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: far/reports
+          if-no-files-found: warn
+          retention-days: 14
