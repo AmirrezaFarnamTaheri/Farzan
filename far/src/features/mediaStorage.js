@@ -10,6 +10,7 @@ import { throttle } from '../lib/dom.js';
 const DB_NAME = 'opencoursedeck-media';
 const STORE_NAME = 'mediaState';
 const THROTTLE_MS = 2000;
+const MAX_FLUSH_PASSES = 8;
 const DEFAULT_STATE = Object.freeze({
   volume: 0.8,
   muted: false,
@@ -30,6 +31,14 @@ function staleMediaError(mediaId) {
   const error = new Error(`Stale media operation rejected for "${mediaId}"`);
   error.code = 'STALE_MEDIA_OPERATION';
   error.mediaId = mediaId;
+  return error;
+}
+
+function unavailableMediaError(mediaId, cause = null) {
+  const error = new Error(`Media state for "${mediaId}" could not be read safely; write was not attempted`);
+  error.code = 'MEDIA_STATE_UNAVAILABLE';
+  error.mediaId = mediaId;
+  if (cause) error.cause = cause;
   return error;
 }
 
@@ -127,7 +136,10 @@ export class MediaStorage {
     this._updates = new Map();
     this._ownership = new Map();
     this._revisions = new Map();
+    this._unverifiedReads = new Map();
     this._flushPromise = null;
+    this._destroyPromise = null;
+    this._destroyReceipt = null;
     this._destroyed = false;
 
     this._flushThrottled = throttle(() => this.flush(), THROTTLE_MS);
@@ -171,22 +183,38 @@ export class MediaStorage {
     }
   }
 
-  async destroy() {
-    if (this._destroyed) return this._flushPromise || committedReceipt({ backend: 'indexedDB', operation: 'media-destroy' });
-    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this._onPagehide);
-    let receipt;
-    try {
-      receipt = await this.flush();
-    } finally {
-      this._destroyed = true;
-      for (const [mediaId, generation] of this._ownership) {
-        if (_activeGeneration.get(mediaId) === generation) _activeGeneration.delete(mediaId);
-      }
-      this._ownership.clear();
-      this._loading.clear();
-      this._updates.clear();
+  destroy() {
+    if (this._destroyPromise) return this._destroyPromise;
+    if (this._destroyed) {
+      return Promise.resolve(this._destroyReceipt || failedReceipt({
+        backend: 'indexedDB',
+        operation: 'media-destroy',
+        error: 'Media storage was destroyed without a final receipt',
+      }));
     }
-    return receipt;
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this._onPagehide);
+    this._destroyPromise = (async () => {
+      let receipt;
+      try {
+        receipt = await this.flush();
+        return receipt;
+      } finally {
+        this._destroyReceipt = receipt || failedReceipt({
+          backend: 'indexedDB',
+          operation: 'media-destroy',
+          error: 'Media storage final flush did not produce a receipt',
+        });
+        this._destroyed = true;
+        for (const [mediaId, generation] of this._ownership) {
+          if (_activeGeneration.get(mediaId) === generation) _activeGeneration.delete(mediaId);
+        }
+        this._ownership.clear();
+        this._loading.clear();
+        this._updates.clear();
+        this._unverifiedReads.clear();
+      }
+    })();
+    return this._destroyPromise;
   }
 
   async get(mediaId) {
@@ -199,14 +227,14 @@ export class MediaStorage {
         try {
           const state = normalizeState(await dbGet(mediaId));
           context.assertCurrent();
+          this._unverifiedReads.delete(mediaId);
           if (!this._cache.has(mediaId)) this._cache.set(mediaId, state);
           return { ...this._cache.get(mediaId) };
         } catch (error) {
           if (error?.code === 'STALE_OPERATION' || error?.code === 'STALE_MEDIA_OPERATION') throw staleMediaError(mediaId);
           context.assertCurrent();
-          const state = { ...DEFAULT_STATE };
-          if (!this._cache.has(mediaId)) this._cache.set(mediaId, state);
-          return { ...this._cache.get(mediaId) };
+          this._unverifiedReads.set(mediaId, error);
+          return { ...DEFAULT_STATE };
         } finally {
           if (this._loading.get(mediaId) === loading) this._loading.delete(mediaId);
         }
@@ -233,6 +261,9 @@ export class MediaStorage {
         this._assertOwned(mediaId, generation);
         const state = await this.get(mediaId);
         this._assertOwned(mediaId, generation);
+        if (this._unverifiedReads.has(mediaId)) {
+          throw unavailableMediaError(mediaId, this._unverifiedReads.get(mediaId));
+        }
         const revision = (this._revisions.get(mediaId) || 0) + 1;
         const next = { ...state, [key]: value };
         this._revisions.set(mediaId, revision);
@@ -290,23 +321,29 @@ export class MediaStorage {
       let totalCommitted = 0;
       let totalFailed = 0;
       let lastRevision = null;
+      let passes = 0;
+      let newer = false;
       do {
         const pass = await this._flushPass();
+        passes += 1;
         totalCommitted += pass.committed;
         totalFailed += pass.failed;
+        newer = pass.newer;
         lastRevision = Math.max(lastRevision || 0, ...[...this._revisions.values(), 0]);
-        if (!pass.newer) break;
-      } while (!this._destroyed);
+        if (!newer) break;
+      } while (!this._destroyed && passes < MAX_FLUSH_PASSES);
 
+      if (newer && passes >= MAX_FLUSH_PASSES) totalFailed += this._dirty.size || 1;
       if (totalFailed) {
         return failedReceipt({
           revision: lastRevision,
           backend: 'indexedDB',
           operation: 'media-flush',
-          error: `${totalFailed} media write(s) failed or became stale`,
+          error: `${totalFailed} media write(s) failed, became stale, or exceeded the flush pass limit`,
+          details: { passes, pending: this._dirty.size },
         });
       }
-      return committedReceipt({ revision: lastRevision, backend: 'indexedDB', operation: 'media-flush' });
+      return committedReceipt({ revision: lastRevision, backend: 'indexedDB', operation: 'media-flush', details: { passes } });
     })().finally(() => {
       this._flushPromise = null;
     });
