@@ -111,8 +111,12 @@ describe('static assets and service worker precache', () => {
 
     for (const feature of ['player', 'notes', 'pdf', 'canvas', 'progress']) {
       expect(entry).not.toContain(`import '../${feature}.js';`);
-      expect(entry).toContain(`${feature}: () => import('../${feature}.js')`);
+      expect(entry).toContain(`import('../${feature}.js')`);
     }
+    expect(entry).not.toContain("import './features/mediaStorage.js';");
+    expect(entry).toContain("await import('./features/mediaStorage.js')");
+    expect(entry.indexOf("await import('./features/mediaStorage.js')"))
+      .toBeLessThan(entry.indexOf("return import('../player.js')"));
     expect(entry).toContain('pd.loadFeature');
     expect(entry).toContain('pd.loadFeatures');
     expect(entry).toContain("import('../app.js')");
