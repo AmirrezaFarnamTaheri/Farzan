@@ -7,10 +7,30 @@
 
 let nextMutationId = 0;
 
-function freezeDetails(value) {
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function freezeDetails(value, seen = new WeakMap()) {
   if (!value || typeof value !== 'object') return value ?? null;
-  if (Array.isArray(value)) return Object.freeze(value.map(freezeDetails));
-  return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, freezeDetails(item)])));
+  if (!Array.isArray(value) && !isPlainObject(value)) return value;
+
+  const existing = seen.get(value);
+  if (existing) return existing;
+
+  if (Array.isArray(value)) {
+    const copy = [];
+    seen.set(value, copy);
+    for (const item of value) copy.push(freezeDetails(item, seen));
+    return Object.freeze(copy);
+  }
+
+  const copy = Object.create(Object.getPrototypeOf(value));
+  seen.set(value, copy);
+  for (const [key, item] of Object.entries(value)) copy[key] = freezeDetails(item, seen);
+  return Object.freeze(copy);
 }
 
 export function createMutationReceipt({
