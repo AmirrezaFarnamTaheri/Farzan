@@ -29,6 +29,13 @@ function staleWorkerError(workerName, requestId = null, generation = null) {
   return error;
 }
 
+function supersededWorkerError(workerName, supersedeKey) {
+  const error = new Error(`Worker "${workerName}" request was superseded`);
+  error.code = 'WORKER_SUPERSEDED';
+  error.supersedeKey = supersedeKey;
+  return error;
+}
+
 function abortError(reason) {
   if (typeof DOMException === 'function') return new DOMException(reason || 'Worker request aborted', 'AbortError');
   const error = new Error(reason || 'Worker request aborted');
@@ -36,8 +43,27 @@ function abortError(reason) {
   return error;
 }
 
+function stableIdentity(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableIdentity).join(',')}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableIdentity(value[key])}`).join(',')}}`;
+}
+
+function sameIdentity(left, right) {
+  return stableIdentity(left) === stableIdentity(right);
+}
+
 function isBusy(def) {
   return def.pending.size > 0;
+}
+
+function maybeStopIdleCheck() {
+  if (!idleTimer) return;
+  const active = Object.values(workerDefs).some(def => def.instance || def.pending.size);
+  if (!active) {
+    clearInterval(idleTimer);
+    idleTimer = null;
+  }
 }
 
 function rejectGeneration(def, generation, error) {
@@ -47,6 +73,7 @@ function rejectGeneration(def, generation, error) {
     pending.operationContext.invalidate();
     pending.reject(error);
   }
+  maybeStopIdleCheck();
 }
 
 function destroyWorker(def, error = null) {
@@ -58,6 +85,7 @@ function destroyWorker(def, error = null) {
     try { worker.terminate(); } catch {}
   }
   if (error) rejectGeneration(def, generation, error);
+  maybeStopIdleCheck();
 }
 
 function responseMatchesRequest(payload, pending, workerGeneration) {
@@ -65,6 +93,9 @@ function responseMatchesRequest(payload, pending, workerGeneration) {
     && payload?.requestId === pending.requestId
     && payload?.generation === pending.generation
     && workerGeneration === pending.generation
+    && payload?.resource === pending.operationContext.resource
+    && payload?.revision === pending.operationContext.revision
+    && sameIdentity(payload?.authority ?? null, pending.operationContext.authority ?? null)
     && pending.operationContext.isCurrent()
     && (!pending.parentContext || pending.parentContext.isCurrent());
 }
@@ -90,19 +121,14 @@ function getWorker(name) {
         def.pending.delete(payload.id);
         pending.operationContext.invalidate();
         pending.reject(staleWorkerError(name, payload.id, generation));
+        maybeStopIdleCheck();
         return;
       }
 
       def.pending.delete(payload.id);
       def.lastUsed = Date.now();
       const { type, id, requestId, generation: responseGeneration, resource, revision, authority, ...data } = payload;
-      const provenance = Object.freeze({
-        requestId,
-        generation: responseGeneration,
-        resource: resource ?? pending.operationContext.resource,
-        revision: revision ?? pending.operationContext.revision,
-        authority: authority ?? pending.operationContext.authority,
-      });
+      const provenance = Object.freeze({ requestId, generation: responseGeneration, resource, revision, authority });
       if (type === 'error') {
         const error = new Error(data.error || 'Worker error');
         error.code = data.code || 'WORKER_ERROR';
@@ -111,6 +137,7 @@ function getWorker(name) {
       } else {
         pending.resolve({ type, ...data, provenance });
       }
+      maybeStopIdleCheck();
     };
 
     worker.onerror = (event) => {
@@ -135,11 +162,22 @@ function terminateIdleWorkers() {
   for (const def of Object.values(workerDefs)) {
     if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) destroyWorker(def);
   }
+  maybeStopIdleCheck();
 }
 
 function startIdleCheck() {
   if (idleTimer) return;
   idleTimer = setInterval(terminateIdleWorkers, IDLE_CHECK_INTERVAL);
+}
+
+function supersedePending(def, workerName, supersedeKey) {
+  if (!supersedeKey) return;
+  for (const [id, pending] of def.pending) {
+    if (pending.supersedeKey !== supersedeKey) continue;
+    def.pending.delete(id);
+    pending.operationContext.invalidate();
+    pending.reject(supersededWorkerError(workerName, supersedeKey));
+  }
 }
 
 export function runInWorker(workerName, message, {
@@ -150,21 +188,19 @@ export function runInWorker(workerName, message, {
   resource = null,
   revision = null,
   authority = null,
+  supersedeKey = null,
 } = {}) {
   return new Promise((resolve, reject) => {
     const handle = getWorker(workerName);
     if (!handle) {
-      reject(new Error(`Worker "${workerName}" not available`));
+      const error = new Error(`Worker "${workerName}" not available`);
+      error.code = 'WORKER_UNAVAILABLE';
+      reject(error);
       return;
     }
 
     const { worker, generation, def } = handle;
-    if (isBusy(def)) {
-      const error = new Error(`Worker "${workerName}" is busy`);
-      error.code = 'WORKER_BUSY';
-      reject(error);
-      return;
-    }
+    supersedePending(def, workerName, supersedeKey);
 
     const id = ++messageId;
     const operationContext = createOperationContext({
@@ -180,7 +216,7 @@ export function runInWorker(workerName, message, {
       if (timer) clearTimeout(timer);
       if (abortListener) signal?.removeEventListener?.('abort', abortListener);
     };
-    const settle = (fn) => (value) => {
+    const settle = fn => value => {
       cleanup();
       fn(value);
     };
@@ -190,6 +226,7 @@ export function runInWorker(workerName, message, {
       generation,
       operationContext,
       parentContext,
+      supersedeKey,
       resolve: settle(resolve),
       reject: settle(reject),
     });
@@ -201,6 +238,7 @@ export function runInWorker(workerName, message, {
         def.pending.delete(id);
         pending.operationContext.invalidate();
         pending.reject(abortError(signal.reason?.message || 'Worker request aborted'));
+        maybeStopIdleCheck();
       };
       if (signal.aborted) {
         abortListener();
@@ -217,8 +255,8 @@ export function runInWorker(workerName, message, {
         pending.operationContext.invalidate();
         const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
         error.code = 'WORKER_TIMEOUT';
-        destroyWorker(def, error);
         pending.reject(error);
+        maybeStopIdleCheck();
       }, timeout);
     }
 
@@ -231,13 +269,14 @@ export function runInWorker(workerName, message, {
         resource: operationContext.resource,
         revision: operationContext.revision,
         authority: operationContext.authority,
-        data: message.data || {},
+        data: message.data ?? {},
       }, transfer);
     } catch (error) {
       def.pending.delete(id);
       operationContext.invalidate();
       cleanup();
       reject(error);
+      maybeStopIdleCheck();
       return;
     }
 
