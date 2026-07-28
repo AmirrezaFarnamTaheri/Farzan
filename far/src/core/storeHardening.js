@@ -11,6 +11,23 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function valuesEqual(left, right, seen = new WeakMap()) {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const mapped = seen.get(left);
+  if (mapped) return mapped === right;
+  seen.set(left, right);
+  const leftKeys = Reflect.ownKeys(left);
+  const rightKeys = Reflect.ownKeys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (!valuesEqual(left[key], right[key], seen)) return false;
+  }
+  return true;
+}
+
 function createConflict(expected, actual) {
   const error = new Error(`Store revision conflict: expected ${expected}, found ${actual}`);
   error.code = 'STORE_REVISION_CONFLICT';
@@ -25,24 +42,34 @@ function storageFor(root, persist) {
   return null;
 }
 
+function emptyEnvelope(extra = {}) {
+  return { revision: 0, state: null, transactionId: null, ...extra };
+}
+
 function readEnvelope(storage, key) {
-  if (!storage) return { revision: 0, state: null, transactionId: null };
+  if (!storage) return emptyEnvelope();
   const raw = storage.getItem(key);
-  if (!raw) return { revision: 0, state: null, transactionId: null };
-  const parsed = JSON.parse(raw);
+  if (!raw) return emptyEnvelope();
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return emptyEnvelope({ error, corrupt: true });
+  }
   if (parsed?.__pdStore === ENVELOPE_VERSION && isObject(parsed.state)) {
     return {
       revision: Number.isInteger(parsed.revision) && parsed.revision >= 0 ? parsed.revision : 0,
       state: parsed.state,
       transactionId: parsed.transactionId || null,
+      corrupt: false,
     };
   }
-  return { revision: 0, state: isObject(parsed) ? parsed : null, transactionId: null };
+  return { revision: 0, state: isObject(parsed) ? parsed : null, transactionId: null, corrupt: false };
 }
 
 function changedKeys(before, after) {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  return [...keys].filter(key => !Object.is(before[key], after[key]));
+  return [...keys].filter(key => !valuesEqual(before[key], after[key]));
 }
 
 export function installStoreHardening(root = window) {
@@ -63,12 +90,19 @@ export function installStoreHardening(root = window) {
       this._initialState = clone(state);
       this._lastReceipt = null;
 
-      let restored = { revision: 0, state: null };
+      let restored = emptyEnvelope();
       if (this._storage) {
         try {
           restored = readEnvelope(this._storage, storageKey);
+          if (restored.error) {
+            root.OpenCourseDeck?.bus?.emit?.('store:restore-error', {
+              storageKey,
+              error: restored.error,
+              recoverable: true,
+            });
+          }
         } catch (error) {
-          root.OpenCourseDeck?.bus?.emit?.('store:restore-error', { storageKey, error });
+          root.OpenCourseDeck?.bus?.emit?.('store:restore-error', { storageKey, error, recoverable: true });
         }
       }
 
@@ -76,7 +110,7 @@ export function installStoreHardening(root = window) {
       this._rawState = { ...clone(state), ...(restored.state ? clone(restored.state) : {}) };
       this.state = new Proxy(this._rawState, {
         set: (_target, key, value) => {
-          if (Object.is(this._rawState[key], value)) return true;
+          if (valuesEqual(this._rawState[key], value)) return true;
           const draft = clone(this._rawState);
           draft[key] = value;
           this._commitDraft(`direct:set:${String(key)}`, draft, { payload: value, recordHistory: true });
