@@ -153,7 +153,16 @@ function atomicReplaceDirectory(stagedDirectory, targetDirectory, { root } = {})
   if (!root) throw new TypeError('atomicReplaceDirectory requires a trusted root');
   const staged = assertContained(stagedDirectory, root, { allowRoot: false, mustExist: true });
   const target = assertContained(targetDirectory, root, { allowRoot: false });
-  if (!fs.statSync(staged).isDirectory()) throw new Error(`Staged output is not a directory: ${staged}`);
+  const stagedStat = fs.lstatSync(staged);
+  if (stagedStat.isSymbolicLink() || !stagedStat.isDirectory()) {
+    throw new Error(`Staged output is not a regular directory: ${staged}`);
+  }
+  if (fs.existsSync(target)) {
+    const targetStat = fs.lstatSync(target);
+    if (targetStat.isSymbolicLink() || !targetStat.isDirectory()) {
+      throw new Error(`Replacement target is not a regular directory: ${target}`);
+    }
+  }
 
   ensureDirectory(path.dirname(target), { root });
   const backup = `${target}.previous-${process.pid}-${Date.now()}`;
