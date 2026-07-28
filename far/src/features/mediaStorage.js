@@ -322,7 +322,7 @@ export class MediaStorage {
       let totalFailed = 0;
       let lastRevision = null;
       let passes = 0;
-      let newer = false;
+      let newer;
       do {
         const pass = await this._flushPass();
         passes += 1;
@@ -340,10 +340,15 @@ export class MediaStorage {
           backend: 'indexedDB',
           operation: 'media-flush',
           error: `${totalFailed} media write(s) failed, became stale, or exceeded the flush pass limit`,
-          details: { passes, pending: this._dirty.size },
+          details: { passes, committed: totalCommitted, pending: this._dirty.size },
         });
       }
-      return committedReceipt({ revision: lastRevision, backend: 'indexedDB', operation: 'media-flush', details: { passes } });
+      return committedReceipt({
+        revision: lastRevision,
+        backend: 'indexedDB',
+        operation: 'media-flush',
+        details: { passes, committed: totalCommitted },
+      });
     })().finally(() => {
       this._flushPromise = null;
     });
