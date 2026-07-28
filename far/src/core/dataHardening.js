@@ -1,10 +1,30 @@
+import { createOperationContext } from './operationContext.js';
+
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 
 function stableHeaders(headers = {}) {
-  return Object.entries(headers)
+  const entries = headers instanceof Headers
+    ? [...headers.entries()]
+    : Array.isArray(headers)
+      ? headers
+      : Object.entries(headers || {});
+  return entries
     .map(([key, value]) => [String(key).toLowerCase(), String(value)])
     .sort(([a], [b]) => a.localeCompare(b));
+}
+
+function hasHeader(headers, name) {
+  const target = String(name).toLowerCase();
+  return stableHeaders(headers).some(([key]) => key === target);
+}
+
+function mergeHeaders(...sources) {
+  const merged = new Headers();
+  for (const source of sources) {
+    for (const [key, value] of stableHeaders(source)) merged.set(key, value);
+  }
+  return merged;
 }
 
 function combineSignals(signals) {
@@ -12,24 +32,35 @@ function combineSignals(signals) {
   if (!active.length) return null;
   if (typeof AbortSignal?.any === 'function') return AbortSignal.any(active);
   const controller = new AbortController();
-  const abort = (event) => controller.abort(event?.target?.reason);
+  const cleanups = [];
+  const abort = (signal) => {
+    controller.abort(signal?.reason);
+    cleanups.splice(0).forEach(cleanup => cleanup());
+  };
   for (const signal of active) {
     if (signal.aborted) {
-      controller.abort(signal.reason);
+      abort(signal);
       break;
     }
-    signal.addEventListener('abort', abort, { once: true });
+    const listener = () => abort(signal);
+    signal.addEventListener('abort', listener, { once: true });
+    cleanups.push(() => signal.removeEventListener('abort', listener));
   }
   return controller.signal;
 }
 
 function wait(ms, signal) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    const onAbort = () => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      reject(signal?.reason || new DOMException('Aborted', 'AbortError'));
+      signal?.removeEventListener?.('abort', onAbort);
+      fn(value);
     };
+    const timer = setTimeout(() => finish(resolve), ms);
+    const onAbort = () => finish(reject, signal?.reason || new DOMException('Aborted', 'AbortError'));
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, { once: true });
   });
@@ -44,7 +75,7 @@ export function installDataHardening(root = window) {
 
   class HardenedHttpClient extends LegacyHttpClient {
     async request(method, url, options = {}) {
-      const normalizedMethod = String(method || 'GET').toUpperCase();
+      const requestedMethod = String(method || 'GET').toUpperCase();
       const {
         body,
         params,
@@ -66,41 +97,46 @@ export function installDataHardening(root = window) {
         fullURL = /^https?:/i.test(fullURL) ? parsed.href : `${parsed.pathname}${parsed.search}${parsed.hash}`;
       }
 
-      const mergedHeaders = { 'Content-Type': 'application/json', ...this._headers, ...headers };
-      const authenticated = Object.keys(mergedHeaders).some(key => key.toLowerCase() === 'authorization');
-      const representationHeaders = stableHeaders(mergedHeaders);
-      const cacheKey = JSON.stringify([normalizedMethod, fullURL, representationHeaders]);
+      let init = {
+        method: requestedMethod,
+        headers: mergeHeaders({ 'Content-Type': 'application/json' }, this._headers, headers),
+        signal,
+      };
+      if (body !== undefined) init.body = typeof body === 'string' ? body : JSON.stringify(body);
+
+      for (const interceptor of this._interceptors.request) {
+        init = (await interceptor(init, fullURL)) ?? init;
+      }
+
+      const normalizedMethod = String(init.method || requestedMethod).toUpperCase();
+      init.method = normalizedMethod;
+      init.headers = mergeHeaders(init.headers);
+      const representationHeaders = stableHeaders(init.headers);
+      const authenticated = hasHeader(init.headers, 'authorization') || hasHeader(init.headers, 'proxy-authorization');
+      const cacheKey = JSON.stringify([
+        normalizedMethod,
+        fullURL,
+        init.credentials || 'same-origin',
+        representationHeaders,
+      ]);
       const allowCache = normalizedMethod === 'GET' && cache && !authenticated;
       const isSWR = cache === 'swr';
 
       if (allowCache) {
         if (!isSWR) {
-          // Single get(): has()+get() races TTL expiry and can resolve
-          // the request with undefined.
           const cached = this._cache.get(cacheKey);
           if (cached !== undefined) return cached;
         } else {
           const hit = this._cache.peek(cacheKey);
           if (hit?.value !== undefined) {
-            // Preserve stale-while-revalidate semantics: return the stale
-            // value immediately and refresh in the background (deduped via
-            // _pendingRequests). Blocking on the network here would defeat
-            // the offline-first contract of QueryBuilder.swr().
             if (hit.stale && !this._pendingRequests.has(cacheKey)) {
-              // Must resolve to data: concurrent GETs dedupe onto this
-              // promise via _pendingRequests and would otherwise receive
-              // undefined.
               const refresh = (async () => {
                 try {
-                  const fresh = await this.request(normalizedMethod, url, {
-                    ...options,
-                    cache: false,
-                  });
+                  const fresh = await this.request(normalizedMethod, url, { ...options, cache: false });
                   this._cache.set(cacheKey, fresh, cacheTTL);
                   root.OpenCourseDeck?.bus?.emit?.('data:cacheUpdate', { url: fullURL, key: cacheKey });
                   return fresh;
                 } catch {
-                  // Background refresh failures keep serving the stale value.
                   return hit.value;
                 }
               })();
@@ -118,21 +154,11 @@ export function installDataHardening(root = window) {
         return this._pendingRequests.get(cacheKey);
       }
 
-      let init = {
-        method: normalizedMethod,
-        headers: mergedHeaders,
-        signal,
-      };
-      if (body !== undefined) init.body = typeof body === 'string' ? body : JSON.stringify(body);
-      for (const interceptor of this._interceptors.request) {
-        init = (await interceptor(init, fullURL)) ?? init;
-      }
-
       const timeoutController = new AbortController();
       const timeoutId = Number(timeout) > 0
         ? setTimeout(() => timeoutController.abort(new DOMException(`Request timed out after ${timeout}ms`, 'TimeoutError')), Number(timeout))
         : null;
-      init.signal = combineSignals([signal, timeoutController.signal]);
+      init.signal = combineSignals([init.signal, signal, timeoutController.signal]);
 
       const execute = async (attempt = 0) => {
         try {
@@ -178,7 +204,7 @@ export function installDataHardening(root = window) {
         return await promise;
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
-        this._pendingRequests.delete(cacheKey);
+        if (this._pendingRequests.get(cacheKey) === promise) this._pendingRequests.delete(cacheKey);
       }
     }
 
@@ -188,25 +214,31 @@ export function installDataHardening(root = window) {
       list.forEach((file, index) => form.append(list.length > 1 ? `${fieldName}[${index}]` : fieldName, file));
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        let abortListener = null;
+        const finish = (fn, value) => {
+          if (abortListener) signal?.removeEventListener?.('abort', abortListener);
+          fn(value);
+        };
         xhr.open('POST', url.startsWith('http') ? url : `${this._base}${url}`);
         xhr.timeout = Number(timeout) > 0 ? Number(timeout) : 0;
-        Object.entries({ ...this._headers, ...headers }).forEach(([key, value]) => {
-          if (key.toLowerCase() !== 'content-type') xhr.setRequestHeader(key, value);
-        });
+        for (const [key, value] of stableHeaders(mergeHeaders(this._headers, headers))) {
+          if (key !== 'content-type') xhr.setRequestHeader(key, value);
+        }
         if (onProgress) xhr.upload.addEventListener('progress', event => {
           if (event.lengthComputable) onProgress(event.loaded / event.total, event.loaded, event.total);
         });
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            try { resolve(JSON.parse(xhr.responseText)); } catch { resolve(xhr.responseText); }
-          } else reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+            try { finish(resolve, JSON.parse(xhr.responseText)); } catch { finish(resolve, xhr.responseText); }
+          } else finish(reject, new Error(`Upload failed: HTTP ${xhr.status}`));
         });
-        xhr.addEventListener('timeout', () => reject(new Error('Upload timed out')));
-        xhr.addEventListener('error', () => reject(new Error('Upload network error')));
-        xhr.addEventListener('abort', () => reject(new DOMException('Upload aborted', 'AbortError')));
+        xhr.addEventListener('timeout', () => finish(reject, new Error('Upload timed out')));
+        xhr.addEventListener('error', () => finish(reject, new Error('Upload network error')));
+        xhr.addEventListener('abort', () => finish(reject, new DOMException('Upload aborted', 'AbortError')));
         if (signal) {
+          abortListener = () => xhr.abort();
           if (signal.aborted) xhr.abort();
-          else signal.addEventListener('abort', () => xhr.abort(), { once: true });
+          else signal.addEventListener('abort', abortListener, { once: true });
         }
         xhr.send(form);
       });
@@ -219,17 +251,139 @@ export function installDataHardening(root = window) {
       this._desiredReconnect = options.reconnect ?? true;
       this._reconnectTimer = null;
       this._generation = 0;
+      this._connectionContext = null;
       this._maxQueueMessages = options.maxQueueMessages ?? 100;
       this._maxQueueBytes = options.maxQueueBytes ?? 256 * 1024;
       this._queuedBytes = 0;
     }
 
+    _beginConnection(protocol) {
+      this._connectionContext?.invalidate();
+      this._connectionContext = createOperationContext({
+        resource: this._url || null,
+        generation: this._generation,
+        revision: this._reconnectCount,
+        authority: Object.freeze({ capability: 'realtime', protocol }),
+      });
+      return this._connectionContext;
+    }
+
     connect() {
       this._reconnect = this._desiredReconnect;
       this._generation += 1;
+      this._connectionContext?.invalidate();
       if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
       return super.connect();
+    }
+
+    _connectWS() {
+      const context = this._beginConnection('ws');
+      const generation = this._generation;
+      this._closeExistingConnections();
+      let socket;
+      try {
+        socket = new WebSocket(this._url);
+        this._ws = socket;
+      } catch (error) {
+        if (context.isCurrent()) {
+          this._emit('error', error);
+          this._attemptReconnect();
+        }
+        return;
+      }
+
+      const owns = () => context.isCurrent()
+        && generation === this._generation
+        && this._ws === socket;
+
+      socket.addEventListener('open', () => {
+        if (!owns()) return;
+        this._connected = true;
+        this._reconnectCount = 0;
+        this._queuedBytes = 0;
+        this._emit('connect', { operationId: context.id, generation });
+        const queued = this._queue;
+        this._queue = [];
+        queued.forEach(message => this.send(message));
+        this._subscriptions.forEach(channel => this.send({ type: 'subscribe', channel }));
+      });
+
+      socket.addEventListener('message', event => {
+        if (!owns()) return;
+        try {
+          const payload = JSON.parse(event.data);
+          this._emit(payload.type ?? 'message', payload);
+          this._emit('*', payload);
+        } catch {
+          this._emit('message', event.data);
+        }
+      });
+
+      socket.addEventListener('close', event => {
+        if (!owns()) return;
+        this._connected = false;
+        this._ws = null;
+        this._emit('disconnect', {
+          code: event?.code,
+          reason: event?.reason,
+          wasClean: event?.wasClean,
+          operationId: context.id,
+          generation,
+        });
+        this._attemptReconnect();
+      });
+
+      socket.addEventListener('error', error => {
+        if (owns()) this._emit('error', error);
+      });
+    }
+
+    _connectSSE() {
+      const context = this._beginConnection('sse');
+      const generation = this._generation;
+      this._closeExistingConnections();
+      let source;
+      try {
+        source = new EventSource(this._url);
+        this._sse = source;
+      } catch (error) {
+        if (context.isCurrent()) {
+          this._emit('error', error);
+          this._attemptReconnect();
+        }
+        return;
+      }
+
+      const owns = () => context.isCurrent()
+        && generation === this._generation
+        && this._sse === source;
+
+      source.addEventListener('open', () => {
+        if (!owns()) return;
+        this._connected = true;
+        this._reconnectCount = 0;
+        this._emit('connect', { operationId: context.id, generation });
+      });
+      source.addEventListener('message', event => {
+        if (!owns()) return;
+        try {
+          const payload = JSON.parse(event.data);
+          this._emit(payload.type ?? 'message', payload);
+          this._emit('*', payload);
+        } catch {
+          this._emit('message', event.data);
+        }
+      });
+      source.addEventListener('error', error => {
+        if (!owns()) return;
+        this._connected = false;
+        this._sse = null;
+        try { source.close(); } catch { /* already closed */ }
+        this._emit('disconnect', { operationId: context.id, generation });
+        this._emit('error', error);
+        this._attemptReconnect();
+      });
     }
 
     _attemptReconnect() {
@@ -241,11 +395,11 @@ export function installDataHardening(root = window) {
       const generation = this._generation;
       this._reconnectCount += 1;
       const delay = this._reconnectDelay * this._reconnectCount;
-      this._emit('reconnecting', { attempt: this._reconnectCount, delay });
+      this._emit('reconnecting', { attempt: this._reconnectCount, delay, generation });
       this._reconnectTimer = setTimeout(() => {
         this._reconnectTimer = null;
         if (!this._reconnect || generation !== this._generation) return;
-        super.connect();
+        this.connect();
       }, delay);
     }
 
@@ -267,16 +421,11 @@ export function installDataHardening(root = window) {
       return false;
     }
 
-    _connectWS() {
-      const result = super._connectWS();
-      const socket = this._ws;
-      socket?.addEventListener('open', () => { this._queuedBytes = 0; }, { once: true });
-      return result;
-    }
-
     disconnect() {
       this._reconnect = false;
       this._generation += 1;
+      this._connectionContext?.invalidate();
+      this._connectionContext = null;
       if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
       this._queue = [];
