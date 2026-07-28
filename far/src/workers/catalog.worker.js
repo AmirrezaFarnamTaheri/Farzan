@@ -2,6 +2,8 @@ const MAX_CANCELLED_REQUESTS = 256;
 const CANCEL_RETENTION_MS = 30000;
 
 const state = {
+  status: 'uninitialized',
+  failure: null,
   catalog: null,
   courses: [],
   topics: [],
@@ -65,6 +67,17 @@ function post(type, meta, data = {}) {
   self.postMessage({ type, ...meta, ...data });
 }
 
+function assertCatalogReady() {
+  if (state.status === 'ready') return;
+  const failed = state.status === 'failed';
+  const error = new Error(failed
+    ? `Catalog load failed${state.failure ? `: ${state.failure}` : ''}`
+    : 'Catalog worker is not initialized; parse a catalog before querying it');
+  error.code = failed ? 'CATALOG_LOAD_FAILED' : 'WORKER_NOT_READY';
+  error.catalogState = state.status;
+  throw error;
+}
+
 function stableTopicId({ courseId, sourceId, lineage, topic, index }) {
   const declared = topic?.id || topic?.topicId;
   if (declared) return `${courseId}:${sourceId}:${declared}`;
@@ -73,11 +86,14 @@ function stableTopicId({ courseId, sourceId, lineage, topic, index }) {
 }
 
 function parseCatalog(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    const error = new TypeError('Catalog payload must be an object keyed by course id');
+    error.code = 'INVALID_CATALOG';
+    throw error;
+  }
+
   const courses = [];
   const topics = [];
-
-  if (!raw || typeof raw !== 'object') return { courses, topics };
-
   const processTopic = (topic, topicIdx, courseId, courseTitle, srcIdx, src, lineage = []) => {
     const url = topic?.url ?? '';
     let title = topic?.title ?? url ?? `Topic ${topicIdx + 1}`;
@@ -161,15 +177,23 @@ self.onmessage = function onMessage(event) {
 
     switch (payload.type) {
       case 'parse': {
+        state.status = 'loading';
+        state.failure = null;
         const result = parseCatalog(data.catalogJson);
         assertNotCancelled(meta);
         state.catalog = data.catalogJson;
         state.courses = result.courses;
         state.topics = result.topics;
-        post('parse:done', meta, result);
+        state.status = 'ready';
+        post('parse:done', meta, {
+          ...result,
+          catalogState: state.status,
+          empty: result.courses.length === 0 && result.topics.length === 0,
+        });
         break;
       }
       case 'filter': {
+        assertCatalogReady();
         const predicate = data.predicate;
         let filtered = [];
         if (predicate === 'hasVideo') filtered = state.topics.filter(t => t.videos.length || t.url);
@@ -177,16 +201,17 @@ self.onmessage = function onMessage(event) {
         else if (predicate === 'hasError') filtered = state.topics.filter(t => !!t.error);
         else if (predicate === 'noMedia') filtered = state.topics.filter(t => !(t.videos.length || t.url || t.pdfs.length));
         assertNotCancelled(meta);
-        post('filter:done', meta, { topics: filtered });
+        post('filter:done', meta, { topics: filtered, catalogState: state.status, empty: filtered.length === 0 });
         break;
       }
       case 'search': {
+        assertCatalogReady();
         const query = String(data.query ?? '').toLowerCase();
         const results = query
           ? state.topics.filter(t => t.title.toLowerCase().includes(query)).slice(0, data.limit ?? 25)
           : [];
         assertNotCancelled(meta);
-        post('search:done', meta, { results });
+        post('search:done', meta, { results, catalogState: state.status, empty: results.length === 0 });
         break;
       }
       default: {
@@ -196,6 +221,13 @@ self.onmessage = function onMessage(event) {
       }
     }
   } catch (error) {
+    if (payload?.type === 'parse' && error?.code !== 'WORKER_CANCELLED') {
+      state.status = 'failed';
+      state.failure = error?.message || String(error);
+      state.catalog = null;
+      state.courses = [];
+      state.topics = [];
+    }
     post('error', meta || {
       id: payload?.id ?? null,
       requestId: payload?.requestId ?? payload?.id ?? null,
@@ -206,6 +238,7 @@ self.onmessage = function onMessage(event) {
     }, {
       code: error?.code || 'CATALOG_WORKER_ERROR',
       error: error?.message || String(error),
+      catalogState: error?.catalogState || state.status,
     });
   } finally {
     if (meta) forgetCancellation(meta.requestId);
