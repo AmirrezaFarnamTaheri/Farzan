@@ -20,13 +20,20 @@ try {
   fs.mkdirSync(path.join(root, 'dist'));
   atomicWrite(path.join(root, 'dist', 'app.js'), 'release-bytes', { root });
 
+  const commit = '0123456789abcdef0123456789abcdef01234567';
   const manifest = createManifest({
     root: path.join(root, 'dist'),
     version: 'test',
-    commit: 'deadbeef',
+    commit,
   });
 
-  assert.equal(verifyManifest(manifest, { root: path.join(root, 'dist') }).verified, true);
+  assert.equal(verifyManifest(manifest, { root: path.join(root, 'dist'), expectedCommit: commit }).verified, true);
+
+  expectFailure(() => createManifest({
+    root: path.join(root, 'dist'),
+    version: 'test',
+    commit: 'deadbeef',
+  }), 'short commit must fail');
 
   fs.writeFileSync(path.join(root, 'dist', 'app.js'), 'tampered');
   expectFailure(() => verifyManifest(manifest, { root: path.join(root, 'dist') }), 'tampered bytes must fail');
@@ -36,8 +43,9 @@ try {
   expectFailure(() => verifyManifest(manifest, { root: path.join(root, 'dist') }), 'extra artifact must fail');
 
   fs.rmSync(path.join(root, 'dist', 'extra.js'));
+  fs.mkdirSync(path.join(root, 'outside'));
   fs.symlinkSync(path.join(root, 'outside'), path.join(root, 'dist', 'escape'));
-  expectFailure(() => createManifest({ root: path.join(root, 'dist'), version: 'test', commit: 'deadbeef' }), 'symlink artifact must fail');
+  expectFailure(() => createManifest({ root: path.join(root, 'dist'), version: 'test', commit }), 'symlink artifact must fail');
 
   console.log('[adversarial-release-test] all negative paths passed');
 } finally {
