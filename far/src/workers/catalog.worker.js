@@ -1,9 +1,43 @@
+const MAX_CANCELLED_REQUESTS = 256;
+const CANCEL_RETENTION_MS = 30000;
+
 const state = {
   catalog: null,
   courses: [],
   topics: [],
 };
-const cancelled = new Set();
+const cancelled = new Map();
+
+function pruneCancelled(now = Date.now()) {
+  for (const [requestId, expiresAt] of cancelled) {
+    if (expiresAt > now) continue;
+    cancelled.delete(requestId);
+  }
+  while (cancelled.size > MAX_CANCELLED_REQUESTS) {
+    const oldest = cancelled.keys().next().value;
+    if (oldest === undefined) break;
+    cancelled.delete(oldest);
+  }
+}
+
+function rememberCancellation(requestId) {
+  pruneCancelled();
+  cancelled.delete(requestId);
+  cancelled.set(requestId, Date.now() + CANCEL_RETENTION_MS);
+  pruneCancelled();
+}
+
+function forgetCancellation(requestId) {
+  cancelled.delete(requestId);
+}
+
+function assertNotCancelled(meta) {
+  pruneCancelled();
+  if (!cancelled.has(meta.requestId)) return;
+  const error = new Error('Worker request cancelled');
+  error.code = 'WORKER_CANCELLED';
+  throw error;
+}
 
 function requestMeta(payload) {
   const meta = {
@@ -17,6 +51,11 @@ function requestMeta(payload) {
   if (!Number.isInteger(meta.id) || meta.id <= 0 || meta.requestId !== meta.id) {
     const error = new TypeError('Invalid worker request identity');
     error.code = 'INVALID_WORKER_REQUEST';
+    throw error;
+  }
+  if (!Number.isInteger(meta.generation) || meta.generation < 0) {
+    const error = new TypeError('Invalid worker generation');
+    error.code = 'INVALID_WORKER_GENERATION';
     throw error;
   }
   return meta;
@@ -107,22 +146,23 @@ function parseCatalog(raw) {
   return { courses, topics };
 }
 
-self.onmessage = function(event) {
+self.onmessage = function onMessage(event) {
   const payload = event?.data;
   if (payload?.type === 'cancel') {
-    if (Number.isInteger(payload.requestId)) cancelled.add(payload.requestId);
+    if (Number.isInteger(payload.requestId)) rememberCancellation(payload.requestId);
     return;
   }
 
-  let meta;
+  let meta = null;
   try {
     meta = requestMeta(payload);
     const data = payload.data ?? {};
-    if (cancelled.has(meta.requestId)) throw Object.assign(new Error('Worker request cancelled'), { code: 'WORKER_CANCELLED' });
+    assertNotCancelled(meta);
 
     switch (payload.type) {
       case 'parse': {
         const result = parseCatalog(data.catalogJson);
+        assertNotCancelled(meta);
         state.catalog = data.catalogJson;
         state.courses = result.courses;
         state.topics = result.topics;
@@ -136,18 +176,24 @@ self.onmessage = function(event) {
         else if (predicate === 'hasPdf') filtered = state.topics.filter(t => t.pdfs.length);
         else if (predicate === 'hasError') filtered = state.topics.filter(t => !!t.error);
         else if (predicate === 'noMedia') filtered = state.topics.filter(t => !(t.videos.length || t.url || t.pdfs.length));
+        assertNotCancelled(meta);
         post('filter:done', meta, { topics: filtered });
         break;
       }
       case 'search': {
         const query = String(data.query ?? '').toLowerCase();
-        post('search:done', meta, {
-          results: query ? state.topics.filter(t => t.title.toLowerCase().includes(query)).slice(0, data.limit ?? 25) : [],
-        });
+        const results = query
+          ? state.topics.filter(t => t.title.toLowerCase().includes(query)).slice(0, data.limit ?? 25)
+          : [];
+        assertNotCancelled(meta);
+        post('search:done', meta, { results });
         break;
       }
-      default:
-        throw Object.assign(new Error(`Unknown message type: ${payload.type}`), { code: 'UNKNOWN_WORKER_MESSAGE' });
+      default: {
+        const error = new Error(`Unknown message type: ${payload.type}`);
+        error.code = 'UNKNOWN_WORKER_MESSAGE';
+        throw error;
+      }
     }
   } catch (error) {
     post('error', meta || {
@@ -162,6 +208,6 @@ self.onmessage = function(event) {
       error: error?.message || String(error),
     });
   } finally {
-    if (meta) cancelled.delete(meta.requestId);
+    if (meta) forgetCancellation(meta.requestId);
   }
 };
