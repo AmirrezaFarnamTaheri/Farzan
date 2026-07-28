@@ -66,6 +66,21 @@ function maybeStopIdleCheck() {
   }
 }
 
+function sendCancellation(worker, pending, reason) {
+  try {
+    worker?.postMessage?.({
+      type: 'cancel',
+      id: pending.requestId,
+      requestId: pending.requestId,
+      generation: pending.generation,
+      resource: pending.operationContext.resource,
+      revision: pending.operationContext.revision,
+      authority: pending.operationContext.authority,
+      reason,
+    });
+  } catch {}
+}
+
 function rejectGeneration(def, generation, error) {
   for (const [id, pending] of def.pending) {
     if (pending.generation !== generation) continue;
@@ -114,7 +129,11 @@ function getWorker(name) {
     const worker = new Worker(def.url, { type: 'classic' });
 
     worker.onmessage = (event) => {
-      const payload = event.data || {};
+      // A terminated/replaced Worker can still dispatch a queued message.
+      // Never let an obsolete instance inspect or settle the new generation.
+      if (def.instance !== worker || def.generation !== generation) return;
+
+      const payload = event.data ?? {};
       const pending = def.pending.get(payload.id);
       if (!pending) return;
       if (!responseMatchesRequest(payload, pending, generation)) {
@@ -175,6 +194,7 @@ function supersedePending(def, workerName, supersedeKey) {
   for (const [id, pending] of def.pending) {
     if (pending.supersedeKey !== supersedeKey) continue;
     def.pending.delete(id);
+    sendCancellation(def.instance, pending, 'superseded');
     pending.operationContext.invalidate();
     pending.reject(supersededWorkerError(workerName, supersedeKey));
   }
@@ -221,7 +241,7 @@ export function runInWorker(workerName, message, {
       fn(value);
     };
 
-    def.pending.set(id, {
+    const pending = {
       requestId: id,
       generation,
       operationContext,
@@ -229,15 +249,17 @@ export function runInWorker(workerName, message, {
       supersedeKey,
       resolve: settle(resolve),
       reject: settle(reject),
-    });
+    };
+    def.pending.set(id, pending);
 
     if (signal) {
       abortListener = () => {
-        const pending = def.pending.get(id);
-        if (!pending) return;
+        const current = def.pending.get(id);
+        if (!current) return;
         def.pending.delete(id);
-        pending.operationContext.invalidate();
-        pending.reject(abortError(signal.reason?.message || 'Worker request aborted'));
+        sendCancellation(worker, current, 'aborted');
+        current.operationContext.invalidate();
+        current.reject(abortError(signal.reason?.message || 'Worker request aborted'));
         maybeStopIdleCheck();
       };
       if (signal.aborted) {
@@ -249,13 +271,14 @@ export function runInWorker(workerName, message, {
 
     if (timeout > 0) {
       timer = setTimeout(() => {
-        const pending = def.pending.get(id);
-        if (!pending || pending.generation !== generation) return;
+        const current = def.pending.get(id);
+        if (!current || current.generation !== generation) return;
         def.pending.delete(id);
-        pending.operationContext.invalidate();
+        sendCancellation(worker, current, 'timeout');
+        current.operationContext.invalidate();
         const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
         error.code = 'WORKER_TIMEOUT';
-        pending.reject(error);
+        current.reject(error);
         maybeStopIdleCheck();
       }, timeout);
     }
@@ -269,7 +292,7 @@ export function runInWorker(workerName, message, {
         resource: operationContext.resource,
         revision: operationContext.revision,
         authority: operationContext.authority,
-        data: message.data ?? {},
+        data: Object.prototype.hasOwnProperty.call(message, 'data') ? message.data : {},
       }, transfer);
     } catch (error) {
       def.pending.delete(id);
@@ -305,5 +328,7 @@ export function getWorkerStatus() {
 }
 
 const WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
-window.OpenCourseDeck = window.OpenCourseDeck || {};
-window.OpenCourseDeck.WorkerPool = WorkerPool;
+if (typeof window !== 'undefined') {
+  window.OpenCourseDeck = window.OpenCourseDeck || {};
+  window.OpenCourseDeck.WorkerPool = WorkerPool;
+}
