@@ -35,7 +35,6 @@ import { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTem
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
-import './features/mediaStorage.js';
 import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';
@@ -83,7 +82,10 @@ pd.workers = {
 };
 
 const featureLoaders = {
-  player: () => import('../player.js'),
+  player: async () => {
+    await import('./features/mediaStorage.js');
+    return import('../player.js');
+  },
   notes: () => import('../notes.js'),
   pdf: () => import('../pdf.js'),
   canvas: () => import('../canvas.js'),
