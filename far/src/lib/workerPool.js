@@ -19,6 +19,12 @@ function createDefinition(url) {
   };
 }
 
+function staleWorkerError(workerName) {
+  const error = new Error(`Worker "${workerName}" request became stale`);
+  error.code = 'STALE_WORKER_REQUEST';
+  return error;
+}
+
 function isBusy(def) {
   return def.pending.size > 0;
 }
@@ -37,7 +43,7 @@ function destroyWorker(def, error = null) {
   def.instance = null;
   def.generation += 1;
   if (worker) {
-    try { worker.terminate(); } catch { /* best effort */ }
+    try { worker.terminate(); } catch {}
   }
   if (error) rejectGeneration(def, generation, error);
 }
@@ -59,6 +65,11 @@ function getWorker(name) {
       const { type, id, ...data } = event.data || {};
       const pending = def.pending.get(id);
       if (!pending || pending.generation !== generation) return;
+      if (pending.context && !pending.context()) {
+        def.pending.delete(id);
+        pending.reject(staleWorkerError(name));
+        return;
+      }
       def.pending.delete(id);
       def.lastUsed = Date.now();
       if (type === 'error') pending.reject(new Error(data.error || 'Worker error'));
@@ -66,12 +77,6 @@ function getWorker(name) {
     };
 
     worker.onerror = (event) => {
-      // An error can arrive from a worker that has already been replaced --
-      // termination is asynchronous, and a crash is exactly the situation that
-      // produces a late event. Without this guard the handler for the DEAD
-      // worker called destroyWorker() on the shared def, terminating its live
-      // successor and rejecting every request in flight on it. onmessage above
-      // already checks the generation; onerror did not.
       if (def.instance !== worker || def.generation !== generation) return;
       const error = new Error(`Worker "${name}" crashed: ${event.message || 'unknown error'}`);
       destroyWorker(def, error);
@@ -90,9 +95,7 @@ function getWorker(name) {
 function terminateIdleWorkers() {
   const now = Date.now();
   for (const def of Object.values(workerDefs)) {
-    if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) {
-      destroyWorker(def);
-    }
+    if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) destroyWorker(def);
   }
 }
 
@@ -101,7 +104,7 @@ function startIdleCheck() {
   idleTimer = setInterval(terminateIdleWorkers, IDLE_CHECK_INTERVAL);
 }
 
-export function runInWorker(workerName, message, { transfer = [], timeout = 30000 } = {}) {
+export function runInWorker(workerName, message, { transfer = [], timeout = 30000, signal, context = null } = {}) {
   return new Promise((resolve, reject) => {
     const handle = getWorker(workerName);
     if (!handle) {
@@ -117,17 +120,36 @@ export function runInWorker(workerName, message, { transfer = [], timeout = 3000
 
     const id = ++messageId;
     let timer = null;
-
-    const settle = (fn) => (value) => {
+    let abortListener = null;
+    const cleanup = () => {
       if (timer) clearTimeout(timer);
+      if (abortListener) signal?.removeEventListener?.('abort', abortListener);
+    };
+    const settle = (fn) => (value) => {
+      cleanup();
       fn(value);
     };
 
+    const requestContext = () => !signal?.aborted && (!context || context.isCurrent());
+
     def.pending.set(id, {
       generation,
+      context: requestContext,
       resolve: settle(resolve),
       reject: settle(reject),
     });
+
+    if (signal) {
+      abortListener = () => {
+        const pending = def.pending.get(id);
+        if (!pending) return;
+        def.pending.delete(id);
+        pending.reject(new DOMException('Worker request aborted', 'AbortError'));
+        destroyWorker(def);
+      };
+      if (signal.aborted) abortListener();
+      else signal.addEventListener('abort', abortListener, { once: true });
+    }
 
     if (timeout > 0) {
       timer = setTimeout(() => {
@@ -135,8 +157,6 @@ export function runInWorker(workerName, message, { transfer = [], timeout = 3000
         if (!pending || pending.generation !== generation) return;
         def.pending.delete(id);
         const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
-        // A timed-out worker may still emit a late response or be stuck in a CPU
-        // loop. Terminate that generation rather than returning it to the pool.
         destroyWorker(def, error);
         pending.reject(error);
       }, timeout);
@@ -146,7 +166,7 @@ export function runInWorker(workerName, message, { transfer = [], timeout = 3000
       worker.postMessage({ type: message.type, id, data: message.data || {} }, transfer);
     } catch (error) {
       def.pending.delete(id);
-      if (timer) clearTimeout(timer);
+      cleanup();
       reject(error);
     }
 
@@ -156,8 +176,7 @@ export function runInWorker(workerName, message, { transfer = [], timeout = 3000
 
 export function terminateAll() {
   for (const [name, def] of Object.entries(workerDefs)) {
-    const error = new Error(`Worker pool terminated: ${name}`);
-    destroyWorker(def, error);
+    destroyWorker(def, new Error(`Worker pool terminated: ${name}`));
   }
   if (idleTimer) {
     clearInterval(idleTimer);
@@ -166,15 +185,13 @@ export function terminateAll() {
 }
 
 export function getWorkerStatus() {
-  return Object.fromEntries(
-    Object.entries(workerDefs).map(([name, def]) => [name, {
-      available: Boolean(def.instance),
-      busy: isBusy(def),
-      pending: def.pending.size,
-      generation: def.generation,
-      lastUsed: def.lastUsed || null,
-    }]),
-  );
+  return Object.fromEntries(Object.entries(workerDefs).map(([name, def]) => [name, {
+    available: Boolean(def.instance),
+    busy: isBusy(def),
+    pending: def.pending.size,
+    generation: def.generation,
+    lastUsed: def.lastUsed || null,
+  }]));
 }
 
 const WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
