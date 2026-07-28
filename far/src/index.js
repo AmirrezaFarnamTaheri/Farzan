@@ -8,6 +8,7 @@ import '../db.js';
 import '../ui.js';
 import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
+import { installAuxiliaryDbLifecycle } from './core/auxiliaryDbLifecycle.js';
 import { installDataHardening } from './core/dataHardening.js';
 import { installStoreHardening } from './core/storeHardening.js';
 import { installAIAuthority } from './core/aiAuthority.js';
@@ -38,6 +39,7 @@ import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
+installAuxiliaryDbLifecycle(window);
 installStorageSafety(window);
 installDataHardening(window);
 installStoreHardening(window);
@@ -49,62 +51,4 @@ const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 pd.easing = easing;
 pd.HElement = HElement;
 pd.h = h;
-pd.RAFLoop = RAFLoop;
-pd.RequestQueue = RequestQueue;
-pd.stagger = stagger;
-pd.Timeline = Timeline;
-pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
-pd.VirtualList = VirtualList;
-pd.WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
-pd.ThemeBuilder = { buildUserThemeVars };
-pd.locale = { ...locale, messages: { 'en-US': enUS, 'fa-IR': faIR } };
-locale.locale('en-US', enUS);
-locale.locale('fa-IR', faIR);
-pd.TranslatorRegistry = TranslatorRegistry;
-pd.BaseTranslator = BaseTranslator;
-pd.OpenAITranslator = OpenAITranslator;
-pd.CustomAPITranslator = CustomAPITranslator;
-pd.GoogleTranslator = GoogleTranslator;
-pd.LANGUAGES = LANGUAGES;
-pd.getLanguageName = getLanguageName;
-pd.TranslationCache = translationCache;
-pd.NoteTemplates = { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems };
-pd.AI = initAIClient(window);
-pd.CanvasZoom = CanvasZoom;
-pd.CourseGraph = CourseGraph;
-pd.KnowledgeGraph = KnowledgeGraph;
-pd.workers = {
-  search: new URL('./workers/search.worker.js', import.meta.url).href,
-  catalog: new URL('./workers/catalog.worker.js', import.meta.url).href,
-};
-
-const featureLoaders = {
-  player: () => import('../player.js'),
-  notes: () => import('../notes.js'),
-  pdf: () => import('../pdf.js'),
-  canvas: () => import('../canvas.js'),
-  progress: () => import('../progress.js'),
-};
-const featurePromises = new Map();
-pd.loadFeature = (name) => {
-  const loader = featureLoaders[name];
-  if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
-  if (!featurePromises.has(name)) featurePromises.set(name, loader());
-  return featurePromises.get(name);
-};
-pd.loadFeatures = (names = []) => Promise.all(names.map(name => pd.loadFeature(name)));
-
-try { performance.mark?.('pd:bundle:evaluated'); } catch {}
-
-initBeforeUnloadGuard();
-initErrorBoundary();
-initOfflineBanner();
-pd.ProductReadiness = enforceProductReadiness(document);
-
-import('../app.js')
-  .then(() => {
-    try { initCommandPalette(); } catch (error) {
-      console.warn('[OpenCourseDeck] initCommandPalette failed', error);
-    }
-  })
-  .catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));
+pd.AuxiliaryDbLifecycle = window.OpenCourseDeck.AuxiliaryDbLifecycle;
