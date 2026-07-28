@@ -1,18 +1,37 @@
 /* eslint-disable no-undef */
-// Vendored copy only: a CDN fallback would execute remote code without
-// integrity pinning and contradicts the offline-first security posture.
 try {
   importScripts('../../vendor/fuse.min.js');
 } catch (error) {
   console.warn('[SearchWorker] Failed to load vendored Fuse.js:', error);
 }
 
+const MAX_CANCELLED = 2048;
+const CANCEL_TTL = 60000;
 const state = {
   data: [],
   fuse: null,
   revision: 0,
 };
-const cancelled = new Set();
+const cancelled = new Map();
+
+function rememberCancelled(id) {
+  cancelled.set(id, Date.now());
+  while (cancelled.size > MAX_CANCELLED) {
+    const oldest = [...cancelled.entries()].sort((a, b) => a[1] - b[1])[0];
+    if (!oldest) break;
+    cancelled.delete(oldest[0]);
+  }
+}
+
+function isCancelled(id) {
+  const timestamp = cancelled.get(id);
+  if (!timestamp) return false;
+  if (Date.now() - timestamp > CANCEL_TTL) {
+    cancelled.delete(id);
+    return false;
+  }
+  return true;
+}
 
 function requestMeta(payload) {
   const meta = {
@@ -23,16 +42,8 @@ function requestMeta(payload) {
     revision: payload?.revision ?? null,
     authority: payload?.authority ?? null,
   };
-  if (!Number.isInteger(meta.id) || meta.id <= 0 || meta.requestId !== meta.id) {
-    const error = new TypeError('Invalid worker request identity');
-    error.code = 'INVALID_WORKER_REQUEST';
-    throw error;
-  }
-  if (!Number.isInteger(meta.generation) || meta.generation < 0) {
-    const error = new TypeError('Invalid worker generation');
-    error.code = 'INVALID_WORKER_GENERATION';
-    throw error;
-  }
+  if (!Number.isInteger(meta.id) || meta.id <= 0 || meta.requestId !== meta.id) throw Object.assign(new TypeError('Invalid worker request identity'), { code: 'INVALID_WORKER_REQUEST' });
+  if (!Number.isInteger(meta.generation) || meta.generation < 0) throw Object.assign(new TypeError('Invalid worker generation'), { code: 'INVALID_WORKER_GENERATION' });
   return meta;
 }
 
@@ -41,41 +52,30 @@ function post(type, meta, data = {}) {
 }
 
 function assertNotCancelled(meta) {
-  if (!cancelled.has(meta.requestId)) return;
-  cancelled.delete(meta.requestId);
-  const error = new Error('Worker request was cancelled');
-  error.code = 'WORKER_CANCELLED';
-  throw error;
+  if (!isCancelled(meta.requestId)) return;
+  throw Object.assign(new Error('Worker request was cancelled'), { code: 'WORKER_CANCELLED' });
 }
 
 function initFuse(data, options = {}) {
-  if (typeof Fuse !== 'function') {
-    const error = new Error('Vendored Fuse.js is unavailable');
-    error.code = 'SEARCH_ENGINE_UNAVAILABLE';
-    throw error;
-  }
+  if (typeof Fuse !== 'function') throw Object.assign(new Error('Vendored Fuse.js is unavailable'), { code: 'SEARCH_ENGINE_UNAVAILABLE' });
   if (!Array.isArray(data)) throw new TypeError('Search index items must be an array');
-  const defaultOptions = {
+  state.data = data;
+  state.fuse = new Fuse(data, {
     keys: ['title', 'label', 'description', 'searchText'],
     threshold: 0.3,
     distance: 100,
     includeMatches: true,
     includeScore: true,
     minMatchCharLength: 2,
-  };
-  state.data = data;
-  state.fuse = new Fuse(data, { ...defaultOptions, ...options });
+    ...options,
+  });
   state.revision += 1;
 }
 
 function search(query, options = {}) {
+  if (!state.fuse) throw Object.assign(new Error('Search worker is not initialized'), { code: 'SEARCH_WORKER_NOT_READY' });
   const normalized = String(query ?? '');
   if (!normalized.trim()) return { results: [], query: normalized, matches: [], indexRevision: state.revision };
-  if (!state.fuse) {
-    const error = new Error('Search worker is not initialized');
-    error.code = 'SEARCH_WORKER_NOT_READY';
-    throw error;
-  }
   const limit = Math.max(1, Math.min(250, Number(options.limit) || 25));
   const fuseResults = state.fuse.search(normalized, { limit });
   return {
@@ -89,56 +89,41 @@ function search(query, options = {}) {
 self.onmessage = function onMessage(event) {
   const payload = event?.data;
   if (payload?.type === 'cancel') {
-    if (Number.isInteger(payload.requestId)) cancelled.add(payload.requestId);
+    if (Number.isInteger(payload.requestId)) rememberCancelled(payload.requestId);
     return;
   }
 
   let meta = null;
   try {
     meta = requestMeta(payload);
-    const type = payload.type;
     const data = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : {};
     assertNotCancelled(meta);
-
-    switch (type) {
-      case 'init': {
+    switch (payload.type) {
+      case 'init':
         initFuse(data?.items || [], data?.options || {});
         assertNotCancelled(meta);
         post('init:done', meta, { success: true, itemCount: state.data.length, indexRevision: state.revision });
         break;
-      }
-      case 'search': {
-        const results = search(data?.query, data?.options || {});
-        assertNotCancelled(meta);
-        post('search:done', meta, results);
+      case 'search':
+        post('search:done', meta, search(data?.query, data?.options || {}));
         break;
-      }
-      case 'update': {
+      case 'update':
         if (!Array.isArray(data?.items)) throw new TypeError('Search update requires an items array');
         initFuse(data.items, data.options || {});
-        assertNotCancelled(meta);
         post('update:done', meta, { success: true, itemCount: state.data.length, indexRevision: state.revision });
         break;
-      }
-      default: {
-        const error = new Error(`Unknown message type: ${type}`);
-        error.code = 'UNKNOWN_WORKER_MESSAGE';
-        throw error;
-      }
+      default:
+        throw Object.assign(new Error(`Unknown message type: ${payload.type}`), { code: 'UNKNOWN_WORKER_MESSAGE' });
     }
   } catch (error) {
-    const fallbackMeta = meta || {
+    post('error', meta || {
       id: payload?.id ?? null,
       requestId: payload?.requestId ?? payload?.id ?? null,
       generation: payload?.generation ?? null,
       resource: payload?.resource ?? null,
       revision: payload?.revision ?? null,
       authority: payload?.authority ?? null,
-    };
-    post('error', fallbackMeta, {
-      code: error?.code || 'SEARCH_WORKER_ERROR',
-      error: error?.message || String(error),
-    });
+    }, { code: error?.code || 'SEARCH_WORKER_ERROR', error: error?.message || String(error) });
   } finally {
     if (meta) cancelled.delete(meta.requestId);
   }
