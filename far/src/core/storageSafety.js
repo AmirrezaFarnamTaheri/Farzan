@@ -14,6 +14,15 @@ function removeKeys(storage, keys) {
   }
 }
 
+function withCompatibility(receipt, details = {}) {
+  return Object.freeze({
+    ...receipt,
+    ...details,
+    failures: details.failures || receipt.details?.failures || [],
+    cleared: details.cleared || receipt.details?.cleared || [],
+  });
+}
+
 function deleteDatabase(factory, name) {
   return new Promise((resolve, reject) => {
     if (!factory) return resolve(false);
@@ -37,11 +46,11 @@ export function installStorageSafety(root = window) {
     if (!VALID_SCOPES.has(normalized)) throw new TypeError(`Unknown deletion scope: ${normalized || '(empty)'}`);
     if (normalized === 'preferences') {
       removeKeys(root.localStorage, PREFERENCE_KEYS);
-      return committedReceipt({ backend: 'localStorage', operation: 'clear-preferences', details: { keys: PREFERENCE_KEYS } });
+      return withCompatibility(committedReceipt({ backend: 'localStorage', operation: 'clear-preferences', details: { scope: normalized, keys: PREFERENCE_KEYS } }), { scope: normalized });
     }
     if (normalized === 'all') return db.clearAll();
     const result = await originalClearUserData(normalized);
-    return committedReceipt({ backend: 'indexedDB', operation: `clear-${normalized}`, details: result });
+    return withCompatibility(committedReceipt({ backend: 'indexedDB', operation: `clear-${normalized}`, details: result }), { scope: normalized });
   };
 
   db.clearAll = async (...args) => {
@@ -53,16 +62,13 @@ export function installStorageSafety(root = window) {
       removeKeys(root.sessionStorage, SESSION_KEYS);
       receipt.auxiliary = await lifecycle.requestClose(AUXILIARY_DATABASES, { reason: 'clear-all' });
       for (const name of AUXILIARY_DATABASES) {
-        try {
-          await deleteDatabase(root.indexedDB, name);
-        } catch (error) {
-          failures.push({ name, message: error?.message || String(error) });
-        }
+        try { await deleteDatabase(root.indexedDB, name); }
+        catch (error) { failures.push({ name, message: error?.message || String(error) }); }
       }
       if (failures.length) throw new Error('Auxiliary database deletion incomplete');
-      return committedReceipt({ backend: 'indexedDB', operation: 'clear-all', details: receipt });
+      return withCompatibility(committedReceipt({ backend: 'indexedDB', operation: 'clear-all', details: receipt }), { cleared: AUXILIARY_DATABASES });
     } catch (error) {
-      return failedReceipt({ backend: 'indexedDB', operation: 'clear-all', error: error?.message || String(error), details: { ...receipt, failures } });
+      return withCompatibility(failedReceipt({ backend: 'indexedDB', operation: 'clear-all', error: error?.message || String(error), details: { ...receipt, failures } }), { failures });
     }
   };
 
