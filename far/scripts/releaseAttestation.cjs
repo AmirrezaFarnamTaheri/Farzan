@@ -6,9 +6,16 @@ const { spawnSync } = require('node:child_process');
 const { atomicWrite, ensureDirectory } = require('./fsSafe.cjs');
 const { createManifest, manifestDigest, verifyManifest } = require('./releaseManifest.cjs');
 
+const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
+
 function resolveSourceCommit(repositoryRoot) {
   const environmentCommit = String(process.env.GITHUB_SHA || process.env.SOURCE_VERSION || '').trim();
-  if (/^[0-9a-f]{7,64}$/i.test(environmentCommit)) return environmentCommit.toLowerCase();
+  if (environmentCommit) {
+    if (!FULL_COMMIT_PATTERN.test(environmentCommit)) {
+      throw new Error('Release attestation requires a full 40-character source commit');
+    }
+    return environmentCommit.toLowerCase();
+  }
 
   const result = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: repositoryRoot,
@@ -17,7 +24,7 @@ function resolveSourceCommit(repositoryRoot) {
     timeout: 10_000,
   });
   const commit = String(result.stdout || '').trim();
-  if (result.error || result.status !== 0 || !/^[0-9a-f]{40}$/i.test(commit)) {
+  if (result.error || result.status !== 0 || !FULL_COMMIT_PATTERN.test(commit)) {
     throw new Error('Unable to resolve the source commit for release attestation');
   }
   return commit.toLowerCase();
@@ -43,8 +50,10 @@ function writeReleaseManifest({
   if (!repositoryRoot || !artifactRoot || !outputFile) {
     throw new TypeError('writeReleaseManifest requires repositoryRoot, artifactRoot, and outputFile');
   }
-  if (!fs.existsSync(artifactRoot) || !fs.statSync(artifactRoot).isDirectory()) {
-    throw new Error(`Release artifact root is missing: ${artifactRoot}`);
+  if (!fs.existsSync(artifactRoot)) throw new Error(`Release artifact root is missing: ${artifactRoot}`);
+  const artifactStat = fs.lstatSync(artifactRoot);
+  if (artifactStat.isSymbolicLink() || !artifactStat.isDirectory()) {
+    throw new Error(`Release artifact root is not a regular directory: ${artifactRoot}`);
   }
   const manifest = createManifest({
     root: artifactRoot,
@@ -77,8 +86,14 @@ function verifyReleaseManifestFile({
   if (expectedVersion !== undefined && manifest.version !== String(expectedVersion)) {
     throw new Error(`Release manifest version mismatch: expected ${expectedVersion}, got ${manifest.version}`);
   }
-  if (expectedCommit !== undefined && manifest.commit !== String(expectedCommit).toLowerCase()) {
-    throw new Error(`Release manifest commit mismatch: expected ${expectedCommit}, got ${manifest.commit}`);
+  if (expectedCommit !== undefined) {
+    const normalizedExpected = String(expectedCommit).toLowerCase();
+    if (!FULL_COMMIT_PATTERN.test(normalizedExpected)) {
+      throw new Error('Expected release commit must be a full 40-character SHA-1');
+    }
+    if (manifest.commit !== normalizedExpected) {
+      throw new Error(`Release manifest commit mismatch: expected ${expectedCommit}, got ${manifest.commit}`);
+    }
   }
   const verification = verifyManifest(manifest, { root: artifactRoot, exact });
   return { manifest, verification };
