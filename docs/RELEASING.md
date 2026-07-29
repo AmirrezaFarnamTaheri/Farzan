@@ -7,18 +7,19 @@ Production releases are built from an exact commit on `main`, verified completel
 The workflow supports two safe entry points:
 
 1. **Recommended manual release:** dispatch the Release workflow from `main`. Leave the tag field blank. The workflow derives `v<version>` from `far/package.json`, verifies the exact `main` commit, creates the missing tag only after verification succeeds, and publishes the release.
-2. **Existing-tag release:** push an existing `vMAJOR.MINOR.PATCH` tag. The workflow verifies that the tag matches `far/package.json`, points into `main`, and has not moved.
+2. **Existing-tag release or retry:** push a `vMAJOR.MINOR.PATCH` tag, or manually provide an existing tag. The workflow reads that tag's own commit and `far/package.json`, verifies that identity against `main` history, and never requires an older tag to match the newer package version currently on `main`.
 
 ## Release decision flow
 
 The workflow follows one serialized state machine for the repository:
 
 1. Resolve the package version, requested/default tag, remote tag state, and exact source commit.
-2. Verify the exact commit and continue every independent check that remains safe to run.
-3. Fail once at the aggregate gate using a fixed check order, while preserving each command log and annotation.
-4. Create a missing tag only after verification succeeds.
-5. Re-check the tag immediately before publication and again after publication.
-6. Publish only when no complete release exists; a complete retry must have every expected asset with the same local file size.
+2. For an existing tag, validate the package version from the tagged commit itself.
+3. Verify the exact commit and continue every independent check that remains safe to run.
+4. Fail once at the aggregate gate using a fixed check order, while preserving each command log and annotation.
+5. Create a missing default tag only after verification succeeds.
+6. Re-check the tag immediately before publication and again after publication.
+7. Publish only when no complete release exists; a complete retry must have every expected asset with the same local file size.
 
 All release runs share one concurrency group, so manual and tag-triggered releases cannot publish concurrently. External tag movement is detected before and after publication; an existing tag is never changed by the workflow.
 
@@ -29,7 +30,7 @@ All release runs share one concurrency group, so manual and tag-triggered releas
 3. Merge the release commit into `main`.
 4. Open **Actions → Release → Run workflow**.
 5. Select `main` in the branch picker.
-6. Leave **Optional release tag** blank unless retrying a known existing tag.
+6. Leave **Optional existing release tag** blank unless retrying a known existing tag.
 7. Run the workflow and review the generated summaries and attached diagnostics.
 
 For example, when `far/package.json` contains `1.1.2`, a blank manual request resolves to `v1.1.2`.
@@ -46,16 +47,18 @@ git push origin v1.2.3
 The tag must:
 
 - use `vMAJOR.MINOR.PATCH` format;
-- match the committed `far/package.json` version;
+- match the `far/package.json` version in its own commit;
 - resolve to a commit reachable from `main`;
 - remain immutable.
+
+To retry an older existing release after `main` advances, dispatch the workflow from `main` and enter that existing tag. The resolver validates the tag's own commit and package version before rebuilding it.
 
 ## Failure and retry behavior
 
 The release workflow is designed to expose all useful evidence in one run:
 
-- dependency installation retries up to three times for transient registry or network failures;
-- browser smoke tests receive one bounded retry, with a warning when the retry recovers;
+- dependency installation makes up to three total attempts, meaning at most two retries, for transient registry or network failures;
+- browser smoke tests make up to two total attempts, with a warning when the second attempt recovers;
 - independent verification checks continue after failures where safe;
 - skipped checks are reported as unmet prerequisites;
 - a final aggregate gate fails the release when any required check did not succeed; failures are listed in a fixed, deterministic order matching the summary table;
@@ -68,15 +71,15 @@ The workflow never moves an existing tag and never overwrites an existing releas
 
 ### Missing tag during checkout
 
-Do not repeatedly dispatch a nonexistent tag. Run the workflow from `main` and leave the tag field blank. The workflow will derive the correct tag and create it only after the commit passes verification.
+Do not repeatedly dispatch a nonexistent explicit tag. To create the current package release, run the workflow from `main` and leave the tag field blank. To retry another version, create and push that intended tag first.
 
 ### Version mismatch
 
-Update `far/package.json` or request the tag matching its committed version. The workflow refuses to publish a tag whose version differs from the package version.
+For a new blank-tag release, update `far/package.json` on `main`. For an existing-tag retry, the tag must match the package version in its own tagged commit. Create a new correctly versioned tag rather than moving an existing one.
 
 ### Main advanced after dispatch
 
-Run the workflow again from the current `main`. This prevents a stale manual dispatch from releasing an older commit accidentally.
+Run the workflow again from the current `main`. This prevents a stale blank-tag manual dispatch from releasing an older commit accidentally.
 
 ### Generated artifacts changed
 
@@ -84,7 +87,7 @@ Download the diagnostics artifact, inspect the generated diff, regenerate `dist`
 
 ### Partial existing release
 
-The workflow treats a complete existing release as a successful idempotent retry. It refuses an incomplete or draft release so an operator can inspect and repair that exceptional state without silently replacing assets.
+The workflow treats a complete existing release as a successful idempotent retry. It refuses an incomplete, size-mismatched, or draft release so an operator can inspect and repair that exceptional state without silently replacing assets.
 
 ## End-to-end publication validation
 
