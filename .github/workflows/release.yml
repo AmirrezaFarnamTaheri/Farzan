@@ -19,12 +19,16 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: release-${{ github.event_name }}-${{ inputs.tag || github.ref_name || github.sha }}
-  cancel-in-progress: false
-
 env:
   NODE_VERSION: '22'
+
+# Release state machine:
+# 1. Resolve package version, tag state, and exact commit.
+# 2. Verify and package that immutable commit while collecting every safe failure.
+# 3. Serialize publication, create a missing tag only after verification, and publish once.
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   resolve:
@@ -613,33 +617,70 @@ jobs:
         with:
           retries: 3
           script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
             const tag = process.env.RELEASE_TAG;
-            const required = new Set([
+            const requiredNames = [
               `opencoursedeck-${tag}.tar.gz`,
               `opencoursedeck-${tag}-manifest.json`,
               `opencoursedeck-${tag}-attestation.json`,
               'SHA256SUMS',
-            ]);
+            ];
+            const required = new Map(requiredNames.map((name) => [
+              name,
+              fs.statSync(path.join('release-assets', name)).size,
+            ]));
             try {
               const response = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag,
               });
-              const present = new Set(response.data.assets.map((asset) => asset.name));
-              const missing = [...required].filter((name) => !present.has(name));
-              if (missing.length === 0 && !response.data.draft) {
+              const present = new Map(response.data.assets.map((asset) => [asset.name, asset.size]));
+              const missing = [...required.keys()].filter((name) => !present.has(name));
+              const sizeMismatches = [...required.entries()]
+                .filter(([name, size]) => present.has(name) && present.get(name) !== size)
+                .map(([name, size]) => `${name}: remote=${present.get(name)}, local=${size}`);
+              if (missing.length === 0 && sizeMismatches.length === 0 && !response.data.draft) {
                 core.notice(`Release ${tag} already contains every immutable asset; publication is an idempotent no-op.`);
                 core.setOutput('complete', 'true');
                 return;
               }
-              core.setFailed(`Release ${tag} already exists but is incomplete or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Resolve the partial release before retrying.`);
+              core.setFailed(`Release ${tag} already exists but is incomplete, size-mismatched, or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Size mismatches: ${sizeMismatches.join('; ') || '<none>'}. Resolve the partial release before retrying.`);
             } catch (error) {
               if (error.status !== 404) throw error;
               core.setOutput('complete', 'false');
             }
 
+      - name: Reverify immutable tag before publication
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+        with:
+          retries: 3
+          script: |
+            const ref = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${process.env.RELEASE_TAG}`,
+            });
+            let object = ref.data.object;
+            for (let depth = 0; depth < 5 && object.type === 'tag'; depth += 1) {
+              const tag = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: object.sha,
+              });
+              object = tag.data.object;
+            }
+            if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
+              core.setFailed(`Release tag changed before publication: ${object.type}:${object.sha}`);
+            }
+
       - name: Publish GitHub Release
+        id: publish
         if: steps.existing.outputs.complete != 'true'
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
@@ -652,6 +693,40 @@ jobs:
             release-assets/*.tar.gz
             release-assets/*.json
             release-assets/SHA256SUMS
+
+      - name: Verify published release identity
+        if: always() && (steps.existing.outputs.complete == 'true' || steps.publish.outcome == 'success')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+        with:
+          retries: 3
+          script: |
+            const ref = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${process.env.RELEASE_TAG}`,
+            });
+            let object = ref.data.object;
+            for (let depth = 0; depth < 5 && object.type === 'tag'; depth += 1) {
+              const tag = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: object.sha,
+              });
+              object = tag.data.object;
+            }
+            if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
+              core.setFailed(`Published release tag does not resolve to the verified commit: ${object.type}:${object.sha}`);
+              return;
+            }
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: process.env.RELEASE_TAG,
+            });
+            if (release.data.draft) core.setFailed(`Release ${process.env.RELEASE_TAG} remained a draft after publication.`);
 
       - name: Summarize publication
         if: always()
