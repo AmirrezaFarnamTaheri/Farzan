@@ -1,6 +1,7 @@
 {
   "name": "opencoursedeck",
   "private": true,
+  "type": "module",
   "version": "1.1.2",
   "description": "OpenCourseDeck learning studio — static app with vendored browser libs",
   "scripts": {
@@ -11,7 +12,7 @@
     "first-run": "npm run vendor && npm run build:release",
     "build": "node scripts/build.cjs",
     "build:watch": "node scripts/build.cjs --watch",
-    "build:sw": "node scripts/clean-workbox.cjs && node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
+    "build:sw": "npm run clean:workbox && node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
     "build:release": "npm run build && node scripts/build-sw-dist.cjs",
     "release:manifest": "node scripts/create-release-manifest.cjs",
     "release:verify": "node scripts/verify-release-manifest.cjs",
