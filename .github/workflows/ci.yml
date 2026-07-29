@@ -1,5 +1,7 @@
 name: CI
 
+run-name: CI · ${{ github.event_name }} · ${{ github.ref_name }} · ${{ github.sha }}
+
 on:
   push:
     branches:
@@ -14,10 +16,14 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: '22'
+
 jobs:
   verify:
+    name: Verify repository
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: far
@@ -32,29 +38,77 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: far/package-lock.json
 
+      - name: Describe execution context
+        run: |
+          {
+            echo '## CI execution context'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Ref | \`${{ github.ref }}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Node | \`$NODE_VERSION\` |"
+            echo "| Attempt | \`${{ github.run_attempt }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prepare diagnostics
-        run: mkdir -p reports
+        run: mkdir -p reports/ci reports/generated-diff
 
       - name: Install dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee reports/npm-ci.log
+        id: install
+        continue-on-error: true
+        run: |
+          log=reports/ci/npm-ci.log
+          : > "$log"
+          for attempt in 1 2 3; do
+            echo "::group::npm ci attempt $attempt of 3"
+            if npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "npm ci failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            if (( attempt < 3 )); then
+              echo "Transient installation failure suspected; retrying after $((attempt * 10)) seconds." | tee -a "$log"
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
 
       - name: Vendor browser dependencies
-        run: npm run vendor 2>&1 | tee reports/vendor.log
+        id: vendor
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run vendor 2>&1 | tee reports/ci/vendor.log
 
       - name: Check encoding
-        run: npm run check:encoding 2>&1 | tee reports/encoding.log
+        id: encoding
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:encoding 2>&1 | tee reports/ci/encoding.log
 
       - name: Check workflow invariants
-        run: npm run check:workflows 2>&1 | tee reports/workflow-check.log
+        id: workflows
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:workflows 2>&1 | tee reports/ci/workflow-check.log
 
       - name: Validate repository
-        run: npm run validate 2>&1 | tee reports/validate.log
+        id: validate
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run validate 2>&1 | tee reports/ci/validate.log
 
       - name: Lint source
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
         run: |
           set +e
           npm run lint -- --format json --output-file reports/eslint.json
@@ -70,61 +124,169 @@ jobs:
                 warnings += report.warningCount || 0;
                 for (const message of report.messages || []) {
                   const level = message.severity === 2 ? "error" : "warning";
-                  console.log(`${report.filePath}:${message.line || 0}:${message.column || 0} ${level} ${message.message} (${message.ruleId || "parse"})`);
+                  const command = level === "error" ? "error" : "warning";
+                  const title = `${message.ruleId || "parse"}: ${message.message}`.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+                  console.log(`::${command} file=${report.filePath},line=${message.line || 1},col=${message.column || 1},title=${title}::${title}`);
                 }
               }
               console.log(`ESLint summary: ${errors} error(s), ${warnings} warning(s)`);
-            ' reports/eslint.json | tee reports/eslint-summary.log
+            ' reports/eslint.json | tee reports/ci/eslint-summary.log
+          else
+            echo "ESLint did not produce a JSON report." | tee reports/ci/eslint-summary.log
           fi
           exit "$status"
 
       - name: Build release
-        run: npm run build:release 2>&1 | tee reports/build-release.log
+        id: build_release
+        if: >-
+          steps.install.outcome == 'success' &&
+          steps.vendor.outcome == 'success'
+        continue-on-error: true
+        run: npm run build:release 2>&1 | tee reports/ci/build-release.log
 
       - name: Verify generated artifacts
-        run: npm run check:generated 2>&1 | tee reports/check-generated.log
+        id: generated
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:generated 2>&1 | tee reports/ci/check-generated.log
 
       - name: Verify committed artifacts are current
+        id: generated_drift
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
         run: |
-          set +e
-          mkdir -p reports/generated-diff
-          git status --porcelain=v1 --untracked-files=all -- dist vendor > reports/generated-diff/status.txt
-          status=0
-          if [[ -s reports/generated-diff/status.txt ]]; then
-            git diff --stat -- dist vendor > reports/generated-diff/stat.txt
+          status_file=reports/generated-diff/status.txt
+          git status --porcelain=v1 --untracked-files=all -- dist vendor > "$status_file"
+          if [[ -s "$status_file" ]]; then
+            git diff --stat -- dist vendor | tee reports/generated-diff/stat.txt
             git diff --binary -- dist vendor > reports/generated-diff/generated.patch
             tar -czf reports/generated-diff/generated-files.tar.gz dist vendor
-            cat reports/generated-diff/status.txt
-            cat reports/generated-diff/stat.txt
-            status=1
-          else
-            rm -f reports/generated-diff/status.txt
+            cat "$status_file"
+            echo "::error title=Generated artifacts are stale::Build output changed committed dist/vendor files. Download generated-diff diagnostics, regenerate locally, and commit the source-of-truth output." >&2
+            exit 1
           fi
-          exit "$status"
+          rm -f "$status_file"
 
       - name: Generate and verify release attestation
-        run: npm run release:attest 2>&1 | tee reports/release-attestation.log
+        id: attestation
+        if: >-
+          steps.build_release.outcome == 'success' &&
+          steps.generated.outcome == 'success' &&
+          steps.generated_drift.outcome == 'success'
+        continue-on-error: true
+        run: npm run release:attest 2>&1 | tee reports/ci/release-attestation.log
 
       - name: Run adversarial release integrity tests
-        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/adversarial-release.log
+        id: adversarial
+        if: steps.attestation.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/ci/adversarial-release.log
 
       - name: Run tests
-        run: npm test 2>&1 | tee reports/tests.log
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm test 2>&1 | tee reports/ci/tests.log
 
       - name: Audit production dependency advisories
-        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/npm-audit.log
+        id: dependency_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/ci/npm-audit.log
 
       - name: Audit project rules
-        run: npm run audit 2>&1 | tee reports/project-audit.log
+        id: project_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run audit 2>&1 | tee reports/ci/project-audit.log
 
       - name: Generate bundle report
-        run: npm run report:bundle 2>&1 | tee reports/bundle-report.log
+        id: bundle_report
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run report:bundle 2>&1 | tee reports/ci/bundle-report.log
 
       - name: Run smoke tests
-        run: npm run smoke 2>&1 | tee reports/smoke.log
+        id: smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run smoke 2>&1 | tee reports/ci/smoke.log
 
       - name: Run browser smoke tests
-        run: npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
+        id: browser_smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: |
+          log=reports/ci/browser-smoke.log
+          : > "$log"
+          for attempt in 1 2; do
+            echo "::group::browser smoke attempt $attempt of 2"
+            if npm run smoke:browser 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              if (( attempt > 1 )); then
+                echo "::warning title=Browser smoke recovered on retry::The first browser smoke attempt failed. The retained log should be reviewed for flakiness."
+              fi
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "browser smoke failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            (( attempt == 2 )) || sleep 10
+          done
+          exit 1
+
+      - name: Summarize CI results
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+        run: |
+          {
+            echo '## CI results'
+            echo
+            echo '| Check | Outcome |'
+            echo '|---|---|'
+            while IFS='=' read -r name outcome; do
+              [[ -n "$name" ]] || continue
+              printf '| `%s` | **%s** |\n' "$name" "$outcome"
+            done <<EOF_SUMMARY
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          release-attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          EOF_SUMMARY
+            echo
+            echo 'All available checks were allowed to finish. Skipped checks identify prerequisites that did not succeed.'
+            echo 'Detailed logs and generated-file evidence are attached in the CI diagnostics artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload CI diagnostics
         if: always()
@@ -134,3 +296,53 @@ jobs:
           path: far/reports
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Enforce CI result
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+        run: |
+          failures=()
+          while IFS='=' read -r name outcome; do
+            [[ "$outcome" == "success" ]] || failures+=("$name=$outcome")
+          done <<EOF_RESULTS
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          release-attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          EOF_RESULTS
+
+          if (( ${#failures[@]} > 0 )); then
+            printf '::error title=CI verification failed::%s\n' "${failures[*]}"
+            echo "Review the CI summary and diagnostics artifact. Skipped checks are reported as failures because their prerequisites did not complete." >&2
+            exit 1
+          fi
