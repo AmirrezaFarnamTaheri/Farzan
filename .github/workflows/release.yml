@@ -1,6 +1,9 @@
 name: Release
 
-run-name: Release ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+run-name: >-
+  Release ${{ github.event_name == 'workflow_dispatch'
+    && (inputs.tag || 'from package version')
+    || github.ref_name }}
 
 on:
   push:
@@ -9,194 +12,453 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to publish (for example v1.1.3)'
-        required: true
+        description: 'Optional release tag. Leave blank to use v<far/package.json version> from main.'
+        required: false
         type: string
 
 permissions:
   contents: read
 
-env:
-  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: release-${{ github.event_name }}-${{ inputs.tag || github.ref_name || github.sha }}
   cancel-in-progress: false
 
+env:
+  NODE_VERSION: '22'
+
 jobs:
-  build:
-    name: Verify and package
+  resolve:
+    name: Resolve release identity
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     outputs:
-      release_commit: ${{ steps.identity.outputs.commit }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_commit: ${{ steps.resolve.outputs.release_commit }}
+      checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
+      tag_exists: ${{ steps.resolve.outputs.tag_exists }}
+      bootstrap_tag: ${{ steps.resolve.outputs.bootstrap_tag }}
+      package_version: ${{ steps.resolve.outputs.package_version }}
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:
       - name: Require an authoritative trigger
-        working-directory: .
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_REF: ${{ github.ref }}
         run: |
           if [[ "$EVENT_NAME" == "workflow_dispatch" && "$DISPATCH_REF" != "refs/heads/main" ]]; then
-            echo "Manual releases must be dispatched from refs/heads/main, not $DISPATCH_REF. Select main in the workflow branch picker and dispatch the existing release tag again." >&2
-            exit 1
-          fi
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid release tag: $RELEASE_TAG. Supply an existing semantic-version tag such as v1.1.2." >&2
+            echo "::error title=Release must start from main::Manual releases must be dispatched from refs/heads/main, not $DISPATCH_REF. Select main in the workflow branch picker and retry." >&2
             exit 1
           fi
 
-      - name: Check out the exact release tag
+      - name: Check out release source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Verify release project layout
-        working-directory: .
-        run: |
-          test -f far/package.json || {
-            echo "Release tag $RELEASE_TAG does not contain far/package.json. Create the tag from a main commit that contains the release project, then dispatch that existing tag." >&2
-            exit 1
-          }
-          test -f far/package-lock.json || {
-            echo "Release tag $RELEASE_TAG does not contain far/package-lock.json. Commit the lockfile on main, create a matching release tag from that commit, then dispatch the tag again." >&2
-            exit 1
-          }
 
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: far/package-lock.json
 
-      - name: Verify release identity
-        id: identity
-        working-directory: far
+      - name: Resolve package, tag, and commit
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          TRIGGER_TAG: ${{ github.ref_name }}
         run: |
-          git fetch --force --no-tags origin main:refs/remotes/origin/main
-          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
-            echo "Release tag does not exist locally: $RELEASE_TAG. Create and push the tag before dispatching the release workflow." >&2
-            exit 1
-          }
+          package_version="$(node -p "require('./far/package.json').version")"
+          expected_tag="v${package_version}"
 
-          release_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
-          head_commit="$(git rev-parse HEAD)"
-          if [[ "$head_commit" != "$release_commit" ]]; then
-            echo "Checked-out commit $head_commit does not match $RELEASE_TAG ($release_commit). Do not move release tags; dispatch the workflow for the immutable tag commit." >&2
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            release_tag="$TRIGGER_TAG"
+          else
+            release_tag="${REQUESTED_TAG:-$expected_tag}"
+          fi
+
+          if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=Invalid release tag::$release_tag is not a semantic-version tag such as $expected_tag." >&2
             exit 1
           fi
+          if [[ "$release_tag" != "$expected_tag" ]]; then
+            echo "::error title=Version mismatch::Requested tag $release_tag does not match far/package.json version $expected_tag. Update the package version or leave the manual tag input blank." >&2
+            exit 1
+          fi
+
+          git fetch --force --no-tags origin main:refs/remotes/origin/main
+          remote_tag="$(git ls-remote --tags --refs origin "refs/tags/$release_tag")"
+
+          if [[ -n "$remote_tag" ]]; then
+            git fetch --force --no-tags origin "refs/tags/$release_tag:refs/tags/$release_tag"
+            release_commit="$(git rev-parse "refs/tags/$release_tag^{commit}")"
+            checkout_ref="refs/tags/$release_tag"
+            tag_exists=true
+            bootstrap_tag=false
+          else
+            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+              echo "::error title=Missing pushed tag::The push event references $release_tag, but the tag cannot be resolved from origin." >&2
+              exit 1
+            fi
+            release_commit="$(git rev-parse HEAD)"
+            checkout_ref="$release_commit"
+            tag_exists=false
+            bootstrap_tag=true
+
+            current_main="$(git rev-parse refs/remotes/origin/main)"
+            if [[ "$release_commit" != "$current_main" ]]; then
+              echo "::error title=Main advanced::This dispatch started at $release_commit, but main is now $current_main. Re-run the workflow from the current main branch so the release cannot publish a stale commit." >&2
+              exit 1
+            fi
+          fi
+
           if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/main; then
-            echo "Release commit $release_commit is not reachable from main. Merge the intended commit to main and create a new version tag from that main commit." >&2
+            echo "::error title=Release commit is outside main::$release_commit is not reachable from main. Merge the intended change and create a new version release." >&2
+            exit 1
+          fi
+
+          {
+            printf 'release_tag=%s\n' "$release_tag"
+            printf 'release_commit=%s\n' "$release_commit"
+            printf 'checkout_ref=%s\n' "$checkout_ref"
+            printf 'tag_exists=%s\n' "$tag_exists"
+            printf 'bootstrap_tag=%s\n' "$bootstrap_tag"
+            printf 'package_version=%s\n' "$package_version"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo '## Release identity'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Trigger | \`$EVENT_NAME\` |"
+            echo "| Package version | \`$package_version\` |"
+            echo "| Release tag | \`$release_tag\` |"
+            echo "| Release commit | \`$release_commit\` |"
+            echo "| Existing tag | \`$tag_exists\` |"
+            echo "| Bootstrap after verification | \`$bootstrap_tag\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Verify and package
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    outputs:
+      release_commit: ${{ needs.resolve.outputs.release_commit }}
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      SOURCE_VERSION: ${{ needs.resolve.outputs.release_commit }}
+    defaults:
+      run:
+        working-directory: far
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.resolve.outputs.checkout_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Prepare diagnostics
+        run: mkdir -p reports/ci reports/generated-diff
+
+      - name: Verify release identity again
+        id: identity
+        run: |
+          actual_commit="$(git rev-parse HEAD)"
+          if [[ "$actual_commit" != "$SOURCE_VERSION" ]]; then
+            echo "::error title=Checkout identity changed::Checked out $actual_commit, expected $SOURCE_VERSION." >&2
             exit 1
           fi
 
           package_version="$(node -p "require('./package.json').version")"
           expected_tag="v${package_version}"
           if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
-            echo "Tag $RELEASE_TAG does not match package version $expected_tag. Update package.json before tagging, or dispatch the tag that matches the committed package version." >&2
+            echo "::error title=Version mismatch::Tag $RELEASE_TAG does not match package version $expected_tag." >&2
             exit 1
           fi
 
-          printf 'commit=%s\n' "$release_commit" >> "$GITHUB_OUTPUT"
-          printf 'version=%s\n' "$package_version" >> "$GITHUB_OUTPUT"
+          git fetch --force --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$actual_commit" refs/remotes/origin/main; then
+            echo "::error title=Release commit left main::$actual_commit is no longer reachable from main." >&2
+            exit 1
+          fi
 
       - name: Install dependencies reproducibly
-        working-directory: far
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        id: install
+        continue-on-error: true
+        run: |
+          log=reports/ci/npm-ci.log
+          : > "$log"
+          for attempt in 1 2 3; do
+            echo "::group::npm ci attempt $attempt of 3"
+            if npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "npm ci failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            if (( attempt < 3 )); then
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
 
       - name: Vendor browser dependencies
-        working-directory: far
-        run: npm run vendor
+        id: vendor
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run vendor 2>&1 | tee reports/ci/vendor.log
 
       - name: Check encoding
-        working-directory: far
-        run: npm run check:encoding
+        id: encoding
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:encoding 2>&1 | tee reports/ci/encoding.log
 
       - name: Check workflow invariants
-        working-directory: far
-        run: npm run check:workflows
+        id: workflows
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:workflows 2>&1 | tee reports/ci/workflow-check.log
 
       - name: Validate repository
-        working-directory: far
-        run: npm run validate
+        id: validate
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run validate 2>&1 | tee reports/ci/validate.log
 
       - name: Lint source
-        working-directory: far
-        run: npm run lint
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee reports/ci/lint.log
 
       - name: Build release
-        working-directory: far
-        run: npm run build:release
+        id: build_release
+        if: >-
+          steps.install.outcome == 'success' &&
+          steps.vendor.outcome == 'success'
+        continue-on-error: true
+        run: npm run build:release 2>&1 | tee reports/ci/build-release.log
 
       - name: Verify generated output
-        working-directory: far
-        run: npm run check:generated
+        id: generated
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:generated 2>&1 | tee reports/ci/check-generated.log
 
       - name: Verify committed generated files are current
-        working-directory: far
+        id: generated_drift
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
         run: |
-          status_file="$(mktemp)"
-          git status --porcelain=v1 --untracked-files=all -- dist vendor > "$status_file"
-          if [[ -s "$status_file" ]]; then
-            cat "$status_file"
-            git diff --stat -- dist vendor
-            echo "Release generation changed committed dist/vendor content. Regenerate and commit those files on main, then create a new release tag." >&2
+          git status --porcelain=v1 --untracked-files=all -- dist vendor > reports/generated-diff-status.txt
+          if [[ -s reports/generated-diff-status.txt ]]; then
+            git diff --stat -- dist vendor | tee reports/generated-diff-stat.txt
+            git diff --binary -- dist vendor > reports/generated.patch
+            cat reports/generated-diff-status.txt
+            echo "::error title=Generated artifacts changed::Regenerate and commit dist/vendor on main, then run the release again." >&2
             exit 1
           fi
 
       - name: Run tests
-        working-directory: far
-        run: npm test
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm test 2>&1 | tee reports/ci/tests.log
 
       - name: Audit production dependencies
-        working-directory: far
-        run: npm audit --omit=dev --audit-level=high
+        id: dependency_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/ci/npm-audit.log
 
       - name: Audit project rules
-        working-directory: far
-        run: npm run audit
+        id: project_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run audit 2>&1 | tee reports/ci/project-audit.log
 
       - name: Generate bundle report
-        working-directory: far
-        run: npm run report:bundle
+        id: bundle_report
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run report:bundle 2>&1 | tee reports/ci/bundle-report.log
 
       - name: Run smoke tests
-        working-directory: far
-        run: npm run smoke
+        id: smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run smoke 2>&1 | tee reports/ci/smoke.log
 
       - name: Run browser smoke tests
-        working-directory: far
-        run: npm run smoke:browser
+        id: browser_smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: |
+          log=reports/ci/browser-smoke.log
+          : > "$log"
+          for attempt in 1 2; do
+            echo "::group::browser smoke attempt $attempt of 2"
+            if npm run smoke:browser 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "browser smoke failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            (( attempt == 2 )) || sleep 10
+          done
+          exit 1
 
       - name: Generate final release attestation
-        working-directory: far
-        env:
-          SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
-        run: npm run release:attest
+        id: attestation
+        if: >-
+          steps.build_release.outcome == 'success' &&
+          steps.generated.outcome == 'success' &&
+          steps.generated_drift.outcome == 'success'
+        continue-on-error: true
+        run: npm run release:attest 2>&1 | tee reports/ci/release-attestation.log
 
       - name: Run adversarial release integrity checks
-        working-directory: far
-        env:
-          SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
-        run: node scripts/adversarial-release-test.cjs
+        id: adversarial
+        if: steps.attestation.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/ci/adversarial-release.log
 
       - name: Reverify final release contents
-        working-directory: far
+        id: final_verify
+        if: steps.adversarial.outcome == 'success'
+        continue-on-error: true
+        run: npm run release:verify 2>&1 | tee reports/ci/release-verify.log
+
+      - name: Summarize release verification
+        if: always()
         env:
-          SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
-        run: npm run release:verify
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          FINAL_VERIFY: ${{ steps.final_verify.outcome }}
+        run: |
+          {
+            echo '## Release verification'
+            echo
+            echo '| Check | Outcome |'
+            echo '|---|---|'
+            while IFS='=' read -r name outcome; do
+              [[ -n "$name" ]] || continue
+              printf '| `%s` | **%s** |\n' "$name" "$outcome"
+            done <<EOF_SUMMARY
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          final-release-verification=$FINAL_VERIFY
+          EOF_SUMMARY
+            echo
+            echo 'Detailed logs are attached as the release diagnostics artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce release verification result
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          FINAL_VERIFY: ${{ steps.final_verify.outcome }}
+        run: |
+          failures=()
+          while IFS='=' read -r name outcome; do
+            [[ "$outcome" == "success" ]] || failures+=("$name=$outcome")
+          done <<EOF_RESULTS
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          final-release-verification=$FINAL_VERIFY
+          EOF_RESULTS
+
+          if (( ${#failures[@]} > 0 )); then
+            printf '::error title=Release verification failed::%s\n' "${failures[*]}"
+            echo "Review the summary and release diagnostics artifact for every failure; skipped checks indicate an unmet prerequisite." >&2
+            exit 1
+          fi
 
       - name: Package immutable release assets
-        working-directory: far
-        env:
-          SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
         run: |
           archive="opencoursedeck-${RELEASE_TAG}.tar.gz"
           manifest="opencoursedeck-${RELEASE_TAG}-manifest.json"
@@ -222,16 +484,10 @@ jobs:
           const expectedVersion = process.env.RELEASE_TAG.slice(1);
           const expectedCommit = process.env.SOURCE_VERSION.toLowerCase();
           for (const [name, document] of [['manifest', manifest], ['attestation', attestation]]) {
-            if (document.version !== expectedVersion) {
-              throw new Error(`${name} version ${document.version} does not match ${expectedVersion}`);
-            }
-            if (document.commit !== expectedCommit) {
-              throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}`);
-            }
+            if (document.version !== expectedVersion) throw new Error(`${name} version ${document.version} does not match ${expectedVersion}`);
+            if (document.commit !== expectedCommit) throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}`);
           }
-          if (attestation.verified !== true) {
-            throw new Error('Release attestation is not verified');
-          }
+          if (attestation.verified !== true) throw new Error('Release attestation is not verified');
           NODE
 
           (
@@ -248,32 +504,97 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload release diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release-diagnostics-${{ env.RELEASE_TAG }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            far/reports/ci/
+            far/reports/generated*
+          if-no-files-found: warn
+          retention-days: 14
+
   publish:
     name: Publish GitHub Release
-    needs: build
+    needs:
+      - resolve
+      - build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      EXPECTED_COMMIT: ${{ needs.resolve.outputs.release_commit }}
+      BOOTSTRAP_TAG: ${{ needs.resolve.outputs.bootstrap_tag }}
 
     steps:
-      - name: Re-check the release tag
+      - name: Check out verified release commit
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
+          ref: ${{ needs.resolve.outputs.release_commit }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Detect tag movement
+      - name: Ensure immutable release tag
+        id: tag
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          EXPECTED_COMMIT: ${{ needs.build.outputs.release_commit }}
-        shell: bash --noprofile --norc -eo pipefail {0}
-        run: |
-          actual_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
-          if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
-            echo "Release tag moved from $EXPECTED_COMMIT to $actual_commit. Restore the immutable tag reference and investigate before publishing." >&2
-            exit 1
-          fi
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+          BOOTSTRAP_TAG: ${{ env.BOOTSTRAP_TAG }}
+        with:
+          retries: 3
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const expected = process.env.EXPECTED_COMMIT.toLowerCase();
+            const bootstrap = process.env.BOOTSTRAP_TAG === 'true';
+
+            async function resolveObject(object) {
+              let current = object;
+              for (let depth = 0; depth < 5 && current.type === 'tag'; depth += 1) {
+                const response = await github.rest.git.getTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_sha: current.sha,
+                });
+                current = response.data.object;
+              }
+              return current;
+            }
+
+            let ref;
+            let created = false;
+            try {
+              ref = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              if (!bootstrap) {
+                core.setFailed(`Release tag ${tag} is missing and this run is not authorized to bootstrap it.`);
+                return;
+              }
+              core.notice(`Creating immutable release tag ${tag} at ${expected}`);
+              ref = await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`,
+                sha: expected,
+              });
+              created = true;
+            }
+
+            const resolved = await resolveObject(ref.data.object);
+            if (resolved.type !== 'commit' || resolved.sha.toLowerCase() !== expected) {
+              core.setFailed(`Tag ${tag} resolves to ${resolved.type}:${resolved.sha}, expected commit ${expected}. Refusing to move an immutable release tag.`);
+              return;
+            }
+            core.info(`Verified ${tag} -> ${expected}`);
+            core.setOutput('created', String(created));
 
       - name: Download verified release assets
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -282,14 +603,48 @@ jobs:
           path: release-assets
 
       - name: Verify downloaded assets
-        shell: bash --noprofile --norc -eo pipefail {0}
         run: cd release-assets && sha256sum -c SHA256SUMS
 
+      - name: Detect an already-complete release
+        id: existing
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        with:
+          retries: 3
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const required = new Set([
+              `opencoursedeck-${tag}.tar.gz`,
+              `opencoursedeck-${tag}-manifest.json`,
+              `opencoursedeck-${tag}-attestation.json`,
+              'SHA256SUMS',
+            ]);
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              const present = new Set(response.data.assets.map((asset) => asset.name));
+              const missing = [...required].filter((name) => !present.has(name));
+              if (missing.length === 0 && !response.data.draft) {
+                core.notice(`Release ${tag} already contains every immutable asset; publication is an idempotent no-op.`);
+                core.setOutput('complete', 'true');
+                return;
+              }
+              core.setFailed(`Release ${tag} already exists but is incomplete or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Resolve the partial release before retrying.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.setOutput('complete', 'false');
+            }
+
       - name: Publish GitHub Release
+        if: steps.existing.outputs.complete != 'true'
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ needs.build.outputs.release_commit }}
+          target_commitish: ${{ env.EXPECTED_COMMIT }}
           generate_release_notes: true
           overwrite_files: false
           fail_on_unmatched_files: true
@@ -297,3 +652,17 @@ jobs:
             release-assets/*.tar.gz
             release-assets/*.json
             release-assets/SHA256SUMS
+
+      - name: Summarize publication
+        if: always()
+        run: |
+          {
+            echo '## Publication'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Tag | \`$RELEASE_TAG\` |"
+            echo "| Commit | \`$EXPECTED_COMMIT\` |"
+            echo "| Tag bootstrapped | \`${{ steps.tag.outputs.created || 'false' }}\` |"
+            echo "| Existing complete release | \`${{ steps.existing.outputs.complete || 'false' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
