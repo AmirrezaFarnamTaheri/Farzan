@@ -14,7 +14,8 @@ const {
 } = require('../scripts/check-workflows.cjs');
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.resolve(testDirectory, '..', '..');
+const projectRoot = path.resolve(testDirectory, '..');
+const repositoryRoot = path.resolve(projectRoot, '..');
 
 function readWorkflow(filename) {
   return fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', filename), 'utf8');
@@ -25,6 +26,35 @@ const workflows = {
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+const eslintConfig = fs.readFileSync(path.join(projectRoot, 'eslint.config.js'), 'utf8');
+
+describe('module and command contract', () => {
+  it('uses explicit ESM without leaving the ESLint configuration in CommonJS', () => {
+    expect(packageJson.type).toBe('module');
+    expect(eslintConfig).toContain("import js from '@eslint/js';");
+    expect(eslintConfig).toContain('export default [');
+    expect(eslintConfig).not.toMatch(/\brequire\s*\(/);
+    expect(eslintConfig).not.toContain('module.exports');
+  });
+
+  it('keeps executable Node tooling on explicit CommonJS file extensions', () => {
+    const referencedTools = Object.values(packageJson.scripts).flatMap((command) => (
+      [...command.matchAll(/\bnode\s+((?:scripts|desktop)\/[^\s&|]+\.cjs)\b/g)].map((match) => match[1])
+    ));
+
+    expect(referencedTools.length).toBeGreaterThan(0);
+    for (const relativePath of referencedTools) {
+      expect(fs.existsSync(path.join(projectRoot, relativePath)), relativePath).toBe(true);
+    }
+  });
+
+  it('runs the committed Workbox cleanup implementation directly', () => {
+    expect(packageJson.scripts['build:sw']).toContain('node scripts/clean-workbox.cjs &&');
+    expect(fs.existsSync(path.join(projectRoot, 'scripts', 'clean-workbox.cjs'))).toBe(true);
+  });
+});
 
 describe('GitHub Actions hardening', () => {
   it('accepts the committed workflow set', () => {
