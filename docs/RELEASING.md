@@ -9,6 +9,19 @@ The workflow supports two safe entry points:
 1. **Recommended manual release:** dispatch the Release workflow from `main`. Leave the tag field blank. The workflow derives `v<version>` from `far/package.json`, verifies the exact `main` commit, creates the missing tag only after verification succeeds, and publishes the release.
 2. **Existing-tag release:** push an existing `vMAJOR.MINOR.PATCH` tag. The workflow verifies that the tag matches `far/package.json`, points into `main`, and has not moved.
 
+## Release decision flow
+
+The workflow follows one serialized state machine for the repository:
+
+1. Resolve the package version, requested/default tag, remote tag state, and exact source commit.
+2. Verify the exact commit and continue every independent check that remains safe to run.
+3. Fail once at the aggregate gate using a fixed check order, while preserving each command log and annotation.
+4. Create a missing tag only after verification succeeds.
+5. Re-check the tag immediately before publication and again after publication.
+6. Publish only when no complete release exists; a complete retry must have every expected asset with the same local file size.
+
+All release runs share one concurrency group, so manual and tag-triggered releases cannot publish concurrently. External tag movement is detected before and after publication; an existing tag is never changed by the workflow.
+
 ## Recommended release procedure
 
 1. Update `far/package.json` version.
@@ -45,9 +58,9 @@ The release workflow is designed to expose all useful evidence in one run:
 - browser smoke tests receive one bounded retry, with a warning when the retry recovers;
 - independent verification checks continue after failures where safe;
 - skipped checks are reported as unmet prerequisites;
-- a final aggregate gate fails the release when any required check did not succeed;
+- a final aggregate gate fails the release when any required check did not succeed; failures are listed in a fixed, deterministic order matching the summary table;
 - diagnostics upload even when verification fails;
-- a successful release retry becomes a no-op when the immutable release and all expected assets already exist.
+- a successful release retry becomes a no-op only when the immutable release is not a draft and all expected assets exist with the same file sizes as the newly verified package.
 
 The workflow never moves an existing tag and never overwrites an existing release asset.
 
@@ -72,6 +85,10 @@ Download the diagnostics artifact, inspect the generated diff, regenerate `dist`
 ### Partial existing release
 
 The workflow treats a complete existing release as a successful idempotent retry. It refuses an incomplete or draft release so an operator can inspect and repair that exceptional state without silently replacing assets.
+
+## End-to-end publication validation
+
+Pull-request CI validates the complete build, tests, audits, smoke checks, release manifest, attestation, workflow policy, and packaging prerequisites without mutating tags or Releases. GitHub does not provide a harmless simulation of the final tag-creation and Release-publication mutations. The first manual run from merged `main`, with the tag field left blank, is therefore the authoritative end-to-end publication validation. The workflow serializes that mutation, creates the tag only after verification, and re-verifies release identity after publication.
 
 ## Required permissions
 
