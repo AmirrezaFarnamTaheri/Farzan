@@ -62,11 +62,11 @@ jobs:
         working-directory: .
         run: |
           test -f far/package.json || {
-            echo "Release tag $RELEASE_TAG does not contain far/package.json" >&2
+            echo "Release tag $RELEASE_TAG does not contain far/package.json. Create the tag from a main commit that contains the release project, then dispatch that existing tag." >&2
             exit 1
           }
           test -f far/package-lock.json || {
-            echo "Release tag $RELEASE_TAG does not contain far/package-lock.json" >&2
+            echo "Release tag $RELEASE_TAG does not contain far/package-lock.json. Commit the lockfile on main, create a matching release tag from that commit, then dispatch the tag again." >&2
             exit 1
           }
 
