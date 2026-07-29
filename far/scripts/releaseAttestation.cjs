@@ -9,7 +9,7 @@ const { createManifest, manifestDigest, verifyManifest } = require('./releaseMan
 const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 
 function resolveSourceCommit(repositoryRoot) {
-  const environmentCommit = String(process.env.GITHUB_SHA || process.env.SOURCE_VERSION || '').trim();
+  const environmentCommit = String(process.env.SOURCE_VERSION || process.env.GITHUB_SHA || '').trim();
   if (environmentCommit) {
     if (!FULL_COMMIT_PATTERN.test(environmentCommit)) {
       throw new Error('Release attestation requires a full 40-character source commit');
@@ -55,30 +55,13 @@ function writeReleaseManifest({
   if (artifactStat.isSymbolicLink() || !artifactStat.isDirectory()) {
     throw new Error(`Release artifact root is not a regular directory: ${artifactRoot}`);
   }
-  const manifest = createManifest({
-    root: artifactRoot,
-    version,
-    commit,
-    product,
-    artifactRoot: artifactLabel,
-  });
+  const manifest = createManifest({ root: artifactRoot, version, commit, product, artifactRoot: artifactLabel });
   ensureDirectory(path.dirname(outputFile), { root: repositoryRoot });
   atomicWrite(outputFile, `${JSON.stringify(manifest, null, 2)}\n`, { root: repositoryRoot });
-  return {
-    manifest,
-    outputFile,
-    manifestSha256: manifestDigest(manifest),
-  };
+  return { manifest, outputFile, manifestSha256: manifestDigest(manifest) };
 }
 
-function verifyReleaseManifestFile({
-  repositoryRoot,
-  artifactRoot,
-  manifestFile,
-  expectedVersion,
-  expectedCommit,
-  exact = true,
-} = {}) {
+function verifyReleaseManifestFile({ repositoryRoot, artifactRoot, manifestFile, expectedVersion, expectedCommit, exact = true } = {}) {
   if (!repositoryRoot || !artifactRoot || !manifestFile) {
     throw new TypeError('verifyReleaseManifestFile requires repositoryRoot, artifactRoot, and manifestFile');
   }
@@ -99,13 +82,7 @@ function verifyReleaseManifestFile({
   return { manifest, verification };
 }
 
-function writeVerificationAttestation({
-  repositoryRoot,
-  outputFile,
-  manifestFile,
-  manifest,
-  verification,
-} = {}) {
+function writeVerificationAttestation({ repositoryRoot, outputFile, manifestFile, manifest, verification } = {}) {
   if (!repositoryRoot || !outputFile || !manifestFile || !manifest || !verification) {
     throw new TypeError('writeVerificationAttestation requires all release verification inputs');
   }
