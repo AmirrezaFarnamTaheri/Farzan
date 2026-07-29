@@ -1,5 +1,7 @@
 name: CI
 
+run-name: CI · ${{ github.event_name }} · ${{ github.ref_name }} · ${{ github.sha }}
+
 on:
   push:
     branches:
@@ -16,121 +18,11 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: far
-        shell: bash --noprofile --norc -eo pipefail {0}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: far/package-lock.json
-
-      - name: Prepare diagnostics
-        run: mkdir -p reports
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee reports/npm-ci.log
-
-      - name: Vendor browser dependencies
-        run: npm run vendor 2>&1 | tee reports/vendor.log
-
-      - name: Check encoding
-        run: npm run check:encoding 2>&1 | tee reports/encoding.log
-
-      - name: Check workflow invariants
-        run: npm run check:workflows 2>&1 | tee reports/workflow-check.log
-
-      - name: Validate repository
-        run: npm run validate 2>&1 | tee reports/validate.log
-
-      - name: Lint source
-        run: |
-          set +e
-          npm run lint -- --format json --output-file reports/eslint.json
-          status=$?
-          if [[ -s reports/eslint.json ]]; then
-            node -e '
-              const fs = require("node:fs");
-              const reports = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              let errors = 0;
-              let warnings = 0;
-              for (const report of reports) {
-                errors += report.errorCount || 0;
-                warnings += report.warningCount || 0;
-                for (const message of report.messages || []) {
-                  const level = message.severity === 2 ? "error" : "warning";
-                  console.log(`${report.filePath}:${message.line || 0}:${message.column || 0} ${level} ${message.message} (${message.ruleId || "parse"})`);
-                }
-              }
-              console.log(`ESLint summary: ${errors} error(s), ${warnings} warning(s)`);
-            ' reports/eslint.json | tee reports/eslint-summary.log
-          fi
-          exit "$status"
-
-      - name: Build release
-        run: npm run build:release 2>&1 | tee reports/build-release.log
-
-      - name: Verify generated artifacts
-        run: npm run check:generated 2>&1 | tee reports/check-generated.log
-
-      - name: Verify committed artifacts are current
-        run: |
-          set +e
-          mkdir -p reports/generated-diff
-          git status --porcelain=v1 --untracked-files=all -- dist vendor > reports/generated-diff/status.txt
-          status=0
-          if [[ -s reports/generated-diff/status.txt ]]; then
-            git diff --stat -- dist vendor > reports/generated-diff/stat.txt
-            git diff --binary -- dist vendor > reports/generated-diff/generated.patch
-            tar -czf reports/generated-diff/generated-files.tar.gz dist vendor
-            cat reports/generated-diff/status.txt
-            cat reports/generated-diff/stat.txt
-            status=1
-          else
-            rm -f reports/generated-diff/status.txt
-          fi
-          exit "$status"
-
-      - name: Generate and verify release attestation
-        run: npm run release:attest 2>&1 | tee reports/release-attestation.log
-
-      - name: Run adversarial release integrity tests
-        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/adversarial-release.log
-
-      - name: Run tests
-        run: npm test 2>&1 | tee reports/tests.log
-
-      - name: Audit production dependency advisories
-        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/npm-audit.log
-
-      - name: Audit project rules
-        run: npm run audit 2>&1 | tee reports/project-audit.log
-
-      - name: Generate bundle report
-        run: npm run report:bundle 2>&1 | tee reports/bundle-report.log
-
-      - name: Run smoke tests
-        run: npm run smoke 2>&1 | tee reports/smoke.log
-
-      - name: Run browser smoke tests
-        run: npm run smoke:browser 2>&1 | tee reports/browser-smoke.log
-
-      - name: Upload CI diagnostics
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ci-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: far/reports
-          if-no-files-found: warn
-          retention-days: 14
+    name: Verify repository
+    uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+    with:
+      source_ref: ${{ github.sha }}
+      release_mode: false
+      node_version: '22'

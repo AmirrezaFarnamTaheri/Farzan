@@ -6,10 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
+  extractWorkflowDispatchTagInput,
   validateActionPins,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,
+  validateVerificationWorkflow,
   validateWorkflowSet,
 } = require('../scripts/check-workflows.cjs');
 
@@ -23,6 +25,7 @@ function readWorkflow(filename) {
 
 const workflows = {
   'ci.yml': readWorkflow('ci.yml'),
+  'verify.yml': readWorkflow('verify.yml'),
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };
@@ -43,7 +46,6 @@ describe('module and command contract', () => {
     const referencedTools = Object.values(packageJson.scripts).flatMap((command) => (
       [...command.matchAll(/\bnode\s+((?:scripts|desktop)\/[^\s&|]+\.cjs)\b/g)].map((match) => match[1])
     ));
-
     expect(referencedTools.length).toBeGreaterThan(0);
     for (const relativePath of referencedTools) {
       expect(fs.existsSync(path.join(projectRoot, relativePath)), relativePath).toBe(true);
@@ -61,59 +63,138 @@ describe('GitHub Actions hardening', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
   });
 
-  it('rejects a release guard that inherits the application working directory', () => {
+  it('requires CI and release to share one verification implementation', () => {
+    const brokenCi = workflows['ci.yml']
+      .replace('uses: ./.github/workflows/verify.yml', 'runs-on: ubuntu-latest')
+      .replace('source_ref: ${{ github.sha }}', 'source_ref: main');
+    const brokenRelease = workflows['release.yml']
+      .replace('uses: ./.github/workflows/verify.yml', 'runs-on: ubuntu-latest')
+      .replace('release_mode: true', 'release_mode: false');
+
+    expect(validateCiWorkflow(brokenCi)).toEqual(expect.arrayContaining([
+      expect.stringContaining('shared verification workflow'),
+      expect.stringContaining('exact trigger commit'),
+    ]));
+    expect(validateReleaseWorkflow(brokenRelease)).toEqual(expect.arrayContaining([
+      expect.stringContaining('shared verification workflow'),
+      expect.stringContaining('release mode'),
+    ]));
+  });
+
+  it('scopes the optional-tag assertion to workflow_dispatch.inputs.tag', () => {
+    const tagInput = extractWorkflowDispatchTagInput(workflows['release.yml']);
+    expect(tagInput).toContain('required: false');
     const broken = workflows['release.yml']
-      .replace('        shell: bash --noprofile --norc -eo pipefail {0}', '        working-directory: far\n        shell: bash --noprofile --norc -eo pipefail {0}')
-      .replace('        working-directory: .\n        env:', '        env:');
-
+      .replace(tagInput, tagInput.replace('required: false', 'required: true'))
+      .replace('permissions:\n', 'permissions:\n  required: false\n');
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('job-wide working-directory'),
-      expect.stringContaining('workspace root'),
+      expect.stringContaining('workflow_dispatch tag input must be optional'),
     ]));
   });
 
-  it('rejects release checkout outside the explicit tag namespace', () => {
-    const broken = workflows['release.yml'].replaceAll(
-      'ref: refs/tags/${{ env.RELEASE_TAG }}',
-      'ref: ${{ env.RELEASE_TAG }}',
-    );
-
+  it('rejects release authorization that happens after checkout', () => {
+    const workflow = workflows['release.yml'];
+    const guard = workflow.indexOf('      - name: Require an authoritative trigger');
+    const checkout = workflow.indexOf('      - name: Check out release source');
+    const guardBlock = workflow.slice(guard, checkout);
+    const broken = workflow.slice(0, guard) + workflow.slice(checkout, checkout + guardBlock.length) + guardBlock + workflow.slice(checkout + guardBlock.length);
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('explicit tag-namespace checkouts'),
+      expect.stringContaining('must execute before checkout'),
     ]));
   });
 
-  it('rejects mutable or unreviewed action references', () => {
-    const mutable = workflows['ci.yml'].replace(
-      /actions\/checkout@[0-9a-f]{40}/,
-      'actions/checkout@v6',
-    );
-    expect(validateActionPins('ci.yml', mutable)).toEqual(expect.arrayContaining([
+  it('rejects a release workflow that cannot derive or bootstrap the package tag', () => {
+    const broken = workflows['release.yml']
+      .replaceAll('main_expected_tag="v${main_package_version}"', 'main_expected_tag="$REQUESTED_TAG"')
+      .replace('github.rest.git.createRef', 'github.rest.git.getRef');
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('derive the default release tag'),
+      expect.stringContaining('created only after verification'),
+    ]));
+  });
+
+  it('requires provided-tag retries to validate the tagged commit version', () => {
+    const broken = workflows['release.yml']
+      .replace('git show "${release_commit}:far/package.json"', 'cat far/package.json')
+      .replaceAll('[[ -n "$REQUESTED_TAG" ]]', '[[ -z "$REQUESTED_TAG" ]]')
+      .replace('Requested retry tag is missing', 'Tag missing');
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('tagged commit package version'),
+      expect.stringContaining('distinguish provided-tag retries'),
+      expect.stringContaining('actionable failure guidance'),
+    ]));
+  });
+
+  it('requires serialized publication and tag checks around the mutation', () => {
+    const broken = workflows['release.yml']
+      .replace('group: release-${{ github.repository }}', 'group: release-${{ github.event_name }}-${{ github.ref_name }}')
+      .replace('      - name: Reverify immutable tag before publication', '      - name: Prepare publication')
+      .replace('      - name: Verify published release identity', '      - name: Report publication');
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('serialized concurrency group'),
+      expect.stringContaining('immediately before publication'),
+      expect.stringContaining('verified after mutation'),
+    ]));
+  });
+
+  it('requires idempotent retries to validate release assets, not only names', () => {
+    const broken = workflows['release.yml']
+      .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
+      .replace('fs.statSync', 'fs.existsSync');
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('idempotent release retry detection'),
+      expect.stringContaining('compare local and remote asset sizes'),
+    ]));
+  });
+
+  it('requires the shared pipeline to remain tolerant, observable, and strict at the final gate', () => {
+    const broken = workflows['verify.yml']
+      .replaceAll('continue-on-error: true\n', '')
+      .replace('for attempt in 1 2 3', 'for attempt in 1')
+      .replace('      - name: Enforce verification result', '      - name: Report verification result')
+      .replace('GIT_REF: ${{ github.ref }}', 'GIT_REF: unsafe')
+      .replace('path.relative(root, report.filePath)', 'report.filePath');
+    expect(validateVerificationWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('independent checks must continue'),
+      expect.stringContaining('dependency-install retry'),
+      expect.stringContaining('aggregate result gate'),
+      expect.stringContaining('context values must pass through env'),
+      expect.stringContaining('repository-relative paths'),
+    ]));
+  });
+
+  it('rejects mutable or unreviewed action references across the shared workflow', () => {
+    const mutable = workflows['verify.yml'].replace(/actions\/checkout@[0-9a-f]{40}/, 'actions/checkout@v6');
+    expect(validateActionPins('verify.yml', mutable)).toEqual(expect.arrayContaining([
       expect.stringContaining('40-character commit SHA'),
     ]));
-
     const unknownSha = 'a'.repeat(40);
-    const unknown = `${workflows['ci.yml']}\n      - uses: example/unreviewed@${unknownSha}\n`;
-    expect(validateActionPins('ci.yml', unknown)).toEqual(expect.arrayContaining([
+    const unknown = `${workflows['verify.yml']}\n      - uses: example/unreviewed@${unknownSha}\n`;
+    expect(validateActionPins('verify.yml', unknown)).toEqual(expect.arrayContaining([
       expect.stringContaining('audited action allowlist'),
     ]));
   });
 
-  it('requires CI checkout credentials to be ephemeral', () => {
-    const broken = workflows['ci.yml'].replace('          persist-credentials: false\n', '');
-    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
+  it('requires shared checkout credentials to be ephemeral', () => {
+    const broken = workflows['verify.yml'].replace('          persist-credentials: false\n', '');
+    expect(validateVerificationWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('disable persisted credentials'),
     ]));
   });
 
-  it('requires validated retention and transient retry handling', () => {
+  it('requires maintenance dry-run, retries, summary, failure isolation, and 404 tolerance', () => {
     const broken = workflows['actions-maintenance.yml']
       .replace('          retries: 3\n', '')
-      .replace(/\s+if \(!Number\.isInteger\(retentionDays\)[\s\S]*?\n\s+}\n/, '\n');
-
+      .replace('      dry_run:\n', '      preview:\n')
+      .replace('cleanup will continue', 'cleanup stopped')
+      .replace('error.status === 404', 'error.status === 410')
+      .replace('core.summary', 'core.notice');
     expect(validateMaintenanceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('retry transient failures'),
-      expect.stringContaining('retention configuration'),
+      expect.stringContaining('dry-run control'),
+      expect.stringContaining('must not stop remaining cleanup'),
+      expect.stringContaining('idempotent no-op'),
+      expect.stringContaining('summary is missing'),
     ]));
   });
 });

@@ -1,0 +1,481 @@
+name: Shared Verification
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: 'Exact branch, tag, or commit to verify.'
+        required: true
+        type: string
+      release_mode:
+        description: 'Enable release identity checks and immutable asset packaging.'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Semantic-version tag used when release_mode is enabled.'
+        required: false
+        default: ''
+        type: string
+      source_version:
+        description: 'Expected immutable commit SHA used for release provenance.'
+        required: false
+        default: ''
+        type: string
+      node_version:
+        description: 'Node.js major version.'
+        required: false
+        default: '22'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: ${{ inputs.release_mode && 'Verify and package release' || 'Verify repository' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      NODE_VERSION: ${{ inputs.node_version }}
+      RELEASE_MODE: ${{ inputs.release_mode }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_VERSION: ${{ inputs.source_version }}
+    defaults:
+      run:
+        working-directory: far
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out verification source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: ${{ inputs.release_mode && 0 || 1 }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Describe verification context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          COMMIT_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          {
+            echo '## Verification context'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Mode | \`$([[ "$RELEASE_MODE" == "true" ]] && echo release || echo ci)\` |"
+            echo "| Event | \`$EVENT_NAME\` |"
+            echo "| Trigger ref | \`$GIT_REF\` |"
+            echo "| Trigger commit | \`$COMMIT_SHA\` |"
+            echo "| Verified source | \`$SOURCE_REF\` |"
+            echo "| Node | \`$NODE_VERSION\` |"
+            echo "| Attempt | \`$RUN_ATTEMPT\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare diagnostics
+        run: mkdir -p reports/ci reports/generated-diff
+
+      - name: Verify release identity
+        id: identity
+        if: inputs.release_mode
+        continue-on-error: true
+        run: |
+          actual_commit="$(git rev-parse HEAD)"
+          if [[ "$actual_commit" != "$SOURCE_VERSION" ]]; then
+            echo "::error title=Checkout identity changed::Checked out $actual_commit, expected $SOURCE_VERSION. Re-run the release and investigate any changed tag or ref." >&2
+            exit 1
+          fi
+
+          package_version="$(node -p "require('./package.json').version")"
+          expected_tag="v${package_version}"
+          if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
+            echo "::error title=Version mismatch::Tag $RELEASE_TAG does not match package version $expected_tag. Correct the package version and create a new tag; never move an existing release tag." >&2
+            exit 1
+          fi
+
+          git fetch --force --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$actual_commit" refs/remotes/origin/main; then
+            echo "::error title=Release commit left main::$actual_commit is not reachable from main. Restore the intended main history or release a new commit that is reachable from main." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies reproducibly
+        id: install
+        continue-on-error: true
+        run: |
+          log=reports/ci/npm-ci.log
+          : > "$log"
+          for attempt in 1 2 3; do
+            echo "::group::npm ci attempt $attempt of 3"
+            if npm ci --ignore-scripts --legacy-peer-deps 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "npm ci failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            if (( attempt < 3 )); then
+              echo "Transient installation failure suspected; retrying after $((attempt * 10)) seconds." | tee -a "$log"
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
+
+      - name: Vendor browser dependencies
+        id: vendor
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run vendor 2>&1 | tee reports/ci/vendor.log
+
+      - name: Check encoding
+        id: encoding
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:encoding 2>&1 | tee reports/ci/encoding.log
+
+      - name: Check workflow invariants
+        id: workflows
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:workflows 2>&1 | tee reports/ci/workflow-check.log
+
+      - name: Validate repository
+        id: validate
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run validate 2>&1 | tee reports/ci/validate.log
+
+      - name: Lint source
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set +e
+          npm run lint -- --format json --output-file reports/eslint.json
+          status=$?
+          if [[ -s reports/eslint.json ]]; then
+            node -e '
+              const fs = require("node:fs");
+              const path = require("node:path");
+              const reports = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              const root = process.env.GITHUB_WORKSPACE || process.cwd();
+              const escapeProperty = (value) => String(value)
+                .replace(/%/g, "%25")
+                .replace(/\r/g, "%0D")
+                .replace(/\n/g, "%0A")
+                .replace(/:/g, "%3A")
+                .replace(/,/g, "%2C");
+              const escapeData = (value) => String(value)
+                .replace(/%/g, "%25")
+                .replace(/\r/g, "%0D")
+                .replace(/\n/g, "%0A");
+              let errors = 0;
+              let warnings = 0;
+              for (const report of reports) {
+                const file = path.relative(root, report.filePath) || report.filePath;
+                errors += report.errorCount || 0;
+                warnings += report.warningCount || 0;
+                for (const message of report.messages || []) {
+                  const level = message.severity === 2 ? "error" : "warning";
+                  const title = `${message.ruleId || "parse"}: ${message.message}`;
+                  console.log(`::${level} file=${escapeProperty(file)},line=${message.line || 1},col=${message.column || 1},title=${escapeProperty(title)}::${escapeData(title)}`);
+                }
+              }
+              console.log(`ESLint summary: ${errors} error(s), ${warnings} warning(s)`);
+            ' reports/eslint.json | tee reports/ci/eslint-summary.log
+          else
+            echo "ESLint did not produce a JSON report." | tee reports/ci/eslint-summary.log
+          fi
+          exit "$status"
+
+      - name: Build release
+        id: build_release
+        if: >-
+          steps.install.outcome == 'success' &&
+          steps.vendor.outcome == 'success'
+        continue-on-error: true
+        run: npm run build:release 2>&1 | tee reports/ci/build-release.log
+
+      - name: Verify generated artifacts
+        id: generated
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:generated 2>&1 | tee reports/ci/check-generated.log
+
+      - name: Verify committed artifacts are current
+        id: generated_drift
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: |
+          status_file=reports/generated-diff/status.txt
+          git status --porcelain=v1 --untracked-files=all -- dist vendor > "$status_file"
+          if [[ -s "$status_file" ]]; then
+            git diff --stat -- dist vendor | tee reports/generated-diff/stat.txt
+            git diff --binary -- dist vendor > reports/generated-diff/generated.patch
+            tar -czf reports/generated-diff/generated-files.tar.gz dist vendor
+            cat "$status_file"
+            echo "::error title=Generated artifacts are stale::Build output changed committed dist/vendor files. Download verification diagnostics, regenerate locally, and commit the source-of-truth output." >&2
+            exit 1
+          fi
+          rm -f "$status_file"
+
+      - name: Generate and verify release attestation
+        id: attestation
+        if: >-
+          steps.build_release.outcome == 'success' &&
+          steps.generated.outcome == 'success' &&
+          steps.generated_drift.outcome == 'success'
+        continue-on-error: true
+        run: npm run release:attest 2>&1 | tee reports/ci/release-attestation.log
+
+      - name: Run adversarial release integrity tests
+        id: adversarial
+        if: steps.attestation.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/adversarial-release-test.cjs 2>&1 | tee reports/ci/adversarial-release.log
+
+      - name: Run tests
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm test 2>&1 | tee reports/ci/tests.log
+
+      - name: Audit production dependency advisories
+        id: dependency_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee reports/ci/npm-audit.log
+
+      - name: Audit project rules
+        id: project_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run audit 2>&1 | tee reports/ci/project-audit.log
+
+      - name: Generate bundle report
+        id: bundle_report
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run report:bundle 2>&1 | tee reports/ci/bundle-report.log
+
+      - name: Run smoke tests
+        id: smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run smoke 2>&1 | tee reports/ci/smoke.log
+
+      - name: Run browser smoke tests
+        id: browser_smoke
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: |
+          log=reports/ci/browser-smoke.log
+          : > "$log"
+          for attempt in 1 2; do
+            echo "::group::browser smoke attempt $attempt of 2"
+            if npm run smoke:browser 2>&1 | tee -a "$log"; then
+              echo "::endgroup::"
+              if (( attempt > 1 )); then
+                echo "::warning title=Browser smoke recovered on retry::The first browser-smoke attempt failed. Review the retained log for flakiness before relying on repeated recovery."
+              fi
+              exit 0
+            fi
+            status=${PIPESTATUS[0]}
+            echo "browser smoke failed with exit code $status" | tee -a "$log"
+            echo "::endgroup::"
+            (( attempt == 2 )) || sleep 10
+          done
+          exit 1
+
+      - name: Reverify final release contents
+        id: final_verify
+        if: inputs.release_mode && steps.adversarial.outcome == 'success'
+        continue-on-error: true
+        run: npm run release:verify 2>&1 | tee reports/ci/release-verify.log
+
+      - name: Summarize verification results
+        if: always()
+        env:
+          IDENTITY: ${{ steps.identity.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+          FINAL_VERIFY: ${{ steps.final_verify.outcome }}
+        run: |
+          {
+            echo '## Verification results'
+            echo
+            echo '| Check | Outcome |'
+            echo '|---|---|'
+            if [[ "$RELEASE_MODE" == "true" ]]; then
+              printf '| `%s` | **%s** |\n' release-identity "$IDENTITY"
+            fi
+            while IFS='=' read -r name outcome; do
+              [[ -n "$name" ]] || continue
+              printf '| `%s` | **%s** |\n' "$name" "$outcome"
+            done <<EOF_SUMMARY
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          release-attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          EOF_SUMMARY
+            if [[ "$RELEASE_MODE" == "true" ]]; then
+              printf '| `%s` | **%s** |\n' final-release-verification "$FINAL_VERIFY"
+            fi
+            echo
+            echo 'All available checks were allowed to finish. Skipped checks identify prerequisites that did not succeed.'
+            echo 'Detailed command logs and generated-file evidence are attached in the diagnostics artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ inputs.release_mode && format('release-diagnostics-{0}-{1}-{2}', inputs.release_tag, github.run_id, github.run_attempt) || format('ci-diagnostics-{0}-{1}', github.run_id, github.run_attempt) }}
+          path: far/reports
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce verification result
+        if: always()
+        env:
+          IDENTITY: ${{ steps.identity.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          VENDOR: ${{ steps.vendor.outcome }}
+          ENCODING: ${{ steps.encoding.outcome }}
+          WORKFLOWS: ${{ steps.workflows.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD_RELEASE: ${{ steps.build_release.outcome }}
+          GENERATED: ${{ steps.generated.outcome }}
+          GENERATED_DRIFT: ${{ steps.generated_drift.outcome }}
+          ATTESTATION: ${{ steps.attestation.outcome }}
+          ADVERSARIAL: ${{ steps.adversarial.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
+          BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+          FINAL_VERIFY: ${{ steps.final_verify.outcome }}
+        run: |
+          failures=()
+          if [[ "$RELEASE_MODE" == "true" && "$IDENTITY" != "success" ]]; then
+            failures+=("release-identity=$IDENTITY")
+          fi
+          while IFS='=' read -r name outcome; do
+            [[ "$outcome" == "success" ]] || failures+=("$name=$outcome")
+          done <<EOF_RESULTS
+          install=$INSTALL
+          vendor=$VENDOR
+          encoding=$ENCODING
+          workflow-invariants=$WORKFLOWS
+          repository-validation=$VALIDATE
+          lint=$LINT
+          build-release=$BUILD_RELEASE
+          generated-output=$GENERATED
+          generated-drift=$GENERATED_DRIFT
+          release-attestation=$ATTESTATION
+          adversarial-integrity=$ADVERSARIAL
+          tests=$TESTS
+          dependency-audit=$DEPENDENCY_AUDIT
+          project-audit=$PROJECT_AUDIT
+          bundle-report=$BUNDLE_REPORT
+          smoke=$SMOKE
+          browser-smoke=$BROWSER_SMOKE
+          EOF_RESULTS
+          if [[ "$RELEASE_MODE" == "true" && "$FINAL_VERIFY" != "success" ]]; then
+            failures+=("final-release-verification=$FINAL_VERIFY")
+          fi
+
+          if (( ${#failures[@]} > 0 )); then
+            printf '::error title=Verification failed::%s\n' "${failures[*]}"
+            echo "Review the summary and diagnostics artifact. Skipped checks are failures because their prerequisites did not complete." >&2
+            exit 1
+          fi
+
+      - name: Package immutable release assets
+        if: inputs.release_mode
+        run: |
+          archive="opencoursedeck-${RELEASE_TAG}.tar.gz"
+          manifest="opencoursedeck-${RELEASE_TAG}-manifest.json"
+          attestation="opencoursedeck-${RELEASE_TAG}-attestation.json"
+
+          rm -rf release-assets
+          mkdir -p release-assets
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -czf "release-assets/$archive" \
+            dist
+          cp reports/release/release-manifest.json "release-assets/$manifest"
+          cp reports/release/release-attestation.json "release-assets/$attestation"
+
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('reports/release/release-manifest.json', 'utf8'));
+          const attestation = JSON.parse(fs.readFileSync('reports/release/release-attestation.json', 'utf8'));
+          const expectedVersion = process.env.RELEASE_TAG.slice(1);
+          const expectedCommit = process.env.SOURCE_VERSION.toLowerCase();
+          for (const [name, document] of [['manifest', manifest], ['attestation', attestation]]) {
+            if (document.version !== expectedVersion) throw new Error(`${name} version ${document.version} does not match ${expectedVersion}. Rebuild the release from the matching package version.`);
+            if (document.commit !== expectedCommit) throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}. Re-run verification for the exact release commit.`);
+          }
+          if (attestation.verified !== true) throw new Error('Release attestation is not verified. Download release diagnostics, correct the failed integrity check, and rerun the Release workflow from main or the existing tag.');
+          NODE
+
+          (
+            cd release-assets
+            sha256sum "$archive" "$manifest" "$attestation" > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Upload verified release assets
+        if: inputs.release_mode
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release-assets-${{ inputs.release_tag }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: far/release-assets/
+          if-no-files-found: error
+          retention-days: 7
