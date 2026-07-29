@@ -43,7 +43,7 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
-    "@fortawesome/fontawesome-free": "^7.2.8",
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.12",
     "fuse.js": "7.0.0",
