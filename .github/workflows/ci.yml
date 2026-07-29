@@ -43,17 +43,22 @@ jobs:
           cache-dependency-path: far/package-lock.json
 
       - name: Describe execution context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           {
             echo '## CI execution context'
             echo
             echo '| Field | Value |'
             echo '|---|---|'
-            echo "| Event | \`${{ github.event_name }}\` |"
-            echo "| Ref | \`${{ github.ref }}\` |"
-            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Event | \`$EVENT_NAME\` |"
+            echo "| Ref | \`$GIT_REF\` |"
+            echo "| Commit | \`$COMMIT_SHA\` |"
             echo "| Node | \`$NODE_VERSION\` |"
-            echo "| Attempt | \`${{ github.run_attempt }}\` |"
+            echo "| Attempt | \`$RUN_ATTEMPT\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare diagnostics
@@ -116,17 +121,29 @@ jobs:
           if [[ -s reports/eslint.json ]]; then
             node -e '
               const fs = require("node:fs");
+              const path = require("node:path");
               const reports = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              const root = process.env.GITHUB_WORKSPACE || process.cwd();
+              const escapeProperty = (value) => String(value)
+                .replace(/%/g, "%25")
+                .replace(/\r/g, "%0D")
+                .replace(/\n/g, "%0A")
+                .replace(/:/g, "%3A")
+                .replace(/,/g, "%2C");
+              const escapeData = (value) => String(value)
+                .replace(/%/g, "%25")
+                .replace(/\r/g, "%0D")
+                .replace(/\n/g, "%0A");
               let errors = 0;
               let warnings = 0;
               for (const report of reports) {
+                const file = path.relative(root, report.filePath) || report.filePath;
                 errors += report.errorCount || 0;
                 warnings += report.warningCount || 0;
                 for (const message of report.messages || []) {
                   const level = message.severity === 2 ? "error" : "warning";
-                  const command = level === "error" ? "error" : "warning";
-                  const title = `${message.ruleId || "parse"}: ${message.message}`.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-                  console.log(`::${command} file=${report.filePath},line=${message.line || 1},col=${message.column || 1},title=${title}::${title}`);
+                  const title = `${message.ruleId || "parse"}: ${message.message}`;
+                  console.log(`::${level} file=${escapeProperty(file)},line=${message.line || 1},col=${message.column || 1},title=${escapeProperty(title)}::${escapeData(title)}`);
                 }
               }
               console.log(`ESLint summary: ${errors} error(s), ${warnings} warning(s)`);
