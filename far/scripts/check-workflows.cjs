@@ -25,7 +25,7 @@ function extractNamedStep(workflow, name) {
 
 function validateActionPins(filename, workflow) {
   const errors = [];
-  const usesPattern = /^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?\s*$/gm;
+  const usesPattern = /^[ \t]*(?:-[ \t]+)?uses:[ \t]*([^ \t#]+)(?:[ \t]+#[ \t]*(\S+))?[ \t]*$/gm;
 
   for (const match of workflow.matchAll(usesPattern)) {
     const reference = match[1];
