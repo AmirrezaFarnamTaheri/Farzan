@@ -7,9 +7,9 @@
 (() => {
   'use strict';
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // UTILITIES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   const $ = (s, r = document) => r.querySelector(s);
   const uid = (p = 'pd') => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -84,12 +84,12 @@
   }
 
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════
   // CLASS: MediaPlayer
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════
   class MediaPlayer {
     /**
-     * @param {string|HTMLElement} container  â€“ Wrapper element or selector
+     * @param {string|HTMLElement} container  – Wrapper element or selector
      * @param {Object} options
      */
     constructor(container, options = {}) {
@@ -184,7 +184,7 @@
 
     // ─────────────────────────────────────────────────────
     // DOM BUILDER
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     _buildDOM() {
       this._container.classList.add('pd-player', `pd-player-${this._opts.type}`, `theme-${this._opts.theme}`);
       this._container.replaceChildren();
@@ -207,7 +207,7 @@
 
       if (!this._opts.controls) return;
 
-      // â”€â”€ Controls wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Controls wrapper ──────────────────────────────
       const controls = document.createElement('div');
       controls.className = 'pd-controls';
       controls.setAttribute('role', 'region');
@@ -343,7 +343,7 @@
         </div>
       `;
 
-      // â”€â”€ Visualizer canvas (audio mode) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Visualizer canvas (audio mode) ────────────────
       if (this._opts.visualizer && this._opts.type === 'audio') {
         this._vizCanvas = document.createElement('canvas');
         this._vizCanvas.className = 'pd-visualizer';
@@ -353,7 +353,7 @@
       this._container.appendChild(controls);
       this._controls = controls;
 
-      // â”€â”€ Queue panel (initially hidden) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Queue panel (initially hidden) ───────────────
       this._queuePanel = document.createElement('div');
       this._queuePanel.className = 'pd-queue-panel';
       this._queuePanel.hidden = true;
@@ -425,9 +425,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // NATIVE MEDIA EVENTS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     _bindNative() {
       const m = this._media;
 
@@ -450,7 +450,7 @@
         if (this._dom?.seekBuf) this._dom.seekBuf.style.width = `${pct}%`;
       });
 
-      // â”€â”€ Controls interaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Controls interaction ───────────────────────────
       if (!this._opts.controls) return;
 
       // Play/pause button
@@ -488,7 +488,7 @@
           if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
           if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
           this._emit('speed', rate);
-          this._saveSession();
+          this._saveSession(true);
           if (this._mediaStorage && this._currentTrack()) {
             this._mediaStorage.set(this._mediaId(), 'rate', rate);
           }
@@ -663,9 +663,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // NATIVE EVENT HANDLERS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     _onPlay() {
       this._state.playing = true;
       if (this._dom) {
@@ -770,7 +770,8 @@
         duration: dur,
         percent: pct,
       });
-      this._saveSession();
+      // Forced: seeks are explicit user actions worth persisting immediately.
+      this._saveSession(true);
     }
 
     _onVolumeChange() {
@@ -790,9 +791,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // PUBLIC TRANSPORT API
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     play() {
       return this._media.play().catch(err => {
         if (err.name !== 'AbortError') console.warn('[MediaPlayer]', err);
@@ -856,7 +857,7 @@
       btn.dataset.repeatMode = this._state.repeat;
     }
 
-    /** Cycle playback speeds: 0.5 â†’ 0.75 â†’ 1 â†’ 1.25 â†’ 1.5 â†’ 2 */
+    /** Cycle playback speeds: 0.5 → 0.75 → 1 → 1.25 → 1.5 → 2 */
     cycleSpeed() {
       if (this._dom?.speedPanel) {
         this._dom.speedPanel.hidden = !this._dom.speedPanel.hidden;
@@ -883,7 +884,7 @@
           if (this._dom.speedValue) this._dom.speedValue.textContent = this._formatSpeedLabel(rate);
           if (this._dom.speedBtn) this._dom.speedBtn.textContent = this._formatSpeedLabel(rate);
           this._emit('speed', rate);
-          this._saveSession();
+          this._saveSession(true);
           if (this._mediaStorage && this._currentTrack()) {
             this._mediaStorage.set(this._mediaId(), 'rate', rate);
           }
@@ -893,9 +894,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // PLAYLIST / QUEUE API
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     /**
      * Load a full playlist
      * @param {Array<TrackObject>} tracks
@@ -1115,9 +1116,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // QUEUE PANEL
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     showQueue() {
       this._queuePanel.hidden = false;
       this._renderQueue();
@@ -1359,9 +1360,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // AUDIO VISUALIZER
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     _initVisualizer() {
       if (this._opts.type !== 'audio') return;
 
@@ -1459,10 +1460,16 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // SESSION PERSISTENCE
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    _saveSession() {
+    // ──────────────────────────────────────────────────────
+    _saveSession(force = false) {
+      // timeupdate fires ~4x/s; without throttling that is ~8 synchronous
+      // storage writes per second for the whole playback session. Explicit
+      // user actions (seek, speed change, teardown) pass force=true.
+      const now = Date.now();
+      if (!force && now - (this._lastSessionSaveAt || 0) < 1000) return;
+      this._lastSessionSaveAt = now;
       try {
         const data = {
           volume:      this._state.volume,
@@ -1474,10 +1481,16 @@
           playbackRate: this._media.playbackRate,
         };
         sessionStorage.setItem(this._opts.storageKey, JSON.stringify(data));
-        sessionStorage.setItem(this._opts.storageKey + '-playlist', JSON.stringify({
-          shuffle: this._state.shuffle,
-          repeat: this._state.repeat,
-        }));
+        // The playlist-mode key only changes with shuffle/repeat; skip the
+        // redundant write otherwise.
+        const playlistSig = `${this._state.shuffle}|${this._state.repeat}`;
+        if (playlistSig !== this._lastPlaylistSig) {
+          this._lastPlaylistSig = playlistSig;
+          sessionStorage.setItem(this._opts.storageKey + '-playlist', JSON.stringify({
+            shuffle: this._state.shuffle,
+            repeat: this._state.repeat,
+          }));
+        }
       } catch { /* quota exceeded or private browsing */ }
     }
 
@@ -1505,9 +1518,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // LOADING STATES
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     _setLoading(on) {
       this._state.loading = on;
       if (this._dom?.loadingOverlay) this._dom.loadingOverlay.hidden = !on;
@@ -1519,9 +1532,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // EVENT EMITTER
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     on(event, handler) {
       (this._listeners[event] = this._listeners[event] ?? []).push(handler);
       return this;
@@ -1552,9 +1565,9 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // PUBLIC GETTERS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     get currentTime() { return this._media.currentTime; }
     get duration()    { return this._media.duration;    }
     get volume()      { return this._media.volume;      }
@@ -1655,7 +1668,7 @@
     }
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     // AB LOOP
     setLoopA() {
@@ -1874,6 +1887,12 @@
       if (!hint || !text) return;
       hint.hidden = true;
 
+      // Staleness guard: rapid track changes can leave an older call
+      // resolving after a newer one; without this token the previous
+      // track's resume state would overwrite the current track's.
+      const requestToken = (this._resumeHintToken = (this._resumeHintToken || 0) + 1);
+      const isStale = () => requestToken !== this._resumeHintToken || this._currentTrack() !== track;
+
       let savedTime = 0;
       const mediaId = this._opts.mediaId || track?.id || track?.src || '';
       if (this._mediaStorage && mediaId) {
@@ -1881,34 +1900,30 @@
           const state = await this._mediaStorage.get(mediaId);
           savedTime = Number(state?.time) || 0;
         } catch { /* ignore */ }
-      }
-      if (!savedTime) {
-        const topicId = track?.topicId || track?.id;
-        const db = window.DB;
-        if (topicId && db?.getWatchedSegments) {
-          try {
-            const segments = await db.getWatchedSegments(topicId);
-            if (segments?.length) {
-              const maxEnd = segments.reduce((max, s) => Math.max(max, Number(s.end) || 0), 0);
-              if (maxEnd > 10) savedTime = maxEnd;
-            }
-          } catch { /* ignore */ }
-        }
+        if (isStale()) return;
       }
 
+      // One segments read serves both the fallback resume time and the
+      // watched-intervals overlay.
       const topicId = track?.topicId || track?.id;
       const db = window.DB;
+      let segments = null;
       if (topicId && db?.getWatchedSegments) {
-        try {
-          const segments = await db.getWatchedSegments(topicId);
-          if (segments?.length) {
-            this._watchedIntervals = segments
+        try { segments = await db.getWatchedSegments(topicId); } catch { /* ignore */ }
+        if (isStale()) return;
+      }
+
+      if (!savedTime && segments?.length) {
+        const maxEnd = segments.reduce((max, s) => Math.max(max, Number(s.end) || 0), 0);
+        if (maxEnd > 10) savedTime = maxEnd;
+      }
+
+      if (segments) {
+        this._watchedIntervals = segments.length
+          ? segments
               .filter(s => s.start != null && s.end != null)
-              .map(s => ({ start: Number(s.start), end: Number(s.end) }));
-          } else {
-            this._watchedIntervals = [];
-          }
-        } catch { this._watchedIntervals = []; }
+              .map(s => ({ start: Number(s.start), end: Number(s.end) }))
+          : [];
       }
 
       if (savedTime > 10) {
@@ -1951,7 +1966,7 @@
 
 
     // DESTROY
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     destroy() {
       if (this._destroyed) return;
       this._destroyed = true;
@@ -1974,7 +1989,10 @@
         this._waveformScrubber = null;
       }
       if (this._mediaStorage) {
-        this._mediaStorage.flush();
+        // destroy() flushes and removes the storage's pagehide listener so
+        // destroyed players don't accumulate window listeners.
+        if (typeof this._mediaStorage.destroy === 'function') this._mediaStorage.destroy();
+        else this._mediaStorage.flush();
         this._mediaStorage = null;
       }
       if (this._seekAccumTimer) {
@@ -1992,9 +2010,9 @@
   }
 
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════
   // AUTO-INIT: [data-player] elements
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════
   function autoInit() {
     document.querySelectorAll('[data-player]').forEach(el => {
       if (el._pdPlayer) return;
@@ -2038,7 +2056,7 @@
 
   document.addEventListener('DOMContentLoaded', autoInit);
 
-  // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Export ────────────────────────────────────────────────
   window.OpenCourseDeck            = window.OpenCourseDeck ?? {};
   window.OpenCourseDeck.MediaPlayer = MediaPlayer;
   window.OpenCourseDeck.Player      = { init: autoInit, destroyAll, getActiveSnapshot, requestActivePictureInPicture };

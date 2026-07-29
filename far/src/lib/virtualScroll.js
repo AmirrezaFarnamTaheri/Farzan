@@ -26,6 +26,8 @@ export class VirtualList {
     this._fragment = document.createDocumentFragment();
     this._renderedRange = { start: -1, end: -1 };
     this._renderedNodes = new Map();
+    this._offsetSyncScheduled = false;
+    this._destroyed = false;
 
     this._onScroll = throttle(() => {
       this._scrollTop = this._viewport.scrollTop;
@@ -187,12 +189,12 @@ export class VirtualList {
         requestAnimationFrame(() => {
           if (node.isConnected) {
             const measured = node.offsetHeight;
-            if (measured > 0) {
+            if (measured > 0 && measured !== this._measuredHeights.get(i)) {
               this._measuredHeights.set(i, measured);
               this._estimatedHeight = Math.round(
                 (this._estimatedHeight * 0.9) + (measured * 0.1)
               );
-              this._rebuildOffsetCache();
+              this._scheduleOffsetSync();
             }
           }
         });
@@ -207,7 +209,31 @@ export class VirtualList {
     this._updateSentinel();
   }
 
+  /**
+   * Measured heights shift every offset after the measured row, so retained
+   * nodes must be repositioned and the sentinel resized — otherwise rows
+   * overlap until the visible range changes. Batched via rAF so a burst of
+   * measurements triggers one layout pass.
+   * @internal
+   */
+  _scheduleOffsetSync() {
+    if (this._offsetSyncScheduled) return;
+    this._offsetSyncScheduled = true;
+    requestAnimationFrame(() => {
+      this._offsetSyncScheduled = false;
+      if (this._destroyed) return;
+      this._rebuildOffsetCache();
+      for (const [index, node] of this._renderedNodes) {
+        node.style.top = `${this._getItemOffset(index)}px`;
+      }
+      this._updateSentinel();
+      this._renderedRange = { start: -1, end: -1 };
+      this._render();
+    });
+  }
+
   destroy() {
+    this._destroyed = true;
     if (this._resizeObserver) this._resizeObserver.disconnect();
     this._viewport.removeEventListener('scroll', this._onScroll);
     this._viewport.remove();

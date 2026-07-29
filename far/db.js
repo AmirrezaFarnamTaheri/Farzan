@@ -12,11 +12,16 @@ this.name = name;
 this.version = version;
 this.schema = schema;
 this.db = null;
+this._opening = null;
 }
 
 async open() {
 if (this.db) return this.db;
-return new Promise((resolve, reject) => {
+// Memoize the in-flight open: concurrent first calls (e.g. several reads in
+// one Promise.all) must share a single connection instead of each opening —
+// and leaking — their own.
+if (this._opening) return this._opening;
+this._opening = new Promise((resolve, reject) => {
 const req = indexedDB.open(this.name, this.version);
 req.onupgradeneeded = e => {
 const db = e.target.result;
@@ -49,6 +54,8 @@ resolve(this.db);
 req.onblocked = () => reject(new Error(`Opening IndexedDB database "${this.name}" was blocked by another connection`));
 req.onerror = () => reject(req.error);
 });
+this._opening.finally(() => { this._opening = null; }).catch(() => {});
+return this._opening;
 }
 
 async _transaction(store, mode="readonly") {

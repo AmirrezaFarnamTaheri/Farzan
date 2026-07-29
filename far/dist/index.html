@@ -6,6 +6,18 @@
   <meta name="description" content="OpenCourseDeck — Your personal interactive learning studio" />
   <meta name="theme-color" content="#7c3aed" id="meta-theme-color" />
   <meta name="color-scheme" content="dark light" />
+  <!-- media-src/connect-src/frame-src/img-src intentionally allow http: —
+       this offline-first app loads user-supplied course catalogs that may
+       point at self-hosted or LAN media/PDF servers without TLS (see
+       tests/assets-precache.test.js "unrestricted remote media/PDF CSP
+       available"). Do not narrow those to https-only.
+       dev-server.cjs extractCsp() re-serves this exact meta content as a
+       real CSP response header for local/offline/desktop serving, which is
+       the only place object-src/base-uri/frame-ancestors/form-action take
+       effect for that mode (frame-ancestors is spec-ignored when delivered
+       via <meta>, but not when lifted into a real header) — keep this in
+       sync with the header CSP in vercel.json for anything that isn't
+       scheme permissiveness. -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self' blob: data:;
              script-src 'self';
@@ -15,7 +27,11 @@
              media-src 'self' blob: data: http: https:;
              connect-src 'self' blob: data: http: https:;
              frame-src 'self' blob: data: http: https:;
-             worker-src 'self' blob:;" />
+             worker-src 'self' blob:;
+             object-src 'none';
+             base-uri 'none';
+             frame-ancestors 'none';
+             form-action 'self';" />
 
   <!-- Stylesheets are normal blocking links so strict CSP does not block inline preload handlers. -->
 
@@ -701,17 +717,12 @@
     src="./vendor/chart.umd.js"
     defer></script>
 
-  <!-- PDF.js (vendored from pdfjs-dist@3.11.174) -->
+  <!-- PDF.js (vendored from pdfjs-dist; version tracks package.json) -->
   <script id="lib-pdfjs"
     src="./vendor/pdf.min.js"
     defer></script>
 
-  <!-- Marked (Markdown) -->
-  <script id="lib-marked"
-    src="./vendor/marked.min.js"
-    defer></script>
-
-  <!-- DOMPurify (sanitize markdown/HTML output) -->
+  <!-- DOMPurify (sanitize HTML output) -->
   <script id="lib-dompurify"
     src="./vendor/purify.min.js"
     defer></script>

@@ -466,16 +466,16 @@ export function mountSettingsView(deps = {}) {
       document.querySelector('[data-ai-clear-key]')?.toggleAttribute('hidden', mode.value !== 'custom-api');
     };
 
-    const setStatus = () => {
+    const setStatus = (displayMode = current.mode) => {
       const labels = {
         hidden: 'Hidden',
         disabled: 'Off',
         'local-gemma': 'Local private mode',
         'custom-api': 'Approved API',
       };
-      const modeLabel = labels[current.mode] || 'Hidden';
+      const modeLabel = labels[displayMode] || 'Hidden';
       status.textContent = modeLabel;
-      status.className = `badge ${current.mode === 'hidden' || current.mode === 'disabled' ? 'badge-info' : 'badge-success'}`;
+      status.className = `badge ${displayMode === 'hidden' || displayMode === 'disabled' ? 'badge-info' : 'badge-success'}`;
       summary.replaceChildren();
       const facts = [
         ['Mode', modeLabel],
@@ -539,8 +539,7 @@ export function mountSettingsView(deps = {}) {
 
     on(mode, 'change', () => {
       setModeVisibility();
-      current.mode = mode.value;
-      setStatus();
+      setStatus(mode.value);
     });
     on(endpoint, 'input', renderEndpointApproval);
     on(approval, 'change', () => {
@@ -615,7 +614,6 @@ export function mountSettingsView(deps = {}) {
         const imported = await ai?.importLocalModelFile?.(file);
         const stored = {
           ...current,
-          mode: mode.value,
           model: model.value.trim() || selectedModelOption()?.id || current.model,
           keyStorage: 'session',
           hasKey: Boolean(sessionStorage.getItem(keyName)),
@@ -669,7 +667,6 @@ export function mountSettingsView(deps = {}) {
         });
         const stored = {
           ...current,
-          mode: mode.value,
           model: model.value.trim() || selectedModelOption()?.id || current.model,
           keyStorage: 'session',
           hasKey: Boolean(sessionStorage.getItem(keyName)),
@@ -692,7 +689,6 @@ export function mountSettingsView(deps = {}) {
     on(document.querySelector('[data-ai-mark-local-installed]'), 'click', async () => {
       const stored = {
         ...current,
-        mode: mode.value,
         model: model.value.trim() || selectedModelOption()?.id || current.model,
         keyStorage: 'session',
         hasKey: Boolean(sessionStorage.getItem(keyName)),

@@ -38,7 +38,7 @@
 - `OpenCourseDeck.ChartPlugins` is bundled and exposes the Chart.js plugin objects imported in `app.js`: heatmap, sparkline, arc, and gauge. `OpenCourseDeck.CanvasCharts` is bundled and exposes `CanvasGauge`, `CanvasTreemap`, `CanvasAreaChart`, and `CanvasHeatmap`.
 - These visualization namespaces are bundled and exposed for runtime use; deeper route-level UX integration is still separate from namespace exposure.
 - Plugin runtime state currently exposes `OpenCourseDeck.plugins` as an app-level object. `src/features/pluginHost.js` exists and is tested, but it is not imported by `src/index.js` or `app.js`, so `OpenCourseDeck.PluginHost` is not part of the active runtime bundle by default.
-- Translation modules currently exist as source files, but they are not part of the active runtime bundle by default. `src/features/translator.js` would expose `OpenCourseDeck.TranslatorRegistry` if imported; `src/features/translationCache.js` exports `translationCache` but does not attach it to `window.OpenCourseDeck`.
+- Translation modules ARE part of the active runtime bundle: `src/index.js` imports `src/features/translator.js` and `src/features/translationCache.js` and exposes them as `OpenCourseDeck.TranslatorRegistry` and `OpenCourseDeck.TranslationCache`. The registry is wired, but no view calls it yet (notes and the player have no translate action).
 - Player-adjacent source modules such as `MediaStorage` and `WaveformScrubber` expose namespaces when their modules are imported, and `player.js` checks for those namespaces. They are not imported by the active entrypoint in the current runtime, so the player falls back when those namespaces are absent.
 
 ### Performance notes

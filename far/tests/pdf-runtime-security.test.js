@@ -24,7 +24,7 @@ describe('PDF.js runtime security contract', () => {
     installPdfSecurity(rootObject);
     const result = rootObject.pdfjsLib.getDocument({ data: new Uint8Array([1, 2, 3]) });
 
-    expect(result).toMatchObject({ isEvalSupported: false, stopEvent: true, useSystemFonts: false });
+    expect(result).toMatchObject({ isEvalSupported: false, stopAtErrors: true, useSystemFonts: false });
     expect(getDocument).toHaveBeenCalledWith(expect.objectContaining({ isEvalSupported: false }));
     expect(rootObject.OpenCourseDeck.PdfSecurity.evalDisabled).toBe(true);
   });

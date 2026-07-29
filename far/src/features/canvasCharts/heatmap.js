@@ -14,7 +14,12 @@ const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 function parseDate(str) {
   const parts = String(str).split('-');
   if (parts.length < 3) return null;
-  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  // An Invalid Date (e.g. an ISO datetime string, or non-numeric parts) is
+  // still truthy, so callers must explicitly reject it — otherwise it
+  // poisons min/maxDate with NaN and the grid-walk loop below never
+  // terminates (NaN comparisons are always false).
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function buildGrid(data) {
@@ -46,7 +51,12 @@ function buildGrid(data) {
   let weekIdx = 0;
   let lastMonth = -1;
 
-  while (current <= maxDate || current.getDay() !== 1) {
+  // Iteration cap as defense-in-depth: even with parseDate's Invalid Date
+  // guard, a future change to the loop condition should not be able to
+  // hang the tab.
+  const maxIterations = 7 * 400;
+  let iterations = 0;
+  while ((current <= maxDate || current.getDay() !== 1) && iterations++ < maxIterations) {
     const dayOfWeek = current.getDay() === 0 ? 6 : current.getDay() - 1;
     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
     const val = grid.get(key) || 0;
@@ -100,8 +110,16 @@ export class CanvasHeatmap {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || canvas.width / dpr;
     const h = canvas.clientHeight || canvas.height / dpr;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    // Only reallocate the backing store when the size actually changed.
+    // _draw() runs on every hover-cell change, so an unconditional
+    // reassignment here reallocated (and fully cleared) the canvas on
+    // every pointer move across the grid.
+    const nextWidth = Math.round(w * dpr);
+    const nextHeight = Math.round(h * dpr);
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+    }
     this._width = w;
     this._height = h;
     return { w, h };
@@ -219,7 +237,10 @@ export class CanvasHeatmap {
     }
 
     this._canvas.style.cursor = this._hoverCell ? 'pointer' : 'default';
-    if (this._hoverCell !== prev) this._draw();
+    // Compare by cell identity (date), not object identity: a fresh
+    // object is spread every move even within the same cell, so `!==`
+    // triggered a full redraw on every mousemove.
+    if (this._hoverCell?.date !== prev?.date) this._draw();
   }
 
   _onMouseLeave() {

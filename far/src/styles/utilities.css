@@ -209,3 +209,165 @@ mark {
   backdrop-filter: blur(calc(var(--glass-blur) - 4px));
   -webkit-backdrop-filter: blur(calc(var(--glass-blur) - 4px));
 }
+
+/* ── Screen-reader-only text ──────────────────────────────
+   Used by aria-announcer live regions and form helper text
+   (index.html, notesRoute.js, ui.js). Without this rule the text
+   rendered visibly instead of being exposed only to assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Accent color picker dots ──────────────────────────────
+   index.html renders <button class="accent-dot" data-accent="...">; the
+   reset's button{background:none;border:none;padding:0} collapsed these
+   to 0x0 with no CSS of their own. */
+.accent-dot {
+  width: 18px;
+  height: 18px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.accent-dot::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--dot-color, var(--accent));
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+.accent-dot:hover { transform: scale(1.12); }
+.accent-dot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.accent-dot[aria-current="true"]::before,
+.accent-dot.active::before {
+  box-shadow: 0 0 0 2px var(--bg) inset, 0 0 0 4px var(--dot-color, var(--accent));
+}
+
+/* ── Sidebar footer widgets ────────────────────────────────
+   .footer-btn / .now-playing-mini / .storage-usage / .theme-quick-*
+   had no rules anywhere: icon buttons rendered ~16px (below the 24px
+   WCAG 2.5.8 touch-target minimum) and the storage meter / mini-player
+   were invisible 0-height boxes. */
+.footer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-h-sm);
+  height: var(--btn-h-sm);
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.footer-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.footer-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.storage-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.storage-bar-wrap {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.storage-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.now-playing-mini {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.now-playing-mini-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-3);
+}
+.now-playing-mini-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-playing-mini-btn {
+  width: var(--btn-h-xs);
+  height: var(--btn-h-xs);
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+.now-playing-mini-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+
+.theme-quick-wrap {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+.theme-quick-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.theme-quick-btn:hover { transform: scale(1.1); }
+.theme-quick-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-quick-btn[data-theme-set="dark"]     { background: #13131f; }
+.theme-quick-btn[data-theme-set="light"]    { background: #f5f5fa; }
+.theme-quick-btn[data-theme-set="midnight"] { background: #05050d; }
+.theme-quick-btn[data-theme-set="forest"]   { background: #0d1f14; }
+.theme-quick-btn[data-theme-set="ocean"]    { background: #020c18; }
+.theme-quick-btn[data-theme-set="sunset"]   { background: #180a00; }
+.theme-quick-btn[data-theme-set="rose"]     { background: #180010; }
+.theme-quick-btn[data-theme-set="paper"]    { background: #faf8f0; }

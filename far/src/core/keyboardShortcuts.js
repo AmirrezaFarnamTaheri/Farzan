@@ -11,13 +11,24 @@ export const KeyboardShortcuts = {
   },
 
   init() {
-    document.addEventListener('keydown', e => {
+    // Idempotent: repeated init() calls previously stacked anonymous,
+    // unremovable document listeners.
+    if (this._bound) return this;
+    // `[contenteditable]` alone also matches contenteditable="false" (a common
+    // read-only island inside an editor), which suppressed every shortcut —
+    // the exact inverse of the intent.
+    const EDITABLE = 'input,textarea,select,[contenteditable]:not([contenteditable="false"])';
+    this._bound = (e) => {
       const target = eventTargetEl(e);
-      if (target?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
-      if (target?.closest?.('[contenteditable],[contenteditable="true"]')) return;
-      
+      if (target?.matches?.(EDITABLE)) return;
+      if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) return;
+
       const combo = [
         e.ctrlKey  ? 'ctrl'  : '',
+        // Include meta: without it, held Cmd did not disqualify a match, so
+        // Cmd+Ctrl+K fired the 'ctrl+k' shortcut and hijacked the browser's
+        // own Cmd shortcuts via preventDefault().
+        e.metaKey  ? 'meta'  : '',
         e.altKey   ? 'alt'   : '',
         e.shiftKey ? 'shift' : '',
         e.key.toLowerCase(),
@@ -30,7 +41,15 @@ export const KeyboardShortcuts = {
           return;
         }
       }
-    });
+    };
+    document.addEventListener('keydown', this._bound);
+    return this;
+  },
+
+  destroy() {
+    if (this._bound) document.removeEventListener('keydown', this._bound);
+    this._bound = null;
+    return this;
   },
 
   showHelp() {
@@ -47,10 +66,16 @@ export const KeyboardShortcuts = {
     table.appendChild(tbody);
 
     Modal.create({
-      title: '?? Keyboard Shortcuts',
+      title: 'Keyboard Shortcuts',
       body:  table,
       size:  'sm',
     });
   },
 };
+
+// Alias: the live consumers (src/views/helpRoute.js and
+// src/features/commandPalette.js) call `_showHelp()`, matching the inline
+// implementation in app.js. Without this, swapping in this module would make
+// both call sites silent no-ops (they use optional chaining).
+KeyboardShortcuts._showHelp = KeyboardShortcuts.showHelp;
 

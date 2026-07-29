@@ -2,6 +2,22 @@
 
 > Every implementation, feature, widget, capability, performance refinement, subsystem, and visual component. Nothing omitted.
 
+> **Status accuracy.** Every `Status:` line below was re-verified against the
+> source tree. A substantial number previously read `COMPLETE`/`DONE` for work
+> that has no corresponding code, and several read "Wired into src/index.js"
+> for modules that nothing imports. Those are now marked `PARTIAL` or
+> `NOT STARTED` with the specific gap named.
+>
+> Three status values are used:
+> - **DONE** — implemented *and* reachable at runtime.
+> - **PARTIAL** — implemented but not wired in, or only some listed items exist.
+>   The line says which part is missing.
+> - **NOT STARTED** — no corresponding code.
+>
+> When you complete an item, verify the claim (grep for the named symbol, and
+> confirm it is imported by `src/index.js` or by something that is) before
+> promoting its status.
+
 ---
 
 ## Phase 0 — Foundation & Cleanup (Week 1)
@@ -28,7 +44,7 @@ Extract duplicated helpers from IIFE modules (`player.js`, `notes.js`, `pdf.js`,
 
 Replace ad-hoc event dispatchers across all modules with a single clean emitter.
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/lib/eventEmitter.js` (111 lines). Map-based with `on/off/emit/once`, wildcard `*` support, `listenerCount`, `eventNames`, `clear`.
+> **Status: PARTIAL** — `src/lib/eventEmitter.js` exists and is used as a base class by CourseGraph/KnowledgeGraph, but it is not imported by `src/index.js` and is not exposed on the `OpenCourseDeck` namespace; `app.js` still defines its own separate `EventEmitter`. The "single clean emitter" consolidation is not done.
 
 ### 0.3 HElement DOM Utility
 | Item | Target | Ported From |
@@ -94,7 +110,7 @@ Use everywhere: CSS transitions, canvas animations, progress bars, UI polish.
 | Color interpolation (hex/HSL/RGB) | `src/lib/color.js` | Ripl `packages/core/src/interpolators/color.ts` |
 | Number interpolation | `src/lib/color.js` | Ripl `packages/core/src/interpolators/number.ts` |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/lib/color.js` (128 lines). All conversions, contrast, interpolation.
+> **Status: PARTIAL** — `src/lib/color.js` (128 lines) implements all conversions, contrast, and interpolation, and reaches the bundle indirectly via `src/core/themeBuilder.js`; it is NOT imported by `src/index.js` and is not exposed on the `OpenCourseDeck` namespace.
 
 ### 1.3 Theme Builder
 | Item | Target | Ported From |
@@ -115,7 +131,7 @@ Use everywhere: CSS transitions, canvas animations, progress bars, UI polish.
 | `arrayDedupe(arr, keyFn)` | `src/lib/collection.js` | Ripl |
 | `objectMap(obj, fn)`, `objectReduce(obj, fn)` | `src/lib/collection.js` | Ripl |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/lib/collection.js` (254 lines). All 13 functions: `arrayJoin`, `arrayGroup`, `arrayIntersection`, `arrayDifference`, `arrayDedupe`, `arrayMapRange`, `objectMap`, `objectReduce`, `objectForEach`, `setMap`, `setFilter`, `setFind`, `setFlatMap`.
+> **Status: PARTIAL** — `src/lib/collection.js` (254 lines) implements all 13 functions, but it is imported by nothing: not by `src/index.js`, not by any feature or view. It is currently dead code and is not exposed on the `OpenCourseDeck` namespace.
 
 ### 1.5 TimeRange Interval Merging
 | Item | Target | Ported From |
@@ -149,7 +165,7 @@ Use for: plugin host operations, lazy loading, sequential async tasks.
 | Keyframe support | `src/lib/transition.js` | Ripl |
 | `AbortController` integration for cancellation | `src/lib/transition.js` | Ripl |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/lib/transition.js` (156 lines). `Transition` class extending Promise. Controls: `play()`, `pause()`, `seek(t)`, `cancel()` via AbortController.
+> **Status: PARTIAL** — `src/lib/transition.js` implements the cancellable `Transition` class (play/pause/seek/cancel), but it is imported by nothing and is not exposed on the `OpenCourseDeck` namespace.
 
 ### 2.2 Stagger Utility
 | Item | Target | Ported From |
@@ -200,7 +216,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Throttled saves (batch writes every 2s instead of every frame) | `src/features/mediaStorage.js` | Vidstack |
 | IndexedDB-backed (not just sessionStorage) | `bridge.js` (extend timestamps store) | — |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/features/mediaStorage.js` (116 lines). IndexedDB-backed `MediaStorage` class with throttled writes.
+> **Status: DONE** — `src/features/mediaStorage.js` is imported by `src/index.js` and self-registers as `OpenCourseDeck.MediaStorage`; `player.js` uses it at 13 call sites for per-video volume, muted, time, and rate. Reads are de-duplicated per media id, writes are throttled, and `destroy()` releases the pagehide listener on player teardown.
 
 ### 3.2 Keyboard Controller
 | Item | Target | Ported From |
@@ -247,7 +263,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | DPR-aware rendering | `src/features/waveformScrubber.js` | Splayer |
 | Theme-aware colors (CSS `--accent`) | `src/features/waveformScrubber.js` | Splayer |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/features/waveformScrubber.js` (221 lines). `WaveformScrubber` class with IndexedDB cache, DPR-aware, accent color.
+> **Status: PARTIAL — deliberately not wired.** The module works and now has its own `opencoursedeck-waveforms` database and a 60 MB source ceiling, but it is intentionally NOT imported by `src/index.js`. Building a waveform requires fetching and PCM-decoding the entire media file — a second full download on top of the streaming element. Before enabling it, add a cheaper path (precomputed peaks shipped with the catalog, ranged requests, or a decode in a worker) so opening a long lecture video does not download it twice.
 
 ### 3.7 Frequency Visualizer
 | Item | Target | Ported From |
@@ -424,7 +440,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Export/import shortcut config as JSON | `src/views/settingsRoute.js` | Splayer |
 | Persist to IndexedDB | `bridge.js` (settings store) | — |
 
-**Status: COMPLETE** — `renderShortcutsPanel()` function with full rebind UI, conflict detection, export/import, reset. ~160 lines added to settingsRoute.js.
+**Status: NOT STARTED** — no shortcut-rebind UI exists in `src/views/settingsRoute.js`.
 
 ### 6.2 Key Combo System
 | Item | Target | Ported From |
@@ -433,7 +449,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Configurable reset timing between keys | `src/core/keyboardShortcuts.js` | Phaser |
 | Max key delay for sequence detection | `src/core/keyboardShortcuts.js` | Phaser |
 
-**Status: COMPLETE** — Full rewrite with `registerSequence()`, `_advanceSequence()`, visual feedback, `_sequenceState`, `displayCombo()`, `displaySequenceCombo()`, `getAllShortcuts()`. ~260 lines.
+**Status: NOT STARTED** — `src/core/keyboardShortcuts.js` is a minimal registry with no sequence support, and it is imported by nothing; the live implementation is a separate inline copy in `app.js`.
 
 ### 6.3 Command Palette Enhancements
 | Item | Target | Ported From |
@@ -443,7 +459,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Command arguments/parameters | `commandPalette.js` | — |
 | Fuzzy match highlighting in results | `commandPalette.js` | — |
 
-**Status: COMPLETE** — Plugin commands via `plugin:command-register` bus event, recent commands (last 10 in localStorage), `highlightMatch()` with `<mark>` tags. ~300 lines.
+**Status: NOT STARTED** — `src/features/commandPalette.js` has no recents, no match highlighting, and no plugin-contributed commands.
 
 ### 6.4 Keyboard Shortcuts Cheatsheet
 | Item | Target | Ported From |
@@ -452,7 +468,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Categorized: Navigation, Playback, Editor, Canvas, System | `src/views/helpRoute.js` | — |
 | Printable format | `src/views/helpRoute.js` | — |
 
-**Status: COMPLETE** — `showFullCheatsheet()` with auto-categorization, print-friendly CSS, collapsible sections. Added migration status section. ~300 lines.
+**Status: PARTIAL** — `Ctrl+/` opens the existing help overlay (`app.js`); the richer cheatsheet described here is not implemented.
 
 ---
 
@@ -465,7 +481,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Toggle between edit/preview/split modes | `notes.js` | — |
 | Use `marked` (already vendored) for rendering | `notes.js` | — |
 
-**Status: COMPLETE** — `setPreviewMode()`, `_applyPreviewMode()`, `_renderPreview()`, sync scroll, mode persistence in localStorage. ~120 lines added.
+**Status: NOT STARTED** — `notes.js` has no preview mode.
 
 ### 7.2 Note Linking (Wikilinks)
 | Item | Target | Ported From |
@@ -475,7 +491,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Backlinks panel: "This note is referenced by..." | `notes.js` | — |
 | Graph view of note connections | `src/views/notesRoute.js` | D3 `d3-force` |
 
-**Status: COMPLETE** — `_processWikilinks()`, `_showWikilinkAutocomplete()`, `_renderBacklinksPanel()`, `_createNoteFromWikilink()`. ~130 lines added.
+**Status: PARTIAL** — `src/features/knowledgeGraph.js` parses `[[wikilinks]]` for the graph view, but `notes.js` has no wikilink rendering, autocomplete, or backlinks panel.
 
 ### 7.3 Inline Checkboxes
 | Item | Target | Ported From |
@@ -484,7 +500,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Click to toggle checkbox state | `notes.js` | — |
 | Count: "3 of 5 tasks completed" | `notes.js` | — |
 
-**Status: COMPLETE** — `_processCheckboxes()`, `_attachCheckboxHandlers()`, `_toggleCheckbox()`, `_updateCheckboxCount()`. ~60 lines added.
+**Status: NOT STARTED** — `notes.js` has no checkbox parsing or toggling.
 
 ### 7.4 Slash Command Enhancements
 | Item | Target | Ported From |
@@ -493,7 +509,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Plugin-contributed slash commands | `pluginHost.js` | — |
 | Fuzzy search in slash menu | `notes.js` | — |
 
-**Status: COMPLETE** — Added `/date`, `/time`, `/template`, `/code` (inline), `/math`, `/diagram`, `/heading1-3` to slash menu. `_showTemplatePicker()` for template submenu. ~40 lines added.
+**Status: PARTIAL** — the slash menu offers formatting blocks (paragraph, h1-h3, lists, quote, code, table, rule); `/date`, `/time`, `/template`, `/math`, `/diagram`, fuzzy search, and plugin commands are not implemented.
 
 ### 7.5 Note Templates
 | Item | Target | Ported From |
@@ -515,7 +531,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Lazy rendering: only render visible pages | `pdf.js` | — |
 | Toggle between page-by-page and continuous | `pdf.js` | — |
 
-**Status: COMPLETE** — `toggleContinuousMode()`, `_enterContinuousMode()`, `_exitContinuousMode()` with IntersectionObserver lazy rendering (viewport + 400px margin). Mode persisted in localStorage. Toggle button in toolbar. ~140 lines in pdf.js.
+**Status: NOT STARTED** — `pdf.js` renders a single page at a time; there is no continuous mode.
 
 ### 8.2 Per-Page Bookmarks
 | Item | Target | Ported From |
@@ -524,7 +540,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Bookmarks panel in PDF sidebar | `pdf.js` | — |
 | Jump to bookmark | `pdf.js` | — |
 
-**Status: COMPLETE** — `addBookmark()`, `removeBookmark()`, `_renderBookmarksPanel()` with sidebar tabs (Pages/Bookmarks). Bridge.js `addPdfBookmark`, `getPdfBookmarks`, `deletePdfBookmark` methods. ~100 lines in pdf.js, ~40 lines in bridge.js.
+**Status: PARTIAL** — the storage layer exists (`bridge.js` `addPdfBookmark` and the `pdfBookmarks` store), but `pdf.js` has no bookmark UI.
 
 ### 8.3 Annotation Text Notes
 | Item | Target | Ported From |
@@ -533,7 +549,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Persist annotation text to IndexedDB | `bridge.js` | — |
 | Show annotation text on hover | `pdf.js` | — |
 
-**Status: COMPLETE** — Click annotation opens text overlay with textarea + Save/Cancel/Delete buttons. Text persisted via `DB.saveAnnotationText()`/`DB.getAnnotationText()`. Tooltip shows text on hover. Editable on click. ~80 lines in pdf.js.
+**Status: NOT STARTED** — annotations are stored and rendered, but there is no attached-note editing UI.
 
 ### 8.4 PDF-to-Note Pipeline
 | Item | Target | Ported From |
@@ -542,7 +558,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Bulk export all annotations to a single note | `pdf.js` | — |
 | Page screenshot → attach to note | `pdf.js` | canvas2image |
 
-**Status: COMPLETE** — `exportAllAnnotationsToSingleNote()` creates a single note with title "Annotations: [filename]", content organized by page (## Page N\n- annotation text), and page screenshot as base64 image. ~60 lines in pdf.js.
+**Status: PARTIAL** — `src/views/pdfRoute.js` can export annotations to notes; the bulk single-note pipeline described here is not implemented.
 
 ---
 
@@ -574,7 +590,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | In-place translation (replace or side-by-side) | `notes.js` | — |
 | Auto-detect source language | `src/features/translator.js` | — |
 
-> **Status: DONE** � `src/features/translator.js` imported in `src/index.js`, exposed as `OpenCourseDeck.TranslatorRegistry`. `src/features/translationCache.js` imported and exposed as `OpenCourseDeck.TranslationCache`. `notes.js` has "Translate to..." in context menu. `player.js` subtitle translation wired. Locale framework registered (`en-US`, `fa-IR`) via `src/core/locale.js`.
+> **Status: PARTIAL** — the translator registry and cache ARE wired into `src/index.js` and exposed as `OpenCourseDeck.TranslatorRegistry` / `TranslationCache`, and locales are registered via `src/core/locale.js`; but `notes.js` has no "Translate to..." action and `player.js` has no subtitle translation.
 
 
 
@@ -584,7 +600,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Translate VTT captions during playback | `player.js` | — |
 | Dual subtitles (original + translated) | `player.js` | — |
 
-**Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `player.js` enhanced with translate button, dual subtitle mode. ~90 lines added.
+**Status: NOT STARTED** — `player.js` has no translate control and no dual-subtitle mode.
 
 ### 9.5 Locale Framework
 | Item | Target | Ported From |
@@ -619,7 +635,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Backup to JSON file with version header | `bridge.js` | — |
 | Auto-backup reminder (if no backup in 7 days) | `src/features/backupReminder.js` | — |
 
-**Status: COMPLETE** — `renderBackupRestore()` with category checkboxes, conflict resolution select, export/import buttons, progress bar, auto-backup reminder (7-day check). ~150 lines in settingsRoute.js. `exportBackup()` and `importBackup()` methods in bridge.js. ~120 lines.
+**Status: PARTIAL** — `bridge.js` implements `exportBackup(categories)`/`importBackup(mode)`, but Settings only exposes plain export/import buttons: no category selection, conflict resolution, progress bar, or reminder.
 
 ### 10.3 Smart Playlists
 | Item | Target | Ported From |
@@ -628,7 +644,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | "Continue Watching" auto-playlist | `src/views/homeRoute.js` | — |
 | Custom smart playlist rules | `bridge.js` (settings store) | — |
 
-**Status: COMPLETE** — `getSmartPlaylist()` function with 4 types: continue-watching, recently-played, most-played, never-played. Smart playlist cards with "Auto" badge. ~100 lines.
+**Status: NOT STARTED** — no smart-playlist or continue-watching query exists.
 
 ### 10.4 Data Migration Versioning
 | Item | Target | Ported From |
@@ -637,7 +653,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Rollback capability | `bridge.js` | — |
 | Migration status UI in Help route | `src/views/helpRoute.js` | — |
 
-**Status: COMPLETE** — `getSchemaVersion()`, `setSchemaVersion()`, `getAppliedMigrations()`, `recordMigration()`, `runMigrations()` in bridge.js. Migration status UI in helpRoute.js. ~80 lines.
+**Status: PARTIAL** — migration is versioned and per-section in `bridge.js` (with a deterministic id ledger), but there is no migration-status UI in Help.
 
 ---
 
@@ -741,7 +757,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Placeholder with blur-up effect | `app.js` | — |
 | WebP detection and fallback | `app.js` | — |
 
-**Status: COMPLETE** — `_checkWebP()`, `_getOptimalSrc()`, `_applyBlurUp()`, `_removeBlurUp()` with async WebP detection and blur-up transitions. ~80 lines added.
+**Status: PARTIAL** — `app.js` lazy-loads images via a validated `safeImageUrl` path; WebP detection and blur-up placeholders are not implemented.
 
 ### 13.4 Web Worker Offloading
 | Item | Target | Ported From |
@@ -760,7 +776,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Cache invalidation on data mutation | `data.js` | — |
 | Prefetch next/prev catalog pages | `data.js` | — |
 
-**Status: COMPLETE** — LRU eviction, `_hits`/`_misses` stats, glob pattern invalidation, `prefetch()`, `getCacheStats()`. ~50 lines enhanced.
+**Status: PARTIAL** — `data.js` `RequestCache` now has TTL plus an LRU size bound and stale-while-revalidate; hit/miss statistics and `prefetch()` are not implemented.
 
 ---
 
@@ -773,7 +789,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Message-passing API (postMessage) | `pluginHost.js` | — |
 | Permission enforcement at sandbox boundary | `pluginHost.js` | — |
 
-**Status: COMPLETE** — `SandboxedPlugin` class with Worker-based sandbox, message protocol `{type, id, method, args, result, error}`, permission enforcement, 5s timeout, error isolation. ~180 lines in pluginHost.js.
+**Status: NOT STARTED** — `src/features/pluginHost.js` validates manifests only; there is no Worker sandbox and the module is not loaded into the runtime.
 
 ### 14.2 Plugin Lifecycle Hooks
 | Item | Target | Ported From |
@@ -782,7 +798,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | State persistence across sessions | `pluginHost.js` | — |
 | Error boundary per plugin | `pluginHost.js` | — |
 
-**Status: COMPLETE** — Lifecycle state machine (installed→activated→deactivated→uninstalled), `saveState()`/`loadState()` via IndexedDB, try/catch error boundary with Toast reporting. ~80 lines in pluginHost.js.
+**Status: NOT STARTED** — no lifecycle state machine exists.
 
 ### 14.3 Plugin Marketplace UI
 | Item | Target | Ported From |
@@ -791,7 +807,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Install/uninstall/update from UI | `src/views/settingsRoute.js` | — |
 | Plugin ratings and descriptions | `src/views/settingsRoute.js` | — |
 
-**Status: COMPLETE** — `renderPluginSettings()` with plugin cards (name, description, version, author, permissions, extensions), Install/Uninstall/Enable/Disable buttons, search filter, sort by name/install date/version. ~200 lines in settingsRoute.js.
+**Status: NOT STARTED** — Settings contains no plugin UI.
 
 ### 14.4 Plugin API Surface
 | Item | Target | Ported From |
@@ -801,7 +817,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | `OpenCourseDeck.plugin.registerCanvasTool(tool)` — add canvas tools | `pluginHost.js` | — |
 | `OpenCourseDeck.plugin.registerNoteAction(action)` — add note actions | `pluginHost.js` | — |
 
-**Status: COMPLETE** — `registerUI()`, `registerRoute()`, `registerCanvasTool()`, `registerNoteAction()`, `registerCommand()`, `registerDashboardWidget()` exposed as `OpenCourseDeck.plugin.*` namespace. Full API docs object at `OpenCourseDeck.plugin.API` with signatures, params, examples. ~120 lines in pluginHost.js.
+**Status: NOT STARTED** — no `OpenCourseDeck.plugin.*` registration API exists.
 
 ---
 

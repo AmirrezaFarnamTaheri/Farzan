@@ -1,5 +1,18 @@
 # PlasmaDeck / Farzan Unified Audit and Remediation Plan
 
+> **ARCHIVED — superseded snapshot (do not treat as current state).**
+>
+> This document is a point-in-time audit that predates the current tree. Most
+> of its P0 findings have since been fixed; spot-checks confirm, among others:
+> pdfjs-dist is 4.10.38 (not the vulnerable 3.11.x it cites), the CSP
+> preload/onload conflict is gone (stylesheets are plain blocking links), the
+> monolithic `style.css` is now a one-line shim over 17 split files under
+> `src/styles/`, `/__debug` is opt-in gated with a size cap, `src/index.js`
+> lazy-loads features, and the bundle is `dist/opencoursedeck.js`.
+>
+> Verify any claim here against the source tree before acting on it. For the
+> current, code-verified status of planned work see `far/ROADMAP.md`.
+
 Generated: 2026-04-29
 Updated: 2026-05-14 (Comprehensive Survey Update)
 

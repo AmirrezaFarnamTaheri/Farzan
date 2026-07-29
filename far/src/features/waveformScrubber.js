@@ -4,12 +4,23 @@
  * DPR-aware, theme-aware, cached per video ID in IndexedDB.
  */
 
-const CACHE_DB = 'opencoursedeck';
+// Dedicated database (like mediaStorage's 'opencoursedeck-media'):
+// opening the main 'opencoursedeck' DB here with a different schema could
+// win the creation race on a fresh profile and leave the app without its
+// stores, and on normal profiles the missing 'waveforms' store made every
+// cache call throw.
+const CACHE_DB = 'opencoursedeck-waveforms';
 const CACHE_STORE = 'waveforms';
+
+/**
+ * Ceiling on the media file size this module will download and decode to
+ * build a waveform. See the fetch in render() for why the cost is high.
+ */
+const MAX_WAVEFORM_SOURCE_BYTES = 60 * 1024 * 1024;
 
 function openCacheDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(CACHE_DB, 3);
+    const req = indexedDB.open(CACHE_DB, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(CACHE_STORE)) {
@@ -25,10 +36,14 @@ async function getCachedWaveform(id) {
   try {
     const db = await openCacheDB();
     return new Promise((resolve) => {
-      const tx = db.transaction(CACHE_STORE, 'readonly');
-      const req = tx.objectStore(CACHE_STORE).get(id);
-      req.onsuccess = () => resolve(req.result?.data ?? null);
-      req.onerror = () => resolve(null);
+      try {
+        const tx = db.transaction(CACHE_STORE, 'readonly');
+        const req = tx.objectStore(CACHE_STORE).get(id);
+        req.onsuccess = () => resolve(req.result?.data ?? null);
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
     });
   } catch {
     return null;
@@ -38,11 +53,15 @@ async function getCachedWaveform(id) {
 async function setCachedWaveform(id, data) {
   try {
     const db = await openCacheDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(CACHE_STORE, 'readwrite');
-      const req = tx.objectStore(CACHE_STORE).put({ id, data });
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(CACHE_STORE, 'readwrite');
+        const req = tx.objectStore(CACHE_STORE).put({ id, data });
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   } catch {
     // Cache is optional
@@ -136,8 +155,18 @@ export class WaveformScrubber {
 
     if (!bars) {
       try {
+        // Building a waveform requires the WHOLE media file: this is a second,
+        // complete download on top of the streaming <audio>/<video> element,
+        // followed by a full in-memory PCM decode. Refuse anything above the
+        // size ceiling rather than pulling a multi-hundred-MB lecture video
+        // twice and decoding it. Content-Length is checked first so an
+        // oversized file is rejected before the body is buffered.
         const resp = await fetch(audioUrl);
+        if (!resp.ok) return;
+        const declaredLength = Number(resp.headers?.get?.('content-length'));
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_WAVEFORM_SOURCE_BYTES) return;
         const buffer = await resp.arrayBuffer();
+        if (buffer.byteLength > MAX_WAVEFORM_SOURCE_BYTES) return;
         const audioCtx = this._getAudioContext();
         bars = await decodeToBars(audioCtx, buffer, barCount);
         this._cache.set(cacheId, bars);

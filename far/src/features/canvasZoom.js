@@ -213,8 +213,15 @@ export class CanvasZoom {
   zoomTo(scale, center = null, options = {}) {
     const newScale = this._clampScale(Number(scale) || 1);
     const duration = Number(options.duration) || 300;
-    const cx = center?.x ?? this.canvas.width / 2;
-    const cy = center?.y ?? this.canvas.height / 2;
+    // CSS pixels, not the device-pixel backing store: every other transform
+    // path here (wheel, pinch) works from getBoundingClientRect(), so using
+    // canvas.width/height anchored the default zoom at 2x the visual centre
+    // on a devicePixelRatio-2 display.
+    const rect = this.canvas.getBoundingClientRect?.();
+    const cssWidth = rect?.width || this.canvas.clientWidth || this.canvas.width;
+    const cssHeight = rect?.height || this.canvas.clientHeight || this.canvas.height;
+    const cx = center?.x ?? cssWidth / 2;
+    const cy = center?.y ?? cssHeight / 2;
 
     if (duration <= 0) {
       const ratio = newScale / this._scale;

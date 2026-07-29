@@ -57,4 +57,29 @@ describe('DataBind safe DOM binding', () => {
     expect(target.style.backgroundImage).toBe('');
     expect(window.__bindStyleXss).toBeUndefined();
   });
+  it('does not assign HTML-injection sink properties like outerHTML/srcdoc', () => {
+    // The old `attr in el` catch-all accepted any DOM property, so an
+    // app-chosen attr could reach outerHTML/srcdoc even though the
+    // 'innerHTML' attr itself was downgraded to textContent.
+    const store = new window.OpenCourseDeck.Data.Store({
+      state: { markup: '<img src=x onerror="window.__bindSinkXss = true">' },
+    });
+
+    window.OpenCourseDeck.Data.DataBind.bind(store, 'markup', '#target', 'outerHTML');
+
+    const target = document.getElementById('target');
+    expect(target).toBeTruthy();
+    expect(target.querySelector('img')).toBeNull();
+    expect(target.textContent).toContain('<img');
+    expect(window.__bindSinkXss).toBeUndefined();
+  });
+
+  it('still assigns allowlisted properties directly', () => {
+    document.body.innerHTML = '<input id="target" />';
+    const store = new window.OpenCourseDeck.Data.Store({ state: { name: 'Ada' } });
+
+    window.OpenCourseDeck.Data.DataBind.bind(store, 'name', '#target', 'value');
+
+    expect(document.getElementById('target').value).toBe('Ada');
+  });
 });

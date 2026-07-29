@@ -13,6 +13,9 @@
     "build:watch": "node scripts/build.cjs --watch",
     "build:sw": "node scripts/clean-workbox.cjs && node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
     "build:release": "npm run build && node scripts/build-sw-dist.cjs",
+    "release:manifest": "node scripts/create-release-manifest.cjs",
+    "release:verify": "node scripts/verify-release-manifest.cjs",
+    "release:attest": "npm run release:manifest && npm run release:verify",
     "desktop": "npm run build && node desktop/launch.cjs",
     "desktop:app-window": "npm run build && node desktop/app-window.cjs",
     "desktop:package": "npm run build && node desktop/package-portable.cjs",
@@ -26,13 +29,13 @@
     "check:generated": "node scripts/check-generated.cjs",
     "check:encoding": "node scripts/check-encoding.cjs",
     "dev": "npm run build:watch",
-    "lint": "node node_modules/eslint/bin/eslint.js src scripts tests app.js bridge.js db.js data.js notes.js player.js pdf.js progress.js canvas.js ui.js boot.js eslint.config.js vitest.config.js",
-    "test": "node node_modules/vitest/vitest.mjs run --passWithNoTests --configLoader runner --pool vmThreads",
+    "lint": "node node_modules/eslint/bin/eslint.js src scripts tests desktop app.js bridge.js db.js data.js notes.js player.js pdf.js progress.js canvas.js ui.js boot.js eslint.config.js vitest.config.js",
+    "test": "node node_modules/vitest/vitest.mjs run --configLoader runner --pool vmThreads",
     "audit": "node scripts/audit.cjs",
     "report:bundle": "node scripts/bundle-report.cjs",
     "smoke": "node scripts/smoke-test.cjs",
     "smoke:browser": "node scripts/browser-smoke.cjs",
-    "ci": "npm run check:encoding && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser",
+    "ci": "npm run check:encoding && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser",
     "offline": "npm ci --offline"
   },
   "dependencies": {
@@ -41,9 +44,8 @@
     "@fontsource/playfair-display": "^5.2.8",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "chart.js": "^4.5.1",
-    "dompurify": "^3.4.0",
+    "dompurify": "^3.4.12",
     "fuse.js": "7.0.0",
-    "marked": "9.1.6",
     "pdfjs-dist": "4.10.38"
   },
   "devDependencies": {

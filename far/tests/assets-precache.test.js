@@ -111,21 +111,28 @@ describe('static assets and service worker precache', () => {
 
     for (const feature of ['player', 'notes', 'pdf', 'canvas', 'progress']) {
       expect(entry).not.toContain(`import '../${feature}.js';`);
-      expect(entry).toContain(`${feature}: () => import('../${feature}.js')`);
+      expect(entry).toContain(`import('../${feature}.js')`);
     }
+    expect(entry).not.toContain("import './features/mediaStorage.js';");
+    expect(entry).toContain("await import('./features/mediaStorage.js')");
+    expect(entry.indexOf("await import('./features/mediaStorage.js')"))
+      .toBeLessThan(entry.indexOf("return import('../player.js')"));
     expect(entry).toContain('pd.loadFeature');
     expect(entry).toContain('pd.loadFeatures');
     expect(entry).toContain("import('../app.js')");
   });
 
-  it('initializes the command palette after the app shell import resolves', () => {
+  it('lazy-loads and initializes the command palette after the app shell resolves', () => {
     const entry = fs.readFileSync(path.join(root, 'src/index.js'), 'utf8');
     const appImport = entry.indexOf("import('../app.js')");
+    const commandImport = entry.indexOf("import('./features/commandPalette.js')");
     const commandInit = entry.indexOf('initCommandPalette()');
 
     expect(appImport).toBeGreaterThan(-1);
-    expect(commandInit).toBeGreaterThan(appImport);
-    expect(entry).toContain('.then(() =>');
+    expect(commandImport).toBeGreaterThan(appImport);
+    expect(commandInit).toBeGreaterThan(commandImport);
+    expect(entry).not.toContain("import { initCommandPalette } from './features/commandPalette.js';");
+    expect(entry).toContain('.then(async () =>');
   });
 
   it('documents service worker update behavior and offline-friendly catalog caching', () => {

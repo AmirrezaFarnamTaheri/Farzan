@@ -51,6 +51,8 @@ export class Timeline {
     this._reverseStartPosition = 0;
     this._onUpdateCallbacks = [];
     this._firedCalls = new Set();
+    this._started = false;
+    this._finished = false;
   }
 
   /**
@@ -128,9 +130,23 @@ export class Timeline {
     if (this._playing) return this;
     this._playing = true;
     this._paused = false;
-    this._direction = 1;
     this._startTime = 0;
-    this._firedCalls.clear();
+    // _started distinguishes a fresh start / replay-after-completion from a
+    // resume. Inferring it from _currentTime would be ambiguous when the
+    // timeline is paused at exactly t=0. A resume must NOT clear
+    // _firedCalls, or every call()/set() entry before the pause point would
+    // fire a second time (duplicate DOM inserts, double toasts).
+    if (!this._started || this._finished) {
+      this._started = true;
+      this._finished = false;
+      this._direction = 1;
+      this._currentTime = 0;
+      this._firedCalls.clear();
+    } else if (this._direction < 0) {
+      // Resuming a paused reverse playback: re-anchor the reverse
+      // origin at the pause position.
+      this._reverseStartPosition = this._currentTime;
+    }
     this._rafId = requestAnimationFrame((ts) => this._tick(ts));
     return this;
   }
@@ -155,6 +171,9 @@ export class Timeline {
   cancel() {
     this._paused = true;
     this._playing = false;
+    // A cancelled timeline restarts from the top on the next play().
+    this._started = false;
+    this._finished = false;
     if (this._rafId) {
       cancelAnimationFrame(this._rafId);
       this._rafId = 0;
@@ -168,6 +187,11 @@ export class Timeline {
    */
   seek(time) {
     this._currentTime = Math.max(0, Math.min(this._duration, time));
+    // Seeking establishes an explicit playhead, so a following play()
+    // resumes from it rather than rewinding to 0.
+    this._started = true;
+    this._finished = false;
+    this._startTime = 0;
     this._applyState(this._currentTime);
     return this;
   }
@@ -209,6 +233,9 @@ export class Timeline {
         this._applyState(this._duration);
         this._paused = true;
         this._playing = false;
+        // Mark complete so the next play() restarts (re-arming call/set
+        // entries) rather than resuming a finished timeline.
+        this._finished = true;
         for (const cb of this._onUpdateCallbacks) cb(this._duration);
         return;
       }
@@ -226,6 +253,7 @@ export class Timeline {
         this._paused = true;
         this._playing = false;
         this._currentTime = 0;
+        this._finished = true;
         for (const cb of this._onUpdateCallbacks) cb(0);
         return;
       }

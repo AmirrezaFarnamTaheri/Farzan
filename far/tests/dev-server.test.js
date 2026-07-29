@@ -109,4 +109,23 @@ describe('dev server range handling', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toBeNull();
   });
+
+  it('answers 400 for malformed percent-encoding instead of crashing', async () => {
+    const res = await request(`${baseUrl}/%`);
+
+    expect(res.status).toBe(400);
+
+    // The server must still be alive for subsequent requests.
+    const followUp = await request(`${baseUrl}/sample.txt`);
+    expect(followUp.status).toBe(200);
+  });
+
+  it('serves .mjs modules with a JavaScript MIME type so nosniff does not block them', async () => {
+    fs.writeFileSync(path.join(root, 'module.mjs'), 'export const ok = true;', 'utf8');
+
+    const res = await request(`${baseUrl}/module.mjs`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/javascript; charset=utf-8');
+  });
 });

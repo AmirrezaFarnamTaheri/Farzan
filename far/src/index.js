@@ -3,14 +3,17 @@ import './core/storageMigrate.js';
 
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
 import { initEndpointApprovalGuard } from './core/endpointApprovalGuard.js';
+import { createOperationContext } from './core/operationContext.js';
 import '../data.js';
 import '../db.js';
 import '../ui.js';
 import '../bridge.js';
 import { installStorageSafety } from './core/storageSafety.js';
+import { installAuxiliaryDbLifecycle } from './core/auxiliaryDbLifecycle.js';
 import { installDataHardening } from './core/dataHardening.js';
+import { installStoreHardening } from './core/storeHardening.js';
+import { installAIAuthority } from './core/aiAuthority.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
-import { initCommandPalette } from './features/commandPalette.js';
 
 import * as easing from './lib/easing.js';
 import { HElement, h } from './lib/hElement.js';
@@ -35,8 +38,11 @@ import { CanvasZoom } from './features/canvasZoom.js';
 import { CourseGraph } from './features/courseGraph.js';
 import { KnowledgeGraph } from './features/knowledgeGraph.js';
 
+installAuxiliaryDbLifecycle(window);
 installStorageSafety(window);
 installDataHardening(window);
+installStoreHardening(window);
+installAIAuthority(window);
 initEndpointApprovalGuard(document);
 
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
@@ -44,6 +50,7 @@ const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 pd.easing = easing;
 pd.HElement = HElement;
 pd.h = h;
+pd.AuxiliaryDbLifecycle = window.OpenCourseDeck.AuxiliaryDbLifecycle;
 pd.RAFLoop = RAFLoop;
 pd.RequestQueue = RequestQueue;
 pd.stagger = stagger;
@@ -57,9 +64,9 @@ locale.locale('en-US', enUS);
 locale.locale('fa-IR', faIR);
 pd.TranslatorRegistry = TranslatorRegistry;
 pd.BaseTranslator = BaseTranslator;
-pd.GoogleTranslator = GoogleTranslator;
 pd.OpenAITranslator = OpenAITranslator;
 pd.CustomAPITranslator = CustomAPITranslator;
+pd.GoogleTranslator = GoogleTranslator;
 pd.LANGUAGES = LANGUAGES;
 pd.getLanguageName = getLanguageName;
 pd.TranslationCache = translationCache;
@@ -74,159 +81,90 @@ pd.workers = {
 };
 
 const featureLoaders = {
-  player: () => import('../player.js'),
+  player: async () => {
+    await import('./features/mediaStorage.js');
+    return import('../player.js');
+  },
   notes: () => import('../notes.js'),
   pdf: () => import('../pdf.js'),
   canvas: () => import('../canvas.js'),
   progress: () => import('../progress.js'),
 };
-const featurePromises = new Map();
+const featureEntries = new Map();
+const featureGenerations = new Map();
 
-pd.loadFeature = (name) => {
-  const loader = featureLoaders[name];
-  if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
-  if (!featurePromises.has(name)) featurePromises.set(name, loader());
-  return featurePromises.get(name);
+function abortError(reason = 'Feature load aborted') {
+  if (typeof DOMException === 'function') return new DOMException(reason, 'AbortError');
+  const error = new Error(reason);
+  error.name = 'AbortError';
+  return error;
+}
+
+function currentFeatureGeneration(name) {
+  return featureGenerations.get(name) || 0;
+}
+
+pd.invalidateFeature = (name) => {
+  const nextGeneration = currentFeatureGeneration(name) + 1;
+  featureGenerations.set(name, nextGeneration);
+  const existing = featureEntries.get(name);
+  existing?.context?.invalidate?.();
+  featureEntries.delete(name);
+  return nextGeneration;
 };
 
-pd.loadFeatures = (names = []) => Promise.all(names.map((name) => pd.loadFeature(name)));
+pd.loadFeature = (name, { signal = null, force = false } = {}) => {
+  const loader = featureLoaders[name];
+  if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
+  if (force) pd.invalidateFeature(name);
 
-(() => {
-  try {
-    const theme = localStorage.getItem('plasma_theme') || 'dark';
-    const accent = localStorage.getItem('plasma_accent') || 'plasma';
-    const dir = localStorage.getItem('plasma_dir') || 'ltr';
-    const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
-    root.setAttribute('data-accent', accent);
-    root.setAttribute('dir', dir);
-    root.style.setProperty('--font-scale', localStorage.getItem('plasma_font_scale') || '1');
-    if (localStorage.getItem('plasma_sidebar_collapsed') === 'true') root.classList.add('sidebar-collapsed');
-    root.setAttribute('data-density', localStorage.getItem('plasma_density') || 'comfortable');
-  } catch {
-    // Storage can be unavailable in hardened or embedded browsers.
+  let entry = featureEntries.get(name);
+  if (!entry) {
+    const generation = currentFeatureGeneration(name);
+    const context = createOperationContext({ resource: `feature:${name}`, generation });
+    entry = { generation, context, promise: null };
+    entry.promise = Promise.resolve()
+      .then(loader)
+      .then((module) => {
+        if (!context.isCurrent() || currentFeatureGeneration(name) !== generation) {
+          const error = new Error(`Feature "${name}" load became stale`);
+          error.code = 'STALE_FEATURE_LOAD';
+          throw error;
+        }
+        return module;
+      })
+      .catch((error) => {
+        if (featureEntries.get(name) === entry) featureEntries.delete(name);
+        throw error;
+      });
+    featureEntries.set(name, entry);
   }
-})();
+
+  if (!signal) return entry.promise;
+  if (signal.aborted) return Promise.reject(abortError(signal.reason?.message || 'Feature load aborted'));
+  return Promise.race([
+    entry.promise,
+    new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(abortError(signal.reason?.message || 'Feature load aborted')), { once: true });
+    }),
+  ]);
+};
+pd.loadFeatures = (names = [], options = {}) => Promise.all(names.map(name => pd.loadFeature(name, options)));
+
+try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 
 initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
 pd.ProductReadiness = enforceProductReadiness(document);
 
-try { performance.mark?.('pd:bundle:evaluated'); } catch {}
-
-const isLocalHost = (() => {
-  try {
-    return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
-  } catch {
-    return false;
-  }
-})();
-
-const debugEnabled = (() => {
-  try {
-    return isLocalHost && new URLSearchParams(location.search).get('debug') === '1';
-  } catch {
-    return false;
-  }
-})();
-
-window.__pdDebug = (payload) => {
-  if (!debugEnabled) return;
-  try { navigator.sendBeacon?.('/__debug?debug=1', JSON.stringify(payload)); } catch {}
-};
-
-window.__pdMark = (name) => {
-  try { performance.mark?.(name); } catch {}
-};
-
-window.__pdMeasure = (name, start, end) => {
-  try {
-    performance.measure?.(name, start, end);
-    const entry = performance.getEntriesByName?.(name)?.at?.(-1);
-    window.__pdDebug?.({
-      location: 'performance',
-      message: 'timing',
-      data: { name, duration: entry?.duration ?? null },
-      timestamp: Date.now(),
-    });
-  } catch {}
-};
-
-window.addEventListener('error', (event) => {
-  window.__pdDebug?.({
-    location: 'window:error',
-    message: 'Unhandled error',
-    data: {
-      msg: String(event?.message || ''),
-      file: String(event?.filename || ''),
-      line: event?.lineno,
-      col: event?.colno,
-    },
-    timestamp: Date.now(),
-  });
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  window.__pdDebug?.({
-    location: 'window:unhandledrejection',
-    message: 'Unhandled rejection',
-    data: { reason: String(event?.reason || '') },
-    timestamp: Date.now(),
-  });
-});
-
-if ('serviceWorker' in navigator) {
-  if (isLocalHost) {
-    try {
-      const key = 'pd_dev_sw_disabled_once';
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, '1');
-        navigator.serviceWorker.getRegistrations()
-          .then((registrations) => Promise.allSettled(registrations.map((registration) => registration.unregister())))
-          .then(() => location.reload())
-          .catch(() => {});
-      }
-    } catch {}
-  }
-
-  window.addEventListener('load', () => {
-    if (isLocalHost) return;
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then((registration) => {
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration } }));
-            }
-          });
-        });
-      })
-      .catch((error) => {
-        window.__pdDebug?.({
-          location: 'service-worker',
-          message: 'Registration failed',
-          data: { reason: String(error?.message || error || '') },
-          timestamp: Date.now(),
-        });
-      });
-  });
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!window.__plasmaSwUpdateAccepted || window.__plasmaSwReloading) return;
-    window.__plasmaSwReloading = true;
-    location.reload();
-  });
-}
-
 import('../app.js')
-  .then(() => {
-    try { initCommandPalette(); } catch (error) {
+  .then(async () => {
+    try {
+      const { initCommandPalette } = await import('./features/commandPalette.js');
+      initCommandPalette();
+    } catch (error) {
       console.warn('[OpenCourseDeck] initCommandPalette failed', error);
     }
   })
-  .catch((error) => {
-    console.error('[OpenCourseDeck] app shell failed to load', error);
-  });
+  .catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));

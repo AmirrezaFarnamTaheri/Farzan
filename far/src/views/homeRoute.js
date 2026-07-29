@@ -389,6 +389,13 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
         Router.navigate('#/courses');
         return;
       }
+      // A fresh user with no progress/timestamps gets action:'courses' with
+      // no topicId (widget copy says "Start with the course catalog") --
+      // without this branch they fell through to '#/notes' instead.
+      if (widget.action === 'courses') {
+        Router.navigate('#/courses');
+        return;
+      }
       Router.navigate(widget.action === 'achievements' ? '#/achievements' : '#/notes');
     });
     widgetsRoot.appendChild(card);

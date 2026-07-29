@@ -15,8 +15,6 @@ module.exports = {
     'manifest.json',
     'style.css',
     'src/styles/**',
-    'src/core/storageSafety.js',
-    'src/features/aiClient.js',
     'opencoursedeck.js',
     'chunks/**',
     'assets/**',

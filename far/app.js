@@ -1,5 +1,5 @@
 // ============================================================
-// OpenCourseDeck UI â€” app.js
+// OpenCourseDeck UI — app.js
 // Complete JavaScript Interaction Layer
 // Version 1.1.2 (keep aligned with package.json)
 // ============================================================
@@ -39,9 +39,9 @@ import { Pointer } from './src/lib/pointer.js';
 (() => {
   'use strict';
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 0. NAMESPACE & GLOBAL STATE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // IMPORTANT: merge into any existing window.OpenCourseDeck so earlier modules
   // (e.g. data.js, db.js) are not clobbered.
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
@@ -104,9 +104,9 @@ import { Pointer } from './src/lib/pointer.js';
   window.OpenCourseDeck = OpenCourseDeck;
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 1. UTILITIES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   /**
    * Create element with optional attributes and children
@@ -510,8 +510,16 @@ import { Pointer } from './src/lib/pointer.js';
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    // See progress.js _downloadBlob: the anchor must be in the document and
+    // the object URL must outlive the download fetch, or Firefox/Safari
+    // silently produce no file.
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
   }
 
   function downloadDataUrl(dataUrl, filename) {
@@ -526,10 +534,20 @@ import { Pointer } from './src/lib/pointer.js';
   function printStudioBoardPdf({ title = 'OpenCourseDeck Studio board', svg = '', png = '' } = {}) {
     const media = svg || (png ? `<img src="${String(png).replace(/"/g, '&quot;')}" alt="Studio board" />` : '');
     if (!media) return false;
-    const win = window.open?.('', '_blank', 'noopener,noreferrer');
-    if (!win?.document) return false;
-    win.document.open();
-    win.document.write([
+    // window.open with the `noopener` feature returns null per spec, so a
+    // popup shell cannot be written to. Print through a hidden same-origin
+    // iframe instead (same approach as the PDF viewer's print path).
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    if (!doc) {
+      frame.remove();
+      return false;
+    }
+    doc.open();
+    doc.write([
       '<!doctype html><html><head><meta charset="utf-8">',
       `<title>${String(title).replace(/[<>&"]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch])}</title>`,
       '<style>html,body{margin:0;background:#fff;color:#111;font:14px system-ui,sans-serif}main{padding:24px}svg,img{display:block;max-width:100%;height:auto;border:1px solid #ddd}@media print{main{padding:0}svg,img{border:0}}</style>',
@@ -537,9 +555,18 @@ import { Pointer } from './src/lib/pointer.js';
       media,
       '</main></body></html>',
     ].join(''));
-    win.document.close();
-    try { win.focus?.(); } catch {}
-    try { win.print?.(); } catch {}
+    doc.close();
+    const win = frame.contentWindow;
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      frame.remove();
+    };
+    win?.addEventListener?.('afterprint', () => setTimeout(cleanup, 100), { once: true });
+    setTimeout(cleanup, 60_000);
+    try { win?.focus?.(); } catch {}
+    try { win?.print?.(); } catch {}
     return true;
   }
 
@@ -552,30 +579,79 @@ import { Pointer } from './src/lib/pointer.js';
     }
   }
 
-  function fallbackSanitizeHtml(html) {
-    const template = document.createElement('template');
-    // Intentional parser boundary: route templates are sanitized before insertion.
-    template.innerHTML = String(html ?? '');
-    const forbiddenSelector = 'script, style, meta, link, iframe, object, embed, form, template';
-    template.content.querySelectorAll(forbiddenSelector).forEach(node => node.remove());
-    template.content.querySelectorAll('*').forEach(node => {
+  const SANITIZE_FORBIDDEN_TAGS = 'script, style, meta, link, base, iframe, object, embed, form, template, noscript';
+
+  /**
+   * Attributes that are dropped outright: they either execute script, load a
+   * document, or beacon to a third party, and no value of theirs is needed by
+   * any markup this fallback is asked to render.
+   */
+  const SANITIZE_DROP_ATTRS = new Set(['srcdoc', 'ping', 'srcset', 'sizes', 'http-equiv']);
+
+  /**
+   * Scrub one parsed fragment in place. Split out from fallbackSanitizeHtml so
+   * the mutation-XSS re-parse check below can run the identical pass twice.
+   * @param {DocumentFragment} fragment
+   */
+  function scrubFragment(fragment) {
+    fragment.querySelectorAll(SANITIZE_FORBIDDEN_TAGS).forEach(node => node.remove());
+    fragment.querySelectorAll('*').forEach(node => {
+      const tag = node.tagName.toLowerCase();
       [...node.attributes].forEach(attr => {
         const name = attr.name.toLowerCase();
         const value = attr.value;
-        if (name.startsWith('on') || name === 'srcdoc') {
+        // Event handlers, and the attributes above, are never salvageable.
+        if (name.startsWith('on') || SANITIZE_DROP_ATTRS.has(name)) {
           node.removeAttribute(attr.name);
           return;
         }
-        if (['href', 'action'].includes(name) && !safeNavigationUrl(value)) {
+        // `formaction` overrides a form's target and is a navigation sink in
+        // its own right; `xlink:href` is the SVG navigation sink that the
+        // plain `href` check misses entirely.
+        if (['href', 'action', 'formaction'].includes(name) && !safeNavigationUrl(value)) {
           node.removeAttribute(attr.name);
           return;
         }
-        if (['src', 'poster'].includes(name) && !safeMediaUrl(value)) {
+        if (name === 'xlink:href') {
+          // Same-document references only. An external xlink:href on <use>
+          // pulls in a foreign document fragment.
+          if (!String(value).trim().startsWith('#')) node.removeAttribute(attr.name);
+          return;
+        }
+        // Images and posters legitimately carry `data:image/` payloads -- that
+        // is how a pasted screenshot survives a round trip. Routing them
+        // through safeMediaUrl (which allows only video/audio/pdf data URIs)
+        // silently deleted every inline image.
+        if (name === 'background' || name === 'poster' || (name === 'src' && (tag === 'img' || tag === 'image'))) {
+          if (!safeImageUrl(value)) node.removeAttribute(attr.name);
+          return;
+        }
+        if (name === 'src' && !safeMediaUrl(value)) {
           node.removeAttribute(attr.name);
         }
       });
     });
-    return template.innerHTML;
+  }
+
+  function fallbackSanitizeHtml(html) {
+    const template = document.createElement('template');
+    // Intentional parser boundary: <template> content is inert, so nothing here
+    // loads a resource or runs during parsing.
+    template.innerHTML = String(html ?? '');
+    scrubFragment(template.content);
+    const once = template.innerHTML;
+
+    // Mutation-XSS guard. Serializing a parsed tree and re-parsing it can yield
+    // a DIFFERENT tree (foreign-content and table-scope confusion are the usual
+    // culprits), which means markup that was safe when we inspected it can
+    // become dangerous when the caller assigns our string to innerHTML. Run the
+    // identical pass on the re-parsed form; if the result is not a fixed point,
+    // the markup mutates under re-parsing and we refuse to emit it as HTML.
+    const verify = document.createElement('template');
+    verify.innerHTML = once;
+    scrubFragment(verify.content);
+    if (verify.innerHTML !== once) return escapeHtmlText(verify.content.textContent ?? '');
+    return once;
   }
 
   const IMAGE_FALLBACK_SRC = './assets/og-cover.svg';
@@ -623,7 +699,7 @@ import { Pointer } from './src/lib/pointer.js';
   OpenCourseDeck.bus = new EventEmitter();
 
   /**
-   * Animate element height from 0 â†’ auto (or auto â†’ 0)
+   * Animate element height from 0 → auto (or auto → 0)
    * @param {HTMLElement} el
    * @param {boolean} open   true = expand, false = collapse
    * @param {number} duration ms
@@ -651,20 +727,20 @@ import { Pointer } from './src/lib/pointer.js';
   }
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 2. THEME SYSTEM
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // Extracted into `src/core/themeManager.js` and imported at file top.
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 2b. UI PREFERENCES (accent, density, font scale)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // Extracted into `src/core/prefs.js` and imported at file top.
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 3. SIDEBAR
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Sidebar = {
     // Keep in sync with storageMigrate + index pre-boot.
@@ -832,9 +908,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 4. TOPBAR â€” SEARCH
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
+  // 4. TOPBAR — SEARCH
+  // ──────────────────────────────────────────────────────────
 
   const TopbarSearch = {
     input: null,
@@ -864,10 +940,24 @@ import { Pointer } from './src/lib/pointer.js';
         if (!target) return;
         if (!target.closest('.topbar-search')) this._close();
       });
+
+      // The universal index caches notes/timestamps/annotations; drop it
+      // whenever any of them change so new content is searchable without a
+      // reload. TopbarSearch is an app-lifetime singleton, so these
+      // subscriptions intentionally live until the page unloads.
+      const invalidate = () => { this._universalData = null; };
+      const bus = OpenCourseDeck?.bus;
+      for (const event of [
+        'note:create', 'note:save', 'note:delete',
+        'pdf:annotate', 'sync:message', 'sync:local-change',
+        'storage:import-complete', 'data:loaded',
+      ]) {
+        bus?.on?.(event, invalidate);
+      }
     },
 
     /**
-     * Provide data for client-side search (optional â€” falls back to server fetch)
+     * Provide data for client-side search (optional — falls back to server fetch)
      */
     setData(data) {
       this._data = Array.isArray(data) ? data : [];
@@ -1041,9 +1131,19 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _plainText(value) {
-      const div = document.createElement('div');
-      div.innerHTML = String(value || '');
-      return (div.textContent || div.innerText || String(value || '')).replace(/\s+/g, ' ').trim();
+      // DOMParser, not innerHTML: assigning innerHTML — even on a detached
+      // element — still triggers resource loads and inline handlers, so
+      // indexing a note containing <img src=x onerror=...> would execute it.
+      const source = String(value || '');
+      if (!source.includes('<') && !source.includes('&')) {
+        return source.replace(/\s+/g, ' ').trim();
+      }
+      try {
+        const doc = new DOMParser().parseFromString(source, 'text/html');
+        return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+      } catch {
+        return source.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
     },
 
     _render(results, query) {
@@ -1149,9 +1249,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 5. RIPPLE EFFECT (Buttons)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Ripple = {
     init() {
@@ -1185,18 +1285,34 @@ import { Pointer } from './src/lib/pointer.js';
       if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
 
       el.appendChild(ripple);
-      ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+      // `.ripple-wave` previously had no stylesheet rule at all, so no
+      // animation ran, animationend never fired, and one orphan <span> stayed
+      // inside the button on every single click. The rule now exists in
+      // components.css; the timeout remains because DOM cleanup must not
+      // depend on a paint event firing.
+      let removed = false;
+      const drop = () => {
+        if (removed) return;
+        removed = true;
+        clearTimeout(timer);
+        ripple.remove();
+      };
+      const timer = setTimeout(drop, 1200);
+      ripple.addEventListener('animationend', drop, { once: true });
     },
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 6. MODALS & DRAWERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Modal = {
     _cleanupFns: new WeakMap(),
     _previousFocus: new WeakMap(),
+    // Pending deferred-teardown timers from close(), keyed by modal, so a
+    // reopen inside the animation window can cancel the one still in flight.
+    _teardownTimers: new WeakMap(),
 
     /**
      * Open a modal by its ID or element reference
@@ -1210,6 +1326,18 @@ import { Pointer } from './src/lib/pointer.js';
       if (!modal) return;
       if (modal.classList.contains('open')) return;
 
+      // Cancel a teardown still pending from a close() moments ago. Without
+      // this, reopening inside the animation window let the stale timer fire
+      // against the newly-opened modal: it set `hidden` and removed the
+      // backdrop, while openModals, body overflow and app inertness all stayed
+      // in the open state. The result was an invisible dialog holding the page
+      // inert and unscrollable, with no way out but a reload.
+      const pendingTeardown = this._teardownTimers.get(modal);
+      if (pendingTeardown !== undefined) {
+        clearTimeout(pendingTeardown);
+        this._teardownTimers.delete(modal);
+      }
+
       // Backdrop
       let backdrop = modal.previousElementSibling;
       if (!backdrop?.classList.contains('modal-backdrop')) {
@@ -1221,6 +1349,21 @@ import { Pointer } from './src/lib/pointer.js';
       modal.setAttribute('aria-modal', 'true');
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('tabindex', '-1');
+
+      // Give the dialog an accessible name. Without one, a screen reader
+      // announces only "dialog" on open and the user has to explore the
+      // subtree to learn what it is -- WCAG 4.1.2. Done here rather than in
+      // create() so modals declared in static markup are covered too. An
+      // author-supplied aria-label or aria-labelledby always wins.
+      if (!modal.hasAttribute('aria-label') && !modal.hasAttribute('aria-labelledby')) {
+        const titleEl = modal.querySelector('.modal-title');
+        if (titleEl) {
+          if (!titleEl.id) titleEl.id = uid('modal-title');
+          modal.setAttribute('aria-labelledby', titleEl.id);
+        } else if (opts.label) {
+          modal.setAttribute('aria-label', String(opts.label));
+        }
+      }
 
       requestAnimationFrame(() => {
         backdrop.classList.add('open');
@@ -1239,8 +1382,15 @@ import { Pointer } from './src/lib/pointer.js';
       // Close on backdrop click
       backdrop.addEventListener('click', () => this.close(modal), { once: true });
 
-      // Close on Escape
-      const onEsc = e => { if (e.key === 'Escape') this.close(modal); };
+      // Close on Escape. Only the topmost modal responds: every open modal
+      // registers its own document-level handler, so without this guard one
+      // Escape collapsed the entire stack at once.
+      const onEsc = e => {
+        if (e.key !== 'Escape') return;
+        const stack = OpenCourseDeck.state.openModals;
+        if (stack[stack.length - 1] !== modal) return;
+        this.close(modal);
+      };
       document.addEventListener('keydown', onEsc);
       this._cleanupFns.set(modal, () => {
         cleanup();
@@ -1271,13 +1421,18 @@ import { Pointer } from './src/lib/pointer.js';
         backdrop.classList.remove('open');
       }
 
-      setTimeout(() => {
+      const teardown = setTimeout(() => {
+        this._teardownTimers.delete(modal);
+        // Re-check: open() cancels this timer, but a close/open/close sequence
+        // can still land here with the modal legitimately open again.
+        if (modal.classList.contains('open')) return;
         modal.setAttribute('hidden', '');
         modal.removeAttribute('aria-modal');
         if (backdrop?.classList.contains('modal-backdrop')) {
           backdrop.remove();
         }
       }, OpenCourseDeck.config.animationDuration);
+      this._teardownTimers.set(modal, teardown);
 
       OpenCourseDeck.state.openModals = OpenCourseDeck.state.openModals.filter(m => m !== modal);
 
@@ -1288,6 +1443,11 @@ import { Pointer } from './src/lib/pointer.js';
       // Cleanup focus trap
       const cleanup = this._cleanupFns.get(modal);
       if (cleanup) { cleanup(); this._cleanupFns.delete(modal); }
+      // setAppInert is depth-counted, not a boolean setter: `true` pushes a
+      // level and `false` pops one, and the app stays inert while the depth is
+      // above zero. So this must stay `false` even with modals still open --
+      // passing a computed boolean here would push a second level on close and
+      // the page could never become interactive again.
       setAppInert(false);
       restoreFocus(this._previousFocus.get(modal));
       this._previousFocus.delete(modal);
@@ -1314,7 +1474,7 @@ import { Pointer } from './src/lib/pointer.js';
         class: 'modal-close-btn',
         'aria-label': 'Close dialog',
         'data-modal-close': '',
-      }, 'Ã—');
+      }, '×');
 
       const header = title
         ? createElement('div', { class: 'modal-header' },
@@ -1352,10 +1512,15 @@ import { Pointer } from './src/lib/pointer.js';
 
       document.body.appendChild(modal);
 
-      // Auto-remove from DOM after closing
-      OpenCourseDeck.bus.on('modal:close', ({ modal: m }) => {
-        if (m === modal) setTimeout(() => modal.remove(), 400);
-      });
+      // Auto-remove from DOM after closing. Self-removing listener: a
+      // permanent bus subscription per created modal would retain every
+      // closed modal element for the page lifetime.
+      const onModalClose = ({ modal: m }) => {
+        if (m !== modal) return;
+        OpenCourseDeck.bus.off('modal:close', onModalClose);
+        setTimeout(() => modal.remove(), 400);
+      };
+      OpenCourseDeck.bus.on('modal:close', onModalClose);
 
       this.open(modal);
       return modal;
@@ -1387,9 +1552,15 @@ import { Pointer } from './src/lib/pointer.js';
           settle(true);
           this.close(modal);
         });
-        OpenCourseDeck.bus.once('modal:close', ({ modal: closed }) => {
-          if (closed === modal) settle(false);
-        });
+        // Not bus.once(): once() is consumed by the FIRST modal:close of ANY
+        // modal, which would strand this promise if an unrelated modal closes
+        // before ours is dismissed via Escape/backdrop.
+        const onAnyClose = ({ modal: closed }) => {
+          if (closed !== modal) return;
+          OpenCourseDeck.bus.off('modal:close', onAnyClose);
+          settle(false);
+        };
+        OpenCourseDeck.bus.on('modal:close', onAnyClose);
         footer.append(cancelBtn, confirmBtn);
       });
     },
@@ -1416,9 +1587,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 7. DRAWERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Drawer = {
     _cleanupFns: new WeakMap(),
@@ -1511,9 +1682,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 8. DROPDOWN MENUS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Dropdown = {
     _active: null,
@@ -1618,9 +1789,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 9. TABS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Tabs = {
     init() {
@@ -1717,9 +1888,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 10. ACCORDION
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Accordion = {
     init() {
@@ -1780,9 +1951,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 11. TOAST NOTIFICATIONS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Toast = {
     _containers: {},
@@ -1836,7 +2007,7 @@ import { Pointer } from './src/lib/pointer.js';
       this._appendAction(content, action);
       toast.append(iconEl, content);
       if (dismissible) {
-        toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, 'Ã—'));
+        toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, '×'));
       }
       if (duration > 0) {
         toast.appendChild(createElement('div', { class: 'toast-timer' }));
@@ -1877,13 +2048,29 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     dismiss(toast) {
+      if (!toast || toast.dataset.pdDismissing === 'true') return;
+      toast.dataset.pdDismissing = 'true';
       toast.classList.remove('show');
-      toast.classList.add('hide');
-      toast.addEventListener('animationend', () => {
+      // The exit class is `out` -- that is what components.css styles. This
+      // used to add `hide`, which matches no rule, so no animation ever
+      // started, `animationend` never fired, and the toast stayed in the DOM
+      // and in activeToasts permanently. Every toast ever shown accumulated.
+      toast.classList.add('out');
+
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
         toast.remove();
         OpenCourseDeck.state.activeToasts = OpenCourseDeck.state.activeToasts.filter(t => t !== toast);
         OpenCourseDeck.bus.emit('toast:dismiss', { toast });
-      }, { once: true });
+      };
+      // animationend is not guaranteed: the stylesheet may not have loaded, the
+      // toast may be display:none in a background tab, or a future restyle may
+      // drop the animation. Removal must not depend on a paint event.
+      const timer = setTimeout(finish, 1000);
+      toast.addEventListener('animationend', finish, { once: true });
     },
 
     dismissAll() {
@@ -1945,9 +2132,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 12. FORMS â€” Validation, Inputs, Toggles, Range
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
+  // 12. FORMS — Validation, Inputs, Toggles, Range
+  // ──────────────────────────────────────────────────────────
 
   const StorageAlerts = {
     _seen: new Set(),
@@ -2025,7 +2212,7 @@ import { Pointer } from './src/lib/pointer.js';
       this._initFileInputs();
     },
 
-    // â”€â”€ Inline validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Inline validation ──────────────────────────────────
     _initValidation() {
       document.addEventListener('blur', e => {
         const target = eventTargetEl(e);
@@ -2090,7 +2277,7 @@ import { Pointer } from './src/lib/pointer.js';
       return inputs.every(input => this._validateField(input));
     },
 
-    // â”€â”€ Password visibility toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Password visibility toggle ────────────────────────
     _initPasswordToggles() {
       document.addEventListener('click', e => {
         const target = eventTargetEl(e);
@@ -2110,7 +2297,7 @@ import { Pointer } from './src/lib/pointer.js';
       });
     },
 
-    // â”€â”€ Range sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Range sliders ─────────────────────────────────────
     _initRangeSliders() {
       $$('input[type="range"][data-range]').forEach(range => {
         const output = document.getElementById(range.dataset.output)
@@ -2125,7 +2312,7 @@ import { Pointer } from './src/lib/pointer.js';
       });
     },
 
-    // â”€â”€ Character counters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Character counters ────────────────────────────────
     _initCharCounters() {
       $$('[data-char-count]').forEach(input => {
         const max     = input.maxLength;
@@ -2143,7 +2330,7 @@ import { Pointer } from './src/lib/pointer.js';
       });
     },
 
-    // â”€â”€ Custom file inputs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Custom file inputs ────────────────────────────────
     _initFileInputs() {
       $$('[data-file-input]').forEach(wrapper => {
         const input   = $('input[type="file"]', wrapper);
@@ -2176,9 +2363,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 13. TABLES â€” Sorting, Selection, Pagination
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
+  // 13. TABLES — Sorting, Selection, Pagination
+  // ──────────────────────────────────────────────────────────
 
   const Tables = {
     init() {
@@ -2188,7 +2375,7 @@ import { Pointer } from './src/lib/pointer.js';
       this._initSearch();
     },
 
-    // â”€â”€ Column sorting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Column sorting ────────────────────────────────────
     _initSorting() {
       document.addEventListener('click', e => {
         const target = eventTargetEl(e);
@@ -2243,7 +2430,7 @@ import { Pointer } from './src/lib/pointer.js';
       });
     },
 
-    // â”€â”€ Row selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Row selection ─────────────────────────────────────
     _initRowSelection() {
       document.addEventListener('change', e => {
         const target = eventTargetEl(e);
@@ -2286,7 +2473,7 @@ import { Pointer } from './src/lib/pointer.js';
       if (countEl) countEl.textContent = count;
     },
 
-    // â”€â”€ Client-side pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Client-side pagination ────────────────────────────
     _initPagination() {
       $$('[data-pagination]').forEach(nav => {
         const tableId = nav.dataset.pagination;
@@ -2326,7 +2513,7 @@ import { Pointer } from './src/lib/pointer.js';
         return li;
       };
 
-      ul.appendChild(mkBtn('â€¹', current - 1, current === 1));
+      ul.appendChild(mkBtn('‹', current - 1, current === 1));
 
       // Ellipsis logic
       const range = this._pageRange(current, pages);
@@ -2334,13 +2521,13 @@ import { Pointer } from './src/lib/pointer.js';
       range.forEach(p => {
         if (prev !== null && p - prev > 1) {
           ul.appendChild(createElement('li', { class: 'page-item page-ellipsis' },
-            createElement('span', {}, 'â€¦')));
+            createElement('span', {}, '…')));
         }
         ul.appendChild(mkBtn(p, p, false, p === current));
         prev = p;
       });
 
-      ul.appendChild(mkBtn('â€º', current + 1, current === pages));
+      ul.appendChild(mkBtn('›', current + 1, current === pages));
     },
 
     _pageRange(current, total, delta = 2) {
@@ -2353,7 +2540,7 @@ import { Pointer } from './src/lib/pointer.js';
       return range;
     },
 
-    // â”€â”€ Per-table search filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Per-table search filter ───────────────────────────
     _initSearch() {
       $$('[data-table-search]').forEach(input => {
         const tableId = input.dataset.tableSearch;
@@ -2390,9 +2577,9 @@ import { Pointer } from './src/lib/pointer.js';
     },
   };
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 13b. LIST PAGINATION (cards/lists, not tables)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Paginator = {
     paginate(items, { page = 1, perPage = 50 } = {}) {
@@ -2486,9 +2673,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 14. TOOLTIPS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Tooltips = {
     _current: null,
@@ -2496,7 +2683,7 @@ import { Pointer } from './src/lib/pointer.js';
     _observer: null,
 
     init() {
-      // CSS-only tooltips use [data-tip] â€” we enhance with JS for dynamic content
+      // CSS-only tooltips use [data-tip] — we enhance with JS for dynamic content
       document.addEventListener('mouseenter', e => {
         const target = eventTargetEl(e);
         if (!target) return;
@@ -2578,9 +2765,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 15. PROGRESS & LOADERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Progress = {
     /**
@@ -2606,7 +2793,9 @@ import { Pointer } from './src/lib/pointer.js';
         this.set(el, target);
         return;
       }
-      const start    = parseFloat(el.style.getPropertyValue('--progress') ?? '0');
+      // getPropertyValue returns '' (never null) when unset, so `?? '0'`
+      // would keep the empty string and parseFloat('') is NaN.
+      const start    = parseFloat(el.style.getPropertyValue('--progress')) || 0;
       const startTs  = performance.now();
 
       const step = ts => {
@@ -2662,9 +2851,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 16. CHARTS (Thin wrappers â€” expects Chart.js or similar)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
+  // 16. CHARTS (Thin wrappers — expects Chart.js or similar)
+  // ──────────────────────────────────────────────────────────
 
   const Charts = {
     _instances: new Map(),
@@ -2696,6 +2885,16 @@ import { Pointer } from './src/lib/pointer.js';
      * Register a chart instance for later updates
      */
     register(id, instance) {
+      // Re-registering the same id happens on every route remount. Overwriting
+      // the map entry dropped the only reference to the previous chart without
+      // destroying it, so its canvas, resize listeners and animation loop
+      // stayed live and invisible for the rest of the session.
+      const existing = this._instances.get(id);
+      if (existing && existing !== instance) {
+        try { existing.destroy?.(); } catch (error) {
+          console.warn(`[Charts] failed to destroy the previous "${id}" chart`, error);
+        }
+      }
       this._instances.set(id, instance);
     },
 
@@ -2791,9 +2990,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // 17. STAT CARDS â€” Animated counters
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
+  // 17. STAT CARDS — Animated counters
+  // ──────────────────────────────────────────────────────────
 
   const StatCards = {
     init() {
@@ -2840,9 +3039,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 18. NOTIFICATIONS PANEL
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const NotificationsPanel = {
     _badge: null,
@@ -2909,9 +3108,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 19. USER PROFILE MENU
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const UserMenu = {
     init() {
@@ -2927,9 +3126,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 20. COPY TO CLIPBOARD
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Clipboard = {
     init() {
@@ -2965,9 +3164,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 21. DARK MODE AWARE IMAGES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const ThemeImages = {
     init() {
@@ -2984,9 +3183,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 22. SKELETON LOADERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Skeleton = {
     /**
@@ -3014,15 +3213,15 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 23. INFINITE SCROLL
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const InfiniteScroll = {
     /**
      * @param {Object} opts
      * @param {string|HTMLElement} opts.container
-     * @param {Function} opts.onLoad  async fn(page) â†’ returns false when exhausted
+     * @param {Function} opts.onLoad  async fn(page) → returns false when exhausted
      * @param {string} opts.sentinel  selector for bottom sentinel element
      */
     init({ container, onLoad, sentinel = '.scroll-sentinel' } = {}) {
@@ -3067,9 +3266,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 24. ROUTER (Hash-based SPA helper)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   function routeTitle(hash) {
     return {
@@ -3159,9 +3358,9 @@ import { Pointer } from './src/lib/pointer.js';
   })();
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 25. RESPONSIVE UTILITIES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Responsive = {
     /**
@@ -3191,9 +3390,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 33. VIEWS (SPA route rendering)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Views = (() => {
     const container = () => document.getElementById('view-container');
@@ -3349,9 +3548,9 @@ import { Pointer } from './src/lib/pointer.js';
   })();
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 26. KEYBOARD SHORTCUTS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const KeyboardShortcuts = {
     _shortcuts: [],
@@ -3368,6 +3567,12 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     init() {
+      // Idempotent: a second init() used to re-register all eight built-ins
+      // and stack another anonymous, unremovable document keydown listener,
+      // so _shortcuts grew without bound and each combo ran twice.
+      if (this._inited) return;
+      this._inited = true;
+
       // Built-in shortcuts
       this.register('ctrl+shift+f', () => {
         const input = $('.topbar-search input');
@@ -3388,10 +3593,16 @@ import { Pointer } from './src/lib/pointer.js';
 
       document.addEventListener('keydown', e => {
         const target = eventTargetEl(e);
-        if (target?.matches?.('input,textarea,select,[contenteditable],[contenteditable="true"]')) return;
-        if (target?.closest?.('[contenteditable],[contenteditable="true"]')) return;
+        // `[contenteditable]` alone also matches contenteditable="false"
+        // (read-only islands inside an editor), which suppressed every
+        // shortcut there — the inverse of the intent.
+        if (target?.matches?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+        if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) return;
         const combo = [
           e.ctrlKey  ? 'ctrl'  : '',
+          // Held Meta must disqualify a Ctrl-only match, or Cmd+Ctrl+K fires
+          // 'ctrl+k' and preventDefault() hijacks the browser's Cmd shortcut.
+          e.metaKey  ? 'meta'  : '',
           e.altKey   ? 'alt'   : '',
           e.shiftKey ? 'shift' : '',
           e.key.toLowerCase(),
@@ -3421,7 +3632,7 @@ import { Pointer } from './src/lib/pointer.js';
       table.appendChild(tbody);
 
       Modal.create({
-        title: 'âŒ¨ï¸ Keyboard Shortcuts',
+        title: '⌨️ Keyboard Shortcuts',
         body:  table,
         size:  'sm',
       });
@@ -3429,9 +3640,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 27. AVATAR UPLOAD (settings page)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const AvatarUpload = {
     init() {
@@ -3464,9 +3675,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 28. SETTINGS PAGE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Settings = {
     init() {
@@ -3478,7 +3689,7 @@ import { Pointer } from './src/lib/pointer.js';
           try {
             OpenCourseDeck.bus.emit('settings:save', { data });
             if (saveIndicator) {
-              saveIndicator.textContent = 'âœ… Saved';
+              saveIndicator.textContent = '✅ Saved';
               setTimeout(() => { saveIndicator.textContent = ''; }, 2000);
             }
           } catch {
@@ -3495,7 +3706,7 @@ import { Pointer } from './src/lib/pointer.js';
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
           const confirmed = await Modal.confirmAsync({
-            title:     'âš ï¸ Delete Account',
+            title:     '⚠️ Delete Account',
             message:   'This action is <strong>irreversible</strong>. All your data will be permanently deleted. Are you absolutely sure?',
             confirmLabel: 'Delete account',
             cancelLabel: 'Cancel',
@@ -3509,9 +3720,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 29. LAZY IMAGE LOADING
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const LazyImages = {
     init() {
@@ -3545,9 +3756,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 30. DATA FETCHING HELPER
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const API = {
     _baseURL: '',
@@ -3596,9 +3807,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 31. HEATMAP CALENDAR (renders inside [data-heatmap])
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const Heatmap = {
     /**
@@ -3622,7 +3833,8 @@ import { Pointer } from './src/lib/pointer.js';
         for (let d = 0; d < 7; d++) {
           const date = new Date(today);
           date.setDate(today.getDate() - (w * 7 + (6 - d)));
-          const key   = date.toISOString().slice(0, 10);
+          // Key by local day: toISOString() shifts the date for non-UTC users.
+          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
           const count = data[key] ?? 0;
           const level = count === 0 ? 0 : Math.ceil((count / maxCount) * 4);
 
@@ -3642,9 +3854,9 @@ import { Pointer } from './src/lib/pointer.js';
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 32. INITIALIZATION
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   function initEnhancements() {
     // Breadcrumb updates from router events
@@ -3683,7 +3895,8 @@ import { Pointer } from './src/lib/pointer.js';
     // Service worker update prompt (index.html dispatches plasma:sw-update-ready)
     if (!document.documentElement.dataset.pdSwBound) {
       document.documentElement.dataset.pdSwBound = 'true';
-      document.addEventListener('plasma:sw-update-ready', () => {
+      document.addEventListener('plasma:sw-update-ready', (event) => {
+        const registration = event?.detail?.registration;
         const reloadWrap = createElement('div', { style: { marginTop: '8px' } });
         const reloadBtn = createElement('button', { class: 'btn btn-primary btn-sm', 'data-sw-reload': '' }, 'Reload');
         reloadWrap.appendChild(reloadBtn);
@@ -3694,7 +3907,35 @@ import { Pointer } from './src/lib/pointer.js';
           duration: 8000,
         });
         const btn = t?.querySelector?.('[data-sw-reload]');
-        btn?.addEventListener?.('click', () => window.location.reload());
+        btn?.addEventListener?.('click', () => {
+          // The service worker is generated with skipWaiting:false so an
+          // update can never interrupt an in-flight note/canvas/backup write.
+          // A bare location.reload() therefore does NOT activate the waiting
+          // worker (the client survives the navigation and keeps the old one
+          // in control), so the user would reload straight back into the
+          // stale version and the update would only land once every tab is
+          // closed. Tell the waiting worker to take over, then let the
+          // controllerchange handler in src/index.js perform the reload.
+          const waiting = registration?.waiting;
+          if (waiting) {
+            window.__plasmaSwUpdateAccepted = true;
+            try {
+              waiting.postMessage({ type: 'SKIP_WAITING' });
+              // Safety net: if controllerchange never fires (worker failed to
+              // activate), still honor the user's click.
+              setTimeout(() => {
+                if (!window.__plasmaSwReloading) {
+                  window.__plasmaSwReloading = true;
+                  window.location.reload();
+                }
+              }, 3000);
+              return;
+            } catch {
+              window.__plasmaSwUpdateAccepted = false;
+            }
+          }
+          window.location.reload();
+        });
       });
     }
   }
@@ -3801,6 +4042,12 @@ import { Pointer } from './src/lib/pointer.js';
     OpenCourseDeck.safeMediaUrl = safeMediaUrl;
     OpenCourseDeck.safeImageUrl = safeImageUrl;
     OpenCourseDeck.safeFrameUrl = safeFrameUrl;
+    // The hardened fallback sanitizer was only ever threaded into route
+    // modules as an argument, so anything outside that call graph that needed
+    // it wrote its own weaker copy instead. Publish it alongside the URL
+    // policies it is built on.
+    OpenCourseDeck.sanitizeHtml = fallbackSanitizeHtml;
+    OpenCourseDeck.escapeHtmlText = escapeHtmlText;
     OpenCourseDeck.safeFetchUrl = safeFetchUrl;
     OpenCourseDeck.applyImageFallback = applyImageFallback;
     OpenCourseDeck.IMAGE_FALLBACK_SRC = IMAGE_FALLBACK_SRC;
