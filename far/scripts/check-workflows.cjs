@@ -110,6 +110,7 @@ function validateReleaseWorkflow(workflow) {
     requireText(errors, resolver, 'checkout_ref=%s', 'release.yml: resolver must emit the exact checkout ref');
   }
 
+  requireText(errors, workflow, 'group: release-${{ github.repository }}', 'release.yml: all release triggers must share one serialized concurrency group');
   requireText(errors, workflow, 'required: false', 'release.yml: manual tag input must be optional');
   requireText(errors, workflow, 'checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}', 'release.yml: resolver output must expose the exact checkout ref');
   requireText(errors, workflow, 'ref: ${{ needs.resolve.outputs.checkout_ref }}', 'release.yml: build must check out the resolved immutable source');
@@ -117,6 +118,9 @@ function validateReleaseWorkflow(workflow) {
   requireText(errors, workflow, 'github.rest.git.createRef', 'release.yml: missing tags must be created only after verification');
   requireText(errors, workflow, 'Refusing to move an immutable release tag', 'release.yml: tag movement protection is missing');
   requireText(errors, workflow, '- name: Detect an already-complete release', 'release.yml: idempotent release retry detection is missing');
+  requireText(errors, workflow, 'fs.statSync', 'release.yml: idempotent retry must compare local and remote asset sizes');
+  requireText(errors, workflow, '- name: Reverify immutable tag before publication', 'release.yml: tag identity must be rechecked immediately before publication');
+  requireText(errors, workflow, '- name: Verify published release identity', 'release.yml: publication must be verified after mutation');
   requireText(errors, workflow, 'overwrite_files: false', 'release.yml: published release assets must not overwrite existing assets');
   requireText(errors, workflow, '- name: Summarize release verification', 'release.yml: consolidated release verification summary is missing');
   requireText(errors, workflow, '- name: Enforce release verification result', 'release.yml: aggregate release verification gate is missing');
@@ -148,6 +152,9 @@ function validateMaintenanceWorkflow(workflow) {
   }
   if (!cleanup.includes('cleanup will continue')) {
     errors.push('actions-maintenance.yml: one artifact failure must not stop remaining cleanup');
+  }
+  if (!cleanup.includes('error.status === 404')) {
+    errors.push('actions-maintenance.yml: already-removed artifacts must be treated as an idempotent no-op');
   }
   if (!cleanup.includes('core.summary')) {
     errors.push('actions-maintenance.yml: maintenance summary is missing');
@@ -182,7 +189,7 @@ function main() {
     console.error(`[workflow-check] Failed with ${errors.length} issue(s).`);
     process.exit(1);
   }
-  console.log('[workflow-check] OK - workflows enforce pinned actions, resilient execution, immutable releases, diagnostics, and aggregate result gates.');
+  console.log('[workflow-check] OK - workflows enforce pinned actions, serialized resilient execution, immutable releases, diagnostics, and aggregate result gates.');
 }
 
 if (require.main === module) main();
