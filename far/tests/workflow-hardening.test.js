@@ -61,25 +61,48 @@ describe('GitHub Actions hardening', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
   });
 
-  it('rejects a release guard that inherits the application working directory', () => {
-    const broken = workflows['release.yml']
-      .replace('        shell: bash --noprofile --norc -eo pipefail {0}', '        working-directory: far\n        shell: bash --noprofile --norc -eo pipefail {0}')
-      .replace('        working-directory: .\n        env:', '        env:');
+  it('rejects release authorization that happens after checkout', () => {
+    const workflow = workflows['release.yml'];
+    const guard = workflow.indexOf('      - name: Require an authoritative trigger');
+    const checkout = workflow.indexOf('      - name: Check out release source');
+    const guardBlock = workflow.slice(guard, checkout);
+    const broken = workflow.slice(0, guard) + workflow.slice(checkout, checkout + guardBlock.length) + guardBlock + workflow.slice(checkout + guardBlock.length);
 
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('job-wide working-directory'),
-      expect.stringContaining('workspace root'),
+      expect.stringContaining('must execute before checkout'),
     ]));
   });
 
-  it('rejects release checkout outside the explicit tag namespace', () => {
-    const broken = workflows['release.yml'].replaceAll(
-      'ref: refs/tags/${{ env.RELEASE_TAG }}',
-      'ref: ${{ env.RELEASE_TAG }}',
+  it('rejects a release workflow that cannot derive or bootstrap the package tag', () => {
+    const broken = workflows['release.yml']
+      .replace('expected_tag="v${package_version}"', 'expected_tag="$REQUESTED_TAG"')
+      .replace('github.rest.git.createRef', 'github.rest.git.getRef');
+
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('derive from package version'),
+      expect.stringContaining('created only after verification'),
+    ]));
+  });
+
+  it('rejects a release workflow without idempotent retry protection', () => {
+    const broken = workflows['release.yml'].replace(
+      '      - name: Detect an already-complete release',
+      '      - name: Inspect existing release',
     );
 
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('explicit tag-namespace checkouts'),
+      expect.stringContaining('idempotent release retry detection'),
+    ]));
+  });
+
+  it('rejects CI that stops at the first independent failure', () => {
+    const broken = workflows['ci.yml']
+      .replaceAll('continue-on-error: true\n', '')
+      .replace('      - name: Enforce CI result', '      - name: Report CI result');
+
+    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('independent checks must continue'),
+      expect.stringContaining('final aggregate failure gate'),
     ]));
   });
 
@@ -106,14 +129,18 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
-  it('requires validated retention and transient retry handling', () => {
+  it('requires maintenance dry-run, retries, summary, and failure isolation', () => {
     const broken = workflows['actions-maintenance.yml']
       .replace('          retries: 3\n', '')
-      .replace(/\s+if \(!Number\.isInteger\(retentionDays\)[\s\S]*?\n\s+}\n/, '\n');
+      .replace('      dry_run:\n', '      preview:\n')
+      .replace('cleanup will continue', 'cleanup stopped')
+      .replace('core.summary', 'core.notice');
 
     expect(validateMaintenanceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('retry transient failures'),
-      expect.stringContaining('retention configuration'),
+      expect.stringContaining('dry-run control'),
+      expect.stringContaining('must not stop remaining cleanup'),
+      expect.stringContaining('summary is missing'),
     ]));
   });
 });
