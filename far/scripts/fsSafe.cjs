@@ -44,7 +44,9 @@ function assertContained(target, root, { allowRoot = true, mustExist = false } =
 
   const existingAncestor = nearestExisting(resolvedTarget);
   const canonicalAncestor = canonical(existingAncestor);
-  if (!isInside(canonicalAncestor, resolvedRoot, allowRoot)) {
+  // A new child may have the trusted root itself as its nearest existing
+  // ancestor even when the child target is not allowed to equal that root.
+  if (!isInside(canonicalAncestor, resolvedRoot, true)) {
     throw new Error(`Unsafe filesystem target traverses outside root through a symlink: ${resolvedTarget}`);
   }
 
