@@ -32,11 +32,11 @@ jobs:
       release_commit: ${{ steps.identity.outputs.commit }}
     defaults:
       run:
-        working-directory: far
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:
       - name: Require an authoritative trigger
+        working-directory: .
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_REF: ${{ github.ref }}
@@ -47,18 +47,39 @@ jobs:
           fi
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG" >&2
+            echo "Expected an existing semantic-version tag such as v1.1.2" >&2
             exit 1
           fi
 
       - name: Check out the exact release tag
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Verify release project layout
+        working-directory: .
+        run: |
+          test -f far/package.json || {
+            echo "Release tag $RELEASE_TAG does not contain far/package.json. Create the tag from a main commit that contains the release project, then dispatch that existing tag." >&2
+            exit 1
+          }
+          test -f far/package-lock.json || {
+            echo "Release tag $RELEASE_TAG does not contain far/package-lock.json. Commit the lockfile on main, create a matching release tag from that commit, then dispatch the tag again." >&2
+            exit 1
+          }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
       - name: Verify release identity
         id: identity
+        working-directory: far
         run: |
           git fetch --force --no-tags origin main:refs/remotes/origin/main
           git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
@@ -87,35 +108,36 @@ jobs:
           printf 'commit=%s\n' "$release_commit" >> "$GITHUB_OUTPUT"
           printf 'version=%s\n' "$package_version" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: far/package-lock.json
-
       - name: Install dependencies reproducibly
+        working-directory: far
         run: npm ci --ignore-scripts --legacy-peer-deps
 
       - name: Vendor browser dependencies
+        working-directory: far
         run: npm run vendor
 
       - name: Check encoding
+        working-directory: far
         run: npm run check:encoding
 
       - name: Validate repository
+        working-directory: far
         run: npm run validate
 
       - name: Lint source
+        working-directory: far
         run: npm run lint
 
       - name: Build release
+        working-directory: far
         run: npm run build:release
 
       - name: Verify generated output
+        working-directory: far
         run: npm run check:generated
 
       - name: Verify committed generated files are current
+        working-directory: far
         run: |
           status_file="$(mktemp)"
           git status --porcelain=v1 --untracked-files=all -- dist vendor > "$status_file"
@@ -127,39 +149,49 @@ jobs:
           fi
 
       - name: Run tests
+        working-directory: far
         run: npm test
 
       - name: Audit production dependencies
+        working-directory: far
         run: npm audit --omit=dev --audit-level=high
 
       - name: Audit project rules
+        working-directory: far
         run: npm run audit
 
       - name: Generate bundle report
+        working-directory: far
         run: npm run report:bundle
 
       - name: Run smoke tests
+        working-directory: far
         run: npm run smoke
 
       - name: Run browser smoke tests
+        working-directory: far
         run: npm run smoke:browser
 
       - name: Generate final release attestation
+        working-directory: far
         env:
           SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
         run: npm run release:attest
 
       - name: Run adversarial release integrity checks
+        working-directory: far
         env:
           SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
         run: node scripts/adversarial-release-test.cjs
 
       - name: Reverify final release contents
+        working-directory: far
         env:
           SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
         run: npm run release:verify
 
       - name: Package immutable release assets
+        working-directory: far
         env:
           SOURCE_VERSION: ${{ steps.identity.outputs.commit }}
         run: |
@@ -225,7 +257,7 @@ jobs:
       - name: Re-check the release tag
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
