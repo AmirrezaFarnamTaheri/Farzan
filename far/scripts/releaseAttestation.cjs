@@ -9,7 +9,7 @@ const { createManifest, manifestDigest, verifyManifest } = require('./releaseMan
 const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 
 function resolveSourceCommit(repositoryRoot) {
-  const environmentCommit = String(process.env.GITHUB_SHA || process.env.SOURCE_VERSION || '').trim();
+  const environmentCommit = String(process.env.SOURCE_VERSION || process.env.GITHUB_SHA || '').trim();
   if (environmentCommit) {
     if (!FULL_COMMIT_PATTERN.test(environmentCommit)) {
       throw new Error('Release attestation requires a full 40-character source commit');

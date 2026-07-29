@@ -1,0 +1,64 @@
+name: Actions Maintenance
+
+on:
+  schedule:
+    - cron: '23 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: actions-maintenance
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Cleanup old workflow artifacts
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          RETENTION_DAYS: '14'
+        with:
+          script: |
+            const retentionDays = Number.parseInt(process.env.RETENTION_DAYS, 10);
+            const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              },
+              response => response.data.artifacts,
+            );
+
+            const staleArtifacts = artifacts.filter((artifact) => (
+              !artifact.expired && Date.parse(artifact.created_at) < cutoff
+            ));
+
+            let deleted = 0;
+            for (const artifact of staleArtifacts) {
+              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+              deleted += 1;
+            }
+
+            await core.summary
+              .addHeading('Actions artifact retention')
+              .addTable([
+                [{ data: 'Retention days', header: true }, String(retentionDays)],
+                [{ data: 'Scanned', header: true }, String(artifacts.length)],
+                [{ data: 'Deleted', header: true }, String(deleted)],
+              ])
+              .write();
+
+      - name: Report stale workflow artifacts
+        run: echo "Artifact retention cleanup completed"
