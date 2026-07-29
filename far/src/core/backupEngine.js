@@ -1,3 +1,10 @@
+import {
+  AI_BINDING_KEY,
+  AI_SESSION_KEY,
+  AI_SETTINGS_KEY,
+  stripPortableAIAuthority,
+} from './aiAuthority.js';
+
 const DATABASE_NAME = 'opencoursedeck';
 const DATABASE_VERSION = 3;
 const MAIN_STORES = Object.freeze([
@@ -26,9 +33,7 @@ function openDatabase(root) {
     };
     request.onsuccess = () => {
       if (settled) {
-        // The promise already rejected (e.g. onblocked); close the late
-        // connection or it lingers and blocks future schema upgrades.
-        try { request.result.close(); } catch { /* already closed */ }
+        try { request.result.close(); } catch {}
         return;
       }
       settle(resolve, request.result);
@@ -55,6 +60,34 @@ function requestResult(request) {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
   });
+}
+
+function sanitizeSettingsRecords(records = []) {
+  return records.map((record) => {
+    if (!record || record.key !== AI_SETTINGS_KEY) return record;
+    return { ...record, value: stripPortableAIAuthority(record.value) };
+  });
+}
+
+function sanitizePortableBackup(input) {
+  const sanitized = { ...input };
+  if (Array.isArray(input?.settings)) sanitized.settings = sanitizeSettingsRecords(input.settings);
+  if (input?._meta && typeof input._meta === 'object') sanitized._meta = { ...input._meta };
+  return sanitized;
+}
+
+function clearSessionAuthority(root) {
+  const failures = [];
+  for (const key of [AI_SESSION_KEY, AI_BINDING_KEY]) {
+    try { root.sessionStorage?.removeItem?.(key); }
+    catch (error) { failures.push({ key, message: error?.message || String(error) }); }
+  }
+  if (failures.length) {
+    const error = new Error('Backup import committed, but session AI authority could not be fully invalidated');
+    error.code = 'AI_AUTHORITY_INVALIDATION_INCOMPLETE';
+    error.failures = failures;
+    throw error;
+  }
 }
 
 function validateBackup(input) {
@@ -93,16 +126,18 @@ export function installBackupEngine(root = window) {
       const available = MAIN_STORES.filter(store => db.objectStoreNames.contains(store));
       const transaction = db.transaction(available, 'readonly');
       const result = {};
-      const reads = available.map(async store => {
-        result[store] = await requestResult(transaction.objectStore(store).getAll());
+      const reads = available.map(async (store) => {
+        const records = await requestResult(transaction.objectStore(store).getAll());
+        result[store] = store === 'settings' ? sanitizeSettingsRecords(records) : records;
       });
       await Promise.all(reads);
       await transactionDone(transaction);
       result._meta = {
         format: 'opencoursedeck-snapshot',
-        version: 2,
+        version: 3,
         databaseVersion: db.version,
         exportedAt: new Date().toISOString(),
+        portableAuthority: false,
         stores: countRecords(result, available),
       };
       return result;
@@ -113,7 +148,8 @@ export function installBackupEngine(root = window) {
 
   facade.importBackup = async (input, { mode = 'merge' } = {}) => {
     if (!['merge', 'overwrite'].includes(mode)) throw new TypeError(`Unsupported import mode: ${mode}`);
-    const included = validateBackup(input);
+    const portable = sanitizePortableBackup(input);
+    const included = validateBackup(portable);
     const db = await openDatabase(root);
     try {
       const missing = included.filter(store => !db.objectStoreNames.contains(store));
@@ -126,14 +162,15 @@ export function installBackupEngine(root = window) {
         for (const storeName of included) {
           const store = transaction.objectStore(storeName);
           if (mode === 'overwrite') store.clear();
-          for (const record of input[storeName]) store.put(record);
-          counts[storeName] = input[storeName].length;
+          for (const record of portable[storeName]) store.put(record);
+          counts[storeName] = portable[storeName].length;
         }
       } catch (error) {
         try { transaction.abort(); } catch {}
         throw error;
       }
       await completion;
+      clearSessionAuthority(root);
 
       const receipt = {
         committed: true,
@@ -141,8 +178,10 @@ export function installBackupEngine(root = window) {
         importedAt: new Date().toISOString(),
         stores: counts,
         totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        aiAuthorityInvalidated: true,
       };
       root.OpenCourseDeck?.bus?.emit?.('storage:import-complete', receipt);
+      root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidated', { reason: 'backup-import' });
       return receipt;
     } finally {
       db.close();
@@ -154,6 +193,7 @@ export function installBackupEngine(root = window) {
   root.OpenCourseDeck.BackupEngine = {
     databaseName: DATABASE_NAME,
     stores: MAIN_STORES,
+    sanitizePortableBackup,
     validateBackup,
   };
   return facade;
