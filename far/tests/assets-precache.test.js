@@ -122,14 +122,17 @@ describe('static assets and service worker precache', () => {
     expect(entry).toContain("import('../app.js')");
   });
 
-  it('initializes the command palette after the app shell import resolves', () => {
+  it('lazy-loads and initializes the command palette after the app shell resolves', () => {
     const entry = fs.readFileSync(path.join(root, 'src/index.js'), 'utf8');
     const appImport = entry.indexOf("import('../app.js')");
+    const commandImport = entry.indexOf("import('./features/commandPalette.js')");
     const commandInit = entry.indexOf('initCommandPalette()');
 
     expect(appImport).toBeGreaterThan(-1);
-    expect(commandInit).toBeGreaterThan(appImport);
-    expect(entry).toContain('.then(() =>');
+    expect(commandImport).toBeGreaterThan(appImport);
+    expect(commandInit).toBeGreaterThan(commandImport);
+    expect(entry).not.toContain("import { initCommandPalette } from './features/commandPalette.js';");
+    expect(entry).toContain('.then(async () =>');
   });
 
   it('documents service worker update behavior and offline-friendly catalog caching', () => {
