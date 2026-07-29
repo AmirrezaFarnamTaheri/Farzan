@@ -70,6 +70,7 @@ jobs:
               .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at));
 
             let deleted = 0;
+            let alreadyGone = 0;
             const failures = [];
             const previewRows = [];
 
@@ -96,6 +97,11 @@ jobs:
                 });
                 deleted += 1;
               } catch (error) {
+                if (error.status === 404) {
+                  alreadyGone += 1;
+                  core.notice(`Artifact ${artifact.name} (${artifact.id}) was already removed; continuing.`);
+                  continue;
+                }
                 const message = `${artifact.name} (${artifact.id}): ${error.message}`;
                 failures.push(message);
                 core.warning(`Artifact deletion failed but cleanup will continue: ${message}`);
@@ -111,6 +117,7 @@ jobs:
                 [{ data: 'Scanned', header: true }, String(artifacts.length)],
                 [{ data: 'Candidates', header: true }, String(staleArtifacts.length)],
                 [{ data: 'Deleted', header: true }, String(deleted)],
+                [{ data: 'Already absent', header: true }, String(alreadyGone)],
                 [{ data: 'Deletion failures', header: true }, String(failures.length)],
               ]);
 
