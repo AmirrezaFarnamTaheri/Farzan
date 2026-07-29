@@ -84,14 +84,27 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
-  it('rejects a release workflow without idempotent retry protection', () => {
-    const broken = workflows['release.yml'].replace(
-      '      - name: Detect an already-complete release',
-      '      - name: Inspect existing release',
-    );
+  it('requires serialized publication and tag checks around the mutation', () => {
+    const broken = workflows['release.yml']
+      .replace('group: release-${{ github.repository }}', 'group: release-${{ github.event_name }}-${{ github.ref_name }}')
+      .replace('      - name: Reverify immutable tag before publication', '      - name: Prepare publication')
+      .replace('      - name: Verify published release identity', '      - name: Report publication');
+
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('serialized concurrency group'),
+      expect.stringContaining('immediately before publication'),
+      expect.stringContaining('verified after mutation'),
+    ]));
+  });
+
+  it('requires idempotent retries to validate release assets, not only names', () => {
+    const broken = workflows['release.yml']
+      .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
+      .replace('fs.statSync', 'fs.existsSync');
 
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('idempotent release retry detection'),
+      expect.stringContaining('compare local and remote asset sizes'),
     ]));
   });
 
@@ -129,17 +142,19 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
-  it('requires maintenance dry-run, retries, summary, and failure isolation', () => {
+  it('requires maintenance dry-run, retries, summary, failure isolation, and 404 tolerance', () => {
     const broken = workflows['actions-maintenance.yml']
       .replace('          retries: 3\n', '')
       .replace('      dry_run:\n', '      preview:\n')
       .replace('cleanup will continue', 'cleanup stopped')
+      .replace('error.status === 404', 'error.status === 410')
       .replace('core.summary', 'core.notice');
 
     expect(validateMaintenanceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('retry transient failures'),
       expect.stringContaining('dry-run control'),
       expect.stringContaining('must not stop remaining cleanup'),
+      expect.stringContaining('idempotent no-op'),
       expect.stringContaining('summary is missing'),
     ]));
   });
