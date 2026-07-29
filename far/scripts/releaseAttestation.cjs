@@ -55,13 +55,30 @@ function writeReleaseManifest({
   if (artifactStat.isSymbolicLink() || !artifactStat.isDirectory()) {
     throw new Error(`Release artifact root is not a regular directory: ${artifactRoot}`);
   }
-  const manifest = createManifest({ root: artifactRoot, version, commit, product, artifactRoot: artifactLabel });
+  const manifest = createManifest({
+    root: artifactRoot,
+    version,
+    commit,
+    product,
+    artifactRoot: artifactLabel,
+  });
   ensureDirectory(path.dirname(outputFile), { root: repositoryRoot });
   atomicWrite(outputFile, `${JSON.stringify(manifest, null, 2)}\n`, { root: repositoryRoot });
-  return { manifest, outputFile, manifestSha256: manifestDigest(manifest) };
+  return {
+    manifest,
+    outputFile,
+    manifestSha256: manifestDigest(manifest),
+  };
 }
 
-function verifyReleaseManifestFile({ repositoryRoot, artifactRoot, manifestFile, expectedVersion, expectedCommit, exact = true } = {}) {
+function verifyReleaseManifestFile({
+  repositoryRoot,
+  artifactRoot,
+  manifestFile,
+  expectedVersion,
+  expectedCommit,
+  exact = true,
+} = {}) {
   if (!repositoryRoot || !artifactRoot || !manifestFile) {
     throw new TypeError('verifyReleaseManifestFile requires repositoryRoot, artifactRoot, and manifestFile');
   }
@@ -82,7 +99,13 @@ function verifyReleaseManifestFile({ repositoryRoot, artifactRoot, manifestFile,
   return { manifest, verification };
 }
 
-function writeVerificationAttestation({ repositoryRoot, outputFile, manifestFile, manifest, verification } = {}) {
+function writeVerificationAttestation({
+  repositoryRoot,
+  outputFile,
+  manifestFile,
+  manifest,
+  verification,
+} = {}) {
   if (!repositoryRoot || !outputFile || !manifestFile || !manifest || !verification) {
     throw new TypeError('writeVerificationAttestation requires all release verification inputs');
   }
