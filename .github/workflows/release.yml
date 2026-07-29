@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Optional release tag. Leave blank to use v<far/package.json version> from main.'
+        description: 'Optional existing release tag to retry. Leave blank to release v<far/package.json version> from main.'
         required: false
         type: string
 
@@ -23,9 +23,9 @@ env:
   NODE_VERSION: '22'
 
 # Release state machine:
-# 1. Resolve package version, tag state, and exact commit.
+# 1. Resolve the requested/default tag, its exact commit, and its own package version.
 # 2. Verify and package that immutable commit while collecting every safe failure.
-# 3. Serialize publication, create a missing tag only after verification, and publish once.
+# 3. Serialize publication, create a missing default tag only after verification, and publish once.
 concurrency:
   group: release-${{ github.repository }}
   cancel-in-progress: false
@@ -78,21 +78,19 @@ jobs:
           REQUESTED_TAG: ${{ inputs.tag }}
           TRIGGER_TAG: ${{ github.ref_name }}
         run: |
-          package_version="$(node -p "require('./far/package.json').version")"
-          expected_tag="v${package_version}"
+          main_package_version="$(node -p "require('./far/package.json').version")"
+          main_expected_tag="v${main_package_version}"
 
           if [[ "$EVENT_NAME" == "push" ]]; then
             release_tag="$TRIGGER_TAG"
+          elif [[ -n "$REQUESTED_TAG" ]]; then
+            release_tag="$REQUESTED_TAG"
           else
-            release_tag="${REQUESTED_TAG:-$expected_tag}"
+            release_tag="$main_expected_tag"
           fi
 
           if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error title=Invalid release tag::$release_tag is not a semantic-version tag such as $expected_tag." >&2
-            exit 1
-          fi
-          if [[ "$release_tag" != "$expected_tag" ]]; then
-            echo "::error title=Version mismatch::Requested tag $release_tag does not match far/package.json version $expected_tag. Update the package version or leave the manual tag input blank." >&2
+            echo "::error title=Invalid release tag::$release_tag is not a semantic-version tag such as $main_expected_tag. Correct the tag input or leave it blank to release the current main package version." >&2
             exit 1
           fi
 
@@ -105,11 +103,24 @@ jobs:
             checkout_ref="refs/tags/$release_tag"
             tag_exists=true
             bootstrap_tag=false
-          else
-            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
-              echo "::error title=Missing pushed tag::The push event references $release_tag, but the tag cannot be resolved from origin." >&2
+            package_version="$(git show "${release_commit}:far/package.json" | node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(0,'utf8')).version)")"
+            expected_tag="v${package_version}"
+            if [[ "$release_tag" != "$expected_tag" ]]; then
+              echo "::error title=Tagged version mismatch::Existing tag $release_tag points to a commit whose far/package.json version requires $expected_tag. Create a new correctly versioned tag; do not move the existing tag." >&2
               exit 1
             fi
+          else
+            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+              echo "::error title=Missing pushed tag::The push event references $release_tag, but origin cannot resolve it. Restore the pushed tag or dispatch the Release workflow from main with a blank tag." >&2
+              exit 1
+            fi
+            if [[ -n "$REQUESTED_TAG" ]]; then
+              echo "::error title=Requested retry tag is missing::Tag $release_tag does not exist. To create the current main release, dispatch again with the tag field blank; otherwise create and push the intended existing tag before retrying." >&2
+              exit 1
+            fi
+
+            release_tag="$main_expected_tag"
+            package_version="$main_package_version"
             release_commit="$(git rev-parse HEAD)"
             checkout_ref="$release_commit"
             tag_exists=false
@@ -123,7 +134,7 @@ jobs:
           fi
 
           if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/main; then
-            echo "::error title=Release commit is outside main::$release_commit is not reachable from main. Merge the intended change and create a new version release." >&2
+            echo "::error title=Release commit is outside main::$release_commit is not reachable from main. Merge the intended commit into main and create or retry a version tag from that history." >&2
             exit 1
           fi
 
@@ -189,20 +200,20 @@ jobs:
         run: |
           actual_commit="$(git rev-parse HEAD)"
           if [[ "$actual_commit" != "$SOURCE_VERSION" ]]; then
-            echo "::error title=Checkout identity changed::Checked out $actual_commit, expected $SOURCE_VERSION." >&2
+            echo "::error title=Checkout identity changed::Checked out $actual_commit, expected $SOURCE_VERSION. Re-run the release and investigate any changed tag or ref." >&2
             exit 1
           fi
 
           package_version="$(node -p "require('./package.json').version")"
           expected_tag="v${package_version}"
           if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
-            echo "::error title=Version mismatch::Tag $RELEASE_TAG does not match package version $expected_tag." >&2
+            echo "::error title=Version mismatch::Tag $RELEASE_TAG does not match package version $expected_tag. Correct the package version and create a new tag; never move an existing release tag." >&2
             exit 1
           fi
 
           git fetch --force --no-tags origin main:refs/remotes/origin/main
           if ! git merge-base --is-ancestor "$actual_commit" refs/remotes/origin/main; then
-            echo "::error title=Release commit left main::$actual_commit is no longer reachable from main." >&2
+            echo "::error title=Release commit left main::$actual_commit is no longer reachable from main. Restore the intended main history or release a new commit that is reachable from main." >&2
             exit 1
           fi
 
@@ -222,6 +233,7 @@ jobs:
             echo "npm ci failed with exit code $status" | tee -a "$log"
             echo "::endgroup::"
             if (( attempt < 3 )); then
+              echo "Transient installation failure suspected; retrying after $((attempt * 10)) seconds." | tee -a "$log"
               sleep $((attempt * 10))
             fi
           done
@@ -281,7 +293,7 @@ jobs:
             git diff --stat -- dist vendor | tee reports/generated-diff-stat.txt
             git diff --binary -- dist vendor > reports/generated.patch
             cat reports/generated-diff-status.txt
-            echo "::error title=Generated artifacts changed::Regenerate and commit dist/vendor on main, then run the release again." >&2
+            echo "::error title=Generated artifacts changed::Regenerate and commit dist/vendor on main, then run the release again. Download release diagnostics for the exact diff." >&2
             exit 1
           fi
 
@@ -326,6 +338,9 @@ jobs:
             echo "::group::browser smoke attempt $attempt of 2"
             if npm run smoke:browser 2>&1 | tee -a "$log"; then
               echo "::endgroup::"
+              if (( attempt > 1 )); then
+                echo "::warning title=Browser smoke recovered on retry::The first release browser-smoke attempt failed. Review the retained log for flakiness before relying on repeated recovery."
+              fi
               exit 0
             fi
             status=${PIPESTATUS[0]}
@@ -458,7 +473,7 @@ jobs:
 
           if (( ${#failures[@]} > 0 )); then
             printf '::error title=Release verification failed::%s\n' "${failures[*]}"
-            echo "Review the summary and release diagnostics artifact for every failure; skipped checks indicate an unmet prerequisite." >&2
+            echo "Review the summary and release diagnostics artifact for every failure; skipped checks indicate an unmet prerequisite. Correct the first deterministic failure and rerun from main or the existing tag." >&2
             exit 1
           fi
 
@@ -488,10 +503,10 @@ jobs:
           const expectedVersion = process.env.RELEASE_TAG.slice(1);
           const expectedCommit = process.env.SOURCE_VERSION.toLowerCase();
           for (const [name, document] of [['manifest', manifest], ['attestation', attestation]]) {
-            if (document.version !== expectedVersion) throw new Error(`${name} version ${document.version} does not match ${expectedVersion}`);
-            if (document.commit !== expectedCommit) throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}`);
+            if (document.version !== expectedVersion) throw new Error(`${name} version ${document.version} does not match ${expectedVersion}. Rebuild the release from the matching package version.`);
+            if (document.commit !== expectedCommit) throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}. Re-run verification for the exact release commit.`);
           }
-          if (attestation.verified !== true) throw new Error('Release attestation is not verified');
+          if (attestation.verified !== true) throw new Error('Release attestation is not verified. Download release diagnostics, correct the failed integrity check, and rerun the Release workflow from main or the existing tag.');
           NODE
 
           (
@@ -579,7 +594,7 @@ jobs:
             } catch (error) {
               if (error.status !== 404) throw error;
               if (!bootstrap) {
-                core.setFailed(`Release tag ${tag} is missing and this run is not authorized to bootstrap it.`);
+                core.setFailed(`Release tag ${tag} is missing and this run is not authorized to bootstrap it. Dispatch the Release workflow from main with a blank tag to create the current package tag, or create and push the intended existing tag before retrying.`);
                 return;
               }
               core.notice(`Creating immutable release tag ${tag} at ${expected}`);
@@ -594,7 +609,7 @@ jobs:
 
             const resolved = await resolveObject(ref.data.object);
             if (resolved.type !== 'commit' || resolved.sha.toLowerCase() !== expected) {
-              core.setFailed(`Tag ${tag} resolves to ${resolved.type}:${resolved.sha}, expected commit ${expected}. Refusing to move an immutable release tag.`);
+              core.setFailed(`Tag ${tag} resolves to ${resolved.type}:${resolved.sha}, expected commit ${expected}. Refusing to move an immutable release tag. Investigate the tag and publish a new version instead.`);
               return;
             }
             core.info(`Verified ${tag} -> ${expected}`);
@@ -646,7 +661,7 @@ jobs:
                 core.setOutput('complete', 'true');
                 return;
               }
-              core.setFailed(`Release ${tag} already exists but is incomplete, size-mismatched, or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Size mismatches: ${sizeMismatches.join('; ') || '<none>'}. Resolve the partial release before retrying.`);
+              core.setFailed(`Release ${tag} already exists but is incomplete, size-mismatched, or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Size mismatches: ${sizeMismatches.join('; ') || '<none>'}. Inspect the existing release and diagnostics; repair or remove the partial draft before retrying without overwriting assets.`);
             } catch (error) {
               if (error.status !== 404) throw error;
               core.setOutput('complete', 'false');
@@ -676,7 +691,7 @@ jobs:
               object = tag.data.object;
             }
             if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
-              core.setFailed(`Release tag changed before publication: ${object.type}:${object.sha}`);
+              core.setFailed(`Release tag changed before publication: ${object.type}:${object.sha}. Stop publication, restore the intended immutable reference only after investigation, and release a new version when uncertain.`);
             }
 
       - name: Publish GitHub Release
@@ -718,7 +733,7 @@ jobs:
               object = tag.data.object;
             }
             if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
-              core.setFailed(`Published release tag does not resolve to the verified commit: ${object.type}:${object.sha}`);
+              core.setFailed(`Published release tag does not resolve to the verified commit: ${object.type}:${object.sha}. Treat the release as compromised, stop distribution, and investigate the tag before creating a new version.`);
               return;
             }
             const release = await github.rest.repos.getReleaseByTag({
@@ -726,7 +741,7 @@ jobs:
               repo: context.repo.repo,
               tag: process.env.RELEASE_TAG,
             });
-            if (release.data.draft) core.setFailed(`Release ${process.env.RELEASE_TAG} remained a draft after publication.`);
+            if (release.data.draft) core.setFailed(`Release ${process.env.RELEASE_TAG} remained a draft after publication. Open the release, inspect uploaded assets and diagnostics, then publish it only after verification.`);
 
       - name: Summarize publication
         if: always()
