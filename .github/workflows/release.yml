@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to create (for example v1.1.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: far
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Vendor browser dependencies
+        run: npm run vendor
+
+      - name: Validate tag version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          node - <<'NODE'
+          const pkg = require('./package.json');
+          const tag = process.env.TAG || process.env.GITHUB_REF_NAME;
+          if (!/^v\d+\.\d+\.\d+/.test(tag)) {
+            throw new Error(`Invalid release tag: ${tag}`);
+          }
+          if (`v${pkg.version}` !== tag) {
+            throw new Error(`Tag ${tag} does not match package version v${pkg.version}`);
+          }
+          NODE
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+
+      - name: Build release
+        run: npm run build:release
+
+      - name: Verify generated output
+        run: npm run check:generated
+
+      - name: Generate release attestation
+        run: npm run release:attest
+
+      - name: Run release integrity checks
+        run: node scripts/adversarial-release-test.cjs
+
+      - name: Run tests
+        run: npm test
+
+      - name: Create release archive
+        run: |
+          mkdir -p ../release-assets
+          tar -czf ../release-assets/opencoursedeck-${GITHUB_REF_NAME}.tar.gz dist
+          sha256sum ../release-assets/* > ../release-assets/SHA256SUMS
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-assets-${{ github.ref_name }}
+          path: release-assets/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/*.tar.gz
+            release-assets/SHA256SUMS
