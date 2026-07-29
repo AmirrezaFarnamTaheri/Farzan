@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
+  extractWorkflowDispatchTagInput,
   validateActionPins,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
@@ -61,6 +62,19 @@ describe('GitHub Actions hardening', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
   });
 
+  it('scopes the optional-tag assertion to workflow_dispatch.inputs.tag', () => {
+    const tagInput = extractWorkflowDispatchTagInput(workflows['release.yml']);
+    expect(tagInput).toContain('required: false');
+
+    const broken = workflows['release.yml']
+      .replace(tagInput, tagInput.replace('required: false', 'required: true'))
+      .replace('permissions:\n', 'permissions:\n  required: false\n');
+
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('workflow_dispatch tag input must be optional'),
+    ]));
+  });
+
   it('rejects release authorization that happens after checkout', () => {
     const workflow = workflows['release.yml'];
     const guard = workflow.indexOf('      - name: Require an authoritative trigger');
@@ -75,12 +89,25 @@ describe('GitHub Actions hardening', () => {
 
   it('rejects a release workflow that cannot derive or bootstrap the package tag', () => {
     const broken = workflows['release.yml']
-      .replace('expected_tag="v${package_version}"', 'expected_tag="$REQUESTED_TAG"')
+      .replaceAll('main_expected_tag="v${main_package_version}"', 'main_expected_tag="$REQUESTED_TAG"')
       .replace('github.rest.git.createRef', 'github.rest.git.getRef');
 
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('derive the release tag from package version'),
+      expect.stringContaining('derive the default release tag'),
       expect.stringContaining('created only after verification'),
+    ]));
+  });
+
+  it('requires provided-tag retries to validate the tagged commit version', () => {
+    const broken = workflows['release.yml']
+      .replace('git show "${release_commit}:far/package.json"', 'cat far/package.json')
+      .replace('if [[ -n "$REQUESTED_TAG" ]]', 'if [[ -z "$REQUESTED_TAG" ]]')
+      .replace('Requested retry tag is missing', 'Tag missing');
+
+    expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('tagged commit package version'),
+      expect.stringContaining('distinguish provided-tag retries'),
+      expect.stringContaining('actionable failure guidance'),
     ]));
   });
 
@@ -116,6 +143,17 @@ describe('GitHub Actions hardening', () => {
     expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('independent checks must continue'),
       expect.stringContaining('final aggregate failure gate'),
+    ]));
+  });
+
+  it('requires safe context expansion and repository-relative annotations', () => {
+    const broken = workflows['ci.yml']
+      .replace('GIT_REF: ${{ github.ref }}', 'GIT_REF: unsafe')
+      .replace('path.relative(root, report.filePath)', 'report.filePath');
+
+    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('context values must pass through env'),
+      expect.stringContaining('repository-relative paths'),
     ]));
   });
 
