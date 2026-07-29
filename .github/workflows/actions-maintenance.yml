@@ -19,12 +19,24 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Cleanup old workflow artifacts
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           RETENTION_DAYS: '14'
         with:
+          retries: 3
           script: |
-            const retentionDays = Number.parseInt(process.env.RETENTION_DAYS, 10);
+            const rawRetentionDays = process.env.RETENTION_DAYS || '';
+            if (!/^[1-9][0-9]*$/.test(rawRetentionDays)) {
+              core.setFailed(`RETENTION_DAYS must be a positive integer, received: ${rawRetentionDays || '<empty>'}`);
+              return;
+            }
+
+            const retentionDays = Number.parseInt(rawRetentionDays, 10);
+            if (!Number.isInteger(retentionDays) || retentionDays > 3650) {
+              core.setFailed(`RETENTION_DAYS must be between 1 and 3650, received: ${rawRetentionDays}`);
+              return;
+            }
+
             const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
             const artifacts = await github.paginate(
               github.rest.actions.listArtifactsForRepo,

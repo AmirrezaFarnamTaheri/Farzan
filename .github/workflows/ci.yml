@@ -25,10 +25,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
           cache: npm
@@ -45,6 +47,9 @@ jobs:
 
       - name: Check encoding
         run: npm run check:encoding 2>&1 | tee reports/encoding.log
+
+      - name: Check workflow invariants
+        run: npm run check:workflows 2>&1 | tee reports/workflow-check.log
 
       - name: Validate repository
         run: npm run validate 2>&1 | tee reports/validate.log
@@ -123,7 +128,7 @@ jobs:
 
       - name: Upload CI diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ci-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: far/reports

@@ -42,17 +42,16 @@ jobs:
           DISPATCH_REF: ${{ github.ref }}
         run: |
           if [[ "$EVENT_NAME" == "workflow_dispatch" && "$DISPATCH_REF" != "refs/heads/main" ]]; then
-            echo "Manual releases must be dispatched from refs/heads/main, not $DISPATCH_REF" >&2
+            echo "Manual releases must be dispatched from refs/heads/main, not $DISPATCH_REF. Select main in the workflow branch picker and dispatch the existing release tag again." >&2
             exit 1
           fi
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid release tag: $RELEASE_TAG" >&2
-            echo "Expected an existing semantic-version tag such as v1.1.2" >&2
+            echo "Invalid release tag: $RELEASE_TAG. Supply an existing semantic-version tag such as v1.1.2." >&2
             exit 1
           fi
 
       - name: Check out the exact release tag
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -71,7 +70,7 @@ jobs:
           }
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
           cache: npm
@@ -83,25 +82,25 @@ jobs:
         run: |
           git fetch --force --no-tags origin main:refs/remotes/origin/main
           git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
-            echo "Release tag does not exist: $RELEASE_TAG" >&2
+            echo "Release tag does not exist locally: $RELEASE_TAG. Create and push the tag before dispatching the release workflow." >&2
             exit 1
           }
 
           release_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           head_commit="$(git rev-parse HEAD)"
           if [[ "$head_commit" != "$release_commit" ]]; then
-            echo "Checked-out commit $head_commit does not match $RELEASE_TAG ($release_commit)" >&2
+            echo "Checked-out commit $head_commit does not match $RELEASE_TAG ($release_commit). Do not move release tags; dispatch the workflow for the immutable tag commit." >&2
             exit 1
           fi
           if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/main; then
-            echo "Release commit $release_commit is not reachable from main" >&2
+            echo "Release commit $release_commit is not reachable from main. Merge the intended commit to main and create a new version tag from that main commit." >&2
             exit 1
           fi
 
           package_version="$(node -p "require('./package.json').version")"
           expected_tag="v${package_version}"
           if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
-            echo "Tag $RELEASE_TAG does not match package version $expected_tag" >&2
+            echo "Tag $RELEASE_TAG does not match package version $expected_tag. Update package.json before tagging, or dispatch the tag that matches the committed package version." >&2
             exit 1
           fi
 
@@ -119,6 +118,10 @@ jobs:
       - name: Check encoding
         working-directory: far
         run: npm run check:encoding
+
+      - name: Check workflow invariants
+        working-directory: far
+        run: npm run check:workflows
 
       - name: Validate repository
         working-directory: far
@@ -144,7 +147,7 @@ jobs:
           if [[ -s "$status_file" ]]; then
             cat "$status_file"
             git diff --stat -- dist vendor
-            echo "Release generation changed committed dist/vendor content" >&2
+            echo "Release generation changed committed dist/vendor content. Regenerate and commit those files on main, then create a new release tag." >&2
             exit 1
           fi
 
@@ -238,7 +241,7 @@ jobs:
           )
 
       - name: Upload verified release assets
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: release-assets-${{ env.RELEASE_TAG }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: far/release-assets/
@@ -255,7 +258,7 @@ jobs:
 
     steps:
       - name: Re-check the release tag
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -268,12 +271,12 @@ jobs:
         run: |
           actual_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
-            echo "Release tag moved from $EXPECTED_COMMIT to $actual_commit" >&2
+            echo "Release tag moved from $EXPECTED_COMMIT to $actual_commit. Restore the immutable tag reference and investigate before publishing." >&2
             exit 1
           fi
 
       - name: Download verified release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: release-assets-${{ env.RELEASE_TAG }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-assets
@@ -283,11 +286,12 @@ jobs:
         run: cd release-assets && sha256sum -c SHA256SUMS
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ needs.build.outputs.release_commit }}
           generate_release_notes: true
+          overwrite_files: false
           fail_on_unmatched_files: true
           files: |
             release-assets/*.tar.gz
