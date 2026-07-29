@@ -11,6 +11,7 @@ const {
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,
+  validateVerificationWorkflow,
   validateWorkflowSet,
 } = require('../scripts/check-workflows.cjs');
 
@@ -24,6 +25,7 @@ function readWorkflow(filename) {
 
 const workflows = {
   'ci.yml': readWorkflow('ci.yml'),
+  'verify.yml': readWorkflow('verify.yml'),
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };
@@ -44,7 +46,6 @@ describe('module and command contract', () => {
     const referencedTools = Object.values(packageJson.scripts).flatMap((command) => (
       [...command.matchAll(/\bnode\s+((?:scripts|desktop)\/[^\s&|]+\.cjs)\b/g)].map((match) => match[1])
     ));
-
     expect(referencedTools.length).toBeGreaterThan(0);
     for (const relativePath of referencedTools) {
       expect(fs.existsSync(path.join(projectRoot, relativePath)), relativePath).toBe(true);
@@ -62,14 +63,30 @@ describe('GitHub Actions hardening', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
   });
 
+  it('requires CI and release to share one verification implementation', () => {
+    const brokenCi = workflows['ci.yml']
+      .replace('uses: ./.github/workflows/verify.yml', 'runs-on: ubuntu-latest')
+      .replace('source_ref: ${{ github.sha }}', 'source_ref: main');
+    const brokenRelease = workflows['release.yml']
+      .replace('uses: ./.github/workflows/verify.yml', 'runs-on: ubuntu-latest')
+      .replace('release_mode: true', 'release_mode: false');
+
+    expect(validateCiWorkflow(brokenCi)).toEqual(expect.arrayContaining([
+      expect.stringContaining('shared verification workflow'),
+      expect.stringContaining('exact trigger commit'),
+    ]));
+    expect(validateReleaseWorkflow(brokenRelease)).toEqual(expect.arrayContaining([
+      expect.stringContaining('shared verification workflow'),
+      expect.stringContaining('release mode'),
+    ]));
+  });
+
   it('scopes the optional-tag assertion to workflow_dispatch.inputs.tag', () => {
     const tagInput = extractWorkflowDispatchTagInput(workflows['release.yml']);
     expect(tagInput).toContain('required: false');
-
     const broken = workflows['release.yml']
       .replace(tagInput, tagInput.replace('required: false', 'required: true'))
       .replace('permissions:\n', 'permissions:\n  required: false\n');
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('workflow_dispatch tag input must be optional'),
     ]));
@@ -81,7 +98,6 @@ describe('GitHub Actions hardening', () => {
     const checkout = workflow.indexOf('      - name: Check out release source');
     const guardBlock = workflow.slice(guard, checkout);
     const broken = workflow.slice(0, guard) + workflow.slice(checkout, checkout + guardBlock.length) + guardBlock + workflow.slice(checkout + guardBlock.length);
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('must execute before checkout'),
     ]));
@@ -91,7 +107,6 @@ describe('GitHub Actions hardening', () => {
     const broken = workflows['release.yml']
       .replaceAll('main_expected_tag="v${main_package_version}"', 'main_expected_tag="$REQUESTED_TAG"')
       .replace('github.rest.git.createRef', 'github.rest.git.getRef');
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('derive the default release tag'),
       expect.stringContaining('created only after verification'),
@@ -103,7 +118,6 @@ describe('GitHub Actions hardening', () => {
       .replace('git show "${release_commit}:far/package.json"', 'cat far/package.json')
       .replaceAll('[[ -n "$REQUESTED_TAG" ]]', '[[ -z "$REQUESTED_TAG" ]]')
       .replace('Requested retry tag is missing', 'Tag missing');
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('tagged commit package version'),
       expect.stringContaining('distinguish provided-tag retries'),
@@ -116,7 +130,6 @@ describe('GitHub Actions hardening', () => {
       .replace('group: release-${{ github.repository }}', 'group: release-${{ github.event_name }}-${{ github.ref_name }}')
       .replace('      - name: Reverify immutable tag before publication', '      - name: Prepare publication')
       .replace('      - name: Verify published release identity', '      - name: Report publication');
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('serialized concurrency group'),
       expect.stringContaining('immediately before publication'),
@@ -128,54 +141,43 @@ describe('GitHub Actions hardening', () => {
     const broken = workflows['release.yml']
       .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
       .replace('fs.statSync', 'fs.existsSync');
-
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('idempotent release retry detection'),
       expect.stringContaining('compare local and remote asset sizes'),
     ]));
   });
 
-  it('rejects CI that stops at the first independent failure', () => {
-    const broken = workflows['ci.yml']
+  it('requires the shared pipeline to remain tolerant, observable, and strict at the final gate', () => {
+    const broken = workflows['verify.yml']
       .replaceAll('continue-on-error: true\n', '')
-      .replace('      - name: Enforce CI result', '      - name: Report CI result');
-
-    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('independent checks must continue'),
-      expect.stringContaining('final aggregate failure gate'),
-    ]));
-  });
-
-  it('requires safe context expansion and repository-relative annotations', () => {
-    const broken = workflows['ci.yml']
+      .replace('for attempt in 1 2 3', 'for attempt in 1')
+      .replace('      - name: Enforce verification result', '      - name: Report verification result')
       .replace('GIT_REF: ${{ github.ref }}', 'GIT_REF: unsafe')
       .replace('path.relative(root, report.filePath)', 'report.filePath');
-
-    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
+    expect(validateVerificationWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('independent checks must continue'),
+      expect.stringContaining('dependency-install retry'),
+      expect.stringContaining('aggregate result gate'),
       expect.stringContaining('context values must pass through env'),
       expect.stringContaining('repository-relative paths'),
     ]));
   });
 
-  it('rejects mutable or unreviewed action references', () => {
-    const mutable = workflows['ci.yml'].replace(
-      /actions\/checkout@[0-9a-f]{40}/,
-      'actions/checkout@v6',
-    );
-    expect(validateActionPins('ci.yml', mutable)).toEqual(expect.arrayContaining([
+  it('rejects mutable or unreviewed action references across the shared workflow', () => {
+    const mutable = workflows['verify.yml'].replace(/actions\/checkout@[0-9a-f]{40}/, 'actions/checkout@v6');
+    expect(validateActionPins('verify.yml', mutable)).toEqual(expect.arrayContaining([
       expect.stringContaining('40-character commit SHA'),
     ]));
-
     const unknownSha = 'a'.repeat(40);
-    const unknown = `${workflows['ci.yml']}\n      - uses: example/unreviewed@${unknownSha}\n`;
-    expect(validateActionPins('ci.yml', unknown)).toEqual(expect.arrayContaining([
+    const unknown = `${workflows['verify.yml']}\n      - uses: example/unreviewed@${unknownSha}\n`;
+    expect(validateActionPins('verify.yml', unknown)).toEqual(expect.arrayContaining([
       expect.stringContaining('audited action allowlist'),
     ]));
   });
 
-  it('requires CI checkout credentials to be ephemeral', () => {
-    const broken = workflows['ci.yml'].replace('          persist-credentials: false\n', '');
-    expect(validateCiWorkflow(broken)).toEqual(expect.arrayContaining([
+  it('requires shared checkout credentials to be ephemeral', () => {
+    const broken = workflows['verify.yml'].replace('          persist-credentials: false\n', '');
+    expect(validateVerificationWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('disable persisted credentials'),
     ]));
   });
@@ -187,7 +189,6 @@ describe('GitHub Actions hardening', () => {
       .replace('cleanup will continue', 'cleanup stopped')
       .replace('error.status === 404', 'error.status === 410')
       .replace('core.summary', 'core.notice');
-
     expect(validateMaintenanceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('retry transient failures'),
       expect.stringContaining('dry-run control'),
