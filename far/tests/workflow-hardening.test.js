@@ -92,7 +92,8 @@ describe('GitHub Actions hardening', () => {
       expect.stringContaining('40-character commit SHA'),
     ]));
 
-    const unknown = `${workflows['ci.yml']}\n      - uses: example/unreviewed@0123456789abcdef0123456789abcdef01234567\n`;
+    const unknownSha = 'a'.repeat(40);
+    const unknown = `${workflows['ci.yml']}\n      - uses: example/unreviewed@${unknownSha}\n`;
     expect(validateActionPins('ci.yml', unknown)).toEqual(expect.arrayContaining([
       expect.stringContaining('audited action allowlist'),
     ]));
