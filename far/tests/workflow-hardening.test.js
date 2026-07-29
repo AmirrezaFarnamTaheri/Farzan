@@ -79,7 +79,7 @@ describe('GitHub Actions hardening', () => {
       .replace('github.rest.git.createRef', 'github.rest.git.getRef');
 
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('derive from package version'),
+      expect.stringContaining('derive the release tag from package version'),
       expect.stringContaining('created only after verification'),
     ]));
   });
