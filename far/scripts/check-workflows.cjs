@@ -31,8 +31,11 @@ function extractWorkflowDispatchTagInput(workflow) {
   const tagMarker = '      tag:';
   const tagStart = workflow.indexOf(tagMarker, dispatchStart);
   if (tagStart < 0 || tagStart >= dispatchEnd) return '';
-  const nextInput = workflow.indexOf('\n      ', tagStart + tagMarker.length);
-  const tagEnd = nextInput >= 0 && nextInput < dispatchEnd ? nextInput : dispatchEnd;
+
+  const contentStart = tagStart + tagMarker.length;
+  const remainder = workflow.slice(contentStart, dispatchEnd);
+  const nextSiblingOffset = remainder.search(/\n {6}\S/);
+  const tagEnd = nextSiblingOffset < 0 ? dispatchEnd : contentStart + nextSiblingOffset;
   return workflow.slice(tagStart, tagEnd);
 }
 
