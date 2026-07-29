@@ -31,7 +31,6 @@ function extractWorkflowDispatchTagInput(workflow) {
   const tagMarker = '      tag:';
   const tagStart = workflow.indexOf(tagMarker, dispatchStart);
   if (tagStart < 0 || tagStart >= dispatchEnd) return '';
-
   const contentStart = tagStart + tagMarker.length;
   const remainder = workflow.slice(contentStart, dispatchEnd);
   const nextSiblingOffset = remainder.search(/\n {6}\S/);
@@ -42,38 +41,29 @@ function extractWorkflowDispatchTagInput(workflow) {
 function validateActionPins(filename, workflow) {
   const errors = [];
   const usesPattern = /^[ \t]*(?:-[ \t]+)?uses:[ \t]*([^\s#]+)(?:[ \t]+#[ \t]*(\S+))?[ \t]*$/gm;
-
   for (const match of workflow.matchAll(usesPattern)) {
     const reference = match[1];
     const versionComment = match[2] || '';
     if (reference.startsWith('./')) continue;
-
     const at = reference.lastIndexOf('@');
     if (at <= 0) {
       errors.push(`${filename}: malformed action reference ${reference}`);
       continue;
     }
-
     const action = reference.slice(0, at);
     const revision = reference.slice(at + 1);
     if (!/^[0-9a-f]{40}$/.test(revision)) {
       errors.push(`${filename}: ${action} must be pinned to a lowercase 40-character commit SHA`);
       continue;
     }
-
     const expected = EXPECTED_ACTION_PINS.get(action);
     if (!expected) {
       errors.push(`${filename}: ${action} is not in the audited action allowlist`);
       continue;
     }
-    if (revision !== expected.sha) {
-      errors.push(`${filename}: ${action} is pinned to ${revision}; expected ${expected.sha} (${expected.version})`);
-    }
-    if (versionComment !== expected.version) {
-      errors.push(`${filename}: ${action}@${revision} must carry the version comment # ${expected.version}`);
-    }
+    if (revision !== expected.sha) errors.push(`${filename}: ${action} is pinned to ${revision}; expected ${expected.sha} (${expected.version})`);
+    if (versionComment !== expected.version) errors.push(`${filename}: ${action}@${revision} must carry the version comment # ${expected.version}`);
   }
-
   return errors;
 }
 
@@ -83,28 +73,46 @@ function requireText(errors, text, expected, message) {
 
 function validateCiWorkflow(workflow) {
   const errors = [];
-  const checkout = extractNamedStep(workflow, 'Check out repository');
+  requireText(errors, workflow, 'uses: ./.github/workflows/verify.yml', 'ci.yml: CI must call the shared verification workflow');
+  requireText(errors, workflow, 'source_ref: ${{ github.sha }}', 'ci.yml: CI must verify the exact trigger commit');
+  requireText(errors, workflow, 'release_mode: false', 'ci.yml: CI must call shared verification in non-release mode');
+  if (workflow.includes('npm run ') || workflow.includes('npm ci ')) {
+    errors.push('ci.yml: verification commands must remain centralized in verify.yml');
+  }
+  return errors;
+}
+
+function validateVerificationWorkflow(workflow) {
+  const errors = [];
+  requireText(errors, workflow, 'workflow_call:', 'verify.yml: reusable workflow_call trigger is missing');
+  requireText(errors, workflow, 'source_ref:', 'verify.yml: exact source_ref input is missing');
+  requireText(errors, workflow, 'release_mode:', 'verify.yml: release_mode input is missing');
+
+  const checkout = extractNamedStep(workflow, 'Check out verification source');
   if (!checkout) {
-    errors.push('ci.yml: checkout step is missing');
-  } else if (!checkout.includes('persist-credentials: false')) {
-    errors.push('ci.yml: checkout must disable persisted credentials');
+    errors.push('verify.yml: checkout step is missing');
+  } else {
+    requireText(errors, checkout, 'ref: ${{ inputs.source_ref }}', 'verify.yml: checkout must use the exact source_ref input');
+    requireText(errors, checkout, 'persist-credentials: false', 'verify.yml: checkout must disable persisted credentials');
   }
 
-  requireText(errors, workflow, '- name: Check workflow invariants', 'ci.yml: workflow invariant check step is missing');
-  requireText(errors, workflow, '- name: Summarize CI results', 'ci.yml: consolidated CI summary is missing');
-  requireText(errors, workflow, '- name: Enforce CI result', 'ci.yml: final aggregate failure gate is missing');
-  requireText(errors, workflow, 'for attempt in 1 2 3', 'ci.yml: bounded dependency-install retry is missing');
-  requireText(errors, workflow, 'for attempt in 1 2', 'ci.yml: bounded browser-smoke retry is missing');
-  requireText(errors, workflow, 'continue-on-error: true', 'ci.yml: independent checks must continue so all failures are reported');
-  requireText(errors, workflow, 'if: always()', 'ci.yml: diagnostics and summaries must run after failures');
-  requireText(errors, workflow, 'GIT_REF: ${{ github.ref }}', 'ci.yml: context values must pass through env instead of shell template expansion');
-  requireText(errors, workflow, 'path.relative(root, report.filePath)', 'ci.yml: ESLint annotations must use repository-relative paths');
+  requireText(errors, workflow, 'for attempt in 1 2 3', 'verify.yml: bounded dependency-install retry is missing');
+  requireText(errors, workflow, 'for attempt in 1 2', 'verify.yml: bounded browser-smoke retry is missing');
+  requireText(errors, workflow, 'continue-on-error: true', 'verify.yml: independent checks must continue so all failures are reported');
+  requireText(errors, workflow, 'GIT_REF: ${{ github.ref }}', 'verify.yml: context values must pass through env instead of shell template expansion');
+  requireText(errors, workflow, 'path.relative(root, report.filePath)', 'verify.yml: ESLint annotations must use repository-relative paths');
+  requireText(errors, workflow, '- name: Summarize verification results', 'verify.yml: consolidated verification summary is missing');
+  requireText(errors, workflow, '- name: Upload verification diagnostics', 'verify.yml: unconditional diagnostics upload is missing');
+  requireText(errors, workflow, '- name: Enforce verification result', 'verify.yml: aggregate result gate is missing');
+  requireText(errors, workflow, '- name: Verify release identity', 'verify.yml: release identity check is missing');
+  requireText(errors, workflow, '- name: Reverify final release contents', 'verify.yml: final release verification is missing');
+  requireText(errors, workflow, '- name: Package immutable release assets', 'verify.yml: immutable release packaging is missing');
+  requireText(errors, workflow, '- name: Upload verified release assets', 'verify.yml: verified release asset upload is missing');
+  requireText(errors, workflow, 'Browser smoke recovered on retry', 'verify.yml: recovered browser-smoke retries must be visible');
+  requireText(errors, workflow, 'Download release diagnostics', 'verify.yml: integrity failures must include actionable diagnostics guidance');
 
-  const upload = extractNamedStep(workflow, 'Upload CI diagnostics');
-  const gate = extractNamedStep(workflow, 'Enforce CI result');
-  if (!upload.includes('if: always()')) errors.push('ci.yml: diagnostics upload must run unconditionally');
-  if (!gate.includes('if: always()')) errors.push('ci.yml: aggregate failure gate must run unconditionally');
-
+  const diagnostics = extractNamedStep(workflow, 'Upload verification diagnostics');
+  if (!diagnostics.includes('if: always()')) errors.push('verify.yml: diagnostics must upload even when verification fails');
   return errors;
 }
 
@@ -112,12 +120,9 @@ function validateReleaseWorkflow(workflow) {
   const errors = [];
   const guardIndex = workflow.indexOf('      - name: Require an authoritative trigger');
   const sourceCheckoutIndex = workflow.indexOf('      - name: Check out release source');
-
   if (guardIndex < 0) errors.push('release.yml: authoritative trigger guard is missing');
   if (sourceCheckoutIndex < 0) errors.push('release.yml: release-source checkout step is missing');
-  if (guardIndex >= 0 && sourceCheckoutIndex >= 0 && guardIndex >= sourceCheckoutIndex) {
-    errors.push('release.yml: authoritative trigger guard must execute before checkout');
-  }
+  if (guardIndex >= 0 && sourceCheckoutIndex >= 0 && guardIndex >= sourceCheckoutIndex) errors.push('release.yml: authoritative trigger guard must execute before checkout');
 
   const tagInput = extractWorkflowDispatchTagInput(workflow);
   if (!tagInput) {
@@ -136,12 +141,16 @@ function validateReleaseWorkflow(workflow) {
     requireText(errors, resolver, 'git show "${release_commit}:far/package.json"', 'release.yml: existing-tag retries must read the tagged commit package version');
     requireText(errors, resolver, 'if [[ -n "$REQUESTED_TAG" ]]', 'release.yml: resolver must distinguish provided-tag retries from blank-tag bootstrap');
     requireText(errors, resolver, 'Requested retry tag is missing', 'release.yml: missing explicit retry tags need actionable failure guidance');
-    requireText(errors, resolver, 'checkout_ref=%s', 'release.yml: resolver must emit the exact checkout ref');
   }
 
   requireText(errors, workflow, 'group: release-${{ github.repository }}', 'release.yml: all release triggers must share one serialized concurrency group');
-  requireText(errors, workflow, 'checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}', 'release.yml: resolver output must expose the exact checkout ref');
-  requireText(errors, workflow, 'ref: ${{ needs.resolve.outputs.checkout_ref }}', 'release.yml: build must check out the resolved immutable source');
+  requireText(errors, workflow, 'uses: ./.github/workflows/verify.yml', 'release.yml: release must call the shared verification workflow');
+  requireText(errors, workflow, 'source_ref: ${{ needs.resolve.outputs.checkout_ref }}', 'release.yml: shared verification must use the resolved immutable ref');
+  requireText(errors, workflow, 'release_mode: true', 'release.yml: shared verification must run in release mode');
+  requireText(errors, workflow, 'release_tag: ${{ needs.resolve.outputs.release_tag }}', 'release.yml: shared verification must receive the resolved tag');
+  requireText(errors, workflow, 'source_version: ${{ needs.resolve.outputs.release_commit }}', 'release.yml: shared verification must receive the resolved commit');
+  if (workflow.includes('npm run ') || workflow.includes('npm ci ')) errors.push('release.yml: verification commands must remain centralized in verify.yml');
+
   requireText(errors, workflow, '- name: Ensure immutable release tag', 'release.yml: verified tag bootstrap step is missing');
   requireText(errors, workflow, 'github.rest.git.createRef', 'release.yml: missing tags must be created only after verification');
   requireText(errors, workflow, 'Refusing to move an immutable release tag', 'release.yml: tag movement protection is missing');
@@ -150,17 +159,6 @@ function validateReleaseWorkflow(workflow) {
   requireText(errors, workflow, '- name: Reverify immutable tag before publication', 'release.yml: tag identity must be rechecked immediately before publication');
   requireText(errors, workflow, '- name: Verify published release identity', 'release.yml: publication must be verified after mutation');
   requireText(errors, workflow, 'overwrite_files: false', 'release.yml: published release assets must not overwrite existing assets');
-  requireText(errors, workflow, '- name: Summarize release verification', 'release.yml: consolidated release verification summary is missing');
-  requireText(errors, workflow, '- name: Enforce release verification result', 'release.yml: aggregate release verification gate is missing');
-  requireText(errors, workflow, '- name: Upload release diagnostics', 'release.yml: release diagnostics upload is missing');
-  requireText(errors, workflow, 'Browser smoke recovered on retry', 'release.yml: recovered browser-smoke retries must be visible');
-  requireText(errors, workflow, 'Download release diagnostics', 'release.yml: integrity failures must include actionable diagnostics guidance');
-
-  const releaseUpload = extractNamedStep(workflow, 'Upload release diagnostics');
-  if (!releaseUpload.includes('if: always()')) {
-    errors.push('release.yml: release diagnostics must upload even when verification fails');
-  }
-
   return errors;
 }
 
@@ -171,33 +169,20 @@ function validateMaintenanceWorkflow(workflow) {
     errors.push('actions-maintenance.yml: cleanup step is missing');
     return errors;
   }
-  if (!cleanup.includes('retries: 3')) {
-    errors.push('actions-maintenance.yml: GitHub API cleanup should retry transient failures');
-  }
-  if (!cleanup.includes('Number.isInteger(retentionDays)')) {
-    errors.push('actions-maintenance.yml: retention configuration must be validated before deletion');
-  }
-  if (!workflow.includes('dry_run:')) {
-    errors.push('actions-maintenance.yml: manual dry-run control is missing');
-  }
-  if (!cleanup.includes('cleanup will continue')) {
-    errors.push('actions-maintenance.yml: one artifact failure must not stop remaining cleanup');
-  }
-  if (!cleanup.includes('error.status === 404')) {
-    errors.push('actions-maintenance.yml: already-removed artifacts must be treated as an idempotent no-op');
-  }
-  if (!cleanup.includes('core.summary')) {
-    errors.push('actions-maintenance.yml: maintenance summary is missing');
-  }
+  if (!cleanup.includes('retries: 3')) errors.push('actions-maintenance.yml: GitHub API cleanup should retry transient failures');
+  if (!cleanup.includes('Number.isInteger(retentionDays)')) errors.push('actions-maintenance.yml: retention configuration must be validated before deletion');
+  if (!workflow.includes('dry_run:')) errors.push('actions-maintenance.yml: manual dry-run control is missing');
+  if (!cleanup.includes('cleanup will continue')) errors.push('actions-maintenance.yml: one artifact failure must not stop remaining cleanup');
+  if (!cleanup.includes('error.status === 404')) errors.push('actions-maintenance.yml: already-removed artifacts must be treated as an idempotent no-op');
+  if (!cleanup.includes('core.summary')) errors.push('actions-maintenance.yml: maintenance summary is missing');
   return errors;
 }
 
 function validateWorkflowSet(files) {
   const errors = [];
-  for (const [filename, workflow] of Object.entries(files)) {
-    errors.push(...validateActionPins(filename, workflow));
-  }
+  for (const [filename, workflow] of Object.entries(files)) errors.push(...validateActionPins(filename, workflow));
   errors.push(...validateCiWorkflow(files['ci.yml'] || ''));
+  errors.push(...validateVerificationWorkflow(files['verify.yml'] || ''));
   errors.push(...validateReleaseWorkflow(files['release.yml'] || ''));
   errors.push(...validateMaintenanceWorkflow(files['actions-maintenance.yml'] || ''));
   return errors;
@@ -210,6 +195,7 @@ function readWorkflow(filename) {
 function main() {
   const files = {
     'ci.yml': readWorkflow('ci.yml'),
+    'verify.yml': readWorkflow('verify.yml'),
     'release.yml': readWorkflow('release.yml'),
     'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
   };
@@ -219,7 +205,7 @@ function main() {
     console.error(`[workflow-check] Failed with ${errors.length} issue(s).`);
     process.exit(1);
   }
-  console.log('[workflow-check] OK - workflows enforce pinned actions, scoped inputs, serialized resilient execution, immutable releases, diagnostics, and aggregate result gates.');
+  console.log('[workflow-check] OK - callers share one pinned, resilient verification pipeline with scoped inputs, immutable release publication, diagnostics, and aggregate gates.');
 }
 
 if (require.main === module) main();
@@ -232,5 +218,6 @@ module.exports = {
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,
+  validateVerificationWorkflow,
   validateWorkflowSet,
 };
