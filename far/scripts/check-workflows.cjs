@@ -61,8 +61,8 @@ function validateActionPins(filename, workflow) {
   return errors;
 }
 
-function requireText(errors, workflow, text, message) {
-  if (!workflow.includes(text)) errors.push(message);
+function requireText(errors, text, expected, message) {
+  if (!text.includes(expected)) errors.push(message);
 }
 
 function validateCiWorkflow(workflow) {
@@ -101,10 +101,17 @@ function validateReleaseWorkflow(workflow) {
     errors.push('release.yml: authoritative trigger guard must execute before checkout');
   }
 
+  const resolver = extractNamedStep(workflow, 'Resolve package, tag, and commit');
+  if (!resolver) {
+    errors.push('release.yml: release identity resolver is missing');
+  } else {
+    requireText(errors, resolver, 'expected_tag="v${package_version}"', 'release.yml: resolver must derive the release tag from package version');
+    requireText(errors, resolver, 'git ls-remote --tags --refs', 'release.yml: resolver must check tag existence before exact checkout');
+    requireText(errors, resolver, 'checkout_ref=%s', 'release.yml: resolver must emit the exact checkout ref');
+  }
+
   requireText(errors, workflow, 'required: false', 'release.yml: manual tag input must be optional');
-  requireText(errors, workflow, 'expected_tag="v${package_version}"', 'release.yml: release tag must derive from package version');
-  requireText(errors, workflow, 'git ls-remote --tags --refs', 'release.yml: tag existence must be resolved before exact checkout');
-  requireText(errors, workflow, 'checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}', 'release.yml: resolver must publish the exact checkout ref');
+  requireText(errors, workflow, 'checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}', 'release.yml: resolver output must expose the exact checkout ref');
   requireText(errors, workflow, 'ref: ${{ needs.resolve.outputs.checkout_ref }}', 'release.yml: build must check out the resolved immutable source');
   requireText(errors, workflow, '- name: Ensure immutable release tag', 'release.yml: verified tag bootstrap step is missing');
   requireText(errors, workflow, 'github.rest.git.createRef', 'release.yml: missing tags must be created only after verification');
