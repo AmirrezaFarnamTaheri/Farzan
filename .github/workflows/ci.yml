@@ -80,7 +80,22 @@ jobs:
         run: npm run check:generated 2>&1 | tee reports/check-generated.log
 
       - name: Verify committed artifacts are current
-        run: git diff --exit-code --stat -- dist vendor 2>&1 | tee reports/artifact-diff.log
+        run: |
+          set +e
+          mkdir -p reports/generated-diff
+          git status --porcelain=v1 --untracked-files=all -- dist vendor > reports/generated-diff/status.txt
+          status=0
+          if [[ -s reports/generated-diff/status.txt ]]; then
+            git diff --stat -- dist vendor > reports/generated-diff/stat.txt
+            git diff --binary -- dist vendor > reports/generated-diff/generated.patch
+            tar -czf reports/generated-diff/generated-files.tar.gz dist vendor
+            cat reports/generated-diff/status.txt
+            cat reports/generated-diff/stat.txt
+            status=1
+          else
+            rm -f reports/generated-diff/status.txt
+          fi
+          exit "$status"
 
       - name: Generate and verify release attestation
         run: npm run release:attest 2>&1 | tee reports/release-attestation.log
