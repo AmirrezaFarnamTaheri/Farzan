@@ -14,7 +14,6 @@ import { installDataHardening } from './core/dataHardening.js';
 import { installStoreHardening } from './core/storeHardening.js';
 import { installAIAuthority } from './core/aiAuthority.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
-import { initCommandPalette } from './features/commandPalette.js';
 
 import * as easing from './lib/easing.js';
 import { HElement, h } from './lib/hElement.js';
@@ -160,8 +159,11 @@ initOfflineBanner();
 pd.ProductReadiness = enforceProductReadiness(document);
 
 import('../app.js')
-  .then(() => {
-    try { initCommandPalette(); } catch (error) {
+  .then(async () => {
+    try {
+      const { initCommandPalette } = await import('./features/commandPalette.js');
+      initCommandPalette();
+    } catch (error) {
       console.warn('[OpenCourseDeck] initCommandPalette failed', error);
     }
   })
