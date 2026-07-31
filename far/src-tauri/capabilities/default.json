@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Deny-by-default capability for the OpenCourseDeck main window.",
+  "windows": ["main"],
+  "permissions": []
+}
