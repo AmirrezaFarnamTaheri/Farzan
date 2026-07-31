@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - 'far/src-tauri/**'
+      - 'far/assets/icon-192.svg'
       - 'far/scripts/native-*.cjs'
+      - 'far/scripts/prepare-native-assets.cjs'
       - 'far/scripts/stage-native-exe.cjs'
       - 'far/package.json'
       - 'far/package-lock.json'
@@ -49,9 +51,10 @@ jobs:
       - name: Install JavaScript dependencies reproducibly
         run: npm ci --ignore-scripts --legacy-peer-deps
 
-      - name: Build production frontend
+      - name: Build production frontend and native assets
         run: |
           npm run vendor
+          npm run native:prepare
           npm run build:release
 
       - name: Enforce strict native prerequisites
