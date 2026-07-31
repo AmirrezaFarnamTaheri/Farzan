@@ -36,13 +36,7 @@ jobs:
           echo "4f1814f64e6de2c04945c449491c86b89283eda26c97ad8502b39746f33ac72f  .audit-remediation/phase-b1.patch.gz.b64.02" | sha256sum --check --strict
           echo "2252b6d97373365e52cddae6880c0acc4574b393fa2bb8fe0f3f0871d8fd3b81  .audit-remediation/phase-b1.patch.gz.b64.03" | sha256sum --check --strict
           echo "5958b27e5732058f070f98ebd99052366de887b92a3eef25a6c144df86455be6  .audit-remediation/phase-b1.patch.gz.b64.04" | sha256sum --check --strict
-          cat \
-            .audit-remediation/phase-b1.patch.gz.b64 \
-            .audit-remediation/phase-b1.patch.gz.b64.01 \
-            .audit-remediation/phase-b1.patch.gz.b64.02 \
-            .audit-remediation/phase-b1.patch.gz.b64.03 \
-            .audit-remediation/phase-b1.patch.gz.b64.04 \
-            | base64 -d | gzip -d > /tmp/phase-b1.patch
+          cat .audit-remediation/phase-b1.patch.gz.b64{,.01,.02,.03,.04} | base64 -d | gzip -d > /tmp/phase-b1.patch
           echo "a4557950f2b210ed47b226550285a9fb1b5322709f527d2bfedac5ad7c2d87f5  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
           git apply /tmp/phase-b1.patch
@@ -52,16 +46,16 @@ jobs:
           echo "e529190e3acea33687178c9a9fd6eeef2ba8e9278d9f7ccd821b5673d9c7a066  .audit-remediation/phase-b1-async.patch.gz.b64.02" | sha256sum --check --strict
           echo "e716ae77fa8ac6b300918905ae06b79814238d1f609f2409fdcd38051b0da092  .audit-remediation/phase-b1-async.patch.gz.b64.03" | sha256sum --check --strict
           echo "47cf43bd6f8d201c34c812c6e4f07d992e0c6ef6fcceb460bbbf25c37c2e5217  .audit-remediation/phase-b1-async.patch.gz.b64.04" | sha256sum --check --strict
-          cat \
-            .audit-remediation/phase-b1-async.patch.gz.b64 \
-            .audit-remediation/phase-b1-async.patch.gz.b64.01 \
-            .audit-remediation/phase-b1-async.patch.gz.b64.02 \
-            .audit-remediation/phase-b1-async.patch.gz.b64.03 \
-            .audit-remediation/phase-b1-async.patch.gz.b64.04 \
-            | base64 -d | gzip -d > /tmp/phase-b1-async.patch
+          cat .audit-remediation/phase-b1-async.patch.gz.b64{,.01,.02,.03,.04} | base64 -d | gzip -d > /tmp/phase-b1-async.patch
           echo "eec2417d508078f8dd6fdd8a06d8136f1a9d3ad90803e1cae3da24fabd72b559  /tmp/phase-b1-async.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1-async.patch
           git apply /tmp/phase-b1-async.patch
+
+          echo "759c233abf09e2e8df08da07841fcabc3fa771c5a1c095359d99051b8e75cde2  .audit-remediation/phase-b1-namespace.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-b1-namespace.patch.gz.b64 | gzip -d > /tmp/phase-b1-namespace.patch
+          echo "d2d94554dfd109dfa8f31eb08c9a8ec4c9526821f8eceb3235b76427b92f7cdb  /tmp/phase-b1-namespace.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-b1-namespace.patch
+          git apply /tmp/phase-b1-namespace.patch
           git diff --check
 
       - name: Install dependencies reproducibly
