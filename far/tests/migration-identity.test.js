@@ -14,6 +14,21 @@ describe('migration identity', () => {
     );
   });
 
+  it('uses a wide deterministic fallback identity without Web Crypto', async () => {
+    const records = await buildLegacyRecords('note', [
+      { title: 'First', body: 'alpha' },
+      { title: 'Second', body: 'beta' },
+    ], 3, null);
+    const ids = records.map(([, id]) => id);
+
+    expect(new Set(ids).size).toBe(2);
+    for (const id of ids) {
+      const suffix = id.split('-migrated-v3-')[1];
+      expect(suffix).toHaveLength(24);
+      expect(suffix).toMatch(/^fnv1a-[0-9a-f]{18}$/);
+    }
+  });
+
   it('rejects hash collisions with different canonical content', async () => {
     const cryptoRoot = {
       subtle: {
