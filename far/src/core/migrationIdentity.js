@@ -15,12 +15,19 @@ async function digestText(text, cryptoRoot) {
       .map(byte => byte.toString(16).padStart(2, '0'))
       .join('');
   }
-  let hash = 0x811c9dc5;
-  for (const byte of encoded) {
-    hash ^= byte;
-    hash = Math.imul(hash, 0x01000193) >>> 0;
+
+  // Four independently seeded FNV-1a lanes provide a wide deterministic
+  // fallback for environments where Web Crypto is unavailable.
+  const lanes = [0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+  for (let lane = 0; lane < lanes.length; lane += 1) {
+    let hash = lanes[lane];
+    for (const byte of encoded) {
+      hash ^= (byte + lane * 17) & 0xff;
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    lanes[lane] = hash;
   }
-  return `fnv1a-${hash.toString(16).padStart(8, '0')}`;
+  return `fnv1a-${lanes.map(hash => hash.toString(16).padStart(8, '0')).join('')}`;
 }
 
 export async function buildLegacyRecords(kind, records, version, cryptoRoot = globalThis.crypto) {
