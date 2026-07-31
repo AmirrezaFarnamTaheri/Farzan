@@ -22,4 +22,15 @@ describe('vendored browser libraries', () => {
     const workerSource = fs.readFileSync(path.join(root, 'src/workers/search.worker.js'), 'utf8');
     expect(workerSource).toContain("importScripts('../../vendor/fuse.min.js')");
   });
+
+  it('adapts PDF.js document destruction to the loading task', () => {
+    const vendorScript = fs.readFileSync(path.join(root, 'scripts/vendor-libs.cjs'), 'utf8');
+    expect(vendorScript).toContain("documentProperty === 'destroy'");
+    expect(vendorScript).toContain('return () => target.destroy()');
+    expect(vendorScript).toContain('new Proxy(loadingTask');
+
+    const compatibilityScript = fs.readFileSync(path.join(root, 'vendor/pdf.min.js'), 'utf8');
+    expect(compatibilityScript).toContain("documentProperty === 'destroy'");
+    expect(compatibilityScript).toContain('target.destroy()');
+  });
 });
