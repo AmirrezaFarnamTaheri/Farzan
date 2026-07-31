@@ -1,3 +1,10 @@
+function recoveryError(summary, cause) {
+  const detail = cause?.message ? `: ${cause.message}` : '';
+  const error = new Error(`${summary}${detail}. Close other OpenCourseDeck tabs, reload the app, verify browser storage permissions, and retry.`);
+  if (cause) error.cause = cause;
+  return error;
+}
+
 export async function replaceDocumentAnnotations(idb, docId, annotations) {
   const records = Array.isArray(annotations) ? annotations : [];
   for (const record of records) {
@@ -23,10 +30,10 @@ export async function replaceDocumentAnnotations(idb, docId, annotations) {
     for (const record of records) store.put(record);
 
     return new Promise((resolve, reject) => {
-      cursorRequest.onerror = () => reject(cursorRequest.error || new Error('Annotation replacement cursor failed'));
+      cursorRequest.onerror = () => reject(recoveryError('Annotation replacement cursor failed', cursorRequest.error));
       transaction.oncomplete = () => resolve(records);
-      transaction.onerror = () => reject(transaction.error || new Error('Annotation replacement transaction failed'));
-      transaction.onabort = () => reject(transaction.error || new Error('Annotation replacement transaction aborted'));
+      transaction.onerror = () => reject(recoveryError('Annotation replacement transaction failed', transaction.error));
+      transaction.onabort = () => reject(recoveryError('Annotation replacement transaction aborted', transaction.error));
     });
   }
 
