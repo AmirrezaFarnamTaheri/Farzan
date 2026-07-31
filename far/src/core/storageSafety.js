@@ -77,18 +77,50 @@ function deleteDatabase(factory, name) {
   });
 }
 
-function failureName(failure) {
-  return failure?.name ?? failure?.key ?? failure?.store ?? failure?.backend ?? '<unknown>';
+const FRIENDLY_FAILURE_LABELS = new Map([
+  ['notes', 'Notes'],
+  ['folders', 'Notes'],
+  ['opencoursedeck-templates', 'Notes'],
+  ['progress', 'Learning progress'],
+  ['timestamps', 'Media progress'],
+  ['watchedSegments', 'Media progress'],
+  ['pdfBookmarks', 'Document data'],
+  ['annotations', 'Document data'],
+  ['opencoursedeck-translations', 'Translation cache'],
+  ['opencoursedeck-media', 'Offline media'],
+  ['plasma-playlists', 'Playlists'],
+  ['plasma-studio-board', 'Studio data'],
+  ['plasma-canvas-board', 'Studio data'],
+  ['primary-storage', 'Primary app data'],
+  ['localStorage', 'Browser storage'],
+  ['sessionStorage', 'Session data'],
+  ['indexedDB', 'Local app data'],
+  ['settings', 'App settings'],
+]);
+
+function failureLabel(failure) {
+  const candidates = [failure?.name, failure?.key, failure?.store, failure?.backend].filter(Boolean);
+  for (const candidate of candidates) {
+    if (FRIENDLY_FAILURE_LABELS.has(candidate)) return FRIENDLY_FAILURE_LABELS.get(candidate);
+    if (PREFERENCE_KEYS.includes(candidate)) return 'Preferences';
+    if (SESSION_KEYS.includes(candidate)) return 'Session data';
+    if (/note|folder|template/i.test(candidate)) return 'Notes';
+    if (/progress|timestamp|watched/i.test(candidate)) return 'Learning progress';
+    if (/pdf|annotation|document/i.test(candidate)) return 'Document data';
+    if (/playlist/i.test(candidate)) return 'Playlists';
+    if (/studio|canvas/i.test(candidate)) return 'Studio data';
+  }
+  return 'Local app data';
 }
 
 function notifyDeletionFailure(root, failures) {
   if (!failures.length) return;
-  const names = failures.map(failureName).join(', ');
+  const labels = [...new Set(failures.map(failureLabel))].join(', ');
   const blocked = failures.some(failure => /blocked/i.test(failure.message));
   const guidance = blocked
     ? 'Deletion is blocked by another open tab or process. Close other OpenCourseDeck tabs and retry.'
     : 'Close other OpenCourseDeck tabs, check browser storage permissions, and retry.';
-  try { root.OpenCourseDeck?.Toast?.error?.(`Local data reset incomplete for: ${names}. ${guidance}`); } catch {}
+  try { root.OpenCourseDeck?.Toast?.error?.(`Local data reset incomplete for: ${labels}. ${guidance}`); } catch {}
 }
 
 function deletionFailure(error, receipt) {
