@@ -29,7 +29,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .audit-remediation/phase-b.patch.gz.b64 | gzip -d > /tmp/phase-b.patch
+          echo "3671147e1869676aec9c6de050e4e3d5e0b53ac4c65821a3126b88a0621f6ced  .audit-remediation/phase-b.patch.gz.b64" | sha256sum --check --strict
+          echo "946f03c1410255645559407b1b8490c946ed22f77e8e80d6a2c2338080552aeb  .audit-remediation/phase-b.patch.gz.b64.01" | sha256sum --check --strict
+          echo "18e722b089a048812bf7d841fbd3db1652eceea928c972d6292143272802ab31  .audit-remediation/phase-b.patch.gz.b64.02" | sha256sum --check --strict
+          echo "849c7bc3395362abc71e093397f8e5987e4b5dfd8b0e641d7857152e621fc78c  .audit-remediation/phase-b.patch.gz.b64.03" | sha256sum --check --strict
+          cat \
+            .audit-remediation/phase-b.patch.gz.b64 \
+            .audit-remediation/phase-b.patch.gz.b64.01 \
+            .audit-remediation/phase-b.patch.gz.b64.02 \
+            .audit-remediation/phase-b.patch.gz.b64.03 \
+            | base64 -d | gzip -d > /tmp/phase-b.patch
           echo "85bc3c2d3bac6fd5140e05d96c47a487c566dca09865742d5bf6cd32df4454b6  /tmp/phase-b.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b.patch
           git apply /tmp/phase-b.patch
