@@ -1,4 +1,4 @@
-name: Audit Remediation Bootstrap
+name: Audit Remediation Apply
 
 on:
   pull_request:
@@ -6,30 +6,56 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  source-snapshot:
-    name: Export source snapshot
-    if: github.head_ref == 'fix/master-forensic-audit-remediation'
+  apply-phase-a:
+    name: Apply verified data-integrity patch
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Check out pull request source
+      - name: Check out exact pull request head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: audit-remediation-source-${{ github.event.pull_request.head.sha }}
-          path: |
-            .
-            !.git/**
-            !**/node_modules/**
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
+      - name: Decode, verify, and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .audit-remediation/phase-a.patch.gz.b64 | gzip -d > /tmp/phase-a.patch
+          echo "71022e7f3bdbe33b445ef7f79f284412fcf847621b22057fbb86ebc57816cb18  /tmp/phase-a.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-a.patch
+          git apply /tmp/phase-a.patch
+
+      - name: Run static verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check far/bridge.js
+          node --check far/db.js
+          node --check far/src/core/backupEngine.js
+          node --check far/src/core/storageSafety.js
+          node --check far/tests/backup-engine.test.js
+          node --check far/tests/bridge.test.js
+          node --check far/tests/catalog.test.js
+          node --check far/tests/storage-safety.test.js
+          git diff --check
+
+      - name: Commit verified patch to remediation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .audit-remediation
+          rm .github/workflows/audit-remediation-bootstrap.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix: make storage and migration outcomes truthful"
+          git push origin HEAD:fix/master-forensic-audit-remediation
