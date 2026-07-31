@@ -1,0 +1,74 @@
+name: Audit Remediation Apply Phase B.1
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-phase-b1:
+    name: Apply verified browser and bundle fix
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Decode, verify, and apply patch
+        run: |
+          set -euo pipefail
+          echo "f1444d9aef062d6b102a93db79409f6c903cfe1611ebfbf942ab7cf543add0db  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-b1.patch.gz.b64 | gzip -d > /tmp/phase-b1.patch
+          echo "9ef33bb480b753884f2153029d8cf22b8bcc75476e99a973b367e7919a3cbd56  /tmp/phase-b1.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-b1.patch
+          git apply /tmp/phase-b1.patch
+          git diff --check
+
+      - name: Install dependencies reproducibly
+        working-directory: far
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Vendor and build production distribution
+        working-directory: far
+        run: |
+          npm run vendor
+          npm run build:release
+          npm run check:generated
+
+      - name: Run focused regression tests
+        working-directory: far
+        run: node node_modules/vitest/vitest.mjs run tests/runtime-wiring.test.js tests/browser-smoke-script.test.js --configLoader runner --pool vmThreads
+
+      - name: Enforce entry bundle budget
+        working-directory: far
+        run: npm run report:bundle
+
+      - name: Exercise production Chromium smoke
+        working-directory: far
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: npm run smoke:dist-browser
+
+      - name: Commit verified patch and generated artifacts
+        run: |
+          set -euo pipefail
+          rm -rf .audit-remediation
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix: validate built workers and remove duplicate graph wiring"
+          git push origin HEAD:fix/master-forensic-audit-remediation
