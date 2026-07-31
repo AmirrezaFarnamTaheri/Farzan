@@ -23,7 +23,7 @@
     ],
     "security": {
       "freezePrototype": true,
-      "csp": "default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' blob: data: https:; media-src 'self' blob: data: http: https:; connect-src 'self' blob: data: https:; frame-src 'self' blob: data: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+      "csp": "default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' blob: data: https:; media-src 'self' blob: data: https:; connect-src 'self' blob: data: https:; frame-src 'self' blob: data: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     }
   },
   "bundle": {
