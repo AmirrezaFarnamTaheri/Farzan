@@ -56,6 +56,12 @@ jobs:
           echo "48eb735e9fa504f582beae0efc85eee73e28b770837f9a554446f4827ad7cc22  /tmp/phase-c-lint.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-c-lint.patch
           git apply /tmp/phase-c-lint.patch
+
+          echo "6aa464242a54482c0da2c937f3a76a1496ca4993adc85923f1472dfa97f45ea2  .audit-remediation/phase-c-sbom.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-c-sbom.patch.gz.b64 | gzip -d > /tmp/phase-c-sbom.patch
+          echo "47861bd6fefcc7b49d8180fc09b6689eaa5a981bda04059b6ccecb0142bdadba  /tmp/phase-c-sbom.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-c-sbom.patch
+          git apply /tmp/phase-c-sbom.patch
           git diff --check
 
       - name: Install dependencies reproducibly
@@ -75,7 +81,9 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf .audit-remediation
+          rm -rf .workflow-staging
           rm -f .github/phase-c-trigger.txt
+          rm -f .github/workflows/stage-phase-c-sbom-delta.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
