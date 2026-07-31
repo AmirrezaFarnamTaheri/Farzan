@@ -15,11 +15,17 @@ function parsePageMap(raw) {
     const value = JSON.parse(raw);
     if (!value || Array.isArray(value) || typeof value !== 'object') return null;
     const entries = Object.entries(value);
-    const pageShaped = entries.every(([page, records]) => (
-      Number.isFinite(Number(page))
-      && Array.isArray(records)
-      && records.every(record => !record?.docId)
-    ));
+    const pageShaped = entries.every(([page, records]) => {
+      const pageNumber = Number(page);
+      return Number.isInteger(pageNumber)
+        && pageNumber > 0
+        && Array.isArray(records)
+        && records.every(record => (
+          record
+          && typeof record === 'object'
+          && (record.page == null || Number(record.page) === pageNumber)
+        ));
+    });
     return pageShaped ? value : null;
   } catch {
     return null;
@@ -37,6 +43,17 @@ function readPageFallback(root) {
   storage.setItem(PAGE_ANNOTATION_KEY, JSON.stringify(legacyPages));
   storage.removeItem(LEGACY_ANNOTATION_KEY);
   return legacyPages;
+}
+
+function emitMigrationFailure(root, error, canonicalId, aliases) {
+  root.OpenCourseDeck?.bus?.emit?.('pdf:identity-migration-failed', {
+    docId: canonicalId,
+    aliases,
+    error: {
+      name: error?.name || 'Error',
+      message: error?.message || String(error),
+    },
+  });
 }
 
 function installPageFallbackHardening(root, viewer) {
@@ -68,17 +85,23 @@ function installPageFallbackHardening(root, viewer) {
         }, {});
         const migratedAliases = aliases.filter((_, index) => (results[index + 1] || []).length > 0);
         if (migratedAliases.length && root.DB?.saveAnnotations) {
-          await root.DB.saveAnnotations(canonicalId, state.annotations);
-          await Promise.all(migratedAliases.map(alias => root.DB.saveAnnotations(alias, {})));
-          root.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
-            docId: canonicalId,
-            aliases: migratedAliases,
-            annotations: records.length,
-          });
+          try {
+            await root.DB.saveAnnotations(canonicalId, state.annotations);
+            await Promise.all(migratedAliases.map(alias => root.DB.saveAnnotations(alias, {})));
+            root.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
+              docId: canonicalId,
+              aliases: migratedAliases,
+              annotations: records.length,
+            });
+          } catch (error) {
+            // The read succeeded, so retain the merged annotations. Alias
+            // cleanup is optional maintenance and must not hide user data.
+            emitMigrationFailure(root, error, canonicalId, migratedAliases);
+          }
         }
         return;
       } catch {
-        // Fall back to the page-only local store below.
+        // Only read failures fall back to the page-local store below.
       }
     }
     state.annotations = readPageFallback(root);
