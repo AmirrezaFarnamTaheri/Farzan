@@ -16,6 +16,18 @@ updates:
       development-dependencies:
         dependency-type: development
 
+  - package-ecosystem: cargo
+    directory: /far/src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Asia/Baku
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - rust
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
