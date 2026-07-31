@@ -16,7 +16,7 @@ jobs:
       github.head_ref == 'fix/master-forensic-audit-remediation' &&
       github.actor == 'AmirrezaFarnamTaheri'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -31,17 +31,19 @@ jobs:
       - name: Decode, verify, and apply patch
         run: |
           set -euo pipefail
-          echo "9419cc3cdf2420dfdc0b541a45c2bc0a150e82c3e56dc84ff7b30b53cfc59a8d  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
-          echo "6f2b5f95dcc8820056febff0d2b8f162391ac5f6138c8a82446f2815199bc669  .audit-remediation/phase-b1.patch.gz.b64.01" | sha256sum --check --strict
-          echo "37f1866ae963d909a389304c8fbe202cfe598d7c672bd79e437f70946b1b9346  .audit-remediation/phase-b1.patch.gz.b64.02" | sha256sum --check --strict
-          echo "a62d270b20075f8f65252194dd9e76138b18a27d282d5ccf6774b61ce6a72419  .audit-remediation/phase-b1.patch.gz.b64.03" | sha256sum --check --strict
+          echo "b02a8ffb6ba6f2de2d0d73623f4f3cf33c057c044967b1b6b2631c89e5e50889  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
+          echo "f0c37722730f28b2df18c79d6f26014b9bfe869d914ccf1edcff9ffefe8763a4  .audit-remediation/phase-b1.patch.gz.b64.01" | sha256sum --check --strict
+          echo "4f1814f64e6de2c04945c449491c86b89283eda26c97ad8502b39746f33ac72f  .audit-remediation/phase-b1.patch.gz.b64.02" | sha256sum --check --strict
+          echo "2252b6d97373365e52cddae6880c0acc4574b393fa2bb8fe0f3f0871d8fd3b81  .audit-remediation/phase-b1.patch.gz.b64.03" | sha256sum --check --strict
+          echo "5958b27e5732058f070f98ebd99052366de887b92a3eef25a6c144df86455be6  .audit-remediation/phase-b1.patch.gz.b64.04" | sha256sum --check --strict
           cat \
             .audit-remediation/phase-b1.patch.gz.b64 \
             .audit-remediation/phase-b1.patch.gz.b64.01 \
             .audit-remediation/phase-b1.patch.gz.b64.02 \
             .audit-remediation/phase-b1.patch.gz.b64.03 \
+            .audit-remediation/phase-b1.patch.gz.b64.04 \
             | base64 -d | gzip -d > /tmp/phase-b1.patch
-          echo "ba4b804f30e1425ae38392af0d2dc7466fba5067bdec7b5ec9d8419ecea404c5  /tmp/phase-b1.patch" | sha256sum --check --strict
+          echo "a4557950f2b210ed47b226550285a9fb1b5322709f527d2bfedac5ad7c2d87f5  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
           git apply /tmp/phase-b1.patch
           git diff --check
