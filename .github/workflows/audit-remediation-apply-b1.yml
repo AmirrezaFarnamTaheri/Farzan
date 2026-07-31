@@ -31,7 +31,7 @@ jobs:
       - name: Decode, verify, and apply patch
         run: |
           set -euo pipefail
-          echo "f1444d9aef062d6b102a93db79409f6c903cfe1611ebfbf942ab7cf543add0db  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
+          echo "2a56f1ede4925d57c00e130ecdf03d023746e1b2f14fdc471b80602f5ac6dfc9  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
           base64 -d .audit-remediation/phase-b1.patch.gz.b64 | gzip -d > /tmp/phase-b1.patch
           echo "9ef33bb480b753884f2153029d8cf22b8bcc75476e99a973b367e7919a3cbd56  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
