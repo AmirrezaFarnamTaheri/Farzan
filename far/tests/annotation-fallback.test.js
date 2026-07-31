@@ -52,4 +52,22 @@ describe('annotation fallback hardening', () => {
     ]);
     await expect(db.getAnnotations('global')).resolves.toEqual([]);
   });
+
+  it('never lets stale fallback data overwrite an authoritative database record', async () => {
+    const localStorage = createStorage();
+    localStorage.setItem('plasma-pdf-annotations-by-document', JSON.stringify({
+      'doc-a': [{ id: 'shared-id', docId: 'doc-a', page: 1, text: 'stale fallback', updatedAt: 1 }],
+    }));
+    const authoritative = { id: 'shared-id', docId: 'doc-a', page: 1, text: 'authoritative', updatedAt: 2 };
+    const db = {
+      getAllAnnotations: vi.fn(async () => [authoritative]),
+      saveAnnotations: vi.fn(async () => [authoritative]),
+    };
+    const root = { document, DB: db, OpenCourseDeck: {}, localStorage };
+
+    installBridgeHardening(root);
+
+    await expect(db.getAllAnnotations()).resolves.toEqual([authoritative]);
+    await expect(db.getAnnotations('doc-a')).resolves.toEqual([authoritative]);
+  });
 });
