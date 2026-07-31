@@ -6,23 +6,43 @@ import { generateSbom } from '../scripts/generate-sbom.cjs';
 import { verifySbom } from '../scripts/verify-sbom.cjs';
 import pkg from '../package.json';
 
-function validSbom() {
-  const names = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})];
+function validSbom(packageDefinition = pkg) {
+  const names = [...Object.keys(packageDefinition.dependencies || {}), ...Object.keys(packageDefinition.devDependencies || {})];
+  const rootRef = `application:${packageDefinition.name}@${packageDefinition.version}`;
+  const components = names.map((name, index) => ({
+    type: 'library',
+    name,
+    version: 'test',
+    'bom-ref': `component:${index}:${name}`,
+  }));
   return {
     bomFormat: 'CycloneDX',
     specVersion: '1.6',
     serialNumber: 'urn:uuid:11111111-1111-4111-8111-111111111111',
     version: 1,
-    metadata: { component: { type: 'application', name: pkg.name, version: pkg.version } },
-    components: names.map((name) => ({ type: 'library', name, version: 'test' })),
+    metadata: {
+      component: {
+        type: 'application',
+        name: packageDefinition.name,
+        version: packageDefinition.version,
+        'bom-ref': rootRef,
+      },
+    },
+    components,
+    dependencies: [
+      { ref: rootRef, dependsOn: components.map(component => component['bom-ref']) },
+      ...components.map(component => ({ ref: component['bom-ref'], dependsOn: [] })),
+    ],
   };
 }
 
 describe('release SBOM verification', () => {
   it('accepts a complete CycloneDX application document', () => {
+    const dependencyCount = Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length;
     expect(verifySbom(validSbom(), pkg)).toEqual({
-      componentCount: Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length,
-      dependencyCount: Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length,
+      componentCount: dependencyCount,
+      dependencyCount,
+      graphNodeCount: dependencyCount + 1,
     });
   });
 
@@ -42,16 +62,37 @@ describe('release SBOM verification', () => {
       version: '1.0.0',
       dependencies: { '@example/shared': '1.0.0' },
     };
-    const sbom = {
-      bomFormat: 'CycloneDX',
-      specVersion: '1.6',
-      serialNumber: 'urn:uuid:11111111-1111-4111-8111-111111111111',
-      version: 1,
-      metadata: { component: { type: 'application', name: 'fixture', version: '1.0.0' } },
-      components: [{ type: 'library', name: 'shared', version: '1.0.0' }],
-    };
+    const sbom = validSbom(scopedPackage);
+    sbom.components[0].name = 'shared';
 
     expect(() => verifySbom(sbom, scopedPackage)).toThrow('missing dependency component @example/shared');
+  });
+
+  it('rejects duplicate component identities and dangling dependency references', () => {
+    const duplicate = validSbom();
+    duplicate.components[1]['bom-ref'] = duplicate.components[0]['bom-ref'];
+    expect(() => verifySbom(duplicate, pkg)).toThrow(/duplicate bom-ref/);
+
+    const dangling = validSbom();
+    dangling.dependencies[0].dependsOn.push('component:missing');
+    expect(() => verifySbom(dangling, pkg)).toThrow(/depends on unknown component component:missing/);
+  });
+
+  it('requires every direct package dependency to be linked from the application root', () => {
+    const sbom = validSbom();
+    const removedRef = sbom.dependencies[0].dependsOn.pop();
+
+    expect(() => verifySbom(sbom, pkg)).toThrow(`metadata component does not reference direct dependency ${removedRef}`);
+  });
+
+  it('requires a graph entry for every component and rejects self-cycles', () => {
+    const missingNode = validSbom();
+    const removed = missingNode.dependencies.pop();
+    expect(() => verifySbom(missingNode, pkg)).toThrow(`dependency graph is missing component ${removed.ref}`);
+
+    const selfCycle = validSbom();
+    selfCycle.dependencies[1].dependsOn.push(selfCycle.dependencies[1].ref);
+    expect(() => verifySbom(selfCycle, pkg)).toThrow(/depends on itself/);
   });
 
   it('includes spawn errors when npm cannot be launched', () => {
