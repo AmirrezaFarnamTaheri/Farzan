@@ -1,6 +1,7 @@
 const LEGACY_ANNOTATION_KEY = 'plasma-pdf-annotations';
 const DOCUMENT_ANNOTATION_KEY = 'plasma-pdf-annotations-by-document';
 const ERROR_STATUS_COLOR = '#b91c1c';
+const LEGACY_ERROR_STATUS_COLOR = '#ef4444';
 
 function readJson(storage, key, fallback) {
   try {
@@ -33,7 +34,10 @@ function mergeAnnotations(...groups) {
   for (const group of groups) {
     for (const annotation of Array.isArray(group) ? group : []) {
       if (!annotation || typeof annotation !== 'object') continue;
-      merged.set(annotationIdentity(annotation), annotation);
+      const identity = annotationIdentity(annotation);
+      // Callers pass authoritative records first. Legacy and document fallback
+      // data may fill gaps, but must never overwrite a newer database record.
+      if (!merged.has(identity)) merged.set(identity, annotation);
     }
   }
   return [...merged.values()];
@@ -110,13 +114,27 @@ function hardenAnnotations(root, db) {
   Object.defineProperty(db, '__annotationFallbackHardened', { value: true });
 }
 
+function normalizedColor(root, value) {
+  const probe = root.document?.createElement?.('span');
+  if (!probe) return value;
+  probe.style.color = '';
+  probe.style.color = value;
+  return probe.style.color;
+}
+
 function updateSplashStatus(root, status) {
   const element = root.document?.getElementById?.('splash-status');
   if (!element) return;
-  if (status === 'degraded') element.style.color = ERROR_STATUS_COLOR;
-  else if (status === 'authoritative' && ['#ef4444', ERROR_STATUS_COLOR].includes(element.style.color)) {
-    element.style.removeProperty('color');
+  if (status === 'degraded') {
+    element.style.color = ERROR_STATUS_COLOR;
+    return;
   }
+  if (status !== 'authoritative') return;
+  const errorColors = new Set([
+    normalizedColor(root, LEGACY_ERROR_STATUS_COLOR),
+    normalizedColor(root, ERROR_STATUS_COLOR),
+  ]);
+  if (errorColors.has(element.style.color)) element.style.removeProperty('color');
 }
 
 function hardenCatalog(root, dataStore) {
