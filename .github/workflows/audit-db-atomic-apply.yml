@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify staged patch checksum
-        run: echo '7c72a79e18c45ec5e2c28b35f87c6408f1abf6850d32706ecbaf9b662f379a16  .audit-remediation/apply-db-atomic.cjs' | sha256sum --check --strict
+        run: echo 'f78a584cda4aad3811ef4a3fbfd0fcd954ccbe1c386b14945e806880a6b02155  .audit-remediation/apply-db-atomic.cjs' | sha256sum --check --strict
 
       - name: Install dependencies reproducibly
         working-directory: far
