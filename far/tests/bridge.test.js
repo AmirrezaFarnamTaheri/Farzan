@@ -478,6 +478,23 @@ describe('bridge DB safety helpers', () => {
     expect(docB.map((annotation) => annotation.id)).toEqual(['b-1']);
   });
 
+  it('replaces a document annotation set and removes stale canonical records', async () => {
+    await window.DB.saveAnnotations('doc-replace', {
+      1: [
+        { id: 'keep', type: 'highlight', updatedAt: 10 },
+        { id: 'remove', type: 'text', updatedAt: 10 },
+      ],
+    });
+
+    await window.DB.saveAnnotations('doc-replace', {
+      2: [{ id: 'keep', type: 'draw', updatedAt: 20 }],
+    });
+
+    expect(await window.DB.getAnnotations('doc-replace')).toEqual([
+      expect.objectContaining({ id: 'keep', type: 'draw', page: 2 }),
+    ]);
+  });
+
   it('returns all PDF annotations for backup export', async () => {
     await window.DB.saveAnnotations('doc-a', {
       1: [{ id: 'a-1', type: 'highlight', updatedAt: 10 }],

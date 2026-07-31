@@ -7,6 +7,8 @@ describe('browser smoke script wiring', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['smoke:browser']).toBe('node scripts/browser-smoke.cjs');
+    expect(packageJson.scripts['smoke:dist-browser']).toBe('node scripts/dist-browser-smoke.cjs');
     expect(packageJson.scripts.ci).toContain('npm run smoke:browser');
+    expect(packageJson.scripts.ci).toContain('npm run smoke:dist-browser');
   });
 });

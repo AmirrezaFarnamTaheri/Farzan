@@ -97,6 +97,51 @@ describe('PDF viewer safe messages', () => {
     expect(window.PlasmaPDFState.searchResults).toEqual([expect.objectContaining({ page: 1 })]);
   });
 
+  it('uses canonical PDF identity and migrates transport-keyed annotations', async () => {
+    const sourceUrl = 'https://cdn.example.test/course.pdf?token=one';
+    const makePage = () => ({
+      rotate: 0,
+      getViewport: vi.fn(() => ({ width: 100, height: 100 })),
+      render: vi.fn(() => ({ promise: Promise.resolve() })),
+      getTextContent: vi.fn(async () => ({ items: [] })),
+    });
+    globalThis.pdfjsLib = {
+      getDocument: vi.fn(() => ({
+        promise: Promise.resolve({
+          numPages: 1,
+          fingerprints: ['canonical-fingerprint'],
+          getPage: vi.fn(async () => makePage()),
+        }),
+      })),
+    };
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));
+    const getAnnotations = vi.fn(async docId => docId === sourceUrl
+      ? [{ id: 'legacy-annotation', docId, page: 2, updatedAt: 10 }]
+      : []);
+    const saveAnnotations = vi.fn(async () => []);
+    window.DB = { getAnnotations, saveAnnotations };
+    window.PlasmaPDFViewer._buildThumbnails = vi.fn(async () => {});
+
+    await window.PlasmaPDFViewer.load(sourceUrl);
+
+    expect(window.PlasmaPDFState.annotationDocId).toBe('fingerprint:canonical-fingerprint');
+    expect(window.PlasmaPDFState.searchDocId).toBe('fingerprint:canonical-fingerprint');
+    expect(window.PlasmaPDFState.annotationAliases).toContain(sourceUrl);
+    expect(window.PlasmaPDFState.annotations[2]).toEqual([
+      expect.objectContaining({ id: 'legacy-annotation', docId: 'fingerprint:canonical-fingerprint' }),
+    ]);
+    expect(saveAnnotations).toHaveBeenCalledWith(
+      'fingerprint:canonical-fingerprint',
+      expect.objectContaining({ 2: expect.any(Array) }),
+    );
+    expect(saveAnnotations).toHaveBeenCalledWith(sourceUrl, {});
+    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('pdf:identity-migrated', expect.objectContaining({
+      docId: 'fingerprint:canonical-fingerprint',
+      aliases: [sourceUrl],
+      annotations: 1,
+    }));
+  });
+
   it('queues the latest page render instead of dropping requests during an active render', async () => {
     const renderResolvers = [];
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));

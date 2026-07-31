@@ -37,7 +37,8 @@
     "report:bundle": "node scripts/bundle-report.cjs",
     "smoke": "node scripts/smoke-test.cjs",
     "smoke:browser": "node scripts/browser-smoke.cjs",
-    "ci": "npm run check:encoding && npm run check:workflows && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser",
+    "smoke:dist-browser": "node scripts/dist-browser-smoke.cjs",
+    "ci": "npm run check:encoding && npm run check:workflows && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser && npm run smoke:dist-browser",
     "offline": "npm ci --offline"
   },
   "dependencies": {

@@ -116,6 +116,17 @@ function validateVerificationWorkflow(workflow) {
   return errors;
 }
 
+function validateBrowserAssuranceWorkflow(workflow) {
+  const errors = [];
+  requireText(errors, workflow, 'pull_request:', 'browser-assurance.yml: pull-request trigger is missing');
+  requireText(errors, workflow, '- name: Check out browser-assurance source', 'browser-assurance.yml: checkout step is missing');
+  requireText(errors, workflow, 'persist-credentials: false', 'browser-assurance.yml: checkout must disable persisted credentials');
+  requireText(errors, workflow, '- name: Run production browser smoke tests', 'browser-assurance.yml: real production-browser smoke gate is missing');
+  requireText(errors, workflow, 'CHROME_BIN: /usr/bin/google-chrome', 'browser-assurance.yml: deterministic Chrome executable is missing');
+  requireText(errors, workflow, 'npm run smoke:dist-browser', 'browser-assurance.yml: production distribution smoke command is missing');
+  return errors;
+}
+
 function validateReleaseWorkflow(workflow) {
   const errors = [];
   const guardIndex = workflow.indexOf('      - name: Require an authoritative trigger');
@@ -183,6 +194,7 @@ function validateWorkflowSet(files) {
   for (const [filename, workflow] of Object.entries(files)) errors.push(...validateActionPins(filename, workflow));
   errors.push(...validateCiWorkflow(files['ci.yml'] || ''));
   errors.push(...validateVerificationWorkflow(files['verify.yml'] || ''));
+  errors.push(...validateBrowserAssuranceWorkflow(files['browser-assurance.yml'] || ''));
   errors.push(...validateReleaseWorkflow(files['release.yml'] || ''));
   errors.push(...validateMaintenanceWorkflow(files['actions-maintenance.yml'] || ''));
   return errors;
@@ -196,6 +208,7 @@ function main() {
   const files = {
     'ci.yml': readWorkflow('ci.yml'),
     'verify.yml': readWorkflow('verify.yml'),
+    'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
     'release.yml': readWorkflow('release.yml'),
     'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
   };
@@ -215,6 +228,7 @@ module.exports = {
   extractNamedStep,
   extractWorkflowDispatchTagInput,
   validateActionPins,
+  validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,

@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const {
   extractWorkflowDispatchTagInput,
   validateActionPins,
+  validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,
@@ -26,6 +27,7 @@ function readWorkflow(filename) {
 const workflows = {
   'ci.yml': readWorkflow('ci.yml'),
   'verify.yml': readWorkflow('verify.yml'),
+  'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };
@@ -160,6 +162,20 @@ describe('GitHub Actions hardening', () => {
       expect.stringContaining('aggregate result gate'),
       expect.stringContaining('context values must pass through env'),
       expect.stringContaining('repository-relative paths'),
+    ]));
+  });
+
+  it('requires a real production-browser gate with pinned, credential-safe setup', () => {
+    const broken = workflows['browser-assurance.yml']
+      .replace('persist-credentials: false', 'persist-credentials: true')
+      .replace('      - name: Run production browser smoke tests', '      - name: Skip production browser smoke tests')
+      .replace('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
+      .replace('npm run smoke:dist-browser', 'npm run smoke:browser');
+    expect(validateBrowserAssuranceWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('disable persisted credentials'),
+      expect.stringContaining('production-browser smoke gate'),
+      expect.stringContaining('deterministic Chrome executable'),
+      expect.stringContaining('production distribution smoke command'),
     ]));
   });
 

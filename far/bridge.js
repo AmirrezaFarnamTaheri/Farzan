@@ -348,56 +348,9 @@
       localStorage.setItem(MIGRATED_IDS_KEY, JSON.stringify([..._migratedIds]));
     }
 
-    function _stableStringify(value) {
-      if (value === null || typeof value !== 'object') return JSON.stringify(value);
-      if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
-      const entries = Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${_stableStringify(value[key])}`);
-      return `{${entries.join(',')}}`;
-    }
-
-    async function _digestText(text) {
-      const encoded = new TextEncoder().encode(text);
-      if (window.crypto?.subtle?.digest) {
-        const digest = await window.crypto.subtle.digest('SHA-256', encoded);
-        return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-      }
-      let hash = 0x811c9dc5;
-      for (const byte of encoded) {
-        hash ^= byte;
-        hash = Math.imul(hash, 0x01000193) >>> 0;
-      }
-      return `fnv1a-${hash.toString(16).padStart(8, '0')}`;
-    }
-
-    async function _contentStableRecordId(kind, record) {
-      const identity = { ...record };
-      delete identity.id;
-      const canonical = _stableStringify(identity);
-      const digest = await _digestText(`opencoursedeck:migration:v${MIGRATION_VERSION}:${kind}\0${canonical}`);
-      return { id: `${kind}-migrated-v${MIGRATION_VERSION}-${digest.slice(0, 24)}`, canonical, digest };
-    }
-
     async function _buildLegacyRecords(kind, records) {
-      const output = [];
-      const identities = new Map();
-      for (const record of records.filter(Boolean)) {
-        let id = record.id;
-        let canonical = null;
-        if (!id) {
-          const identity = await _contentStableRecordId(kind, record);
-          id = identity.id;
-          canonical = identity.canonical;
-        }
-        const prior = identities.get(id);
-        if (prior && canonical && prior !== canonical) {
-          const error = new Error(`Migration identity collision for ${kind}:${id}`);
-          error.code = 'MIGRATION_IDENTITY_COLLISION';
-          throw error;
-        }
-        if (canonical) identities.set(id, canonical);
-        output.push([record, id]);
-      }
-      return output;
+      const { buildLegacyRecords } = await import('./src/core/migrationIdentity.js');
+      return buildLegacyRecords(kind, records, MIGRATION_VERSION, window.crypto);
     }
 
     async function _migrationCheckpoint(idb, section) {
@@ -829,7 +782,8 @@
       if (idb) {
         await _migrateOnce();
         try {
-          for (const next of nextArr) await idb.put('annotations', next);
+          const { replaceDocumentAnnotations } = await import('./src/core/annotationPersistence.js');
+          await replaceDocumentAnnotations(idb, docId, nextArr);
           _broadcast('annotation', 'save', { docId, annotations: nextArr });
           return nextArr;
         } catch (e) {
@@ -841,13 +795,8 @@
       }
 
       const dict = _read('plasma-pdf-annotations', {});
-      if (!dict[docId]) dict[docId] = [];
-      const docList = dict[docId];
-      for (const next of nextArr) {
-        const idx = docList.findIndex(a => a.id === next.id);
-        if (idx >= 0) docList[idx] = next;
-        else docList.push(next);
-      }
+      if (nextArr.length) dict[docId] = nextArr;
+      else delete dict[docId];
       _write('plasma-pdf-annotations', dict);
       return nextArr;
     }

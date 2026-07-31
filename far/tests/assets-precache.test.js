@@ -93,16 +93,18 @@ describe('static assets and service worker precache', () => {
   });
 
   it('uses offline-friendly runtime caching for catalog data and app bundles', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const config = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
     const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
 
-    expect(config).toContain("cacheName: 'opencoursedeck-data'");
+    expect(config).toContain('({ url, sameOrigin }) => sameOrigin');
+    expect(config).toContain('cacheName: `opencoursedeck-data-v${pkg.version}`');
     expect(config).toContain("handler: 'NetworkFirst'");
-    expect(config).toContain("cacheName: 'opencoursedeck-app-bundle'");
+    expect(config).toContain('cacheName: `opencoursedeck-app-bundle-v${pkg.version}`');
     expect(config).toContain("handler: 'StaleWhileRevalidate'");
-    expect(sw).toContain('opencoursedeck-data');
+    expect(sw).toContain(`opencoursedeck-data-v${pkg.version}`);
     expect(sw).toContain('NetworkFirst');
-    expect(sw).toContain('opencoursedeck-app-bundle');
+    expect(sw).toContain(`opencoursedeck-app-bundle-v${pkg.version}`);
     expect(sw).toContain('StaleWhileRevalidate');
   });
 

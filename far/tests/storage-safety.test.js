@@ -69,7 +69,7 @@ describe('storage safety', () => {
       degraded: false,
       status: 'committed',
       operation: 'clear-notes',
-      backend: 'indexedDB',
+      backend: 'indexedDB+localStorage',
       details: { scope: 'notes' },
       failures: [],
       cleared: [],

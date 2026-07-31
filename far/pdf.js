@@ -163,6 +163,7 @@
     textCache:     new Map(),
     annotations:   {},          // { [pageNum]: Annotation[] }
     annotationDocId: 'global',
+    annotationAliases: [],
     searchDocId:   'global',
     activeTool:    'pan',       // 'pan' | 'highlight' | 'text' | 'draw'
     highlights:    [],          // persisted highlight annotations
@@ -270,10 +271,10 @@
         State.searchIdx = -1;
         State.textCache = new Map();
         State.annotations = {};
-        State.annotationDocId = typeof source === 'string'
-          ? source
-          : `file:${source?.name || 'local'}:${source?.size || 0}`;
-        State.searchDocId = this._deriveSearchDocId(source, State.pdfDoc);
+        State.annotationDocId = await this._deriveCanonicalDocId(source, State.pdfDoc, src.data);
+        State.annotationAliases = this._deriveLegacyDocIds(source)
+          .filter(docId => docId && docId !== State.annotationDocId);
+        State.searchDocId = State.annotationDocId;
 
         this._updatePageUI();
         await this._loadAnnotations();
@@ -926,6 +927,40 @@
       return State.annotationDocId || 'global';
     },
 
+    _deriveLegacyDocIds(source) {
+      if (typeof source === 'string') return [source, `url:${source}`];
+      if (source instanceof File) {
+        return [
+          `file:${source.name}:${source.size}`,
+          `file:${source.name}:${source.size}:${source.lastModified || 0}`,
+        ];
+      }
+      if (source instanceof ArrayBuffer) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
+      if (ArrayBuffer.isView(source)) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
+      return [];
+    },
+
+    async _deriveCanonicalDocId(source, pdfDoc = State.pdfDoc, sourceData = null) {
+      const fingerprintId = this._deriveSearchDocId(source, pdfDoc);
+      if (fingerprintId.startsWith('fingerprint:')) return fingerprintId;
+
+      let bytes = sourceData;
+      if (!bytes && typeof pdfDoc?.getData === 'function') {
+        try { bytes = await pdfDoc.getData(); } catch {}
+      }
+      if (bytes) {
+        const view = bytes instanceof Uint8Array
+          ? bytes
+          : new Uint8Array(bytes.buffer || bytes, bytes.byteOffset || 0, bytes.byteLength);
+        try {
+          const digest = await crypto.subtle.digest('SHA-256', view);
+          const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          return `sha256:${hex}`;
+        } catch {}
+      }
+      return fingerprintId;
+    },
+
     searchNext() {
       if (!State.searchResults.length) return;
       State.searchIdx = (State.searchIdx + 1) % State.searchResults.length;
@@ -1062,12 +1097,36 @@
     async _loadAnnotations() {
       if (window.DB?.getAnnotations) {
         try {
-          const records = await window.DB.getAnnotations(State.annotationDocId);
+          const canonicalId = State.annotationDocId;
+          const aliases = Array.from(new Set(State.annotationAliases || []));
+          const results = await Promise.all([
+            window.DB.getAnnotations(canonicalId),
+            ...aliases.map(alias => window.DB.getAnnotations(alias)),
+          ]);
+          const merged = new Map();
+          results.flat().forEach((annotation) => {
+            const next = { ...annotation, docId: canonicalId };
+            const current = merged.get(next.id);
+            if (!current || Number(next.updatedAt || 0) >= Number(current.updatedAt || 0)) {
+              merged.set(next.id, next);
+            }
+          });
+          const records = [...merged.values()];
           State.annotations = records.reduce((acc, annotation) => {
             const page = annotation.page ?? 1;
             (acc[page] = acc[page] ?? []).push(annotation);
             return acc;
           }, {});
+          const migratedAliases = aliases.filter((_, index) => (results[index + 1] || []).length > 0);
+          if (migratedAliases.length && window.DB?.saveAnnotations) {
+            await window.DB.saveAnnotations(canonicalId, State.annotations);
+            await Promise.all(migratedAliases.map(alias => window.DB.saveAnnotations(alias, {})));
+            window.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
+              docId: canonicalId,
+              aliases: migratedAliases,
+              annotations: records.length,
+            });
+          }
           return;
         } catch {}
       }
@@ -1465,6 +1524,7 @@
       textCache: new Map(),
       annotations: {},
       annotationDocId: 'global',
+      annotationAliases: [],
       searchDocId: 'global',
       activeTool: 'pan',
       highlights: [],
