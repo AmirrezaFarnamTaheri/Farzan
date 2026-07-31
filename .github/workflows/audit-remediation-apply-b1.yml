@@ -31,9 +31,9 @@ jobs:
       - name: Decode, verify, and apply patch
         run: |
           set -euo pipefail
-          echo "27a0ee99b29088180b53ec8cbf7c09de2b3d37abbed7f2c8203b68efd01073f6  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
+          echo "ebc6ea885852a3a169a2f44ce678ec6ff042190d4941219b739d1da09dcf0913  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
           base64 -d .audit-remediation/phase-b1.patch.gz.b64 | gzip -d > /tmp/phase-b1.patch
-          echo "d0cf4e09989bedf31571a2674b1331ac0c8a71be5c301d1cc9dcae05cb0dfed5  /tmp/phase-b1.patch" | sha256sum --check --strict
+          echo "ba4b804f30e1425ae38392af0d2dc7466fba5067bdec7b5ec9d8419ecea404c5  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
           git apply /tmp/phase-b1.patch
           git diff --check
@@ -70,5 +70,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "fix: validate built workers and defer optional runtime utilities"
+          git commit -m "fix: validate built workers and stabilize browser assurance"
           git push origin HEAD:fix/master-forensic-audit-remediation
