@@ -87,17 +87,21 @@ for (const file of ['build.rs', 'src/main.rs', 'src/lib.rs']) {
 
 const cargoLockExists = fs.existsSync(rel('src-tauri', 'Cargo.lock'));
 add(cargoLockExists ? 'ok' : strict ? 'fail' : 'warn', 'Tauri Cargo lockfile exists');
+add(fs.existsSync(rel('assets', 'icon-192.svg')) ? 'ok' : 'fail', 'Native icon source exists');
+const generatedIcon = rel('src-tauri', 'icons', 'icon.png');
+const generatedIconReady = fs.existsSync(generatedIcon) && fs.statSync(generatedIcon).size >= 512;
 add(
-  fs.existsSync(rel('src-tauri', 'icons', 'icon.ico')) ? 'ok' : 'warn',
-  'Windows desktop icon exists',
-  'optional for Cargo verification; required before signed public installer distribution',
+  generatedIconReady ? 'ok' : strict ? 'fail' : 'warn',
+  'Generated Windows desktop icon exists',
+  generatedIconReady ? `${fs.statSync(generatedIcon).size} bytes` : 'run `npm run native:prepare` before strict verification or native compilation',
 );
 
 if (packageJson) {
   const scripts = packageJson.scripts || {};
+  add(scripts['native:prepare'] === 'node scripts/prepare-native-assets.cjs' ? 'ok' : 'fail', 'Native asset preparation script is declared');
   add(scripts['tauri:check'] === 'node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml' ? 'ok' : 'fail', 'Tauri check script is declared');
-  add(scripts['tauri:build'] === 'node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release' ? 'ok' : 'fail', 'Tauri release build script is declared');
-  add(scripts['tauri:bundle'] === 'tauri build --config src-tauri/tauri.conf.json' ? 'ok' : 'fail', 'Tauri bundle script uses the official CLI');
+  add(scripts['tauri:build'] === 'npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release' ? 'ok' : 'fail', 'Tauri release build prepares assets and compiles through the pinned wrapper');
+  add(scripts['tauri:bundle'] === 'npm run native:prepare && tauri build --config src-tauri/tauri.conf.json' ? 'ok' : 'fail', 'Tauri bundle script prepares assets and uses the official CLI');
   add(scripts['native:package'] === 'npm run tauri:bundle && node scripts/stage-native-exe.cjs' ? 'ok' : 'fail', 'native package script stages the verified executable');
 }
 
@@ -116,7 +120,22 @@ if (tauriConfig) {
   add(tauriConfig.build?.beforeBuildCommand === 'npm run build:release' ? 'ok' : 'fail', 'Tauri rebuilds the production frontend before bundling');
   add(tauriConfig.build?.removeUnusedCommands === true ? 'ok' : 'warn', 'Tauri removes unused commands');
   add(tauriConfig.app?.security?.freezePrototype === true ? 'ok' : 'warn', 'Tauri freezes JavaScript prototypes');
+
+  const csp = tauriConfig.app?.security?.csp;
+  const requiredCspDirectives = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+  ];
+  add(
+    typeof csp === 'string' && requiredCspDirectives.every((directive) => csp.includes(directive)) ? 'ok' : 'fail',
+    'Tauri enforces a restrictive Content Security Policy',
+  );
+
   add(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('nsis') ? 'ok' : 'fail', 'Tauri bundle targets Windows NSIS');
+  add(Array.isArray(tauriConfig.bundle?.icon) && tauriConfig.bundle.icon.includes('icons/icon.png') ? 'ok' : 'fail', 'Tauri bundle uses the generated native icon');
 }
 
 if (capabilities) {
@@ -155,7 +174,7 @@ const warned = checks.filter((check) => check.status === 'warn');
 if (failed.length) console.log(`\n${failed.length} required native readiness check(s) failed.`);
 if (warned.length) console.log(`\n${warned.length} native readiness warning(s) remain.`);
 if (failed.length || warned.length) {
-  console.log('Next native packaging step: resolve the reported scaffold, lockfile, toolchain, or signing gap and rerun `npm run native:preflight:strict`.');
+  console.log('Next native packaging step: resolve the reported asset, scaffold, lockfile, toolchain, or signing gap and rerun `npm run native:preflight:strict`.');
 }
 
 process.exit(strict && failed.length ? 1 : 0);
