@@ -197,6 +197,13 @@ export function getTemplatePickerItems() {
   });
 }
 
-const NoteTemplates = { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems };
+export const NoteTemplates = {
+  getAllTemplates,
+  getTemplate,
+  saveAsTemplate,
+  updateTemplate,
+  deleteTemplate,
+  getTemplatePickerItems,
+};
 window.OpenCourseDeck = window.OpenCourseDeck || {};
 window.OpenCourseDeck.NoteTemplates = NoteTemplates;
