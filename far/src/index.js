@@ -8,6 +8,7 @@ import '../data.js';
 import '../db.js';
 import '../ui.js';
 import '../bridge.js';
+import { installBridgeHardening } from './core/bridgeHardening.js';
 import { installStorageSafety } from './core/storageSafety.js';
 import { installAuxiliaryDbLifecycle } from './core/auxiliaryDbLifecycle.js';
 import { installDataHardening } from './core/dataHardening.js';
@@ -33,6 +34,7 @@ import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
 
+installBridgeHardening(window);
 installAuxiliaryDbLifecycle(window);
 installStorageSafety(window);
 installDataHardening(window);
@@ -155,7 +157,7 @@ import('../app.js')
         GoogleTranslator: translator.GoogleTranslator,
         LANGUAGES: translator.LANGUAGES,
         getLanguageName: translator.getLanguageName,
-        TranslationCache: translationCache,
+        TranslationCache: translationCache.translationCache,
         NoteTemplates: noteTemplates.NoteTemplates,
       });
       initCommandPalette();
