@@ -1,1 +1,0 @@
-Trigger Phase C after SBOM identity normalization.
