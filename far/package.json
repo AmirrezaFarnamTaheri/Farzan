@@ -49,14 +49,14 @@
     "check:font-budget": "node scripts/check-font-budget.cjs"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.2.8",
-    "@fontsource/jetbrains-mono": "^5.2.8",
-    "@fontsource/playfair-display": "^5.2.8",
-    "@fortawesome/fontawesome-free": "^7.2.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fortawesome/fontawesome-free": "^7.3.1",
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.12",
-    "fuse.js": "7.0.0",
-    "pdfjs-dist": "4.10.38"
+    "fuse.js": "7.5.0",
+    "pdfjs-dist": "6.2.108"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
