@@ -24,9 +24,6 @@ describe('runtime wiring', () => {
     './features/errorBoundary.js',
     './features/offlineBanner.js',
     './features/commandPalette.js',
-    './features/knowledgeGraph.js',
-    './features/courseGraph.js',
-    './features/canvasZoom.js',
     './core/storageSafety.js',
     './core/dataHardening.js',
     './core/endpointApprovalGuard.js',
@@ -48,6 +45,42 @@ describe('runtime wiring', () => {
 
   it.each(requiredModules)('src/index.js imports %s', (specifier) => {
     expect(indexSource).toContain(specifier);
+  });
+
+  it('defers translation and note-template utilities until the app shell resolves', () => {
+    const appImport = indexSource.indexOf("import('../app.js')");
+    for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
+      expect(indexSource).toContain(`import('${specifier}')`);
+      expect(indexSource).not.toMatch(new RegExp(`from ['\"]${specifier.replaceAll('.', '\\.')}['\"]`));
+      expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
+    }
+    expect(indexSource).toContain('Object.assign(pd, {');
+    expect(indexSource).toContain('NoteTemplates: noteTemplates.NoteTemplates');
+  });
+
+  it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
+    const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+
+    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js', './src/features/canvasZoom.js']) {
+      expect(appSource).toContain(specifier);
+      expect(indexSource).not.toContain(specifier);
+    }
+    expect(appSource).toContain('OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph }');
+  });
+
+
+
+  it('uses one document-relative resolver for public and pooled production workers', () => {
+    const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'utf8');
+    const assetSource = fs.readFileSync(path.join(root, 'src/core/workerAssets.js'), 'utf8');
+
+    expect(indexSource).toContain("import { workerAssets } from './core/workerAssets.js'");
+    expect(indexSource).toContain('pd.workers = workerAssets');
+    expect(poolSource).toContain("import { workerAssets } from '../core/workerAssets.js'");
+    expect(poolSource).toContain('createDefinition(workerAssets.search)');
+    expect(poolSource).toContain('createDefinition(workerAssets.catalog)');
+    expect(assetSource).toContain('globalThis.document?.baseURI');
+    expect(assetSource).toContain('src/workers/${file}');
   });
 
   it('player.js media-storage integration has a provider on the namespace', async () => {

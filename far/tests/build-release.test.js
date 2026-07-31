@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { rewriteReleaseStaticFile } = require('../scripts/build.cjs');
+const { assertReleaseGraph, rewriteReleaseStaticFile, stageStaticAssets } = require('../scripts/build.cjs');
 const { stripSourceMapReferences } = require('../scripts/build-sw-dist.cjs');
 
 describe('production release staging', () => {
@@ -23,6 +23,44 @@ describe('production release staging', () => {
 
     expect(release).toContain('src="./opencoursedeck.js"');
     expect(release).not.toContain('dist/opencoursedeck.js');
+  });
+
+
+
+  it('stages classic worker assets into the self-contained production release', () => {
+    const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-worker-source-'));
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-worker-dist-'));
+    try {
+      const workerDir = path.join(sourceRoot, 'src', 'workers');
+      fs.mkdirSync(workerDir, { recursive: true });
+      fs.writeFileSync(path.join(workerDir, 'search.worker.js'), 'self.onmessage = () => {};', 'utf8');
+      fs.writeFileSync(path.join(workerDir, 'catalog.worker.js'), 'self.onmessage = () => {};', 'utf8');
+
+      stageStaticAssets(sourceRoot, outputDir);
+
+      expect(fs.readFileSync(path.join(outputDir, 'src', 'workers', 'search.worker.js'), 'utf8')).toContain('onmessage');
+      expect(fs.readFileSync(path.join(outputDir, 'src', 'workers', 'catalog.worker.js'), 'utf8')).toContain('onmessage');
+    } finally {
+      fs.rmSync(sourceRoot, { recursive: true, force: true });
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a production release that omits a required worker asset', () => {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-worker-graph-'));
+    try {
+      for (const file of ['index.html', 'boot.js', 'manifest.json', 'pdf-runtime.js', 'opencoursedeck.js', 'style.css']) {
+        fs.writeFileSync(path.join(outputDir, file), file === 'boot.js' ? "import('./opencoursedeck.js')" : '', 'utf8');
+      }
+      fs.mkdirSync(path.join(outputDir, 'src', 'styles'), { recursive: true });
+      fs.writeFileSync(path.join(outputDir, 'src', 'styles', 'index.css'), '', 'utf8');
+      fs.mkdirSync(path.join(outputDir, 'src', 'workers'), { recursive: true });
+      fs.writeFileSync(path.join(outputDir, 'src', 'workers', 'search.worker.js'), '', 'utf8');
+
+      expect(() => assertReleaseGraph(outputDir)).toThrow(/catalog\.worker\.js/);
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 
   it('removes line and block source-map references from Workbox output', () => {

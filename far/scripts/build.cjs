@@ -64,23 +64,24 @@ function rewriteReleaseStaticFile(file, content) {
   return content;
 }
 
-function stageStaticAssets() {
+function stageStaticAssets(sourceRoot = root, outputDir = outdir) {
   const staticDirs = ['assets', 'data', 'docs', 'vendor'];
   for (const dir of staticDirs) {
-    copyDirectory(path.join(root, dir), path.join(outdir, dir));
+    copyDirectory(path.join(sourceRoot, dir), path.join(outputDir, dir));
   }
-  copyDirectory(path.join(root, 'src', 'styles'), path.join(outdir, 'src', 'styles'));
+  copyDirectory(path.join(sourceRoot, 'src', 'styles'), path.join(outputDir, 'src', 'styles'));
+  copyDirectory(path.join(sourceRoot, 'src', 'workers'), path.join(outputDir, 'src', 'workers'));
 
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js']) {
-    const from = path.join(root, file);
-    const to = path.join(outdir, file);
+    const from = path.join(sourceRoot, file);
+    const to = path.join(outputDir, file);
     if (!fs.existsSync(from)) continue;
     const content = rewriteReleaseStaticFile(file, fs.readFileSync(from, 'utf8'));
     fs.writeFileSync(to, content, 'utf8');
   }
 }
 
-function assertReleaseGraph() {
+function assertReleaseGraph(outputDir = outdir) {
   const requiredReleaseFiles = [
     'index.html',
     'boot.js',
@@ -89,13 +90,15 @@ function assertReleaseGraph() {
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
+    path.join('src', 'workers', 'search.worker.js'),
+    path.join('src', 'workers', 'catalog.worker.js'),
   ];
-  const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outdir, file)));
+  const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outputDir, file)));
   if (missing.length) {
     throw new Error(`Production build is missing required release files: ${missing.join(', ')}`);
   }
 
-  const bootSource = fs.readFileSync(path.join(outdir, 'boot.js'), 'utf8');
+  const bootSource = fs.readFileSync(path.join(outputDir, 'boot.js'), 'utf8');
   if (!bootSource.includes("./opencoursedeck.js")) {
     throw new Error('Production boot file does not reference ./opencoursedeck.js');
   }
@@ -106,7 +109,7 @@ function assertReleaseGraph() {
     throw new Error('Production boot file references unstaged source modules');
   }
 
-  const sourceMaps = walkFiles(outdir).filter(file => file.endsWith('.map'));
+  const sourceMaps = walkFiles(outputDir).filter(file => file.endsWith('.map'));
   if (sourceMaps.length) {
     throw new Error(`Production build contains forbidden source maps: ${sourceMaps.join(', ')}`);
   }
@@ -143,4 +146,5 @@ module.exports = {
   main,
   removeProductionSourceMaps,
   rewriteReleaseStaticFile,
+  stageStaticAssets,
 };
