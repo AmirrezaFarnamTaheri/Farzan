@@ -9,7 +9,6 @@
 /far/vendor/*
 !/far/vendor/pdf.min.mjs
 !/far/vendor/pdf.worker.min.mjs
-/far/src-tauri
 /.cargo
 
 # Root-level debris (downloaded tooling, test artifacts)

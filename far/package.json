@@ -12,21 +12,25 @@
     "first-run": "npm run vendor && npm run build:release",
     "build": "node scripts/build.cjs",
     "build:watch": "node scripts/build.cjs --watch",
-    "build:sw": "node scripts/clean-workbox.cjs && node node_modules/workbox-cli/build/bin.js generateSW scripts/workbox.config.cjs",
+    "build:sw": "node scripts/build-sw-dist.cjs",
     "build:release": "npm run build && node scripts/build-sw-dist.cjs",
     "release:manifest": "node scripts/create-release-manifest.cjs",
     "release:verify": "node scripts/verify-release-manifest.cjs",
-    "release:attest": "npm run release:manifest && npm run release:verify",
+    "release:attest": "npm run release:manifest && npm run release:verify && npm run release:sbom && npm run release:verify-sbom",
     "desktop": "npm run build && node desktop/launch.cjs",
     "desktop:app-window": "npm run build && node desktop/app-window.cjs",
     "desktop:package": "npm run build && node desktop/package-portable.cjs",
+    "native:prepare": "node scripts/prepare-native-assets.cjs",
     "native:preflight": "node scripts/native-preflight.cjs",
     "native:preflight:strict": "node scripts/native-preflight.cjs --strict",
+    "tauri": "tauri",
     "tauri:check": "node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml",
-    "tauri:build": "node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release",
-    "native:exe": "npm run tauri:build && node scripts/stage-native-exe.cjs",
-    "tauri:bundle": "node scripts/native-cargo.cjs run --manifest-path tauri-dev/tauri-dev/crates/tauri-cli/Cargo.toml -- bundle --config src-tauri/tauri.conf.json",
-    "native:package": "npm run tauri:bundle",
+    "tauri:check:locked": "node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml --locked",
+    "tauri:build": "npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release",
+    "tauri:build:locked": "npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release --locked",
+    "native:exe": "npm run build:release && npm run tauri:build:locked && node scripts/stage-native-exe.cjs",
+    "tauri:bundle": "npm run native:prepare && tauri build --config src-tauri/tauri.conf.json",
+    "native:package": "npm run tauri:bundle && node scripts/stage-native-exe.cjs",
     "check:generated": "node scripts/check-generated.cjs",
     "check:encoding": "node scripts/check-encoding.cjs",
     "check:workflows": "node scripts/check-workflows.cjs",
@@ -37,8 +41,12 @@
     "report:bundle": "node scripts/bundle-report.cjs",
     "smoke": "node scripts/smoke-test.cjs",
     "smoke:browser": "node scripts/browser-smoke.cjs",
-    "ci": "npm run check:encoding && npm run check:workflows && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser",
-    "offline": "npm ci --offline"
+    "smoke:dist-browser": "node scripts/dist-browser-smoke.cjs",
+    "ci": "npm run check:encoding && npm run check:workflows && npm run validate && npm run lint && npm run build:release && npm run check:generated && npm run release:attest && npm test && npm run audit && npm run report:bundle && npm run smoke && npm run smoke:browser && npm run smoke:dist-browser",
+    "offline": "npm ci --offline",
+    "release:sbom": "node scripts/generate-sbom.cjs",
+    "release:verify-sbom": "node scripts/verify-sbom.cjs",
+    "check:font-budget": "node scripts/check-font-budget.cjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -52,6 +60,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "2.11.4",
     "@testing-library/dom": "^10.4.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.2.1",
@@ -60,8 +69,11 @@
     "globals": "^17.5.0",
     "http-server": "^14.1.1",
     "jsdom": "^29.0.2",
-    "sharp": "^0.34.5",
+    "sharp": "0.35.3",
     "vitest": "^4.1.4",
-    "workbox-cli": "^7.4.1"
+    "workbox-build": "7.4.1"
+  },
+  "overrides": {
+    "ejs": "6.0.1"
   }
 }

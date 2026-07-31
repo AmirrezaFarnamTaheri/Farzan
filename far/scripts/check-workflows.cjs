@@ -12,6 +12,7 @@ const EXPECTED_ACTION_PINS = new Map([
   ['actions/upload-artifact', { sha: 'b7c566a772e6b6bfb58ed0dc250532a479d7789f', version: 'v6.0.0' }],
   ['actions/download-artifact', { sha: '018cc2cf5baa6db3ef3c5f8a56943fffe632ef53', version: 'v6.0.0' }],
   ['actions/github-script', { sha: 'ed597411d8f924073f98dfc5c65a23a2325f34cd', version: 'v8.0.0' }],
+  ['actions/attest', { sha: 'c32b4b8b198b65d0bd9d63490e847ff7b53989d4', version: 'v4.0.0' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
 ]);
 
@@ -108,11 +109,24 @@ function validateVerificationWorkflow(workflow) {
   requireText(errors, workflow, '- name: Reverify final release contents', 'verify.yml: final release verification is missing');
   requireText(errors, workflow, '- name: Package immutable release assets', 'verify.yml: immutable release packaging is missing');
   requireText(errors, workflow, '- name: Upload verified release assets', 'verify.yml: verified release asset upload is missing');
+  requireText(errors, workflow, 'reports/release/sbom.cdx.json', 'verify.yml: CycloneDX SBOM must be packaged with immutable release assets');
+  requireText(errors, workflow, '"$sbom" > SHA256SUMS', 'verify.yml: SBOM must be covered by release checksums');
   requireText(errors, workflow, 'Browser smoke recovered on retry', 'verify.yml: recovered browser-smoke retries must be visible');
   requireText(errors, workflow, 'Download release diagnostics', 'verify.yml: integrity failures must include actionable diagnostics guidance');
 
   const diagnostics = extractNamedStep(workflow, 'Upload verification diagnostics');
   if (!diagnostics.includes('if: always()')) errors.push('verify.yml: diagnostics must upload even when verification fails');
+  return errors;
+}
+
+function validateBrowserAssuranceWorkflow(workflow) {
+  const errors = [];
+  requireText(errors, workflow, 'pull_request:', 'browser-assurance.yml: pull-request trigger is missing');
+  requireText(errors, workflow, '- name: Check out browser-assurance source', 'browser-assurance.yml: checkout step is missing');
+  requireText(errors, workflow, 'persist-credentials: false', 'browser-assurance.yml: checkout must disable persisted credentials');
+  requireText(errors, workflow, '- name: Run production browser smoke tests', 'browser-assurance.yml: real production-browser smoke gate is missing');
+  requireText(errors, workflow, 'CHROME_BIN: /usr/bin/google-chrome', 'browser-assurance.yml: deterministic Chrome executable is missing');
+  requireText(errors, workflow, 'npm run smoke:dist-browser', 'browser-assurance.yml: production distribution smoke command is missing');
   return errors;
 }
 
@@ -159,6 +173,13 @@ function validateReleaseWorkflow(workflow) {
   requireText(errors, workflow, '- name: Reverify immutable tag before publication', 'release.yml: tag identity must be rechecked immediately before publication');
   requireText(errors, workflow, '- name: Verify published release identity', 'release.yml: publication must be verified after mutation');
   requireText(errors, workflow, 'overwrite_files: false', 'release.yml: published release assets must not overwrite existing assets');
+  requireText(errors, workflow, 'id-token: write', 'release.yml: signed provenance requires OIDC permission');
+  requireText(errors, workflow, 'attestations: write', 'release.yml: signed provenance requires attestation permission');
+  requireText(errors, workflow, 'artifact-metadata: write', 'release.yml: signed provenance requires artifact metadata permission');
+  requireText(errors, workflow, '- name: Attest immutable release artifacts', 'release.yml: signed artifact provenance step is missing');
+  requireText(errors, workflow, '- name: Attest release SBOM', 'release.yml: signed SBOM attestation step is missing');
+  requireText(errors, workflow, 'sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'release.yml: SBOM attestation must bind the published archive to its SBOM');
+  requireText(errors, workflow, '`opencoursedeck-${tag}-sbom.cdx.json`', 'release.yml: idempotency checks must include the SBOM asset');
   return errors;
 }
 
@@ -183,6 +204,7 @@ function validateWorkflowSet(files) {
   for (const [filename, workflow] of Object.entries(files)) errors.push(...validateActionPins(filename, workflow));
   errors.push(...validateCiWorkflow(files['ci.yml'] || ''));
   errors.push(...validateVerificationWorkflow(files['verify.yml'] || ''));
+  errors.push(...validateBrowserAssuranceWorkflow(files['browser-assurance.yml'] || ''));
   errors.push(...validateReleaseWorkflow(files['release.yml'] || ''));
   errors.push(...validateMaintenanceWorkflow(files['actions-maintenance.yml'] || ''));
   return errors;
@@ -196,6 +218,7 @@ function main() {
   const files = {
     'ci.yml': readWorkflow('ci.yml'),
     'verify.yml': readWorkflow('verify.yml'),
+    'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
     'release.yml': readWorkflow('release.yml'),
     'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
   };
@@ -215,6 +238,7 @@ module.exports = {
   extractNamedStep,
   extractWorkflowDispatchTagInput,
   validateActionPins,
+  validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,

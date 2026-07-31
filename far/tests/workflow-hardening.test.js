@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const {
   extractWorkflowDispatchTagInput,
   validateActionPins,
+  validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
   validateMaintenanceWorkflow,
   validateReleaseWorkflow,
@@ -26,12 +27,14 @@ function readWorkflow(filename) {
 const workflows = {
   'ci.yml': readWorkflow('ci.yml'),
   'verify.yml': readWorkflow('verify.yml'),
+  'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const eslintConfig = fs.readFileSync(path.join(projectRoot, 'eslint.config.js'), 'utf8');
+const workboxBuildScript = fs.readFileSync(path.join(projectRoot, 'scripts/build-sw-dist.cjs'), 'utf8');
 
 describe('module and command contract', () => {
   it('uses explicit ESM without leaving the ESLint configuration in CommonJS', () => {
@@ -52,9 +55,11 @@ describe('module and command contract', () => {
     }
   });
 
-  it('runs the committed Workbox cleanup implementation directly', () => {
-    expect(packageJson.scripts['build:sw']).toContain('node scripts/clean-workbox.cjs &&');
-    expect(fs.existsSync(path.join(projectRoot, 'scripts', 'clean-workbox.cjs'))).toBe(true);
+  it('runs the committed Workbox build implementation directly', () => {
+    expect(packageJson.scripts['build:sw']).toBe('node scripts/build-sw-dist.cjs');
+    expect(workboxBuildScript).toContain("require('workbox-build')");
+    expect(workboxBuildScript).toContain('generateSW(config)');
+    expect(workboxBuildScript).not.toContain('workbox-cli');
   });
 });
 
@@ -137,6 +142,34 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
+  it('requires signed provenance and an SBOM bound to the immutable release archive', () => {
+    const brokenRelease = workflows['release.yml']
+      .replace('      id-token: write\n', '')
+      .replace('      attestations: write\n', '')
+      .replace('      artifact-metadata: write\n', '')
+      .replace('      - name: Attest immutable release artifacts', '      - name: Skip artifact attestation')
+      .replace('      - name: Attest release SBOM', '      - name: Skip SBOM attestation')
+      .replace('sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'sbom-path: missing.json')
+      .replace('`opencoursedeck-${tag}-sbom.cdx.json`,', '');
+    const brokenVerify = workflows['verify.yml']
+      .replace('          cp reports/release/sbom.cdx.json "release-assets/$sbom"\n', '')
+      .replace(' "$sbom" > SHA256SUMS', ' > SHA256SUMS');
+
+    expect(validateReleaseWorkflow(brokenRelease)).toEqual(expect.arrayContaining([
+      expect.stringContaining('OIDC permission'),
+      expect.stringContaining('attestation permission'),
+      expect.stringContaining('artifact metadata permission'),
+      expect.stringContaining('signed artifact provenance'),
+      expect.stringContaining('signed SBOM attestation'),
+      expect.stringContaining('bind the published archive'),
+      expect.stringContaining('idempotency checks must include the SBOM'),
+    ]));
+    expect(validateVerificationWorkflow(brokenVerify)).toEqual(expect.arrayContaining([
+      expect.stringContaining('CycloneDX SBOM'),
+      expect.stringContaining('covered by release checksums'),
+    ]));
+  });
+
   it('requires idempotent retries to validate release assets, not only names', () => {
     const broken = workflows['release.yml']
       .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
@@ -160,6 +193,20 @@ describe('GitHub Actions hardening', () => {
       expect.stringContaining('aggregate result gate'),
       expect.stringContaining('context values must pass through env'),
       expect.stringContaining('repository-relative paths'),
+    ]));
+  });
+
+  it('requires a real production-browser gate with pinned, credential-safe setup', () => {
+    const broken = workflows['browser-assurance.yml']
+      .replace('persist-credentials: false', 'persist-credentials: true')
+      .replace('      - name: Run production browser smoke tests', '      - name: Skip production browser smoke tests')
+      .replace('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
+      .replace('npm run smoke:dist-browser', 'npm run smoke:browser');
+    expect(validateBrowserAssuranceWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('disable persisted credentials'),
+      expect.stringContaining('production-browser smoke gate'),
+      expect.stringContaining('deterministic Chrome executable'),
+      expect.stringContaining('production distribution smoke command'),
     ]));
   });
 

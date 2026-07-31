@@ -1,0 +1,46 @@
+name: Browser Assurance
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-browser:
+    name: Production Chromium assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: far
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out browser-assurance source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Install dependencies reproducibly
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Vendor and build production distribution
+        run: |
+          npm run vendor
+          npm run build:release
+
+      - name: Run production browser smoke tests
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: npm run smoke:dist-browser

@@ -1,0 +1,7 @@
+# Default ownership. More specific rules can be added as the maintainer team grows.
+* @AmirrezaFarnamTaheri
+
+/.github/ @AmirrezaFarnamTaheri
+/far/src/core/ @AmirrezaFarnamTaheri
+/far/scripts/ @AmirrezaFarnamTaheri
+/far/src-tauri/ @AmirrezaFarnamTaheri

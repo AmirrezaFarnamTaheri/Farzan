@@ -10,6 +10,7 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const RESULT_ID = 'opencoursedeck-dist-smoke-result';
+const RESULT_PATH = '/__smoke_result__';
 
 function mimeType(file) {
   const extension = path.extname(file).toLowerCase();
@@ -54,6 +55,7 @@ function makePdf() {
 function smokeModule() {
   return `
 const result = document.createElement('pre');
+const resultEndpoint = ${JSON.stringify(RESULT_PATH)};
 result.id = ${JSON.stringify(RESULT_ID)};
 result.dataset.status = 'running';
 result.textContent = 'production distribution smoke running';
@@ -66,6 +68,15 @@ const timeout = (promise, label, ms = 12000) => Promise.race([
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+async function report(status, detail) {
+  await fetch(resultEndpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ status, detail }),
+  });
 }
 
 function waitFor(predicate, label, ms = 12000) {
@@ -144,7 +155,8 @@ async function run() {
   invariant(indexResponse.ok, 'served dist index.html was unavailable');
   invariant((await indexResponse.text()).includes('opencoursedeck'), 'served index did not reference the production bundle');
 
-  const pd = await waitFor(() => window.OpenCourseDeck?.workers && window.OpenCourseDeck?.loadFeature && window.DB, 'application bundle');
+  await waitFor(() => window.OpenCourseDeck?.workers && window.OpenCourseDeck?.loadFeature && window.DB, 'application bundle');
+  const pd = window.OpenCourseDeck;
 
   invariant('serviceWorker' in navigator, 'service workers are unavailable');
   const registration = await timeout(navigator.serviceWorker.register('/sw.js'), 'service worker registration');
@@ -207,21 +219,33 @@ async function run() {
     await deleteDatabase(name);
   }
 
-  result.dataset.status = 'passed';
-  result.textContent = JSON.stringify({
+  const detail = {
     serviceWorker: true,
     workers: true,
     indexedDB: true,
     pdf: true,
     media: true,
     fullWipe: true,
-  });
+  };
+  result.dataset.status = 'passed';
+  result.textContent = JSON.stringify(detail);
+  try {
+    await report('passed', detail);
+  } catch (reportError) {
+    console.error('[dist-browser-smoke] result report failed', reportError);
+  }
 }
 
-run().catch(error => {
+run().catch(async error => {
   console.error('[dist-browser-smoke]', error);
+  const detail = error?.stack || error?.message || String(error);
   result.dataset.status = 'failed';
-  result.textContent = error?.stack || error?.message || String(error);
+  result.textContent = detail;
+  try {
+    await report('failed', detail);
+  } catch (reportError) {
+    console.error('[dist-browser-smoke] result report failed', reportError);
+  }
 });
 `;
 }
@@ -241,6 +265,115 @@ function findChrome() {
   throw new Error(`No supported Chrome/Chromium executable found (${candidates.join(', ')})`);
 }
 
+async function removeProfileDirectory(directory, {
+  rm = fs.promises.rm.bind(fs.promises),
+  wait = delay => new Promise(resolve => setTimeout(resolve, delay)),
+  terminate = terminateProfileProcesses,
+  attempts = 12,
+  retryDelayMs = 250,
+} = {}) {
+  terminate(directory);
+  const retryableCodes = new Set(['EBUSY', 'ENOTEMPTY', 'EPERM']);
+  const boundedAttempts = Math.max(1, Number(attempts) || 1);
+  for (let attempt = 1; attempt <= boundedAttempts; attempt += 1) {
+    try {
+      await rm(directory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!retryableCodes.has(error?.code) || attempt === boundedAttempts) throw error;
+      await wait(Math.max(0, Number(retryDelayMs) || 0) * attempt);
+    }
+  }
+}
+
+function terminateProfileProcesses(directory, spawnSync = childProcess.spawnSync) {
+  if (process.platform !== 'linux') return;
+  const marker = `--user-data-dir=${directory}`;
+  for (const signal of ['TERM', 'KILL']) {
+    spawnSync('pkill', [`-${signal}`, '-f', marker], {
+      stdio: 'ignore',
+      timeout: 5000,
+    });
+  }
+}
+
+
+async function stopChildProcess(child, {
+  wait = delay => new Promise(resolve => setTimeout(resolve, delay)),
+  graceMs = 2000,
+} = {}) {
+  if (!child || child.exitCode != null || child.signalCode) return;
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  child.kill('SIGTERM');
+  const graceful = await Promise.race([
+    exited.then(() => true),
+    wait(graceMs).then(() => false),
+  ]);
+  if (graceful || child.exitCode != null) return;
+  child.kill('SIGKILL');
+  await Promise.race([exited, wait(graceMs)]);
+}
+
+async function runChromeUntilResult(chrome, args, resultPromise, {
+  spawn = childProcess.spawn,
+  timeoutMs = 60000,
+  stop = stopChildProcess,
+} = {}) {
+  const child = spawn(chrome, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout?.setEncoding?.('utf8');
+  child.stderr?.setEncoding?.('utf8');
+  child.stdout?.on?.('data', chunk => { stdout += chunk; });
+  child.stderr?.on?.('data', chunk => { stderr += chunk; });
+
+  const exit = new Promise(resolve => child.once('exit', (code, signal) => resolve({ type: 'exit', code, signal })));
+  const spawnError = new Promise(resolve => child.once('error', error => resolve({ type: 'spawn-error', error })));
+  let timeoutHandle;
+  const timeout = new Promise(resolve => {
+    timeoutHandle = setTimeout(() => resolve({ type: 'timeout' }), timeoutMs);
+  });
+  const reported = Promise.resolve(resultPromise).then(
+    value => ({ type: 'result', value }),
+    error => ({ type: 'result-error', error }),
+  );
+
+  const outcome = await Promise.race([reported, exit, spawnError, timeout]);
+  clearTimeout(timeoutHandle);
+
+  if (outcome.type === 'result') {
+    await stop(child);
+    return { result: outcome.value, stdout, stderr };
+  }
+
+  await stop(child);
+  const output = `${stdout}\n${stderr}`.slice(-12000);
+  if (outcome.type === 'spawn-error' || outcome.type === 'result-error') throw outcome.error;
+  if (outcome.type === 'timeout') {
+    throw new Error(`Production browser smoke timed out after ${timeoutMs} ms.\n${output}`);
+  }
+  throw new Error(`Production browser exited before reporting a result (code ${outcome.code}, signal ${outcome.signal || 'none'}).\n${output}`);
+}
+
+function readJsonBody(request, { limit = 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', chunk => {
+      body += chunk;
+      if (body.length > limit) reject(new Error('Browser smoke result exceeded the size limit'));
+    });
+    request.once('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'));
+      } catch (error) {
+        reject(new Error(`Invalid browser smoke result: ${error.message}`));
+      }
+    });
+    request.once('error', reject);
+  });
+}
+
 function safeDistPath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split('?')[0]);
   const relative = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
@@ -253,14 +386,33 @@ function safeDistPath(urlPath) {
 async function main() {
   assert.ok(fs.existsSync(path.join(DIST, 'index.html')), 'dist/index.html is missing; run build:release first');
   assert.ok(fs.existsSync(path.join(DIST, 'sw.js')), 'dist/sw.js is missing; run build:release first');
-  assert.ok(fs.existsSync(path.join(DIST, 'src', 'workers', 'catalog.worker.js')), 'production catalog worker is missing');
-  assert.ok(fs.existsSync(path.join(DIST, 'src', 'workers', 'search.worker.js')), 'production search worker is missing');
+  assert.ok(fs.existsSync(path.join(DIST, 'opencoursedeck.js')), 'dist/opencoursedeck.js is missing; run build:release first');
 
   const index = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
   const harnessHtml = index.replace(/<\/body>/i, `<script type="module" src="/__smoke__.mjs"></script></body>`);
   const pdf = makePdf();
+  let scenarioSettled = false;
+  let settleScenario;
+  const scenarioResult = new Promise(resolve => { settleScenario = resolve; });
+  const recordScenario = payload => {
+    if (scenarioSettled) return;
+    scenarioSettled = true;
+    settleScenario(payload);
+  };
   const server = http.createServer((request, response) => {
     try {
+      if (request.url === RESULT_PATH && request.method === 'POST') {
+        readJsonBody(request).then(payload => {
+          recordScenario(payload);
+          response.writeHead(204, { 'cache-control': 'no-store' });
+          response.end();
+        }).catch(error => {
+          recordScenario({ status: 'failed', detail: error.message });
+          response.writeHead(400, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+          response.end(error.message);
+        });
+        return;
+      }
       if (request.url === '/__smoke__.mjs') {
         response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
         response.end(smokeModule());
@@ -300,7 +452,7 @@ async function main() {
   try {
     const chrome = findChrome();
     const target = `http://127.0.0.1:${address.port}/__smoke__.html`;
-    const execution = childProcess.spawnSync(chrome, [
+    const execution = await runChromeUntilResult(chrome, [
       '--headless=new',
       '--disable-background-networking',
       '--disable-component-update',
@@ -311,24 +463,20 @@ async function main() {
       '--disable-sync',
       '--no-first-run',
       '--no-sandbox',
-      '--dump-dom',
-      '--virtual-time-budget=25000',
       `--user-data-dir=${userData}`,
       target,
-    ], {
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-      timeout: 45000,
-    });
-    if (execution.error) throw execution.error;
-    const output = `${execution.stdout || ''}\n${execution.stderr || ''}`;
-    if (execution.status !== 0 || !output.includes(`id="${RESULT_ID}"`) || !output.includes('data-status="passed"')) {
-      throw new Error(`Production browser smoke failed (status ${execution.status}).\n${output.slice(-12000)}`);
+    ], scenarioResult);
+    if (execution.result?.status !== 'passed') {
+      const detail = typeof execution.result?.detail === 'string'
+        ? execution.result.detail
+        : JSON.stringify(execution.result?.detail || execution.result || {});
+      const output = `${execution.stdout || ''}\n${execution.stderr || ''}`.slice(-12000);
+      throw new Error(`Production browser smoke reported failure.\n${detail}\n${output}`);
     }
     console.log('[dist-browser-smoke] OK — served dist validated service worker, workers, IndexedDB, PDF, media, and full wipe lifecycle.');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    fs.rmSync(userData, { recursive: true, force: true });
+    await removeProfileDirectory(userData);
   }
 }
 
@@ -339,4 +487,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, makePdf };
+module.exports = { main, makePdf, readJsonBody, removeProfileDirectory, runChromeUntilResult, stopChildProcess, terminateProfileProcesses };

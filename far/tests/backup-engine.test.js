@@ -147,6 +147,36 @@ describe('atomic backup engine', () => {
     });
   });
 
+
+  it('returns a committed-degraded receipt when post-commit authority invalidation fails', async () => {
+    const root = rootWithFacade({
+      [AI_SESSION_KEY]: 'session-secret',
+      [AI_BINDING_KEY]: '{"version":1}',
+    });
+    const originalRemove = root.sessionStorage.removeItem.bind(root.sessionStorage);
+    root.sessionStorage.removeItem = (key) => {
+      if (key === AI_BINDING_KEY) throw new Error('storage denied');
+      return originalRemove(key);
+    };
+    installBackupEngine(root);
+
+    const receipt = await root.DB.importBackup({ notes: [{ id: 'committed-note', title: 'Committed' }] });
+    const snapshot = await root.DB.exportBackup();
+
+    expect(receipt).toMatchObject({
+      committed: true,
+      durable: true,
+      degraded: true,
+      status: 'committed-degraded',
+      retrySafe: false,
+      aiAuthorityInvalidated: false,
+    });
+    expect(receipt.warnings).toEqual([
+      expect.objectContaining({ code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE' }),
+    ]);
+    expect(snapshot.notes).toEqual([expect.objectContaining({ id: 'committed-note' })]);
+  });
+
   it('treats an included empty store as an overwrite-to-empty command', async () => {
     const seed = await new Promise((resolve, reject) => {
       const request = indexedDB.open('opencoursedeck', 3);

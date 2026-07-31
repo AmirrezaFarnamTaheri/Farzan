@@ -438,6 +438,7 @@ jobs:
           archive="opencoursedeck-${RELEASE_TAG}.tar.gz"
           manifest="opencoursedeck-${RELEASE_TAG}-manifest.json"
           attestation="opencoursedeck-${RELEASE_TAG}-attestation.json"
+          sbom="opencoursedeck-${RELEASE_TAG}-sbom.cdx.json"
 
           rm -rf release-assets
           mkdir -p release-assets
@@ -451,6 +452,7 @@ jobs:
             dist
           cp reports/release/release-manifest.json "release-assets/$manifest"
           cp reports/release/release-attestation.json "release-assets/$attestation"
+          cp reports/release/sbom.cdx.json "release-assets/$sbom"
 
           node - <<'NODE'
           const fs = require('node:fs');
@@ -467,7 +469,7 @@ jobs:
 
           (
             cd release-assets
-            sha256sum "$archive" "$manifest" "$attestation" > SHA256SUMS
+            sha256sum "$archive" "$manifest" "$attestation" "$sbom" > SHA256SUMS
             sha256sum -c SHA256SUMS
           )
 

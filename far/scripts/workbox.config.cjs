@@ -30,10 +30,10 @@ module.exports = {
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
   runtimeCaching: [
     {
-      urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/data/'),
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'plasma-data',
+        cacheName: `plasma-data-v${pkg.version}`,
         networkTimeoutSeconds: 3,
         expiration: {
           maxEntries: 50,
@@ -42,10 +42,10 @@ module.exports = {
       },
     },
     {
-      urlPattern: ({ url }) => url.pathname.startsWith('/vendor/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/vendor/'),
       handler: 'CacheFirst',
       options: {
-        cacheName: 'plasma-vendor',
+        cacheName: `plasma-vendor-v${pkg.version}`,
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -53,10 +53,10 @@ module.exports = {
       },
     },
     {
-      urlPattern: ({ url }) => url.pathname.startsWith('/dist/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/dist/'),
       handler: 'StaleWhileRevalidate',
       options: {
-        cacheName: 'plasma-dist',
+        cacheName: `plasma-dist-v${pkg.version}`,
         expiration: {
           maxEntries: 20,
           maxAgeSeconds: 24 * 60 * 60,

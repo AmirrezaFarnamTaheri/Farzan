@@ -179,6 +179,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     env:
       RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
       EXPECTED_COMMIT: ${{ needs.resolve.outputs.release_commit }}
@@ -275,6 +278,7 @@ jobs:
               `opencoursedeck-${tag}.tar.gz`,
               `opencoursedeck-${tag}-manifest.json`,
               `opencoursedeck-${tag}-attestation.json`,
+              `opencoursedeck-${tag}-sbom.cdx.json`,
               'SHA256SUMS',
             ];
             const required = new Map(requiredNames.map((name) => [
@@ -302,6 +306,22 @@ jobs:
               if (error.status !== 404) throw error;
               core.setOutput('complete', 'false');
             }
+
+      - name: Attest immutable release artifacts
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
+        with:
+          subject-path: |
+            release-assets/*.tar.gz
+            release-assets/*.json
+            release-assets/SHA256SUMS
+
+      - name: Attest release SBOM
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
+        with:
+          subject-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}.tar.gz
+          sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json
 
       - name: Reverify immutable tag before publication
         if: steps.existing.outputs.complete != 'true'

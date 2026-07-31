@@ -11,8 +11,8 @@ function createStorage() {
 }
 
 function createRoot() {
-  const clearAll = vi.fn(async () => true);
-  const clearUserData = vi.fn(async (scope) => ({ scope }));
+  const clearAll = vi.fn(async () => ({ committed: true, durable: true, failures: [], parts: [] }));
+  const clearUserData = vi.fn(async (scope) => ({ committed: true, durable: true, failures: [], parts: [], scope }));
   return {
     DB: { clearAll, clearUserData },
     OpenCourseDeck: { Toast: { error: vi.fn() } },
@@ -69,7 +69,7 @@ describe('storage safety', () => {
       degraded: false,
       status: 'committed',
       operation: 'clear-notes',
-      backend: 'indexedDB',
+      backend: 'indexedDB+localStorage',
       details: { scope: 'notes' },
       failures: [],
       cleared: [],
@@ -78,7 +78,77 @@ describe('storage safety', () => {
     expect(originalClearUserData).toHaveBeenCalledWith('notes');
   });
 
-  it('surfaces blocked auxiliary database details before rejecting a full reset', async () => {
+  it('does not convert a failed primary clear into a committed receipt', async () => {
+    const root = createRoot();
+    root.DB.clearUserData.mockResolvedValue({
+      committed: false,
+      durable: false,
+      status: 'failed',
+      failures: [{ backend: 'indexedDB', store: 'notes', message: 'clear failed' }],
+    });
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([expect.objectContaining({ store: 'notes' })]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Notes'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('indexedDB'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('undefined'));
+  });
+
+  it('rejects a nominally committed receipt when one backend was unavailable', async () => {
+    const root = createRoot();
+    root.DB.clearUserData.mockResolvedValue({
+      committed: true,
+      durable: true,
+      status: 'committed',
+      failures: [],
+      parts: [{ backend: 'indexedDB', available: false, cleared: [], failures: [] }],
+    });
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([
+      expect.objectContaining({ backend: 'indexedDB', unavailable: true }),
+    ]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Local app data'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('indexedDB'));
+  });
+
+  it('rejects preference deletion when storage reports the key still exists', async () => {
+    const root = createRoot();
+    root.localStorage.getItem.mockImplementation(key => key === 'plasma_theme' ? 'dark' : null);
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('preferences').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, status: 'failed' });
+    expect(error.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ backend: 'localStorage', key: 'plasma_theme' }),
+    ]));
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Preferences'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('plasma_theme'));
+  });
+
+  it('rejects preference deletion when localStorage is unavailable', async () => {
+    const root = createRoot();
+    root.localStorage = null;
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('preferences').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([
+      expect.objectContaining({ backend: 'localStorage', unavailable: true }),
+    ]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Browser storage'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('localStorage'));
+  });
+
+  it('surfaces friendly blocked-storage guidance while preserving technical receipt details', async () => {
     const root = createRoot();
     root.indexedDB = {
       deleteDatabase: vi.fn((name) => {
@@ -104,6 +174,9 @@ describe('storage safety', () => {
       expect.objectContaining({ name: 'opencoursedeck-templates' }),
     ]);
     expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Notes'),
+    );
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(
       expect.stringContaining('opencoursedeck-templates'),
     );
     expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(

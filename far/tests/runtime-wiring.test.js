@@ -24,9 +24,8 @@ describe('runtime wiring', () => {
     './features/errorBoundary.js',
     './features/offlineBanner.js',
     './features/commandPalette.js',
-    './features/knowledgeGraph.js',
-    './features/courseGraph.js',
-    './features/canvasZoom.js',
+    './core/bridgeHardening.js',
+    './core/pdfIdentityHardening.js',
     './core/storageSafety.js',
     './core/dataHardening.js',
     './core/endpointApprovalGuard.js',
@@ -50,9 +49,64 @@ describe('runtime wiring', () => {
     expect(indexSource).toContain(specifier);
   });
 
+  it('defers translation and note-template utilities until the app shell resolves', () => {
+    const appImport = indexSource.indexOf("import('../app.js')");
+    for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
+      expect(indexSource).toContain(`import('${specifier}')`);
+      expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\.')}["']`));
+      expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
+    }
+    expect(indexSource).toContain('const cacheApi = translationCache.translationCache || translationCache');
+    expect(indexSource).toContain('const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates');
+    expect(indexSource).toContain('TranslationCache: cacheApi');
+    expect(indexSource).toContain('NoteTemplates: templateApi');
+    expect(indexSource).not.toContain('TranslationCache: translationCache,');
+  });
+
+  it('exports stable deferred utility contracts', async () => {
+    const translationCache = await import('../src/features/translationCache.js');
+    const noteTemplates = await import('../src/features/noteTemplates.js');
+
+    for (const method of ['init', 'get', 'set', 'clear', 'size', 'prune', 'clearEngine', 'hashParams']) {
+      expect(typeof translationCache.translationCache[method]).toBe('function');
+    }
+    for (const method of ['getAllTemplates', 'getTemplate', 'saveAsTemplate', 'updateTemplate', 'deleteTemplate', 'getTemplatePickerItems']) {
+      expect(typeof noteTemplates.NoteTemplates[method]).toBe('function');
+    }
+    expect(window.OpenCourseDeck.NoteTemplates).toBe(noteTemplates.NoteTemplates);
+  });
+
+  it('installs PDF identity hardening only after the lazy PDF runtime is available', () => {
+    const pdfImport = indexSource.indexOf("await import('../pdf.js')");
+    const hardeningCall = indexSource.indexOf('installPdfIdentityHardening(window)');
+    expect(pdfImport).toBeGreaterThan(-1);
+    expect(hardeningCall).toBeGreaterThan(pdfImport);
+  });
+
+  it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
+    const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+
+    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js', './src/features/canvasZoom.js']) {
+      expect(appSource).toContain(specifier);
+      expect(indexSource).not.toContain(specifier);
+    }
+    expect(appSource).toContain('OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph }');
+  });
+
+  it('uses one document-relative resolver for public and pooled production workers', () => {
+    const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'utf8');
+    const assetSource = fs.readFileSync(path.join(root, 'src/core/workerAssets.js'), 'utf8');
+
+    expect(indexSource).toContain("import { workerAssets } from './core/workerAssets.js'");
+    expect(indexSource).toContain('pd.workers = workerAssets');
+    expect(poolSource).toContain("import { workerAssets } from '../core/workerAssets.js'");
+    expect(poolSource).toContain('createDefinition(workerAssets.search)');
+    expect(poolSource).toContain('createDefinition(workerAssets.catalog)');
+    expect(assetSource).toContain('globalThis.document?.baseURI');
+    expect(assetSource).toContain('src/workers/${file}');
+  });
+
   it('player.js media-storage integration has a provider on the namespace', async () => {
-    // player.js reads window.OpenCourseDeck.MediaStorage and falls back to null.
-    // The module self-registers on import, so importing it must be enough.
     const playerSource = fs.readFileSync(path.join(root, 'player.js'), 'utf8');
     expect(playerSource).toContain('window.OpenCourseDeck?.MediaStorage');
 
@@ -73,9 +127,6 @@ describe('runtime wiring', () => {
   });
 
   it('waveformScrubber stays out of the bundle until its double-download is solved', () => {
-    // Deliberate: render() fetches and PCM-decodes the entire media file, a
-    // second full download on top of the streaming element. If you wire it in,
-    // delete this assertion and record the reason in ROADMAP 3.6.
     expect(indexSource).not.toContain('waveformScrubber');
   });
 

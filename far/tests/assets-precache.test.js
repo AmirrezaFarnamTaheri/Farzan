@@ -26,11 +26,13 @@ describe('static assets and service worker precache', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const developmentConfig = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
     const releaseConfig = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
+    const buildScript = fs.readFileSync(path.join(root, 'scripts/build-sw-dist.cjs'), 'utf8');
 
-    expect(exists('scripts/clean-workbox.cjs')).toBe(true);
-    expect(pkg.scripts['build:sw']).toContain('scripts/clean-workbox.cjs');
-    expect(pkg.scripts['build:sw']).toContain('generateSW scripts/workbox.config.cjs');
+    expect(pkg.scripts['build:sw']).toBe('node scripts/build-sw-dist.cjs');
     expect(pkg.scripts['build:release']).toContain('scripts/build-sw-dist.cjs');
+    expect(buildScript).toContain("require('workbox-build')");
+    expect(buildScript).toContain('generateSW(config)');
+    expect(buildScript).not.toContain('workbox-cli');
     expect(developmentConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain("globDirectory: 'dist'");
@@ -93,16 +95,18 @@ describe('static assets and service worker precache', () => {
   });
 
   it('uses offline-friendly runtime caching for catalog data and app bundles', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const config = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
     const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
 
-    expect(config).toContain("cacheName: 'opencoursedeck-data'");
+    expect(config).toContain('({ url, sameOrigin }) => sameOrigin');
+    expect(config).toContain('cacheName: `opencoursedeck-data-v${pkg.version}`');
     expect(config).toContain("handler: 'NetworkFirst'");
-    expect(config).toContain("cacheName: 'opencoursedeck-app-bundle'");
+    expect(config).toContain('cacheName: `opencoursedeck-app-bundle-v${pkg.version}`');
     expect(config).toContain("handler: 'StaleWhileRevalidate'");
-    expect(sw).toContain('opencoursedeck-data');
+    expect(sw).toContain(`opencoursedeck-data-v${pkg.version}`);
     expect(sw).toContain('NetworkFirst');
-    expect(sw).toContain('opencoursedeck-app-bundle');
+    expect(sw).toContain(`opencoursedeck-app-bundle-v${pkg.version}`);
     expect(sw).toContain('StaleWhileRevalidate');
   });
 

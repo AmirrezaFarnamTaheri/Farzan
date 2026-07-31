@@ -1,11 +1,12 @@
 import { createOperationContext } from '../core/operationContext.js';
+import { workerAssets } from '../core/workerAssets.js';
 
 const IDLE_TIMEOUT = 30000;
 const IDLE_CHECK_INTERVAL = 10000;
 
 const workerDefs = {
-  search: createDefinition(new URL('../workers/search.worker.js', import.meta.url).href),
-  catalog: createDefinition(new URL('../workers/catalog.worker.js', import.meta.url).href),
+  search: createDefinition(workerAssets.search),
+  catalog: createDefinition(workerAssets.catalog),
 };
 
 let messageId = 0;

@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a bounded product improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What user problem exists today? Include a concrete scenario.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed outcome
+      description: Describe observable behavior, not only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Constraints and alternatives
+      description: Compatibility, privacy, offline, accessibility, or migration considerations.
