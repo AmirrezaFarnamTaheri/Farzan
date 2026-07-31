@@ -6,9 +6,9 @@ const root = path.join(__dirname, '..');
 const output = path.join(root, 'reports', 'release', 'sbom.cdx.json');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
-function generateSbom({ cwd = root, destination = output } = {}) {
+function generateSbom({ cwd = root, destination = output, spawn = childProcess.spawnSync } = {}) {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const result = childProcess.spawnSync(npm, [
+  const result = spawn(npm, [
     'sbom',
     '--sbom-format', 'cyclonedx',
     '--sbom-type', 'application',
@@ -17,8 +17,8 @@ function generateSbom({ cwd = root, destination = output } = {}) {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.status !== 0) {
-    throw new Error(`npm sbom failed (${result.status}): ${result.stderr || result.stdout}`);
+  if (result.error || result.status !== 0) {
+    throw new Error(`npm sbom failed (${result.status}): ${result.error?.message || result.stderr || result.stdout}`);
   }
   const document = JSON.parse(result.stdout);
   document.metadata = document.metadata || {};
