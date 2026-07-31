@@ -95,6 +95,37 @@ describe('release SBOM verification', () => {
     expect(() => verifySbom(selfCycle, pkg)).toThrow(/depends on itself/);
   });
 
+  it('normalizes npm root graph identity to the metadata bom-ref', () => {
+    const destination = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sbom-normalize-')), 'sbom.json');
+    const legacyRoot = `${pkg.name}@${pkg.version}`;
+    const source = {
+      bomFormat: 'CycloneDX',
+      specVersion: '1.5',
+      serialNumber: 'urn:uuid:11111111-1111-4111-8111-111111111111',
+      version: 1,
+      metadata: { component: { name: pkg.name, version: pkg.version, 'bom-ref': legacyRoot } },
+      components: [{ type: 'library', name: 'dep', version: '1.0.0', 'bom-ref': 'dep@1.0.0' }],
+      dependencies: [
+        { ref: legacyRoot, dependsOn: ['dep@1.0.0'] },
+        { ref: 'dep@1.0.0', dependsOn: [] },
+      ],
+    };
+
+    const generated = generateSbom({
+      destination,
+      spawn: () => ({ status: 0, stdout: JSON.stringify(source), stderr: '', error: null }),
+    });
+    const rootRef = `pkg:npm/${pkg.name}@${pkg.version}`;
+
+    expect(generated.metadata.component['bom-ref']).toBe(rootRef);
+    expect(generated.metadata.component.purl).toBe(rootRef);
+    expect(generated.dependencies).toEqual([
+      { ref: rootRef, dependsOn: ['dep@1.0.0'] },
+      { ref: 'dep@1.0.0', dependsOn: [] },
+    ]);
+    expect(JSON.parse(fs.readFileSync(destination, 'utf8')).dependencies[0].ref).toBe(rootRef);
+  });
+
   it('includes spawn errors when npm cannot be launched', () => {
     const destination = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sbom-test-')), 'sbom.json');
     const spawnError = Object.assign(new Error('spawn npm ENOENT'), { code: 'ENOENT' });
