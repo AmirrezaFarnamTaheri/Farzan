@@ -13,6 +13,7 @@ describe('desktop shell wiring', () => {
     const appWindow = read('desktop/app-window.cjs');
     const pack = read('desktop/package-portable.cjs');
     const nativeCargo = read('scripts/native-cargo.cjs');
+    const prepareNative = read('scripts/prepare-native-assets.cjs');
     const preflight = read('scripts/native-preflight.cjs');
     const stageNative = read('scripts/stage-native-exe.cjs');
     const tauriCargo = read('src-tauri/Cargo.toml');
@@ -25,12 +26,13 @@ describe('desktop shell wiring', () => {
     expect(packageJson.scripts.desktop).toBe('npm run build && node desktop/launch.cjs');
     expect(packageJson.scripts['desktop:app-window']).toBe('npm run build && node desktop/app-window.cjs');
     expect(packageJson.scripts['desktop:package']).toBe('npm run build && node desktop/package-portable.cjs');
+    expect(packageJson.scripts['native:prepare']).toBe('node scripts/prepare-native-assets.cjs');
     expect(packageJson.scripts['native:preflight']).toBe('node scripts/native-preflight.cjs');
     expect(packageJson.scripts['native:preflight:strict']).toBe('node scripts/native-preflight.cjs --strict');
     expect(packageJson.scripts['tauri:check']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml');
-    expect(packageJson.scripts['tauri:build']).toBe('node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release');
+    expect(packageJson.scripts['tauri:build']).toBe('npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release');
     expect(packageJson.scripts['native:exe']).toBe('npm run build:release && npm run tauri:build && node scripts/stage-native-exe.cjs');
-    expect(packageJson.scripts['tauri:bundle']).toBe('tauri build --config src-tauri/tauri.conf.json');
+    expect(packageJson.scripts['tauri:bundle']).toBe('npm run native:prepare && tauri build --config src-tauri/tauri.conf.json');
     expect(packageJson.scripts['native:package']).toBe('npm run tauri:bundle && node scripts/stage-native-exe.cjs');
 
     expect(rootLauncher).toContain('desktop-dist\\OpenCourseDeck-Native\\OpenCourseDeck.exe');
@@ -46,8 +48,11 @@ describe('desktop shell wiring', () => {
     expect(pack).toContain("permissions: 'deny-by-default'");
 
     expect(nativeCargo).toContain("spawnSync('cargo'");
+    expect(prepareNative).toContain("path.join(root, 'assets', 'icon-192.svg')");
+    expect(prepareNative).toContain("path.join(targetDirectory, 'icon.png')");
     expect(preflight).toContain('Cargo dependencies resolve from the committed lockfile');
     expect(preflight).toContain('registry releases instead of missing local paths');
+    expect(preflight).toContain('Tauri enforces a restrictive Content Security Policy');
     expect(stageNative).toContain("'open-course-deck.exe'");
     expect(stageNative).toContain('OpenCourseDeck-Native');
 
@@ -67,8 +72,11 @@ describe('desktop shell wiring', () => {
     expect(tauriConfig.build.beforeBuildCommand).toBe('npm run build:release');
     expect(tauriConfig.build.removeUnusedCommands).toBe(true);
     expect(tauriConfig.bundle.targets).toContain('nsis');
+    expect(tauriConfig.bundle.icon).toContain('icons/icon.png');
     expect(tauriConfig.app.windows[0].label).toBe('main');
     expect(tauriConfig.app.security.freezePrototype).toBe(true);
+    expect(tauriConfig.app.security.csp).toContain("default-src 'self'");
+    expect(tauriConfig.app.security.csp).toContain("object-src 'none'");
     expect(tauriCapability.windows).toContain('main');
     expect(tauriCapability.permissions).toEqual([]);
   });
