@@ -100,7 +100,10 @@ if (packageJson) {
   const scripts = packageJson.scripts || {};
   add(scripts['native:prepare'] === 'node scripts/prepare-native-assets.cjs' ? 'ok' : 'fail', 'Native asset preparation script is declared');
   add(scripts['tauri:check'] === 'node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml' ? 'ok' : 'fail', 'Tauri check script is declared');
+  add(scripts['tauri:check:locked'] === 'node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml --locked' ? 'ok' : 'fail', 'Locked Tauri check script is declared');
   add(scripts['tauri:build'] === 'npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release' ? 'ok' : 'fail', 'Tauri release build prepares assets and compiles through the pinned wrapper');
+  add(scripts['tauri:build:locked'] === 'npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release --locked' ? 'ok' : 'fail', 'Locked Tauri release build is declared');
+  add(scripts['native:exe'] === 'npm run build:release && npm run tauri:build:locked && node scripts/stage-native-exe.cjs' ? 'ok' : 'fail', 'Native executable staging uses the locked release build');
   add(scripts['tauri:bundle'] === 'npm run native:prepare && tauri build --config src-tauri/tauri.conf.json' ? 'ok' : 'fail', 'Tauri bundle script prepares assets and uses the official CLI');
   add(scripts['native:package'] === 'npm run tauri:bundle && node scripts/stage-native-exe.cjs' ? 'ok' : 'fail', 'native package script stages the verified executable');
 }
