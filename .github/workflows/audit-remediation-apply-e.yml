@@ -47,6 +47,7 @@ jobs:
         working-directory: far
         run: |
           npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+          npm audit fix --package-lock-only --ignore-scripts --legacy-peer-deps
           cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
 
       - name: Install regenerated npm lockfile reproducibly
