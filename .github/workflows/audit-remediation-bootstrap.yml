@@ -1,0 +1,35 @@
+name: Audit Remediation Bootstrap
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    name: Export source snapshot
+    if: github.head_ref == 'fix/master-forensic-audit-remediation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out pull request source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: audit-remediation-source-${{ github.event.pull_request.head.sha }}
+          path: |
+            .
+            !.git/**
+            !**/node_modules/**
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
