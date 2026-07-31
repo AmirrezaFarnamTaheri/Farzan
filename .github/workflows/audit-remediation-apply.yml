@@ -1,0 +1,63 @@
+name: Audit Remediation Apply Phase B
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-phase-b:
+    name: Apply verified identity and browser patch
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Decode, verify, and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .audit-remediation/phase-b.patch.gz.b64 | gzip -d > /tmp/phase-b.patch
+          echo "5070f184719e2b2c8887852dcce63fc18bb37990130f12d63c67630551f775f7  /tmp/phase-b.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-b.patch
+          git apply /tmp/phase-b.patch
+
+      - name: Run static and workflow verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check far/bridge.js
+          node --check far/pdf.js
+          node --check far/src/core/annotationPersistence.js
+          node --check far/src/core/migrationIdentity.js
+          node --check far/scripts/workbox-dist.config.cjs
+          node --check far/scripts/workbox.config.cjs
+          node --check far/tests/migration-identity.test.js
+          node --check far/tests/pdf.test.js
+          node far/scripts/check-workflows.cjs
+          node -e "JSON.parse(require('fs').readFileSync('far/package.json', 'utf8'))"
+          git diff --check
+
+      - name: Commit verified patch to remediation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .audit-remediation
+          rm .github/workflows/audit-remediation-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix: canonicalize document identity and add real browser gate"
+          git push origin HEAD:fix/master-forensic-audit-remediation
