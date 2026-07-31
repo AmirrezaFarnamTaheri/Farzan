@@ -14,6 +14,7 @@ import { installAuxiliaryDbLifecycle } from './core/auxiliaryDbLifecycle.js';
 import { installDataHardening } from './core/dataHardening.js';
 import { installStoreHardening } from './core/storeHardening.js';
 import { installAIAuthority } from './core/aiAuthority.js';
+import { installPdfIdentityHardening } from './core/pdfIdentityHardening.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
 
 import * as easing from './lib/easing.js';
@@ -68,7 +69,11 @@ const featureLoaders = {
     return import('../player.js');
   },
   notes: () => import('../notes.js'),
-  pdf: () => import('../pdf.js'),
+  pdf: async () => {
+    const module = await import('../pdf.js');
+    installPdfIdentityHardening(window);
+    return module;
+  },
   canvas: () => import('../canvas.js'),
   progress: () => import('../progress.js'),
 };
