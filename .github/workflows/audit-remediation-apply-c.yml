@@ -31,19 +31,19 @@ jobs:
       - name: Decode, verify, and apply Phase C patch
         run: |
           set -euo pipefail
-          echo "ba8ab88be251cb89b1f12992b42a6a851b98013148438a6712a80c53aad46555  .audit-remediation/phase-c.patch.gz.b64" | sha256sum --check --strict
-          echo "788220ef8d9440ba7cfc0b07db15e5f471ea3d93dd1222e9f2a4facd9306ba0b  .audit-remediation/phase-c.patch.gz.b64.01" | sha256sum --check --strict
-          echo "c3199f37e26a77607eb27d39d51e33a405f226901c763eeae7ced2bb86af300f  .audit-remediation/phase-c.patch.gz.b64.02" | sha256sum --check --strict
-          echo "526d5d1be0777d6f10bf11642b089012a243639b3b397b7ef1a26f81b9463bf3  .audit-remediation/phase-c.patch.gz.b64.03" | sha256sum --check --strict
-          echo "52ee8eea124b79b8b217a23d1d7eb0126a37862af1e2e2074cd086a5fb9b546a  .audit-remediation/phase-c.patch.gz.b64.04" | sha256sum --check --strict
-          echo "a012e908a482902f388b8448f93bb64904667788840bc900d13b2cfe2363a159  .audit-remediation/phase-c.patch.gz.b64.05" | sha256sum --check --strict
-          echo "907f7a3c38c62e28525fc64e9cf3aef77ceb88b725b51173859177dd13a912f6  .audit-remediation/phase-c.patch.gz.b64.06" | sha256sum --check --strict
-          echo "da109e57177c97489fefb1fd3df976b2c07a6817d19e8c99ae15d57238d56e5d  .audit-remediation/phase-c.patch.gz.b64.07" | sha256sum --check --strict
-          echo "0db7ab049f8a02762e88aed748c7f8540630c456f01ceddb5f617f476c3aadfc  .audit-remediation/phase-c.patch.gz.b64.08" | sha256sum --check --strict
-          echo "f122796d8d66dd1f7c3390c37d657bb01efa05211e24537d433bbdba797d04aa  .audit-remediation/phase-c.patch.gz.b64.09" | sha256sum --check --strict
-          echo "34cd62c9714d9ada336e4c51cdf1e6b8e90778a1797afaa894986268e10a5cdb  .audit-remediation/phase-c.patch.gz.b64.10" | sha256sum --check --strict
-          echo "ee5a172b36873a086412d23c03aab76d31ad17784fa30fa1c422537c60bc7b3e  .audit-remediation/phase-c.patch.gz.b64.11" | sha256sum --check --strict
-          echo "e6b3ee8489f8f87523ec5ed9f5c6ae29e4cf440ad41ef201b3e8054347127cf8  .audit-remediation/phase-c.patch.gz.b64.12" | sha256sum --check --strict
+          echo "2f4cf784018c68214071b31b140dc51608ad14c784ea120b288659b5ceb30c77  .audit-remediation/phase-c.patch.gz.b64" | sha256sum --check --strict
+          echo "ca2848d60170a16439f90101faf81176fd0d56c706d5cf3594620cc0f70a2c41  .audit-remediation/phase-c.patch.gz.b64.01" | sha256sum --check --strict
+          echo "ceb9ea54268501827f40e69513f56bc9fd9d5ee37311ea72890e5002b3e3e803  .audit-remediation/phase-c.patch.gz.b64.02" | sha256sum --check --strict
+          echo "9d0791347ce39f8c1bb6401441d29e78d72dce1afde2245cb64c8fcb03a0fcad  .audit-remediation/phase-c.patch.gz.b64.03" | sha256sum --check --strict
+          echo "b20cf966cf3c04528e654333ada78a09a5cd38ab931083aa4a9df1954bf9fe29  .audit-remediation/phase-c.patch.gz.b64.04" | sha256sum --check --strict
+          echo "1fe84585ccc740a23ea6de1430e5f3ff8927ee2e4fbc8bccb9eb867d60031e58  .audit-remediation/phase-c.patch.gz.b64.05" | sha256sum --check --strict
+          echo "c4c85167e3d2a862af02ac409681281202be822e4f3d862062afa07aae7902cf  .audit-remediation/phase-c.patch.gz.b64.06" | sha256sum --check --strict
+          echo "1ca653390bfb1d837228b5fd81d675625430c45ee78acb0c74fd4dc4e5755aa9  .audit-remediation/phase-c.patch.gz.b64.07" | sha256sum --check --strict
+          echo "4c898ee9f722274ff0f7254e65059ffa6c75e4002dbe3fff107499d9fb139e0b  .audit-remediation/phase-c.patch.gz.b64.08" | sha256sum --check --strict
+          echo "881f1a773794f4da6cd27a19f5ecce91b1d98705844bf28e4160e8b611350eec  .audit-remediation/phase-c.patch.gz.b64.09" | sha256sum --check --strict
+          echo "a16bd65c219e4cb97db73712c40eeef09170d1bc75f92997551fbcdf58b1ba99  .audit-remediation/phase-c.patch.gz.b64.10" | sha256sum --check --strict
+          echo "8b8982332cfdb944a31795de9b48da2329e5f56f8119e9ac70896cb96db0a91f  .audit-remediation/phase-c.patch.gz.b64.11" | sha256sum --check --strict
+          echo "c7e9258bc5f7161fc1d0fb1d93542b7e71472ec415007b4152fb21acbb7af6e8  .audit-remediation/phase-c.patch.gz.b64.12" | sha256sum --check --strict
           cat .audit-remediation/phase-c.patch.gz.b64{,.01,.02,.03,.04,.05,.06,.07,.08,.09,.10,.11,.12} > /tmp/phase-c.patch.gz.b64
           echo "e557181d0d0139a936245045cc7a58a3bfc30d80d9584deb7858bf73d2e407ea  /tmp/phase-c.patch.gz.b64" | sha256sum --check --strict
           base64 -d /tmp/phase-c.patch.gz.b64 | gzip -d > /tmp/phase-c.patch
