@@ -1,0 +1,414 @@
+name: Release
+
+run-name: >-
+  Release ${{ github.event_name == 'workflow_dispatch'
+    && (inputs.tag || 'from package version')
+    || github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional existing release tag to retry. Leave blank to release v<far/package.json version> from main.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Release state machine:
+# 1. Resolve the requested/default tag, its exact commit, and its own package version.
+# 2. Run the same reusable verification pipeline used by CI against that immutable commit.
+# 3. Serialize publication, create a missing default tag only after verification, and publish once.
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve release identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_commit: ${{ steps.resolve.outputs.release_commit }}
+      checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
+      tag_exists: ${{ steps.resolve.outputs.tag_exists }}
+      bootstrap_tag: ${{ steps.resolve.outputs.bootstrap_tag }}
+      package_version: ${{ steps.resolve.outputs.package_version }}
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Require an authoritative trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$DISPATCH_REF" != "refs/heads/main" ]]; then
+            echo "::error title=Release must start from main::Manual releases must be dispatched from refs/heads/main, not $DISPATCH_REF. Select main in the workflow branch picker and retry." >&2
+            exit 1
+          fi
+
+      - name: Check out release source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: far/package-lock.json
+
+      - name: Resolve package, tag, and commit
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          TRIGGER_TAG: ${{ github.ref_name }}
+        run: |
+          main_package_version="$(node -p "require('./far/package.json').version")"
+          main_expected_tag="v${main_package_version}"
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            release_tag="$TRIGGER_TAG"
+          elif [[ -n "$REQUESTED_TAG" ]]; then
+            release_tag="$REQUESTED_TAG"
+          else
+            release_tag="$main_expected_tag"
+          fi
+
+          if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=Invalid release tag::$release_tag is not a semantic-version tag such as $main_expected_tag. Correct the tag input or leave it blank to release the current main package version." >&2
+            exit 1
+          fi
+
+          git fetch --force --no-tags origin main:refs/remotes/origin/main
+          remote_tag="$(git ls-remote --tags --refs origin "refs/tags/$release_tag")"
+
+          if [[ -n "$remote_tag" ]]; then
+            git fetch --force --no-tags origin "refs/tags/$release_tag:refs/tags/$release_tag"
+            release_commit="$(git rev-parse "refs/tags/$release_tag^{commit}")"
+            checkout_ref="refs/tags/$release_tag"
+            tag_exists=true
+            bootstrap_tag=false
+            package_version="$(git show "${release_commit}:far/package.json" | node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(0,'utf8')).version)")"
+            expected_tag="v${package_version}"
+            if [[ "$release_tag" != "$expected_tag" ]]; then
+              echo "::error title=Tagged version mismatch::Existing tag $release_tag points to a commit whose far/package.json version requires $expected_tag. Create a new correctly versioned tag; do not move the existing tag." >&2
+              exit 1
+            fi
+          else
+            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+              echo "::error title=Missing pushed tag::The push event references $release_tag, but origin cannot resolve it. Restore the pushed tag or dispatch the Release workflow from main with a blank tag." >&2
+              exit 1
+            fi
+            if [[ -n "$REQUESTED_TAG" ]]; then
+              echo "::error title=Requested retry tag is missing::Tag $release_tag does not exist. To create the current main release, dispatch again with the tag field blank; otherwise create and push the intended existing tag before retrying." >&2
+              exit 1
+            fi
+
+            release_tag="$main_expected_tag"
+            package_version="$main_package_version"
+            release_commit="$(git rev-parse HEAD)"
+            checkout_ref="$release_commit"
+            tag_exists=false
+            bootstrap_tag=true
+
+            current_main="$(git rev-parse refs/remotes/origin/main)"
+            if [[ "$release_commit" != "$current_main" ]]; then
+              echo "::error title=Main advanced::This dispatch started at $release_commit, but main is now $current_main. Re-run the workflow from the current main branch so the release cannot publish a stale commit." >&2
+              exit 1
+            fi
+          fi
+
+          if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/main; then
+            echo "::error title=Release commit is outside main::$release_commit is not reachable from main. Merge the intended commit into main and create or retry a version tag from that history." >&2
+            exit 1
+          fi
+
+          {
+            printf 'release_tag=%s\n' "$release_tag"
+            printf 'release_commit=%s\n' "$release_commit"
+            printf 'checkout_ref=%s\n' "$checkout_ref"
+            printf 'tag_exists=%s\n' "$tag_exists"
+            printf 'bootstrap_tag=%s\n' "$bootstrap_tag"
+            printf 'package_version=%s\n' "$package_version"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo '## Release identity'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Trigger | \`$EVENT_NAME\` |"
+            echo "| Package version | \`$package_version\` |"
+            echo "| Release tag | \`$release_tag\` |"
+            echo "| Release commit | \`$release_commit\` |"
+            echo "| Existing tag | \`$tag_exists\` |"
+            echo "| Bootstrap after verification | \`$bootstrap_tag\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Verify and package
+    needs: resolve
+    uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+    with:
+      source_ref: ${{ needs.resolve.outputs.checkout_ref }}
+      release_mode: true
+      release_tag: ${{ needs.resolve.outputs.release_tag }}
+      source_version: ${{ needs.resolve.outputs.release_commit }}
+      node_version: '22'
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - resolve
+      - verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      EXPECTED_COMMIT: ${{ needs.resolve.outputs.release_commit }}
+      BOOTSTRAP_TAG: ${{ needs.resolve.outputs.bootstrap_tag }}
+
+    steps:
+      - name: Check out verified release commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.resolve.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Ensure immutable release tag
+        id: tag
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+          BOOTSTRAP_TAG: ${{ env.BOOTSTRAP_TAG }}
+        with:
+          retries: 3
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const expected = process.env.EXPECTED_COMMIT.toLowerCase();
+            const bootstrap = process.env.BOOTSTRAP_TAG === 'true';
+
+            async function resolveObject(object) {
+              let current = object;
+              for (let depth = 0; depth < 5 && current.type === 'tag'; depth += 1) {
+                const response = await github.rest.git.getTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_sha: current.sha,
+                });
+                current = response.data.object;
+              }
+              return current;
+            }
+
+            let ref;
+            let created = false;
+            try {
+              ref = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              if (!bootstrap) {
+                core.setFailed(`Release tag ${tag} is missing and this run is not authorized to bootstrap it. Dispatch the Release workflow from main with a blank tag to create the current package tag, or create and push the intended existing tag before retrying.`);
+                return;
+              }
+              core.notice(`Creating immutable release tag ${tag} at ${expected}`);
+              ref = await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`,
+                sha: expected,
+              });
+              created = true;
+            }
+
+            const resolved = await resolveObject(ref.data.object);
+            if (resolved.type !== 'commit' || resolved.sha.toLowerCase() !== expected) {
+              core.setFailed(`Tag ${tag} resolves to ${resolved.type}:${resolved.sha}, expected commit ${expected}. Refusing to move an immutable release tag. Investigate the tag and publish a new version instead.`);
+              return;
+            }
+            core.info(`Verified ${tag} -> ${expected}`);
+            core.setOutput('created', String(created));
+
+      - name: Download verified release assets
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: release-assets-${{ env.RELEASE_TAG }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-assets
+
+      - name: Verify downloaded assets
+        run: cd release-assets && sha256sum -c SHA256SUMS
+
+      - name: Detect an already-complete release
+        id: existing
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        with:
+          retries: 3
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const tag = process.env.RELEASE_TAG;
+            const requiredNames = [
+              `opencoursedeck-${tag}.tar.gz`,
+              `opencoursedeck-${tag}-manifest.json`,
+              `opencoursedeck-${tag}-attestation.json`,
+              `opencoursedeck-${tag}-sbom.cdx.json`,
+              'SHA256SUMS',
+            ];
+            const required = new Map(requiredNames.map((name) => [
+              name,
+              fs.statSync(path.join('release-assets', name)).size,
+            ]));
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              const present = new Map(response.data.assets.map((asset) => [asset.name, asset.size]));
+              const missing = [...required.keys()].filter((name) => !present.has(name));
+              const sizeMismatches = [...required.entries()]
+                .filter(([name, size]) => present.has(name) && present.get(name) !== size)
+                .map(([name, size]) => `${name}: remote=${present.get(name)}, local=${size}`);
+              if (missing.length === 0 && sizeMismatches.length === 0 && !response.data.draft) {
+                core.notice(`Release ${tag} already contains every immutable asset; publication is an idempotent no-op.`);
+                core.setOutput('complete', 'true');
+                return;
+              }
+              core.setFailed(`Release ${tag} already exists but is incomplete, size-mismatched, or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Size mismatches: ${sizeMismatches.join('; ') || '<none>'}. Inspect the existing release and diagnostics; repair or remove the partial draft before retrying without overwriting assets.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.setOutput('complete', 'false');
+            }
+
+      - name: Attest immutable release artifacts
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
+        with:
+          subject-path: |
+            release-assets/*.tar.gz
+            release-assets/*.json
+            release-assets/SHA256SUMS
+
+      - name: Attest release SBOM
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
+        with:
+          subject-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}.tar.gz
+          sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json
+
+      - name: Reverify immutable tag before publication
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+        with:
+          retries: 3
+          script: |
+            const ref = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${process.env.RELEASE_TAG}`,
+            });
+            let object = ref.data.object;
+            for (let depth = 0; depth < 5 && object.type === 'tag'; depth += 1) {
+              const tag = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: object.sha,
+              });
+              object = tag.data.object;
+            }
+            if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
+              core.setFailed(`Release tag changed before publication: ${object.type}:${object.sha}. Stop publication, restore the intended immutable reference only after investigation, and release a new version when uncertain.`);
+            }
+
+      - name: Publish GitHub Release
+        id: publish
+        if: steps.existing.outputs.complete != 'true'
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ env.EXPECTED_COMMIT }}
+          generate_release_notes: true
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*.tar.gz
+            release-assets/*.json
+            release-assets/SHA256SUMS
+
+      - name: Verify published release identity
+        if: always() && (steps.existing.outputs.complete == 'true' || steps.publish.outcome == 'success')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+        with:
+          retries: 3
+          script: |
+            const ref = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${process.env.RELEASE_TAG}`,
+            });
+            let object = ref.data.object;
+            for (let depth = 0; depth < 5 && object.type === 'tag'; depth += 1) {
+              const tag = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: object.sha,
+              });
+              object = tag.data.object;
+            }
+            if (object.type !== 'commit' || object.sha.toLowerCase() !== process.env.EXPECTED_COMMIT.toLowerCase()) {
+              core.setFailed(`Published release tag does not resolve to the verified commit: ${object.type}:${object.sha}. Treat the release as compromised, stop distribution, and investigate the tag before creating a new version.`);
+              return;
+            }
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: process.env.RELEASE_TAG,
+            });
+            if (release.data.draft) core.setFailed(`Release ${process.env.RELEASE_TAG} remained a draft after publication. Open the release, inspect uploaded assets and diagnostics, then publish it only after verification.`);
+
+      - name: Summarize publication
+        if: always()
+        run: |
+          {
+            echo '## Publication'
+            echo
+            echo '| Field | Value |'
+            echo '|---|---|'
+            echo "| Tag | \`$RELEASE_TAG\` |"
+            echo "| Commit | \`$EXPECTED_COMMIT\` |"
+            echo "| Tag bootstrapped | \`${{ steps.tag.outputs.created || 'false' }}\` |"
+            echo "| Existing complete release | \`${{ steps.existing.outputs.complete || 'false' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
