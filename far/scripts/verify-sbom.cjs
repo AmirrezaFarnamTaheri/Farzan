@@ -18,7 +18,7 @@ function verifySbom(document, pkg = require('../package.json')) {
   const required = new Set([...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})]);
   const present = new Set(components.map((component) => component?.name).filter(Boolean));
   for (const name of required) {
-    if (!present.has(name) && !present.has(name.split('/').pop())) errors.push(`missing dependency component ${name}`);
+    if (!present.has(name)) errors.push(`missing dependency component ${name}`);
   }
   const serialized = JSON.stringify(document);
   for (const marker of ['OPENAI_API_KEY', 'GITHUB_TOKEN', 'Authorization: Bearer']) {
