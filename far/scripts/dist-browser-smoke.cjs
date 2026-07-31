@@ -229,7 +229,11 @@ async function run() {
   };
   result.dataset.status = 'passed';
   result.textContent = JSON.stringify(detail);
-  await report('passed', detail);
+  try {
+    await report('passed', detail);
+  } catch (reportError) {
+    console.error('[dist-browser-smoke] result report failed', reportError);
+  }
 }
 
 run().catch(async error => {
