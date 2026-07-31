@@ -79,15 +79,12 @@ function sanitizePortableBackup(input) {
 function clearSessionAuthority(root) {
   const failures = [];
   for (const key of [AI_SESSION_KEY, AI_BINDING_KEY]) {
-    try { root.sessionStorage?.removeItem?.(key); }
-    catch (error) { failures.push({ key, message: error?.message || String(error) }); }
+    try {
+      root.sessionStorage?.removeItem?.(key);
+      if (root.sessionStorage?.getItem?.(key) != null) throw new Error(`Session key ${key} remained after deletion`);
+    } catch (error) { failures.push({ key, message: error?.message || String(error) }); }
   }
-  if (failures.length) {
-    const error = new Error('Backup import committed, but session AI authority could not be fully invalidated');
-    error.code = 'AI_AUTHORITY_INVALIDATION_INCOMPLETE';
-    error.failures = failures;
-    throw error;
-  }
+  return failures;
 }
 
 function validateBackup(input) {
@@ -170,18 +167,37 @@ export function installBackupEngine(root = window) {
         throw error;
       }
       await completion;
-      clearSessionAuthority(root);
+      const authorityFailures = clearSessionAuthority(root);
+      const degraded = authorityFailures.length > 0;
 
       const receipt = {
         committed: true,
+        durable: true,
+        status: degraded ? 'committed-degraded' : 'committed',
+        degraded,
+        retrySafe: false,
         mode,
         importedAt: new Date().toISOString(),
         stores: counts,
         totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
-        aiAuthorityInvalidated: true,
+        aiAuthorityInvalidated: !degraded,
+        warnings: degraded ? [{
+          code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
+          message: 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
+          failures: authorityFailures,
+        }] : [],
       };
       root.OpenCourseDeck?.bus?.emit?.('storage:import-complete', receipt);
-      root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidated', { reason: 'backup-import' });
+      if (degraded) {
+        root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidation-incomplete', {
+          reason: 'backup-import',
+          committed: true,
+          retrySafe: false,
+          failures: authorityFailures,
+        });
+      } else {
+        root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidated', { reason: 'backup-import' });
+      }
       return receipt;
     } finally {
       db.close();

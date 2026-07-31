@@ -11,8 +11,8 @@ function createStorage() {
 }
 
 function createRoot() {
-  const clearAll = vi.fn(async () => true);
-  const clearUserData = vi.fn(async (scope) => ({ scope }));
+  const clearAll = vi.fn(async () => ({ committed: true, durable: true, failures: [], parts: [] }));
+  const clearUserData = vi.fn(async (scope) => ({ committed: true, durable: true, failures: [], parts: [], scope }));
   return {
     DB: { clearAll, clearUserData },
     OpenCourseDeck: { Toast: { error: vi.fn() } },
@@ -76,6 +76,36 @@ describe('storage safety', () => {
     });
     expect(result.id).toMatch(/^mutation-/);
     expect(originalClearUserData).toHaveBeenCalledWith('notes');
+  });
+
+
+  it('does not convert a failed primary clear into a committed receipt', async () => {
+    const root = createRoot();
+    root.DB.clearUserData.mockResolvedValue({
+      committed: false,
+      durable: false,
+      status: 'failed',
+      failures: [{ backend: 'indexedDB', store: 'notes', message: 'clear failed' }],
+    });
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([expect.objectContaining({ store: 'notes' })]);
+  });
+
+  it('rejects preference deletion when storage reports the key still exists', async () => {
+    const root = createRoot();
+    root.localStorage.getItem.mockImplementation(key => key === 'plasma_theme' ? 'dark' : null);
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('preferences').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, status: 'failed' });
+    expect(error.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ backend: 'localStorage', key: 'plasma_theme' }),
+    ]));
   });
 
   it('surfaces blocked auxiliary database details before rejecting a full reset', async () => {

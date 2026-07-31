@@ -204,6 +204,20 @@ tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
 });
 }
 
+async bulkPutWithCheckpoint(store,list,checkpoint){
+const db = await this.open();
+const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
+const tx = db.transaction(stores,"readwrite");
+const target = tx.objectStore(store);
+list.forEach(item=>target.put(item));
+if(checkpoint) tx.objectStore('settings').put(checkpoint);
+return new Promise((res,rej)=>{
+tx.oncomplete=()=>res(true);
+tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
+tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+});
+}
+
 async export(){
 const db = await this.open();
 const result={};

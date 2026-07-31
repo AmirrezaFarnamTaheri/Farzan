@@ -194,6 +194,26 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getSetting('plasma-studio-board')).toBeNull();
   });
 
+
+  it('rejects a clear operation when any primary IndexedDB store fails', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async clear(store) {
+        if (store === 'notes') throw new Error('notes clear failed');
+        return true;
+      }
+      async count() { return 0; }
+    };
+
+    const error = await window.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ code: 'STORAGE_RESET_INCOMPLETE' });
+    expect(error.receipt).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ backend: 'indexedDB', store: 'notes', message: 'notes clear failed' }),
+    ]));
+  });
+
   it('does not fall back to localStorage when progress save hits storage quota', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
@@ -686,15 +706,25 @@ describe('bridge DB safety helpers', () => {
     const first = await window.DB.getAllTimestamps();
     expect(first).toHaveLength(2);
     const ids = first.map((ts) => ts.id).sort();
-    expect(ids).toEqual(['ts-migrated-0', 'ts-migrated-1']);
+    expect(ids).toHaveLength(2);
+    expect(ids.every(id => /^timestamp-migrated-v3-/.test(id))).toBe(true);
 
-    // Force another migration pass over the same legacy payload.
+    // Reorder the legacy payload and force another migration pass. Identity
+    // must follow record content rather than array position.
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { topicId: 't2', time: 34 },
+      { topicId: 't1', time: 12 },
+    ]));
     localStorage.removeItem('plasma_migrated_v2');
     await window.DB.getAllTimestamps();
     const second = await window.DB.getAllTimestamps();
 
     expect(second).toHaveLength(2);
     expect(second.map((ts) => ts.id).sort()).toEqual(ids);
+    expect(JSON.parse(localStorage.getItem('plasma_migration_report_v3'))).toMatchObject({
+      version: 3,
+      status: 'completed',
+    });
   });
 
   it('shares one in-flight migration across concurrent DB calls', async () => {

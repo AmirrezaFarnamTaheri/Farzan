@@ -19,6 +19,9 @@
       courses: [],
       topics: [],
       raw: null,
+      status: 'idle',
+      lastError: null,
+      lastSuccessfulAt: null,
     };
 
     const DEMO_FALLBACK = {
@@ -103,11 +106,19 @@
       return { courses, topics };
     }
 
-    async function init({ path = './data/catalog.json' } = {}) {
-      if (STATE.loaded) return true;
+    async function init({ path = './data/catalog.json', force = false } = {}) {
+      if (STATE.loaded && !force) return true;
       if (STATE.loading) return STATE.loading;
 
       STATE.loading = (async () => {
+        const previous = {
+          raw: STATE.raw,
+          courses: STATE.courses,
+          topics: STATE.topics,
+          path: _activeCatalogPath,
+          authoritative: STATE.status === 'authoritative',
+        };
+        STATE.status = 'loading';
         const fetchWithRetry = async (url, retries = 2) => {
           for (let i = 0; i <= retries; i++) {
             try {
@@ -120,6 +131,7 @@
               await new Promise(r => setTimeout(r, 1000 * (i + 1)));
             }
           }
+          throw new Error(`Catalog fetch failed for ${url}`);
         };
 
         const updateStatus = (msg, isError = false) => {
@@ -131,33 +143,52 @@
         };
 
         try {
-          let raw = null;
-          try {
-            updateStatus('Loading catalog pointer...');
-            const pointer = await fetchWithRetry(path);
-            const targetCatalog = pointer.currentCatalog || 'data/opencoursedeck-starter.json';
-            _activeCatalogPath = targetCatalog.startsWith('./') ? targetCatalog : `./${targetCatalog}`;
-            
-            updateStatus('Loading catalog content...');
-            raw = await fetchWithRetry(_activeCatalogPath);
-          } catch (err) {
-            console.warn('[DataStore] Failed to load catalog JSON, using demo fallback:', err);
-            raw = DEMO_FALLBACK;
-            _activeCatalogPath = 'demo-fallback';
-            updateStatus('Catalog load failed. Using offline demo.');
-          }
-
+          updateStatus('Loading catalog pointer...');
+          const pointer = await fetchWithRetry(path);
+          const targetCatalog = pointer.currentCatalog || 'data/opencoursedeck-starter.json';
+          const resolvedPath = targetCatalog.startsWith('./') ? targetCatalog : `./${targetCatalog}`;
+          updateStatus('Loading catalog content...');
+          const raw = await fetchWithRetry(resolvedPath);
           const norm = _normalize(raw);
           STATE.raw = raw;
           STATE.courses = norm.courses;
           STATE.topics = norm.topics;
           STATE.loaded = true;
-          window.OpenCourseDeck?.bus?.emit?.('data:loaded', { courses: STATE.courses.length, topics: STATE.topics.length });
+          STATE.status = 'authoritative';
+          STATE.lastError = null;
+          STATE.lastSuccessfulAt = Date.now();
+          _activeCatalogPath = resolvedPath;
+          window.OpenCourseDeck?.bus?.emit?.('data:loaded', {
+            courses: STATE.courses.length,
+            topics: STATE.topics.length,
+            status: STATE.status,
+            source: _activeCatalogPath,
+          });
           return true;
         } catch (err) {
-          console.error('[DataStore] Critical failure in init:', err);
-          updateStatus('Critical failure loading content.', true);
-          return false;
+          console.warn('[DataStore] Failed to load catalog JSON:', err);
+          STATE.lastError = { name: err?.name || 'Error', message: err?.message || String(err), at: Date.now() };
+          const usingLastKnownGood = Boolean(previous.authoritative && previous.raw);
+          const raw = usingLastKnownGood ? previous.raw : DEMO_FALLBACK;
+          const norm = usingLastKnownGood
+            ? { courses: previous.courses, topics: previous.topics }
+            : _normalize(raw);
+          STATE.raw = raw;
+          STATE.courses = norm.courses;
+          STATE.topics = norm.topics;
+          STATE.loaded = true;
+          STATE.status = 'degraded';
+          _activeCatalogPath = usingLastKnownGood ? previous.path : 'demo-fallback';
+          updateStatus(usingLastKnownGood
+            ? 'Catalog refresh failed. Using last known good catalog.'
+            : 'Catalog load failed. Using offline demo.', true);
+          window.OpenCourseDeck?.bus?.emit?.('data:degraded', {
+            source: _activeCatalogPath,
+            recovery: 'retry',
+            usingLastKnownGood,
+            error: STATE.lastError,
+          });
+          return true;
         } finally {
           STATE.loading = null;
         }
@@ -166,11 +197,27 @@
       return STATE.loading;
     }
 
+    function retry(options = {}) {
+      return init({ ...options, force: true });
+    }
+
+    function getState() {
+      return Object.freeze({
+        loaded: STATE.loaded,
+        status: STATE.status,
+        source: _activeCatalogPath,
+        lastError: STATE.lastError ? { ...STATE.lastError } : null,
+        lastSuccessfulAt: STATE.lastSuccessfulAt,
+        courses: STATE.courses.length,
+        topics: STATE.topics.length,
+      });
+    }
+
     function allCourses() { return STATE.courses.slice(); }
     function allTopics() { return STATE.topics.slice(); }
     function isLoaded() { return STATE.loaded; }
 
-    return { init, isLoaded, allCourses, allTopics, catalogPath };
+    return { init, retry, getState, isLoaded, allCourses, allTopics, catalogPath };
   })();
 
   window.DataStore = window.DataStore ?? DataStore;
@@ -281,9 +328,11 @@
       catch (e) { console.warn('[DB] localStorage write failed:', key, e); throw e; }
     }
 
-    // Issue 4: per-record migration tracking
+    // Versioned, content-stable migration checkpoints.
     const _migratedSections = new Set();
+    const MIGRATION_VERSION = 3;
     const MIGRATED_IDS_KEY = 'plasma_migrated_ids';
+    const MIGRATION_REPORT_KEY = 'plasma_migration_report_v3';
     let _migratedIds = null;
 
     function _loadMigratedIds() {
@@ -296,7 +345,74 @@
     }
 
     function _persistMigratedIds() {
-      try { localStorage.setItem(MIGRATED_IDS_KEY, JSON.stringify([..._migratedIds])); } catch {}
+      localStorage.setItem(MIGRATED_IDS_KEY, JSON.stringify([..._migratedIds]));
+    }
+
+    function _stableStringify(value) {
+      if (value === null || typeof value !== 'object') return JSON.stringify(value);
+      if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
+      const entries = Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${_stableStringify(value[key])}`);
+      return `{${entries.join(',')}}`;
+    }
+
+    async function _digestText(text) {
+      const encoded = new TextEncoder().encode(text);
+      if (window.crypto?.subtle?.digest) {
+        const digest = await window.crypto.subtle.digest('SHA-256', encoded);
+        return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+      let hash = 0x811c9dc5;
+      for (const byte of encoded) {
+        hash ^= byte;
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+      }
+      return `fnv1a-${hash.toString(16).padStart(8, '0')}`;
+    }
+
+    async function _contentStableRecordId(kind, record) {
+      const identity = { ...record };
+      delete identity.id;
+      const canonical = _stableStringify(identity);
+      const digest = await _digestText(`opencoursedeck:migration:v${MIGRATION_VERSION}:${kind}\0${canonical}`);
+      return { id: `${kind}-migrated-v${MIGRATION_VERSION}-${digest.slice(0, 24)}`, canonical, digest };
+    }
+
+    async function _buildLegacyRecords(kind, records) {
+      const output = [];
+      const identities = new Map();
+      for (const record of records.filter(Boolean)) {
+        let id = record.id;
+        let canonical = null;
+        if (!id) {
+          const identity = await _contentStableRecordId(kind, record);
+          id = identity.id;
+          canonical = identity.canonical;
+        }
+        const prior = identities.get(id);
+        if (prior && canonical && prior !== canonical) {
+          const error = new Error(`Migration identity collision for ${kind}:${id}`);
+          error.code = 'MIGRATION_IDENTITY_COLLISION';
+          throw error;
+        }
+        if (canonical) identities.set(id, canonical);
+        output.push([record, id]);
+      }
+      return output;
+    }
+
+    async function _migrationCheckpoint(idb, section) {
+      try { return await idb.get('settings', `migration:v${MIGRATION_VERSION}:${section}`); }
+      catch { return null; }
+    }
+
+    async function _persistMigrationReport(idb, report) {
+      const record = { key: `migration:v${MIGRATION_VERSION}:report`, value: report };
+      try { await idb.put('settings', record); } catch (error) {
+        console.warn('[DB] failed to persist migration report to IndexedDB:', error);
+      }
+      try { localStorage.setItem(MIGRATION_REPORT_KEY, JSON.stringify(report)); } catch (error) {
+        console.warn('[DB] failed to persist migration report mirror:', error);
+      }
     }
 
     let _migrating = null;
@@ -305,47 +421,54 @@
 
     async function _migrateOnce() {
       if (localStorage.getItem(KEY_MIGRATED) === 'true') return true;
-      // Memoize the in-flight run: concurrent DB calls before the migrated
-      // flag is set must share one migration, not start parallel runs that
-      // race each other (and any concurrent deletes) with duplicate puts.
       if (_migrating) return _migrating;
-      // Back off after a failure so a persistently failing section does not
-      // turn every subsequent DB call into a full migration attempt.
       if (_lastMigrateFailureAt && Date.now() - _lastMigrateFailureAt < MIGRATE_RETRY_BACKOFF_MS) return false;
       _migrating = _runMigration().finally(() => { _migrating = null; });
       return _migrating;
     }
 
-    // Migrate one section: read legacy records, batch-insert the not-yet
-    // migrated ones in a single transaction, then persist the id ledger.
-    // Records without an id get a DETERMINISTIC id derived from their array
-    // index so a retried run (after another section failed) matches the
-    // ledger instead of re-inserting duplicates under fresh random ids.
-    async function _migrateSection(idb, ids, failures, section, store, buildRecords) {
+    async function _migrateSection(idb, ids, failures, report, section, store, buildRecords) {
       if (_migratedSections.has(section)) return;
       try {
+        const checkpoint = await _migrationCheckpoint(idb, section);
+        if (checkpoint?.value?.completed === true && checkpoint.value.version === MIGRATION_VERSION) {
+          _migratedSections.add(section);
+          report.sections[section] = { status: 'checkpoint', records: checkpoint.value.records || 0 };
+          return;
+        }
         const pending = [];
-        for (const [rid, record] of buildRecords()) {
+        for (const [rid, record] of await buildRecords()) {
           if (ids.has(rid)) continue;
           pending.push([rid, record]);
         }
-        if (pending.length) {
-          const records = pending.map(([, record]) => record);
-          // One transaction for the whole section instead of one per record
-          // (PlasmaDB.put opens a fresh readwrite transaction each call, so
-          // a few thousand legacy records meant a multi-second stall on
-          // first load). Fall back to sequential puts for DB adapters that
-          // do not implement bulkPut.
-          if (typeof idb.bulkPut === 'function') {
-            await idb.bulkPut(store, records);
-          } else {
-            for (const record of records) await idb.put(store, record);
+        const checkpointRecord = {
+          key: `migration:v${MIGRATION_VERSION}:${section}`,
+          value: {
+            version: MIGRATION_VERSION,
+            section,
+            completed: true,
+            records: pending.length,
+            completedAt: new Date().toISOString(),
+          },
+        };
+        const records = pending.map(([, record]) => record);
+        if (typeof idb.bulkPutWithCheckpoint === 'function') {
+          await idb.bulkPutWithCheckpoint(store, records, checkpointRecord);
+        } else {
+          if (records.length) {
+            if (typeof idb.bulkPut === 'function') await idb.bulkPut(store, records);
+            else for (const record of records) await idb.put(store, record);
           }
-          for (const [rid] of pending) ids.add(rid);
-          _persistMigratedIds();
+          await idb.put('settings', checkpointRecord);
         }
+        for (const [rid] of pending) ids.add(rid);
+        _persistMigratedIds();
         _migratedSections.add(section);
-      } catch (error) { failures.push({ section, error: _errorInfo(error) }); }
+        report.sections[section] = { status: 'migrated', records: pending.length };
+      } catch (error) {
+        failures.push({ section, error: _errorInfo(error) });
+        report.sections[section] = { status: 'failed', error: _errorInfo(error) };
+      }
     }
 
     async function _runMigration() {
@@ -353,70 +476,76 @@
       if (!idb) return false;
       const failures = [];
       const ids = _loadMigratedIds();
+      const report = {
+        version: MIGRATION_VERSION,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+        status: 'running',
+        sections: {},
+      };
       try {
-        window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration starting',data:{hasLegacyProgress:!!localStorage.getItem(KEY_PROGRESS),hasLegacyTs:!!localStorage.getItem(KEY_TIMESTAMPS),hasLegacyNotes:!!localStorage.getItem('plasma-notes')},timestamp:Date.now()});
+        window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration starting',data:{version:MIGRATION_VERSION},timestamp:Date.now()});
 
-        await _migrateSection(idb, ids, failures, 'progress', 'progress', () => {
+        await _migrateSection(idb, ids, failures, report, 'progress', 'progress', async () => {
           const map = _read(KEY_PROGRESS, {});
           return Object.entries(map)
             .filter(([, v]) => v && v.topicId)
             .map(([key, v]) => [`progress:${key}`, v]);
         });
 
-        await _migrateSection(idb, ids, failures, 'timestamps', 'timestamps', () => {
-          const list = _read(KEY_TIMESTAMPS, []);
-          return list
-            .map((ts, i) => (ts ? [ts, ts.id ?? `ts-migrated-${i}`] : null))
-            .filter(Boolean)
-            .map(([ts, id]) => [`timestamps:${id}`, { ...ts, id }]);
+        await _migrateSection(idb, ids, failures, report, 'timestamps', 'timestamps', async () => {
+          const list = await _buildLegacyRecords('timestamp', _read(KEY_TIMESTAMPS, []));
+          return list.map(([record, id]) => [`timestamps:${id}`, { ...record, id }]);
         });
 
-        await _migrateSection(idb, ids, failures, 'notes', 'notes', () => {
-          const notes = _read('plasma-notes', []);
-          return notes
-            .map((n, i) => (n ? [n, n.id ?? `note-migrated-${i}`] : null))
-            .filter(Boolean)
-            .map(([n, id]) => [`notes:${id}`, { ...n, id }]);
+        await _migrateSection(idb, ids, failures, report, 'notes', 'notes', async () => {
+          const list = await _buildLegacyRecords('note', _read('plasma-notes', []));
+          return list.map(([record, id]) => [`notes:${id}`, { ...record, id }]);
         });
 
-        await _migrateSection(idb, ids, failures, 'folders', 'folders', () => {
-          const folders = _read('plasma-folders', []);
-          return folders
-            .map((f, i) => (f ? [f, f.id ?? `folder-migrated-${i}`] : null))
-            .filter(Boolean)
-            .map(([f, id]) => [`folders:${id}`, { ...f, id }]);
+        await _migrateSection(idb, ids, failures, report, 'folders', 'folders', async () => {
+          const list = await _buildLegacyRecords('folder', _read('plasma-folders', []));
+          return list.map(([record, id]) => [`folders:${id}`, { ...record, id }]);
         });
 
-        await _migrateSection(idb, ids, failures, 'settings', 'settings', () => {
+        await _migrateSection(idb, ids, failures, report, 'settings', 'settings', async () => {
           const ns = _read('plasma-notes-settings', null);
           return ns && typeof ns === 'object'
             ? [['settings:notes', { key: 'notes', value: ns }]]
             : [];
         });
 
-        await _migrateSection(idb, ids, failures, 'annotations', 'annotations', () => {
+        await _migrateSection(idb, ids, failures, report, 'annotations', 'annotations', async () => {
           const annsRaw = _read('plasma-pdf-annotations', {});
           const anns = Array.isArray(annsRaw)
             ? annsRaw
             : Object.entries(annsRaw).flatMap(([page, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? page), docId: a.docId ?? 'global' })));
-          return anns
-            .map((a, i) => (a ? [a, a.id ?? `ann-migrated-${i}`] : null))
-            .filter(Boolean)
-            .map(([a, id]) => [`annotations:${id}`, { ...a, id }]);
+          const list = await _buildLegacyRecords('annotation', anns);
+          return list.map(([record, id]) => [`annotations:${id}`, { ...record, id }]);
         });
 
+        report.completedAt = new Date().toISOString();
         if (failures.length) {
+          report.status = 'failed';
+          report.failures = failures;
+          await _persistMigrationReport(idb, report);
           _lastMigrateFailureAt = Date.now();
-          _emit('storage:migration-error', { kind: 'migration', backend: 'indexedDB', failures });
+          _emit('storage:migration-error', { kind: 'migration', backend: 'indexedDB', failures, report });
           return false;
         }
 
         localStorage.setItem(KEY_MIGRATED, 'true');
         localStorage.removeItem(MIGRATED_IDS_KEY);
+        report.status = 'completed';
+        await _persistMigrationReport(idb, report);
         _lastMigrateFailureAt = 0;
-        window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration completed',data:{},timestamp:Date.now()});
+        window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration completed',data:{version:MIGRATION_VERSION},timestamp:Date.now()});
         return true;
       } catch (e) {
+        report.completedAt = new Date().toISOString();
+        report.status = 'failed';
+        report.failures = [...failures, { section: 'migration', error: _errorInfo(e) }];
+        await _persistMigrationReport(idb, report);
         _lastMigrateFailureAt = Date.now();
         console.warn('[DB] migration failed:', e);
         window.__pdDebug?.({location:'bridge.js:migrate',message:'Migration failed',data:{err:String(e&&e.message||e)},timestamp:Date.now()});
@@ -723,88 +852,140 @@
       return nextArr;
     }
 
-    // Issue 2: add watchedSegments and pdfBookmarks
-    async function clearAll({ includeNotes = true, includeSettings = true, includeAnnotations = true, includePrefs = true } = {}) {  
+    function _storageRemoval(storage, keys, backend) {
+      const cleared = [];
+      const failures = [];
+      for (const key of keys) {
+        try {
+          storage?.removeItem?.(key);
+          if (storage?.getItem?.(key) != null) throw new Error(`Key ${key} remained after deletion`);
+          cleared.push(key);
+        } catch (error) {
+          failures.push({ backend, key, message: error?.message || String(error) });
+        }
+      }
+      return { cleared, failures };
+    }
+
+    async function _clearIdbStores(idb, stores) {
+      const cleared = [];
+      const failures = [];
+      if (!idb) return { cleared, failures, available: false };
+      for (const store of stores) {
+        try {
+          await idb.clear(store);
+          if (typeof idb.count === 'function' && await idb.count(store) !== 0) {
+            throw new Error(`Store ${store} remained non-empty after deletion`);
+          }
+          cleared.push(store);
+        } catch (error) {
+          failures.push({ backend: 'indexedDB', store, message: error?.message || String(error) });
+        }
+      }
+      return { cleared, failures, available: true };
+    }
+
+    async function _deleteIdbSettings(idb, keys) {
+      const cleared = [];
+      const failures = [];
+      if (!idb) return { cleared, failures, available: false };
+      for (const key of keys) {
+        try {
+          await idb.delete('settings', key);
+          if (typeof idb.get === 'function' && await idb.get('settings', key) != null) {
+            throw new Error(`Setting ${key} remained after deletion`);
+          }
+          cleared.push(key);
+        } catch (error) {
+          failures.push({ backend: 'indexedDB', store: 'settings', key, message: error?.message || String(error) });
+        }
+      }
+      return { cleared, failures, available: true };
+    }
+
+    function _deletionOutcome(operation, scope, parts) {
+      const failures = parts.flatMap(part => part?.failures || []);
+      const receipt = {
+        operation,
+        scope,
+        committed: failures.length === 0,
+        durable: failures.length === 0,
+        status: failures.length === 0 ? 'committed' : 'failed',
+        degraded: failures.length > 0,
+        failures,
+        parts,
+        completedAt: new Date().toISOString(),
+      };
+      if (failures.length) {
+        const error = new Error(`${operation} did not delete every requested record`);
+        error.code = 'STORAGE_RESET_INCOMPLETE';
+        error.receipt = receipt;
+        error.failures = failures;
+        throw error;
+      }
+      return receipt;
+    }
+
+    async function clearAll({ includeNotes = true, includeSettings = true, includeAnnotations = true, includePrefs = true } = {}) {
       const idb = _getIdb();
       const stores = ['progress', 'timestamps', 'watchedSegments', 'pdfBookmarks'];
       if (includeNotes) stores.push('notes', 'folders');
       if (includeSettings) stores.push('settings');
       if (includeAnnotations) stores.push('annotations');
+      const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS, KEY_MIGRATED, MIGRATED_IDS_KEY];
+      if (includeNotes) localKeys.push('plasma-notes', 'plasma-folders');
+      if (includeSettings) localKeys.push('plasma-notes-settings');
+      if (includeAnnotations) localKeys.push('plasma-pdf-annotations');
+      if (includePrefs) localKeys.push(
+        'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
+        'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
+        'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
+        'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
+        'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists',
+        'plasma-studio-board', 'plasma-canvas-board', MIGRATION_REPORT_KEY,
+      );
 
-      if (idb) {
-        for (const s of stores) {
-          try { await idb.clear(s); } catch (e) { console.warn(`[DB] clearAll failed for store ${s}:`, e); }    
-        }
-      }
-
-      // Mirror localStorage cleanup
-      localStorage.removeItem(KEY_PROGRESS);
-      localStorage.removeItem(KEY_TIMESTAMPS);
-      if (includeNotes) {
-        localStorage.removeItem('plasma-notes');
-        localStorage.removeItem('plasma-folders');
-      }
-      if (includeSettings) {
-        localStorage.removeItem('plasma-notes-settings');
-      }
-      if (includeAnnotations) {
-        localStorage.removeItem('plasma-pdf-annotations');
-      }
-      if (includePrefs) {
-        const prefKeys = [
-          'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
-          'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
-          'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
-          'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
-          'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists',
-          'plasma-studio-board', 'plasma_migrated_ids',
-          // canvas.js autosaves the whiteboard under its own key; without
-          // this, "delete all local data" left a full serialized board behind.
-          'plasma-canvas-board'
-        ];
-        prefKeys.forEach(k => localStorage.removeItem(k));
-      }
-
-      localStorage.removeItem(KEY_MIGRATED);
-      window.__pdDebug?.({location:'bridge.js:clearAll',message:'Data wiped',data:{stores},timestamp:Date.now()});
-      return true;
+      const idbResult = await _clearIdbStores(idb, stores);
+      const localResult = _storageRemoval(localStorage, [...new Set(localKeys)], 'localStorage');
+      const receipt = _deletionOutcome('clear-all', 'all', [idbResult, localResult]);
+      window.__pdDebug?.({location:'bridge.js:clearAll',message:'Data wiped',data:{stores,receipt},timestamp:Date.now()});
+      return receipt;
     }
 
-    // Issue 2: add watchedSegments and pdfBookmarks to media scope
     async function clearUserData(scope) {
       const idb = _getIdb();
-      const clearStores = async (stores) => {
-        if (idb) {
-          for (const store of stores) {
-            try { await idb.clear(store); } catch {}
-          }
-        }
-      };
       if (scope === 'notes') {
-        await clearStores(['notes', 'folders']);
-        localStorage.removeItem('plasma-notes');
-        localStorage.removeItem('plasma-folders');
-        localStorage.removeItem('plasma-notes-settings');
-      } else if (scope === 'progress') {
-        await clearStores(['progress']);
-        localStorage.removeItem(KEY_PROGRESS);
-      } else if (scope === 'media') {
-        await clearStores(['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']);
-        localStorage.removeItem(KEY_TIMESTAMPS);
-        localStorage.removeItem('plasma-pdf-annotations');
-      } else if (scope === 'playlists') {
-        if (idb) try { await idb.delete('settings', 'plasma-playlists'); } catch {}
-        localStorage.removeItem('plasma-playlists');
-      } else if (scope === 'studio') {
-        if (idb) try { await idb.delete('settings', 'plasma-studio-board'); } catch {}
-        localStorage.removeItem('plasma-studio-board');
-        // canvas.js autosaves the same board under a second key.
-        if (idb) try { await idb.delete('settings', 'plasma-canvas-board'); } catch {}
-        localStorage.removeItem('plasma-canvas-board');
-      } else {
-        await clearAll();
+        return _deletionOutcome('clear-notes', scope, [
+          await _clearIdbStores(idb, ['notes', 'folders']),
+          _storageRemoval(localStorage, ['plasma-notes', 'plasma-folders', 'plasma-notes-settings'], 'localStorage'),
+        ]);
       }
-      return { scope };
+      if (scope === 'progress') {
+        return _deletionOutcome('clear-progress', scope, [
+          await _clearIdbStores(idb, ['progress']),
+          _storageRemoval(localStorage, [KEY_PROGRESS], 'localStorage'),
+        ]);
+      }
+      if (scope === 'media') {
+        return _deletionOutcome('clear-media', scope, [
+          await _clearIdbStores(idb, ['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']),
+          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations'], 'localStorage'),
+        ]);
+      }
+      if (scope === 'playlists') {
+        return _deletionOutcome('clear-playlists', scope, [
+          await _deleteIdbSettings(idb, ['plasma-playlists']),
+          _storageRemoval(localStorage, ['plasma-playlists'], 'localStorage'),
+        ]);
+      }
+      if (scope === 'studio') {
+        return _deletionOutcome('clear-studio', scope, [
+          await _deleteIdbSettings(idb, ['plasma-studio-board', 'plasma-canvas-board']),
+          _storageRemoval(localStorage, ['plasma-studio-board', 'plasma-canvas-board'], 'localStorage'),
+        ]);
+      }
+      if (scope === 'all') return clearAll();
+      throw new TypeError(`Unknown deletion scope: ${String(scope || '(empty)')}`);
     }
 
     async function _byIndex(store, indexName, value, fallback) {
