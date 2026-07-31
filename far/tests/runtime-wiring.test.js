@@ -51,7 +51,7 @@ describe('runtime wiring', () => {
     const appImport = indexSource.indexOf("import('../app.js')");
     for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
       expect(indexSource).toContain(`import('${specifier}')`);
-      expect(indexSource).not.toMatch(new RegExp(`from ['\"]${specifier.replaceAll('.', '\\.')}['\"]`));
+      expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\.')}["']`));
       expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
     }
     expect(indexSource).toContain('Object.assign(pd, {');

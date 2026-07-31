@@ -1,0 +1,1025 @@
+{
+  "schemaVersion": 1,
+  "product": "OpenCourseDeck",
+  "version": "1.1.2",
+  "commit": "2938ca1e70305b678e980cbdfa6c18c447e914f8",
+  "artifactRoot": "dist",
+  "generatedAt": "2026-07-31T14:06:45.395Z",
+  "artifactCount": 169,
+  "artifacts": [
+    {
+      "path": "assets/favicon.svg",
+      "size": 422,
+      "mode": 420,
+      "sha256": "444a7c7eabc3eac3c429dbd55ebb912e9f7765311e600ed98d8cbd2c3a8b7b94"
+    },
+    {
+      "path": "assets/icon-192.svg",
+      "size": 623,
+      "mode": 420,
+      "sha256": "ee21fe219f64571941bad5714d2c819c4b032e91b92bd5b8767341298e94c605"
+    },
+    {
+      "path": "assets/og-cover.svg",
+      "size": 1243,
+      "mode": 420,
+      "sha256": "b42305f0d19baaec16ee2fd841c7c3f86b8e598f5503fc56ec5eade047c7b3b3"
+    },
+    {
+      "path": "boot.js",
+      "size": 4159,
+      "mode": 420,
+      "sha256": "fd8a093d21251727e437175d6d17df51a4d4c70d96f851c09a99bcfd9df6a9b7"
+    },
+    {
+      "path": "chunks/achievementsRoute-BNEC7KXE.js",
+      "size": 5574,
+      "mode": 420,
+      "sha256": "a0779269523c6282dc5519b748c5439850c980934faac5c5f379b9f43ae1b15c"
+    },
+    {
+      "path": "chunks/annotationPersistence-N35BLB7S.js",
+      "size": 298,
+      "mode": 420,
+      "sha256": "05580d1565c90f0d75933c297f0b2ae66d29ad8f7c3460fb48813f322bd01fca"
+    },
+    {
+      "path": "chunks/app-AC47GOGU.js",
+      "size": 141187,
+      "mode": 420,
+      "sha256": "45759ce61de964ec604f91ae1225a3e1e10bd0f55434b79c44510f64271480fa"
+    },
+    {
+      "path": "chunks/bookmarksRoute-QASJ3N25.js",
+      "size": 8696,
+      "mode": 420,
+      "sha256": "f6ef37b37d786b66d51c494e951a2153200d019aec146f5e8655fbc1f38af25f"
+    },
+    {
+      "path": "chunks/canvas-CLQJM44W.js",
+      "size": 50298,
+      "mode": 420,
+      "sha256": "37a24f4ea67d6ed6971f2662e0d35a709fc46db3348ccb3c11eea14aabcd6815"
+    },
+    {
+      "path": "chunks/chunk-BEH7XED3.js",
+      "size": 1688,
+      "mode": 420,
+      "sha256": "6a1b9b34097d534f7b3168f8c0b260523f28d0fbeb3646ff555c2fc51467874c"
+    },
+    {
+      "path": "chunks/chunk-DM6NUPL4.js",
+      "size": 2060,
+      "mode": 420,
+      "sha256": "753bf38792f23480277b802288cf296a91021bcc4997d85c1bbb6d15bea60e89"
+    },
+    {
+      "path": "chunks/chunk-VC46IEJQ.js",
+      "size": 106,
+      "mode": 420,
+      "sha256": "ff9e0dca4365b7b1581e7275f3c6dbcf1474ffb874d81a3375ecf7a835dbaa6f"
+    },
+    {
+      "path": "chunks/chunk-YJSMJH3W.js",
+      "size": 2148,
+      "mode": 420,
+      "sha256": "17b27284e48d361879831f21bffc051319244ce5c701e3e10f3f08f152338ee7"
+    },
+    {
+      "path": "chunks/chunk-ZJMM3CWX.js",
+      "size": 4794,
+      "mode": 420,
+      "sha256": "918c9909801ee0ac83d1f0225994062a2e250a969d28e80adfdbc15fc8f831c8"
+    },
+    {
+      "path": "chunks/commandPalette-IUPUP23M.js",
+      "size": 6174,
+      "mode": 420,
+      "sha256": "88cf2f8ad5553cb33441b162061cf538cccdce26b4fde618c69a10d038b89102"
+    },
+    {
+      "path": "chunks/coursesRoute-B7Y46ZXR.js",
+      "size": 29750,
+      "mode": 420,
+      "sha256": "c1355910638c4c986e6e088ea4d4a0f3e9d8ea3d0513fc35c387170c4fc6c763"
+    },
+    {
+      "path": "chunks/helpRoute-XYSV2IJT.js",
+      "size": 6546,
+      "mode": 420,
+      "sha256": "711e6c9a5a2a2af8783598c680e1892ded3691000331bee9711eee4bf575b45b"
+    },
+    {
+      "path": "chunks/homeRoute-KKBEAABO.js",
+      "size": 14383,
+      "mode": 420,
+      "sha256": "be922d50b3b16f0688294784dd5659cb34466cb86ab284736d9ff655df30486a"
+    },
+    {
+      "path": "chunks/materialsRoute-2XQ5UHCO.js",
+      "size": 6419,
+      "mode": 420,
+      "sha256": "4619b8d10e53ea4d70b501ffec3010bfbe3a1e64a61b49c9b57843499037a501"
+    },
+    {
+      "path": "chunks/mediaStorage-YS3IJRFK.js",
+      "size": 6587,
+      "mode": 420,
+      "sha256": "72f7900f954cb59a3c83101845c4cf61ccb2920ebef4218d37c44557e43d186c"
+    },
+    {
+      "path": "chunks/migrationIdentity-UG3TV5IS.js",
+      "size": 992,
+      "mode": 420,
+      "sha256": "4d9c6ddbb6694a66e40e45d36236bde901f71eff9a615e06f9204fbd02bd9ba2"
+    },
+    {
+      "path": "chunks/myCoursesRoute-2YCMWJ3Z.js",
+      "size": 3560,
+      "mode": 420,
+      "sha256": "706dfb40815ec8e74c4bcaf6b536d453b1b97b68a255fd24b777dd1c3fe942ff"
+    },
+    {
+      "path": "chunks/notes-EJASVJKH.js",
+      "size": 40469,
+      "mode": 420,
+      "sha256": "ebecfae7f3de58778ef448a1cca00304333e12c78e230385c6e5aae409cac9ae"
+    },
+    {
+      "path": "chunks/notesRoute-UZVRO4DZ.js",
+      "size": 10132,
+      "mode": 420,
+      "sha256": "e0003d84275cd8a325c561406e56bbda6f1adb84ba478609381b6a78c435c291"
+    },
+    {
+      "path": "chunks/noteTemplates-V33M3W4R.js",
+      "size": 4580,
+      "mode": 420,
+      "sha256": "86ade7d91ac6d38ef6ffc4da48dbf727c1e9a1c281802b2197e3d4104afe4e6e"
+    },
+    {
+      "path": "chunks/pdf-TT7OOBXK.js",
+      "size": 29331,
+      "mode": 420,
+      "sha256": "c4dc44281ffa4a33410c1b01ef97c35f4412e59e8e0cd139c9caf49ed12beaff"
+    },
+    {
+      "path": "chunks/pdfRoute-BTPP4JQC.js",
+      "size": 8440,
+      "mode": 420,
+      "sha256": "3c57de50dbe9173358da4fd5eb5e779ab00e0b469b6299c5457002d1aad60f95"
+    },
+    {
+      "path": "chunks/player-DFI34KJB.js",
+      "size": 48580,
+      "mode": 420,
+      "sha256": "e0880e5aa1d3b88ed9a20589623a886184e2d407f3ba837d097c7fe529c5dd8f"
+    },
+    {
+      "path": "chunks/playlistsRoute-NXA56I35.js",
+      "size": 6566,
+      "mode": 420,
+      "sha256": "75181e8272e2e68991ad01639ef7b508bd6fab32a815dd327763e9e6670ad973"
+    },
+    {
+      "path": "chunks/progress-H4NYBJ56.js",
+      "size": 35164,
+      "mode": 420,
+      "sha256": "53cce248f4ec93afb6abd8e027e9b39f1686f3f6108ef2cde90978c110f251a3"
+    },
+    {
+      "path": "chunks/progressRoute-7BONQ745.js",
+      "size": 7540,
+      "mode": 420,
+      "sha256": "20b639a92fae1a1a7c415c834bb7a90af04ae0a4db65b191922fb477d2bb9032"
+    },
+    {
+      "path": "chunks/settingsRoute-JBJDUJYJ.js",
+      "size": 28468,
+      "mode": 420,
+      "sha256": "869cecd9361dba93001be122eb0fb09992742029224e5f6170b5c14cc13d1aa0"
+    },
+    {
+      "path": "chunks/studioRoute-MF3VW6QQ.js",
+      "size": 21683,
+      "mode": 420,
+      "sha256": "10d1e3b721f22d9b17e0838f41d415dc5fe3eaa703baff10dd8b2b4dce44bfd7"
+    },
+    {
+      "path": "chunks/tagsRoute-WS76KV5A.js",
+      "size": 5689,
+      "mode": 420,
+      "sha256": "851b4cce56f0fa1bfb5540625fd5ecd5aa0b40c84009603afd8e880e80717778"
+    },
+    {
+      "path": "chunks/translationCache-NBBVJHX7.js",
+      "size": 203,
+      "mode": 420,
+      "sha256": "cbaa8ba540249d46554bd9a86b223f8c396d02098537525aa1cbb82bd53a8a8d"
+    },
+    {
+      "path": "chunks/translator-UACWV4G2.js",
+      "size": 8661,
+      "mode": 420,
+      "sha256": "410fdb0706e253ce7fccb55954f43c4eb8b8fe14dd36b882165307fe77260da5"
+    },
+    {
+      "path": "data/catalog.json",
+      "size": 146,
+      "mode": 420,
+      "sha256": "3b17dc4298763ba31bca0d60793622014b2c3dcfbd8cb506123c33531a2da0f3"
+    },
+    {
+      "path": "data/opencoursedeck-starter.json",
+      "size": 1419,
+      "mode": 420,
+      "sha256": "6a27333657af81a1509e8d90f17cc5bcde4dace0059cf1afe82f4b97e7518c12"
+    },
+    {
+      "path": "docs/architecture.md",
+      "size": 4036,
+      "mode": 420,
+      "sha256": "5174aaf9554d06556b6e064866441d516cee6c0194fc3794ca8bd4bfa5037def"
+    },
+    {
+      "path": "docs/backup-restore.md",
+      "size": 1626,
+      "mode": 420,
+      "sha256": "155b2e11992528e426512b091eed915f76b5b23da87c47089c1d5cfde96c5545"
+    },
+    {
+      "path": "docs/content-and-catalog.md",
+      "size": 2492,
+      "mode": 420,
+      "sha256": "59c7a9e50c0845f3a9772b419f364e5acd49b3c267512b298c8c50e242c90a59"
+    },
+    {
+      "path": "docs/forensic-audit-2026-07.md",
+      "size": 16206,
+      "mode": 420,
+      "sha256": "ec0db615fcb3da52b2b9449519c4d57aaf0d6ecfcd86786bbdf47f5363cd1004"
+    },
+    {
+      "path": "docs/getting-started.md",
+      "size": 2739,
+      "mode": 420,
+      "sha256": "7003ee139808e69aa402ada585895f51a073d36f9b3338519ad77e49f216ae04"
+    },
+    {
+      "path": "docs/plugin-system-plan.md",
+      "size": 8447,
+      "mode": 420,
+      "sha256": "7953adf0edc10a1a0d1320936ff2d29c4e46cdd5ae7cc361b0c393842e621f19"
+    },
+    {
+      "path": "docs/release-and-rollback.md",
+      "size": 2900,
+      "mode": 420,
+      "sha256": "469fe3794afa9effa40ce97a03feda5ab2ae34cf478af4c2ca9e0b13e194d891"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "size": 4516,
+      "mode": 420,
+      "sha256": "143ba748244df2cc2783bbadbd71cf01fd9885696dbcc7bd805c0f967ad4adc8"
+    },
+    {
+      "path": "docs/tauri-crate-downloads.md",
+      "size": 71721,
+      "mode": 420,
+      "sha256": "7f84bd389f079e4fffcb1d3166cd00e636658a05688afc16acaba617427d843a"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "size": 1836,
+      "mode": 420,
+      "sha256": "6002f82520eb6e0430f20b5e0cf326b3b1709c627191110a53fff48c8ea1ac29"
+    },
+    {
+      "path": "index.html",
+      "size": 33706,
+      "mode": 420,
+      "sha256": "d1fd2f85056232086d7f6afb4bc69edb6a6e4d71d14751383b8ec2263fda3293"
+    },
+    {
+      "path": "manifest.json",
+      "size": 713,
+      "mode": 420,
+      "sha256": "9e7d941833726fcacd0b5f5a8e4f75128d62b1697582c8a73e0ecf6225332a67"
+    },
+    {
+      "path": "opencoursedeck.js",
+      "size": 181975,
+      "mode": 420,
+      "sha256": "fc5dd95df6f1d8ff5fa27b332425164e667eeb8c775f472bd72d977d5baae732"
+    },
+    {
+      "path": "pdf-runtime.js",
+      "size": 435,
+      "mode": 420,
+      "sha256": "14c1708f61640fcada1596978ed1b55da6a7d6fc389d552397a5a5345ab5afc3"
+    },
+    {
+      "path": "src/styles/accents.css",
+      "size": 1415,
+      "mode": 420,
+      "sha256": "03e6915e210c237e93c5767e368e73c0ea9a8c667fffd8e3026396b2d65651f1"
+    },
+    {
+      "path": "src/styles/animations.css",
+      "size": 260,
+      "mode": 420,
+      "sha256": "31f7505595ab4b359656b2c81fb814b27944773bdb73f6c56ffc2db3d39fdb5c"
+    },
+    {
+      "path": "src/styles/base.css",
+      "size": 8228,
+      "mode": 420,
+      "sha256": "d96e8247d8bb2fbf3ac494442aef53cebac155b7fd097edb536b32eab5ec9f24"
+    },
+    {
+      "path": "src/styles/components.css",
+      "size": 91256,
+      "mode": 420,
+      "sha256": "6abf79684fa264f5486445f9d66bd463338cefd361cec61ea9b82dfef651980d"
+    },
+    {
+      "path": "src/styles/density.css",
+      "size": 725,
+      "mode": 420,
+      "sha256": "f6edea1e8714684ae0f5d941473b943ee067247078d1147c2b7b8701a12e476b"
+    },
+    {
+      "path": "src/styles/elevation.css",
+      "size": 2052,
+      "mode": 420,
+      "sha256": "e2357d9629f43ab74cba7729c416c9e6441288a3433ee42ef5847cd89f919bea"
+    },
+    {
+      "path": "src/styles/enhancements.css",
+      "size": 9056,
+      "mode": 420,
+      "sha256": "56210743c00a7724640dbebc730c1faa2cbf6d229c9930c0b0cd57829839523b"
+    },
+    {
+      "path": "src/styles/index.css",
+      "size": 1086,
+      "mode": 420,
+      "sha256": "9b5b46a32e8933ff0938f79ce942f3b6d138092f3cd1a56ef6e52df5ffd1d426"
+    },
+    {
+      "path": "src/styles/layout.css",
+      "size": 9528,
+      "mode": 420,
+      "sha256": "bef5daf5f88ec7975e3f1935d97c17568ccadbf09c3974ac31fcf66e6b686f45"
+    },
+    {
+      "path": "src/styles/notes-enhancements.css",
+      "size": 11089,
+      "mode": 420,
+      "sha256": "d2a0dbe7739699bf9e595db2cf481f74d8f6eb3603f02c2aaf4785268793fe51"
+    },
+    {
+      "path": "src/styles/progress-enhancements.css",
+      "size": 6987,
+      "mode": 420,
+      "sha256": "cd2de27b536793862aca03e8cdd931e7f1c5526d9206670db21fa57167379f21"
+    },
+    {
+      "path": "src/styles/reset.css",
+      "size": 2628,
+      "mode": 420,
+      "sha256": "0296e2fcaf93d606e96603581f80ee1811d23dbec384661fae610f6ddfd2a2e4"
+    },
+    {
+      "path": "src/styles/settings-enhancements.css",
+      "size": 11714,
+      "mode": 420,
+      "sha256": "59ae06cd1f46f175568498dbafc1a7c98d20576efc3e242739862c715e879d68"
+    },
+    {
+      "path": "src/styles/themes.css",
+      "size": 6347,
+      "mode": 420,
+      "sha256": "268dcd3f5f39deb5fff57a2d98a92f19f939cfb8be931f2798ff3aaee1b39856"
+    },
+    {
+      "path": "src/styles/tokens.css",
+      "size": 6099,
+      "mode": 420,
+      "sha256": "2ba275c79796321c71c20a407b37193a5fe00a4b4a88b5fa232ef291d8052de6"
+    },
+    {
+      "path": "src/styles/utilities.css",
+      "size": 10477,
+      "mode": 420,
+      "sha256": "c0c56af84f6f85e4784498b50f59779d25cf8140e94d1d1e452511767b430769"
+    },
+    {
+      "path": "src/styles/views.css",
+      "size": 14654,
+      "mode": 420,
+      "sha256": "a148c06cd2eb1c9bbdd271a3bc86ff88e936f592e0c31c449548747cbd1e83ca"
+    },
+    {
+      "path": "src/workers/catalog.worker.js",
+      "size": 8090,
+      "mode": 420,
+      "sha256": "1209a9342efed1f5a8bf0b4343b1ef68b45c48f92941b6e2ccc31368173eecc7"
+    },
+    {
+      "path": "src/workers/search.worker.js",
+      "size": 4616,
+      "mode": 420,
+      "sha256": "a3b2d94cb419091bb01ce37f82488593695b5f108fd9298017fa02e63a52bb96"
+    },
+    {
+      "path": "style.css",
+      "size": 34,
+      "mode": 420,
+      "sha256": "7ccf961f16470e4574b679fbb249afe4520356fd69761dc62581c30c4e83f8d6"
+    },
+    {
+      "path": "sw.js",
+      "size": 17721,
+      "mode": 420,
+      "sha256": "553118a9e1ddc912e38f4e2366becad897fbc4e359c77f9acfb2d9d5248a3da1"
+    },
+    {
+      "path": "vendor/chart.umd.js",
+      "size": 208480,
+      "mode": 420,
+      "sha256": "84d0e233daba702b8f77d669d8c137cad36d441a10f200b6f2d3ab553bdfcf6b"
+    },
+    {
+      "path": "vendor/fontawesome/css/all.min.css",
+      "size": 75736,
+      "mode": 420,
+      "sha256": "315a2999dc82dad613889f30964b5fd2e874bf83604febcd7725457a98bb4347"
+    },
+    {
+      "path": "vendor/fontawesome/webfonts/fa-brands-400.woff2",
+      "size": 110088,
+      "mode": 420,
+      "sha256": "70c632ba73c7ad942141bb2f56994b8eddf0a284c01aab9f21e0cd10021530c4"
+    },
+    {
+      "path": "vendor/fontawesome/webfonts/fa-regular-400.woff2",
+      "size": 18924,
+      "mode": 420,
+      "sha256": "81aaa8342d90df0a3c0b87655e2c31a71941f0dd351fb9fb1ca5d692e744f6d0"
+    },
+    {
+      "path": "vendor/fontawesome/webfonts/fa-solid-900.woff2",
+      "size": 114740,
+      "mode": 420,
+      "sha256": "ff58a6b0a01dbce082458f6e5a58719df4e80e0c2b50f744bb5871e21eca6878"
+    },
+    {
+      "path": "vendor/fontawesome/webfonts/fa-v4compatibility.woff2",
+      "size": 4032,
+      "mode": 420,
+      "sha256": "4bad0278281153ad5354855ccfbc0674279ec47eff29b3d262c213478311cc52"
+    },
+    {
+      "path": "vendor/fonts/fonts.css",
+      "size": 107,
+      "mode": 420,
+      "sha256": "0dfecd09db097375b90d8aecdbcab425f4315c0c5a8ed39d699e9800ba391010"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-300-normal.woff2",
+      "size": 7812,
+      "mode": 420,
+      "sha256": "2f4d3f2e59e0dd665765f7e6d52f0cd8173a1ec1732b544622e3a4780ad3877c"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-400-normal.woff2",
+      "size": 7712,
+      "mode": 420,
+      "sha256": "f0bb586459ce8f09b238285040f17e3e9e9538b2c5a7aae0775194e33c36c3c3"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-500-normal.woff2",
+      "size": 7900,
+      "mode": 420,
+      "sha256": "b77a86ec16aadc157f4a99e8898d71cd75ea264753d9bdf13f962f8c3988cbb0"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-600-normal.woff2",
+      "size": 7972,
+      "mode": 420,
+      "sha256": "6c2a37f82a676bcd441b735e4e2cda4edb8873a059ab9c362a84f0711f257041"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-700-normal.woff2",
+      "size": 7904,
+      "mode": 420,
+      "sha256": "5917871d3cc970d8ce195101cbf65c1f68ec948022eb6070030342bb7edfb3bb"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-800-normal.woff2",
+      "size": 7992,
+      "mode": 420,
+      "sha256": "e84cb164b47aaad63db12da876c341c59f78b6b25f9069dcdea3c1f8ca8b8f9b"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-900-normal.woff2",
+      "size": 7808,
+      "mode": 420,
+      "sha256": "b077cd77ee8e020e7abee610cdd384f31443257ebd921077646b1239421635ae"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-300-normal.woff2",
+      "size": 10356,
+      "mode": 420,
+      "sha256": "71090ccd2581f26325c9a702e0238a5a2364e311e94f6315cdb773c8a2e42244"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-400-normal.woff2",
+      "size": 10232,
+      "mode": 420,
+      "sha256": "ef572f9187a8be018d9d9c2c6b77c1f6cb2af4199f02fc16c292ea10ab25a2cc"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-500-normal.woff2",
+      "size": 10432,
+      "mode": 420,
+      "sha256": "1c2db92d3cd9b237ca7c9c07af556d542f28ded1db54cd4382cf776501c5291f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-600-normal.woff2",
+      "size": 10484,
+      "mode": 420,
+      "sha256": "509fca9c59564f9a846fa69bc647f9b050fc11abf1c9f6f3da71fb2d5ed425bd"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-700-normal.woff2",
+      "size": 10496,
+      "mode": 420,
+      "sha256": "a46b99781170971e2c99a87ff7ee9f5cf90a9dfcd18175e1be6300201d030123"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-800-normal.woff2",
+      "size": 10440,
+      "mode": 420,
+      "sha256": "5c3f504d068a53469514175401cb3fe4d210231f44df0ef15d3da5f32d9ff445"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-cyrillic-ext-900-normal.woff2",
+      "size": 10164,
+      "mode": 420,
+      "sha256": "bab6fa98dec970eb67cd74cf7c9da3c18eb924eb381314544b5da2448b789e81"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-300-normal.woff2",
+      "size": 8004,
+      "mode": 420,
+      "sha256": "88669b6ea20ccf52555d032740c5a1b7f550f6d54ca0acc0969cf938fafead55"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-400-normal.woff2",
+      "size": 7776,
+      "mode": 420,
+      "sha256": "c15ddd00a9927b56f5c655a41f976f79bd848a20cce91fc14227751872a1cc27"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-500-normal.woff2",
+      "size": 7920,
+      "mode": 420,
+      "sha256": "cc197d79d33a3615a047baae85f4d1957f6f98b8898313658e160b1d519b1b6f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-600-normal.woff2",
+      "size": 7944,
+      "mode": 420,
+      "sha256": "9c5a897f9d9fcfe60d90631d766ae62b4bf1edd76633fa7a4b2f8c87e036789b"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-700-normal.woff2",
+      "size": 7920,
+      "mode": 420,
+      "sha256": "737c6c91cd60372d30e6540096ada83c89c9b4613cd7472e3366bf2e07ad99f1"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-800-normal.woff2",
+      "size": 7892,
+      "mode": 420,
+      "sha256": "18a6a4a8e29310db74c01b9d85b30e708e0b1fd8d9a2d01a259b82fe4d112422"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-900-normal.woff2",
+      "size": 7840,
+      "mode": 420,
+      "sha256": "b247a595e1774ac8274daad7061f6e2f4638a1f3ab73a89afcf4fef1a2e1a2e5"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-300-normal.woff2",
+      "size": 5348,
+      "mode": 420,
+      "sha256": "a605c6297c3a4193ce503d8ffbe9d8f9575343a186f2c94fe2844d5035a8c5e6"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-400-normal.woff2",
+      "size": 5264,
+      "mode": 420,
+      "sha256": "eadedd9e13c2582430a9fb1519eb86152fdabb483a6f66d90f8d8a52e977a1b7"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-500-normal.woff2",
+      "size": 5428,
+      "mode": 420,
+      "sha256": "75a9ec9383a3b7a7bf7cfb94f64edf38d9cfdc5f7ffa0cbed2733627a6e4426d"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-600-normal.woff2",
+      "size": 5432,
+      "mode": 420,
+      "sha256": "399f94d75aa73403e40e2353e8c0cc75c38f7362a6ca263b3b02d9723157ffe5"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-700-normal.woff2",
+      "size": 5444,
+      "mode": 420,
+      "sha256": "b7b2732ebc981b30a5463ffc850407649dba41e625aee124cc63293da4547629"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-800-normal.woff2",
+      "size": 5548,
+      "mode": 420,
+      "sha256": "33bc91a610e159df66b874231f4c8f0037ac947fdd1b270cc60a7ee658a2c21f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-greek-ext-900-normal.woff2",
+      "size": 5348,
+      "mode": 420,
+      "sha256": "0a5995a6b462e34fa2663f4d8dad1684d2b55eb28999b2bc85274cd055f498e5"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-300-normal.woff2",
+      "size": 23916,
+      "mode": 420,
+      "sha256": "be0276550393a72b94d673505567dceba801511d5e1ca5a87793190dc5d5a6ca"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-400-normal.woff2",
+      "size": 23664,
+      "mode": 420,
+      "sha256": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-500-normal.woff2",
+      "size": 24272,
+      "mode": 420,
+      "sha256": "f3779f1efccc4bdcdf9c0a02ab95bf6bd092ed09c48c08cedc725889edd1d19f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-600-normal.woff2",
+      "size": 24452,
+      "mode": 420,
+      "sha256": "f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-700-normal.woff2",
+      "size": 24356,
+      "mode": 420,
+      "sha256": "6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-800-normal.woff2",
+      "size": 24400,
+      "mode": 420,
+      "sha256": "a7d0a50f15d389cad679238466bdb5fc9787aa0715719064ce25abaff042820d"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-900-normal.woff2",
+      "size": 23900,
+      "mode": 420,
+      "sha256": "d5c0ed7b8b5dde97d48b97947d740bbd8ad3ba9f2c5cc6b8280f16acba2d828e"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-300-normal.woff2",
+      "size": 35880,
+      "mode": 420,
+      "sha256": "b11def546ac052fad7993e39c53801b55af99b0fd51a9ac0e72884b5c3fcaa3f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-400-normal.woff2",
+      "size": 35000,
+      "mode": 420,
+      "sha256": "6744a7f509ebc6ab220a6cd4ea77e898adf014f03d88dcda5d45d8a9feefb4e9"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-500-normal.woff2",
+      "size": 36024,
+      "mode": 420,
+      "sha256": "2c6fbc42d315528beb06c1096df45487bf4186c4b78b8111d12c9c951f8acca2"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-600-normal.woff2",
+      "size": 36260,
+      "mode": 420,
+      "sha256": "e4bdf67b0cd15ca9e184509275be95db942195d3cc2b17f6a0452f2adf75d0bf"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-700-normal.woff2",
+      "size": 36244,
+      "mode": 420,
+      "sha256": "143f9504f1377012aa3e39c90c4354ef429cb0494b9ac0e1437f1a81e5412236"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-800-normal.woff2",
+      "size": 36128,
+      "mode": 420,
+      "sha256": "eade55593308b9e4916dd7f47826929ce3e40cad85a2b338d56e5fd1e7bf8e5e"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-latin-ext-900-normal.woff2",
+      "size": 35328,
+      "mode": 420,
+      "sha256": "de536299a1eeca46fe494787380486ec890627e0d50e1be18ef6001cbd1e5105"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-300-normal.woff2",
+      "size": 5060,
+      "mode": 420,
+      "sha256": "1e3cde652acfbc67194e84d2068953d4799df8b125089f11687142c39603cd7f"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-400-normal.woff2",
+      "size": 4972,
+      "mode": 420,
+      "sha256": "547ad9fdaeb0ae43487f4b8a02e47c36553c0c0cb73c8aa98f93b7b615f6b55d"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-500-normal.woff2",
+      "size": 5112,
+      "mode": 420,
+      "sha256": "44e36aa5a8f12130029a29bb0e6695d0262b67446ce321e878b1fb56162b5de6"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-600-normal.woff2",
+      "size": 5100,
+      "mode": 420,
+      "sha256": "1aeb94ae9db052a4a2fe6f3046f928cff1fdbd7abdf870a9a01c13cae6faeba5"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-700-normal.woff2",
+      "size": 5104,
+      "mode": 420,
+      "sha256": "5fafa3829a16d9ea5ac3a67c51e54186353122790b604a3e361f96cab188da8b"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-800-normal.woff2",
+      "size": 5176,
+      "mode": 420,
+      "sha256": "37852ffd38e1064bd06a0b95aed12cbb4f248c6f0b5ffcf9c1a4ffc40500b22c"
+    },
+    {
+      "path": "vendor/fonts/inter/files/inter-vietnamese-900-normal.woff2",
+      "size": 5028,
+      "mode": 420,
+      "sha256": "885b386e9391ec4856c6dc78fff64ecaae1b9995a4b766a6900d6fb3b0d6744d"
+    },
+    {
+      "path": "vendor/fonts/inter/index.css",
+      "size": 15637,
+      "mode": 420,
+      "sha256": "5df9369babb13fa058da3742a218811e78870269d183ed26df9b05195b7908d8"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-400-normal.woff2",
+      "size": 5328,
+      "mode": 420,
+      "sha256": "522f5827308102a9c0ea7860b5a11306043610ecf03d150ba32056a06e8c56e2"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-600-normal.woff2",
+      "size": 5384,
+      "mode": 420,
+      "sha256": "b450f960a0d29846370fc050b6183727d2075a2bcb1c5595c99374bf083b5a83"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-700-normal.woff2",
+      "size": 5336,
+      "mode": 420,
+      "sha256": "6251ef44d6390a4f0622432eb852864af90dd1b8310d153c3c6d235e0c412570"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-ext-400-normal.woff2",
+      "size": 1160,
+      "mode": 420,
+      "sha256": "5f4292eb92ca542e9f60048ca72832d0183b1a06e5d7bcfeed16f9be9ebb4018"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-ext-600-normal.woff2",
+      "size": 1160,
+      "mode": 420,
+      "sha256": "1cdd5a996070b3e5decbb63fd1abb41b97d4288ad8a5100f3945b5f15755ada5"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-cyrillic-ext-700-normal.woff2",
+      "size": 1152,
+      "mode": 420,
+      "sha256": "cdd84c976f72d46f7848f0eed7f949f798fb5dd0c9ea15e8d5a4606e6cfb43ab"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-greek-400-normal.woff2",
+      "size": 4228,
+      "mode": 420,
+      "sha256": "365b7a8eaff022b13ed0561fde3890a04a30507d773ecd5adb3aca8e766a285c"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-greek-600-normal.woff2",
+      "size": 4308,
+      "mode": 420,
+      "sha256": "de02415369898d9aa2d9f30379b6c201fc1c0a7017589d973747d993a68f709b"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-greek-700-normal.woff2",
+      "size": 4300,
+      "mode": 420,
+      "sha256": "ccc154baa0425b7761e171d4270aa6e100d0c5c88c1fef65c4d2345a4ab62a80"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2",
+      "size": 21168,
+      "mode": 420,
+      "sha256": "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2",
+      "size": 21860,
+      "mode": 420,
+      "sha256": "400c6bfda18d5d14acad1c15d6dcb9f8e13c015e7286317e0b9a482539bef147"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2",
+      "size": 21908,
+      "mode": 420,
+      "sha256": "d0d4e818808f2a0ba39b2b09d1989366f63494e295f003c7ef436697378507e8"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-ext-400-normal.woff2",
+      "size": 7336,
+      "mode": 420,
+      "sha256": "505dfba8ecbe77e82765f36d317ed7ef4ac42719dc5f4ae68d1c483fd22d0d14"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-ext-600-normal.woff2",
+      "size": 7512,
+      "mode": 420,
+      "sha256": "90899aac1c15552c028fd205376bb537a2a5205164fe8626efabad77d7260c20"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-latin-ext-700-normal.woff2",
+      "size": 7472,
+      "mode": 420,
+      "sha256": "45a606d88f72bc0afae4d1a6988e3dba3a5e77ee51aa3b550e37c31c728f4d2d"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-vietnamese-400-normal.woff2",
+      "size": 3924,
+      "mode": 420,
+      "sha256": "efc9e0df126ca6dd1c37a022bfe1d664d23b3fcaa32979d2028ecb4c074306c8"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-vietnamese-600-normal.woff2",
+      "size": 3996,
+      "mode": 420,
+      "sha256": "3591494d22e7993ea776a7f3a6442f9fefe4cc84f88c025245dcbe1f0ef743d3"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/files/jetbrains-mono-vietnamese-700-normal.woff2",
+      "size": 3992,
+      "mode": 420,
+      "sha256": "c95f3997692ba039a5d812313f82b832b3286d5f9de35a1695a2cc695548c44b"
+    },
+    {
+      "path": "vendor/fonts/jetbrains-mono/index.css",
+      "size": 6476,
+      "mode": 420,
+      "sha256": "96eac35da949aba6bed58cf5e6171e0c6ad8fa18c81f680ab49892019f6d54cf"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-cyrillic-400-normal.woff2",
+      "size": 11444,
+      "mode": 420,
+      "sha256": "e740be684698fe83afd47e28ba5070f6e8d9759d37717679a74abd461eda01f6"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-cyrillic-700-normal.woff2",
+      "size": 12360,
+      "mode": 420,
+      "sha256": "cfbfb0e36791f82470367d25c5a8d498dc1561a7a66a4172b7c6df749fdf9894"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-cyrillic-800-normal.woff2",
+      "size": 12396,
+      "mode": 420,
+      "sha256": "b56fac55959b4ddf165c9f3666edd35de2792f3fd54177c3cb41ce44a98451c9"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-400-normal.woff2",
+      "size": 21856,
+      "mode": 420,
+      "sha256": "1fe9ad5d8b2ebd8ecb8fbd05bed1e3fdfa52dae3f1a04e1c219918442fe9394d"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-700-normal.woff2",
+      "size": 23224,
+      "mode": 420,
+      "sha256": "28453852ea165c47b5a941be00e418402e1407002ed87507f062a1e316328fe6"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-800-normal.woff2",
+      "size": 23272,
+      "mode": 420,
+      "sha256": "576ff9c33a472cc36e3975f24811db2234b0a10872939b04c0ba9b915e9c2b3f"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-ext-400-normal.woff2",
+      "size": 12336,
+      "mode": 420,
+      "sha256": "b13dce34203d893eb00980383bc5abf8b75c9eb1f59c3a630e9fc8baf2e9984f"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-ext-700-normal.woff2",
+      "size": 12904,
+      "mode": 420,
+      "sha256": "edb9f5d879b30c617698bcc288692c339d5a0a2464a5476f00025195e5cad166"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-latin-ext-800-normal.woff2",
+      "size": 12968,
+      "mode": 420,
+      "sha256": "24adb236cec8998bd06999d084c3f6f3f76b19e33feaeaa0ef00ac82d20500b4"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-vietnamese-400-normal.woff2",
+      "size": 5584,
+      "mode": 420,
+      "sha256": "8e05ed367ad11305be595bd17e48eea6ada9303a6414924563ceb72534342f76"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-vietnamese-700-normal.woff2",
+      "size": 5664,
+      "mode": 420,
+      "sha256": "560402596d5f067fab1884bd39cadedbc8da9b01f85e39f134c06fb4d4472f2d"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/files/playfair-display-vietnamese-800-normal.woff2",
+      "size": 5688,
+      "mode": 420,
+      "sha256": "02b169e7c5478b2d1836c7f6c5f09e15e6ab5ab06c7a9b805b19d0e3b4ab4506"
+    },
+    {
+      "path": "vendor/fonts/playfair-display/index.css",
+      "size": 4640,
+      "mode": 420,
+      "sha256": "d20820b77e04899311865ce0a055e076a21c6ea32ccd72b04fae090262016c0f"
+    },
+    {
+      "path": "vendor/fuse.min.js",
+      "size": 23850,
+      "mode": 420,
+      "sha256": "e3621b53cb77b4ec306dec41ed95511e6dd80d17fae5a04f3e346d214b9f8f92"
+    },
+    {
+      "path": "vendor/pdf.min.js",
+      "size": 404,
+      "mode": 420,
+      "sha256": "9de4e9f4d92fc8156129aca072ef364cefd191728d121170d776d34e6115d953"
+    },
+    {
+      "path": "vendor/pdf.min.mjs",
+      "size": 352645,
+      "mode": 420,
+      "sha256": "27fc2a057a00f92a4334ad06e17dbd7259912954e9fb7f76400bcca5fd190a9c"
+    },
+    {
+      "path": "vendor/pdf.worker.min.js",
+      "size": 37,
+      "mode": 420,
+      "sha256": "435d38fd64d6e1445f4db1ffa6fe76df9851c8157c961086e431593837cfb7b4"
+    },
+    {
+      "path": "vendor/pdf.worker.min.mjs",
+      "size": 1375838,
+      "mode": 420,
+      "sha256": "1baa1844c89c80a5b2797c916e75ab29254be46d8e9cb53cb6364d7aad84be36"
+    },
+    {
+      "path": "vendor/purify.min.js",
+      "size": 29170,
+      "mode": 420,
+      "sha256": "fccd016ce1c4f0c39c5e7ca7e95cad31898364ae5852439db685004065ac4a61"
+    },
+    {
+      "path": "workbox-a26db9c3.js",
+      "size": 22749,
+      "mode": 420,
+      "sha256": "dbd8988b7b781a8cacd46b9811c1f410ad3bc0738f6678e8a81821eee3a130c7"
+    }
+  ]
+}

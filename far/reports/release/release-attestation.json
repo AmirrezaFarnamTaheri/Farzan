@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "opencoursedeck-release-verification",
+  "product": "OpenCourseDeck",
+  "version": "1.1.2",
+  "commit": "2938ca1e70305b678e980cbdfa6c18c447e914f8",
+  "artifactRoot": "dist",
+  "artifactCount": 169,
+  "manifest": "reports/release/release-manifest.json",
+  "manifestSha256": "bff2fe18df25ce77e2cde94e28df73ec8e7510b4f6fd8e460f8c72afebfe538f",
+  "verified": true,
+  "verifiedAt": "2026-07-31T14:06:45.663Z",
+  "runtime": {
+    "node": "v22.23.1",
+    "platform": "linux",
+    "arch": "x64",
+    "ci": true
+  }
+}

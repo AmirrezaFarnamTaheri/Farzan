@@ -139,6 +139,34 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
+  it('requires signed provenance and an SBOM bound to the immutable release archive', () => {
+    const brokenRelease = workflows['release.yml']
+      .replace('      id-token: write\n', '')
+      .replace('      attestations: write\n', '')
+      .replace('      artifact-metadata: write\n', '')
+      .replace('      - name: Attest immutable release artifacts', '      - name: Skip artifact attestation')
+      .replace('      - name: Attest release SBOM', '      - name: Skip SBOM attestation')
+      .replace('sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'sbom-path: missing.json')
+      .replace('`opencoursedeck-${tag}-sbom.cdx.json`,', '');
+    const brokenVerify = workflows['verify.yml']
+      .replace('          cp reports/release/sbom.cdx.json "release-assets/$sbom"\n', '')
+      .replace(' "$sbom" > SHA256SUMS', ' > SHA256SUMS');
+
+    expect(validateReleaseWorkflow(brokenRelease)).toEqual(expect.arrayContaining([
+      expect.stringContaining('OIDC permission'),
+      expect.stringContaining('attestation permission'),
+      expect.stringContaining('artifact metadata permission'),
+      expect.stringContaining('signed artifact provenance'),
+      expect.stringContaining('signed SBOM attestation'),
+      expect.stringContaining('bind the published archive'),
+      expect.stringContaining('idempotency checks must include the SBOM'),
+    ]));
+    expect(validateVerificationWorkflow(brokenVerify)).toEqual(expect.arrayContaining([
+      expect.stringContaining('CycloneDX SBOM'),
+      expect.stringContaining('covered by release checksums'),
+    ]));
+  });
+
   it('requires idempotent retries to validate release assets, not only names', () => {
     const broken = workflows['release.yml']
       .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
