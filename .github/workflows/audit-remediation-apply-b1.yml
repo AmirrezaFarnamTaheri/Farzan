@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Decode, verify, and apply patch
+      - name: Decode, verify, and apply patches
         run: |
           set -euo pipefail
           echo "b02a8ffb6ba6f2de2d0d73623f4f3cf33c057c044967b1b6b2631c89e5e50889  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
@@ -46,6 +46,22 @@ jobs:
           echo "a4557950f2b210ed47b226550285a9fb1b5322709f527d2bfedac5ad7c2d87f5  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
           git apply /tmp/phase-b1.patch
+
+          echo "219e086a7ab9bcb0a9a9f1fc54b1b1a7b2fb2d6ff9650ed7bd0ec35f45e1eee5  .audit-remediation/phase-b1-async.patch.gz.b64" | sha256sum --check --strict
+          echo "a61b5237c8c84791a3547bf3d6d048febbc37656e9da49a0556340cecc4fdcd4  .audit-remediation/phase-b1-async.patch.gz.b64.01" | sha256sum --check --strict
+          echo "e529190e3acea33687178c9a9fd6eeef2ba8e9278d9f7ccd821b5673d9c7a066  .audit-remediation/phase-b1-async.patch.gz.b64.02" | sha256sum --check --strict
+          echo "e716ae77fa8ac6b300918905ae06b79814238d1f609f2409fdcd38051b0da092  .audit-remediation/phase-b1-async.patch.gz.b64.03" | sha256sum --check --strict
+          echo "47cf43bd6f8d201c34c812c6e4f07d992e0c6ef6fcceb460bbbf25c37c2e5217  .audit-remediation/phase-b1-async.patch.gz.b64.04" | sha256sum --check --strict
+          cat \
+            .audit-remediation/phase-b1-async.patch.gz.b64 \
+            .audit-remediation/phase-b1-async.patch.gz.b64.01 \
+            .audit-remediation/phase-b1-async.patch.gz.b64.02 \
+            .audit-remediation/phase-b1-async.patch.gz.b64.03 \
+            .audit-remediation/phase-b1-async.patch.gz.b64.04 \
+            | base64 -d | gzip -d > /tmp/phase-b1-async.patch
+          echo "eec2417d508078f8dd6fdd8a06d8136f1a9d3ad90803e1cae3da24fabd72b559  /tmp/phase-b1-async.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-b1-async.patch
+          git apply /tmp/phase-b1-async.patch
           git diff --check
 
       - name: Install dependencies reproducibly
@@ -80,5 +96,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "fix: validate built workers and stabilize browser assurance"
+          git commit -m "fix: validate built workers and await browser completion"
           git push origin HEAD:fix/master-forensic-audit-remediation
