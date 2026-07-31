@@ -50,6 +50,12 @@ jobs:
           echo "3a64a4ab8f13f35e50dcacc441970267fdb9d0d05ec8f37515c1c256b9d4e429  /tmp/phase-c.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-c.patch
           git apply /tmp/phase-c.patch
+
+          echo "374e03ca8009845874fcda8b24f6c2883e94f1249d46b0af7bb9ed46f24d9345  .audit-remediation/phase-c-lint.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-c-lint.patch.gz.b64 | gzip -d > /tmp/phase-c-lint.patch
+          echo "48eb735e9fa504f582beae0efc85eee73e28b770837f9a554446f4827ad7cc22  /tmp/phase-c-lint.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-c-lint.patch
+          git apply /tmp/phase-c-lint.patch
           git diff --check
 
       - name: Install dependencies reproducibly
@@ -69,6 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf .audit-remediation
+          rm -f .github/phase-c-trigger.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
