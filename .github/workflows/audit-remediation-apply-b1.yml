@@ -56,6 +56,16 @@ jobs:
           echo "d2d94554dfd109dfa8f31eb08c9a8ec4c9526821f8eceb3235b76427b92f7cdb  /tmp/phase-b1-namespace.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1-namespace.patch
           git apply /tmp/phase-b1-namespace.patch
+
+          echo "7d570e1d298651f47a9a7aae70d36f51219eed0c90bbe89946feb473aa305e2c  .audit-remediation/phase-b1-worker-assets.patch.gz.b64" | sha256sum --check --strict
+          echo "ca65d62904be2ad1fad0b3daf1f87ca3f2b9c79488e27faa5e3e8089ca47bbe3  .audit-remediation/phase-b1-worker-assets.patch.gz.b64.01" | sha256sum --check --strict
+          echo "6d91466ccc7083282758303a4a8b73511b6c337bc3f4ab670c933a2efe948560  .audit-remediation/phase-b1-worker-assets.patch.gz.b64.02" | sha256sum --check --strict
+          echo "fbcb351547a56be8876fdedc56f7297436ceb1ea98c8f6ea7ab949f42e24f5e9  .audit-remediation/phase-b1-worker-assets.patch.gz.b64.03" | sha256sum --check --strict
+          echo "5db569979b750ddea71a7098139b6e2ee4c06c7cb8f038310d7b564a426d52ac  .audit-remediation/phase-b1-worker-assets.patch.gz.b64.04" | sha256sum --check --strict
+          cat .audit-remediation/phase-b1-worker-assets.patch.gz.b64{,.01,.02,.03,.04} | base64 -d | gzip -d > /tmp/phase-b1-worker-assets.patch
+          echo "8e4b4150b0a08e776c99c0f9f83b4c46904c22020f836751d1db401918635f5a  /tmp/phase-b1-worker-assets.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-b1-worker-assets.patch
+          git apply /tmp/phase-b1-worker-assets.patch
           git diff --check
 
       - name: Install dependencies reproducibly
@@ -71,7 +81,7 @@ jobs:
 
       - name: Run focused regression tests
         working-directory: far
-        run: node node_modules/vitest/vitest.mjs run tests/runtime-wiring.test.js tests/browser-smoke-script.test.js --configLoader runner --pool vmThreads
+        run: node node_modules/vitest/vitest.mjs run tests/runtime-wiring.test.js tests/browser-smoke-script.test.js tests/build-release.test.js --configLoader runner --pool vmThreads
 
       - name: Enforce entry bundle budget
         working-directory: far
@@ -90,5 +100,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "fix: validate built workers and await browser completion"
+          git commit -m "fix: stage production workers and await browser completion"
           git push origin HEAD:fix/master-forensic-audit-remediation
