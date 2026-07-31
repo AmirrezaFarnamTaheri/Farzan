@@ -7,29 +7,53 @@ const VALID_SCOPES = new Set(['progress', 'notes', 'media', 'playlists', 'studio
 const PREFERENCE_KEYS = ['plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir', 'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session', 'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir'];
 const SESSION_KEYS = ['plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session', 'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-ai-api-key-session', 'plasma-ai-authority-session', 'pd-player', 'pd-player-playlist'];
 
+function unavailableFailure(backend) {
+  return {
+    backend,
+    name: backend,
+    unavailable: true,
+    message: `${backend} is unavailable; deletion could not be verified`,
+  };
+}
+
 function removeKeys(storage, keys, backend) {
   const cleared = [];
   const failures = [];
+  if (typeof storage?.removeItem !== 'function' || typeof storage?.getItem !== 'function') {
+    failures.push(unavailableFailure(backend));
+    return { cleared, failures, backend, available: false };
+  }
   for (const key of keys) {
     try {
-      storage?.removeItem?.(key);
-      if (storage?.getItem?.(key) != null) throw new Error(`Key ${key} remained after deletion`);
+      storage.removeItem(key);
+      if (storage.getItem(key) != null) throw new Error(`Key ${key} remained after deletion`);
       cleared.push(key);
     } catch (error) {
       failures.push({ backend, key, name: key, message: error?.message || String(error) });
     }
   }
-  return { cleared, failures };
+  return { cleared, failures, backend, available: true };
 }
 
 function requireCommitted(result, operation) {
-  const failures = Array.isArray(result?.failures) ? result.failures : [];
+  const parts = Array.isArray(result?.parts) ? result.parts : [];
+  const failures = Array.isArray(result?.failures) ? [...result.failures] : [];
+  for (const part of parts) {
+    if (part?.available === false) failures.push(unavailableFailure(part.backend || 'indexedDB'));
+    if (part?.durable === false && !part?.failures?.length) {
+      failures.push({
+        backend: part.backend || 'indexedDB',
+        name: part.backend || 'indexedDB',
+        message: `${part.backend || 'storage'} did not return durable deletion evidence`,
+      });
+    }
+  }
   if (result?.committed === true && result?.durable !== false && failures.length === 0) return result;
   const receipt = failedReceipt({
     backend: result?.backend || 'indexedDB',
     operation,
     error: result?.error || `${operation} did not return a durable committed receipt`,
-    details: result || null,
+    details: { ...(result || {}), failures },
   });
   throw deletionFailure(new Error(receipt.error), withCompatibility(receipt, { failures }));
 }
@@ -45,7 +69,7 @@ function withCompatibility(receipt, details = {}) {
 
 function deleteDatabase(factory, name) {
   return new Promise((resolve, reject) => {
-    if (!factory) return resolve(false);
+    if (!factory) return reject(new Error(`IndexedDB is unavailable; ${name} deletion could not be verified`));
     const request = factory.deleteDatabase(name);
     request.onsuccess = () => resolve(true);
     request.onerror = () => reject(request.error || new Error(`Failed to delete ${name}`));
@@ -53,9 +77,13 @@ function deleteDatabase(factory, name) {
   });
 }
 
+function failureName(failure) {
+  return failure?.name ?? failure?.key ?? failure?.store ?? failure?.backend ?? '<unknown>';
+}
+
 function notifyDeletionFailure(root, failures) {
   if (!failures.length) return;
-  const names = failures.map(failure => failure.name).join(', ');
+  const names = failures.map(failureName).join(', ');
   const blocked = failures.some(failure => /blocked/i.test(failure.message));
   const guidance = blocked
     ? 'Deletion is blocked by another open tab or process. Close other OpenCourseDeck tabs and retry.'
@@ -101,7 +129,13 @@ export function installStorageSafety(root = window) {
       }), { scope: normalized, cleared: result.cleared });
     }
     if (normalized === 'all') return db.clearAll();
-    const result = requireCommitted(await originalClearUserData(normalized), `clear-${normalized}`);
+    let result;
+    try {
+      result = requireCommitted(await originalClearUserData(normalized), `clear-${normalized}`);
+    } catch (error) {
+      notifyDeletionFailure(root, error?.failures || error?.receipt?.failures || []);
+      throw error;
+    }
     return withCompatibility(committedReceipt({
       backend: 'indexedDB+localStorage',
       operation: `clear-${normalized}`,
