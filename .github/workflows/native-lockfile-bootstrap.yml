@@ -1,0 +1,45 @@
+name: Native Lockfile Bootstrap
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap-native-lockfile:
+    name: Generate and verify Cargo lockfile
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Generate and validate locked Cargo graph
+        working-directory: far
+        run: |
+          cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
+          cargo metadata --locked --format-version 1 --manifest-path src-tauri/Cargo.toml | Out-Null
+          if (-not (Test-Path src-tauri/Cargo.lock)) { throw 'Cargo.lock was not generated' }
+
+      - name: Commit verified Cargo lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --force far/src-tauri/Cargo.lock
+          git diff --cached --check
+          git commit -m "build: commit locked Tauri dependency graph"
+          git push origin HEAD:fix/master-forensic-audit-remediation
