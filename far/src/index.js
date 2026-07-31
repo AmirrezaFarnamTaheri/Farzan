@@ -104,37 +104,27 @@ pd.loadFeature = (name, { signal = null, force = false } = {}) => {
   const loader = featureLoaders[name];
   if (!loader) return Promise.reject(new Error(`Unknown OpenCourseDeck feature: ${name}`));
   if (force) pd.invalidateFeature(name);
-
   let entry = featureEntries.get(name);
   if (!entry) {
     const generation = currentFeatureGeneration(name);
     const context = createOperationContext({ resource: `feature:${name}`, generation });
     entry = { generation, context, promise: null };
-    entry.promise = Promise.resolve()
-      .then(loader)
-      .then((module) => {
-        if (!context.isCurrent() || currentFeatureGeneration(name) !== generation) {
-          const error = new Error(`Feature "${name}" load became stale`);
-          error.code = 'STALE_FEATURE_LOAD';
-          throw error;
-        }
-        return module;
-      })
-      .catch((error) => {
-        if (featureEntries.get(name) === entry) featureEntries.delete(name);
+    entry.promise = Promise.resolve().then(loader).then((module) => {
+      if (!context.isCurrent() || currentFeatureGeneration(name) !== generation) {
+        const error = new Error(`Feature "${name}" load became stale`);
+        error.code = 'STALE_FEATURE_LOAD';
         throw error;
-      });
+      }
+      return module;
+    }).catch((error) => {
+      if (featureEntries.get(name) === entry) featureEntries.delete(name);
+      throw error;
+    });
     featureEntries.set(name, entry);
   }
-
   if (!signal) return entry.promise;
   if (signal.aborted) return Promise.reject(abortError(signal.reason?.message || 'Feature load aborted'));
-  return Promise.race([
-    entry.promise,
-    new Promise((_, reject) => {
-      signal.addEventListener('abort', () => reject(abortError(signal.reason?.message || 'Feature load aborted')), { once: true });
-    }),
-  ]);
+  return Promise.race([entry.promise, new Promise((_, reject) => signal.addEventListener('abort', () => reject(abortError(signal.reason?.message || 'Feature load aborted')), { once: true }))]);
 };
 pd.loadFeatures = (names = [], options = {}) => Promise.all(names.map(name => pd.loadFeature(name, options)));
 
@@ -145,29 +135,29 @@ initErrorBoundary();
 initOfflineBanner();
 pd.ProductReadiness = enforceProductReadiness(document);
 
-import('../app.js')
-  .then(async () => {
-    try {
-      const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all([
-        import('./features/translator.js'),
-        import('./features/translationCache.js'),
-        import('./features/noteTemplates.js'),
-        import('./features/commandPalette.js'),
-      ]);
-      Object.assign(pd, {
-        TranslatorRegistry: translator.TranslatorRegistry,
-        BaseTranslator: translator.BaseTranslator,
-        OpenAITranslator: translator.OpenAITranslator,
-        CustomAPITranslator: translator.CustomAPITranslator,
-        GoogleTranslator: translator.GoogleTranslator,
-        LANGUAGES: translator.LANGUAGES,
-        getLanguageName: translator.getLanguageName,
-        TranslationCache: translationCache.translationCache,
-        NoteTemplates: noteTemplates.NoteTemplates,
-      });
-      initCommandPalette();
-    } catch (error) {
-      console.warn('[OpenCourseDeck] deferred runtime initialization failed', error);
-    }
-  })
-  .catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));
+import('../app.js').then(async () => {
+  try {
+    const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all([
+      import('./features/translator.js'),
+      import('./features/translationCache.js'),
+      import('./features/noteTemplates.js'),
+      import('./features/commandPalette.js'),
+    ]);
+    const cacheApi = translationCache.translationCache || translationCache;
+    const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates;
+    Object.assign(pd, {
+      TranslatorRegistry: translator.TranslatorRegistry,
+      BaseTranslator: translator.BaseTranslator,
+      OpenAITranslator: translator.OpenAITranslator,
+      CustomAPITranslator: translator.CustomAPITranslator,
+      GoogleTranslator: translator.GoogleTranslator,
+      LANGUAGES: translator.LANGUAGES,
+      getLanguageName: translator.getLanguageName,
+      TranslationCache: cacheApi,
+      NoteTemplates: templateApi,
+    });
+    initCommandPalette();
+  } catch (error) {
+    console.warn('[OpenCourseDeck] deferred runtime initialization failed', error);
+  }
+}).catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));
