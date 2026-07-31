@@ -24,6 +24,8 @@ describe('runtime wiring', () => {
     './features/errorBoundary.js',
     './features/offlineBanner.js',
     './features/commandPalette.js',
+    './core/bridgeHardening.js',
+    './core/pdfIdentityHardening.js',
     './core/storageSafety.js',
     './core/dataHardening.js',
     './core/endpointApprovalGuard.js',
@@ -55,7 +57,16 @@ describe('runtime wiring', () => {
       expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
     }
     expect(indexSource).toContain('Object.assign(pd, {');
+    expect(indexSource).toContain('TranslationCache: translationCache.translationCache');
+    expect(indexSource).not.toContain('TranslationCache: translationCache,');
     expect(indexSource).toContain('NoteTemplates: noteTemplates.NoteTemplates');
+  });
+
+  it('installs PDF identity hardening only after the lazy PDF runtime is available', () => {
+    const pdfImport = indexSource.indexOf("await import('../pdf.js')");
+    const hardeningCall = indexSource.indexOf('installPdfIdentityHardening(window)');
+    expect(pdfImport).toBeGreaterThan(-1);
+    expect(hardeningCall).toBeGreaterThan(pdfImport);
   });
 
   it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
@@ -67,8 +78,6 @@ describe('runtime wiring', () => {
     }
     expect(appSource).toContain('OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph }');
   });
-
-
 
   it('uses one document-relative resolver for public and pooled production workers', () => {
     const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'utf8');
@@ -84,8 +93,6 @@ describe('runtime wiring', () => {
   });
 
   it('player.js media-storage integration has a provider on the namespace', async () => {
-    // player.js reads window.OpenCourseDeck.MediaStorage and falls back to null.
-    // The module self-registers on import, so importing it must be enough.
     const playerSource = fs.readFileSync(path.join(root, 'player.js'), 'utf8');
     expect(playerSource).toContain('window.OpenCourseDeck?.MediaStorage');
 
@@ -106,9 +113,6 @@ describe('runtime wiring', () => {
   });
 
   it('waveformScrubber stays out of the bundle until its double-download is solved', () => {
-    // Deliberate: render() fetches and PCM-decodes the entire media file, a
-    // second full download on top of the streaming element. If you wire it in,
-    // delete this assertion and record the reason in ROADMAP 3.6.
     expect(indexSource).not.toContain('waveformScrubber');
   });
 
