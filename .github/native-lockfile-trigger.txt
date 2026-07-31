@@ -1,0 +1,1 @@
+Trigger the one-shot Cargo lockfile bootstrap after tracking src-tauri.
