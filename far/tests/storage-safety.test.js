@@ -78,7 +78,6 @@ describe('storage safety', () => {
     expect(originalClearUserData).toHaveBeenCalledWith('notes');
   });
 
-
   it('does not convert a failed primary clear into a committed receipt', async () => {
     const root = createRoot();
     root.DB.clearUserData.mockResolvedValue({
@@ -93,6 +92,28 @@ describe('storage safety', () => {
 
     expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
     expect(error.failures).toEqual([expect.objectContaining({ store: 'notes' })]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('notes'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('undefined'));
+  });
+
+  it('rejects a nominally committed receipt when one backend was unavailable', async () => {
+    const root = createRoot();
+    root.DB.clearUserData.mockResolvedValue({
+      committed: true,
+      durable: true,
+      status: 'committed',
+      failures: [],
+      parts: [{ backend: 'indexedDB', available: false, cleared: [], failures: [] }],
+    });
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([
+      expect.objectContaining({ backend: 'indexedDB', unavailable: true }),
+    ]);
+    expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('indexedDB'));
   });
 
   it('rejects preference deletion when storage reports the key still exists', async () => {
@@ -106,6 +127,19 @@ describe('storage safety', () => {
     expect(error.failures).toEqual(expect.arrayContaining([
       expect.objectContaining({ backend: 'localStorage', key: 'plasma_theme' }),
     ]));
+  });
+
+  it('rejects preference deletion when localStorage is unavailable', async () => {
+    const root = createRoot();
+    root.localStorage = null;
+    installStorageSafety(root);
+
+    const error = await root.DB.clearUserData('preferences').catch(value => value);
+
+    expect(error).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual([
+      expect.objectContaining({ backend: 'localStorage', unavailable: true }),
+    ]);
   });
 
   it('surfaces blocked auxiliary database details before rejecting a full reset', async () => {
