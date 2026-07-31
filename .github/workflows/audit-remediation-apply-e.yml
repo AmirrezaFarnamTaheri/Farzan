@@ -41,6 +41,12 @@ jobs:
           base64 -d /tmp/phase-e-files.tar.gz.b64 > /tmp/phase-e-files.tar.gz
           echo "e6e54aa0d3f3f8dd8316200178c32e7749bb9ba064bd05a31686f56e04d4d992  /tmp/phase-e-files.tar.gz" | sha256sum --check --strict
           tar -xzf /tmp/phase-e-files.tar.gz -C .
+
+          echo "cf375f27065b2a9c760031ee858e41a395dfd17c36b822e54ec26699a6377af0  .audit-remediation/phase-e-test-delta.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-e-test-delta.patch.gz.b64 | gzip -d > /tmp/phase-e-test-delta.patch
+          echo "07ebcda4a3d1a81cbf6b96839ba6e40db5a7050dad2bfa2237008dfa8708ca15  /tmp/phase-e-test-delta.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-e-test-delta.patch
+          git apply /tmp/phase-e-test-delta.patch
           git diff --check
 
       - name: Regenerate npm and Cargo lockfiles
@@ -85,6 +91,7 @@ jobs:
           rm -f .github/workflows/audit-remediation-dependencies.yml
           rm -f .github/dependency-remediation-trigger.txt
           rm -f .github/phase-c-sbom-trigger.txt
+          rm -f .github/phase-e-trigger.txt
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
