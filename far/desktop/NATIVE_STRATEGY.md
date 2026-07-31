@@ -4,13 +4,14 @@ OpenCourseDeck has one production native path and two development fallbacks.
 
 ## 1. Tauri native app
 
-The production wrapper is the standard Tauri v2 project in `src-tauri/`. It uses pinned crates.io releases, a committed `Cargo.lock`, and the official npm Tauri CLI. The web release is rebuilt before native compilation and embedded through Tauri's custom protocol.
+The production wrapper is the standard Tauri v2 project in `src-tauri/`. It uses pinned crates.io releases, a committed `Cargo.lock`, and the official npm Tauri CLI. The web release is rebuilt before native compilation and embedded through Tauri's custom protocol. The Windows bundle icon is generated reproducibly from `assets/icon-192.svg` before compilation.
 
 Verification sequence:
 
 ```sh
-npm ci
+npm ci --ignore-scripts --legacy-peer-deps
 npm run vendor
+npm run native:prepare
 npm run build:release
 npm run native:preflight:strict
 npm run tauri:check -- --locked
@@ -35,12 +36,14 @@ Security and packaging shape:
 - App id: `app.opencoursedeck.desktop`
 - Bundle target: Windows NSIS
 - Capability permissions: empty by default and scoped to the `main` window
+- Content Security Policy: explicitly configured and enforced by native preflight
 - Prototype freezing: enabled
 - Unused commands: removed from production builds
 - Rust dependencies: pinned registry releases with a committed lockfile
+- Native icon: deterministic `src-tauri/icons/icon.png` generated from the committed SVG source
 - Native executable staging: `desktop-dist/OpenCourseDeck-Native/OpenCourseDeck.exe`
 
-The permanent Windows workflow performs strict preflight, locked Cargo metadata/check/build, executable size and SHA-256 verification, and artifact upload. A green workflow proves reproducible compilation; publisher signing and installer launch smoke remain release-operator requirements.
+The permanent Windows workflow performs deterministic asset preparation, strict preflight, locked Cargo metadata/check/build, executable size and SHA-256 verification, and artifact upload. A green workflow proves reproducible compilation; publisher signing and installer launch smoke remain release-operator requirements.
 
 ## 2. Electron app shell
 
