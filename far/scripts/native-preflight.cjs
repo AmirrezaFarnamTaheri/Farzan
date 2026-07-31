@@ -48,6 +48,19 @@ function compact(output) {
     .join(' ');
 }
 
+function fileReady(file, minimumBytes = 512) {
+  return fs.existsSync(file) && fs.statSync(file).isFile() && fs.statSync(file).size >= minimumBytes;
+}
+
+function icoReady(file) {
+  if (!fileReady(file)) return false;
+  const header = fs.readFileSync(file).subarray(0, 6);
+  return header.length === 6
+    && header.readUInt16LE(0) === 0
+    && header.readUInt16LE(2) === 1
+    && header.readUInt16LE(4) >= 1;
+}
+
 let packageJson;
 let tauriConfig;
 let capabilities;
@@ -88,12 +101,20 @@ for (const file of ['build.rs', 'src/main.rs', 'src/lib.rs']) {
 const cargoLockExists = fs.existsSync(rel('src-tauri', 'Cargo.lock'));
 add(cargoLockExists ? 'ok' : strict ? 'fail' : 'warn', 'Tauri Cargo lockfile exists');
 add(fs.existsSync(rel('assets', 'icon-192.svg')) ? 'ok' : 'fail', 'Native icon source exists');
-const generatedIcon = rel('src-tauri', 'icons', 'icon.png');
-const generatedIconReady = fs.existsSync(generatedIcon) && fs.statSync(generatedIcon).size >= 512;
+
+const generatedPng = rel('src-tauri', 'icons', 'icon.png');
+const generatedIco = rel('src-tauri', 'icons', 'icon.ico');
+const pngPrepared = fileReady(generatedPng);
+const icoPrepared = icoReady(generatedIco);
 add(
-  generatedIconReady ? 'ok' : strict ? 'fail' : 'warn',
-  'Generated Windows desktop icon exists',
-  generatedIconReady ? `${fs.statSync(generatedIcon).size} bytes` : 'run `npm run native:prepare` before strict verification or native compilation',
+  pngPrepared ? 'ok' : strict ? 'fail' : 'warn',
+  'Generated cross-platform desktop icon exists',
+  pngPrepared ? `${fs.statSync(generatedPng).size} bytes` : 'run `npm run native:prepare` before strict verification or native compilation',
+);
+add(
+  icoPrepared ? 'ok' : strict ? 'fail' : 'warn',
+  'Generated Windows ICO resource exists',
+  icoPrepared ? `${fs.statSync(generatedIco).size} bytes` : 'run `npm run native:prepare`; Tauri Windows compilation requires src-tauri/icons/icon.ico',
 );
 
 if (packageJson) {
@@ -113,6 +134,8 @@ if (cargoToml) {
   add(cargoToml.includes('tauri-build = { version = "=2.6.3"') ? 'ok' : 'fail', 'Tauri build helper version is pinned');
   add(cargoToml.includes('custom-protocol = ["tauri/custom-protocol"]') ? 'ok' : 'fail', 'release build enables the custom protocol');
   add(!/\bpath\s*=/.test(cargoToml) ? 'ok' : 'fail', 'Tauri dependencies use registry releases instead of missing local paths');
+  add(cargoToml.includes('publish = false') ? 'ok' : 'fail', 'Native package is not publishable independently');
+  add(cargoToml.includes('license-file = "../../LICENSE"') ? 'ok' : 'fail', 'Native package inherits the repository license');
 }
 
 if (tauriConfig) {
@@ -136,9 +159,12 @@ if (tauriConfig) {
     typeof csp === 'string' && requiredCspDirectives.every((directive) => csp.includes(directive)) ? 'ok' : 'fail',
     'Tauri enforces a restrictive Content Security Policy',
   );
+  add(typeof csp === 'string' && !/media-src[^;]*\bhttp:/.test(csp) ? 'ok' : 'fail', 'Tauri media policy rejects plaintext HTTP');
 
+  const icons = Array.isArray(tauriConfig.bundle?.icon) ? tauriConfig.bundle.icon : [];
   add(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('nsis') ? 'ok' : 'fail', 'Tauri bundle targets Windows NSIS');
-  add(Array.isArray(tauriConfig.bundle?.icon) && tauriConfig.bundle.icon.includes('icons/icon.png') ? 'ok' : 'fail', 'Tauri bundle uses the generated native icon');
+  add(icons.includes('icons/icon.png') ? 'ok' : 'fail', 'Tauri bundle uses the generated PNG icon');
+  add(icons.includes('icons/icon.ico') ? 'ok' : 'fail', 'Tauri bundle uses the generated Windows ICO resource');
 }
 
 if (capabilities) {
