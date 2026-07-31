@@ -30,6 +30,6 @@
     "active": true,
     "targets": ["nsis"],
     "publisher": "OpenCourseDeck",
-    "icon": ["icons/icon.png"]
+    "icon": ["icons/icon.png", "icons/icon.ico"]
   }
 }
