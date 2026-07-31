@@ -1,0 +1,22 @@
+[package]
+name = "open-course-deck"
+version = "1.1.2"
+description = "OpenCourseDeck desktop application"
+authors = ["OpenCourseDeck contributors"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "open_course_deck_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.5", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
