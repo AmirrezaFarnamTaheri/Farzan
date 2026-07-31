@@ -42,6 +42,19 @@ const IGNORED_DIRS = new Set([
   'Electron.NET-main',
 ]);
 
+// These files are byte-for-byte or deterministically generated third-party
+// minified artifacts. Scanning them reports upstream byte sequences that
+// Farzan neither authors nor safely rewrites. Farzan-authored compatibility
+// wrappers such as vendor/pdf.min.js remain in scope.
+const IGNORED_FILES = new Set([
+  'vendor/chart.umd.js',
+  'vendor/fontawesome/css/all.min.css',
+  'vendor/fuse.min.js',
+  'vendor/pdf.min.mjs',
+  'vendor/pdf.worker.min.mjs',
+  'vendor/purify.min.js',
+]);
+
 const EXTENSIONS = new Set(['.js', '.cjs', '.mjs', '.ts', '.css', '.html', '.md', '.json', '.yml', '.yaml']);
 
 /** Max distinct corrupted runs reported per file before truncating. */
@@ -143,6 +156,10 @@ function findMojibake(text, limit = Infinity) {
   return found;
 }
 
+function relativeFile(full) {
+  return path.relative(root, full).split(path.sep).join('/');
+}
+
 /**
  * Walk a directory tree and collect mojibake findings from every text file.
  * @param {string} dir
@@ -165,16 +182,18 @@ function walk(dir, sink) {
     }
     if (!entry.isFile() || !EXTENSIONS.has(path.extname(entry.name))) continue;
     if (full === __filename) continue;
+    const relative = relativeFile(full);
+    if (IGNORED_FILES.has(relative)) continue;
     let text;
     try {
       text = fs.readFileSync(full, 'utf8');
     } catch (error) {
-      sink.push(`${path.relative(root, full)}: unreadable file (${error.message})`);
+      sink.push(`${relative}: unreadable file (${error.message})`);
       continue;
     }
     for (const hit of findMojibake(text, MAX_REPORTS_PER_FILE)) {
       sink.push(
-        `${path.relative(root, full)}:${hit.line}: `
+        `${relative}:${hit.line}: `
         + `${JSON.stringify(hit.found)} should be ${JSON.stringify(hit.expected)}`,
       );
     }
@@ -216,4 +235,5 @@ module.exports = {
   CP1252_OVERRIDES,
   EXTENSIONS,
   IGNORED_DIRS,
+  IGNORED_FILES,
 };
