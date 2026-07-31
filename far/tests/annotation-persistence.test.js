@@ -48,6 +48,25 @@ describe('annotation persistence', () => {
     ]);
   });
 
+  it('adds actionable recovery guidance to transaction failures', async () => {
+    const cursorRequest = {};
+    const transaction = {
+      error: new Error('quota exceeded'),
+      objectStore: () => ({
+        index: () => ({ openCursor: () => cursorRequest }),
+        put: vi.fn(),
+      }),
+    };
+    const pending = replaceDocumentAnnotations({
+      open: async () => ({ transaction: () => transaction }),
+    }, 'doc-a', []);
+
+    await vi.waitFor(() => expect(transaction.onerror).toBeTypeOf('function'));
+    transaction.onerror();
+
+    await expect(pending).rejects.toThrow(/quota exceeded.*Close other OpenCourseDeck tabs.*retry/i);
+  });
+
   it('writes replacements before deleting stale records on compatibility adapters', async () => {
     const order = [];
     const adapter = {
