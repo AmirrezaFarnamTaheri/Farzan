@@ -82,16 +82,14 @@ jobs:
           npm run vendor
           npm run ci
 
-      - name: Commit verified dependency and native scaffold
+      - name: Commit verified source and lockfiles
         run: |
           set -euo pipefail
           rm -rf .audit-remediation
-          rm -f .github/workflows/audit-remediation-apply-e.yml
-          rm -f .github/workflows/audit-remediation-apply-d.yml
-          rm -f .github/workflows/audit-remediation-dependencies.yml
           rm -f .github/dependency-remediation-trigger.txt
           rm -f .github/phase-c-sbom-trigger.txt
           rm -f .github/phase-e-trigger.txt
+          git checkout HEAD -- .github/workflows
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
