@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import '../db.js';
 import { replaceDocumentAnnotations } from '../src/core/annotationPersistence.js';
@@ -46,6 +46,38 @@ describe('annotation persistence', () => {
     await expect(idb.getAllByIndex('annotations', 'docId', 'doc-b')).resolves.toEqual([
       expect.objectContaining({ id: 'other', value: 3 }),
     ]);
+  });
+
+  it('writes replacements before deleting stale records on compatibility adapters', async () => {
+    const order = [];
+    const adapter = {
+      getAllByIndex: vi.fn(async () => [
+        { id: 'keep', docId: 'doc-a' },
+        { id: 'remove', docId: 'doc-a' },
+      ]),
+      put: vi.fn(async (_store, record) => order.push(`put:${record.id}`)),
+      delete: vi.fn(async (_store, id) => order.push(`delete:${id}`)),
+    };
+
+    await replaceDocumentAnnotations(adapter, 'doc-a', [
+      { id: 'keep', docId: 'doc-a' },
+      { id: 'add', docId: 'doc-a' },
+    ]);
+
+    expect(order).toEqual(['put:keep', 'put:add', 'delete:remove']);
+  });
+
+  it('propagates compatibility write failures before deleting prior data', async () => {
+    const adapter = {
+      getAllByIndex: vi.fn(async () => [{ id: 'remove', docId: 'doc-a' }]),
+      put: vi.fn(async () => { throw new Error('annotation canonical failed'); }),
+      delete: vi.fn(),
+    };
+
+    await expect(replaceDocumentAnnotations(adapter, 'doc-a', [
+      { id: 'add', docId: 'doc-a' },
+    ])).rejects.toThrow('annotation canonical failed');
+    expect(adapter.delete).not.toHaveBeenCalled();
   });
 
   it('rejects records from another document before opening a transaction', async () => {
