@@ -1,1 +1,0 @@
-Trigger hardened workflow blob materialization.
