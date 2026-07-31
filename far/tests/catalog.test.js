@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('catalog normalization', () => {
   beforeEach(async () => {
@@ -39,6 +39,10 @@ describe('catalog normalization', () => {
       };
     });
     await import('../bridge.js');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loads the pointer catalog and preserves topics from every source', async () => {
@@ -83,6 +87,7 @@ describe('catalog normalization', () => {
   });
 
   it('exposes degraded state and recovers through an explicit retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     let fail = true;
     globalThis.fetch = vi.fn(async (url) => {
       if (fail) throw new Error('temporary network failure');
@@ -109,5 +114,4 @@ describe('catalog normalization', () => {
     expect(window.DataStore.getState()).toMatchObject({ status: 'authoritative', source: './catalog-recovered.json' });
     expect(window.DataStore.allCourses()).toEqual([expect.objectContaining({ id: 'recovered' })]);
   });
-
 });
