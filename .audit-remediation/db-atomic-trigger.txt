@@ -1,0 +1,1 @@
+apply atomic IndexedDB annotation replacement
