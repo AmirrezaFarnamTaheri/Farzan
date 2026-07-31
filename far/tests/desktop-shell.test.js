@@ -30,8 +30,10 @@ describe('desktop shell wiring', () => {
     expect(packageJson.scripts['native:preflight']).toBe('node scripts/native-preflight.cjs');
     expect(packageJson.scripts['native:preflight:strict']).toBe('node scripts/native-preflight.cjs --strict');
     expect(packageJson.scripts['tauri:check']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml');
+    expect(packageJson.scripts['tauri:check:locked']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml --locked');
     expect(packageJson.scripts['tauri:build']).toBe('npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release');
-    expect(packageJson.scripts['native:exe']).toBe('npm run build:release && npm run tauri:build && node scripts/stage-native-exe.cjs');
+    expect(packageJson.scripts['tauri:build:locked']).toBe('npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release --locked');
+    expect(packageJson.scripts['native:exe']).toBe('npm run build:release && npm run tauri:build:locked && node scripts/stage-native-exe.cjs');
     expect(packageJson.scripts['tauri:bundle']).toBe('npm run native:prepare && tauri build --config src-tauri/tauri.conf.json');
     expect(packageJson.scripts['native:package']).toBe('npm run tauri:bundle && node scripts/stage-native-exe.cjs');
 
@@ -50,7 +52,10 @@ describe('desktop shell wiring', () => {
     expect(nativeCargo).toContain("spawnSync('cargo'");
     expect(prepareNative).toContain("path.join(root, 'assets', 'icon-192.svg')");
     expect(prepareNative).toContain("path.join(targetDirectory, 'icon.png')");
+    expect(prepareNative).toContain('.ensureAlpha(1)');
+    expect(prepareNative).toContain('metadata.channels !== 4');
     expect(preflight).toContain('Cargo dependencies resolve from the committed lockfile');
+    expect(preflight).toContain('Locked Tauri release build is declared');
     expect(preflight).toContain('registry releases instead of missing local paths');
     expect(preflight).toContain('Tauri enforces a restrictive Content Security Policy');
     expect(stageNative).toContain("'open-course-deck.exe'");
