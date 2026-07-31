@@ -3,9 +3,29 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const defaultFile = path.join(root, 'reports', 'release', 'sbom.cdx.json');
+const PACKAGE_PATH_PROPERTY = 'cdx:npm:package:path';
+const MERGED_PATHS_PROPERTY = 'opencoursedeck:npm:package:paths';
 
 function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function componentPackagePaths(component) {
+  const paths = [];
+  for (const property of Array.isArray(component?.properties) ? component.properties : []) {
+    if (property?.name === PACKAGE_PATH_PROPERTY && typeof property.value === 'string') paths.push(property.value);
+    if (property?.name === MERGED_PATHS_PROPERTY && typeof property.value === 'string') {
+      try {
+        const parsed = JSON.parse(property.value);
+        if (Array.isArray(parsed)) paths.push(...parsed.filter(value => typeof value === 'string'));
+      } catch {}
+    }
+  }
+  return new Set(paths);
+}
+
+function directPackagePath(name) {
+  return `node_modules/${name}`;
 }
 
 function verifySbom(document, pkg = require('../package.json')) {
@@ -50,11 +70,16 @@ function verifySbom(document, pkg = require('../package.json')) {
   const requiredRefs = new Set();
   for (const name of required) {
     const matches = componentsByName.get(name) || [];
-    if (!matches.length) {
-      errors.push(`missing dependency component ${name}`);
+    const directMatches = matches.filter(component => componentPackagePaths(component).has(directPackagePath(name)));
+    const candidates = directMatches.length ? directMatches : matches.length === 1 ? matches : [];
+    if (!candidates.length) {
+      errors.push(matches.length
+        ? `missing direct dependency component ${name}`
+        : `missing dependency component ${name}`);
       continue;
     }
-    for (const component of matches) {
+    if (candidates.length > 1) errors.push(`multiple direct dependency components found for ${name}`);
+    for (const component of candidates) {
       const ref = nonEmptyString(component?.['bom-ref']);
       if (ref) requiredRefs.add(ref);
     }
@@ -130,4 +155,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { defaultFile, main, verifySbom };
+module.exports = { componentPackagePaths, defaultFile, main, verifySbom };
