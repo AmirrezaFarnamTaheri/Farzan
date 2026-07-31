@@ -56,10 +56,24 @@ describe('runtime wiring', () => {
       expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\.')}["']`));
       expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
     }
-    expect(indexSource).toContain('Object.assign(pd, {');
-    expect(indexSource).toContain('TranslationCache: translationCache.translationCache');
+    expect(indexSource).toContain('const cacheApi = translationCache.translationCache || translationCache');
+    expect(indexSource).toContain('const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates');
+    expect(indexSource).toContain('TranslationCache: cacheApi');
+    expect(indexSource).toContain('NoteTemplates: templateApi');
     expect(indexSource).not.toContain('TranslationCache: translationCache,');
-    expect(indexSource).toContain('NoteTemplates: noteTemplates.NoteTemplates');
+  });
+
+  it('exports stable deferred utility contracts', async () => {
+    const translationCache = await import('../src/features/translationCache.js');
+    const noteTemplates = await import('../src/features/noteTemplates.js');
+
+    for (const method of ['init', 'get', 'set', 'clear', 'size', 'prune', 'clearEngine', 'hashParams']) {
+      expect(typeof translationCache.translationCache[method]).toBe('function');
+    }
+    for (const method of ['getAllTemplates', 'getTemplate', 'saveAsTemplate', 'updateTemplate', 'deleteTemplate', 'getTemplatePickerItems']) {
+      expect(typeof noteTemplates.NoteTemplates[method]).toBe('function');
+    }
+    expect(window.OpenCourseDeck.NoteTemplates).toBe(noteTemplates.NoteTemplates);
   });
 
   it('installs PDF identity hardening only after the lazy PDF runtime is available', () => {
