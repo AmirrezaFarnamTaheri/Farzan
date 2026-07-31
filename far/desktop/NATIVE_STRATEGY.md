@@ -1,66 +1,46 @@
 # OpenCourseDeck Native Packaging Strategy
 
-OpenCourseDeck now has three desktop paths, in priority order.
+OpenCourseDeck has one production native path and two development fallbacks.
 
 ## 1. Tauri native app
 
-Preferred path for a proper single app:
+The production wrapper is the standard Tauri v2 project in `src-tauri/`. It uses pinned crates.io releases, a committed `Cargo.lock`, and the official npm Tauri CLI. The web release is rebuilt before native compilation and embedded through Tauri's custom protocol.
+
+Verification sequence:
 
 ```sh
-npm run native:package
-```
-
-This uses the local Tauri source tree already provided in `tauri-dev/tauri-dev` and the app wrapper in `src-tauri`.
-When a repo-root `.cargo` directory exists beside `far/`, the native scripts automatically use it as `CARGO_HOME` so the wrapper can consume an offline registry/cache supplied with the project.
-Run the full web gate before producing release artifacts:
-
-```sh
-npm run ci
-```
-
-Native readiness check:
-
-```sh
-npm run native:preflight
-```
-
-Strict readiness check, including offline Cargo dependency resolution:
-
-```sh
+npm ci
+npm run vendor
+npm run build:release
 npm run native:preflight:strict
+npm run tauri:check -- --locked
+npm run tauri:build -- --locked
 ```
 
-Fast Rust wrapper check:
-
-```sh
-npm run tauri:check
-```
-
-Release binary build without installer bundling:
-
-```sh
-npm run tauri:build
-```
-
-Stage the browserless native executable into `desktop-dist/OpenCourseDeck-Native`:
+Stage the verified executable:
 
 ```sh
 npm run native:exe
 ```
 
+Build and stage an NSIS package:
+
+```sh
+npm run native:package
+```
+
 Security and packaging shape:
 
 - Frontend output: `dist`
-- Build command: `npm run build`, followed by `npm run build:sw` for the canonical service worker
 - App id: `app.opencoursedeck.desktop`
 - Bundle target: Windows NSIS
-- Capability permissions: empty by default
+- Capability permissions: empty by default and scoped to the `main` window
 - Prototype freezing: enabled
-- Icons: provided in `src-tauri/icons`
-- Tauri crates: local path dependencies, not registry-only dependencies
-- Native preflight: static wrapper checks plus optional offline Cargo dependency resolution
-- Cargo cache: native scripts prefer the repo-root `.cargo` cache when present
+- Unused commands: removed from production builds
+- Rust dependencies: pinned registry releases with a committed lockfile
 - Native executable staging: `desktop-dist/OpenCourseDeck-Native/OpenCourseDeck.exe`
+
+The permanent Windows workflow performs strict preflight, locked Cargo metadata/check/build, executable size and SHA-256 verification, and artifact upload. A green workflow proves reproducible compilation; publisher signing and installer launch smoke remain release-operator requirements.
 
 ## 2. Electron app shell
 
@@ -70,17 +50,7 @@ Fallback path when Electron is installed:
 npm run desktop
 ```
 
-This starts the local static server on a private localhost port and opens a locked-down `BrowserWindow`.
-
-Security shape:
-
-- Node integration disabled
-- Context isolation enabled
-- Sandbox enabled
-- Web security enabled
-- Permission prompts denied by default
-- Single-instance lock enabled
-- External HTTP/HTTPS links open in the operating system
+The shell uses context isolation, disables Node integration, denies permission prompts by default, and opens external links in the operating system.
 
 ## 3. Chromium app-window fallback
 
@@ -90,16 +60,14 @@ Dependency-light fallback:
 npm run desktop:app-window
 ```
 
-This uses installed Edge/Chrome app mode. It is more user-friendly than a normal browser tab, but it is not the final native packaging target.
+This uses an installed Edge or Chrome app window. It is a development convenience, not the production native distribution.
 
 ## Final Release Checklist
 
-- Make sure crates.io dependencies for the local Tauri source tree are available through the normal Cargo cache, the repo-root `.cargo` cache, or a vendored Cargo source directory.
-- Run `npm run ci`.
-- Run `npm run native:preflight:strict`.
-- Run `npm run native:package` on the release machine.
-- If NSIS is not available yet, run `npm run native:exe` to stage the browserless Tauri executable. The executable build is independent of the NSIS installer toolchain.
-- Smoke-test the produced NSIS installer.
-- Verify app launch, local model cache, File System Access fallback behavior, PDF viewing, video playback, and backup export/import.
-- Decide whether Electron remains as a fallback developer shell or is removed from user-facing docs.
-- Add publisher/signing metadata before public distribution.
+- Run the complete web CI gate.
+- Run the permanent Native Windows Assurance workflow against the release commit.
+- Build the NSIS installer with `npm run native:package`.
+- Add and verify publisher/signing metadata.
+- Smoke-test installer install, launch, upgrade, uninstall, and rollback.
+- Verify local data, PDF, media, backup import/export, and destructive-wipe behavior in the signed build.
+- Record executable and installer SHA-256 values in the release evidence.

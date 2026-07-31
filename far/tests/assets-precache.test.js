@@ -26,11 +26,13 @@ describe('static assets and service worker precache', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const developmentConfig = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
     const releaseConfig = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
+    const buildScript = fs.readFileSync(path.join(root, 'scripts/build-sw-dist.cjs'), 'utf8');
 
-    expect(exists('scripts/clean-workbox.cjs')).toBe(true);
-    expect(pkg.scripts['build:sw']).toContain('scripts/clean-workbox.cjs');
-    expect(pkg.scripts['build:sw']).toContain('generateSW scripts/workbox.config.cjs');
+    expect(pkg.scripts['build:sw']).toBe('node scripts/build-sw-dist.cjs');
     expect(pkg.scripts['build:release']).toContain('scripts/build-sw-dist.cjs');
+    expect(buildScript).toContain("require('workbox-build')");
+    expect(buildScript).toContain('generateSW(config)');
+    expect(buildScript).not.toContain('workbox-cli');
     expect(developmentConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain("globDirectory: 'dist'");

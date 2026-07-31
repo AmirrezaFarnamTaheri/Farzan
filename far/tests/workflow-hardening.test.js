@@ -34,6 +34,7 @@ const workflows = {
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const eslintConfig = fs.readFileSync(path.join(projectRoot, 'eslint.config.js'), 'utf8');
+const workboxBuildScript = fs.readFileSync(path.join(projectRoot, 'scripts/build-sw-dist.cjs'), 'utf8');
 
 describe('module and command contract', () => {
   it('uses explicit ESM without leaving the ESLint configuration in CommonJS', () => {
@@ -54,9 +55,11 @@ describe('module and command contract', () => {
     }
   });
 
-  it('runs the committed Workbox cleanup implementation directly', () => {
-    expect(packageJson.scripts['build:sw']).toContain('node scripts/clean-workbox.cjs &&');
-    expect(fs.existsSync(path.join(projectRoot, 'scripts', 'clean-workbox.cjs'))).toBe(true);
+  it('runs the committed Workbox build implementation directly', () => {
+    expect(packageJson.scripts['build:sw']).toBe('node scripts/build-sw-dist.cjs');
+    expect(workboxBuildScript).toContain("require('workbox-build')");
+    expect(workboxBuildScript).toContain('generateSW(config)');
+    expect(workboxBuildScript).not.toContain('workbox-cli');
   });
 });
 

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = process.cwd();
-const sourceExe = path.join(root, 'src-tauri', 'target', 'release', 'opencoursedeck.exe');
+const sourceExe = path.join(root, 'src-tauri', 'target', 'release', 'open-course-deck.exe');
 const frontendIndex = path.join(root, 'dist', 'index.html');
 const outDir = path.join(root, 'desktop-dist', 'OpenCourseDeck-Native');
 const outExe = path.join(outDir, 'OpenCourseDeck.exe');
@@ -20,7 +20,7 @@ if (!fs.existsSync(sourceExe)) {
 
 if (!fs.existsSync(frontendIndex)) {
   console.error(`Native frontend asset not found: ${frontendIndex}`);
-  console.error('Run `npm run build` before staging the native executable.');
+  console.error('Run `npm run build:release` before staging the native executable.');
   process.exit(1);
 }
 
@@ -82,8 +82,8 @@ fs.writeFileSync(
     '',
     'Verification commands:',
     '  npm run native:preflight:strict',
-    '  npm run tauri:check',
-    '  npm run tauri:build',
+    '  npm run tauri:check -- --locked',
+    '  npm run tauri:build -- --locked',
     '',
   ].join('\n')
 );
