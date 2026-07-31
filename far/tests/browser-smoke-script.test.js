@@ -31,7 +31,17 @@ describe('browser smoke script wiring', () => {
     expect(source).toContain('const pd = window.OpenCourseDeck;');
   });
 
+  it('does not convert a passed scenario into a failure when result reporting breaks', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'scripts/dist-browser-smoke.cjs'), 'utf8');
+    const passedStatus = source.indexOf("result.dataset.status = 'passed'");
+    const guardedReport = source.indexOf("try {\n    await report('passed', detail);", passedStatus);
+    const failureHandler = source.indexOf('run().catch(async error =>', passedStatus);
 
+    expect(passedStatus).toBeGreaterThan(-1);
+    expect(guardedReport).toBeGreaterThan(passedStatus);
+    expect(guardedReport).toBeLessThan(failureHandler);
+    expect(source).toContain("console.error('[dist-browser-smoke] result report failed', reportError)");
+  });
 
   it('stops Chrome after the page reports completion instead of waiting for browser exit', async () => {
     const child = new EventEmitter();
