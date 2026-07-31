@@ -91,8 +91,36 @@ function main() {
 
   // Keep legacy script URLs operational while loading the patched ESM build.
   // The mutable facade is required because the PDF security layer wraps getDocument.
+  // PDF.js 6 owns teardown on PDFDocumentLoadingTask, so resolved document proxies
+  // receive a compatibility destroy() method that delegates to the real task.
   writeText('pdf.min.js', `void import('./pdf.min.mjs').then((module) => {
   const pdfjsLib = { ...module };
+  const getDocument = pdfjsLib.getDocument.bind(pdfjsLib);
+  pdfjsLib.getDocument = (...args) => {
+    const loadingTask = getDocument(...args);
+    let documentPromise;
+    return new Proxy(loadingTask, {
+      get(target, property, receiver) {
+        if (property === 'promise') {
+          documentPromise ||= target.promise.then((documentProxy) => new Proxy(documentProxy, {
+            get(documentTarget, documentProperty, documentReceiver) {
+              if (documentProperty === 'destroy' && typeof documentTarget.destroy !== 'function') {
+                return () => target.destroy();
+              }
+              const value = Reflect.get(documentTarget, documentProperty, documentReceiver);
+              return typeof value === 'function' ? value.bind(documentTarget) : value;
+            },
+          }));
+          return documentPromise;
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+      set(target, property, value) {
+        return Reflect.set(target, property, value, target);
+      },
+    });
+  };
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', document.baseURI).href;
   window.pdfjsLib = pdfjsLib;
   window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));
