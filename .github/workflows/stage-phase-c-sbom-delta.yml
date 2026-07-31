@@ -1,0 +1,65 @@
+name: Stage Phase C SBOM Delta
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    name: Materialize updated Phase C workflow
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Materialize updated workflow as an ordinary blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .workflow-staging
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/audit-remediation-apply-c.yml').read_text()
+          needle = '''          git apply --check /tmp/phase-c-lint.patch
+          git apply /tmp/phase-c-lint.patch
+          git diff --check
+'''
+          replacement = '''          git apply --check /tmp/phase-c-lint.patch
+          git apply /tmp/phase-c-lint.patch
+
+          echo "6aa464242a54482c0da2c937f3a76a1496ca4993adc85923f1472dfa97f45ea2  .audit-remediation/phase-c-sbom.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-c-sbom.patch.gz.b64 | gzip -d > /tmp/phase-c-sbom.patch
+          echo "47861bd6fefcc7b49d8180fc09b6689eaa5a981bda04059b6ccecb0142bdadba  /tmp/phase-c-sbom.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-c-sbom.patch
+          git apply /tmp/phase-c-sbom.patch
+          git diff --check
+'''
+          if needle not in source:
+              raise SystemExit('Phase C insertion point not found')
+          target = source.replace(needle, replacement, 1)
+          Path('.workflow-staging/audit-remediation-apply-c.yml').write_text(target)
+          PY
+          grep -F 'phase-c-sbom.patch.gz.b64' .workflow-staging/audit-remediation-apply-c.yml
+
+      - name: Commit staged workflow blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .workflow-staging/audit-remediation-apply-c.yml
+          git commit -m "ci: materialize Phase C SBOM delta workflow"
+          git push origin HEAD:fix/master-forensic-audit-remediation
