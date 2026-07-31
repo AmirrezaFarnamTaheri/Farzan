@@ -15,17 +15,18 @@ describe('catalog bridge hardening', () => {
     document.body.innerHTML = '<p id="splash-status"></p>';
   });
 
-  it('retains the last authoritative catalog across repeated failed retries', async () => {
+  it('retains the last authoritative catalog across repeated failures and clears recovered error styling', async () => {
     let state = { status: 'idle', source: null, lastSuccessfulAt: null };
     let courses = [];
     let topics = [];
     let attempts = 0;
     const init = vi.fn(async () => {
       attempts += 1;
-      if (attempts === 1) {
-        state = { status: 'authoritative', source: './catalog-good.json', lastSuccessfulAt: 100 };
-        courses = [{ id: 'real-course' }];
-        topics = [{ topicId: 'real-topic' }];
+      if (attempts === 1 || attempts === 4) {
+        const suffix = attempts === 1 ? 'real' : 'recovered';
+        state = { status: 'authoritative', source: `./catalog-${suffix}.json`, lastSuccessfulAt: attempts * 100 };
+        courses = [{ id: `${suffix}-course` }];
+        topics = [{ topicId: `${suffix}-topic` }];
       } else {
         state = { status: 'degraded', source: 'demo-fallback', lastSuccessfulAt: 100 };
         courses = [{ id: 'demo-course' }];
@@ -52,14 +53,21 @@ describe('catalog bridge hardening', () => {
 
     expect(hardened.allCourses()).toEqual([{ id: 'real-course' }]);
     expect(hardened.allTopics()).toEqual([{ topicId: 'real-topic' }]);
-    expect(hardened.catalogPath()).toBe('./catalog-good.json');
+    expect(hardened.catalogPath()).toBe('./catalog-real.json');
     expect(hardened.getState()).toMatchObject({
       status: 'degraded',
-      source: './catalog-good.json',
+      source: './catalog-real.json',
       usingLastKnownGood: true,
       courses: 1,
       topics: 1,
     });
     expect(document.getElementById('splash-status').style.color).toBe('rgb(185, 28, 28)');
+
+    await hardened.retry();
+
+    expect(hardened.allCourses()).toEqual([{ id: 'recovered-course' }]);
+    expect(hardened.catalogPath()).toBe('./catalog-recovered.json');
+    expect(hardened.getState()).toMatchObject({ status: 'authoritative', source: './catalog-recovered.json' });
+    expect(document.getElementById('splash-status').style.color).toBe('');
   });
 });
