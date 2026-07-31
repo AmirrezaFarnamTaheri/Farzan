@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           base64 -d .audit-remediation/phase-b.patch.gz.b64 | gzip -d > /tmp/phase-b.patch
-          echo "5070f184719e2b2c8887852dcce63fc18bb37990130f12d63c67630551f775f7  /tmp/phase-b.patch" | sha256sum --check --strict
+          echo "85bc3c2d3bac6fd5140e05d96c47a487c566dca09865742d5bf6cd32df4454b6  /tmp/phase-b.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b.patch
           git apply /tmp/phase-b.patch
 
@@ -55,7 +55,6 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf .audit-remediation
-          rm .github/workflows/audit-remediation-apply.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
