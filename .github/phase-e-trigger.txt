@@ -1,1 +1,1 @@
-Trigger Phase E after direct Workbox API contract alignment.
+Trigger Phase E after separating source and workflow writes.
