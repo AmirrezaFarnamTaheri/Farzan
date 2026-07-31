@@ -120,6 +120,7 @@ function main() {
       const cssFile = path.join(pkgRoot, `${weight}.css`);
       if (!fs.existsSync(cssFile)) throw new Error(`Missing Fontsource weight CSS: ${cssFile}`);
       let css = fs.readFileSync(cssFile, 'utf8');
+      css = css.replace(/font-family:\s*'([A-Za-z][\w-]*)';/g, 'font-family: $1;');
       css = css.replace(/src:\s*url\(([^)]+\.woff2)\)\s*format\(['"]woff2['"]\)[^;]*;/g, (_match, woff2) => {
         const cleaned = woff2.replace(/^['"]|['"]$/g, '');
         referenced.add(cleaned.replace(/^\.\//, ''));
