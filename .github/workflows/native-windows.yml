@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'far/src-tauri/**'
-      - 'far/tauri-dev/**'
       - 'far/scripts/native-*.cjs'
       - 'far/scripts/stage-native-exe.cjs'
       - 'far/package.json'
@@ -19,7 +18,7 @@ permissions:
 
 jobs:
   native-windows:
-    name: Cargo check and release build
+    name: Locked Cargo check and release build
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -50,8 +49,10 @@ jobs:
       - name: Install JavaScript dependencies reproducibly
         run: npm ci --ignore-scripts --legacy-peer-deps
 
-      - name: Vendor browser dependencies
-        run: npm run vendor
+      - name: Build production frontend
+        run: |
+          npm run vendor
+          npm run build:release
 
       - name: Enforce strict native prerequisites
         run: npm run native:preflight:strict
@@ -68,12 +69,16 @@ jobs:
           if (-not (Test-Path $exe)) { throw "Native executable not found: $exe" }
           $item = Get-Item $exe
           if ($item.Length -le 0) { throw 'Native executable is empty' }
-          Get-FileHash -Algorithm SHA256 $exe
+          $hash = Get-FileHash -Algorithm SHA256 $exe
+          "$($hash.Hash.ToLowerInvariant())  open-course-deck.exe" | Set-Content -Encoding ascii native-sha256.txt
+          Get-Content native-sha256.txt
 
       - name: Upload native verification artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: native-windows-${{ github.event.pull_request.head.sha || github.sha }}
-          path: far/src-tauri/target/release/open-course-deck.exe
+          path: |
+            far/src-tauri/target/release/open-course-deck.exe
+            far/native-sha256.txt
           if-no-files-found: error
           retention-days: 7
