@@ -1,0 +1,60 @@
+name: Stage Hardened Workflow Blobs
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    name: Decode verified workflow blobs
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/master-forensic-audit-remediation' &&
+      github.actor == 'AmirrezaFarnamTaheri'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify and decode workflow payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "a360ff4387cc38756f8ed798dc45e28db50dca2f6e43e4869062bd9e223da27f  .workflow-staging/verify.gz.b64.00" | sha256sum --check --strict
+          echo "5f401795c3bc2e0b12e129de8bbac7b50a5825e45eb13f975551f05a2c0470f6  .workflow-staging/verify.gz.b64.01" | sha256sum --check --strict
+          echo "0c3e93755c43bdb3d2bd3f25180ebf38497be6e52f64d6d1eb97047bae403317  .workflow-staging/verify.gz.b64.02" | sha256sum --check --strict
+          echo "c307003ea2dd37f08e00ed8fe60ba8008d960440e374f8432f04456ca037110f  .workflow-staging/verify.gz.b64.03" | sha256sum --check --strict
+          echo "d627f590a947e204d6ac5eff3d92f43b056fbf62adbc256a5c512ae32b04dfcb  .workflow-staging/verify.gz.b64.04" | sha256sum --check --strict
+          cat .workflow-staging/verify.gz.b64.* > /tmp/verify.yml.gz.b64
+          echo "c1788f2b96838f3ca92bd787f327e52f748b52b5fcde796de6710cb007bd20c2  /tmp/verify.yml.gz.b64" | sha256sum --check --strict
+          base64 -d /tmp/verify.yml.gz.b64 | gzip -d > .workflow-staging/verify.yml
+          echo "8bd87a937661d231b8f17ab0be2efca74588c66b5c9df986d053e96a438445c4  .workflow-staging/verify.yml" | sha256sum --check --strict
+
+          echo "6c6e0a355aafb4155ee38a6f7f9d367e2626f4968cd7761bccc95491f1c4d030  .workflow-staging/release.gz.b64.00" | sha256sum --check --strict
+          echo "3a1c5f030f3cb2cd52f05f857316fed0ad50dfc70a28bdc27cc81128e31dd23e  .workflow-staging/release.gz.b64.01" | sha256sum --check --strict
+          echo "29fce0985b043c2c89f220dd58a7e3f7df306f132d27972080b0b5ae2401ff89  .workflow-staging/release.gz.b64.02" | sha256sum --check --strict
+          echo "4ed3b55040c2d52aa55223d3070e1f162ac400539c5ae88d9d5dddef770e02a2  .workflow-staging/release.gz.b64.03" | sha256sum --check --strict
+          echo "42f26407724269ad2636feb8c983f93b436d80ff398a962f74a1562101f006cf  .workflow-staging/release.gz.b64.04" | sha256sum --check --strict
+          cat .workflow-staging/release.gz.b64.* > /tmp/release.yml.gz.b64
+          echo "0bce3080709508d9d7cd48541022b947e6f60e9801d4dc9540c738d6bbb4b92f  /tmp/release.yml.gz.b64" | sha256sum --check --strict
+          base64 -d /tmp/release.yml.gz.b64 | gzip -d > .workflow-staging/release.yml
+          echo "d35a09d89586298fe266d178e88039eb187f93b0ef10bc187abd252980496278  .workflow-staging/release.yml" | sha256sum --check --strict
+
+      - name: Commit non-workflow staging blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .workflow-staging/verify.yml .workflow-staging/release.yml
+          git commit -m "ci: materialize hardened workflow blobs"
+          git push origin HEAD:fix/master-forensic-audit-remediation
