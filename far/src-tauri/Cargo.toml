@@ -3,7 +3,8 @@ name = "open-course-deck"
 version = "1.1.2"
 description = "OpenCourseDeck desktop application"
 authors = ["OpenCourseDeck contributors"]
-license = "MIT"
+publish = false
+license-file = "../../LICENSE"
 edition = "2021"
 rust-version = "1.77.2"
 
