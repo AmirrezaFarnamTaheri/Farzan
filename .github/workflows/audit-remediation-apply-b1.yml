@@ -31,8 +31,16 @@ jobs:
       - name: Decode, verify, and apply patch
         run: |
           set -euo pipefail
-          echo "ebc6ea885852a3a169a2f44ce678ec6ff042190d4941219b739d1da09dcf0913  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
-          base64 -d .audit-remediation/phase-b1.patch.gz.b64 | gzip -d > /tmp/phase-b1.patch
+          echo "9419cc3cdf2420dfdc0b541a45c2bc0a150e82c3e56dc84ff7b30b53cfc59a8d  .audit-remediation/phase-b1.patch.gz.b64" | sha256sum --check --strict
+          echo "6f2b5f95dcc8820056febff0d2b8f162391ac5f6138c8a82446f2815199bc669  .audit-remediation/phase-b1.patch.gz.b64.01" | sha256sum --check --strict
+          echo "37f1866ae963d909a389304c8fbe202cfe598d7c672bd79e437f70946b1b9346  .audit-remediation/phase-b1.patch.gz.b64.02" | sha256sum --check --strict
+          echo "a62d270b20075f8f65252194dd9e76138b18a27d282d5ccf6774b61ce6a72419  .audit-remediation/phase-b1.patch.gz.b64.03" | sha256sum --check --strict
+          cat \
+            .audit-remediation/phase-b1.patch.gz.b64 \
+            .audit-remediation/phase-b1.patch.gz.b64.01 \
+            .audit-remediation/phase-b1.patch.gz.b64.02 \
+            .audit-remediation/phase-b1.patch.gz.b64.03 \
+            | base64 -d | gzip -d > /tmp/phase-b1.patch
           echo "ba4b804f30e1425ae38392af0d2dc7466fba5067bdec7b5ec9d8419ecea404c5  /tmp/phase-b1.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-b1.patch
           git apply /tmp/phase-b1.patch
