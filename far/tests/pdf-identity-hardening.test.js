@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { installPdfIdentityHardening } from '../src/core/pdfIdentityHardening.js';
 
+function createStorage() {
+  const values = new Map();
+  return {
+    getItem: vi.fn(key => values.get(key) ?? null),
+    setItem: vi.fn((key, value) => values.set(key, String(value))),
+    removeItem: vi.fn(key => values.delete(key)),
+  };
+}
+
 describe('PDF identity hardening', () => {
   it('hashes preserved bytes after the transport buffer is detached', async () => {
     const derive = vi.fn(async (_source, _document, bytes) => (
@@ -26,5 +35,33 @@ describe('PDF identity hardening', () => {
     expect(second.byteLength).toBe(4);
     expect(viewer._deriveLegacyDocIds(first)).toEqual([]);
     expect(viewer._deriveLegacyDocIds(new Uint8Array(first))).toEqual([]);
+  });
+
+  it('migrates only clearly page-shaped legacy fallback data', async () => {
+    const localStorage = createStorage();
+    localStorage.setItem('plasma-pdf-annotations', JSON.stringify({
+      1: [{ id: 'page-one', page: 1, text: 'legacy' }],
+    }));
+    const state = {
+      annotationDocId: 'doc-a',
+      annotationAliases: [],
+      annotations: {},
+    };
+    const viewer = {
+      load: vi.fn(),
+      _deriveCanonicalDocId: vi.fn(),
+      _deriveLegacyDocIds: vi.fn(),
+    };
+    const root = { PlasmaPDFViewer: viewer, PlasmaPDFState: state, OpenCourseDeck: {}, localStorage };
+    installPdfIdentityHardening(root);
+
+    await viewer._loadAnnotations();
+    expect(state.annotations).toEqual({ 1: [{ id: 'page-one', page: 1, text: 'legacy' }] });
+    expect(localStorage.removeItem).toHaveBeenCalledWith('plasma-pdf-annotations');
+    expect(JSON.parse(localStorage.getItem('plasma-pdf-annotations-by-page'))).toEqual(state.annotations);
+
+    state.annotations = { 2: [{ id: 'page-two', page: 2 }] };
+    viewer._saveAnnotations();
+    expect(JSON.parse(localStorage.getItem('plasma-pdf-annotations-by-page'))).toEqual(state.annotations);
   });
 });
