@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Decode, verify, and apply Phase D patch
+      - name: Decode, verify, and apply Phase D patches
         run: |
           set -euo pipefail
           echo "e476e8a1af42c2572d29996aa7130270de6d695fd52696a59ae62eec293116f8  .audit-remediation/phase-d.patch.gz.b64" | sha256sum --check --strict
@@ -41,6 +41,12 @@ jobs:
           echo "b529ebfd52970b208570112d22e45b918689628b3c58a9af4c01505f2fca4689  /tmp/phase-d.patch" | sha256sum --check --strict
           git apply --check /tmp/phase-d.patch
           git apply /tmp/phase-d.patch
+
+          echo "6dd75293adffceabea4b801c15d7a580a89f45b2bc7e9005033f09f591e1d2f5  .audit-remediation/phase-d-diagnostics.patch.gz.b64" | sha256sum --check --strict
+          base64 -d .audit-remediation/phase-d-diagnostics.patch.gz.b64 | gzip -d > /tmp/phase-d-diagnostics.patch
+          echo "b8e58f9f2734c50f96c441bfaa9f2a8717a7ede43fbcd2ad7281e89a3c301bae  /tmp/phase-d-diagnostics.patch" | sha256sum --check --strict
+          git apply --check /tmp/phase-d-diagnostics.patch
+          git apply /tmp/phase-d-diagnostics.patch
           git diff --check
 
       - name: Install dependencies reproducibly
