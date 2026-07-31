@@ -4,7 +4,7 @@ OpenCourseDeck has one production native path and two development fallbacks.
 
 ## 1. Tauri native app
 
-The production wrapper is the standard Tauri v2 project in `src-tauri/`. It uses pinned crates.io releases, a committed `Cargo.lock`, and the official npm Tauri CLI. The web release is rebuilt before native compilation and embedded through Tauri's custom protocol. The Windows bundle icon is generated reproducibly from `assets/icon-192.svg` before compilation.
+The production wrapper is the standard Tauri v2 project in `src-tauri/`. It uses pinned crates.io releases, a committed `Cargo.lock`, and the official npm Tauri CLI. The web release is rebuilt before native compilation and embedded through Tauri's custom protocol. The Windows bundle icon is generated reproducibly as a verified 256×256 RGBA PNG from `assets/icon-192.svg` before compilation.
 
 Verification sequence:
 
@@ -14,8 +14,8 @@ npm run vendor
 npm run native:prepare
 npm run build:release
 npm run native:preflight:strict
-npm run tauri:check -- --locked
-npm run tauri:build -- --locked
+npm run tauri:check:locked
+npm run tauri:build:locked
 ```
 
 Stage the verified executable:
@@ -40,10 +40,10 @@ Security and packaging shape:
 - Prototype freezing: enabled
 - Unused commands: removed from production builds
 - Rust dependencies: pinned registry releases with a committed lockfile
-- Native icon: deterministic `src-tauri/icons/icon.png` generated from the committed SVG source
+- Native icon: deterministic RGBA `src-tauri/icons/icon.png` generated and validated from the committed SVG source
 - Native executable staging: `desktop-dist/OpenCourseDeck-Native/OpenCourseDeck.exe`
 
-The permanent Windows workflow performs deterministic asset preparation, strict preflight, locked Cargo metadata/check/build, executable size and SHA-256 verification, and artifact upload. A green workflow proves reproducible compilation; publisher signing and installer launch smoke remain release-operator requirements.
+The permanent Windows workflow performs deterministic asset preparation, strict preflight, explicit locked Cargo check/build commands, executable size and SHA-256 verification, and artifact upload. A green workflow proves reproducible compilation; publisher signing and installer launch smoke remain release-operator requirements.
 
 ## 2. Electron app shell
 
