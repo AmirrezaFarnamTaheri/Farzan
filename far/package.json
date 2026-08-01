@@ -13,7 +13,7 @@
     "build": "node scripts/build.cjs",
     "build:watch": "node scripts/build.cjs --watch",
     "build:sw": "node scripts/build-sw-dist.cjs",
-    "build:release": "npm run build && node scripts/build-sw-dist.cjs",
+    "build:release": "npm run build && npm run build:sw",
     "release:manifest": "node scripts/create-release-manifest.cjs",
     "release:verify": "node scripts/verify-release-manifest.cjs",
     "release:attest": "npm run release:manifest && npm run release:verify && npm run release:sbom && npm run release:verify-sbom",
