@@ -10,7 +10,7 @@ const EXPECTED_ACTION_PINS = new Map([
   ['actions/checkout', { sha: '3d3c42e5aac5ba805825da76410c181273ba90b1', version: 'v7.0.1' }],
   ['actions/setup-node', { sha: '820762786026740c76f36085b0efc47a31fe5020', version: 'v7.0.0' }],
   ['actions/upload-artifact', { sha: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a', version: 'v7.0.1' }],
-  ['actions/download-artifact', { sha: '018cc2cf5baa6db3ef3c5f8a56943fffe632ef53', version: 'v6.0.0' }],
+  ['actions/download-artifact', { sha: '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c', version: 'v8.0.1' }],
   ['actions/github-script', { sha: '3a2844b7e9c422d3c10d287c895573f7108da1b3', version: 'v9.0.0' }],
   ['actions/attest', { sha: 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6', version: 'v4.2.0' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
@@ -168,18 +168,22 @@ function validateReleaseWorkflow(workflow) {
   requireText(errors, workflow, '- name: Ensure immutable release tag', 'release.yml: verified tag bootstrap step is missing');
   requireText(errors, workflow, 'github.rest.git.createRef', 'release.yml: missing tags must be created only after verification');
   requireText(errors, workflow, 'Refusing to move an immutable release tag', 'release.yml: tag movement protection is missing');
-  requireText(errors, workflow, '- name: Detect an already-complete release', 'release.yml: idempotent release retry detection is missing');
-  requireText(errors, workflow, 'fs.statSync', 'release.yml: idempotent retry must compare local and remote asset sizes');
+  requireText(errors, workflow, '- name: Materialize release reconciliation helper', 'release.yml: workflow-pinned release reconciliation helper is missing');
+  requireText(errors, workflow, 'git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs"', 'release.yml: release reconciliation helper must come from the exact workflow commit');
+  requireText(errors, workflow, '- name: Inspect existing release state', 'release.yml: digest-verified release state inspection is missing');
+  requireText(errors, workflow, 'inspectRelease', 'release.yml: release state inspection must use the constrained reconciliation helper');
+  requireText(errors, workflow, '- name: Repair verified partial release', 'release.yml: constrained partial release repair is missing');
+  requireText(errors, workflow, 'reconcileRelease', 'release.yml: partial release repair must execute through the constrained reconciliation helper');
   requireText(errors, workflow, '- name: Reverify immutable tag before publication', 'release.yml: tag identity must be rechecked immediately before publication');
   requireText(errors, workflow, '- name: Verify published release identity', 'release.yml: publication must be verified after mutation');
-  requireText(errors, workflow, 'overwrite_files: false', 'release.yml: published release assets must not overwrite existing assets');
+  requireText(errors, workflow, 'overwrite_files: false', 'release.yml: normal publication must not overwrite existing assets');
   requireText(errors, workflow, 'id-token: write', 'release.yml: signed provenance requires OIDC permission');
   requireText(errors, workflow, 'attestations: write', 'release.yml: signed provenance requires attestation permission');
   requireText(errors, workflow, 'artifact-metadata: write', 'release.yml: signed provenance requires artifact metadata permission');
   requireText(errors, workflow, '- name: Attest immutable release artifacts', 'release.yml: signed artifact provenance step is missing');
   requireText(errors, workflow, '- name: Attest release SBOM', 'release.yml: signed SBOM attestation step is missing');
   requireText(errors, workflow, 'sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'release.yml: SBOM attestation must bind the published archive to its SBOM');
-  requireText(errors, workflow, '`opencoursedeck-${tag}-sbom.cdx.json`', 'release.yml: idempotency checks must include the SBOM asset');
+  requireText(errors, workflow, 'steps.repair.outcome == \'success\'', 'release.yml: post-publication verification must cover repaired releases');
   return errors;
 }
 
