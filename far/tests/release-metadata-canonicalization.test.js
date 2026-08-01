@@ -110,7 +110,7 @@ describe('release metadata canonicalization', () => {
     const checksumLines = fs.readFileSync(path.join(fixture.directory, 'SHA256SUMS'), 'utf8').trim().split('\n');
     expect(checksumLines).toHaveLength(4);
     for (const line of checksumLines) {
-      const match = /^([0-9a-f]{64})  (.+)$/.exec(line);
+      const match = /^([0-9a-f]{64}) {2}(.+)$/.exec(line);
       expect(match).not.toBeNull();
       const [, digest, name] = match;
       expect(digest).toBe(sha256(fs.readFileSync(path.join(fixture.directory, name))));
