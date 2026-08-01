@@ -136,11 +136,16 @@ describe('legacy release compatibility SBOM normalization', () => {
       path.join(repositoryRoot, '.github', 'workflows', 'verify.yml'),
       'utf8',
     );
+    const normalizer = fs.readFileSync(
+      path.join(repositoryRoot, '.github', 'scripts', 'normalize-compat-sbom.cjs'),
+      'utf8',
+    );
 
     expect(workflow).toContain('WORKFLOW_SHA: ${{ github.workflow_sha }}');
     expect(workflow).toContain('git show "${WORKFLOW_SHA}:.github/scripts/normalize-compat-sbom.cjs"');
-    expect(workflow).toContain('node "$normalizer" reports/release/sbom.cdx.json package.json reports/release/release-attestation.json');
+    expect(workflow).toContain('node "$normalizer" reports/release/sbom.cdx.json package.json');
     expect(workflow).toContain("if (sbom.metadata?.component?.name !== packageJson.name)");
     expect(workflow).toContain("if (sbom.metadata?.component?.version !== expectedVersion)");
+    expect(normalizer).toContain('release-assets/opencoursedeck-${process.env.RELEASE_TAG}-attestation.json');
   });
 });
