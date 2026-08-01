@@ -109,7 +109,7 @@ function validateVerificationWorkflow(workflow) {
   requireText(errors, workflow, '- name: Reverify final release contents', 'verify.yml: final release verification is missing');
   requireText(errors, workflow, '- name: Package immutable release assets', 'verify.yml: immutable release packaging is missing');
   requireText(errors, workflow, '- name: Upload verified release assets', 'verify.yml: verified release asset upload is missing');
-  requireText(errors, workflow, 'reports/release/sbom.cdx.json', 'verify.yml: CycloneDX SBOM must be packaged with immutable release assets');
+  requireText(errors, workflow, 'cp reports/release/sbom.cdx.json "release-assets/$sbom"', 'verify.yml: CycloneDX SBOM must be packaged with immutable release assets');
   requireText(errors, workflow, '"$sbom" > SHA256SUMS', 'verify.yml: SBOM must be covered by release checksums');
   requireText(errors, workflow, 'Browser smoke recovered on retry', 'verify.yml: recovered browser-smoke retries must be visible');
   requireText(errors, workflow, 'Download release diagnostics', 'verify.yml: integrity failures must include actionable diagnostics guidance');
