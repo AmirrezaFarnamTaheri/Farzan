@@ -64,14 +64,16 @@ jobs:
 
           release = Path('.github/workflows/release.yml')
           release_text = release.read_text()
-          old_cache = """        with:
-            node-version: '22'
-            cache: npm
-            cache-dependency-path: far/package-lock.json
-          """
-          new_cache = """        with:
-            node-version: '22'
-          """
+          old_cache = (
+              "        with:\n"
+              "          node-version: '22'\n"
+              "          cache: npm\n"
+              "          cache-dependency-path: far/package-lock.json\n"
+          )
+          new_cache = (
+              "        with:\n"
+              "          node-version: '22'\n"
+          )
           if release_text.count(old_cache) != 1:
               raise SystemExit(f'expected one resolver cache block, found {release_text.count(old_cache)}')
           release.write_text(release_text.replace(old_cache, new_cache))
