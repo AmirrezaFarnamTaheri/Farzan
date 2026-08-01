@@ -75,6 +75,41 @@ describe('legacy release compatibility SBOM normalization', () => {
     });
   });
 
+  it('uses locale-independent code-unit ordering for reproducible metadata', () => {
+    const document = {
+      bomFormat: 'CycloneDX',
+      metadata: {
+        component: {
+          type: 'application',
+          name: 'far',
+          version: '1.1.2',
+          'bom-ref': 'far@1.1.2',
+        },
+      },
+      components: [
+        { name: 'umlaut', version: '1', 'bom-ref': 'ä@1' },
+        { name: 'lower', version: '1', 'bom-ref': 'z@1' },
+        { name: 'upper', version: '1', 'bom-ref': 'A@1' },
+      ],
+      dependencies: [
+        { ref: 'far@1.1.2', dependsOn: ['ä@1', 'z@1', 'A@1'] },
+        { ref: 'ä@1', dependsOn: [] },
+        { ref: 'z@1', dependsOn: [] },
+        { ref: 'A@1', dependsOn: [] },
+      ],
+    };
+
+    const normalized = normalizeCompatibilitySbom(document, packageMetadata);
+    expect(normalized.components.map((component) => component['bom-ref'])).toEqual(['A@1', 'z@1', 'ä@1']);
+    expect(normalized.dependencies.map((dependency) => dependency.ref)).toEqual([
+      'pkg:npm/opencoursedeck@1.1.2',
+      'A@1',
+      'z@1',
+      'ä@1',
+    ]);
+    expect(normalized.dependencies[0].dependsOn).toEqual(['A@1', 'z@1', 'ä@1']);
+  });
+
   it('is idempotent for already normalized reproducible metadata', () => {
     const document = {
       bomFormat: 'CycloneDX',
