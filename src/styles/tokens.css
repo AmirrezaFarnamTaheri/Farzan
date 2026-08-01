@@ -40,6 +40,12 @@
     --danger-muted:     rgba(239, 68, 68, 0.15);
     --info:             #3b82f6;
     --info-muted:       rgba(59, 130, 246, 0.15);
+    /* Alias: components.css references --error/--error-muted in ~15 rules
+       (alerts, badges, error toasts, invalid inputs); without this those
+       rules invalidate their whole declaration and error states render with
+       no color at all. */
+    --error:            var(--danger);
+    --error-muted:      var(--danger-muted);
 
     /* ── Tag Colors ── */
     --tag-1: #7c3aed; --tag-1-muted: rgba(124,58,237,0.18);
@@ -126,6 +132,21 @@
     --duration-base:   200ms;
     --duration-slow:   350ms;
     --duration-slower: 500ms;
+    --duration-spin:   800ms;
+
+    /* ── Interactive control sizing ── */
+    --btn-h-xs: 28px;
+    --btn-h-sm: 32px;
+    --btn-h-md: 40px;
+    --btn-h-lg: 48px;
+    --btn-h-xl: 56px;
+    --input-h:         var(--btn-h-md);
+    --input-bg:        var(--surface-2);
+    --input-bg-focus:  var(--surface-3);
+    --input-border:    var(--border-strong);
+
+    /* ── Grid gutters ── */
+    --grid-gap: var(--space-4);
 
     /* ── Layout ── */
     --sidebar-width:           260px;

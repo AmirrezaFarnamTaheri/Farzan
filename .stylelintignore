@@ -1,0 +1,4 @@
+# Third-party/generated CSS is reproduced from pinned package sources.
+# Lint the generator and authored styles, not vendored or built artifacts.
+vendor/**
+dist/**

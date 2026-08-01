@@ -1,14 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { generateSW } = require('workbox-build');
 const { removeProductionSourceMaps } = require('./build.cjs');
+const workboxConfig = require('./workbox-dist.config.cjs');
 
 const root = path.join(__dirname, '..');
 const dist = path.join(root, 'dist');
 const indexPath = path.join(dist, 'index.html');
 const swPath = path.join(dist, 'sw.js');
-const cliPath = path.join(root, 'node_modules', 'workbox-cli', 'build', 'bin.js');
-const configPath = path.join('scripts', 'workbox-dist.config.cjs');
 
 function assertFile(filePath, message) {
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
@@ -26,12 +25,16 @@ function walkFiles(directory, files = []) {
   return files;
 }
 
+function stripSourceMapText(source) {
+  return String(source)
+    .replace(/\r?\n?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n|$)/g, '\n')
+    .replace(/\r?\n?\/\*# sourceMappingURL=[\s\S]*?\*\/\s*$/g, '\n');
+}
+
 function stripSourceMapReferences(filePath) {
   if (!fs.existsSync(filePath)) return false;
   const source = fs.readFileSync(filePath, 'utf8');
-  const cleaned = source
-    .replace(/\r?\n?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n|$)/g, '\n')
-    .replace(/\r?\n?\/\*# sourceMappingURL=[\s\S]*?\*\/\s*$/g, '\n');
+  const cleaned = stripSourceMapText(source);
   if (cleaned === source) return false;
   fs.writeFileSync(filePath, cleaned, 'utf8');
   return true;
@@ -55,42 +58,41 @@ function finalizeServiceWorkerArtifacts() {
   }
 }
 
-function main() {
-  assertFile(indexPath, 'Cannot generate release service worker: dist/index.html is missing');
-  assertFile(cliPath, 'Cannot generate release service worker: workbox-cli is not installed');
-
-  const result = spawnSync(process.execPath, [cliPath, 'generateSW', configPath], {
-    cwd: root,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
-
-  if (result.error) throw result.error;
-  if (result.signal) throw new Error(`workbox-cli terminated by signal ${result.signal}`);
-  if (result.status !== 0) {
-    throw new Error(`workbox-cli exited with status ${result.status ?? 'unknown'}`);
+async function generateReleaseServiceWorker(config = workboxConfig) {
+  const result = await generateSW(config);
+  for (const warning of result.warnings || []) {
+    console.warn(`[build:release] Workbox warning: ${warning}`);
   }
+  return result;
+}
 
+async function main() {
+  assertFile(indexPath, 'Cannot generate release service worker: dist/index.html is missing');
+
+  const result = await generateReleaseServiceWorker();
   finalizeServiceWorkerArtifacts();
   assertFile(swPath, 'Release service worker was not generated at dist/sw.js');
   if (fs.statSync(swPath).size === 0) {
     throw new Error('Release service worker at dist/sw.js is empty');
   }
 
-  console.log(`[build:release] generated ${path.relative(root, swPath)} without source maps`);
+  console.log(
+    `[build:release] generated ${path.relative(root, swPath)} ` +
+    `for ${result.count ?? 'unknown'} precached files (${result.size ?? 'unknown'} bytes) without source maps`,
+  );
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error('[build:release] failed', error);
     process.exitCode = 1;
-  }
+  });
 }
 
 module.exports = {
   finalizeServiceWorkerArtifacts,
+  generateReleaseServiceWorker,
   main,
   stripSourceMapReferences,
+  stripSourceMapText,
 };

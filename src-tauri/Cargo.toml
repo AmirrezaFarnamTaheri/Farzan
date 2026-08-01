@@ -1,22 +1,23 @@
 [package]
-name = "opencoursedeck"
+name = "open-course-deck"
 version = "1.1.2"
-description = "OpenCourseDeck local-first learning studio"
-authors = ["OpenCourseDeck"]
-license = ""
-repository = ""
+description = "OpenCourseDeck desktop application"
+authors = ["OpenCourseDeck contributors"]
+publish = false
+license-file = "../../LICENSE"
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "opencoursedeck_lib"
+name = "open_course_deck_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { path = "../tauri-dev/tauri-dev/crates/tauri-build", features = ["codegen"] }
+tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
-tauri = { path = "../tauri-dev/tauri-dev/crates/tauri", features = ["image-ico", "image-png"] }
+tauri = { version = "=2.11.5", features = [] }
 
 [features]
-prod = ["tauri/custom-protocol"]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

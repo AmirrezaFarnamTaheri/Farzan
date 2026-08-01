@@ -23,13 +23,29 @@ export function debounce(fn, delay = 300) {
 }
 
 export function throttle(fn, limit = 100) {
-  let inThrottle;
+  let inThrottle = false;
+  let trailingArgs = null;
+  const run = (args) => {
+    fn(...args);
+    inThrottle = true;
+    setTimeout(() => {
+      inThrottle = false;
+      // Trailing edge: replay the last suppressed call so the final
+      // event in a burst (last scroll position, last state write) is
+      // never silently dropped.
+      if (trailingArgs) {
+        const args2 = trailingArgs;
+        trailingArgs = null;
+        run(args2);
+      }
+    }, limit);
+  };
   return (...args) => {
-    if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
+    if (inThrottle) {
+      trailingArgs = args;
+      return;
     }
+    run(args);
   };
 }
 

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { compareDirs, isGeneratedBundleFile } = require('../scripts/check-generated.cjs');
+const { checkStaticArtifacts, compareDirs, isGeneratedBundleFile } = require('../scripts/check-generated.cjs');
 const tempRoots = [];
 
 function makeDir() {
@@ -91,5 +91,34 @@ describe('generated artifact verification', () => {
     const result = compareDirs(expected, actual, { filter: isGeneratedBundleFile });
     expect(result.clean).toBe(false);
     expect(result.changed).toEqual(['opencoursedeck.js']);
+  });
+});
+
+describe('static release artifact verification', () => {
+  it('accepts a staged copy that matches source (including release rewrites and stripped source maps)', () => {
+    const rootDir = makeDir();
+    const outDir = makeDir();
+    write(rootDir, 'boot.js', "import('./dist/opencoursedeck.js');\n");
+    write(outDir, 'boot.js', "import('./opencoursedeck.js');\n");
+    write(rootDir, 'vendor/lib.js', 'export const x = 1;\n//# sourceMappingURL=lib.js.map\n');
+    write(outDir, 'vendor/lib.js', 'export const x = 1;\n');
+    write(rootDir, 'data/catalog.json', '{"currentCatalog":"data/starter.json"}');
+    write(outDir, 'data/catalog.json', '{"currentCatalog":"data/starter.json"}');
+
+    const result = checkStaticArtifacts({ rootDir, actualOutdir: outDir });
+    expect(result).toEqual({ clean: true, missing: [], changed: [] });
+  });
+
+  it('reports staged static files that drifted from their source', () => {
+    const rootDir = makeDir();
+    const outDir = makeDir();
+    write(rootDir, 'data/catalog.json', '{"currentCatalog":"data/starter.json"}');
+    write(outDir, 'data/catalog.json', '{"currentCatalog":"data/old-catalog.json"}');
+    write(rootDir, 'docs/guide.md', 'current docs');
+
+    const result = checkStaticArtifacts({ rootDir, actualOutdir: outDir });
+    expect(result.clean).toBe(false);
+    expect(result.changed).toEqual(['data/catalog.json']);
+    expect(result.missing).toEqual(['docs/guide.md']);
   });
 });

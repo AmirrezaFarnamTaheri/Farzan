@@ -25,7 +25,7 @@ Private learners and study groups who collect video/PDF course materials (primar
 - **Materials** — file-based assets (images, downloads)
 
 ### Intelligence
-- **AI client** — local Gemma integration + custom API endpoint for semantic search, quiz generation, note summarization
+- **AI client** — local Gemma integration + custom API endpoint for note summarization (semantic search and quiz generation are planned, not implemented)
 - **Fuzzy search** (Fuse.js) across courses, topics, notes, timestamps, annotations
 - **Command palette** (Ctrl+K) — keyboard-driven navigation and actions
 
@@ -33,10 +33,10 @@ Private learners and study groups who collect video/PDF course materials (primar
 - **Progress tracking** — per-topic completion, time spent, streak tracking
 - **Heatmap calendar** — GitHub-style activity visualization
 - **Achievements** — milestone badges
-- **Study queue** — daily plan generation, focus sprints
+- **Study queue** *(planned)* — daily plan generation, focus sprints. Today Playlists provides manual study queues.
 
 ### System
-- **Plugin host** — install/toggle/export plugin manifests from Settings
+- **Plugin host** *(planned)* — `src/features/pluginHost.js` validates plugin manifests, but it is not loaded into the runtime and Settings exposes no plugin UI.
 - **Theme system** — 8 themes (dark, light, midnight, forest, ocean, sunset, rose, paper), 6 accents, 3 density modes, font scaling
 - **Keyboard shortcuts** — full keyboard navigation, shortcuts cheatsheet
 - **Backup/restore** — JSON export/import of all user data

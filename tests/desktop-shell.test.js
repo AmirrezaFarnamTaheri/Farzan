@@ -3,96 +3,100 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('desktop shell wiring', () => {
-  it('keeps the desktop launcher wired as an explicit app-window path', () => {
+  it('keeps browser shells and the registry-backed Tauri wrapper explicit and verifiable', () => {
+    const read = (filePath) => fs.readFileSync(path.join(process.cwd(), filePath), 'utf8');
     const readOptional = (filePath) => {
-      try { return fs.readFileSync(filePath, 'utf8'); } catch { return null; }
+      try { return fs.readFileSync(path.join(process.cwd(), filePath), 'utf8'); } catch { return null; }
     };
-    const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-    const rootLauncher = readOptional(path.join(process.cwd(), '..', 'OpenCourseDeck.bat'));
-    const rootInstaller = readOptional(path.join(process.cwd(), '..', 'Install-OpenCourseDeck.cmd'));
-    const main = fs.readFileSync(path.join(process.cwd(), 'desktop/main.cjs'), 'utf8');
-    const launch = fs.readFileSync(path.join(process.cwd(), 'desktop/launch.cjs'), 'utf8');
-    const appWindow = fs.readFileSync(path.join(process.cwd(), 'desktop/app-window.cjs'), 'utf8');
-    const pack = fs.readFileSync(path.join(process.cwd(), 'desktop/package-portable.cjs'), 'utf8');
-    const nativeCargo = fs.readFileSync(path.join(process.cwd(), 'scripts/native-cargo.cjs'), 'utf8');
-    const preflight = fs.readFileSync(path.join(process.cwd(), 'scripts/native-preflight.cjs'), 'utf8');
-    const stageNative = fs.readFileSync(path.join(process.cwd(), 'scripts/stage-native-exe.cjs'), 'utf8');
-    // Tauri / native desktop files are optional (not yet committed).
-    // Wrap in try/catch so the test documents the expected structure
-    // without failing when files are missing.
-    const tauriCargo = readOptional(path.join(process.cwd(), 'src-tauri/Cargo.toml'));
-    const tauriConfigRaw = readOptional(path.join(process.cwd(), 'src-tauri/tauri.conf.json'));
-    const tauriConfig = tauriConfigRaw ? JSON.parse(tauriConfigRaw) : null;
-    const tauriNsis = readOptional(
-      path.join(process.cwd(), 'tauri-dev/tauri-dev/crates/tauri-bundler/src/bundle/windows/nsis/mod.rs'),
-    );
+    const packageJson = JSON.parse(read('package.json'));
+    const rootLauncher = readOptional('../OpenCourseDeck.bat');
+    const rootInstaller = readOptional('../Install-OpenCourseDeck.cmd');
+    const main = read('desktop/main.cjs');
+    const launch = read('desktop/launch.cjs');
+    const appWindow = read('desktop/app-window.cjs');
+    const pack = read('desktop/package-portable.cjs');
+    const nativeCargo = read('scripts/native-cargo.cjs');
+    const prepareNative = read('scripts/prepare-native-assets.cjs');
+    const preflight = read('scripts/native-preflight.cjs');
+    const stageNative = read('scripts/stage-native-exe.cjs');
+    const tauriCargo = read('src-tauri/Cargo.toml');
+    const tauriConfig = JSON.parse(read('src-tauri/tauri.conf.json'));
+    const tauriCapability = JSON.parse(read('src-tauri/capabilities/default.json'));
+    const tauriBuild = read('src-tauri/build.rs');
+    const tauriMain = read('src-tauri/src/main.rs');
+    const tauriLib = read('src-tauri/src/lib.rs');
 
     expect(packageJson.scripts.desktop).toBe('npm run build && node desktop/launch.cjs');
     expect(packageJson.scripts['desktop:app-window']).toBe('npm run build && node desktop/app-window.cjs');
     expect(packageJson.scripts['desktop:package']).toBe('npm run build && node desktop/package-portable.cjs');
+    expect(packageJson.scripts['native:prepare']).toBe('node scripts/prepare-native-assets.cjs');
     expect(packageJson.scripts['native:preflight']).toBe('node scripts/native-preflight.cjs');
     expect(packageJson.scripts['native:preflight:strict']).toBe('node scripts/native-preflight.cjs --strict');
     expect(packageJson.scripts['tauri:check']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml');
-    expect(packageJson.scripts['tauri:build']).toContain('node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml');
-    expect(packageJson.scripts['native:exe']).toBe('npm run tauri:build && node scripts/stage-native-exe.cjs');
-    expect(packageJson.scripts['tauri:bundle']).toContain('node scripts/native-cargo.cjs run --manifest-path tauri-dev/tauri-dev/crates/tauri-cli/Cargo.toml');
-    expect(packageJson.scripts['native:package']).toBe('npm run tauri:bundle');
-    if (rootLauncher) {
-      expect(rootLauncher).toContain('desktop-dist\\OpenCourseDeck-Native\\OpenCourseDeck.exe');
-      expect(rootLauncher).toContain('OpenCourseDeck-OneClick.bat');
-    }
-    if (rootInstaller) {
-      expect(rootInstaller).toContain('OpenCourseDeck_1.1.2_x64-setup.exe');
-      expect(rootInstaller).toContain('npm run native:package');
-    }
+    expect(packageJson.scripts['tauri:check:locked']).toBe('node scripts/native-cargo.cjs check --manifest-path src-tauri/Cargo.toml --locked');
+    expect(packageJson.scripts['tauri:build']).toBe('npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release');
+    expect(packageJson.scripts['tauri:build:locked']).toBe('npm run native:prepare && node scripts/native-cargo.cjs build --manifest-path src-tauri/Cargo.toml --release --locked');
+    expect(packageJson.scripts['native:exe']).toBe('npm run build:release && npm run tauri:build:locked && node scripts/stage-native-exe.cjs');
+    expect(packageJson.scripts['tauri:bundle']).toBe('npm run native:prepare && tauri build --config src-tauri/tauri.conf.json');
+    expect(packageJson.scripts['native:package']).toBe('npm run tauri:bundle && node scripts/stage-native-exe.cjs');
+
+    if (rootLauncher) expect(rootLauncher).toContain('npm run native:package');
+    if (rootInstaller) expect(rootInstaller).toContain('npm run native:package');
     expect(main).toContain('BrowserWindow');
-    expect(main).toContain("createServer({ root })");
-    expect(main).toContain('setWindowOpenHandler');
     expect(main).toContain('nodeIntegration: false');
     expect(main).toContain('contextIsolation: true');
     expect(main).toContain('requestSingleInstanceLock');
     expect(main).toContain('setPermissionRequestHandler');
-    expect(main).toContain("app.setPath('userData'");
     expect(main).toContain('webSecurity: true');
     expect(launch).toContain('Electron is not installed');
     expect(appWindow).toContain('--app=');
-    expect(appWindow).toContain('OPENCOURSEDECK_BROWSER');
-    expect(appWindow).toContain('createServer({ root })');
-    expect(pack).toContain('opencoursedeck-desktop.json');
-    expect(pack).toContain("preferred: 'electron'");
     expect(pack).toContain("permissions: 'deny-by-default'");
-    expect(nativeCargo).toContain('CARGO_HOME');
-    expect(nativeCargo).toContain("path.resolve(root, '..', '.cargo')");
-    expect(preflight).toContain('Cargo dependencies resolve offline');
-    expect(preflight).toContain('repo-root Cargo cache is available');
-    expect(preflight).toContain('repo-root Cargo cache covers locked registry packages');
-    expect(preflight).toContain('parseLockedRegistryPackages');
-    expect(preflight).toContain('native-cargo-missing.txt');
-    expect(preflight).toContain('native:preflight:strict');
-    expect(stageNative).toContain('OpenCourseDeck-Native');
-    expect(stageNative).toContain("dist', 'index.html'");
-    expect(stageNative).toContain('Native frontend asset not found');
-    expect(stageNative).toContain('pending-nsis-toolchain');
-    expect(stageNative).toContain("status: stagedInstallers.length ? 'staged'");
-    expect(stageNative).toContain('OpenCourseDeck.exe');
-    expect(stageNative).toContain('embedded dist assets with index.html shell');
-    expect(preflight).toContain('tauri-dev/tauri-dev/crates/tauri');
 
-    // Assertions for optional Tauri files; skip if files don't exist
-    if (tauriCargo) {
-      expect(tauriCargo).toContain('../tauri-dev/tauri-dev/crates/tauri');
-      expect(tauriCargo).toContain('../tauri-dev/tauri-dev/crates/tauri-build');
-    }
-    if (tauriNsis) {
-      expect(tauriNsis).toContain('Bin").join("makensis.exe")');
-      expect(tauriNsis).toContain('bin_makensis.exists()');
-    }
-    if (tauriConfig) {
-      expect(tauriConfig.productName).toBe('OpenCourseDeck');
-      expect(tauriConfig.build.frontendDist).toBe('../dist');
-      expect(tauriConfig.bundle.targets).toContain('nsis');
-      expect(tauriConfig.app.windows[0].title).toBe('OpenCourseDeck');
-      expect(tauriConfig.app.security.freezePrototype).toBe(true);
-    }
+    expect(nativeCargo).toContain("spawnSync('cargo'");
+    expect(prepareNative).toContain("path.join(root, 'assets', 'icon-192.svg')");
+    expect(prepareNative).toContain("path.join(targetDirectory, 'icon.png')");
+    expect(prepareNative).toContain("path.join(targetDirectory, 'icon.ico')");
+    expect(prepareNative).toContain('createPngBackedIco');
+    expect(prepareNative).toContain('verifyIco');
+    expect(prepareNative).toContain('.ensureAlpha(1)');
+    expect(prepareNative).toContain('metadata.channels !== 4');
+    expect(preflight).toContain('Generated Windows ICO resource exists');
+    expect(preflight).toContain('Cargo dependencies resolve from the committed lockfile');
+    expect(preflight).toContain('Locked Tauri release build is declared');
+    expect(preflight).toContain('registry releases instead of missing local paths');
+    expect(preflight).toContain('Tauri enforces a restrictive Content Security Policy');
+    expect(preflight).toContain('Tauri media policy rejects plaintext HTTP');
+    expect(preflight).toContain('Native package inherits the repository license');
+    expect(stageNative).toContain("'open-course-deck.exe'");
+    expect(stageNative).toContain('OpenCourseDeck-Native');
+
+    expect(tauriCargo).toContain('tauri = { version = "=2.11.5"');
+    expect(tauriCargo).toContain('tauri-build = { version = "=2.6.3"');
+    expect(tauriCargo).toContain('custom-protocol = ["tauri/custom-protocol"]');
+    expect(tauriCargo).toContain('publish = false');
+    expect(tauriCargo).toContain('license-file = "../../LICENSE"');
+    expect(tauriCargo).not.toContain('license = "MIT"');
+    expect(tauriCargo).not.toMatch(/\bpath\s*=/);
+    expect(tauriBuild).toContain('tauri_build::build()');
+    expect(tauriMain).toContain('open_course_deck_lib::run()');
+    expect(tauriLib).toContain('tauri::Builder::default()');
+    expect(tauriLib).toContain('tauri::generate_context!()');
+
+    expect(tauriConfig.productName).toBe('OpenCourseDeck');
+    expect(tauriConfig.version).toBe(packageJson.version);
+    expect(tauriConfig.identifier).toBe('app.opencoursedeck.desktop');
+    expect(tauriConfig.build.frontendDist).toBe('../dist');
+    expect(tauriConfig.build.beforeBuildCommand).toBe('npm run build:release');
+    expect(tauriConfig.build.removeUnusedCommands).toBe(true);
+    expect(tauriConfig.bundle.targets).toContain('nsis');
+    expect(tauriConfig.bundle.icon).toContain('icons/icon.png');
+    expect(tauriConfig.bundle.icon).toContain('icons/icon.ico');
+    expect(tauriConfig.app.windows[0].label).toBe('main');
+    expect(tauriConfig.app.security.freezePrototype).toBe(true);
+    expect(tauriConfig.app.security.csp).toContain("default-src 'self'");
+    expect(tauriConfig.app.security.csp).toContain("object-src 'none'");
+    expect(tauriConfig.app.security.csp).not.toMatch(/media-src[^;]*\bhttp:/);
+    expect(tauriCapability.windows).toContain('main');
+    expect(tauriCapability.permissions).toEqual([]);
   });
 });

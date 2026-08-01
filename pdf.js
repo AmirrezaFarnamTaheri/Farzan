@@ -1,5 +1,5 @@
 // ============================================================
-// OpenCourseDeck â€” pdf.js
+// OpenCourseDeck — pdf.js
 // Full PDF Viewer with Thumbnails, Annotations, Search
 // Requires: PDF.js library (pdfjs-dist)
 //   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -8,9 +8,9 @@
 (() => {
   'use strict';
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 0. SETUP
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -141,9 +141,9 @@
   }
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 1. CORE STATE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const State = {
     pdfDoc:        null,
@@ -163,15 +163,16 @@
     textCache:     new Map(),
     annotations:   {},          // { [pageNum]: Annotation[] }
     annotationDocId: 'global',
+    annotationAliases: [],
     searchDocId:   'global',
     activeTool:    'pan',       // 'pan' | 'highlight' | 'text' | 'draw'
     highlights:    [],          // persisted highlight annotations
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 2. DOM REFERENCES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const DOM = {
     viewerContainer:   null,
@@ -221,9 +222,9 @@
   }
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 3. LOAD PDF
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const PDFViewer = {
 
@@ -270,10 +271,10 @@
         State.searchIdx = -1;
         State.textCache = new Map();
         State.annotations = {};
-        State.annotationDocId = typeof source === 'string'
-          ? source
-          : `file:${source?.name || 'local'}:${source?.size || 0}`;
-        State.searchDocId = this._deriveSearchDocId(source, State.pdfDoc);
+        State.annotationDocId = await this._deriveCanonicalDocId(source, State.pdfDoc, src.data);
+        State.annotationAliases = this._deriveLegacyDocIds(source)
+          .filter(docId => docId && docId !== State.annotationDocId);
+        State.searchDocId = State.annotationDocId;
 
         this._updatePageUI();
         await this._loadAnnotations();
@@ -294,9 +295,9 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 4. PAGE RENDERING
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     async renderPage(pageNum, {
       scale    = State.scale,
@@ -643,7 +644,7 @@
       this.goTo(pendingPage);
     },
 
-    // â”€â”€ Text layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Text layer ─────────────────────────────────────────
     async _renderTextLayer(page, viewport) {
       const textLayerDiv = DOM.textLayer;
       if (!textLayerDiv) return;
@@ -663,7 +664,7 @@
       }
     },
 
-    // â”€â”€ Annotation layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Annotation layer ────────────────────────────────────
     _renderAnnotationLayer(pageNum, viewport) {
       const layer = DOM.annotationLayer;
       if (!layer) return;
@@ -705,9 +706,9 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 5. NAVIGATION
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     goTo(page) {
       const p = parseInt(page, 10);
@@ -727,9 +728,9 @@
     last()  { this.renderPage(State.totalPages); },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 6. ZOOM
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     zoomIn(step = 0.25) {
       State.fitMode = 'custom';
@@ -757,17 +758,17 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 7. ROTATION
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     rotateCW()  { State.rotation = (State.rotation + 90)  % 360; this.renderPage(State.currentPage); },
     rotateCCW() { State.rotation = (State.rotation + 270) % 360; this.renderPage(State.currentPage); },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 8. THUMBNAILS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     async _buildThumbnails() {
       const sidebar = DOM.thumbnailSidebar;
@@ -833,9 +834,9 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 9. TEXT SEARCH
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     async search(query) {
       if (!State.pdfDoc || !query.trim()) {
@@ -926,6 +927,40 @@
       return State.annotationDocId || 'global';
     },
 
+    _deriveLegacyDocIds(source) {
+      if (typeof source === 'string') return [source, `url:${source}`];
+      if (source instanceof File) {
+        return [
+          `file:${source.name}:${source.size}`,
+          `file:${source.name}:${source.size}:${source.lastModified || 0}`,
+        ];
+      }
+      if (source instanceof ArrayBuffer) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
+      if (ArrayBuffer.isView(source)) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
+      return [];
+    },
+
+    async _deriveCanonicalDocId(source, pdfDoc = State.pdfDoc, sourceData = null) {
+      const fingerprintId = this._deriveSearchDocId(source, pdfDoc);
+      if (fingerprintId.startsWith('fingerprint:')) return fingerprintId;
+
+      let bytes = sourceData;
+      if (!bytes && typeof pdfDoc?.getData === 'function') {
+        try { bytes = await pdfDoc.getData(); } catch {}
+      }
+      if (bytes) {
+        const view = bytes instanceof Uint8Array
+          ? bytes
+          : new Uint8Array(bytes.buffer || bytes, bytes.byteOffset || 0, bytes.byteLength);
+        try {
+          const digest = await crypto.subtle.digest('SHA-256', view);
+          const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          return `sha256:${hex}`;
+        } catch {}
+      }
+      return fingerprintId;
+    },
+
     searchNext() {
       if (!State.searchResults.length) return;
       State.searchIdx = (State.searchIdx + 1) % State.searchResults.length;
@@ -970,9 +1005,9 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 10. DOWNLOAD & PRINT
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     async download(filename = 'document.pdf') {
       if (!State.pdfDoc) return;
@@ -1021,9 +1056,9 @@
     },
 
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
     // 11. UI HELPERS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──────────────────────────────────────────────────────
 
     _updatePageUI() {
       if (DOM.currentPageInput) DOM.currentPageInput.value = State.currentPage;
@@ -1062,12 +1097,36 @@
     async _loadAnnotations() {
       if (window.DB?.getAnnotations) {
         try {
-          const records = await window.DB.getAnnotations(State.annotationDocId);
+          const canonicalId = State.annotationDocId;
+          const aliases = Array.from(new Set(State.annotationAliases || []));
+          const results = await Promise.all([
+            window.DB.getAnnotations(canonicalId),
+            ...aliases.map(alias => window.DB.getAnnotations(alias)),
+          ]);
+          const merged = new Map();
+          results.flat().forEach((annotation) => {
+            const next = { ...annotation, docId: canonicalId };
+            const current = merged.get(next.id);
+            if (!current || Number(next.updatedAt || 0) >= Number(current.updatedAt || 0)) {
+              merged.set(next.id, next);
+            }
+          });
+          const records = [...merged.values()];
           State.annotations = records.reduce((acc, annotation) => {
             const page = annotation.page ?? 1;
             (acc[page] = acc[page] ?? []).push(annotation);
             return acc;
           }, {});
+          const migratedAliases = aliases.filter((_, index) => (results[index + 1] || []).length > 0);
+          if (migratedAliases.length && window.DB?.saveAnnotations) {
+            await window.DB.saveAnnotations(canonicalId, State.annotations);
+            await Promise.all(migratedAliases.map(alias => window.DB.saveAnnotations(alias, {})));
+            window.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
+              docId: canonicalId,
+              aliases: migratedAliases,
+              annotations: records.length,
+            });
+          }
           return;
         } catch {}
       }
@@ -1080,9 +1139,15 @@
     async refreshAnnotationsFromStorage() {
       await this._loadAnnotations();
       const canvas = DOM.pageCanvas;
+      // The annotation layer is styled in CSS pixels; canvas.width/height are
+      // device pixels (scaled by devicePixelRatio in renderPage), so prefer
+      // the CSS-pixel bounding rect and only fall back to device pixels
+      // divided by the current ratio.
+      const rect = canvas?.getBoundingClientRect?.();
+      const dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
       const viewport = {
-        width: Math.max(1, Number(canvas?.width || canvas?.getBoundingClientRect?.().width || 0)),
-        height: Math.max(1, Number(canvas?.height || canvas?.getBoundingClientRect?.().height || 0)),
+        width: Math.max(1, Number(rect?.width || (canvas?.width ?? 0) / dpr)),
+        height: Math.max(1, Number(rect?.height || (canvas?.height ?? 0) / dpr)),
       };
       this._renderAnnotationLayer(State.currentPage, viewport);
       return this.getAnnotations();
@@ -1101,9 +1166,9 @@
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 12. ANNOTATION MANAGER
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const AnnotationManager = {
     _drawing:   false,
@@ -1223,9 +1288,9 @@
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 13. KEYBOARD & TOUCH GESTURES
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const PDFInput = {
     _pinchDist: null,
@@ -1235,6 +1300,11 @@
         const root = DOM.viewerContainer?.closest('.view-pdf') ?? DOM.viewerContainer;
         const target = e.target?.nodeType === 1 ? e.target : document.activeElement;
         if (!root?.contains(target) && !root?.contains(document.activeElement)) {
+          return;
+        }
+        // Never hijack typing in the PDF search box, page-number input,
+        // or any other editable control inside the viewer.
+        if (target?.matches?.('input, textarea, select, [contenteditable], [contenteditable] *')) {
           return;
         }
         switch (e.key) {
@@ -1292,9 +1362,9 @@
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 14. TOOLBAR WIRING
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   const PDFToolbar = {
     _inited: false,
@@ -1403,9 +1473,9 @@
   };
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
   // 15. INIT
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────
 
   let _inited = false;
   function initPDFViewer() {
@@ -1454,6 +1524,7 @@
       textCache: new Map(),
       annotations: {},
       annotationDocId: 'global',
+      annotationAliases: [],
       searchDocId: 'global',
       activeTool: 'pan',
       highlights: [],

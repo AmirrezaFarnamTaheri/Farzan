@@ -51,6 +51,11 @@ export class Pointer {
    * @param {function} [callbacks.onPinch] — called with { scale, centerX, centerY }
    */
   bind(el, callbacks = {}) {
+    // Re-binding without unbinding used to orphan the previous element's
+    // eight listeners: the bound-handler references were overwritten, so
+    // destroy() could no longer remove them and they pinned this instance
+    // (and the old element) for the page lifetime.
+    if (this._el) this.destroy();
     this._el = el;
     this._onDown = callbacks.onDown || null;
     this._onMove = callbacks.onMove || null;

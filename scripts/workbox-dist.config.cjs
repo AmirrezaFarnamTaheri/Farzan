@@ -14,6 +14,7 @@ module.exports = {
     'pdf-runtime.js',
     'manifest.json',
     'style.css',
+
     'opencoursedeck.js',
     'chunks/**',
     'assets/**',
@@ -33,10 +34,10 @@ module.exports = {
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
   runtimeCaching: [
     {
-      urlPattern: ({ url }) => url.pathname.includes('/data/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.includes('/data/'),
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'opencoursedeck-data',
+        cacheName: `opencoursedeck-data-v${pkg.version}`,
         networkTimeoutSeconds: 3,
         expiration: {
           maxEntries: 50,
@@ -45,10 +46,10 @@ module.exports = {
       },
     },
     {
-      urlPattern: ({ url }) => url.pathname.includes('/vendor/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.includes('/vendor/'),
       handler: 'CacheFirst',
       options: {
-        cacheName: 'opencoursedeck-vendor',
+        cacheName: `opencoursedeck-vendor-v${pkg.version}`,
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -56,11 +57,12 @@ module.exports = {
       },
     },
     {
-      urlPattern: ({ url }) =>
-        url.pathname.endsWith('/opencoursedeck.js') || url.pathname.includes('/chunks/'),
+      urlPattern: ({ url, sameOrigin }) => sameOrigin && (
+        url.pathname.endsWith('/opencoursedeck.js') || url.pathname.includes('/chunks/')
+      ),
       handler: 'StaleWhileRevalidate',
       options: {
-        cacheName: 'opencoursedeck-app-bundle',
+        cacheName: `opencoursedeck-app-bundle-v${pkg.version}`,
         expiration: {
           maxEntries: 50,
           maxAgeSeconds: 24 * 60 * 60,

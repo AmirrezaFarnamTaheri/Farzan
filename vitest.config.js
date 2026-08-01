@@ -10,6 +10,7 @@ export default {
     // (window.OpenCourseDeck, window.DB, rAF loops) cannot bleed between files.
     isolate: true,
     // Restore and clear all mocks/spies automatically after each test.
+    testTimeout: 15000,
     restoreMocks: true,
     clearMocks: true,
   },

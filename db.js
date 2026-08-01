@@ -13,6 +13,7 @@ this.version = version;
 this.schema = schema;
 this.db = null;
 this.encryptionPassphrase = null;
+this._opening = null;
 }
 
 setPassphrase(passphrase) {
@@ -87,7 +88,11 @@ async decryptPayload(data) {
 
 async open() {
 if (this.db) return this.db;
-return new Promise((resolve, reject) => {
+// Memoize the in-flight open: concurrent first calls (e.g. several reads in
+// one Promise.all) must share a single connection instead of each opening —
+// and leaking — their own.
+if (this._opening) return this._opening;
+this._opening = new Promise((resolve, reject) => {
 const req = indexedDB.open(this.name, this.version);
 req.onupgradeneeded = e => {
 const db = e.target.result;
@@ -120,6 +125,8 @@ resolve(this.db);
 req.onblocked = () => reject(new Error(`Opening IndexedDB database "${this.name}" was blocked by another connection`));
 req.onerror = () => reject(req.error);
 });
+this._opening.finally(() => { this._opening = null; }).catch(() => {});
+return this._opening;
 }
 
 async _transaction(store, mode="readonly") {
@@ -261,6 +268,20 @@ const db = await this.open();
 const tx = db.transaction(store,"readwrite");
 const s = tx.objectStore(store);
 list.forEach(item=>s.put(item));
+return new Promise((res,rej)=>{
+tx.oncomplete=()=>res(true);
+tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
+tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+});
+}
+
+async bulkPutWithCheckpoint(store,list,checkpoint){
+const db = await this.open();
+const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
+const tx = db.transaction(stores,"readwrite");
+const target = tx.objectStore(store);
+list.forEach(item=>target.put(item));
+if(checkpoint) tx.objectStore('settings').put(checkpoint);
 return new Promise((res,rej)=>{
 tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));

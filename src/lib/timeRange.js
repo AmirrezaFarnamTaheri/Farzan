@@ -16,7 +16,8 @@ export function normalizeTimeIntervals(intervals) {
     .sort((a, b) => a.start - b.start);
 
   if (sorted.length === 0) return [];
-  const merged = [sorted[0]];
+  // Copy each interval so merging never mutates the caller's objects.
+  const merged = [{ start: sorted[0].start, end: sorted[0].end }];
   for (let i = 1; i < sorted.length; i++) {
     const last = merged[merged.length - 1];
     const curr = sorted[i];
@@ -24,7 +25,7 @@ export function normalizeTimeIntervals(intervals) {
     if (curr.start <= last.end) {
       last.end = Math.max(last.end, curr.end);
     } else {
-      merged.push(curr);
+      merged.push({ start: curr.start, end: curr.end });
     }
   }
   return merged;

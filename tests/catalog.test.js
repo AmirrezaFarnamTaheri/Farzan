@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('catalog normalization', () => {
   beforeEach(async () => {
@@ -41,6 +41,10 @@ describe('catalog normalization', () => {
     await import('../bridge.js');
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('loads the pointer catalog and preserves topics from every source', async () => {
     await window.DataStore.init();
 
@@ -80,5 +84,34 @@ describe('catalog normalization', () => {
         catalogIssue: true,
       }),
     ]);
+  });
+
+  it('exposes degraded state and recovers through an explicit retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let fail = true;
+    globalThis.fetch = vi.fn(async (url) => {
+      if (fail) throw new Error('temporary network failure');
+      const requested = String(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => requested.includes('data/catalog.json')
+          ? { currentCatalog: 'catalog-recovered.json' }
+          : { recovered: { title: 'Recovered', topics: [] } },
+      };
+    });
+    delete window.DataStore;
+    delete window.DB;
+    window.OpenCourseDeck = { bus: { emit: vi.fn() } };
+    vi.resetModules();
+    await import('../bridge.js');
+
+    await window.DataStore.init();
+    expect(window.DataStore.getState()).toMatchObject({ status: 'degraded', source: 'demo-fallback' });
+
+    fail = false;
+    await window.DataStore.retry();
+    expect(window.DataStore.getState()).toMatchObject({ status: 'authoritative', source: './catalog-recovered.json' });
+    expect(window.DataStore.allCourses()).toEqual([expect.objectContaining({ id: 'recovered' })]);
   });
 });

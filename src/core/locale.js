@@ -73,7 +73,12 @@ export function setCurrentLang(lang) {
     document.documentElement.lang = lang;
     // RTL languages
     const rtlLangs = new Set(['fa-IR', 'fa', 'ar', 'ar-SA', 'ar-EG', 'he', 'ur']);
-    document.documentElement.dir = rtlLangs.has(lang) ? 'rtl' : 'ltr';
+    const dir = rtlLangs.has(lang) ? 'rtl' : 'ltr';
+    document.documentElement.dir = dir;
+    // Persist so boot (src/index.js reads 'plasma_dir') restores the same
+    // direction on reload; otherwise switching to an RTL locale lasts only
+    // until the next refresh.
+    try { localStorage.setItem('plasma_dir', dir); } catch { /* storage blocked */ }
   }
 }
 

@@ -12,13 +12,22 @@
   // 1. REQUEST CACHE
   // ══════════════════════════════════════════════════════════
   class RequestCache {
-    constructor(ttl = 60_000) {
+    constructor(ttl = 60_000, maxEntries = 200) {
       this._store = new Map();
       this._ttl   = ttl;
+      this._maxEntries = Math.max(1, maxEntries);
     }
 
     set(key, value, ttl = this._ttl) {
+      // LRU bound: cache keys include full URL + headers, so without a
+      // ceiling the map grows for the lifetime of the page. Re-inserting
+      // moves the key to the back (most recently used).
+      this._store.delete(key);
       this._store.set(key, { value, ts: Date.now(), ttl });
+      while (this._store.size > this._maxEntries) {
+        const oldest = this._store.keys().next().value;
+        this._store.delete(oldest);
+      }
     }
 
     /**
@@ -103,7 +112,12 @@
       const isSWR = cache === 'swr';
       if ((cache || isSWR) && method === 'GET') {
         const hit = isSWR ? this._cache.peek(cacheKey) : null;
-        if (!isSWR && this._cache.has(cacheKey)) return this._cache.get(cacheKey);
+        if (!isSWR) {
+          // Single get() call: has()+get() is a TOCTOU pair — the entry can
+          // expire between the two and resolve the request with undefined.
+          const cached = this._cache.get(cacheKey);
+          if (cached !== undefined) return cached;
+        }
         if (isSWR && hit?.value !== undefined) {
           // If stale, revalidate in background (deduped by _pendingRequests)
           if (hit.stale && !this._pendingRequests.has(cacheKey)) {
@@ -121,8 +135,11 @@
                 // refresh cache with new ts
                 this._cache.set(cacheKey, fresh, cacheTTL);
                 window.OpenCourseDeck?.bus?.emit?.('data:cacheUpdate', { url: fullURL, key: cacheKey });
+                // Resolve to data: concurrent GETs dedupe onto this promise.
+                return fresh;
               } catch {
-                // ignore background refresh errors
+                // ignore background refresh errors; keep serving stale
+                return hit.value;
               }
             })();
             this._pendingRequests.set(cacheKey, bg);
@@ -595,8 +612,19 @@
       return this._connectWS();
     }
 
+    _closeExistingConnections() {
+      // A (re)connect must not leak the previous socket: EventSource
+      // auto-reconnects on its own, so every wrapper-driven reconnect that
+      // skips this leaves an extra live connection duplicating events.
+      try { this._ws?.close?.(); } catch { /* already closed */ }
+      try { this._sse?.close?.(); } catch { /* already closed */ }
+      this._ws = null;
+      this._sse = null;
+    }
+
     _connectWS() {
       try {
+        this._closeExistingConnections();
         this._ws = new WebSocket(this._url);
 
         this._ws.addEventListener('open', () => {
@@ -644,6 +672,7 @@
     }
 
     _connectSSE() {
+      this._closeExistingConnections();
       this._sse = new EventSource(this._url);
 
       this._sse.addEventListener('open', () => {
@@ -722,6 +751,14 @@
   // ══════════════════════════════════════════════════════════
   // 7. DATA BINDING (DOM ↔ store)
   // ══════════════════════════════════════════════════════════
+  // Properties DataBind.bind() may assign directly. Anything not listed here
+  // falls through to setAttribute (or the outerHTML/srcdoc text-only path
+  // below), so an app-chosen `attr` can never reach an HTML-injection sink.
+  const SAFE_BIND_PROPS = new Set([
+    'textContent', 'value', 'checked', 'disabled', 'hidden',
+    'placeholder', 'title', 'alt', 'name', 'id',
+  ]);
+
   const DataBind = {
     _bindings: new Map(),
 
@@ -771,8 +808,14 @@
             } else {
               el.removeAttribute(attr);
             }
-          } else if (attr in el) {
+          } else if (SAFE_BIND_PROPS.has(attr) && attr in el) {
+            // Allowlisted DOM properties only: the previous `attr in el`
+            // catch-all accepted outerHTML/srcdoc/insertAdjacentHTML-style
+            // sinks, letting an app-chosen attr inject raw catalog/user
+            // markup even though 'innerHTML' itself was downgraded above.
             el[attr] = display;
+          } else if (/^(?:outerHTML|srcdoc)$/i.test(attr)) {
+            el.textContent = String(display ?? '');
           } else {
             el.setAttribute(attr, display);
           }

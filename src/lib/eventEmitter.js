@@ -36,6 +36,13 @@ export class EventEmitter {
     if (set) {
       if (handler) {
         set.delete(handler);
+        // once() registers an internal wrapper, so removing by the original
+        // handler must also match wrappers that carry it. Without this,
+        // `once(e, h); off(e, h)` was a silent no-op and h still fired after
+        // its owner had torn down.
+        for (const registered of set) {
+          if (registered.listener === handler) set.delete(registered);
+        }
         if (set.size === 0) this._listeners.delete(event);
       } else {
         this._listeners.delete(event);
@@ -81,6 +88,8 @@ export class EventEmitter {
       this.off(event, wrapper);
       handler(...args);
     };
+    // Tag the wrapper so off(event, handler) can find and remove it.
+    wrapper.listener = handler;
     return this.on(event, wrapper);
   }
 

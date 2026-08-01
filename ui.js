@@ -18,6 +18,10 @@
       return String(s).replace(/[&<>"']/g, m =>
         ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     };
+    // Local-day YYYY-MM-DD. toISOString() converts to UTC, which shifts the
+    // date by one day for users in positive-offset timezones.
+    const localISODate = date =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
     // eslint-disable-next-line no-unused-vars
     function _animH(el, open, dur = 250) {
@@ -36,6 +40,25 @@
         });
       });
     }
+
+    /**
+     * Inverse of localISODate. `new Date('2026-07-26')` is NOT this: ECMA-262
+     * parses a date-only ISO string as UTC midnight, which renders as the
+     * PREVIOUS day for every negative-offset timezone (all of the Americas).
+     * The date picker wrote local dates and read them back that way, so the
+     * calendar highlighted the wrong day for roughly half the world.
+     * @param {unknown} value
+     * @returns {Date|null}
+     */
+    const parseLocalISODate = value => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim());
+      if (!match) {
+        const loose = new Date(value);
+        return Number.isNaN(loose.getTime()) ? null : loose;
+      }
+      const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
 
     // ════════════════════════════════════════════════════
     // COMPONENT: BUTTON
@@ -644,7 +667,7 @@
           ?? this._createPopup(wrapper);
         const today    = new Date();
         let   viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        let   selected = input?.value ? new Date(input.value) : null;
+        let   selected = parseLocalISODate(input?.value);
 
         const render = () => {
           const year  = viewDate.getFullYear();
@@ -676,7 +699,7 @@
                 const isToday = date.toDateString() === today.toDateString();
                 const isSel   = selected && date.toDateString() === selected.toDateString();
                 return `<button class="dp-day ${isToday ? 'today' : ''} ${isSel ? 'selected' : ''}"
-                                data-date="${date.toISOString().slice(0,10)}">${d}</button>`;
+                                data-date="${localISODate(date)}">${d}</button>`;
               }).join('')}
             </div>
           `;
@@ -689,10 +712,10 @@
             viewDate.setMonth(viewDate.getMonth() + 1);
             render();
           });
-                    $$('.dp-day', popup).forEach(btn => {
+          $$('.dp-day', popup).forEach(btn => {
             btn.addEventListener('click', () => {
               const date = btn.dataset.date;
-              selected = new Date(date);
+              selected = parseLocalISODate(date);
               if (input) input.value = date;
               popup.classList.remove('open');
 
@@ -788,22 +811,45 @@
     // ════════════════════════════════════════════════════
     const Popover = {
       init() {
+        if (this._inited) return;
+        this._inited = true;
+
+        // One listener, deliberately. This used to be two separate document
+        // listeners: the first opened the popover and called stopPropagation(),
+        // the second closed every open popover whenever the click was outside
+        // `.popover`. stopPropagation() does not stop other listeners on the
+        // SAME node -- only stopImmediatePropagation() does -- so the second
+        // listener always ran and always closed the popover the first had just
+        // opened. The component could not be opened at all.
         document.addEventListener('click', e => {
-          const trigger = e.target.closest('[data-popover]');
-          if (!trigger) return;
+          const node = e.target;
+          const el = node && node.nodeType === 1 ? node : node?.parentElement;
+          if (!el) return;
 
-          const id = trigger.dataset.popover;
-          const pop = document.getElementById(id);
-          if (!pop) return;
+          const trigger = el.closest('[data-popover]');
+          if (trigger) {
+            const pop = document.getElementById(trigger.dataset.popover);
+            if (!pop) return;
+            // Close any other popover before toggling this one, so triggers
+            // behave like a radio group rather than stacking.
+            $$('.popover.open').forEach(p => { if (p !== pop) p.classList.remove('open'); });
+            this.toggle(pop, trigger);
+            return;
+          }
 
-          e.stopPropagation();
-          this.toggle(pop, trigger);
+          // A click inside an open popover is interaction with its content.
+          if (el.closest('.popover')) return;
+
+          $$('.popover.open').forEach(p => p.classList.remove('open'));
         });
 
-        document.addEventListener('click', e => {
-          if (!e.target.closest('.popover')) {
-            $$('.popover.open').forEach(p => p.classList.remove('open'));
-          }
+        // Escape closes the topmost popover, matching every other dismissible
+        // surface in the app.
+        document.addEventListener('keydown', e => {
+          if (e.key !== 'Escape') return;
+          const open = $$('.popover.open');
+          if (!open.length) return;
+          open[open.length - 1].classList.remove('open');
         });
       },
 

@@ -1,9 +1,12 @@
+import { createOperationContext } from '../core/operationContext.js';
+import { workerAssets } from '../core/workerAssets.js';
+
 const IDLE_TIMEOUT = 30000;
 const IDLE_CHECK_INTERVAL = 10000;
 
 const workerDefs = {
-  search: createDefinition(new URL('../workers/search.worker.js', import.meta.url).href),
-  catalog: createDefinition(new URL('../workers/catalog.worker.js', import.meta.url).href),
+  search: createDefinition(workerAssets.search),
+  catalog: createDefinition(workerAssets.catalog),
 };
 
 let messageId = 0;
@@ -19,16 +22,80 @@ function createDefinition(url) {
   };
 }
 
+function staleWorkerError(workerName, requestId = null, generation = null) {
+  const error = new Error(`Worker "${workerName}" request became stale`);
+  error.code = 'STALE_WORKER_REQUEST';
+  error.requestId = requestId;
+  error.generation = generation;
+  return error;
+}
+
+function busyWorkerError(workerName) {
+  const error = new Error(`Worker "${workerName}" is busy`);
+  error.code = 'WORKER_BUSY';
+  return error;
+}
+
+function supersededWorkerError(workerName, supersedeKey) {
+  const error = new Error(`Worker "${workerName}" request was superseded`);
+  error.code = 'WORKER_SUPERSEDED';
+  error.supersedeKey = supersedeKey;
+  return error;
+}
+
+function abortError(reason) {
+  if (typeof DOMException === 'function') return new DOMException(reason || 'Worker request aborted', 'AbortError');
+  const error = new Error(reason || 'Worker request aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function stableIdentity(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableIdentity).join(',')}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableIdentity(value[key])}`).join(',')}}`;
+}
+
+function sameIdentity(left, right) {
+  return stableIdentity(left) === stableIdentity(right);
+}
+
 function isBusy(def) {
   return def.pending.size > 0;
+}
+
+function maybeStopIdleCheck() {
+  if (!idleTimer) return;
+  const active = Object.values(workerDefs).some(def => def.instance || def.pending.size);
+  if (!active) {
+    clearInterval(idleTimer);
+    idleTimer = null;
+  }
+}
+
+function sendCancellation(worker, pending, reason) {
+  try {
+    worker?.postMessage?.({
+      type: 'cancel',
+      id: pending.requestId,
+      requestId: pending.requestId,
+      generation: pending.generation,
+      resource: pending.operationContext.resource,
+      revision: pending.operationContext.revision,
+      authority: pending.operationContext.authority,
+      reason,
+    });
+  } catch {}
 }
 
 function rejectGeneration(def, generation, error) {
   for (const [id, pending] of def.pending) {
     if (pending.generation !== generation) continue;
     def.pending.delete(id);
+    pending.operationContext.invalidate();
     pending.reject(error);
   }
+  maybeStopIdleCheck();
 }
 
 function destroyWorker(def, error = null) {
@@ -37,9 +104,22 @@ function destroyWorker(def, error = null) {
   def.instance = null;
   def.generation += 1;
   if (worker) {
-    try { worker.terminate(); } catch { /* best effort */ }
+    try { worker.terminate(); } catch {}
   }
   if (error) rejectGeneration(def, generation, error);
+  maybeStopIdleCheck();
+}
+
+function responseMatchesRequest(payload, pending, workerGeneration) {
+  return payload?.id === pending.requestId
+    && payload?.requestId === pending.requestId
+    && payload?.generation === pending.generation
+    && workerGeneration === pending.generation
+    && payload?.resource === pending.operationContext.resource
+    && payload?.revision === pending.operationContext.revision
+    && sameIdentity(payload?.authority ?? null, pending.operationContext.authority ?? null)
+    && pending.operationContext.isCurrent()
+    && (!pending.parentContext || pending.parentContext.isCurrent());
 }
 
 function getWorker(name) {
@@ -56,17 +136,38 @@ function getWorker(name) {
     const worker = new Worker(def.url, { type: 'classic' });
 
     worker.onmessage = (event) => {
-      const { type, id, ...data } = event.data || {};
-      const pending = def.pending.get(id);
-      if (!pending || pending.generation !== generation) return;
-      def.pending.delete(id);
+      if (def.instance !== worker || def.generation !== generation) return;
+
+      const payload = event.data ?? {};
+      const pending = def.pending.get(payload.id);
+      if (!pending) return;
+      if (!responseMatchesRequest(payload, pending, generation)) {
+        def.pending.delete(payload.id);
+        pending.operationContext.invalidate();
+        pending.reject(staleWorkerError(name, payload.id, generation));
+        maybeStopIdleCheck();
+        return;
+      }
+
+      def.pending.delete(payload.id);
       def.lastUsed = Date.now();
-      if (type === 'error') pending.reject(new Error(data.error || 'Worker error'));
-      else pending.resolve({ type, ...data });
+      const { type, requestId, generation: responseGeneration, resource, revision, authority, ...data } = payload;
+      const provenance = Object.freeze({ requestId, generation: responseGeneration, resource, revision, authority });
+      if (type === 'error') {
+        const error = new Error(data.error || 'Worker error');
+        error.code = data.code || 'WORKER_ERROR';
+        error.provenance = provenance;
+        pending.reject(error);
+      } else {
+        pending.resolve({ type, ...data, provenance });
+      }
+      maybeStopIdleCheck();
     };
 
     worker.onerror = (event) => {
+      if (def.instance !== worker || def.generation !== generation) return;
       const error = new Error(`Worker "${name}" crashed: ${event.message || 'unknown error'}`);
+      error.code = 'WORKER_CRASH';
       destroyWorker(def, error);
       console.warn(`[WorkerPool] Worker "${name}" error:`, event.message);
     };
@@ -83,10 +184,9 @@ function getWorker(name) {
 function terminateIdleWorkers() {
   const now = Date.now();
   for (const def of Object.values(workerDefs)) {
-    if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) {
-      destroyWorker(def);
-    }
+    if (def.instance && !isBusy(def) && now - def.lastUsed > IDLE_TIMEOUT) destroyWorker(def);
   }
+  maybeStopIdleCheck();
 }
 
 function startIdleCheck() {
@@ -94,62 +194,136 @@ function startIdleCheck() {
   idleTimer = setInterval(terminateIdleWorkers, IDLE_CHECK_INTERVAL);
 }
 
-export function runInWorker(workerName, message, { transfer = [], timeout = 30000 } = {}) {
-  return new Promise((resolve, reject) => {
+function supersedePending(def, workerName, supersedeKey) {
+  if (!supersedeKey) return;
+  for (const [id, pending] of def.pending) {
+    if (pending.supersedeKey !== supersedeKey) continue;
+    def.pending.delete(id);
+    sendCancellation(def.instance, pending, 'superseded');
+    pending.operationContext.invalidate();
+    pending.reject(supersededWorkerError(workerName, supersedeKey));
+  }
+}
+
+export function runInWorker(workerName, message, {
+  transfer = [],
+  timeout = 30000,
+  signal = null,
+  context: parentContext = null,
+  resource = null,
+  revision = null,
+  authority = null,
+  supersedeKey = null,
+} = {}) {
+  const consumer = new Promise((resolve, reject) => {
     const handle = getWorker(workerName);
     if (!handle) {
-      reject(new Error(`Worker "${workerName}" not available`));
+      const error = new Error(`Worker "${workerName}" not available`);
+      error.code = 'WORKER_UNAVAILABLE';
+      reject(error);
       return;
     }
 
     const { worker, generation, def } = handle;
+    supersedePending(def, workerName, supersedeKey);
     if (isBusy(def)) {
-      reject(new Error(`Worker "${workerName}" is busy`));
+      reject(busyWorkerError(workerName));
       return;
     }
 
     const id = ++messageId;
+    const operationContext = createOperationContext({
+      resource: resource ?? parentContext?.resource ?? workerName,
+      revision: revision ?? parentContext?.revision ?? null,
+      generation,
+      authority: authority ?? parentContext?.authority ?? null,
+      signal,
+    });
     let timer = null;
-
-    const settle = (fn) => (value) => {
+    let abortListener = null;
+    const cleanup = () => {
       if (timer) clearTimeout(timer);
+      if (abortListener) signal?.removeEventListener?.('abort', abortListener);
+    };
+    const settle = fn => value => {
+      cleanup();
       fn(value);
     };
 
-    def.pending.set(id, {
+    const pending = {
+      requestId: id,
       generation,
+      operationContext,
+      parentContext,
+      supersedeKey,
       resolve: settle(resolve),
       reject: settle(reject),
-    });
+    };
+    def.pending.set(id, pending);
+
+    if (signal) {
+      abortListener = () => {
+        const current = def.pending.get(id);
+        if (!current) return;
+        def.pending.delete(id);
+        sendCancellation(worker, current, 'aborted');
+        current.operationContext.invalidate();
+        current.reject(abortError(signal.reason?.message || 'Worker request aborted'));
+        maybeStopIdleCheck();
+      };
+      if (signal.aborted) {
+        abortListener();
+        return;
+      }
+      signal.addEventListener('abort', abortListener, { once: true });
+    }
 
     if (timeout > 0) {
       timer = setTimeout(() => {
-        const pending = def.pending.get(id);
-        if (!pending || pending.generation !== generation) return;
+        const current = def.pending.get(id);
+        if (!current || current.generation !== generation) return;
         def.pending.delete(id);
+        sendCancellation(worker, current, 'timeout');
+        current.operationContext.invalidate();
         const error = new Error(`Worker "${workerName}" timed out after ${timeout}ms`);
-        // A timed-out worker may still emit a late response or be stuck in a CPU
-        // loop. Terminate that generation rather than returning it to the pool.
-        destroyWorker(def, error);
-        pending.reject(error);
+        error.code = 'WORKER_TIMEOUT';
+        current.reject(error);
+        destroyWorker(def);
       }, timeout);
     }
 
     try {
-      worker.postMessage({ type: message.type, id, data: message.data || {} }, transfer);
+      worker.postMessage({
+        type: message.type,
+        id,
+        requestId: id,
+        generation,
+        resource: operationContext.resource,
+        revision: operationContext.revision,
+        authority: operationContext.authority,
+        data: Object.prototype.hasOwnProperty.call(message, 'data') ? message.data : {},
+      }, transfer);
     } catch (error) {
       def.pending.delete(id);
-      if (timer) clearTimeout(timer);
+      operationContext.invalidate();
+      cleanup();
       reject(error);
+      maybeStopIdleCheck();
+      return;
     }
 
     startIdleCheck();
   });
+
+  // Mark lifecycle-driven rejections as observed without changing what callers receive.
+  consumer.catch(() => {});
+  return consumer;
 }
 
 export function terminateAll() {
   for (const [name, def] of Object.entries(workerDefs)) {
     const error = new Error(`Worker pool terminated: ${name}`);
+    error.code = 'WORKER_POOL_TERMINATED';
     destroyWorker(def, error);
   }
   if (idleTimer) {
@@ -159,17 +333,17 @@ export function terminateAll() {
 }
 
 export function getWorkerStatus() {
-  return Object.fromEntries(
-    Object.entries(workerDefs).map(([name, def]) => [name, {
-      available: Boolean(def.instance),
-      busy: isBusy(def),
-      pending: def.pending.size,
-      generation: def.generation,
-      lastUsed: def.lastUsed || null,
-    }]),
-  );
+  return Object.fromEntries(Object.entries(workerDefs).map(([name, def]) => [name, {
+    available: Boolean(def.instance),
+    busy: isBusy(def),
+    pending: def.pending.size,
+    generation: def.generation,
+    lastUsed: def.lastUsed || null,
+  }]));
 }
 
 const WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
-window.OpenCourseDeck = window.OpenCourseDeck || {};
-window.OpenCourseDeck.WorkerPool = WorkerPool;
+if (typeof window !== 'undefined') {
+  window.OpenCourseDeck = window.OpenCourseDeck || {};
+  window.OpenCourseDeck.WorkerPool = WorkerPool;
+}

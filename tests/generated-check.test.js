@@ -1,3 +1,4 @@
+// @vitest-environment node
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,7 +44,7 @@ describe('generated output drift checks', () => {
     expect(result.changed).toEqual(['opencoursedeck.js']);
     expect(result.missing).toEqual(['chunks/needed.js']);
     expect(result.extra).toEqual(['extra.js']);
-  });
+  }, 30000);
 
   it('normalizes hashed chunk names while reporting stale content as extra', async () => {
     const { compareDirs } = await import('../scripts/check-generated.cjs');

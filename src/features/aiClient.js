@@ -67,9 +67,15 @@ function normalizeSettings(settings = {}) {
 }
 
 function plainText(value = '') {
-  const div = document.createElement('div');
-  div.innerHTML = String(value || '');
-  return (div.textContent || div.innerText || String(value || '')).replace(/\s+/g, ' ').trim();
+  // DOMParser instead of innerHTML on a detached element: innerHTML still
+  // triggers resource loads and inline handlers (<img onerror>), so
+  // summarizing hostile note content could execute script.
+  try {
+    const doc = new DOMParser().parseFromString(String(value || ''), 'text/html');
+    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+  } catch {
+    return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
 }
 
 function splitSentences(text) {

@@ -3,6 +3,7 @@ import { afterEach, beforeEach } from 'vitest';
 const CANVAS_AUTOSAVE_KEY = 'plasma-canvas-board';
 
 function resetCanvasSingleton() {
+  if (typeof window === 'undefined') return;
   const canvas = window.OpenCourseDeck?.Canvas;
   try { canvas?.destroy?.(); } catch {}
   try { delete window.OpenCourseDeck?.Canvas; } catch {}

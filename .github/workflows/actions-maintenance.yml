@@ -1,0 +1,155 @@
+name: Actions Maintenance
+
+run-name: Actions maintenance · ${{ github.event_name }} · attempt ${{ github.run_attempt }}
+
+# Artifact-producing workflows already set explicit 7- or 14-day retention.
+# Keep this manual-only for exceptional cleanup instead of scheduling a redundant write-capable run.
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: 'Delete non-expired artifacts older than this many days.'
+        required: false
+        default: '14'
+        type: string
+      dry_run:
+        description: 'Preview deletions without changing repository state.'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: actions-maintenance
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    name: Enforce artifact retention
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Inspect and clean workflow artifacts
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RETENTION_DAYS: ${{ inputs.retention_days }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          retries: 3
+          script: |
+            const rawRetentionDays = process.env.RETENTION_DAYS || '';
+            const dryRun = String(process.env.DRY_RUN).toLowerCase() === 'true';
+
+            if (!/^[1-9][0-9]*$/.test(rawRetentionDays)) {
+              core.setFailed(`RETENTION_DAYS must be a positive integer, received: ${rawRetentionDays || '<empty>'}`);
+              return;
+            }
+
+            const retentionDays = Number.parseInt(rawRetentionDays, 10);
+            if (!Number.isInteger(retentionDays) || retentionDays > 3650) {
+              core.setFailed(`RETENTION_DAYS must be between 1 and 3650, received: ${rawRetentionDays}`);
+              return;
+            }
+
+            const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              },
+              response => response.data.artifacts,
+            );
+
+            const staleArtifacts = artifacts
+              .filter((artifact) => !artifact.expired && Date.parse(artifact.created_at) < cutoff)
+              .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at));
+
+            let deleted = 0;
+            let alreadyGone = 0;
+            const failures = [];
+            const previewRows = [];
+
+            for (const artifact of staleArtifacts) {
+              const ageDays = Math.floor((Date.now() - Date.parse(artifact.created_at)) / 86400000);
+              previewRows.push([
+                artifact.name,
+                String(artifact.id),
+                `${ageDays} day(s)`,
+                dryRun ? 'would delete' : 'delete',
+              ]);
+
+              if (dryRun) {
+                core.notice(`Dry run: would delete ${artifact.name} (${artifact.id}), age ${ageDays} day(s)`);
+                continue;
+              }
+
+              try {
+                core.info(`Deleting ${artifact.name} (${artifact.id}), age ${ageDays} day(s)`);
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+              } catch (error) {
+                if (error.status === 404) {
+                  alreadyGone += 1;
+                  core.notice(`Artifact ${artifact.name} (${artifact.id}) was already removed; continuing.`);
+                  continue;
+                }
+                const message = `${artifact.name} (${artifact.id}): ${error.message}`;
+                failures.push(message);
+                core.warning(`Artifact deletion failed but cleanup will continue: ${message}`);
+              }
+            }
+
+            const summary = core.summary
+              .addHeading('Actions artifact retention')
+              .addTable([
+                [{ data: 'Mode', header: true }, dryRun ? 'dry run' : 'delete'],
+                [{ data: 'Retention days', header: true }, String(retentionDays)],
+                [{ data: 'Cutoff', header: true }, new Date(cutoff).toISOString()],
+                [{ data: 'Scanned', header: true }, String(artifacts.length)],
+                [{ data: 'Candidates', header: true }, String(staleArtifacts.length)],
+                [{ data: 'Deleted', header: true }, String(deleted)],
+                [{ data: 'Already absent', header: true }, String(alreadyGone)],
+                [{ data: 'Deletion failures', header: true }, String(failures.length)],
+              ]);
+
+            if (previewRows.length > 0) {
+              summary
+                .addHeading('Candidate artifacts', 3)
+                .addTable([
+                  [
+                    { data: 'Name', header: true },
+                    { data: 'ID', header: true },
+                    { data: 'Age', header: true },
+                    { data: 'Action', header: true },
+                  ],
+                  ...previewRows.slice(0, 50),
+                ]);
+              if (previewRows.length > 50) {
+                summary.addRaw(`\nOnly the first 50 of ${previewRows.length} candidates are shown.\n`);
+              }
+            }
+
+            if (failures.length > 0) {
+              summary
+                .addHeading('Deletion failures', 3)
+                .addList(failures);
+            }
+
+            await summary.write();
+
+            if (failures.length > 0) {
+              core.setFailed(`${failures.length} artifact deletion(s) failed after the remaining candidates were processed.`);
+            } else if (dryRun) {
+              core.notice(`Dry run complete: ${staleArtifacts.length} artifact(s) would be deleted.`);
+            } else {
+              core.notice(`Cleanup complete: deleted ${deleted} artifact(s).`);
+            }

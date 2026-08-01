@@ -1084,22 +1084,19 @@
     },
 
     undo() {
-      if (State.historyIdx <= 0) {
-        if (State.historyIdx === 0 && State.undoStack.length) {
-          const entry = State.undoStack[0];
-          State.layers = normalizeLayers(cloneJSON(entry.layers, []));
-          State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
-          State.selectedIds = new Set();
-          State.historyIdx = -1;
-          this._scheduleRender();
-          this._emitInteractiveChange('undo');
-        }
-        return;
-      }
-      State.historyIdx--;
+      // undoStack[i] holds the snapshot taken BEFORE the change at step i,
+      // so undoing must restore undoStack[historyIdx] (not historyIdx - 1)
+      // and stash the LIVE state — which exists nowhere on the undo stack —
+      // onto the redo stack first, or the newest change is unrecoverable.
+      if (State.historyIdx < 0 || !State.undoStack.length) return;
       const entry = State.undoStack[State.historyIdx];
       if (!entry) return;
-      State.redoStack.push(State.undoStack[State.historyIdx + 1]);
+      State.redoStack.push({
+        action: entry.action,
+        layers: cloneJSON(State.layers, []),
+        activeLayerIdx: State.activeLayerIdx,
+      });
+      State.historyIdx--;
       State.layers = normalizeLayers(cloneJSON(entry.layers, []));
       State.activeLayerIdx = Math.min(State.layers.length - 1, entry.activeLayerIdx);
       State.selectedIds = new Set();
@@ -1417,11 +1414,20 @@
       if (element.type === 'text') {
         return { x: finiteNumber(element.x, 0), y: finiteNumber(element.y, 0) - finiteNumber(element.fontSize, State.fontSize), width: finiteNumber(element.width, String(element.text || '').length * 10 || 80), height: finiteNumber(element.height, finiteNumber(element.fontSize, State.fontSize) + 12) };
       }
+      // Normalize rather than clamp: a shape dragged right-to-left or
+      // bottom-to-top has negative width/height, and clamping those to 0
+      // made the caller's `bounds.width > 2` size check fail, silently
+      // discarding every shape drawn in the -X/-Y direction. Take the
+      // absolute extent and move the origin to the top-left corner.
+      const rawX = finiteNumber(element.x, finiteNumber(element.x1, 0));
+      const rawY = finiteNumber(element.y, finiteNumber(element.y1, 0));
+      const rawWidth = finiteNumber(element.width, finiteNumber(element.x2, 0) - finiteNumber(element.x1, 0));
+      const rawHeight = finiteNumber(element.height, finiteNumber(element.y2, 0) - finiteNumber(element.y1, 0));
       return {
-        x: finiteNumber(element.x, finiteNumber(element.x1, 0)),
-        y: finiteNumber(element.y, finiteNumber(element.y1, 0)),
-        width: Math.max(0, finiteNumber(element.width, finiteNumber(element.x2, 0) - finiteNumber(element.x1, 0))),
-        height: Math.max(0, finiteNumber(element.height, finiteNumber(element.y2, 0) - finiteNumber(element.y1, 0))),
+        x: rawWidth < 0 ? rawX + rawWidth : rawX,
+        y: rawHeight < 0 ? rawY + rawHeight : rawY,
+        width: Math.abs(rawWidth),
+        height: Math.abs(rawHeight),
       };
     },
 
@@ -1460,16 +1466,51 @@
       this._loop();
     },
 
+    /**
+     * Log a per-element draw failure once per element, so a single bad shape
+     * does not produce one console line per frame at 60fps.
+     * @param {{ id?: string }} el
+     * @param {unknown} error
+     */
+    _reportElementError(el, error) {
+      this._elementErrors = this._elementErrors || new Set();
+      const key = el?.id ?? '(anonymous)';
+      if (this._elementErrors.has(key)) return;
+      this._elementErrors.add(key);
+      console.error(`[Canvas] element ${key} failed to draw; skipping it`, error);
+    },
+
     _render() {
       const ctx = this._ctx;
+      if (!ctx || !this._canvas) return;
+      try {
+        this._renderFrame(ctx);
+      } catch (error) {
+        console.error('[Canvas] frame render failed', error);
+      } finally {
+        // Guarantee a balanced context state regardless of how the frame
+        // exited. Canvas2D exposes no save-stack depth, and restore() on an
+        // empty stack is a specified no-op, so popping past the base is safe.
+        // Leaving the stack unbalanced is not: the next frame would start
+        // inside the previous frame's world transform and clip.
+        for (let i = 0; i < 8; i += 1) ctx.restore();
+        const dpr = window.devicePixelRatio ?? 1;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.setLineDash([]);
+      }
+    },
+
+    _renderFrame(ctx) {
       const w   = this._canvas.offsetWidth;
       const h   = this._canvas.offsetHeight;
 
       ctx.clearRect(0, 0, w, h);
 
-      // Background
+      // Background. getPropertyValue returns '' (never null) when the
+      // variable is unset, so `??` could not apply the fallback color.
       ctx.fillStyle = getComputedStyle(document.documentElement)
-        .getPropertyValue('--canvas-bg') ?? '#1e1e2e';
+        .getPropertyValue('--canvas-bg').trim() || '#1e1e2e';
       ctx.fillRect(0, 0, w, h);
 
       // Grid
@@ -1486,13 +1527,27 @@
         ctx.save();
         ctx.globalAlpha = layer.opacity ?? 1;
         for (const el of layer.elements) {
-          this._drawElement(ctx, el);
+          // One malformed element must not take down the frame. Board data
+          // arrives from imported .json and from cross-tab sync, so a missing
+          // points array or a bad font string is reachable without any bug on
+          // our side. An escaping throw skipped the ctx.restore() calls below,
+          // leaving the world transform applied and the save stack unbalanced,
+          // so every later frame compounded the corruption and the canvas
+          // froze permanently.
+          try {
+            this._drawElement(ctx, el);
+          } catch (error) {
+            this._reportElementError(el, error);
+          }
         }
         // Selection handles
         if (!layer.locked) {
           for (const el of layer.elements) {
-            if (State.selectedIds.has(el.id)) {
+            if (!State.selectedIds.has(el.id)) continue;
+            try {
               this._drawSelectionHandle(ctx, el);
+            } catch (error) {
+              this._reportElementError(el, error);
             }
           }
         }
@@ -1558,7 +1613,14 @@
       ctx.fillStyle   = 'rgba(15,23,42,0.8)';
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth   = 1;
-      ctx.roundRect?.(mmX, mmY, mmW, mmH, 6);
+      // roundRect APPENDS to the current path, it does not start one. Without
+      // beginPath() the fill/stroke below also painted every subpath left over
+      // from drawing the board's elements, smeared across the minimap corner.
+      ctx.beginPath();
+      // roundRect is not in older Safari/Firefox; a plain rect keeps the
+      // minimap correct rather than filling a stale path.
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(mmX, mmY, mmW, mmH, 6);
+      else ctx.rect(mmX, mmY, mmW, mmH);
       ctx.fill(); ctx.stroke();
 
       // Viewport indicator
@@ -1936,7 +1998,6 @@
     _drawText(ctx, el) {
       const {
         x, y, text = '',
-        font       = '14px Inter, sans-serif',
         fill       = '#f1f5f9',
         stroke     = null,
         strokeWidth = 1,
@@ -1948,7 +2009,14 @@
         wrapWidth  = 200,
       } = el;
 
-      ctx.font         = font;
+      // Elements created by this module store fontSize/fontFamily rather
+      // than a composed `font` string; without this, every text element
+      // rendered at the 14px default while hit-testing and SVG export used
+      // the real size.
+      const composedFont = el.font
+        || `${finiteNumber(el.fontSize, State.fontSize)}px ${el.fontFamily || State.fontFamily || 'Inter, sans-serif'}`;
+
+      ctx.font         = composedFont;
       ctx.textAlign    = align;
       ctx.textBaseline = baseline;
 

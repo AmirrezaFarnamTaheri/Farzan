@@ -1,3 +1,10 @@
+import {
+  AI_BINDING_KEY,
+  AI_SESSION_KEY,
+  AI_SETTINGS_KEY,
+  stripPortableAIAuthority,
+} from './aiAuthority.js';
+
 const DATABASE_NAME = 'opencoursedeck';
 const DATABASE_VERSION = 3;
 const MAIN_STORES = Object.freeze([
@@ -18,12 +25,24 @@ function openDatabase(root) {
       return;
     }
     const request = root.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Unable to open OpenCourseDeck storage'));
-    request.onblocked = () => reject(new Error('OpenCourseDeck storage is blocked by another tab'));
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
+    request.onsuccess = () => {
+      if (settled) {
+        try { request.result.close(); } catch {}
+        return;
+      }
+      settle(resolve, request.result);
+    };
+    request.onerror = () => settle(reject, request.error || new Error('Unable to open OpenCourseDeck storage'));
+    request.onblocked = () => settle(reject, new Error('OpenCourseDeck storage is blocked by another tab'));
     request.onupgradeneeded = () => {
       request.transaction?.abort?.();
-      reject(new Error('Backup engine cannot create or upgrade the application schema'));
+      settle(reject, new Error('Backup engine cannot create or upgrade the application schema'));
     };
   });
 }
@@ -41,6 +60,31 @@ function requestResult(request) {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
   });
+}
+
+function sanitizeSettingsRecords(records = []) {
+  return records.map((record) => {
+    if (!record || record.key !== AI_SETTINGS_KEY) return record;
+    return { ...record, value: stripPortableAIAuthority(record.value) };
+  });
+}
+
+function sanitizePortableBackup(input) {
+  const sanitized = { ...input };
+  if (Array.isArray(input?.settings)) sanitized.settings = sanitizeSettingsRecords(input.settings);
+  if (input?._meta && typeof input._meta === 'object') sanitized._meta = { ...input._meta };
+  return sanitized;
+}
+
+function clearSessionAuthority(root) {
+  const failures = [];
+  for (const key of [AI_SESSION_KEY, AI_BINDING_KEY]) {
+    try {
+      root.sessionStorage?.removeItem?.(key);
+      if (root.sessionStorage?.getItem?.(key) != null) throw new Error(`Session key ${key} remained after deletion`);
+    } catch (error) { failures.push({ key, message: error?.message || String(error) }); }
+  }
+  return failures;
 }
 
 function validateBackup(input) {
@@ -79,16 +123,18 @@ export function installBackupEngine(root = window) {
       const available = MAIN_STORES.filter(store => db.objectStoreNames.contains(store));
       const transaction = db.transaction(available, 'readonly');
       const result = {};
-      const reads = available.map(async store => {
-        result[store] = await requestResult(transaction.objectStore(store).getAll());
+      const reads = available.map(async (store) => {
+        const records = await requestResult(transaction.objectStore(store).getAll());
+        result[store] = store === 'settings' ? sanitizeSettingsRecords(records) : records;
       });
       await Promise.all(reads);
       await transactionDone(transaction);
       result._meta = {
         format: 'opencoursedeck-snapshot',
-        version: 2,
+        version: 3,
         databaseVersion: db.version,
         exportedAt: new Date().toISOString(),
+        portableAuthority: false,
         stores: countRecords(result, available),
       };
       return result;
@@ -99,7 +145,8 @@ export function installBackupEngine(root = window) {
 
   facade.importBackup = async (input, { mode = 'merge' } = {}) => {
     if (!['merge', 'overwrite'].includes(mode)) throw new TypeError(`Unsupported import mode: ${mode}`);
-    const included = validateBackup(input);
+    const portable = sanitizePortableBackup(input);
+    const included = validateBackup(portable);
     const db = await openDatabase(root);
     try {
       const missing = included.filter(store => !db.objectStoreNames.contains(store));
@@ -112,23 +159,45 @@ export function installBackupEngine(root = window) {
         for (const storeName of included) {
           const store = transaction.objectStore(storeName);
           if (mode === 'overwrite') store.clear();
-          for (const record of input[storeName]) store.put(record);
-          counts[storeName] = input[storeName].length;
+          for (const record of portable[storeName]) store.put(record);
+          counts[storeName] = portable[storeName].length;
         }
       } catch (error) {
         try { transaction.abort(); } catch {}
         throw error;
       }
       await completion;
+      const authorityFailures = clearSessionAuthority(root);
+      const degraded = authorityFailures.length > 0;
 
       const receipt = {
         committed: true,
+        durable: true,
+        status: degraded ? 'committed-degraded' : 'committed',
+        degraded,
+        retrySafe: false,
         mode,
         importedAt: new Date().toISOString(),
         stores: counts,
         totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        aiAuthorityInvalidated: !degraded,
+        warnings: degraded ? [{
+          code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
+          message: 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
+          failures: authorityFailures,
+        }] : [],
       };
       root.OpenCourseDeck?.bus?.emit?.('storage:import-complete', receipt);
+      if (degraded) {
+        root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidation-incomplete', {
+          reason: 'backup-import',
+          committed: true,
+          retrySafe: false,
+          failures: authorityFailures,
+        });
+      } else {
+        root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidated', { reason: 'backup-import' });
+      }
       return receipt;
     } finally {
       db.close();
@@ -140,6 +209,7 @@ export function installBackupEngine(root = window) {
   root.OpenCourseDeck.BackupEngine = {
     databaseName: DATABASE_NAME,
     stores: MAIN_STORES,
+    sanitizePortableBackup,
     validateBackup,
   };
   return facade;

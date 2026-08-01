@@ -1,7 +1,7 @@
-const js = require('@eslint/js');
-const globals = require('globals');
+import js from '@eslint/js';
+import globals from 'globals';
 
-module.exports = [
+export default [
   {
     ignores: [
       '**/node_modules/**',
@@ -58,7 +58,7 @@ module.exports = [
     },
   },
   {
-    files: ['scripts/**/*.cjs', 'eslint.config.js'],
+    files: ['scripts/**/*.cjs', 'desktop/**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
     },

@@ -10,7 +10,6 @@ const requiredVendor = [
   'chart.umd.js',
   'pdf.min.mjs',
   'pdf.worker.min.mjs',
-  'marked.min.js',
   'purify.min.js',
   'fuse.min.js',
 ];

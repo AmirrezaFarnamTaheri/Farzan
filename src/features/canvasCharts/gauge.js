@@ -37,7 +37,10 @@ export class CanvasGauge {
     this._animStart = null;
     this._animFrom = 0;
     this._animTo = this._value;
-    this._currentDisplay = 0;
+    // Must match the clamped initial value: _draw() paints _currentDisplay,
+    // so leaving this at 0 renders the needle/text at 0 (or off-scale
+    // outside the arc when min !== 0) until the first setValue() call.
+    this._currentDisplay = this._value;
 
     this._cachedDpr = 0;
     this._cachedW = 0;

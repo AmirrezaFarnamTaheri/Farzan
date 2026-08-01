@@ -18,6 +18,8 @@ export function stagger(value, config = {}) {
   const min = isRange ? value[0] : 0;
   const max = isRange ? value[1] : value;
 
+  let randomOrigin = null;
+
   return function getStaggeredValue(index, total) {
     let fromIndex;
     if (typeof from === 'number') {
@@ -27,7 +29,14 @@ export function stagger(value, config = {}) {
         case 'first': fromIndex = 0; break;
         case 'center': fromIndex = (total - 1) / 2; break;
         case 'last': fromIndex = total - 1; break;
-        case 'random': fromIndex = Math.floor(Math.random() * total); break;
+        case 'random':
+          // Roll one origin for the whole set so values radiate from a
+          // single random element instead of per-element noise.
+          if (randomOrigin === null || randomOrigin >= total) {
+            randomOrigin = Math.floor(Math.random() * total);
+          }
+          fromIndex = randomOrigin;
+          break;
         default: fromIndex = 0;
       }
     }

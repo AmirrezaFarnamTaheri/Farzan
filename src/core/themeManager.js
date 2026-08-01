@@ -42,10 +42,14 @@ export const ThemeManager = {
     try { localStorage.setItem(this.STORAGE_KEY, theme); } catch { /* ignore */ }
 
     // Update all toggle buttons
+    // Key off the coarse light/dark classification, not `effective === 'dark'`:
+    // getEffective() returns the theme NAME, so midnight/forest/ocean/sunset/
+    // rose (all dark) would otherwise be labelled as light and show the wrong
+    // icon and aria-label.
     $$('[data-theme-toggle]').forEach((btn) => {
       const icon = $('[data-theme-icon]', btn);
-      if (icon) icon.textContent = effective === 'dark' ? '☀️' : '🌙';
-      btn.setAttribute('aria-label', effective === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+      if (icon) icon.textContent = isLightTheme ? '🌙' : '☀️';
+      btn.setAttribute('aria-label', isLightTheme ? 'Switch to dark mode' : 'Switch to light mode');
       btn.setAttribute('data-current-theme', effective);
     });
 
@@ -64,7 +68,12 @@ export const ThemeManager = {
    */
   toggle() {
     const effective = this.getEffective();
-    this.apply(effective === 'dark' ? 'light' : 'dark');
+    // Same classification as apply(): a user on a named dark theme
+    // (midnight/forest/ocean/sunset/rose) pressing the toggle expects light
+    // mode, but `effective === 'dark'` was false for all of them, so the
+    // toggle just swapped one dark theme for another.
+    const isLight = effective === 'light' || effective === 'paper';
+    this.apply(isLight ? 'dark' : 'light');
   },
 
   /**

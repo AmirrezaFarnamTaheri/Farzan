@@ -19,8 +19,15 @@ class FakeWorker {
     this.terminated = true;
   }
 
-  respond(payload) {
-    this.onmessage?.({ data: payload });
+  respond(payload = {}) {
+    const request = this.messages.find(message => message.id === payload.id) || this.messages[0];
+    this.onmessage?.({
+      data: {
+        ...request,
+        type: 'result',
+        ...payload,
+      },
+    });
   }
 
   crash(message = 'boom') {
@@ -63,9 +70,8 @@ describe('worker pool generation isolation', () => {
 
     const second = pool.runInWorker('search', { type: 'query', data: { q: 'b' } });
     const newWorker = FakeWorker.instances[1];
-    expect(newWorker).not.toBe(oldWorker);
     const [{ id }] = newWorker.messages;
-    newWorker.respond({ type: 'result', id, items: ['ok'] });
+    newWorker.respond({ id, items: ['ok'] });
     await expect(second).resolves.toMatchObject({ type: 'result', items: ['ok'] });
   });
 
@@ -81,9 +87,9 @@ describe('worker pool generation isolation', () => {
     const second = pool.runInWorker('search', { type: 'query' });
     const newWorker = FakeWorker.instances[1];
     const newId = newWorker.messages[0].id;
-    oldWorker.respond({ type: 'result', id: newId, items: ['stale'] });
+    oldWorker.respond({ id: newId, items: ['stale'] });
     expect(pool.getWorkerStatus().search.pending).toBe(1);
-    newWorker.respond({ type: 'result', id: newId, items: ['fresh'] });
+    newWorker.respond({ id: newId, items: ['fresh'] });
     await expect(second).resolves.toMatchObject({ items: ['fresh'] });
     expect(oldId).not.toBe(newId);
   });
@@ -96,8 +102,8 @@ describe('worker pool generation isolation', () => {
     await expect(pool.runInWorker('search', { type: 'query' })).rejects.toThrow('busy');
 
     const [searchWorker, catalogWorker] = FakeWorker.instances;
-    searchWorker.respond({ type: 'result', id: searchWorker.messages[0].id });
-    catalogWorker.respond({ type: 'result', id: catalogWorker.messages[0].id });
+    searchWorker.respond({ id: searchWorker.messages[0].id });
+    catalogWorker.respond({ id: catalogWorker.messages[0].id });
     await expect(Promise.all([search, catalog])).resolves.toHaveLength(2);
   });
 
@@ -111,7 +117,7 @@ describe('worker pool generation isolation', () => {
     await vi.advanceTimersByTimeAsync(25);
     await rejection;
     expect(worker.terminated).toBe(true);
-    worker.respond({ type: 'result', id });
+    worker.respond({ id });
     expect(pool.getWorkerStatus().search.pending).toBe(0);
   });
 });

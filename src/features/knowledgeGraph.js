@@ -114,6 +114,11 @@ export class KnowledgeGraph extends EventEmitter {
     const minWc = Math.min(...wcValues, 0);
     const range = maxWc - minWc || 1;
 
+    // First pass: create every node (and index nodes by title as well as
+    // id, since [[wikilinks]] reference titles while DB notes carry
+    // generated ids). Edges are resolved in a second pass so a link to a
+    // note that iterates later is not silently dropped.
+    const byRef = new Map();
     let idx = 0;
     for (const note of noteMap.values()) {
       const id = String(note.id || note.title || '').toLowerCase();
@@ -136,12 +141,19 @@ export class KnowledgeGraph extends EventEmitter {
         vy: 0,
       });
       nodeSet.add(id);
+      byRef.set(id, id);
+      const title = String(note.title || '').toLowerCase().trim();
+      if (title && !byRef.has(title)) byRef.set(title, id);
+    }
 
+    for (const note of noteMap.values()) {
+      const id = String(note.id || note.title || '').toLowerCase();
       const links = extractWikilinks(note.content || '');
       for (const target of links) {
-        const targetId = target.toLowerCase();
+        const targetId = byRef.get(String(target).toLowerCase().trim());
+        if (!targetId || targetId === id) continue;
         const edgeKey = `${id}->${targetId}`;
-        if (!edgeSet.has(edgeKey) && nodeSet.has(targetId)) {
+        if (!edgeSet.has(edgeKey)) {
           edges.push({ source: id, target: targetId });
           edgeSet.add(edgeKey);
         }

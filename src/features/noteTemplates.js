@@ -66,14 +66,22 @@ const BUILTIN_TEMPLATES = {
     id: 'builtin-daily',
     title: 'Daily Journal',
     builtin: true,
-    content: `<h2>Date</h2>
-<p>${new Date().toISOString().slice(0, 10)}</p>
+    // Getter, not a static string: a module-scope template literal froze the
+    // date at import time, so an app left open across midnight stamped
+    // yesterday into every new journal entry. Formatted from local date
+    // parts (toISOString would shift the day for non-UTC users).
+    get content() {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      return `<h2>Date</h2>
+<p>${today}</p>
 <h2>Goals for Today</h2>
 <ul><li><input type="checkbox"> Goal 1</li><li><input type="checkbox"> Goal 2</li></ul>
 <h2>Notes</h2>
 <p>Capture thoughts and observations.</p>
 <h2>Reflection</h2>
-<p>What went well? What could improve?</p>`,
+<p>What went well? What could improve?</p>`;
+    },
   },
 };
 
@@ -189,6 +197,13 @@ export function getTemplatePickerItems() {
   });
 }
 
-const NoteTemplates = { getAllTemplates, getTemplate, saveAsTemplate, updateTemplate, deleteTemplate, getTemplatePickerItems };
+export const NoteTemplates = {
+  getAllTemplates,
+  getTemplate,
+  saveAsTemplate,
+  updateTemplate,
+  deleteTemplate,
+  getTemplatePickerItems,
+};
 window.OpenCourseDeck = window.OpenCourseDeck || {};
 window.OpenCourseDeck.NoteTemplates = NoteTemplates;

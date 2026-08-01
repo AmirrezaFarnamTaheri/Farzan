@@ -1,7 +1,7 @@
 {
-  "$schema": "../../tauri-dev/tauri-dev/crates/tauri-schema-generator/schemas/desktop-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default OpenCourseDeck desktop capability set.",
+  "description": "Deny-by-default capability for the OpenCourseDeck main window.",
   "windows": ["main"],
   "permissions": []
 }

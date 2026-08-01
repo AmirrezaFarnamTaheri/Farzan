@@ -25,7 +25,11 @@ const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 function parseDate(str) {
   const parts = String(str).split('-');
   if (parts.length < 3) return null;
-  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  // An Invalid Date (e.g. an ISO datetime string) is still truthy, so
+  // callers must explicitly reject it — otherwise it poisons min/maxDate
+  // with NaN and the grid-walk loop below never terminates.
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function buildGrid(data) {
@@ -56,7 +60,10 @@ function buildGrid(data) {
   let weekIdx = 0;
   let lastMonth = -1;
 
-  while (current <= maxDate || current.getDay() !== 1) {
+  // Iteration cap as defense-in-depth against a future loop-condition bug.
+  const maxIterations = 7 * 400;
+  let iterations = 0;
+  while ((current <= maxDate || current.getDay() !== 1) && iterations++ < maxIterations) {
     const dayOfWeek = current.getDay() === 0 ? 6 : current.getDay() - 1;
     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
     const val = grid.get(key) || 0;
@@ -99,7 +106,16 @@ export const chartHeatmap = {
     const weekdayWidth = showWeekdays ? 30 : 0;
     const monthHeight = showMonths ? 16 : 0;
 
-    const grid = buildGrid(data);
+    // buildGrid is O(days) with per-day string-key construction; afterDraw
+    // runs on every mousemove via afterEvent's chart.draw() calls, so
+    // without caching by data identity a full grid rebuild happens per
+    // pointer event.
+    let grid = chart._heatmapGridCache;
+    if (!grid || chart._heatmapGridCacheData !== data) {
+      grid = buildGrid(data);
+      chart._heatmapGridCache = grid;
+      chart._heatmapGridCacheData = data;
+    }
     if (!grid.cells.length) return;
 
     const offsetX = chartArea.left + weekdayWidth;
@@ -183,8 +199,13 @@ export const chartHeatmap = {
     const event = args.event;
     if (event.type !== 'mousemove' && event.type !== 'mouseout') return;
 
+    const hadTooltip = Boolean(chart._heatmapTooltip);
+
     if (event.type === 'mouseout') {
       chart._heatmapTooltip = null;
+      // Without this the last-painted tooltip box stayed on the canvas
+      // after the pointer left the grid.
+      if (hadTooltip) chart.draw();
       return;
     }
 
@@ -199,12 +220,18 @@ export const chartHeatmap = {
       const x = cfg.offsetX + cell.week * (cfg.scaledCell + cfg.scaledGap);
       const y = cfg.offsetY + cell.day * (cfg.scaledCell + cfg.scaledGap);
       if (mx >= x && mx <= x + cfg.scaledCell && my >= y && my <= y + cfg.scaledCell) {
-        chart._heatmapTooltip = { x: x + cfg.scaledCell / 2, y, date: cell.date, value: cell.value };
-        chart.draw();
+        // Redraw only when the hovered cell actually changed — otherwise
+        // every mousemove within the same cell triggers a full grid
+        // rebuild + repaint.
+        if (chart._heatmapTooltip?.date !== cell.date) {
+          chart._heatmapTooltip = { x: x + cfg.scaledCell / 2, y, date: cell.date, value: cell.value };
+          chart.draw();
+        }
         return;
       }
     }
 
     chart._heatmapTooltip = null;
+    if (hadTooltip) chart.draw();
   },
 };

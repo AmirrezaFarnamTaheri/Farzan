@@ -194,6 +194,26 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getSetting('plasma-studio-board')).toBeNull();
   });
 
+
+  it('rejects a clear operation when any primary IndexedDB store fails', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async clear(store) {
+        if (store === 'notes') throw new Error('notes clear failed');
+        return true;
+      }
+      async count() { return 0; }
+    };
+
+    const error = await window.DB.clearUserData('notes').catch(value => value);
+
+    expect(error).toMatchObject({ code: 'STORAGE_RESET_INCOMPLETE' });
+    expect(error.receipt).toMatchObject({ committed: false, durable: false, status: 'failed' });
+    expect(error.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ backend: 'indexedDB', store: 'notes', message: 'notes clear failed' }),
+    ]));
+  });
+
   it('does not fall back to localStorage when progress save hits storage quota', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
@@ -458,6 +478,23 @@ describe('bridge DB safety helpers', () => {
     expect(docB.map((annotation) => annotation.id)).toEqual(['b-1']);
   });
 
+  it('replaces a document annotation set and removes stale canonical records', async () => {
+    await window.DB.saveAnnotations('doc-replace', {
+      1: [
+        { id: 'keep', type: 'highlight', updatedAt: 10 },
+        { id: 'remove', type: 'text', updatedAt: 10 },
+      ],
+    });
+
+    await window.DB.saveAnnotations('doc-replace', {
+      2: [{ id: 'keep', type: 'draw', updatedAt: 20 }],
+    });
+
+    expect(await window.DB.getAnnotations('doc-replace')).toEqual([
+      expect.objectContaining({ id: 'keep', type: 'draw', page: 2 }),
+    ]);
+  });
+
   it('returns all PDF annotations for backup export', async () => {
     await window.DB.saveAnnotations('doc-a', {
       1: [{ id: 'a-1', type: 'highlight', updatedAt: 10 }],
@@ -673,5 +710,92 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.getFoldersByParent(null)).resolves.toEqual([
       expect.objectContaining({ id: 'folder-b' }),
     ]);
+  });
+  it('gives id-less legacy records deterministic ids so a retried migration cannot duplicate them', async () => {
+    // Records without an id previously got a fresh random id on every run,
+    // so the dedupe ledger never matched and each retry re-inserted them.
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { topicId: 't1', time: 12 },
+      { topicId: 't2', time: 34 },
+    ]));
+
+    await window.DB.getAllTimestamps();
+    const first = await window.DB.getAllTimestamps();
+    expect(first).toHaveLength(2);
+    const ids = first.map((ts) => ts.id).sort();
+    expect(ids).toHaveLength(2);
+    expect(ids.every(id => /^timestamp-migrated-v3-/.test(id))).toBe(true);
+
+    // Reorder the legacy payload and force another migration pass. Identity
+    // must follow record content rather than array position.
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { topicId: 't2', time: 34 },
+      { topicId: 't1', time: 12 },
+    ]));
+    localStorage.removeItem('plasma_migrated_v2');
+    await window.DB.getAllTimestamps();
+    const second = await window.DB.getAllTimestamps();
+
+    expect(second).toHaveLength(2);
+    expect(second.map((ts) => ts.id).sort()).toEqual(ids);
+    expect(JSON.parse(localStorage.getItem('plasma_migration_report_v3'))).toMatchObject({
+      version: 3,
+      status: 'completed',
+    });
+  });
+
+  it('shares one in-flight migration across concurrent DB calls', async () => {
+    localStorage.setItem('plasma-notes', JSON.stringify([
+      { id: 'concurrent-note', title: 'Legacy', updatedAt: 1 },
+    ]));
+
+    const [a, b, c] = await Promise.all([
+      window.DB.getAllNotes(),
+      window.DB.getAllNotes(),
+      window.DB.getAllNotes(),
+    ]);
+
+    // No duplicate inserts from parallel migration runs.
+    for (const result of [a, b, c]) {
+      expect(result.filter((n) => n.id === 'concurrent-note')).toHaveLength(1);
+    }
+  });
+
+  it('keeps the localStorage note mirror intact when the IndexedDB delete cannot run', async () => {
+    // Post-migration but with IndexedDB unavailable, the mirror is the only
+    // live store -- removing the whole key would erase every note.
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma-notes', JSON.stringify([
+      { id: 'keep-me', title: 'Survivor' },
+      { id: 'drop-me', title: 'Doomed' },
+    ]));
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+
+    await window.DB.deleteNote('drop-me');
+
+    const remaining = JSON.parse(localStorage.getItem('plasma-notes'));
+    expect(remaining).toEqual([expect.objectContaining({ id: 'keep-me' })]);
+  });
+
+  it('broadcasts localStorage-fallback writes so cross-tab sync works without IndexedDB', async () => {
+    const channels = [];
+    class BroadcastChannelMock {
+      constructor(name) {
+        this.name = name;
+        this.postMessage = vi.fn();
+        this.close = vi.fn();
+        channels.push(this);
+      }
+    }
+    window.BroadcastChannel = BroadcastChannelMock;
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+
+    await window.DB.saveNote({ id: 'fallback-note', title: 'No IDB' });
+
+    expect(channels.length).toBeGreaterThanOrEqual(1);
+    const posted = channels.flatMap((ch) => ch.postMessage.mock.calls.map(([msg]) => msg));
+    expect(posted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'note', action: 'save' }),
+    ]));
   });
 });

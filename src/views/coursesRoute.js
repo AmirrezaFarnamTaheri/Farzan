@@ -7,7 +7,11 @@ export async function mountCoursesView(deps = {}) {
     safeExternalUrl,
     safeMediaUrl,
     Router,
-    Toast = window.OpenCourseDeck?.Toast,
+    Toast = window.OpenCourseDeck?.Toast
+      // Fall back to no-ops: Toast may be unregistered during partial
+      // init or in test harnesses, and a bare Toast.success() then threw
+      // mid-handler, skipping the post-mutation UI refresh.
+      ?? { success() {}, error() {}, info() {}, warning() {} },
     consumePendingCourseSession,
     formatMediaClock,
     escapeHtmlText,
@@ -110,6 +114,10 @@ export async function mountCoursesView(deps = {}) {
   const learningMarkerListEl = document.querySelector('[data-learning-marker-list]');
   const learningMarkerJsonEl = document.querySelector('[data-learning-marker-json]');
   const routeDisposers = [];
+  // Player progress bindings must outlive the route when the mini-player
+  // adopts the video; everything else (sync listener, PiP observer) must be
+  // torn down at unmount or it keeps rendering into detached DOM.
+  const playerDisposers = [];
   let flushPlayerProgress = () => Promise.resolve();
   let detailRenderToken = 0;
   let detailRenderTimer = null;
@@ -127,13 +135,17 @@ export async function mountCoursesView(deps = {}) {
     unmount() {
       cancelDetailRender();
       try { flushPlayerProgress(); } catch {}
+      // Route-scoped listeners always die with the route.
+      routeDisposers.splice(0).forEach(fn => {
+        try { fn(); } catch {}
+      });
       let adoptedPlayer = false;
       try {
         const snapshot = window.OpenCourseDeck?.Player?.getActiveSnapshot?.(document);
         if (snapshot && playerEl?._pdPlayer) {
           window.OpenCourseDeck?.MiniPlayer?.adoptPlayer?.(playerEl, snapshot, {
             dispose() {
-              routeDisposers.splice(0).forEach(fn => {
+              playerDisposers.splice(0).forEach(fn => {
                 try { fn(); } catch {}
               });
             },
@@ -144,7 +156,7 @@ export async function mountCoursesView(deps = {}) {
         }
       } catch {}
       if (!adoptedPlayer) {
-        routeDisposers.splice(0).forEach(fn => {
+        playerDisposers.splice(0).forEach(fn => {
           try { fn(); } catch {}
         });
         try { window.OpenCourseDeck?.Player?.destroyAll?.(document); } catch {}
@@ -1069,7 +1081,7 @@ export async function mountCoursesView(deps = {}) {
     inst?.on?.('beforeTrackChange', onBeforeTrackChange);
     inst?.on?.('trackChange', onTrackChange);
     window.addEventListener('beforeunload', onBeforeUnload);
-    routeDisposers.push(() => {
+    playerDisposers.push(() => {
       inst?.off?.('timeupdate', onTimeUpdate);
       inst?.off?.('pause', onPause);
       inst?.off?.('seeked', onSeeked);

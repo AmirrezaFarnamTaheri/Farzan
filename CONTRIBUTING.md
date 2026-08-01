@@ -14,7 +14,8 @@ npm run vendor
 - `npm run build:sw`: generate `sw.js`.
 - `npm run lint`: lint `src/`, `scripts/`, tests, and config.
 - `npm test`: run Vitest.
-- `npm run audit`: validate, lint, and test.
+- `npm run audit`: check package.json/lockfile consistency and lockfile integrity (not a validate/lint/test run).
+- `npm run ci`: the full gate — encoding, validate, lint, release build, generated-artifact check, test, audit, bundle report, and smoke tests.
 
 ### Where To Change What
 

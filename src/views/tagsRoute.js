@@ -142,13 +142,19 @@ async function renderTags() {
     if (state.filter === 'catalog') return tag.topicCount > 0 && tag.noteCount === 0;
     return true;
   };
-  const q = String(state.query || '').trim().toLowerCase();
-  const visibleTags = tagEntries.filter((tag) => {
-    const matchesQuery = !q || tag.label.toLowerCase().includes(q);
-    return matchesQuery && matchesTagFilter(tag);
-  });
+  // Recomputed per render: renderVisibleTags() is re-invoked on every search
+  // keystroke and filter click, so the query/filter must be read at render
+  // time rather than captured once when renderTags() built the tag maps.
+  const computeVisibleTags = () => {
+    const q = String(state.query || '').trim().toLowerCase();
+    return tagEntries.filter((tag) => {
+      const matchesQuery = !q || tag.label.toLowerCase().includes(q);
+      return matchesQuery && matchesTagFilter(tag);
+    });
+  };
 
   const renderVisibleTags = () => {
+    const visibleTags = computeVisibleTags();
     listRoot.replaceChildren();
     if (!tagEntries.length) {
       const empty = document.createElement('p');
@@ -211,11 +217,17 @@ async function renderTags() {
   });
   renderVisibleTags();
 
+  // Search and filter changes only affect which of the already-loaded tags
+  // are shown, so re-run the in-memory render rather than renderTags(),
+  // which re-reads the whole notes store and rebuilds the tag maps on every
+  // keystroke (and races overlapping async renders against the DOM).
+  routeState.rerenderVisibleTags = renderVisibleTags;
+
   if (!searchEl.dataset.pdBound) {
     searchEl.dataset.pdBound = 'true';
     searchEl.addEventListener('input', () => {
       state.query = searchEl.value || '';
-      renderTags();
+      routeState.rerenderVisibleTags?.();
     });
   }
   if (!filtersRoot.dataset.pdBound) {
@@ -224,7 +236,12 @@ async function renderTags() {
       const button = event.target?.closest?.('[data-tag-filter]');
       if (!button) return;
       state.filter = button.dataset.tagFilter || 'all';
-      renderTags();
+      filtersRoot.querySelectorAll('[data-tag-filter]').forEach((chip) => {
+        const active = chip.dataset.tagFilter === state.filter;
+        chip.classList.toggle('active', active);
+        chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      routeState.rerenderVisibleTags?.();
     });
   }
 }
