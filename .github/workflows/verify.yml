@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.source_ref }}
-          fetch-depth: ${{ inputs.release_mode && 0 || 1 }}
+          fetch-depth: ${{ inputs.release_mode && '0' || '1' }}
           persist-credentials: false
 
       - name: Set up Node.js
