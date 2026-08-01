@@ -68,6 +68,13 @@ function planReleaseReconciliation(release, localAssets) {
     byName.set(asset.name, entries);
   }
 
+  const unexpected = [...byName.keys()]
+    .filter((name) => !localAssets.has(name))
+    .sort();
+  if (unexpected.length) {
+    throw new Error(`Release contains unexpected asset(s): ${unexpected.join(', ')}.`);
+  }
+
   const upload = [];
   const replace = [];
   const keep = [];
