@@ -2,9 +2,9 @@ name: Actions Maintenance
 
 run-name: Actions maintenance · ${{ github.event_name }} · attempt ${{ github.run_attempt }}
 
+# Artifact-producing workflows already set explicit 7- or 14-day retention.
+# Keep this manual-only for exceptional cleanup instead of scheduling a redundant write-capable run.
 on:
-  schedule:
-    - cron: '23 3 * * 0'
   workflow_dispatch:
     inputs:
       retention_days:
@@ -35,8 +35,8 @@ jobs:
       - name: Inspect and clean workflow artifacts
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_days || '14' }}
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          RETENTION_DAYS: ${{ inputs.retention_days }}
+          DRY_RUN: ${{ inputs.dry_run }}
         with:
           retries: 3
           script: |
