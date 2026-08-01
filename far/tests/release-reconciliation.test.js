@@ -16,7 +16,10 @@ function localAssets() {
     name,
     size: 100 + index,
     digest: `sha256:${String(index + 1).padStart(64, '0')}`,
-    replaceable: name === 'SHA256SUMS' || name.endsWith('-attestation.json') || name.endsWith('-sbom.cdx.json'),
+    replaceable: name === 'SHA256SUMS'
+      || name.endsWith('-manifest.json')
+      || name.endsWith('-attestation.json')
+      || name.endsWith('-sbom.cdx.json'),
   }]));
 }
 
@@ -51,7 +54,7 @@ describe('partial release reconciliation planning', () => {
     });
   });
 
-  it('repairs the observed state in a missing-first, one-at-a-time order with checksums last', () => {
+  it('repairs missing and stale generated metadata with checksums last', () => {
     const local = localAssets();
     const archive = local.get(`opencoursedeck-${tag}.tar.gz`);
     const manifest = local.get(`opencoursedeck-${tag}-manifest.json`);
@@ -64,7 +67,7 @@ describe('partial release reconciliation planning', () => {
       immutable: false,
       assets: [
         remoteAsset(archive),
-        remoteAsset(manifest),
+        remoteAsset(manifest, { id: 30, digest: `sha256:${'c'.repeat(64)}` }),
         remoteAsset(attestation, { id: 31, digest: `sha256:${'a'.repeat(64)}` }),
         remoteAsset(checksums, { id: 32, size: 302, digest: `sha256:${'b'.repeat(64)}` }),
       ],
@@ -74,27 +77,26 @@ describe('partial release reconciliation planning', () => {
     expect(plan.state).toBe('repair');
     expect(plan.upload).toEqual([`opencoursedeck-${tag}-sbom.cdx.json`]);
     expect(plan.replace).toEqual([
+      { name: `opencoursedeck-${tag}-manifest.json`, assetId: 30 },
       { name: `opencoursedeck-${tag}-attestation.json`, assetId: 31 },
       { name: 'SHA256SUMS', assetId: 32 },
     ]);
-    expect(plan.keep).toEqual(expect.arrayContaining([
-      `opencoursedeck-${tag}.tar.gz`,
-      `opencoursedeck-${tag}-manifest.json`,
-    ]));
+    expect(plan.keep).toContain(`opencoursedeck-${tag}.tar.gz`);
     expect(orderedRepairOperations(plan)).toEqual([
       { type: 'upload', name: `opencoursedeck-${tag}-sbom.cdx.json` },
       { type: 'replace', name: `opencoursedeck-${tag}-attestation.json`, assetId: 31 },
+      { type: 'replace', name: `opencoursedeck-${tag}-manifest.json`, assetId: 30 },
       { type: 'replace', name: 'SHA256SUMS', assetId: 32 },
     ]);
   });
 
-  it('rejects any mismatch in the archive or manifest', () => {
+  it('still rejects any mismatch in the immutable archive', () => {
     const local = localAssets();
     const assets = [...local.values()].map((asset) => remoteAsset(asset));
     assets.find((asset) => asset.name.endsWith('.tar.gz')).digest = `sha256:${'f'.repeat(64)}`;
     const release = { id: 3, tag_name: tag, draft: false, immutable: false, assets };
 
-    expect(() => planReleaseReconciliation(release, local)).toThrow(/Immutable release payload/);
+    expect(() => planReleaseReconciliation(release, local)).toThrow(/Immutable release archive/);
   });
 
   it('fails closed on unexpected or duplicate assets, missing digests, or immutable partial releases', () => {
