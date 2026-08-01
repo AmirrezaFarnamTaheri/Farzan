@@ -8,6 +8,7 @@ const {
 } = require('../../.github/scripts/reconcile-release-assets.cjs');
 
 const tag = 'v1.1.2';
+let nextAssetId = 100;
 
 function localAssets() {
   return new Map(requiredAssetNames(tag).map((name, index) => [name, {
@@ -19,8 +20,9 @@ function localAssets() {
 }
 
 function remoteAsset(local, overrides = {}) {
+  nextAssetId += 1;
   return {
-    id: overrides.id || Math.floor(Math.random() * 100000) + 1,
+    id: nextAssetId,
     name: local.name,
     size: local.size,
     digest: local.digest,
@@ -89,7 +91,7 @@ describe('partial release reconciliation planning', () => {
     expect(() => planReleaseReconciliation(release, local)).toThrow(/Immutable release payload/);
   });
 
-  it('fails closed on duplicate names, missing digests, or immutable partial releases', () => {
+  it('fails closed on unexpected or duplicate assets, missing digests, or immutable partial releases', () => {
     const local = localAssets();
     const first = [...local.values()][0];
     expect(() => planReleaseReconciliation({
@@ -97,11 +99,22 @@ describe('partial release reconciliation planning', () => {
       tag_name: tag,
       draft: false,
       immutable: false,
+      assets: [
+        ...[...local.values()].map((asset) => remoteAsset(asset)),
+        { id: 999, name: 'unexpected-debug.zip', size: 10, digest: `sha256:${'9'.repeat(64)}`, state: 'uploaded' },
+      ],
+    }, local)).toThrow(/unexpected asset\(s\): unexpected-debug\.zip/);
+
+    expect(() => planReleaseReconciliation({
+      id: 5,
+      tag_name: tag,
+      draft: false,
+      immutable: false,
       assets: [remoteAsset(first), remoteAsset(first)],
     }, local)).toThrow(/duplicate asset name/);
 
     expect(() => planReleaseReconciliation({
-      id: 5,
+      id: 6,
       tag_name: tag,
       draft: false,
       immutable: false,
@@ -109,7 +122,7 @@ describe('partial release reconciliation planning', () => {
     }, local)).toThrow(/missing a verifiable SHA-256 digest/);
 
     expect(() => planReleaseReconciliation({
-      id: 6,
+      id: 7,
       tag_name: tag,
       draft: false,
       immutable: true,
@@ -120,7 +133,7 @@ describe('partial release reconciliation planning', () => {
   it('publishes a draft only after exact assets are present', () => {
     const local = localAssets();
     const release = {
-      id: 7,
+      id: 8,
       tag_name: tag,
       draft: true,
       immutable: false,
