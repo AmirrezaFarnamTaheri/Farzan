@@ -71,6 +71,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add far/vendor far/dist
+          git add -u -- far/vendor far/dist
           git commit -m 'chore(generated): reconcile upgraded vendor assets'
           git push origin "HEAD:${HEAD_REF}"
