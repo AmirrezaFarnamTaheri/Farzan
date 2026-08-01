@@ -16,6 +16,11 @@ function packageIdentity(pkg) {
   return { name, version, rootRef: `pkg:npm/${name}@${version}` };
 }
 
+function stableIdentity(value) {
+  if (!value || typeof value !== 'object') return '';
+  return String(value['bom-ref'] || value.ref || value.purl || `${value.name || ''}@${value.version || ''}`);
+}
+
 function normalizeCompatibilitySbom(document, pkg) {
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
     throw new Error('CycloneDX SBOM document must be an object.');
@@ -56,6 +61,9 @@ function normalizeCompatibilitySbom(document, pkg) {
     'bom-ref': rootRef,
   };
 
+  delete document.serialNumber;
+  delete document.metadata.timestamp;
+
   const rootChildren = new Set();
   const retained = [];
 
@@ -69,12 +77,14 @@ function normalizeCompatibilitySbom(document, pkg) {
     }
 
     const dependsOn = [...new Set((Array.isArray(dependency.dependsOn) ? dependency.dependsOn : [])
-      .map(child => legacyRefs.has(child) ? rootRef : child)
-      .filter(child => typeof child === 'string' && child && child !== dependency.ref))]
+      .map((child) => legacyRefs.has(child) ? rootRef : child)
+      .filter((child) => typeof child === 'string' && child && child !== dependency.ref))]
       .sort();
     retained.push({ ...dependency, dependsOn });
   }
 
+  document.components = [...document.components].sort((left, right) => stableIdentity(left).localeCompare(stableIdentity(right)));
+  retained.sort((left, right) => stableIdentity(left).localeCompare(stableIdentity(right)));
   document.dependencies = [
     { ref: rootRef, dependsOn: [...rootChildren].sort() },
     ...retained,
@@ -82,12 +92,34 @@ function normalizeCompatibilitySbom(document, pkg) {
   return document;
 }
 
-function normalizeFile(sbomFile, packageFile) {
+function normalizeCompatibilityAttestation(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    throw new Error('Release attestation document must be an object.');
+  }
+  if (document.verified !== true) {
+    throw new Error('Compatibility release attestation must already be verified.');
+  }
+  delete document.verifiedAt;
+  delete document.runtime;
+  return document;
+}
+
+function normalizeFile(sbomFile, packageFile, attestationFile) {
   const document = JSON.parse(fs.readFileSync(sbomFile, 'utf8'));
   const pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
   const originalName = document?.metadata?.component?.name || 'missing';
   const normalized = normalizeCompatibilitySbom(document, pkg);
   fs.writeFileSync(sbomFile, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+
+  if (attestationFile) {
+    const attestation = JSON.parse(fs.readFileSync(attestationFile, 'utf8'));
+    fs.writeFileSync(
+      attestationFile,
+      `${JSON.stringify(normalizeCompatibilityAttestation(attestation), null, 2)}\n`,
+      'utf8',
+    );
+  }
+
   return {
     originalName,
     normalizedName: normalized.metadata.component.name,
@@ -98,8 +130,10 @@ function normalizeFile(sbomFile, packageFile) {
 function main() {
   const sbomFile = path.resolve(process.argv[2] || 'reports/release/sbom.cdx.json');
   const packageFile = path.resolve(process.argv[3] || 'package.json');
-  const result = normalizeFile(sbomFile, packageFile);
+  const attestationFile = process.argv[4] ? path.resolve(process.argv[4]) : null;
+  const result = normalizeFile(sbomFile, packageFile, attestationFile);
   console.log(`[compat-sbom] normalized ${result.relativePath} root ${result.originalName} -> ${result.normalizedName}`);
+  if (attestationFile) console.log('[compat-sbom] removed run-specific compatibility attestation metadata');
 }
 
 if (require.main === module) {
@@ -112,6 +146,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  normalizeCompatibilityAttestation,
   normalizeCompatibilitySbom,
   normalizeFile,
   packageIdentity,
