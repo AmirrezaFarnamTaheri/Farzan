@@ -185,7 +185,6 @@ jobs:
       EXPECTED_COMMIT: ${{ needs.resolve.outputs.release_commit }}
       BOOTSTRAP_TAG: ${{ needs.resolve.outputs.bootstrap_tag }}
       WORKFLOW_SHA: ${{ github.workflow_sha }}
-      RECONCILE_SCRIPT: ${{ runner.temp }}/reconcile-release-assets.cjs
 
     steps:
       - name: Check out verified release commit
@@ -264,20 +263,23 @@ jobs:
         run: cd release-assets && sha256sum -c SHA256SUMS
 
       - name: Materialize release reconciliation helper
+        id: helper
         run: |
           if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error title=Workflow identity unavailable::Cannot bind release reconciliation to the exact workflow commit." >&2
             exit 1
           fi
-          git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs" > "$RECONCILE_SCRIPT"
-          node --check "$RECONCILE_SCRIPT"
+          reconcile_script="$RUNNER_TEMP/reconcile-release-assets.cjs"
+          git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs" > "$reconcile_script"
+          node --check "$reconcile_script"
+          printf 'path=%s\n' "$reconcile_script" >> "$GITHUB_OUTPUT"
 
       - name: Inspect existing release state
         id: existing
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
-          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
+          RECONCILE_SCRIPT: ${{ steps.helper.outputs.path }}
         with:
           retries: 3
           script: |
@@ -355,7 +357,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
-          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
+          RECONCILE_SCRIPT: ${{ steps.helper.outputs.path }}
         with:
           retries: 3
           script: |
@@ -379,7 +381,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
-          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
+          RECONCILE_SCRIPT: ${{ steps.helper.outputs.path }}
         with:
           retries: 3
           script: |
