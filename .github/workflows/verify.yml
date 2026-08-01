@@ -452,12 +452,22 @@ jobs:
             dist
           cp reports/release/release-manifest.json "release-assets/$manifest"
           cp reports/release/release-attestation.json "release-assets/$attestation"
+
+          if [[ ! -s reports/release/sbom.cdx.json ]]; then
+            echo "::notice title=Generating compatibility SBOM::The verified source predates the repository SBOM scripts; generating a CycloneDX SBOM with npm before packaging."
+            npm sbom \
+              --sbom-format cyclonedx \
+              --sbom-type application \
+              > reports/release/sbom.cdx.json
+          fi
           cp reports/release/sbom.cdx.json "release-assets/$sbom"
 
           node - <<'NODE'
           const fs = require('node:fs');
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const manifest = JSON.parse(fs.readFileSync('reports/release/release-manifest.json', 'utf8'));
           const attestation = JSON.parse(fs.readFileSync('reports/release/release-attestation.json', 'utf8'));
+          const sbom = JSON.parse(fs.readFileSync('reports/release/sbom.cdx.json', 'utf8'));
           const expectedVersion = process.env.RELEASE_TAG.slice(1);
           const expectedCommit = process.env.SOURCE_VERSION.toLowerCase();
           for (const [name, document] of [['manifest', manifest], ['attestation', attestation]]) {
@@ -465,6 +475,12 @@ jobs:
             if (document.commit !== expectedCommit) throw new Error(`${name} commit ${document.commit} does not match ${expectedCommit}. Re-run verification for the exact release commit.`);
           }
           if (attestation.verified !== true) throw new Error('Release attestation is not verified. Download release diagnostics, correct the failed integrity check, and rerun the Release workflow from main or the existing tag.');
+          if (sbom.bomFormat !== 'CycloneDX') throw new Error(`Release SBOM format ${sbom.bomFormat || 'missing'} is not CycloneDX.`);
+          if (!sbom.specVersion) throw new Error('Release SBOM is missing its CycloneDX spec version.');
+          if (sbom.metadata?.component?.name !== packageJson.name) throw new Error(`Release SBOM component ${sbom.metadata?.component?.name || 'missing'} does not match ${packageJson.name}.`);
+          if (sbom.metadata?.component?.version !== expectedVersion) throw new Error(`Release SBOM version ${sbom.metadata?.component?.version || 'missing'} does not match ${expectedVersion}.`);
+          if (!Array.isArray(sbom.components) || sbom.components.length === 0) throw new Error('Release SBOM does not contain dependency components.');
+          if (!Array.isArray(sbom.dependencies)) throw new Error('Release SBOM does not contain a dependency graph.');
           NODE
 
           (
