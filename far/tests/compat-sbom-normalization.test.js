@@ -12,6 +12,10 @@ const {
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..', '..');
+const packageMetadata = {
+  name: 'opencoursedeck',
+  version: '1.1.2',
+};
 
 describe('legacy release compatibility SBOM normalization', () => {
   it('replaces npm directory-derived identity and merges legacy root graph entries', () => {
@@ -39,10 +43,7 @@ describe('legacy release compatibility SBOM normalization', () => {
       ],
     };
 
-    const normalized = normalizeCompatibilitySbom(document, {
-      name: 'opencoursedeck',
-      version: '1.1.2',
-    });
+    const normalized = normalizeCompatibilitySbom(document, packageMetadata);
 
     expect(normalized.metadata.component).toMatchObject({
       type: 'application',
@@ -84,24 +85,24 @@ describe('legacy release compatibility SBOM normalization', () => {
       ],
     };
 
-    const first = normalizeCompatibilitySbom(structuredClone(document), {
-      name: 'opencoursedeck',
-      version: '1.1.2',
-    });
-    const second = normalizeCompatibilitySbom(structuredClone(first), {
-      name: 'opencoursedeck',
-      version: '1.1.2',
-    });
+    const first = normalizeCompatibilitySbom(structuredClone(document), packageMetadata);
+    const second = normalizeCompatibilitySbom(structuredClone(first), packageMetadata);
 
     expect(second).toEqual(first);
   });
 
-  it('fails closed for invalid package identity or non-CycloneDX input', () => {
+  it('fails closed for invalid identity, format, components, or dependency graph', () => {
     expect(() => packageIdentity({ name: '', version: '1.1.2' })).toThrow(/name and version/);
-    expect(() => normalizeCompatibilitySbom({}, {
-      name: 'opencoursedeck',
-      version: '1.1.2',
-    })).toThrow(/not CycloneDX/);
+    expect(() => normalizeCompatibilitySbom({}, packageMetadata)).toThrow(/not CycloneDX/);
+    expect(() => normalizeCompatibilitySbom({
+      bomFormat: 'CycloneDX',
+      components: [],
+      dependencies: [],
+    }, packageMetadata)).toThrow(/dependency components/);
+    expect(() => normalizeCompatibilitySbom({
+      bomFormat: 'CycloneDX',
+      components: [{ name: 'alpha', version: '1.0.0', 'bom-ref': 'alpha@1.0.0' }],
+    }, packageMetadata)).toThrow(/dependency graph/);
   });
 
   it('pins compatibility normalization to the workflow commit before strict validation', () => {
