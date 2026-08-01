@@ -22,7 +22,7 @@ permissions:
 # Release state machine:
 # 1. Resolve the requested/default tag, its exact commit, and its own package version.
 # 2. Run the same reusable verification pipeline used by CI against that immutable commit.
-# 3. Serialize publication, create a missing default tag only after verification, and publish once.
+# 3. Serialize publication, create a missing default tag only after verification, and publish or safely repair once.
 concurrency:
   group: release-${{ github.repository }}
   cancel-in-progress: false
@@ -184,6 +184,8 @@ jobs:
       RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
       EXPECTED_COMMIT: ${{ needs.resolve.outputs.release_commit }}
       BOOTSTRAP_TAG: ${{ needs.resolve.outputs.bootstrap_tag }}
+      WORKFLOW_SHA: ${{ github.workflow_sha }}
+      RECONCILE_SCRIPT: ${{ runner.temp }}/reconcile-release-assets.cjs
 
     steps:
       - name: Check out verified release commit
@@ -253,7 +255,7 @@ jobs:
             core.setOutput('created', String(created));
 
       - name: Download verified release assets
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-assets-${{ env.RELEASE_TAG }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-assets
@@ -261,52 +263,36 @@ jobs:
       - name: Verify downloaded assets
         run: cd release-assets && sha256sum -c SHA256SUMS
 
-      - name: Detect an already-complete release
+      - name: Materialize release reconciliation helper
+        run: |
+          if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Workflow identity unavailable::Cannot bind release reconciliation to the exact workflow commit." >&2
+            exit 1
+          fi
+          git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs" > "$RECONCILE_SCRIPT"
+          node --check "$RECONCILE_SCRIPT"
+
+      - name: Inspect existing release state
         id: existing
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
         with:
           retries: 3
           script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const tag = process.env.RELEASE_TAG;
-            const requiredNames = [
-              `opencoursedeck-${tag}.tar.gz`,
-              `opencoursedeck-${tag}-manifest.json`,
-              `opencoursedeck-${tag}-attestation.json`,
-              `opencoursedeck-${tag}-sbom.cdx.json`,
-              'SHA256SUMS',
-            ];
-            const required = new Map(requiredNames.map((name) => [
-              name,
-              fs.statSync(path.join('release-assets', name)).size,
-            ]));
-            try {
-              const response = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag,
-              });
-              const present = new Map(response.data.assets.map((asset) => [asset.name, asset.size]));
-              const missing = [...required.keys()].filter((name) => !present.has(name));
-              const sizeMismatches = [...required.entries()]
-                .filter(([name, size]) => present.has(name) && present.get(name) !== size)
-                .map(([name, size]) => `${name}: remote=${present.get(name)}, local=${size}`);
-              if (missing.length === 0 && sizeMismatches.length === 0 && !response.data.draft) {
-                core.notice(`Release ${tag} already contains every immutable asset; publication is an idempotent no-op.`);
-                core.setOutput('complete', 'true');
-                return;
-              }
-              core.setFailed(`Release ${tag} already exists but is incomplete, size-mismatched, or still a draft. Missing assets: ${missing.join(', ') || '<none>'}. Size mismatches: ${sizeMismatches.join('; ') || '<none>'}. Inspect the existing release and diagnostics; repair or remove the partial draft before retrying without overwriting assets.`);
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              core.setOutput('complete', 'false');
-            }
+            const { inspectRelease } = require(process.env.RECONCILE_SCRIPT);
+            const { plan } = await inspectRelease({
+              github,
+              context,
+              tag: process.env.RELEASE_TAG,
+            });
+            core.setOutput('state', plan.state);
+            core.setOutput('complete', String(plan.state === 'complete'));
+            core.notice(`Release ${process.env.RELEASE_TAG} state: ${plan.state}; upload=${plan.upload.join(', ') || '<none>'}; replace=${plan.replace.map((item) => item.name).join(', ') || '<none>'}.`);
 
       - name: Attest immutable release artifacts
-        if: steps.existing.outputs.complete != 'true'
+        if: steps.existing.outputs.state != 'complete'
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: |
@@ -315,14 +301,14 @@ jobs:
             release-assets/SHA256SUMS
 
       - name: Attest release SBOM
-        if: steps.existing.outputs.complete != 'true'
+        if: steps.existing.outputs.state != 'complete'
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}.tar.gz
           sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json
 
       - name: Reverify immutable tag before publication
-        if: steps.existing.outputs.complete != 'true'
+        if: steps.existing.outputs.state != 'complete'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
@@ -350,7 +336,7 @@ jobs:
 
       - name: Publish GitHub Release
         id: publish
-        if: steps.existing.outputs.complete != 'true'
+        if: steps.existing.outputs.state == 'absent'
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -363,12 +349,37 @@ jobs:
             release-assets/*.json
             release-assets/SHA256SUMS
 
+      - name: Repair verified partial release
+        id: repair
+        if: steps.existing.outputs.state == 'repair'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
+        with:
+          retries: 3
+          script: |
+            const { reconcileRelease } = require(process.env.RECONCILE_SCRIPT);
+            const result = await reconcileRelease({
+              github,
+              context,
+              tag: process.env.RELEASE_TAG,
+            });
+            core.setOutput('uploaded', JSON.stringify(result.uploaded));
+            core.setOutput('replaced', JSON.stringify(result.replaced));
+            core.notice(`Reconciled ${process.env.RELEASE_TAG}; uploaded=${result.uploaded.join(', ') || '<none>'}; replaced=${result.replaced.join(', ') || '<none>'}; publishedDraft=${result.publishedDraft}.`);
+
       - name: Verify published release identity
-        if: always() && (steps.existing.outputs.complete == 'true' || steps.publish.outcome == 'success')
+        if: >-
+          always() &&
+          (steps.existing.outputs.state == 'complete' ||
+          steps.publish.outcome == 'success' ||
+          steps.repair.outcome == 'success')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           EXPECTED_COMMIT: ${{ env.EXPECTED_COMMIT }}
+          RECONCILE_SCRIPT: ${{ env.RECONCILE_SCRIPT }}
         with:
           retries: 3
           script: |
@@ -390,12 +401,15 @@ jobs:
               core.setFailed(`Published release tag does not resolve to the verified commit: ${object.type}:${object.sha}. Treat the release as compromised, stop distribution, and investigate the tag before creating a new version.`);
               return;
             }
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            const { inspectRelease } = require(process.env.RECONCILE_SCRIPT);
+            const { plan } = await inspectRelease({
+              github,
+              context,
               tag: process.env.RELEASE_TAG,
             });
-            if (release.data.draft) core.setFailed(`Release ${process.env.RELEASE_TAG} remained a draft after publication. Open the release, inspect uploaded assets and diagnostics, then publish it only after verification.`);
+            if (plan.state !== 'complete') {
+              core.setFailed(`Release ${process.env.RELEASE_TAG} failed post-publication digest verification with state ${plan.state}.`);
+            }
 
       - name: Summarize publication
         if: always()
@@ -408,5 +422,6 @@ jobs:
             echo "| Tag | \`$RELEASE_TAG\` |"
             echo "| Commit | \`$EXPECTED_COMMIT\` |"
             echo "| Tag bootstrapped | \`${{ steps.tag.outputs.created || 'false' }}\` |"
-            echo "| Existing complete release | \`${{ steps.existing.outputs.complete || 'false' }}\` |"
+            echo "| Existing release state | \`${{ steps.existing.outputs.state || 'unknown' }}\` |"
+            echo "| Repair outcome | \`${{ steps.repair.outcome || 'skipped' }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
