@@ -149,8 +149,7 @@ describe('GitHub Actions hardening', () => {
       .replace('      artifact-metadata: write\n', '')
       .replace('      - name: Attest immutable release artifacts', '      - name: Skip artifact attestation')
       .replace('      - name: Attest release SBOM', '      - name: Skip SBOM attestation')
-      .replace('sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'sbom-path: missing.json')
-      .replace('`opencoursedeck-${tag}-sbom.cdx.json`,', '');
+      .replace('sbom-path: release-assets/opencoursedeck-${{ env.RELEASE_TAG }}-sbom.cdx.json', 'sbom-path: missing.json');
     const brokenVerify = workflows['verify.yml']
       .replace('          cp reports/release/sbom.cdx.json "release-assets/$sbom"\n', '')
       .replace(' "$sbom" > SHA256SUMS', ' > SHA256SUMS');
@@ -162,7 +161,6 @@ describe('GitHub Actions hardening', () => {
       expect.stringContaining('signed artifact provenance'),
       expect.stringContaining('signed SBOM attestation'),
       expect.stringContaining('bind the published archive'),
-      expect.stringContaining('idempotency checks must include the SBOM'),
     ]));
     expect(validateVerificationWorkflow(brokenVerify)).toEqual(expect.arrayContaining([
       expect.stringContaining('CycloneDX SBOM'),
@@ -170,13 +168,20 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
-  it('requires idempotent retries to validate release assets, not only names', () => {
+  it('requires digest-verified and workflow-pinned partial release reconciliation', () => {
     const broken = workflows['release.yml']
-      .replace('      - name: Detect an already-complete release', '      - name: Inspect existing release')
-      .replace('fs.statSync', 'fs.existsSync');
+      .replace('      - name: Materialize release reconciliation helper', '      - name: Skip reconciliation helper')
+      .replace('git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs"', 'cat .github/scripts/reconcile-release-assets.cjs')
+      .replace('      - name: Inspect existing release state', '      - name: Inspect release names only')
+      .replace('inspectRelease', 'inspectNames')
+      .replace('      - name: Repair verified partial release', '      - name: Overwrite partial release')
+      .replace('reconcileRelease', 'overwriteRelease');
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
-      expect.stringContaining('idempotent release retry detection'),
-      expect.stringContaining('compare local and remote asset sizes'),
+      expect.stringContaining('workflow-pinned release reconciliation helper'),
+      expect.stringContaining('exact workflow commit'),
+      expect.stringContaining('digest-verified release state inspection'),
+      expect.stringContaining('constrained reconciliation helper'),
+      expect.stringContaining('constrained partial release repair'),
     ]));
   });
 
