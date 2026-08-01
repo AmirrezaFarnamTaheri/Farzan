@@ -434,6 +434,8 @@ jobs:
 
       - name: Package immutable release assets
         if: inputs.release_mode
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           archive="opencoursedeck-${RELEASE_TAG}.tar.gz"
           manifest="opencoursedeck-${RELEASE_TAG}-manifest.json"
@@ -454,11 +456,19 @@ jobs:
           cp reports/release/release-attestation.json "release-assets/$attestation"
 
           if [[ ! -s reports/release/sbom.cdx.json ]]; then
-            echo "::notice title=Generating compatibility SBOM::The verified source predates the repository SBOM scripts; generating a CycloneDX SBOM with npm before packaging."
+            echo "::notice title=Generating compatibility SBOM::The verified source predates the repository SBOM scripts; generating and normalizing a CycloneDX SBOM before packaging."
             npm sbom \
               --sbom-format cyclonedx \
               --sbom-type application \
               > reports/release/sbom.cdx.json
+
+            if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error title=Workflow identity unavailable::Cannot bind compatibility SBOM normalization to the exact workflow commit." >&2
+              exit 1
+            fi
+            normalizer="$RUNNER_TEMP/normalize-compat-sbom.cjs"
+            git show "${WORKFLOW_SHA}:.github/scripts/normalize-compat-sbom.cjs" > "$normalizer"
+            node "$normalizer" reports/release/sbom.cdx.json package.json
           fi
           cp reports/release/sbom.cdx.json "release-assets/$sbom"
 
