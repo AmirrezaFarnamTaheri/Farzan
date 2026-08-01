@@ -23,6 +23,12 @@ function normalizeCompatibilitySbom(document, pkg) {
   if (document.bomFormat !== 'CycloneDX') {
     throw new Error(`Compatibility SBOM format ${document.bomFormat || 'missing'} is not CycloneDX.`);
   }
+  if (!Array.isArray(document.components) || document.components.length === 0) {
+    throw new Error('Compatibility SBOM must contain dependency components.');
+  }
+  if (!Array.isArray(document.dependencies)) {
+    throw new Error('Compatibility SBOM must contain a dependency graph.');
+  }
 
   const { name, version, rootRef } = packageIdentity(pkg);
   document.metadata = document.metadata && typeof document.metadata === 'object'
@@ -50,11 +56,10 @@ function normalizeCompatibilitySbom(document, pkg) {
     'bom-ref': rootRef,
   };
 
-  const dependencies = Array.isArray(document.dependencies) ? document.dependencies : [];
   const rootChildren = new Set();
   const retained = [];
 
-  for (const dependency of dependencies) {
+  for (const dependency of document.dependencies) {
     if (!dependency || typeof dependency !== 'object') continue;
     if (legacyRefs.has(dependency.ref)) {
       for (const child of Array.isArray(dependency.dependsOn) ? dependency.dependsOn : []) {
