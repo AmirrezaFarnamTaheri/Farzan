@@ -7,6 +7,10 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function packageIdentity(pkg) {
   const name = nonEmptyString(pkg?.name);
   const version = nonEmptyString(pkg?.version);
@@ -14,6 +18,15 @@ function packageIdentity(pkg) {
     throw new Error('Package metadata must contain non-empty name and version fields.');
   }
   return { name, version, rootRef: `pkg:npm/${name}@${version}` };
+}
+
+function stableIdentity(value) {
+  if (!value || typeof value !== 'object') return '';
+  return String(value['bom-ref'] || value.ref || value.purl || `${value.name || ''}@${value.version || ''}`);
+}
+
+function compareStableIdentity(left, right) {
+  return compareText(stableIdentity(left), stableIdentity(right));
 }
 
 function normalizeCompatibilitySbom(document, pkg) {
@@ -56,6 +69,9 @@ function normalizeCompatibilitySbom(document, pkg) {
     'bom-ref': rootRef,
   };
 
+  delete document.serialNumber;
+  delete document.metadata.timestamp;
+
   const rootChildren = new Set();
   const retained = [];
 
@@ -69,25 +85,51 @@ function normalizeCompatibilitySbom(document, pkg) {
     }
 
     const dependsOn = [...new Set((Array.isArray(dependency.dependsOn) ? dependency.dependsOn : [])
-      .map(child => legacyRefs.has(child) ? rootRef : child)
-      .filter(child => typeof child === 'string' && child && child !== dependency.ref))]
-      .sort();
+      .map((child) => legacyRefs.has(child) ? rootRef : child)
+      .filter((child) => typeof child === 'string' && child && child !== dependency.ref))]
+      .sort(compareText);
     retained.push({ ...dependency, dependsOn });
   }
 
+  document.components = [...document.components].sort(compareStableIdentity);
+  retained.sort(compareStableIdentity);
   document.dependencies = [
-    { ref: rootRef, dependsOn: [...rootChildren].sort() },
+    { ref: rootRef, dependsOn: [...rootChildren].sort(compareText) },
     ...retained,
   ];
   return document;
 }
 
-function normalizeFile(sbomFile, packageFile) {
+function normalizeCompatibilityAttestation(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    throw new Error('Release attestation document must be an object.');
+  }
+  if (document.verified !== true) {
+    throw new Error('Compatibility release attestation must already be verified.');
+  }
+  delete document.verifiedAt;
+  delete document.runtime;
+  return document;
+}
+
+function normalizeAttestationFile(attestationFile) {
+  const attestation = JSON.parse(fs.readFileSync(attestationFile, 'utf8'));
+  fs.writeFileSync(
+    attestationFile,
+    `${JSON.stringify(normalizeCompatibilityAttestation(attestation), null, 2)}\n`,
+    'utf8',
+  );
+}
+
+function normalizeFile(sbomFile, packageFile, attestationFile) {
   const document = JSON.parse(fs.readFileSync(sbomFile, 'utf8'));
   const pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
   const originalName = document?.metadata?.component?.name || 'missing';
   const normalized = normalizeCompatibilitySbom(document, pkg);
   fs.writeFileSync(sbomFile, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+
+  if (attestationFile) normalizeAttestationFile(attestationFile);
+
   return {
     originalName,
     normalizedName: normalized.metadata.component.name,
@@ -98,8 +140,17 @@ function normalizeFile(sbomFile, packageFile) {
 function main() {
   const sbomFile = path.resolve(process.argv[2] || 'reports/release/sbom.cdx.json');
   const packageFile = path.resolve(process.argv[3] || 'package.json');
-  const result = normalizeFile(sbomFile, packageFile);
+  const explicitAttestation = process.argv[4] ? path.resolve(process.argv[4]) : null;
+  const result = normalizeFile(sbomFile, packageFile, explicitAttestation);
+  const candidates = explicitAttestation ? [] : [
+    path.resolve('reports/release/release-attestation.json'),
+    process.env.RELEASE_TAG
+      ? path.resolve(`release-assets/opencoursedeck-${process.env.RELEASE_TAG}-attestation.json`)
+      : null,
+  ].filter((file) => file && fs.existsSync(file));
+  for (const file of candidates) normalizeAttestationFile(file);
   console.log(`[compat-sbom] normalized ${result.relativePath} root ${result.originalName} -> ${result.normalizedName}`);
+  if (explicitAttestation || candidates.length) console.log('[compat-sbom] removed run-specific compatibility attestation metadata');
 }
 
 if (require.main === module) {
@@ -112,7 +163,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  compareStableIdentity,
+  compareText,
+  normalizeAttestationFile,
+  normalizeCompatibilityAttestation,
   normalizeCompatibilitySbom,
   normalizeFile,
   packageIdentity,
+  stableIdentity,
 };
