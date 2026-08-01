@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
+  orderedRepairOperations,
   planReleaseReconciliation,
   requiredAssetNames,
 } = require('../../.github/scripts/reconcile-release-assets.cjs');
@@ -50,7 +51,7 @@ describe('partial release reconciliation planning', () => {
     });
   });
 
-  it('repairs the observed missing SBOM and stale generated metadata without replacing payloads', () => {
+  it('repairs the observed state in a missing-first, one-at-a-time order with checksums last', () => {
     const local = localAssets();
     const archive = local.get(`opencoursedeck-${tag}.tar.gz`);
     const manifest = local.get(`opencoursedeck-${tag}-manifest.json`);
@@ -80,6 +81,11 @@ describe('partial release reconciliation planning', () => {
       `opencoursedeck-${tag}.tar.gz`,
       `opencoursedeck-${tag}-manifest.json`,
     ]));
+    expect(orderedRepairOperations(plan)).toEqual([
+      { type: 'upload', name: `opencoursedeck-${tag}-sbom.cdx.json` },
+      { type: 'replace', name: `opencoursedeck-${tag}-attestation.json`, assetId: 31 },
+      { type: 'replace', name: 'SHA256SUMS', assetId: 32 },
+    ]);
   });
 
   it('rejects any mismatch in the archive or manifest', () => {
