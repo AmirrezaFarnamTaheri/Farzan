@@ -7,6 +7,10 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function packageIdentity(pkg) {
   const name = nonEmptyString(pkg?.name);
   const version = nonEmptyString(pkg?.version);
@@ -19,6 +23,10 @@ function packageIdentity(pkg) {
 function stableIdentity(value) {
   if (!value || typeof value !== 'object') return '';
   return String(value['bom-ref'] || value.ref || value.purl || `${value.name || ''}@${value.version || ''}`);
+}
+
+function compareStableIdentity(left, right) {
+  return compareText(stableIdentity(left), stableIdentity(right));
 }
 
 function normalizeCompatibilitySbom(document, pkg) {
@@ -79,14 +87,14 @@ function normalizeCompatibilitySbom(document, pkg) {
     const dependsOn = [...new Set((Array.isArray(dependency.dependsOn) ? dependency.dependsOn : [])
       .map((child) => legacyRefs.has(child) ? rootRef : child)
       .filter((child) => typeof child === 'string' && child && child !== dependency.ref))]
-      .sort();
+      .sort(compareText);
     retained.push({ ...dependency, dependsOn });
   }
 
-  document.components = [...document.components].sort((left, right) => stableIdentity(left).localeCompare(stableIdentity(right)));
-  retained.sort((left, right) => stableIdentity(left).localeCompare(stableIdentity(right)));
+  document.components = [...document.components].sort(compareStableIdentity);
+  retained.sort(compareStableIdentity);
   document.dependencies = [
-    { ref: rootRef, dependsOn: [...rootChildren].sort() },
+    { ref: rootRef, dependsOn: [...rootChildren].sort(compareText) },
     ...retained,
   ];
   return document;
@@ -155,9 +163,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  compareStableIdentity,
+  compareText,
   normalizeAttestationFile,
   normalizeCompatibilityAttestation,
   normalizeCompatibilitySbom,
   normalizeFile,
   packageIdentity,
+  stableIdentity,
 };
