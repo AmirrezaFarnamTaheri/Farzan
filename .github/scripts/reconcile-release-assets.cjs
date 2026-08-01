@@ -8,6 +8,11 @@ const REPLACEABLE_SUFFIXES = new Set([
   '-attestation.json',
   '-sbom.cdx.json',
 ]);
+const CHECKSUM_ASSET = 'SHA256SUMS';
+
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 function requiredAssetNames(tag) {
   return [
@@ -15,12 +20,12 @@ function requiredAssetNames(tag) {
     `opencoursedeck-${tag}-manifest.json`,
     `opencoursedeck-${tag}-attestation.json`,
     `opencoursedeck-${tag}-sbom.cdx.json`,
-    'SHA256SUMS',
+    CHECKSUM_ASSET,
   ];
 }
 
 function isReplaceableMetadata(name) {
-  return name === 'SHA256SUMS' || [...REPLACEABLE_SUFFIXES].some((suffix) => name.endsWith(suffix));
+  return name === CHECKSUM_ASSET || [...REPLACEABLE_SUFFIXES].some((suffix) => name.endsWith(suffix));
 }
 
 function digestBuffer(buffer) {
@@ -70,7 +75,7 @@ function planReleaseReconciliation(release, localAssets) {
 
   const unexpected = [...byName.keys()]
     .filter((name) => !localAssets.has(name))
-    .sort();
+    .sort(compareText);
   if (unexpected.length) {
     throw new Error(`Release contains unexpected asset(s): ${unexpected.join(', ')}.`);
   }
@@ -113,6 +118,26 @@ function planReleaseReconciliation(release, localAssets) {
     publishDraft: release.draft === true,
     releaseId: release.id,
   };
+}
+
+function orderedRepairOperations(plan) {
+  const missing = plan.upload
+    .filter((name) => name !== CHECKSUM_ASSET)
+    .sort(compareText)
+    .map((name) => ({ type: 'upload', name }));
+  const replacements = plan.replace
+    .filter((item) => item.name !== CHECKSUM_ASSET)
+    .sort((left, right) => compareText(left.name, right.name))
+    .map((item) => ({ type: 'replace', name: item.name, assetId: item.assetId }));
+  const checksum = [];
+  if (plan.upload.includes(CHECKSUM_ASSET)) {
+    checksum.push({ type: 'upload', name: CHECKSUM_ASSET });
+  }
+  const checksumReplacement = plan.replace.find((item) => item.name === CHECKSUM_ASSET);
+  if (checksumReplacement) {
+    checksum.push({ type: 'replace', name: CHECKSUM_ASSET, assetId: checksumReplacement.assetId });
+  }
+  return [...missing, ...replacements, ...checksum];
 }
 
 async function getReleaseByTag(github, context, tag) {
@@ -169,23 +194,26 @@ async function reconcileRelease({ github, context, tag, directory = 'release-ass
   if (!release) throw new Error(`Release ${tag} does not exist; create it through the normal publication path.`);
   if (plan.state === 'complete') return { state: 'complete', uploaded: [], replaced: [], publishedDraft: false };
 
-  const replacementNames = new Set(plan.replace.map((item) => item.name));
-  for (const item of plan.replace) {
-    await github.rest.repos.deleteReleaseAsset({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      asset_id: item.assetId,
+  const operations = orderedRepairOperations(plan);
+  const uploaded = [];
+  const replaced = [];
+  for (const operation of operations) {
+    if (operation.type === 'replace') {
+      await github.rest.repos.deleteReleaseAsset({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        asset_id: operation.assetId,
+      });
+      replaced.push(operation.name);
+    } else {
+      uploaded.push(operation.name);
+    }
+    await uploadAsset({
+      github,
+      context,
+      releaseId: release.id,
+      local: localAssets.get(operation.name),
     });
-  }
-
-  const uploadOrder = [...new Set([...plan.upload, ...replacementNames])]
-    .sort((left, right) => {
-      if (left === 'SHA256SUMS') return 1;
-      if (right === 'SHA256SUMS') return -1;
-      return left.localeCompare(right);
-    });
-  for (const name of uploadOrder) {
-    await uploadAsset({ github, context, releaseId: release.id, local: localAssets.get(name) });
   }
 
   if (plan.publishDraft) {
@@ -203,17 +231,19 @@ async function reconcileRelease({ github, context, tag, directory = 'release-ass
   }
   return {
     state: 'complete',
-    uploaded: uploadOrder.filter((name) => !replacementNames.has(name)),
-    replaced: [...replacementNames],
+    uploaded,
+    replaced,
     publishedDraft: plan.publishDraft,
   };
 }
 
 module.exports = {
+  compareText,
   digestBuffer,
   inspectRelease,
   isReplaceableMetadata,
   normalizeDigest,
+  orderedRepairOperations,
   planReleaseReconciliation,
   readLocalAssets,
   reconcileRelease,
