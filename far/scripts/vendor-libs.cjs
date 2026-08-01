@@ -3,6 +3,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const esbuild = require('esbuild');
 
 const root = path.join(__dirname, '..');
 const vendor = path.join(root, 'vendor');
@@ -24,10 +25,6 @@ const copies = [
     from: 'dompurify/dist/purify.min.js',
     to: 'purify.min.js',
   },
-  {
-    from: 'fuse.js/dist/fuse.min.js',
-    to: 'fuse.min.js',
-  },
 ];
 
 function copyFileFromNodeModules(from, destRel) {
@@ -41,6 +38,28 @@ function copyFileFromNodeModules(from, destRel) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
   console.log('[vendor-libs]', destRel, '<-', from);
+}
+
+function bundleFuseForClassicWorker() {
+  const destRel = 'fuse.min.js';
+  const dest = path.join(vendor, destRel);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  esbuild.buildSync({
+    stdin: {
+      contents: "import Fuse from 'fuse.js'; globalThis.Fuse = Fuse;",
+      resolveDir: root,
+      sourcefile: 'fuse-classic-worker-entry.js',
+      loader: 'js',
+    },
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['es2020'],
+    outfile: dest,
+    logLevel: 'silent',
+  });
+  console.log('[vendor-libs]', destRel, '<- bundled fuse.js classic-worker facade');
 }
 
 function copyDir(src, dest) {
@@ -67,11 +86,41 @@ function main() {
     copyFileFromNodeModules(from, to);
     ok += 1;
   }
+  bundleFuseForClassicWorker();
+  ok += 1;
 
   // Keep legacy script URLs operational while loading the patched ESM build.
   // The mutable facade is required because the PDF security layer wraps getDocument.
+  // PDF.js 6 owns teardown on PDFDocumentLoadingTask, so resolved document proxies
+  // receive a compatibility destroy() method that delegates to the real task.
   writeText('pdf.min.js', `void import('./pdf.min.mjs').then((module) => {
   const pdfjsLib = { ...module };
+  const getDocument = pdfjsLib.getDocument.bind(pdfjsLib);
+  pdfjsLib.getDocument = (...args) => {
+    const loadingTask = getDocument(...args);
+    let documentPromise;
+    return new Proxy(loadingTask, {
+      get(target, property, receiver) {
+        if (property === 'promise') {
+          documentPromise ||= target.promise.then((documentProxy) => new Proxy(documentProxy, {
+            get(documentTarget, documentProperty, documentReceiver) {
+              if (documentProperty === 'destroy' && typeof documentTarget.destroy !== 'function') {
+                return () => target.destroy();
+              }
+              const value = Reflect.get(documentTarget, documentProperty, documentReceiver);
+              return typeof value === 'function' ? value.bind(documentTarget) : value;
+            },
+          }));
+          return documentPromise;
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+      set(target, property, value) {
+        return Reflect.set(target, property, value, target);
+      },
+    });
+  };
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', document.baseURI).href;
   window.pdfjsLib = pdfjsLib;
   window.dispatchEvent(new CustomEvent('opencoursedeck:pdfjs-ready'));

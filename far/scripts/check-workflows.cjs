@@ -7,12 +7,12 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const REPOSITORY_ROOT = path.resolve(PROJECT_ROOT, '..');
 
 const EXPECTED_ACTION_PINS = new Map([
-  ['actions/checkout', { sha: 'df4cb1c069e1874edd31b4311f1884172cec0e10', version: 'v6.0.3' }],
-  ['actions/setup-node', { sha: '249970729cb0ef3589644e2896645e5dc5ba9c38', version: 'v6.5.0' }],
-  ['actions/upload-artifact', { sha: 'b7c566a772e6b6bfb58ed0dc250532a479d7789f', version: 'v6.0.0' }],
+  ['actions/checkout', { sha: '3d3c42e5aac5ba805825da76410c181273ba90b1', version: 'v7.0.1' }],
+  ['actions/setup-node', { sha: '820762786026740c76f36085b0efc47a31fe5020', version: 'v7.0.0' }],
+  ['actions/upload-artifact', { sha: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a', version: 'v7.0.1' }],
   ['actions/download-artifact', { sha: '018cc2cf5baa6db3ef3c5f8a56943fffe632ef53', version: 'v6.0.0' }],
-  ['actions/github-script', { sha: 'ed597411d8f924073f98dfc5c65a23a2325f34cd', version: 'v8.0.0' }],
-  ['actions/attest', { sha: 'c32b4b8b198b65d0bd9d63490e847ff7b53989d4', version: 'v4.0.0' }],
+  ['actions/github-script', { sha: '3a2844b7e9c422d3c10d287c895573f7108da1b3', version: 'v9.0.0' }],
+  ['actions/attest', { sha: 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6', version: 'v4.2.0' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
 ]);
 
