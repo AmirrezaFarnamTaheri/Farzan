@@ -173,7 +173,7 @@ describe('GitHub Actions hardening', () => {
       .replace('      - name: Materialize release reconciliation helper', '      - name: Skip reconciliation helper')
       .replace('git show "${WORKFLOW_SHA}:.github/scripts/reconcile-release-assets.cjs"', 'cat .github/scripts/reconcile-release-assets.cjs')
       .replace('      - name: Inspect existing release state', '      - name: Inspect release names only')
-      .replace('inspectRelease', 'inspectNames')
+      .replaceAll('inspectRelease', 'inspectNames')
       .replace('      - name: Repair verified partial release', '      - name: Overwrite partial release')
       .replace('reconcileRelease', 'overwriteRelease');
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([
