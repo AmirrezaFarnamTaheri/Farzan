@@ -104,6 +104,15 @@ function normalizeCompatibilityAttestation(document) {
   return document;
 }
 
+function normalizeAttestationFile(attestationFile) {
+  const attestation = JSON.parse(fs.readFileSync(attestationFile, 'utf8'));
+  fs.writeFileSync(
+    attestationFile,
+    `${JSON.stringify(normalizeCompatibilityAttestation(attestation), null, 2)}\n`,
+    'utf8',
+  );
+}
+
 function normalizeFile(sbomFile, packageFile, attestationFile) {
   const document = JSON.parse(fs.readFileSync(sbomFile, 'utf8'));
   const pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
@@ -111,14 +120,7 @@ function normalizeFile(sbomFile, packageFile, attestationFile) {
   const normalized = normalizeCompatibilitySbom(document, pkg);
   fs.writeFileSync(sbomFile, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
 
-  if (attestationFile) {
-    const attestation = JSON.parse(fs.readFileSync(attestationFile, 'utf8'));
-    fs.writeFileSync(
-      attestationFile,
-      `${JSON.stringify(normalizeCompatibilityAttestation(attestation), null, 2)}\n`,
-      'utf8',
-    );
-  }
+  if (attestationFile) normalizeAttestationFile(attestationFile);
 
   return {
     originalName,
@@ -130,10 +132,17 @@ function normalizeFile(sbomFile, packageFile, attestationFile) {
 function main() {
   const sbomFile = path.resolve(process.argv[2] || 'reports/release/sbom.cdx.json');
   const packageFile = path.resolve(process.argv[3] || 'package.json');
-  const attestationFile = process.argv[4] ? path.resolve(process.argv[4]) : null;
-  const result = normalizeFile(sbomFile, packageFile, attestationFile);
+  const explicitAttestation = process.argv[4] ? path.resolve(process.argv[4]) : null;
+  const result = normalizeFile(sbomFile, packageFile, explicitAttestation);
+  const candidates = explicitAttestation ? [] : [
+    path.resolve('reports/release/release-attestation.json'),
+    process.env.RELEASE_TAG
+      ? path.resolve(`release-assets/opencoursedeck-${process.env.RELEASE_TAG}-attestation.json`)
+      : null,
+  ].filter((file) => file && fs.existsSync(file));
+  for (const file of candidates) normalizeAttestationFile(file);
   console.log(`[compat-sbom] normalized ${result.relativePath} root ${result.originalName} -> ${result.normalizedName}`);
-  if (attestationFile) console.log('[compat-sbom] removed run-specific compatibility attestation metadata');
+  if (explicitAttestation || candidates.length) console.log('[compat-sbom] removed run-specific compatibility attestation metadata');
 }
 
 if (require.main === module) {
@@ -146,6 +155,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  normalizeAttestationFile,
   normalizeCompatibilityAttestation,
   normalizeCompatibilitySbom,
   normalizeFile,
