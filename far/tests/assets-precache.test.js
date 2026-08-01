@@ -22,18 +22,16 @@ function normalizeLocalRef(ref) {
 }
 
 describe('static assets and service worker precache', () => {
-  it('keeps development and portable release service-worker commands configured', () => {
+  it('keeps the portable release service-worker command centralized', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    const developmentConfig = fs.readFileSync(path.join(root, 'scripts/workbox.config.cjs'), 'utf8');
     const releaseConfig = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
     const buildScript = fs.readFileSync(path.join(root, 'scripts/build-sw-dist.cjs'), 'utf8');
 
     expect(pkg.scripts['build:sw']).toBe('node scripts/build-sw-dist.cjs');
-    expect(pkg.scripts['build:release']).toContain('scripts/build-sw-dist.cjs');
+    expect(pkg.scripts['build:release']).toBe('npm run build && npm run build:sw');
     expect(buildScript).toContain("require('workbox-build')");
     expect(buildScript).toContain('generateSW(config)');
     expect(buildScript).not.toContain('workbox-cli');
-    expect(developmentConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain('cleanupOutdatedCaches: true');
     expect(releaseConfig).toContain("globDirectory: 'dist'");
     expect(releaseConfig).toContain("swDest: 'dist/sw.js'");
