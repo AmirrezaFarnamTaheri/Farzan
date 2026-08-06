@@ -186,7 +186,7 @@
 
     const cards = await manager.getCards();
     const dueCards = await manager.getDueCards();
-    const decks = [...newSet(cards.map(c => c.deck))];
+    const decks = [...new Set(cards.map(c => c.deck))];
 
     container.innerHTML = `
       <div class="flashcard-studio-wrap p-6 max-w-5xl mx-auto space-y-6">
@@ -294,10 +294,6 @@
         renderStudio(container);
       });
     }
-  }
-
-  function newSet(arr) {
-    return Array.from(new Set(arr));
   }
 
   const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};

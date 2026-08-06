@@ -10,8 +10,7 @@
     // ── Shared micro-utilities ────────────────────────────
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-    // eslint-disable-next-line no-unused-vars
-    const _uid = (p = 'ui') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
+
     const esc = s => {
       if (s == null) return '';
       if (s instanceof Node) return s.outerHTML || '';
@@ -23,23 +22,6 @@
     const localISODate = date =>
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-    // eslint-disable-next-line no-unused-vars
-    function _animH(el, open, dur = 250) {
-      return new Promise(resolve => {
-        el.style.overflow   = 'hidden';
-        el.style.transition = `height ${dur}ms ease`;
-        el.style.height     = open ? '0px' : `${el.scrollHeight}px`;
-        requestAnimationFrame(() => {
-          el.style.height = open ? `${el.scrollHeight}px` : '0px';
-          setTimeout(() => {
-            el.style.height     = open ? '' : '0px';
-            el.style.overflow   = open ? '' : 'hidden';
-            el.style.transition = '';
-            resolve();
-          }, dur);
-        });
-      });
-    }
 
     /**
      * Inverse of localISODate. `new Date('2026-07-26')` is NOT this: ECMA-262

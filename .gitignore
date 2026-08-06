@@ -20,4 +20,5 @@ opencoursedeck-server.pid
 .cargo/
 .smart-coding-cache/
 .code-review-graph/
+.cocoindex_code/
 plasmato_downloads/

@@ -92,8 +92,9 @@
   };
 
   const cloneJSON = (value, fallback = null) => {
+    if (value == null) return fallback;
     try {
-      return JSON.parse(JSON.stringify(value ?? fallback));
+      return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
     } catch {
       return fallback;
     }

@@ -62,23 +62,47 @@ const ProgressStats = (() => {
 
     /* per-course breakdown */
     const courses = DataStore.allCourses();
+    const topicsByCourse = new Map();
+    for (const t of allTopics) {
+      if (t.courseId) {
+        let list = topicsByCourse.get(t.courseId);
+        if (!list) { list = []; topicsByCourse.set(t.courseId, list); }
+        list.push(t);
+      }
+    }
+    const progsByCourse = new Map();
+    for (const p of allProgress) {
+      if (p.courseId) {
+        let list = progsByCourse.get(p.courseId);
+        if (!list) { list = []; progsByCourse.set(p.courseId, list); }
+        list.push(p);
+      }
+    }
     const byCourse = courses.map(c => {
-      const topics   = allTopics.filter(t => t.courseId === c.id);
-      const progs    = allProgress.filter(p => p.courseId === c.id);
-      const done     = progs.filter(p => p.status === 'done').length;
-      const total    = topics.length;
-      const pct      = total ? Math.round((done / total) * 100) : 0;
-      const watchSec = progs.reduce((a, p) => a + (p.duration > 0 ? Math.min(p.position || 0, p.duration) : 0), 0);
+      const topics = topicsByCourse.get(c.id) || [];
+      const progs  = progsByCourse.get(c.id) || [];
+      let done = 0;
+      let inProgress = 0;
+      let watchSec = 0;
+      let lastUpdated = 0;
+      for (const p of progs) {
+        if (p.status === 'done') done++;
+        else if (p.status === 'in-progress') inProgress++;
+        if (p.duration > 0) watchSec += Math.min(p.position || 0, p.duration);
+        if ((p.updatedAt || 0) > lastUpdated) lastUpdated = p.updatedAt;
+      }
+      const total = topics.length;
+      const pct   = total ? Math.round((done / total) * 100) : 0;
       return {
         courseId   : c.id,
         title      : c.title,
         total,
         done,
-        inProgress : progs.filter(p => p.status === 'in-progress').length,
+        inProgress,
         pct,
         watchedSec : watchSec,
         watchedFmt : fmtTime(watchSec),
-        lastUpdated: progs.reduce((a, p) => Math.max(a, p.updatedAt || 0), 0),
+        lastUpdated,
       };
     });
 
