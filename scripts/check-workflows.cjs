@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const REPOSITORY_ROOT = path.resolve(PROJECT_ROOT, '..');
+// Since the July 2026 root promotion, .github lives at the project root
+// itself; the old sibling-directory resolution predates that move.
+const REPOSITORY_ROOT = PROJECT_ROOT;
 
 const EXPECTED_ACTION_PINS = new Map([
   ['actions/checkout', { sha: '3d3c42e5aac5ba805825da76410c181273ba90b1', version: 'v7.0.1' }],
@@ -152,7 +154,7 @@ function validateReleaseWorkflow(workflow) {
   } else {
     requireText(errors, resolver, 'main_expected_tag="v${main_package_version}"', 'release.yml: resolver must derive the default release tag from main package version');
     requireText(errors, resolver, 'git ls-remote --tags --refs', 'release.yml: resolver must check tag existence before exact checkout');
-    requireText(errors, resolver, 'git show "${release_commit}:far/package.json"', 'release.yml: existing-tag retries must read the tagged commit package version');
+    requireText(errors, resolver, 'git show "${release_commit}:package.json"', 'release.yml: existing-tag retries must read the tagged commit package version');
     requireText(errors, resolver, 'if [[ -n "$REQUESTED_TAG" ]]', 'release.yml: resolver must distinguish provided-tag retries from blank-tag bootstrap');
     requireText(errors, resolver, 'Requested retry tag is missing', 'release.yml: missing explicit retry tags need actionable failure guidance');
   }

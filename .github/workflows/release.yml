@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Optional existing release tag to retry. Leave blank to release v<far/package.json version> from main.'
+        description: 'Optional existing release tag to retry. Leave blank to release v<package.json version> from main.'
         required: false
         type: string
 
@@ -73,7 +73,7 @@ jobs:
           REQUESTED_TAG: ${{ inputs.tag }}
           TRIGGER_TAG: ${{ github.ref_name }}
         run: |
-          main_package_version="$(node -p "require('./far/package.json').version")"
+          main_package_version="$(node -p "require("./package.json").version")"
           main_expected_tag="v${main_package_version}"
 
           if [[ "$EVENT_NAME" == "push" ]]; then
@@ -98,10 +98,10 @@ jobs:
             checkout_ref="refs/tags/$release_tag"
             tag_exists=true
             bootstrap_tag=false
-            package_version="$(git show "${release_commit}:far/package.json" | node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(0,'utf8')).version)")"
+            package_version="$(git show "${release_commit}:package.json" | node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(0,'utf8')).version)")"
             expected_tag="v${package_version}"
             if [[ "$release_tag" != "$expected_tag" ]]; then
-              echo "::error title=Tagged version mismatch::Existing tag $release_tag points to a commit whose far/package.json version requires $expected_tag. Create a new correctly versioned tag; do not move the existing tag." >&2
+              echo "::error title=Tagged version mismatch::Existing tag $release_tag points to a commit whose package.json version requires $expected_tag. Create a new correctly versioned tag; do not move the existing tag." >&2
               exit 1
             fi
           else

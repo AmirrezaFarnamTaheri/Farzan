@@ -798,4 +798,14 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ kind: 'note', action: 'save' }),
     ]));
   });
+  it('falls back to the pre-rename plasma twin for never-migrated ocd_* settings', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'legacy-1' }]));
+    expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'legacy-1' }]);
+
+    // First save under the canonical key wins from then on.
+    await window.DB.saveSetting('ocd_playlists', [{ id: 'new-1' }]);
+    expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'new-1' }]);
+  });
+
 });

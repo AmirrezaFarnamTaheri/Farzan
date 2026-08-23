@@ -119,7 +119,7 @@ describe('GitHub Actions hardening', () => {
 
   it('requires provided-tag retries to validate the tagged commit version', () => {
     const broken = workflows['release.yml']
-      .replace('git show "${release_commit}:far/package.json"', 'cat far/package.json')
+      .replace('git show "${release_commit}:package.json"', 'cat package.json')
       .replaceAll('[[ -n "$REQUESTED_TAG" ]]', '[[ -z "$REQUESTED_TAG" ]]')
       .replace('Requested retry tag is missing', 'Tag missing');
     expect(validateReleaseWorkflow(broken)).toEqual(expect.arrayContaining([

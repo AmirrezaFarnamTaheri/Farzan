@@ -64,8 +64,6 @@ function validateNoIgnoredGlobsTracked() {
 
   // Patterns that should never be tracked
   const forbiddenGlobs = [
-    { pattern: /^far\/dist\/plasma\.(js|js\.map)$/, label: 'far/dist/plasma.js' },
-    { pattern: /^far\/sw\.(js|js\.map)$/, label: 'far/sw.js (stale service worker)' },
     { pattern: /\.nupkg$/, label: '*.nupkg binary' },
     { pattern: /\.crate$/, label: '*.crate binary' },
     { pattern: /^NSIS-Tool-/, label: 'NSIS-Tool root artifact' },

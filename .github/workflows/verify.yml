@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: far/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Describe verification context
         env:
@@ -370,7 +370,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.release_mode && format('release-diagnostics-{0}-{1}-{2}', inputs.release_tag, github.run_id, github.run_attempt) || format('ci-diagnostics-{0}-{1}', github.run_id, github.run_attempt) }}
-          path: far/reports
+          path: reports
           if-no-files-found: warn
           retention-days: 14
 
@@ -504,6 +504,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-assets-${{ inputs.release_tag }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: far/release-assets/
+          path: release-assets/
           if-no-files-found: error
           retention-days: 7

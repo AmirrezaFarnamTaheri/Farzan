@@ -29,11 +29,9 @@ npm start
 
 Open `http://localhost:5173/`.
 
-On Windows, the launchers are often easier:
+On Windows, the launcher is often easier:
 
-- `Run-OpenCourseDeck.vbs`: app-like launch with no console window.
-- `Run-OpenCourseDeck.cmd`: launch with console logs visible.
-- `Stop-OpenCourseDeck.cmd`: stop the local server.
+- `Run-OpenCourseDeck.cmd`: launches the local server with console logs visible. Stop it with `Ctrl+C` in that console.
 
 ### Regular Run
 

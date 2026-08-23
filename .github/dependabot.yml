@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directory: /far
+    directory: /
     schedule:
       interval: weekly
       day: monday
@@ -17,7 +17,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: cargo
-    directory: /far/src-tauri
+    directory: /src-tauri
     schedule:
       interval: weekly
       day: monday
