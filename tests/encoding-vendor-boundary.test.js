@@ -19,7 +19,7 @@ describe('encoding scan vendor boundary', () => {
     ]));
   });
 
-  it('keeps Farzan-authored compatibility wrappers in scope', () => {
+  it('keeps app-authored compatibility wrappers in scope', () => {
     expect(IGNORED_FILES.has('vendor/pdf.min.js')).toBe(false);
     expect(IGNORED_FILES.has('vendor/pdf.worker.min.js')).toBe(false);
   });

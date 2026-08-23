@@ -333,9 +333,9 @@ export function mountSettingsView(deps = {}) {
       if (window.DB?.clearUserData) await window.DB.clearUserData(scope);
       else if (scope === 'all') await window.DB?.clearAll?.();
       if (scope === 'all' || scope === 'media') {
-        sessionStorage.removeItem('plasma_pending_topic');
-        sessionStorage.removeItem('plasma_pending_position');
-        sessionStorage.removeItem('plasma_pending_course_session');
+        sessionStorage.removeItem('ocd_pending_topic');
+        sessionStorage.removeItem('ocd_pending_position');
+        sessionStorage.removeItem('ocd_pending_course_session');
       }
       Toast?.success?.(`Cleared ${label}`);
       storageController?.update?.();
@@ -518,7 +518,7 @@ export function mountSettingsView(deps = {}) {
       setStatus();
     };
 
-    Promise.resolve(window.DB?.getSetting?.('plasma-ai-settings')).then(async (saved) => {
+    Promise.resolve(window.DB?.getSetting?.('ocd_ai_settings')).then(async (saved) => {
       const sanitized = {
         mode: saved?.mode || 'hidden',
         model: saved?.model || 'gemma-local',
@@ -531,7 +531,7 @@ export function mountSettingsView(deps = {}) {
         localModelFile: saved?.localModelFile && typeof saved.localModelFile === 'object' ? saved.localModelFile : null,
       };
       if (saved?.apiKey || saved?.keyStorage === 'local') {
-        await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', sanitized));
+        await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', sanitized));
         Toast?.info?.('A previously stored AI key was removed. API keys are now session-only.');
       }
       apply(sanitized);
@@ -590,7 +590,7 @@ export function mountSettingsView(deps = {}) {
         next.hasKey = false;
       }
 
-      await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', next));
+      await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', next));
       apply(next);
       Toast?.success?.('AI options saved');
     });
@@ -627,7 +627,7 @@ export function mountSettingsView(deps = {}) {
             importedAt: imported?.importedAt || Date.now(),
           },
         };
-        await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
+        await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', stored));
         apply(stored);
         Toast?.success?.('Local model file imported');
       } catch (error) {
@@ -674,7 +674,7 @@ export function mountSettingsView(deps = {}) {
           localModelSource: source,
           localModelFile: downloaded,
         };
-        await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
+        await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', stored));
         apply(stored);
         Toast?.success?.('Local model downloaded');
       } catch (error) {
@@ -696,7 +696,7 @@ export function mountSettingsView(deps = {}) {
         localModelSource: localSource.value.trim() || selectedModelOption()?.url || current.localModelSource,
         localModelFile: current.localModelFile,
       };
-      await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
+      await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', stored));
       apply(stored);
       Toast?.success?.('Local model marked installed');
     });
@@ -704,7 +704,7 @@ export function mountSettingsView(deps = {}) {
     on(document.querySelector('[data-ai-clear-local-model]'), 'click', async () => {
       await ai?.clearLocalModelFile?.();
       const stored = { ...current, localModelStatus: 'not-installed', localModelFile: null, keyStorage: 'session' };
-      await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
+      await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', stored));
       apply(stored);
       Toast?.info?.('Local model cache cleared');
     });
@@ -712,7 +712,7 @@ export function mountSettingsView(deps = {}) {
     on(document.querySelector('[data-ai-clear-key]'), 'click', async () => {
       sessionStorage.removeItem(keyName);
       const stored = { ...current, keyStorage: 'session', hasKey: false };
-      await Promise.resolve(window.DB?.saveSetting?.('plasma-ai-settings', stored));
+      await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', stored));
       apply(stored);
       Toast?.info?.('Session AI key cleared');
     });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach } from 'vitest';
 
-const CANVAS_AUTOSAVE_KEY = 'plasma-canvas-board';
+const CANVAS_AUTOSAVE_KEY = 'ocd_canvas_board';
 
 function resetCanvasSingleton() {
   if (typeof window === 'undefined') return;

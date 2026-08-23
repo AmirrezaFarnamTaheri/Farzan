@@ -6,7 +6,7 @@ OpenCourseDeck is a self-contained, browser-based learning studio for studying v
 
 ## Who it's for
 
-Private learners and study groups who collect video/PDF course materials (primarily medical education content from Plasmato) and want a local, offline-friendly environment to watch, annotate, track progress, and review.
+Private learners and study groups who collect video/PDF course materials from any source and want a local, offline-friendly environment to watch, annotate, track progress, and review.
 
 ## Core capabilities
 

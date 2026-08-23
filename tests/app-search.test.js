@@ -22,7 +22,7 @@ describe('app topbar search rendering', () => {
     window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
     window.location.hash = '#/help';
     document.body.innerHTML = `
-      <div id="plasma-app">
+      <div id="ocd-app">
         <div class="topbar-search"><input data-search-input /></div>
         <main id="view-container"></main>
       </div>
@@ -65,7 +65,7 @@ describe('app topbar search rendering', () => {
   });
 
   it('central URL helpers allow expected URLs and reject executable schemes', () => {
-    expect(window.OpenCourseDeck.safeExternalUrl('https://plasmato.net/course')).toBe('https://plasmato.net/course');
+    expect(window.OpenCourseDeck.safeExternalUrl('https://media.example.com/course')).toBe('https://media.example.com/course');
     expect(window.OpenCourseDeck.safeExternalUrl('http://example.test/course')).toBe('http://example.test/course');
     expect(window.OpenCourseDeck.safeExternalUrl('/relative-course')).toContain('/relative-course');
     expect(window.OpenCourseDeck.safeExternalUrl('javascript:alert(1)')).toBeNull();
@@ -331,11 +331,11 @@ describe('app topbar search rendering', () => {
   });
 
   it('blocks unsafe pending course autoplay media URLs', async () => {
-    sessionStorage.setItem('plasma_pending_topic', 'pending-xss');
+    sessionStorage.setItem('ocd_pending_topic', 'pending-xss');
     window.DataStore = {
       init: vi.fn().mockResolvedValue(true),
       allCourses: vi.fn(() => [
-        { id: 'course-pending', title: 'Pending course', productUrl: 'https://plasmato.net/course' },
+        { id: 'course-pending', title: 'Pending course', productUrl: 'https://media.example.com/course' },
       ]),
       allTopics: vi.fn(() => [
         {
@@ -365,7 +365,7 @@ describe('app topbar search rendering', () => {
 
     expect(loadPlaylist).not.toHaveBeenCalled();
     expect(window.__pendingAutoplayXss).toBeUndefined();
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBeNull();
   });
 
   it('renders toast action strings as text while allowing node actions', () => {

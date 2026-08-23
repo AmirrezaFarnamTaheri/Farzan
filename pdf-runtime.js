@@ -6,7 +6,7 @@ const pdfjsLib = { ...pdfjsModule };
 const getDocument = pdfjsLib.getDocument.bind(pdfjsLib);
 
 // PDF.js 6 moved document teardown to PDFDocumentLoadingTask. Preserve the
-// established Farzan document-proxy contract while delegating cleanup to the
+// established legacy document-proxy contract while delegating cleanup to the
 // owning task, so callers do not leak workers or depend on a removed method.
 pdfjsLib.getDocument = (...args) => {
   const loadingTask = getDocument(...args);

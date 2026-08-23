@@ -18,6 +18,7 @@ import {
   uid,
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
+import { EventEmitter } from './src/lib/eventEmitter.js';
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
 import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
 import { chartGauge as GaugePlugin } from './src/features/chartPlugins/gauge.js';
@@ -232,11 +233,11 @@ import { Pointer } from './src/lib/pointer.js';
   function setPendingCourseMedia(topicId, position = null) {
     if (!topicId) return;
     try {
-      sessionStorage.setItem('plasma_pending_topic', String(topicId));
+      sessionStorage.setItem('ocd_pending_topic', String(topicId));
       if (Number.isFinite(Number(position)) && Number(position) > 0) {
-        sessionStorage.setItem('plasma_pending_position', String(Math.max(0, Number(position))));
+        sessionStorage.setItem('ocd_pending_position', String(Math.max(0, Number(position))));
       } else {
-        sessionStorage.removeItem('plasma_pending_position');
+        sessionStorage.removeItem('ocd_pending_position');
       }
     } catch {}
   }
@@ -246,10 +247,10 @@ import { Pointer } from './src/lib/pointer.js';
     try {
       const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
       if (!queue.length) {
-        sessionStorage.removeItem('plasma_pending_course_session');
+        sessionStorage.removeItem('ocd_pending_course_session');
         return;
       }
-      sessionStorage.setItem('plasma_pending_course_session', JSON.stringify({
+      sessionStorage.setItem('ocd_pending_course_session', JSON.stringify({
         queue,
         queueIndex: Math.max(0, Number(snapshot.queueIndex) || 0),
         currentTime: Math.max(0, Number(snapshot.currentTime) || 0),
@@ -267,9 +268,9 @@ import { Pointer } from './src/lib/pointer.js';
 
   function consumePendingCourseSession() {
     try {
-      const raw = sessionStorage.getItem('plasma_pending_course_session');
+      const raw = sessionStorage.getItem('ocd_pending_course_session');
       if (!raw) return null;
-      sessionStorage.removeItem('plasma_pending_course_session');
+      sessionStorage.removeItem('ocd_pending_course_session');
       const snapshot = JSON.parse(raw);
       if (!snapshot || typeof snapshot !== 'object') return null;
       const queue = Array.isArray(snapshot.queue) ? snapshot.queue.filter(Boolean) : [];
@@ -289,18 +290,18 @@ import { Pointer } from './src/lib/pointer.js';
         track: snapshot.track && typeof snapshot.track === 'object' ? { ...snapshot.track } : null,
       };
     } catch {
-      try { sessionStorage.removeItem('plasma_pending_course_session'); } catch {}
+      try { sessionStorage.removeItem('ocd_pending_course_session'); } catch {}
       return null;
     }
   }
 
   function setPendingPdfPage(docId, page = null) {
     try {
-      if (docId) sessionStorage.setItem('plasma_pending_pdf_doc', String(docId));
+      if (docId) sessionStorage.setItem('ocd_pending_pdf_doc', String(docId));
       if (Number.isFinite(Number(page)) && Number(page) > 0) {
-        sessionStorage.setItem('plasma_pending_pdf_page', String(Math.max(1, Math.floor(Number(page)))));
+        sessionStorage.setItem('ocd_pending_pdf_page', String(Math.max(1, Math.floor(Number(page)))));
       } else {
-        sessionStorage.removeItem('plasma_pending_pdf_page');
+        sessionStorage.removeItem('ocd_pending_pdf_page');
       }
     } catch {}
   }
@@ -669,33 +670,10 @@ import { Pointer } from './src/lib/pointer.js';
     return img;
   }
 
-  /**
-   * Simple event emitter
-   */
-  class EventEmitter {
-    constructor() { this._events = {}; }
-    on(event, fn) {
-      (this._events[event] ??= []).push(fn);
-      return this;
-    }
-    off(event, fn) {
-      if (this._events[event]) {
-        this._events[event] = this._events[event].filter(f => f !== fn && f.fn !== fn);
-      }
-      return this;
-    }
-    emit(event, ...args) {
-      (this._events[event] ?? []).forEach(fn => fn(...args));
-      return this;
-    }
-    once(event, fn) {
-      const wrapper = (...args) => { fn(...args); this.off(event, wrapper); };
-      wrapper.fn = fn;
-      return this.on(event, wrapper);
-    }
-  }
-
-  // Global event bus
+  // Global event bus — shared EventEmitter from src/lib/eventEmitter.js
+  // (Map-based, wildcard support, handler-error isolation). The former
+  // inline duplicate drifted from the module version; this is the single
+  // implementation now.
   OpenCourseDeck.bus = new EventEmitter();
 
   /**
@@ -744,7 +722,7 @@ import { Pointer } from './src/lib/pointer.js';
 
   const Sidebar = {
     // Keep in sync with storageMigrate + index pre-boot.
-    STORAGE_KEY: 'plasma_sidebar_collapsed',
+    STORAGE_KEY: 'ocd_sidebar_collapsed',
     el: null,
     mainContent: null,
     topbar: null,
@@ -2195,10 +2173,10 @@ import { Pointer } from './src/lib/pointer.js';
       OpenCourseDeck.bus.on?.('storage:fallback', showFallback);
       OpenCourseDeck.bus.on?.('db:versionchange', showDbVersionChange);
       if (window.__pdDbVersionChangeHandler) {
-        window.removeEventListener?.('plasma:db-versionchange', window.__pdDbVersionChangeHandler);
+        window.removeEventListener?.('ocd:db-versionchange', window.__pdDbVersionChangeHandler);
       }
       window.__pdDbVersionChangeHandler = showDbVersionChange;
-      window.addEventListener?.('plasma:db-versionchange', showDbVersionChange);
+      window.addEventListener?.('ocd:db-versionchange', showDbVersionChange);
       if (window.OpenCourseDeck?.lastStorageIssue) showSaveError(window.OpenCourseDeck.lastStorageIssue);
     },
   };
@@ -3892,10 +3870,10 @@ import { Pointer } from './src/lib/pointer.js';
       btn.addEventListener('click', () => cpOpen());
     }
 
-    // Service worker update prompt (index.html dispatches plasma:sw-update-ready)
+    // Service worker update prompt (index.html dispatches ocd:sw-update-ready)
     if (!document.documentElement.dataset.pdSwBound) {
       document.documentElement.dataset.pdSwBound = 'true';
-      document.addEventListener('plasma:sw-update-ready', (event) => {
+      document.addEventListener('ocd:sw-update-ready', (event) => {
         const registration = event?.detail?.registration;
         const reloadWrap = createElement('div', { style: { marginTop: '8px' } });
         const reloadBtn = createElement('button', { class: 'btn btn-primary btn-sm', 'data-sw-reload': '' }, 'Reload');
@@ -3918,20 +3896,20 @@ import { Pointer } from './src/lib/pointer.js';
           // controllerchange handler in src/index.js perform the reload.
           const waiting = registration?.waiting;
           if (waiting) {
-            window.__plasmaSwUpdateAccepted = true;
+            window.__ocdSwUpdateAccepted = true;
             try {
               waiting.postMessage({ type: 'SKIP_WAITING' });
               // Safety net: if controllerchange never fires (worker failed to
               // activate), still honor the user's click.
               setTimeout(() => {
-                if (!window.__plasmaSwReloading) {
-                  window.__plasmaSwReloading = true;
+                if (!window.__ocdSwReloading) {
+                  window.__ocdSwReloading = true;
                   window.location.reload();
                 }
               }, 3000);
               return;
             } catch {
-              window.__plasmaSwUpdateAccepted = false;
+              window.__ocdSwUpdateAccepted = false;
             }
           }
           window.location.reload();

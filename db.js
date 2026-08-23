@@ -5,7 +5,12 @@
 (() => {
 'use strict';
 
-class PlasmaDB {
+// KDF parameters. v2 envelopes carry a random per-database salt and the
+// hardened iteration count; legacy envelopes keep the original values.
+const LEGACY_KDF = { salt: 'opencoursedeck-salt', iterations: 10000 };
+const KDF_ITERATIONS = 600000;
+
+class OpenCourseDB {
 
 constructor(name, version = 1, schema = []) {
 this.name = name;
@@ -32,10 +37,11 @@ _getCrypto() {
   return null;
 }
 
-async _deriveKey(passphrase, saltStr = 'opencoursedeck-salt') {
+async _deriveKey(passphrase, salt = LEGACY_KDF.salt, iterations = LEGACY_KDF.iterations) {
   const cryptoObj = this._getCrypto();
   if (!cryptoObj || !cryptoObj.subtle) return null;
   const encoder = new TextEncoder();
+  const saltBytes = typeof salt === 'string' ? encoder.encode(salt) : salt;
   const baseKey = await cryptoObj.subtle.importKey(
     'raw',
     encoder.encode(passphrase),
@@ -46,8 +52,8 @@ async _deriveKey(passphrase, saltStr = 'opencoursedeck-salt') {
   return cryptoObj.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode(saltStr),
-      iterations: 10000,
+      salt: saltBytes,
+      iterations,
       hash: 'SHA-256'
     },
     baseKey,
@@ -61,13 +67,18 @@ async encryptPayload(data) {
   if (!this.encryptionPassphrase) return data;
   const cryptoObj = this._getCrypto();
   if (!cryptoObj || !cryptoObj.subtle) return data;
-  const key = await this._deriveKey(this.encryptionPassphrase);
+  // v2 envelope: random per-database salt + hardened PBKDF2 iteration count.
+  const salt = cryptoObj.getRandomValues(new Uint8Array(16));
+  const key = await this._deriveKey(this.encryptionPassphrase, salt, KDF_ITERATIONS);
   if (!key) return data;
   const iv = cryptoObj.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(data));
   const ciphertext = await cryptoObj.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
   return {
     __encrypted: true,
+    v: 2,
+    salt: Array.from(salt),
+    iterations: KDF_ITERATIONS,
     iv: Array.from(iv),
     ciphertext: Array.from(new Uint8Array(ciphertext))
   };
@@ -77,7 +88,14 @@ async decryptPayload(data) {
   if (!data || !data.__encrypted || !this.encryptionPassphrase) return data;
   const cryptoObj = this._getCrypto();
   if (!cryptoObj || !cryptoObj.subtle) return data;
-  const key = await this._deriveKey(this.encryptionPassphrase);
+  // Legacy envelopes (no v field) used the static app-wide salt and the
+  // original 10,000-iteration KDF; keep decrypting them transparently.
+  const isLegacy = data.v !== 2;
+  const key = await this._deriveKey(
+    this.encryptionPassphrase,
+    isLegacy ? LEGACY_KDF.salt : Uint8Array.from(data.salt ?? []),
+    isLegacy ? LEGACY_KDF.iterations : (data.iterations ?? KDF_ITERATIONS)
+  );
   if (!key) return data;
   const iv = new Uint8Array(data.iv);
   const ciphertext = new Uint8Array(data.ciphertext);
@@ -350,5 +368,7 @@ return data;
 }
 
 window.OpenCourseDeck = window.OpenCourseDeck || {};
-window.OpenCourseDeck.DB = { PlasmaDB, DBQuery };
+// Historical PlasmaDB name kept as an alias so existing integrations and
+// tests continue to resolve the same constructor.
+window.OpenCourseDeck.DB = { OpenCourseDB, PlasmaDB: OpenCourseDB, DBQuery };
 })();

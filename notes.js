@@ -11,9 +11,9 @@
   // 0. CONSTANTS & STATE
   // ──────────────────────────────────────────────────────────
 
-  const STORAGE_KEY   = 'plasma-notes';
-  const FOLDERS_KEY   = 'plasma-folders';
-  const SETTINGS_KEY  = 'plasma-notes-settings';
+  const STORAGE_KEY   = 'ocd_notes';
+  const FOLDERS_KEY   = 'ocd_folders';
+  const SETTINGS_KEY  = 'ocd_notes_settings';
   const SYSTEM_FOLDER_IDS = new Set(['', 'default', '__pinned__']);
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -64,7 +64,7 @@
     return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
-  function safeFilename(name, fallback = 'plasma-note') {
+  function safeFilename(name, fallback = 'note') {
     return String(name || fallback)
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
       .replace(/\s+/g, ' ')
@@ -123,7 +123,7 @@
       try { window.OpenCourseDeck?.bus?.emit?.(type, payload); } catch {}
       try {
         if (typeof CustomEvent === 'function') {
-          window.dispatchEvent?.(new CustomEvent(`plasma:${type}`, { detail: payload }));
+          window.dispatchEvent?.(new CustomEvent(`ocd:${type}`, { detail: payload }));
         }
       } catch {}
       return payload;
@@ -1549,12 +1549,12 @@
     exportAll(format = 'json') {
       const notes = Store.getNotes();
       if (format === 'json') {
-        this._download('plasma-notes.json', JSON.stringify(notes, null, 2), 'application/json');
+        this._download('notes.json', JSON.stringify(notes, null, 2), 'application/json');
       } else if (format === 'md') {
         const md = notes.map(n =>
           `# ${n.title}\n\n${this._htmlToMd(n.content)}\n\n---\n`
         ).join('\n');
-        this._download('plasma-notes.md', md, 'text/markdown');
+        this._download('notes.md', md, 'text/markdown');
       }
     },
 

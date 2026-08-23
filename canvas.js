@@ -147,7 +147,7 @@
     _paused:   false,
     _listeners: [],
     _autosaveTimer: null,
-    _autosaveKey: 'plasma-canvas-board',
+    _autosaveKey: 'ocd_canvas_board',
     _autosaveDebounceMs: 1500,
     _pointerId: null,
     _spaceDown: false,
@@ -999,7 +999,7 @@
     },
 
     _emitInteractiveChange(action) {
-      this._canvas?.dispatchEvent?.(new CustomEvent('plasma:studio-board-change', {
+      this._canvas?.dispatchEvent?.(new CustomEvent('ocd:studio-board-change', {
         bubbles: true,
         detail: { action, board: this.serialize() },
       }));

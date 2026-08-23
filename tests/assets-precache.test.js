@@ -73,7 +73,7 @@ describe('static assets and service worker precache', () => {
     expect(csp).toMatch(/media-src[^;]*http:[^;]*https:/);
     expect(csp).toMatch(/connect-src[^;]*http:[^;]*https:/);
     expect(csp).toMatch(/frame-src[^;]*http:[^;]*https:/);
-    expect(csp).not.toContain('https://plasmato.s3.ir-thr-at1.arvanstorage.ir');
+    expect(csp).not.toContain('https://legacy-media-bucket.example.com');
   });
 
   it('precache includes boot and the active catalog file in the release directory', () => {

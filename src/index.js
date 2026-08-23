@@ -66,6 +66,8 @@ pd.workers = workerAssets;
 const featureLoaders = {
   player: async () => {
     await import('./features/mediaStorage.js');
+    // Wire the waveform scrubber namespace the player probes for at runtime.
+    await import('./features/waveformScrubber.js');
     return import('../player.js');
   },
   notes: () => import('../notes.js'),

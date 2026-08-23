@@ -81,7 +81,7 @@ async function renderPlaylists(deps) {
       }
     })(),
     (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-    (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('plasma-playlists')); } catch { return []; } })(),
+    (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch { return []; } })(),
   ]);
   if (!document.body.contains(listRoot)) return;
 
@@ -235,9 +235,9 @@ async function renderPlaylists(deps) {
       const input = document.querySelector('[data-playlist-name]');
       const title = String(input?.value || firstCatalog.title || 'Saved playlist').trim() || 'Saved playlist';
       const now = Date.now();
-      const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('plasma-playlists'));
+      const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists'));
       const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      await window.DB.saveSetting('plasma-playlists', [
+      await window.DB.saveSetting('ocd_playlists', [
         { id, title, topicIds: [...new Set(firstCatalog.topicIds)], createdAt: now, updatedAt: now },
         ...current,
       ].slice(0, 50));
@@ -250,8 +250,8 @@ async function renderPlaylists(deps) {
   listRoot.onclick = async (event) => {
     const btn = event.target?.closest?.('[data-delete-playlist]');
     if (!btn || !window.DB?.saveSetting) return;
-    const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('plasma-playlists'));
-    await window.DB.saveSetting('plasma-playlists', current.filter(item => item.id !== btn.dataset.deletePlaylist));
+    const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists'));
+    await window.DB.saveSetting('ocd_playlists', current.filter(item => item.id !== btn.dataset.deletePlaylist));
     Toast.success('Playlist deleted');
     renderPlaylists(deps);
   };

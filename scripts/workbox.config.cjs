@@ -13,7 +13,6 @@ module.exports = {
     'pdf-runtime.js',
     'manifest.json',
     'style.css',
-    'plasmato_full_*.json',
     'assets/**',
     'vendor/**',
     'dist/**',
@@ -33,7 +32,7 @@ module.exports = {
       urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'plasma-data',
+        cacheName: 'opencoursedeck-data',
         networkTimeoutSeconds: 3,
         expiration: {
           maxEntries: 50,
@@ -45,7 +44,7 @@ module.exports = {
       urlPattern: ({ url }) => url.pathname.startsWith('/vendor/'),
       handler: 'CacheFirst',
       options: {
-        cacheName: 'plasma-vendor',
+        cacheName: 'ocd-vendor',
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -56,7 +55,7 @@ module.exports = {
       urlPattern: ({ url }) => url.pathname.startsWith('/dist/'),
       handler: 'StaleWhileRevalidate',
       options: {
-        cacheName: 'plasma-dist',
+        cacheName: 'ocd-dist',
         expiration: {
           maxEntries: 20,
           maxAgeSeconds: 24 * 60 * 60,

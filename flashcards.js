@@ -5,7 +5,8 @@
 (() => {
   'use strict';
 
-  const STORE_NAME = 'plasma-flashcards-store';
+  const STORE_NAME = 'ocd_flashcards';
+  const LEGACY_STORE_NAME = 'plasma-flashcards-store';
   let memoryStore = [];
 
   /**
@@ -56,7 +57,8 @@
     getStorage() {
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
-          const raw = window.localStorage.getItem(STORE_NAME);
+          const raw = window.localStorage.getItem(STORE_NAME)
+            ?? window.localStorage.getItem(LEGACY_STORE_NAME);
           if (raw) return JSON.parse(raw);
         }
       } catch {}
@@ -77,6 +79,7 @@
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') {
           window.localStorage.removeItem(STORE_NAME);
+          window.localStorage.removeItem(LEGACY_STORE_NAME);
         }
       } catch {}
     }

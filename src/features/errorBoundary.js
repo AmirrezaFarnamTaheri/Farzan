@@ -120,7 +120,7 @@ function onUnhandledRejection(event) {
  * @param {{ container?: HTMLElement }} options
  */
 export function initErrorBoundary({ container } = {}) {
-  _container = container ?? document.getElementById('plasma-app') ?? document.body;
+  _container = container ?? document.getElementById('ocd-app') ?? document.body;
   if (_initialized) return;
   _initialized = true;
   window.addEventListener('error', onError);

@@ -452,17 +452,17 @@
         });
 
         await _migrateSection(idb, ids, failures, report, 'notes', 'notes', async () => {
-          const list = await _buildLegacyRecords('note', _read('plasma-notes', []));
+          const list = await _buildLegacyRecords('note', _read('ocd_notes', []));
           return list.map(([record, id]) => [`notes:${id}`, { ...record, id }]);
         });
 
         await _migrateSection(idb, ids, failures, report, 'folders', 'folders', async () => {
-          const list = await _buildLegacyRecords('folder', _read('plasma-folders', []));
+          const list = await _buildLegacyRecords('folder', _read('ocd_folders', []));
           return list.map(([record, id]) => [`folders:${id}`, { ...record, id }]);
         });
 
         await _migrateSection(idb, ids, failures, report, 'settings', 'settings', async () => {
-          const ns = _read('plasma-notes-settings', null);
+          const ns = _read('ocd_notes_settings', null);
           return ns && typeof ns === 'object'
             ? [['settings:notes', { key: 'notes', value: ns }]]
             : [];
@@ -614,7 +614,7 @@
           try { return (await idb.getAll('notes')) ?? []; } catch {}
         }
       }
-      try { return JSON.parse(localStorage.getItem('plasma-notes')) ?? []; } catch { return []; }
+      try { return JSON.parse(localStorage.getItem('ocd_notes')) ?? []; } catch { return []; }
     }
 
     async function saveNote(note) {
@@ -633,12 +633,12 @@
       }
 
       // IndexedDB unavailable: mirror notes in localStorage (see notes.js primary store).
-      const list = _read('plasma-notes', []);
+      const list = _read('ocd_notes', []);
       const idx = list.findIndex(n => n?.id === id);
       if (idx >= 0) list[idx] = next;
       else list.push(next);
-      try { _write('plasma-notes', list); } catch (e) {
-        _signalSaveError('note', 'localStorage', e, { key: 'plasma-notes' });
+      try { _write('ocd_notes', list); } catch (e) {
+        _signalSaveError('note', 'localStorage', e, { key: 'ocd_notes' });
         throw e;
       }
       _broadcast('note', 'save', next);
@@ -658,11 +658,11 @@
         // the canonical IndexedDB delete actually happened. If IDB is gone,
         // the mirror may be the only live store — wiping it would erase
         // EVERY note, so fall through to a targeted filter instead.
-        localStorage.removeItem('plasma-notes');
+        localStorage.removeItem('ocd_notes');
       } else {
-        const list = _read('plasma-notes', []);
+        const list = _read('ocd_notes', []);
         const next = list.filter(n => n?.id !== id);
-        _write('plasma-notes', next);
+        _write('ocd_notes', next);
       }
       _broadcast('note', 'delete', { id });
     }
@@ -673,7 +673,7 @@
         await _migrateOnce();
         try { return (await idb.getAll('folders')) ?? []; } catch {}
       }
-      return _read('plasma-folders', []);
+      return _read('ocd_folders', []);
     }
 
     async function saveFolder(folder) {
@@ -689,11 +689,11 @@
           }
         }
       }
-      const list = _read('plasma-folders', []);
+      const list = _read('ocd_folders', []);
       const idx = list.findIndex(f => f?.id === id);
       if (idx >= 0) list[idx] = next;
       else list.push(next);
-      _write('plasma-folders', list);
+      _write('ocd_folders', list);
       _broadcast('folder', 'save', next);
       return next;
     }
@@ -708,14 +708,22 @@
         try { await idb.delete('folders', id); idbDeleted = true; } catch {}
       }
       if (idbDeleted && _isMigrated()) {
-        localStorage.removeItem('plasma-folders');
+        localStorage.removeItem('ocd_folders');
       } else {
-        const list = _read('plasma-folders', []);
+        const list = _read('ocd_folders', []);
         const next = list.filter(f => f?.id !== id);
-        _write('plasma-folders', next);
+        _write('ocd_folders', next);
       }
       _broadcast('folder', 'delete', { id });
     }
+
+    const SETTING_KEY_ALIASES = {
+      ocd_playlists: 'plasma-playlists',
+      ocd_studio_board: 'plasma-studio-board',
+      ocd_canvas_board: 'plasma-canvas-board',
+      ocd_notes_settings: 'plasma-notes-settings',
+      ocd_ai_settings: 'plasma-ai-settings',
+    };
 
     async function getSetting(key) {
       const idb = _getIdb();
@@ -726,7 +734,13 @@
           if (entry) return entry.value;
         } catch {}
       }
-      return _read(key, null);
+      const direct = _read(key, null);
+      if (direct != null) return direct;
+      // Rename support: fall back to the pre-rename plasma-era twin so
+      // existing user data stays readable until the next save writes
+      // the canonical ocd_* key.
+      const legacyKey = SETTING_KEY_ALIASES[key];
+      return legacyKey ? _read(legacyKey, null) : null;
     }
 
     async function saveSetting(key, value) {
@@ -882,15 +896,18 @@
       if (includeSettings) stores.push('settings');
       if (includeAnnotations) stores.push('annotations');
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS, KEY_MIGRATED, MIGRATED_IDS_KEY];
-      if (includeNotes) localKeys.push('plasma-notes', 'plasma-folders');
-      if (includeSettings) localKeys.push('plasma-notes-settings');
+      if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
+      if (includeSettings) localKeys.push('ocd_notes_settings');
       if (includeAnnotations) localKeys.push('plasma-pdf-annotations');
       if (includePrefs) localKeys.push(
         'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
         'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
         'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
         'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
-        'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists',
+        'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists', 'ocd_playlists', 'ocd_notes', 'ocd_folders',
+        'ocd_notes_settings', 'ocd_theme', 'ocd_accent', 'ocd_density',
+        'ocd_font_scale', 'ocd_dir', 'ocd_sidebar_collapsed', 'ocd_flashcards',
+        'ocd_ai_settings',
         'plasma-studio-board', 'plasma-canvas-board', MIGRATION_REPORT_KEY,
       );
 
@@ -906,7 +923,7 @@
       if (scope === 'notes') {
         return _deletionOutcome('clear-notes', scope, [
           await _clearIdbStores(idb, ['notes', 'folders']),
-          _storageRemoval(localStorage, ['plasma-notes', 'plasma-folders', 'plasma-notes-settings'], 'localStorage'),
+          _storageRemoval(localStorage, ['ocd_notes', 'ocd_folders', 'ocd_notes_settings'], 'localStorage'),
         ]);
       }
       if (scope === 'progress') {
@@ -953,10 +970,10 @@
     const getProgressByCourse = (courseId) => _byIndex('progress', 'courseId', courseId, () => Object.values(_read(KEY_PROGRESS, {})));
     const getTimestampsByTopic = (topicId) => _byIndex('timestamps', 'topicId', topicId, () => _read(KEY_TIMESTAMPS, []));
     const getTimestampsByCourse = (courseId) => _byIndex('timestamps', 'courseId', courseId, () => _read(KEY_TIMESTAMPS, []));
-    const getNotesByTopic = (topicId) => _byIndex('notes', 'topicId', topicId, () => _read('plasma-notes', []));
-    const getNotesByCourse = (courseId) => _byIndex('notes', 'courseId', courseId, () => _read('plasma-notes', []));
-    const getNotesByFolder = (folderId) => _byIndex('notes', 'folderId', folderId, () => _read('plasma-notes', []).map(n => ({ folderId: n.folderId ?? 'default', ...n })));
-    const getFoldersByParent = (parentId) => _byIndex('folders', 'parentId', parentId, () => _read('plasma-folders', []).map(f => ({ parentId: f.parentId ?? null, ...f })));
+    const getNotesByTopic = (topicId) => _byIndex('notes', 'topicId', topicId, () => _read('ocd_notes', []));
+    const getNotesByCourse = (courseId) => _byIndex('notes', 'courseId', courseId, () => _read('ocd_notes', []));
+    const getNotesByFolder = (folderId) => _byIndex('notes', 'folderId', folderId, () => _read('ocd_notes', []).map(n => ({ folderId: n.folderId ?? 'default', ...n })));
+    const getFoldersByParent = (parentId) => _byIndex('folders', 'parentId', parentId, () => _read('ocd_folders', []).map(f => ({ parentId: f.parentId ?? null, ...f })));
     async function getRecentNotes(limit = 10) {
       const idb = _getIdb();
       if (idb) {
@@ -994,7 +1011,7 @@
       }
       const all = store === 'progress'
         ? Object.values(_read(KEY_PROGRESS, {}))
-        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'plasma-notes', []);
+        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'ocd_notes', []);
       return all.filter(r => r && r[indexName] >= lower && r[indexName] <= upper).slice(0, limit);
     }
 
@@ -1016,7 +1033,7 @@
       }
       const all = store === 'progress'
         ? Object.values(_read(KEY_PROGRESS, {}))
-        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'plasma-notes', []);
+        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'ocd_notes', []);
       return all.filter(r => r?.[indexName] === value).length;
     }
 

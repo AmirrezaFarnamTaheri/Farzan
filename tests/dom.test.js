@@ -92,8 +92,8 @@ describe('dom utils', () => {
   });
 
   it('setAppInert reference-counts app background inert state', () => {
-    document.body.innerHTML = '<div id="plasma-app"></div>';
-    const app = document.getElementById('plasma-app');
+    document.body.innerHTML = '<div id="ocd-app"></div>';
+    const app = document.getElementById('ocd-app');
 
     setAppInert(true, app);
     setAppInert(true, app);

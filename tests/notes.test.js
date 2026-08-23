@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const now = Date.now();
 
 function seedNotes() {
-  localStorage.setItem('plasma-notes', JSON.stringify([
+  localStorage.setItem('ocd_notes', JSON.stringify([
     {
       id: 'pinned-note',
       title: 'Pinned note',
@@ -41,7 +41,7 @@ function seedNotes() {
       charCount: 4,
     },
   ]));
-  localStorage.setItem('plasma-folders', JSON.stringify([
+  localStorage.setItem('ocd_folders', JSON.stringify([
     { id: 'default', name: 'Personal', icon: 'Folder', color: '' },
     { id: 'xss-folder', name: '<img src=x onerror="window.__folderNameXss = true">', icon: '<svg onload="window.__folderIconXss = true"></svg>', color: '' },
   ]));
@@ -57,33 +57,33 @@ describe('notes route filters', () => {
     document.queryCommandState = vi.fn(() => false);
     document.queryCommandValue = vi.fn(() => '');
     window.DB = {
-      getAllNotes: vi.fn(() => Promise.resolve(JSON.parse(localStorage.getItem('plasma-notes') || '[]'))),
-      getAllFolders: vi.fn(() => Promise.resolve(JSON.parse(localStorage.getItem('plasma-folders') || '[]'))),
+      getAllNotes: vi.fn(() => Promise.resolve(JSON.parse(localStorage.getItem('ocd_notes') || '[]'))),
+      getAllFolders: vi.fn(() => Promise.resolve(JSON.parse(localStorage.getItem('ocd_folders') || '[]'))),
       getSetting: vi.fn(() => Promise.resolve(null)),
       saveNote: vi.fn((note) => {
-        const notes = JSON.parse(localStorage.getItem('plasma-notes') || '[]');
+        const notes = JSON.parse(localStorage.getItem('ocd_notes') || '[]');
         const idx = notes.findIndex((item) => item.id === note.id);
         if (idx >= 0) notes[idx] = note;
         else notes.unshift(note);
-        localStorage.setItem('plasma-notes', JSON.stringify(notes));
+        localStorage.setItem('ocd_notes', JSON.stringify(notes));
         return Promise.resolve(note);
       }),
       deleteNote: vi.fn((id) => {
-        const notes = JSON.parse(localStorage.getItem('plasma-notes') || '[]').filter((note) => note.id !== id);
-        localStorage.setItem('plasma-notes', JSON.stringify(notes));
+        const notes = JSON.parse(localStorage.getItem('ocd_notes') || '[]').filter((note) => note.id !== id);
+        localStorage.setItem('ocd_notes', JSON.stringify(notes));
         return Promise.resolve(true);
       }),
       saveFolder: vi.fn((folder) => {
-        const folders = JSON.parse(localStorage.getItem('plasma-folders') || '[]');
+        const folders = JSON.parse(localStorage.getItem('ocd_folders') || '[]');
         const idx = folders.findIndex((item) => item.id === folder.id);
         if (idx >= 0) folders[idx] = folder;
         else folders.push(folder);
-        localStorage.setItem('plasma-folders', JSON.stringify(folders));
+        localStorage.setItem('ocd_folders', JSON.stringify(folders));
         return Promise.resolve(folder);
       }),
       deleteFolder: vi.fn((id) => {
-        const folders = JSON.parse(localStorage.getItem('plasma-folders') || '[]').filter((folder) => folder.id !== id);
-        localStorage.setItem('plasma-folders', JSON.stringify(folders));
+        const folders = JSON.parse(localStorage.getItem('ocd_folders') || '[]').filter((folder) => folder.id !== id);
+        localStorage.setItem('ocd_folders', JSON.stringify(folders));
         return Promise.resolve(true);
       }),
       saveSetting: vi.fn((key, value) => {
@@ -185,7 +185,7 @@ describe('notes route filters', () => {
       id: folder.id,
       name: 'Canonical folder',
     }));
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-notes-settings', { view: 'grid' });
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_notes_settings', { view: 'grid' });
     expect(window.DB.deleteFolder).toHaveBeenCalledWith(folder.id);
   });
 
@@ -200,7 +200,7 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getNote(note.id)).toEqual(expect.objectContaining({
       title: 'Memory canonical note',
     }));
-    expect(JSON.parse(localStorage.getItem('plasma-notes'))).not.toEqual(expect.arrayContaining([
+    expect(JSON.parse(localStorage.getItem('ocd_notes'))).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: note.id }),
     ]));
 
@@ -234,7 +234,7 @@ describe('notes route filters', () => {
 
     window.PlasmaNotesStore.deleteFolder(folder.id);
 
-    const notes = JSON.parse(localStorage.getItem('plasma-notes'));
+    const notes = JSON.parse(localStorage.getItem('ocd_notes'));
     expect(notes).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: 'Foldered note', folderId: 'default' }),
     ]));
@@ -265,8 +265,8 @@ describe('notes route filters', () => {
 
   it('hydrates the notes UI from canonical DB reads without rewriting local mirrors', async () => {
     window.PlasmaNotesStore._hydrated = false;
-    const localNotesBefore = localStorage.getItem('plasma-notes');
-    const localFoldersBefore = localStorage.getItem('plasma-folders');
+    const localNotesBefore = localStorage.getItem('ocd_notes');
+    const localFoldersBefore = localStorage.getItem('ocd_folders');
     window.DB.getAllNotes.mockResolvedValueOnce([
       {
         id: 'canonical-note',
@@ -287,9 +287,9 @@ describe('notes route filters', () => {
     await window.PlasmaNotesStore.hydrateFromDB();
     window.PlasmaNotesApp.openNote('canonical-note');
 
-    expect(localStorage.getItem('plasma-notes')).toBe(localNotesBefore);
-    expect(localStorage.getItem('plasma-folders')).toBe(localFoldersBefore);
-    expect(localStorage.getItem('plasma-notes-settings')).toBeNull();
+    expect(localStorage.getItem('ocd_notes')).toBe(localNotesBefore);
+    expect(localStorage.getItem('ocd_folders')).toBe(localFoldersBefore);
+    expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(window.PlasmaNotesStore.getNotes()).toEqual([
       expect.objectContaining({ id: 'canonical-note', title: 'Canonical note' }),
     ]);
@@ -360,15 +360,15 @@ describe('notes route filters', () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
     window.PlasmaNotesStore._settings = null;
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'repair-same', title: 'Local older', folderId: '__pinned__', updatedAt: now - 10 },
       { id: 'repair-local', title: 'Local only', folderId: 'xss-folder', updatedAt: now + 1 },
     ]));
-    localStorage.setItem('plasma-folders', JSON.stringify([
+    localStorage.setItem('ocd_folders', JSON.stringify([
       { id: 'xss-folder', name: 'Local folder', icon: 'Folder', color: '' },
       { id: '__pinned__', name: 'Bad pinned folder', icon: 'Pin', color: '' },
     ]));
-    localStorage.setItem('plasma-notes-settings', JSON.stringify({ view: 'list', density: 'compact' }));
+    localStorage.setItem('ocd_notes_settings', JSON.stringify({ view: 'list', density: 'compact' }));
     window.DB.getAllNotes.mockResolvedValueOnce([
       { id: 'repair-same', title: 'DB newer', folderId: 'default', updatedAt: now + 20 },
       { id: 'repair-db', title: 'DB only', folderId: 'default', updatedAt: now + 2 },
@@ -409,8 +409,8 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getSettings()).toEqual({ view: 'grid', density: 'compact' });
     expect(window.DB.saveNote).toHaveBeenCalledTimes(3);
     expect(window.DB.saveFolder).toHaveBeenCalledTimes(2);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-notes-settings', { view: 'grid', density: 'compact' });
-    expect(JSON.parse(localStorage.getItem('plasma-notes'))).toEqual(expect.arrayContaining([
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_notes_settings', { view: 'grid', density: 'compact' });
+    expect(JSON.parse(localStorage.getItem('ocd_notes'))).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'repair-same', title: 'DB newer' }),
       expect.objectContaining({ id: 'repair-local' }),
       expect.objectContaining({ id: 'repair-db' }),
@@ -427,13 +427,13 @@ describe('notes route filters', () => {
     const folder = window.PlasmaNotesStore.createFolder('Fallback folder');
     window.PlasmaNotesStore.saveSettings({ view: 'list' });
 
-    expect(JSON.parse(localStorage.getItem('plasma-notes'))).toEqual(expect.arrayContaining([
+    expect(JSON.parse(localStorage.getItem('ocd_notes'))).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: note.id, title: 'Fallback note' }),
     ]));
-    expect(JSON.parse(localStorage.getItem('plasma-folders'))).toEqual(expect.arrayContaining([
+    expect(JSON.parse(localStorage.getItem('ocd_folders'))).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: folder.id, name: 'Fallback folder' }),
     ]));
-    expect(JSON.parse(localStorage.getItem('plasma-notes-settings'))).toEqual({ view: 'list' });
+    expect(JSON.parse(localStorage.getItem('ocd_notes_settings'))).toEqual({ view: 'list' });
   });
 
   it('reports bridge-less localStorage write failures through the storage issue channel', () => {
@@ -443,7 +443,7 @@ describe('notes route filters', () => {
     const originalSetItem = Storage.prototype.setItem;
     window.OpenCourseDeck.bus.emit = emit;
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
-      if (key === 'plasma-notes') throw quotaError;
+      if (key === 'ocd_notes') throw quotaError;
       return originalSetItem.call(this, key, value);
     });
 
@@ -457,13 +457,13 @@ describe('notes route filters', () => {
     expect(window.OpenCourseDeck.lastStorageIssue).toEqual(expect.objectContaining({
       kind: 'note-list',
       backend: 'localStorage',
-      key: 'plasma-notes',
+      key: 'ocd_notes',
       error: expect.objectContaining({ quota: true }),
     }));
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'note-list',
       backend: 'localStorage',
-      key: 'plasma-notes',
+      key: 'ocd_notes',
     }));
   });
 
@@ -600,7 +600,7 @@ describe('notes route filters', () => {
 
   it('sanitizes imported note content and records import counts', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
-    const localNotesBefore = localStorage.getItem('plasma-notes');
+    const localNotesBefore = localStorage.getItem('ocd_notes');
     const file = new File([JSON.stringify([
       {
         id: 'import-xss',
@@ -625,7 +625,7 @@ describe('notes route filters', () => {
     expect(imported.content).toContain('Imported');
     expect(imported.content).not.toContain('<script>');
     expect(imported.content).not.toContain('onerror');
-    expect(localStorage.getItem('plasma-notes')).toBe(localNotesBefore);
+    expect(localStorage.getItem('ocd_notes')).toBe(localNotesBefore);
     expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'import-xss' }));
     expect(window.OpenCourseDeck.lastNotesImportResult.errors).toEqual([
       expect.objectContaining({ message: 'Note record must be an object.' }),

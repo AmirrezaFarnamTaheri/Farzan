@@ -1158,10 +1158,10 @@ export async function mountCoursesView(deps = {}) {
 
   // Auto-select first course
   const pendingSession = consumePendingCourseSession();
-  const pendingTopicId = sessionStorage.getItem('plasma_pending_topic');
-  const pendingPosition = Number(sessionStorage.getItem('plasma_pending_position') || 0);
-  if (pendingTopicId) sessionStorage.removeItem('plasma_pending_topic');
-  if (pendingPosition) sessionStorage.removeItem('plasma_pending_position');
+  const pendingTopicId = sessionStorage.getItem('ocd_pending_topic');
+  const pendingPosition = Number(sessionStorage.getItem('ocd_pending_position') || 0);
+  if (pendingTopicId) sessionStorage.removeItem('ocd_pending_topic');
+  if (pendingPosition) sessionStorage.removeItem('ocd_pending_position');
 
   const selectCourse = (courseId) => {
     const btn = listEl.querySelector(`[data-course-id="${courseId}"]`);

@@ -46,7 +46,7 @@ const IGNORED_DIRS = new Set([
 
 // These files are byte-for-byte or deterministically generated third-party
 // minified artifacts. Scanning them reports upstream byte sequences that
-// Farzan neither authors nor safely rewrites. Farzan-authored compatibility
+// OpenCourseDeck neither authors nor safely rewrites. App-authored compatibility
 // wrappers such as vendor/pdf.min.js remain in scope.
 const IGNORED_FILES = new Set([
   'vendor/chart.umd.js',

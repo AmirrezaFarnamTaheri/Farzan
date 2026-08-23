@@ -85,7 +85,7 @@ printStudioBoardPdf,
   const setStatus = (message) => {
     if (status) status.textContent = message;
   };
-  const boardKey = 'plasma-studio-board';
+  const boardKey = 'ocd_studio_board';
   let inspectedElementId = null;
   let interactiveSaveTimer = null;
   let studioLinkOptions = [];
@@ -483,7 +483,7 @@ printStudioBoardPdf,
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   };
-  on(canvas, 'plasma:studio-board-change', () => {
+  on(canvas, 'ocd:studio-board-change', () => {
     renderInspector();
     clearTimeout(interactiveSaveTimer);
     interactiveSaveTimer = setTimeout(() => {

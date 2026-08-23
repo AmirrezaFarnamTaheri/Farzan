@@ -187,11 +187,11 @@ const ProgressStats = (() => {
     if (!window.Chart) return;
 
     // Destroy previous instances to avoid leaks on re-render
-    if (window.__plasmaCharts) {
-      try { window.__plasmaCharts.overall?.destroy?.(); } catch {}
-      try { window.__plasmaCharts.courses?.destroy?.(); } catch {}
+    if (window.__ocdCharts) {
+      try { window.__ocdCharts.overall?.destroy?.(); } catch {}
+      try { window.__ocdCharts.courses?.destroy?.(); } catch {}
     }
-    window.__plasmaCharts = window.__plasmaCharts ?? {};
+    window.__ocdCharts = window.__ocdCharts ?? {};
     const chartPalette = {
       done: '#2e7d32',
       active: '#1565c0',
@@ -206,7 +206,7 @@ const ProgressStats = (() => {
     // doughnut — overall completion
     const dCtx = q('#chart-overall')?.getContext('2d');
     if (dCtx) {
-      window.__plasmaCharts.overall = new Chart(dCtx, {
+      window.__ocdCharts.overall = new Chart(dCtx, {
         type: 'doughnut',
         data: {
           labels: ['Completed', 'In Progress', 'Not Started'],
@@ -226,7 +226,7 @@ const ProgressStats = (() => {
     // bar — per-course completion %
     const bCtx = q('#chart-courses')?.getContext('2d');
     if (bCtx) {
-      window.__plasmaCharts.courses = new Chart(bCtx, {
+      window.__ocdCharts.courses = new Chart(bCtx, {
         type: 'bar',
         data: {
           labels  : stats.byCourse.map(c => c.title),
@@ -311,9 +311,9 @@ const ProgressStats = (() => {
     const allTimestamps= await DB.getAllTimestamps();
     const allFolders   = await DB.getAllFolders?.() ?? [];
     const allAnnotations = await DB.getAllAnnotations?.() ?? [];
-    const notesSettings= await DB.getSetting?.('plasma-notes-settings') ?? null;
-    const playlistsSettings= await DB.getSetting?.('plasma-playlists') ?? null;
-    const studioSettings= await DB.getSetting?.('plasma-studio-board') ?? null;
+    const notesSettings= await DB.getSetting?.('ocd_notes_settings') ?? null;
+    const playlistsSettings= await DB.getSetting?.('ocd_playlists') ?? null;
+    const studioSettings= await DB.getSetting?.('ocd_studio_board') ?? null;
 
     const payload = {
       exportedAt  : new Date().toISOString(),
@@ -564,7 +564,7 @@ const ProgressStats = (() => {
               _recordImportError(result, 'progress', p.topicId, err);
             }
           });
-        // Notes are stored by notes.js in localStorage under "plasma-notes".
+        // Notes are stored by notes.js in localStorage under "ocd_notes" (migrated from the legacy key).
         // Older backups may have {topicId, courseId, html, text}; keep whatever fields exist.
         if (noteRecords.length) {
           const imported = noteRecords.map((n) => ({
@@ -618,30 +618,30 @@ const ProgressStats = (() => {
         }
         if (payload.settings?.notes && DB.saveSetting) {
             try {
-              await DB.saveSetting('plasma-notes-settings', payload.settings.notes);
+              await DB.saveSetting('ocd_notes_settings', payload.settings.notes);
               result.settings += 1;
             } catch (err) {
-              _recordImportError(result, 'settings', 'plasma-notes-settings', err);
+              _recordImportError(result, 'settings', 'ocd_notes_settings', err);
             }
         } else if (payload.settings?.notes) {
           result.skipped += 1;
         }
         if (Array.isArray(payload.settings?.playlists) && DB.saveSetting) {
             try {
-              await DB.saveSetting('plasma-playlists', payload.settings.playlists);
+              await DB.saveSetting('ocd_playlists', payload.settings.playlists);
               result.settings += 1;
             } catch (err) {
-              _recordImportError(result, 'settings', 'plasma-playlists', err);
+              _recordImportError(result, 'settings', 'ocd_playlists', err);
             }
         } else if (payload.settings?.playlists) {
           result.skipped += 1;
         }
         if (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) && DB.saveSetting) {
             try {
-              await DB.saveSetting('plasma-studio-board', payload.settings.studio);
+              await DB.saveSetting('ocd_studio_board', payload.settings.studio);
               result.settings += 1;
             } catch (err) {
-              _recordImportError(result, 'settings', 'plasma-studio-board', err);
+              _recordImportError(result, 'settings', 'ocd_studio_board', err);
             }
         } else if (payload.settings?.studio) {
           result.skipped += 1;
@@ -748,10 +748,10 @@ const ProgressStats = (() => {
   }
 
   function destroy() {
-    if (window.__plasmaCharts) {
-      try { window.__plasmaCharts.overall?.destroy?.(); } catch {}
-      try { window.__plasmaCharts.courses?.destroy?.(); } catch {}
-      window.__plasmaCharts = {};
+    if (window.__ocdCharts) {
+      try { window.__ocdCharts.overall?.destroy?.(); } catch {}
+      try { window.__ocdCharts.courses?.destroy?.(); } catch {}
+      window.__ocdCharts = {};
     }
   }
 
@@ -871,7 +871,7 @@ const ProgressStats = (() => {
   }
 
   async function _createImportSnapshot() {
-    const settingsKeys = ['plasma-notes-settings', 'plasma-playlists', 'plasma-studio-board'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board'];
     const annotations = await Promise.resolve(DB.getAllAnnotations?.()).catch(() => []);
     return {
       progress: await Promise.resolve(DB.getAllProgress?.()).catch(() => []),

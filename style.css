@@ -68,7 +68,7 @@
   pointer-events: none;
 }
 
-#plasma-app, .bg-orbs {
+#ocd-app, .bg-orbs {
   position: relative;
   z-index: 1;
 }

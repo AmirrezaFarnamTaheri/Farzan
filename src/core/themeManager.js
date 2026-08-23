@@ -2,7 +2,7 @@ import { $, $$, eventTargetEl } from '../lib/dom.js';
 
 export const ThemeManager = {
   // Keep in sync with src/core/storageMigrate.js + index pre-boot.
-  STORAGE_KEY: 'plasma_theme',
+  STORAGE_KEY: 'ocd_theme',
   SYSTEM_QUERY: window.matchMedia('(prefers-color-scheme: dark)'),
 
   /**

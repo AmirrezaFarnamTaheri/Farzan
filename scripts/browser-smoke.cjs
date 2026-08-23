@@ -7,7 +7,7 @@ async function main() {
     <!doctype html>
     <html>
       <body>
-        <div id="plasma-app">
+        <div id="ocd-app">
           <main id="main-content" class="main-content" tabindex="-1">
             <div id="view-container"></div>
           </main>

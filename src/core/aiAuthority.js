@@ -1,8 +1,8 @@
 import { committedReceipt, failedReceipt } from './mutationReceipt.js';
 
-export const AI_SETTINGS_KEY = 'plasma-ai-settings';
-export const AI_SESSION_KEY = 'plasma-ai-api-key-session';
-export const AI_BINDING_KEY = 'plasma-ai-authority-session';
+export const AI_SETTINGS_KEY = 'ocd_ai_settings';
+export const AI_SESSION_KEY = 'ocd_ai_api_key_session';
+export const AI_BINDING_KEY = 'ocd_ai_authority_session';
 const BINDING_VERSION = 1;
 
 function isLoopback(hostname) {

@@ -126,8 +126,11 @@ describe('runtime wiring', () => {
     }
   });
 
-  it('waveformScrubber stays out of the bundle until its double-download is solved', () => {
-    expect(indexSource).not.toContain('waveformScrubber');
+  it('waveformScrubber is wired through the lazy player feature loader', () => {
+    // The player probes window.OpenCourseDeck.WaveformScrubber at runtime;
+    // shipping it inside the player chunk keeps it out of the eager bundle
+    // while making the namespace available (the old double-download concern).
+    expect(indexSource).toContain("import('./features/waveformScrubber.js')");
   });
 
   it('caps the media size waveformScrubber will download and decode', () => {

@@ -1,5 +1,5 @@
 /* App shell */
-.plasma-app {
+.ocd-app {
   min-height: 100vh;
   display: flex;
   background:
@@ -9,7 +9,7 @@
     var(--bg);
 }
 
-.plasma-app::before {
+.ocd-app::before {
   content: '';
   position: fixed;
   inset: 0;

@@ -1,8 +1,10 @@
-﻿## Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
-### Unreleased
+## [1.1.2] — 2026-07-29
+
+First tagged release of OpenCourseDeck (tag `v1.1.2`).
 
 - Tooling: esbuild bundling (`dist/opencoursedeck.js`), Workbox service worker generation, local fonts + Font Awesome vendoring.
 - Fixes: splash dismiss, Progress namespace collision mitigation, canvas DPR transform, HttpClient cache TTL race, realtime disconnect payload, notes undo index.
@@ -12,3 +14,12 @@ All notable changes to this project will be documented in this file.
 - Performance: local debug timing marks for boot import, bundle-to-ready, and app init.
 - UX: in-app Help route with first-run checklist, storage summary, docs links, backup entry, and shortcuts entry point.
 - Fixes: route handlers are registered before router initialization so the initial hash resolves immediately.
+
+## [Unreleased]
+
+- Release engineering: SBOM generation and verification, release attestation, digest-verified partial-release reconciliation, canonical release metadata (2026-08-01 series).
+- Performance: optimized course progress aggregation; removed unused helpers (2026-08-06).
+- De-branding: legacy PlasmaDeck/Farzan-era naming removed from docs, configs, guard scripts, and code identifiers; active preference keys migrated to a neutral `ocd_*` localStorage namespace with automatic one-time migration of existing user data.
+- Storage hardening: database payload encryption upgraded to per-database random salt + 600,000 PBKDF2 iterations for new writes, with transparent fallback decryption of legacy envelopes.
+- Cleanup: untracked the committed `.cargo` registry cache (~814 MB) from version control; deleted superseded PlasmaDeck-era audit documents; repaired the stale `native-windows.yml` workflow paths left over from the `far/` directory era.
+- Consolidation: the app shell now uses the shared `EventEmitter` from `src/lib/eventEmitter.js`; the dead duplicate `src/core/keyboardShortcuts.js` module (which imported a nonexistent stylesheet-less overlays module) was removed in favor of the wired implementation in `app.js`.

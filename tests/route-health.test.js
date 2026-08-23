@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 async function loadApp() {
   vi.resetModules();
   document.body.innerHTML = `
-    <div id="plasma-app">
+    <div id="ocd-app">
       <main id="main-content" tabindex="-1">
         <div id="view-container"></div>
       </main>

@@ -2,7 +2,7 @@
 
 **Date:** July 25, 2026  
 **Status:** Architectural Blueprint & Implementation Specification  
-**Target Project:** OpenCourseDeck (`Farzan Learning Studio`)
+**Target Project:** OpenCourseDeck
 
 ---
 

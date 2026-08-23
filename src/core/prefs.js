@@ -2,10 +2,10 @@ import { eventTargetEl } from '../lib/dom.js';
 
 export const Prefs = {
   KEYS: {
-    accent: 'plasma_accent',
-    density: 'plasma_density',
-    fontScale: 'plasma_font_scale',
-    dir: 'plasma_dir',
+    accent: 'ocd_accent',
+    density: 'ocd_density',
+    fontScale: 'ocd_font_scale',
+    dir: 'ocd_dir',
   },
   get(key, fallback = null) {
     try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
@@ -15,7 +15,7 @@ export const Prefs = {
   },
   applyAll() {
     const root = document.documentElement;
-    const accent = this.get(this.KEYS.accent, root.getAttribute('data-accent') || 'plasma');
+    const accent = this.get(this.KEYS.accent, root.getAttribute('data-accent') || 'violet');
     const density = this.get(this.KEYS.density, root.getAttribute('data-density') || 'comfortable');
     const fontScale = this.get(this.KEYS.fontScale, root.style.getPropertyValue('--font-scale')?.trim() || '1');
     const dir = this.get(this.KEYS.dir, root.getAttribute('dir') || 'ltr');

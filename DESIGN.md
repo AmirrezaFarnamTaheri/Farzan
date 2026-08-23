@@ -1,7 +1,7 @@
 # OpenCourseDeck Design System Specifications (`DESIGN.md`)
 
 ## 1. Global Vision
-OpenCourseDeck (Farzan) is a high-performance, dark-first interactive learning studio combining desktop video playback, Rich Notes editing, 2D vector canvas sketching, PDF annotations, and SM-2 Spaced Repetition flashcards.
+OpenCourseDeck is a high-performance, dark-first interactive learning studio combining desktop video playback, Rich Notes editing, 2D vector canvas sketching, PDF annotations, and SM-2 Spaced Repetition flashcards.
 
 The aesthetic philosophy centers on **Sleek Glassmorphism with WebGL Atmospheric Accents**:
 - **Palette**: Deep void dark tones (`#0f0f1a`, `#181825`) with vibrant OKLCH purple (`#7c3aed`) and cyan (`#06b6d4`) accents.

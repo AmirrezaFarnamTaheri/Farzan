@@ -71,7 +71,6 @@ function validateNoIgnoredGlobsTracked() {
     { pattern: /^NSIS-Tool-/, label: 'NSIS-Tool root artifact' },
     { pattern: /^crates\.io-index$/, label: 'crates.io-index' },
     { pattern: /^test\.txt$/, label: 'test.txt' },
-    { pattern: /^far\/plasmato_full_\d{4}-\d{2}-\d{2}\.json$/, label: 'plasmato_full at far/ root' },
   ];
 
   for (const file of trackedFiles) {

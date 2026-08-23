@@ -3,7 +3,7 @@ import { initEndpointApprovalGuard } from '../src/core/endpointApprovalGuard.js'
 
 let intersectionCallbacks;
 
-async function loadApp(html = '<div id="plasma-app"><main id="view-container"></main></div>') {
+async function loadApp(html = '<div id="ocd-app"><main id="view-container"></main></div>') {
   vi.resetModules();
   intersectionCallbacks = [];
   document.body.innerHTML = html;
@@ -67,7 +67,7 @@ describe('app shell resilience helpers', () => {
 
   it('recovers infinite scroll loading state when onLoad rejects', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
         <section id="scroll-root">
           <div class="scroll-loader" hidden></div>
@@ -94,7 +94,7 @@ describe('app shell resilience helpers', () => {
 
   it('keeps invalid numeric table values at the bottom while sorting', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
         <table id="sortable-test-table">
           <thead><tr><th data-sort="score" data-sort-type="number">Score</th></tr></thead>
@@ -187,7 +187,7 @@ describe('app shell resilience helpers', () => {
   it('opens drawers as modal dialogs and restores focus on close', async () => {
     await loadApp(`
       <button id="drawer-opener">Open drawer</button>
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
       </div>
       <aside id="test-drawer" class="drawer" hidden aria-hidden="true">
@@ -196,7 +196,7 @@ describe('app shell resilience helpers', () => {
     `);
     const opener = document.getElementById('drawer-opener');
     const drawer = document.getElementById('test-drawer');
-    const app = document.getElementById('plasma-app');
+    const app = document.getElementById('ocd-app');
     opener.focus();
 
     window.OpenCourseDeck.Drawer.open(drawer);
@@ -217,7 +217,7 @@ describe('app shell resilience helpers', () => {
 
   it('removes app tooltips when their anchor leaves the DOM', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
         <button id="tip-anchor" data-tip-js="Helpful">Hover</button>
       </div>
@@ -273,7 +273,7 @@ describe('app shell resilience helpers', () => {
 
   it('falls back to a local asset when lazy or themed images fail', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
         <img id="lazy-img" data-src="https://cdn.example.test/missing.jpg" />
         <img id="theme-img" data-src-dark="https://cdn.example.test/dark.jpg" data-src-light="https://cdn.example.test/light.jpg" />
@@ -391,7 +391,7 @@ describe('app shell resilience helpers', () => {
     expect(view.querySelector('[data-home-widget="recent"]').textContent).toContain('Fresh ECG insight');
 
     view.querySelector('[data-home-widget="review"]').click();
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-old');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-old');
     expect(window.location.hash).toBe('#/courses');
   });
 
@@ -491,7 +491,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-playlist-name]').value = 'Cardio queue';
     document.querySelector('[data-save-playlist]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-playlists', expect.any(Array)));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_playlists', expect.any(Array)));
     const saved = saveSetting.mock.calls[0][1][0];
     expect(saved.title).toBe('Cardio queue');
     expect(saved.topicIds).toEqual(['topic-1', 'topic-2']);
@@ -517,7 +517,7 @@ describe('app shell resilience helpers', () => {
     const saveSetting = vi.fn(async () => true);
     window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
-      getSetting: vi.fn(async (key) => (key === 'plasma-studio-board' ? savedBoard : null)),
+      getSetting: vi.fn(async (key) => (key === 'ocd_studio_board' ? savedBoard : null)),
       saveSetting,
     };
 
@@ -526,7 +526,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(canvasApi.loadState).toHaveBeenCalledWith(savedBoard));
     document.querySelector('[data-studio-save]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', expect.objectContaining({ version: 1 })));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', expect.objectContaining({ version: 1 })));
     expect(canvasApi.init).toHaveBeenCalledWith(document.getElementById('studio-canvas'));
     expect(document.querySelector('[data-studio-status]').textContent).toContain('Saved');
 
@@ -572,7 +572,7 @@ describe('app shell resilience helpers', () => {
     };
     window.OpenCourseDeck.Canvas = canvasApi;
     window.DB = {
-      getSetting: vi.fn(async (key) => (key === 'plasma-studio-board' ? remoteBoard : null)),
+      getSetting: vi.fn(async (key) => (key === 'ocd_studio_board' ? remoteBoard : null)),
       saveSetting: vi.fn(async () => true),
     };
 
@@ -582,12 +582,12 @@ describe('app shell resilience helpers', () => {
     const result = await controller.refreshFromSync({
       kind: 'setting',
       action: 'save',
-      record: { key: 'plasma-studio-board', value: remoteBoard },
+      record: { key: 'ocd_studio_board', value: remoteBoard },
     });
 
     expect(result).toEqual(expect.objectContaining({
       refreshed: true,
-      key: 'plasma-studio-board',
+      key: 'ocd_studio_board',
       inspectedElementId: 'shape-1',
       selectedIds: ['shape-1'],
     }));
@@ -652,7 +652,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-studio-text]').value = 'Arrhythmia map';
     document.querySelector('[data-studio-add-text]').click();
     await vi.waitFor(() => expect(canvasApi.addText).toHaveBeenCalledWith('Arrhythmia map'));
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Note added');
 
     document.querySelector('[data-studio-add-card]').click();
@@ -711,7 +711,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(canvasApi.addImage).toHaveBeenCalledWith('https://cdn.example.test/diagram.png'));
     expect(document.querySelector('[data-studio-image-url]').value).toBe('');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Image added');
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
 
     controller.unmount();
   });
@@ -758,7 +758,7 @@ describe('app shell resilience helpers', () => {
       x: 160,
       y: 140,
     }));
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Dropped image added');
 
     controller.unmount();
@@ -795,7 +795,7 @@ describe('app shell resilience helpers', () => {
 
     await vi.waitFor(() => expect(canvasApi.applyTemplate).toHaveBeenCalledWith('cornell'));
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith('Replace the current Studio board with this template?');
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Template applied');
 
     document.querySelector('[data-studio-export-pdf]').click();
@@ -856,7 +856,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-studio-layer-name]').value = 'Findings';
     document.querySelector('[data-studio-add-layer]').click();
     await vi.waitFor(() => expect(canvasApi.addLayer).toHaveBeenCalledWith('Findings'));
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
 
     document.querySelector('[data-set-layer="1"]').click();
     await vi.waitFor(() => expect(canvasApi.setActiveLayer).toHaveBeenCalledWith(1));
@@ -932,7 +932,7 @@ describe('app shell resilience helpers', () => {
       linkTarget: 'note-7',
       linkLabel: 'ECG note',
     })));
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', board);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', board);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Properties updated');
 
     controller.unmount();
@@ -1034,7 +1034,7 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Linked URL opened');
 
     document.querySelector('[data-open-studio-link="ts-link"]').click();
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-1');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
     expect(window.location.hash).toBe('#/courses');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Opening linked timestamp');
 
@@ -1070,7 +1070,7 @@ describe('app shell resilience helpers', () => {
     input.dispatchEvent(new Event('change'));
 
     await vi.waitFor(() => expect(canvasApi.loadState).toHaveBeenCalledWith(importedBoard));
-    expect(saveSetting).toHaveBeenCalledWith('plasma-studio-board', normalizedBoard);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', normalizedBoard);
     expect(document.querySelector('[data-studio-status]').textContent).toBe('JSON imported');
 
     controller.unmount();
@@ -1117,7 +1117,7 @@ describe('app shell resilience helpers', () => {
     window.DB = { clearUserData };
     window.OpenCourseDeck.UI = {};
     window.OpenCourseDeck.UI.confirm = vi.fn(async () => true);
-    sessionStorage.setItem('plasma_pending_topic', 'topic-1');
+    sessionStorage.setItem('ocd_pending_topic', 'topic-1');
 
     const controller = await window.OpenCourseDeck.Views.settings();
     document.getElementById('select-clear-scope').value = 'notes';
@@ -1125,7 +1125,7 @@ describe('app shell resilience helpers', () => {
 
     await vi.waitFor(() => expect(clearUserData).toHaveBeenCalledWith('notes'));
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.stringContaining('notes, folders, and note settings'));
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-1');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
 
     controller.unmount();
   });
@@ -1134,7 +1134,7 @@ describe('app shell resilience helpers', () => {
     await loadApp();
     const saveSetting = vi.fn(async () => true);
     window.DB = {
-      getSetting: vi.fn(async (key) => (key === 'plasma-ai-settings'
+      getSetting: vi.fn(async (key) => (key === 'ocd_ai_settings'
         ? { mode: 'hidden', model: 'gemma-local', keyStorage: 'session', hasKey: false }
         : null)),
       saveSetting,
@@ -1155,7 +1155,7 @@ describe('app shell resilience helpers', () => {
     approval.dispatchEvent(new Event('change', { bubbles: true }));
     document.querySelector('[data-ai-save]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-ai-settings', expect.objectContaining({
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_ai_settings', expect.objectContaining({
       mode: 'custom-api',
       model: 'user-model',
       endpoint: 'https://api.example.test/v1/chat/completions',
@@ -1170,7 +1170,7 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-ai-key-storage]').value).toBe('session');
 
     document.querySelector('[data-ai-clear-key]').click();
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('plasma-ai-settings', expect.objectContaining({ hasKey: false })));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_ai_settings', expect.objectContaining({ hasKey: false })));
     expect(saveSetting.mock.calls.at(-1)[1].apiKey).toBeUndefined();
 
     controller.unmount();
@@ -1340,8 +1340,8 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-bookmark-id="note-pdf"]').textContent).toContain('PDF page note');
     document.querySelector('[data-bookmark-id="note-pdf"] a').click();
 
-    expect(sessionStorage.getItem('plasma_pending_pdf_doc')).toBe('doc-a.pdf');
-    expect(sessionStorage.getItem('plasma_pending_pdf_page')).toBe('9');
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-a.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('9');
     expect(window.location.hash).toBe('#/pdf');
     expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledWith(9);
   });
@@ -1475,7 +1475,7 @@ describe('app shell resilience helpers', () => {
     expect(view.querySelector('[data-review-topic-id="topic-recent"]')).toBeNull();
 
     view.querySelector('[data-review-topic="topic-old"]').click();
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-old');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-old');
     expect(window.location.hash).toBe('#/courses');
   });
 
@@ -1498,7 +1498,7 @@ describe('app shell resilience helpers', () => {
 
   it('honors formnovalidate while still blocking invalid validated submits', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <main id="view-container"></main>
         <form id="sample-form" data-validate>
           <div class="form-group">
@@ -1526,7 +1526,7 @@ describe('app shell resilience helpers', () => {
   it('exposes central media URL validation for catalog actions', async () => {
     await loadApp();
 
-    expect(window.OpenCourseDeck.safeMediaUrl('https://plasmato.net/video.mp4')).toBe('https://plasmato.net/video.mp4');
+    expect(window.OpenCourseDeck.safeMediaUrl('https://media.example.com/video.mp4')).toBe('https://media.example.com/video.mp4');
     expect(window.OpenCourseDeck.safeMediaUrl('https://media.example.test/video.mp4')).toBe('https://media.example.test/video.mp4');
     expect(window.OpenCourseDeck.safeMediaUrl('http://media.example.test/video.mp4')).toBe('http://media.example.test/video.mp4');
     expect(window.OpenCourseDeck.safeMediaUrl('/media/local.pdf')).toContain('/media/local.pdf');
@@ -1552,7 +1552,7 @@ describe('app shell resilience helpers', () => {
 
   it('searches catalog, notes, timestamps, and PDF annotations from the topbar', async () => {
     await loadApp(`
-      <div id="plasma-app">
+      <div id="ocd-app">
         <header class="topbar"><div class="topbar-search"><input data-search-input /></div></header>
         <main id="view-container"></main>
       </div>
@@ -1585,8 +1585,8 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelector('.search-result-item')?.textContent).toContain('Saved checkpoint'));
     document.querySelector('.search-result-item').click();
 
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-1');
-    expect(sessionStorage.getItem('plasma_pending_position')).toBe('125');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
+    expect(sessionStorage.getItem('ocd_pending_position')).toBe('125');
     expect(window.location.hash).toBe('#/courses');
   });
 
@@ -1612,9 +1612,9 @@ describe('app shell resilience helpers', () => {
 
     mini.querySelector('[data-mini-resume]').click();
 
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-2');
-    expect(sessionStorage.getItem('plasma_pending_position')).toBe('30');
-    expect(JSON.parse(sessionStorage.getItem('plasma_pending_course_session'))).toEqual(expect.objectContaining({
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-2');
+    expect(sessionStorage.getItem('ocd_pending_position')).toBe('30');
+    expect(JSON.parse(sessionStorage.getItem('ocd_pending_course_session'))).toEqual(expect.objectContaining({
       queueIndex: 1,
       currentTime: 30,
       playbackRate: 1.25,
@@ -1638,14 +1638,14 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
     document.querySelector('[data-bookmark-id="ts-1"] a').click();
 
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBe('topic-1');
-    expect(sessionStorage.getItem('plasma_pending_position')).toBe('125');
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
+    expect(sessionStorage.getItem('ocd_pending_position')).toBe('125');
     expect(window.location.hash).toBe('#/courses');
   });
 
   it('seeks pending course timestamp handoffs after loading the topic', async () => {
     await loadApp();
-    sessionStorage.removeItem('plasma_pending_course_session');
+    sessionStorage.removeItem('ocd_pending_course_session');
     const seekTo = vi.fn();
     const loadPlaylist = vi.fn();
     const media = { addEventListener: vi.fn() };
@@ -1680,8 +1680,8 @@ describe('app shell resilience helpers', () => {
         },
       ]),
     };
-    sessionStorage.setItem('plasma_pending_topic', 'topic-1');
-    sessionStorage.setItem('plasma_pending_position', '95');
+    sessionStorage.setItem('ocd_pending_topic', 'topic-1');
+    sessionStorage.setItem('ocd_pending_position', '95');
 
     await window.OpenCourseDeck.Views.courses();
     await vi.advanceTimersByTimeAsync(140);
@@ -1697,8 +1697,8 @@ describe('app shell resilience helpers', () => {
     ], true);
     expect(seekTo).toHaveBeenCalledWith(95);
     expect(media.addEventListener).toHaveBeenCalledWith('loadedmetadata', expect.any(Function), { once: true });
-    expect(sessionStorage.getItem('plasma_pending_topic')).toBeNull();
-    expect(sessionStorage.getItem('plasma_pending_position')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_position')).toBeNull();
   });
 
   it('restores pending full course sessions before falling back to single-topic autoplay', async () => {
@@ -1723,7 +1723,7 @@ describe('app shell resilience helpers', () => {
         { topicId: 'topic-2', courseId: 'course-a', title: 'Second lecture', videos: ['https://example.test/video-2.mp4'] },
       ]),
     };
-    sessionStorage.setItem('plasma_pending_course_session', JSON.stringify({
+    sessionStorage.setItem('ocd_pending_course_session', JSON.stringify({
       queue: [
         { title: 'Loaded lecture', topicId: 'topic-1', courseId: 'course-a', src: 'https://example.test/video.mp4' },
         { title: 'Second lecture', topicId: 'topic-2', courseId: 'course-a', src: 'https://example.test/video-2.mp4' },
@@ -1745,7 +1745,7 @@ describe('app shell resilience helpers', () => {
       playbackRate: 1.25,
       queue: [expect.objectContaining({ topicId: 'topic-1' }), expect.objectContaining({ topicId: 'topic-2' })],
     }));
-    expect(sessionStorage.getItem('plasma_pending_course_session')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_course_session')).toBeNull();
   });
 
   it('hands course player state to the mini-player before destroying route media', async () => {
@@ -2351,13 +2351,13 @@ describe('app shell resilience helpers', () => {
   });
   it('service worker update prompt tells the waiting worker to take over', async () => {
     delete document.documentElement.dataset.pdSwBound;
-    delete window.__plasmaSwUpdateAccepted;
-    delete window.__plasmaSwReloading;
+    delete window.__ocdSwUpdateAccepted;
+    delete window.__ocdSwReloading;
     await loadApp();
 
     const postMessage = vi.fn();
     const registration = { waiting: { postMessage } };
-    document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration } }));
+    document.dispatchEvent(new CustomEvent('ocd:sw-update-ready', { detail: { registration } }));
 
     const reloadBtn = document.querySelector('[data-sw-reload]');
     expect(reloadBtn).toBeTruthy();
@@ -2369,24 +2369,24 @@ describe('app shell resilience helpers', () => {
     // would reload straight back into the stale build. The click must post
     // SKIP_WAITING and arm the controllerchange reload gate.
     expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    expect(window.__plasmaSwUpdateAccepted).toBe(true);
+    expect(window.__ocdSwUpdateAccepted).toBe(true);
   });
 
   it('does not arm the reload gate when there is no waiting worker', async () => {
     delete document.documentElement.dataset.pdSwBound;
-    delete window.__plasmaSwUpdateAccepted;
-    delete window.__plasmaSwReloading;
+    delete window.__ocdSwUpdateAccepted;
+    delete window.__ocdSwReloading;
     await loadApp();
 
     // registration.waiting is absent (update already activated, or the
     // registration went away): the handler must not claim an update was
     // accepted, or the controllerchange gate in src/index.js would reload on
     // an unrelated controller change.
-    document.dispatchEvent(new CustomEvent('plasma:sw-update-ready', { detail: { registration: {} } }));
+    document.dispatchEvent(new CustomEvent('ocd:sw-update-ready', { detail: { registration: {} } }));
     const reloadBtn = document.querySelector('[data-sw-reload]');
     expect(reloadBtn).toBeTruthy();
 
-    expect(window.__plasmaSwUpdateAccepted).toBeFalsy();
+    expect(window.__ocdSwUpdateAccepted).toBeFalsy();
   });
 });
 

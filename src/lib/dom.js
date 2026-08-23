@@ -87,7 +87,7 @@ export function restoreFocus(target, fallback = document.getElementById('main-co
 
 const appInertDepths = new WeakMap();
 
-export function setAppInert(active, root = document.getElementById('plasma-app')) {
+export function setAppInert(active, root = document.getElementById('ocd-app')) {
   if (!root) return;
   const currentDepth = appInertDepths.get(root) || 0;
   const nextDepth = Math.max(0, currentDepth + (active ? 1 : -1));

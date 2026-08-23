@@ -23,7 +23,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('merges localStorage and IndexedDB notes during compatibility migration', async () => {
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },
       { id: 'n2', title: 'Local only', updatedAt: 20 },
     ]));
@@ -38,7 +38,7 @@ describe('bridge DB safety helpers', () => {
 
   it('uses IndexedDB as canonical for notes after migration completes', async () => {
     await window.DB.saveNote({ id: 'n1', title: 'Canonical IDB', updatedAt: 30 });
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Stale local newer timestamp', updatedAt: 999 },
       { id: 'local-only-after-migration', title: 'Should stay out', updatedAt: 1000 },
     ]));
@@ -58,7 +58,7 @@ describe('bridge DB safety helpers', () => {
     const note = await window.DB.saveNote({ id: 'canonical-note-save', title: 'IDB only' });
 
     expect(note).toEqual(expect.objectContaining({ id: 'canonical-note-save', title: 'IDB only' }));
-    expect(localStorage.getItem('plasma-notes')).toBeNull();
+    expect(localStorage.getItem('ocd_notes')).toBeNull();
     expect(await window.DB.getAllNotes()).toEqual([
       expect.objectContaining({ id: 'canonical-note-save', title: 'IDB only' }),
     ]);
@@ -67,7 +67,7 @@ describe('bridge DB safety helpers', () => {
   it('uses IndexedDB as canonical for folders and settings after migration completes', async () => {
     await window.DB.saveFolder({ id: 'f1', name: 'Canonical folder', updatedAt: 30 });
     await window.DB.saveSetting('plasma-playlists', [{ id: 'idb-playlist' }]);
-    localStorage.setItem('plasma-folders', JSON.stringify([
+    localStorage.setItem('ocd_folders', JSON.stringify([
       { id: 'f1', name: 'Stale folder', updatedAt: 999 },
       { id: 'local-folder', name: 'Local only' },
     ]));
@@ -82,16 +82,16 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
 
     const folder = await window.DB.saveFolder({ id: 'canonical-folder-save', name: 'IDB folder' });
-    const setting = await window.DB.saveSetting('plasma-notes-settings', { view: 'kanban' });
+    const setting = await window.DB.saveSetting('ocd_notes_settings', { view: 'kanban' });
 
     expect(folder).toEqual(expect.objectContaining({ id: 'canonical-folder-save', name: 'IDB folder' }));
     expect(setting).toEqual({ view: 'kanban' });
-    expect(localStorage.getItem('plasma-folders')).toBeNull();
-    expect(localStorage.getItem('plasma-notes-settings')).toBeNull();
+    expect(localStorage.getItem('ocd_folders')).toBeNull();
+    expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(await window.DB.getAllFolders()).toEqual([
       expect.objectContaining({ id: 'canonical-folder-save', name: 'IDB folder' }),
     ]);
-    expect(await window.DB.getSetting('plasma-notes-settings')).toEqual({ view: 'kanban' });
+    expect(await window.DB.getSetting('ocd_notes_settings')).toEqual({ view: 'kanban' });
   });
 
   it('uses IndexedDB as canonical for annotations after migration completes', async () => {
@@ -134,7 +134,7 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
-    await window.DB.saveSetting('plasma-notes-settings', { view: 'list' });
+    await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
     await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
     await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
     localStorage.setItem('plasma-pdf-annotations', JSON.stringify([{ id: 'ann-1' }]));
@@ -145,9 +145,9 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllTimestamps()).toEqual([]);
     expect(await window.DB.getAllNotes()).toEqual([]);
     expect(await window.DB.getAllFolders()).toEqual([]);
-    expect(localStorage.getItem('plasma-notes')).toBeNull();
-    expect(localStorage.getItem('plasma-folders')).toBeNull();
-    expect(localStorage.getItem('plasma-notes-settings')).toBeNull();
+    expect(localStorage.getItem('ocd_notes')).toBeNull();
+    expect(localStorage.getItem('ocd_folders')).toBeNull();
+    expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(localStorage.getItem('plasma-playlists')).toBeNull();
     expect(localStorage.getItem('plasma-studio-board')).toBeNull();
     expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
@@ -158,7 +158,7 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
-    await window.DB.saveSetting('plasma-notes-settings', { view: 'list' });
+    await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
     await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
     await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
     await window.DB.saveAnnotations('doc-a', { 1: [{ id: 'ann-1', type: 'highlight' }] });
@@ -173,9 +173,9 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllFolders()).toEqual([]);
     expect(await window.DB.getAnnotations('doc-a')).toHaveLength(1);
     expect(localStorage.getItem('plasma_theme')).toBe('dark');
-    expect(localStorage.getItem('plasma-notes')).toBeNull();
-    expect(localStorage.getItem('plasma-folders')).toBeNull();
-    expect(localStorage.getItem('plasma-notes-settings')).toBeNull();
+    expect(localStorage.getItem('ocd_notes')).toBeNull();
+    expect(localStorage.getItem('ocd_folders')).toBeNull();
+    expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(await window.DB.getSetting('plasma-playlists')).toEqual([{ id: 'playlist-1' }]);
     expect(await window.DB.getSetting('plasma-studio-board')).toEqual({ version: 1, layers: [] });
   });
@@ -261,7 +261,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('does not mark migration complete when a compatibility section fails', async () => {
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'legacy-note', title: 'Legacy note', updatedAt: 10 },
     ]));
     const emit = vi.fn();
@@ -294,13 +294,13 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
       { id: 'ts-1', topicId: 'topic-1' },
     ]));
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'note-1', title: 'Note' },
     ]));
-    localStorage.setItem('plasma-folders', JSON.stringify([
+    localStorage.setItem('ocd_folders', JSON.stringify([
       { id: 'folder-1', name: 'Folder' },
     ]));
-    localStorage.setItem('plasma-notes-settings', JSON.stringify({ view: 'list' }));
+    localStorage.setItem('ocd_notes_settings', JSON.stringify({ view: 'list' }));
     localStorage.setItem('plasma-pdf-annotations', JSON.stringify([
       { id: 'ann-1', docId: 'doc-a', page: 1 },
     ]));
@@ -336,7 +336,7 @@ describe('bridge DB safety helpers', () => {
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = null;
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
-      if (key === 'plasma-notes') throw quotaError;
+      if (key === 'ocd_notes') throw quotaError;
       return originalSetItem.call(this, key, value);
     });
 
@@ -345,7 +345,7 @@ describe('bridge DB safety helpers', () => {
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'note',
       backend: 'localStorage',
-      key: 'plasma-notes',
+      key: 'ocd_notes',
       error: expect.objectContaining({ quota: true }),
     }));
   });
@@ -361,7 +361,7 @@ describe('bridge DB safety helpers', () => {
 
     await expect(window.DB.saveFolder({ id: 'folder-quota', name: 'Do not diverge' })).rejects.toThrow('canonical quota exceeded');
 
-    expect(localStorage.getItem('plasma-folders')).toBeNull();
+    expect(localStorage.getItem('ocd_folders')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'folder',
       backend: 'indexedDB',
@@ -378,9 +378,9 @@ describe('bridge DB safety helpers', () => {
       async put() { throw new Error('settings canonical failed'); }
     };
 
-    await expect(window.DB.saveSetting('plasma-notes-settings', { view: 'grid' })).rejects.toThrow('settings canonical failed');
+    await expect(window.DB.saveSetting('ocd_notes_settings', { view: 'grid' })).rejects.toThrow('settings canonical failed');
 
-    expect(localStorage.getItem('plasma-notes-settings')).toBeNull();
+    expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'setting',
       backend: 'indexedDB',
@@ -545,8 +545,8 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllFolders()).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'delete-folder' }),
     ]));
-    expect(localStorage.getItem('plasma-notes')).toBeNull();
-    expect(localStorage.getItem('plasma-folders')).toBeNull();
+    expect(localStorage.getItem('ocd_notes')).toBeNull();
+    expect(localStorage.getItem('ocd_folders')).toBeNull();
   });
 
   it('deletes timestamps from local mirrors and IndexedDB stores', async () => {
@@ -676,12 +676,12 @@ describe('bridge DB safety helpers', () => {
       { id: 'ts-a', topicId: 'topic-a', courseId: 'course-a' },
       { id: 'ts-b', topicId: 'topic-b', courseId: 'course-b' },
     ]));
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', topicId: 'topic-a', courseId: 'course-a', updatedAt: 10 },
       { id: 'n2', topicId: 'topic-b', courseId: 'course-a', folderId: 'folder-a', updatedAt: 30 },
       { id: 'n3', topicId: 'topic-c', courseId: 'course-c', folderId: 'folder-a', updatedAt: 20 },
     ]));
-    localStorage.setItem('plasma-folders', JSON.stringify([
+    localStorage.setItem('ocd_folders', JSON.stringify([
       { id: 'folder-a', parentId: 'root' },
       { id: 'folder-b' },
     ]));
@@ -745,7 +745,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('shares one in-flight migration across concurrent DB calls', async () => {
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'concurrent-note', title: 'Legacy', updatedAt: 1 },
     ]));
 
@@ -765,7 +765,7 @@ describe('bridge DB safety helpers', () => {
     // Post-migration but with IndexedDB unavailable, the mirror is the only
     // live store -- removing the whole key would erase every note.
     localStorage.setItem('plasma_migrated_v2', 'true');
-    localStorage.setItem('plasma-notes', JSON.stringify([
+    localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'keep-me', title: 'Survivor' },
       { id: 'drop-me', title: 'Doomed' },
     ]));
@@ -773,7 +773,7 @@ describe('bridge DB safety helpers', () => {
 
     await window.DB.deleteNote('drop-me');
 
-    const remaining = JSON.parse(localStorage.getItem('plasma-notes'));
+    const remaining = JSON.parse(localStorage.getItem('ocd_notes'));
     expect(remaining).toEqual([expect.objectContaining({ id: 'keep-me' })]);
   });
 

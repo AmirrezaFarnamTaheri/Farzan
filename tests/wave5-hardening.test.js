@@ -21,7 +21,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 async function loadApp() {
   vi.resetModules();
-  document.body.innerHTML = '<div id="plasma-app"><main id="view-container"></main></div>';
+  document.body.innerHTML = '<div id="ocd-app"><main id="view-container"></main></div>';
   window.location.hash = '#/help';
   window.matchMedia = vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   window.requestAnimationFrame = vi.fn((cb) => { cb(0); return 1; });
@@ -176,7 +176,7 @@ describe('app.js Modal stacking and reopen', () => {
     pd.Modal.close(inner);
 
     expect(pd.state.openModals).toEqual([outer]);
-    expect(document.getElementById('plasma-app').hasAttribute('inert')).toBe(true);
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
   });
 
   it('Escape closes only the topmost modal', async () => {

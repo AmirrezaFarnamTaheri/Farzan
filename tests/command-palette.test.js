@@ -4,7 +4,7 @@ import { initCommandPalette } from '../src/features/commandPalette.js';
 describe('command palette', () => {
   beforeEach(() => {
     document.body.innerHTML = `
-      <main id="plasma-app"></main>
+      <main id="ocd-app"></main>
       <button id="opener">Open palette</button>
       <div id="command-palette-overlay" aria-hidden="true">
         <div id="command-palette">
@@ -71,7 +71,7 @@ describe('command palette', () => {
   it('traps focus, inert background, and restores opener on close', () => {
     initCommandPalette();
     const opener = document.getElementById('opener');
-    const app = document.getElementById('plasma-app');
+    const app = document.getElementById('ocd-app');
     const input = document.getElementById('cp-input');
     opener.focus();
 
@@ -90,7 +90,7 @@ describe('command palette', () => {
 
   it('keeps command palette close idempotent for inert bookkeeping', () => {
     initCommandPalette();
-    const app = document.getElementById('plasma-app');
+    const app = document.getElementById('ocd-app');
 
     window.OpenCourseDeck.CommandPalette.open();
     window.OpenCourseDeck.CommandPalette.close();

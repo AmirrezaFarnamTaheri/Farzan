@@ -292,7 +292,7 @@ describe('Canvas renderer scheduling', () => {
     Object.defineProperty(canvasEl, 'offsetHeight', { value: 180, configurable: true });
     canvasEl.getBoundingClientRect = vi.fn(() => ({ left: 0, top: 0, width: 320, height: 180 }));
     const changeSpy = vi.fn();
-    canvasEl.addEventListener('plasma:studio-board-change', changeSpy);
+    canvasEl.addEventListener('ocd:studio-board-change', changeSpy);
 
     window.OpenCourseDeck.Canvas.loadState({ layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] }] });
     window.OpenCourseDeck.Canvas.init(canvasEl);

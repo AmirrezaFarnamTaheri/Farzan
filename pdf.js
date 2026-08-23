@@ -632,14 +632,14 @@
       let pendingDoc = '';
       let pendingPage = 0;
       try {
-        pendingDoc = sessionStorage.getItem('plasma_pending_pdf_doc') || '';
-        pendingPage = Number(sessionStorage.getItem('plasma_pending_pdf_page') || 0);
+        pendingDoc = sessionStorage.getItem('ocd_pending_pdf_doc') || '';
+        pendingPage = Number(sessionStorage.getItem('ocd_pending_pdf_page') || 0);
       } catch {}
       if (!pendingPage) return;
       if (pendingDoc && pendingDoc !== State.annotationDocId && pendingDoc !== State.searchDocId) return;
       try {
-        sessionStorage.removeItem('plasma_pending_pdf_doc');
-        sessionStorage.removeItem('plasma_pending_pdf_page');
+        sessionStorage.removeItem('ocd_pending_pdf_doc');
+        sessionStorage.removeItem('ocd_pending_pdf_page');
       } catch {}
       this.goTo(pendingPage);
     },

@@ -18,8 +18,8 @@ describe('progress backup exports', () => {
       getAllFolders: vi.fn(async () => [{ id: 'folder-1', name: 'Folder' }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-1', page: 2 }]),
       getSetting: vi.fn(async (key) => {
-        if (key === 'plasma-playlists') return [{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }];
-        if (key === 'plasma-studio-board') return { version: 1, layers: [{ id: 'layer-1', elements: [] }] };
+        if (key === 'ocd_playlists') return [{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }];
+        if (key === 'ocd_studio_board') return { version: 1, layers: [{ id: 'layer-1', elements: [] }] };
         return { view: 'list' };
       }),
       saveProgress: vi.fn(async () => true),
@@ -416,8 +416,8 @@ describe('progress backup exports', () => {
     }));
     expect(window.OpenCourseDeck.lastImportResult.progress).toBe(1);
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-playlists', [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }]);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('plasma-studio-board', { version: 1, layers: [{ id: 'layer-1', elements: [] }] });
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_playlists', [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }]);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', { version: 1, layers: [{ id: 'layer-1', elements: [] }] });
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'progress', id: 'bad-topic', message: 'write failed' }),
     ]);

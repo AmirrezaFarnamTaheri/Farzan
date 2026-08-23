@@ -66,16 +66,16 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 try {
-  __pdPost('boot:import_plasma', { src: './dist/opencoursedeck.js' });
+  __pdPost('boot:import_bundle', { src: './dist/opencoursedeck.js' });
   __pdMark('pd:boot:import:start');
   await import('./dist/opencoursedeck.js');
   await initializeRuntimeCapabilities();
   __pdMark('pd:boot:import:end');
   __pdMeasure('pd:boot:import', 'pd:boot:import:start', 'pd:boot:import:end');
   __pdMeasure('pd:boot:total_to_import', 'pd:boot:start', 'pd:boot:import:end');
-  __pdPost('boot:import_plasma_ok', {});
+  __pdPost('boot:import_bundle_ok', {});
 } catch (err) {
-  __pdPost('boot:import_plasma_fail', { err: String(err), stack: err?.stack });
+  __pdPost('boot:import_bundle_fail', { err: String(err), stack: err?.stack });
   const statusEl = document.getElementById('splash-status');
   if (statusEl) {
     statusEl.textContent = '';

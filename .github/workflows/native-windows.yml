@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - 'far/src-tauri/**'
-      - 'far/assets/icon-192.svg'
-      - 'far/scripts/native-*.cjs'
-      - 'far/scripts/prepare-native-assets.cjs'
-      - 'far/scripts/stage-native-exe.cjs'
-      - 'far/package.json'
-      - 'far/package-lock.json'
+      - 'src-tauri/**'
+      - 'assets/icon-192.svg'
+      - 'scripts/native-*.cjs'
+      - 'scripts/prepare-native-assets.cjs'
+      - 'scripts/stage-native-exe.cjs'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/native-windows.yml'
   workflow_dispatch:
 
@@ -25,7 +25,6 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        working-directory: far
         shell: pwsh
     steps:
       - name: Check out native source
@@ -39,7 +38,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: far/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Report native toolchain
         run: |
@@ -81,7 +80,7 @@ jobs:
         with:
           name: native-windows-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            far/src-tauri/target/release/open-course-deck.exe
-            far/native-sha256.txt
+            src-tauri/target/release/open-course-deck.exe
+            native-sha256.txt
           if-no-files-found: error
           retention-days: 7
