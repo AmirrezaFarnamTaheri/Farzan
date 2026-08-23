@@ -17,6 +17,9 @@ First tagged release of OpenCourseDeck (tag `v1.1.2`).
 
 ## [Unreleased]
 
+- PWA offline layer restored: nothing registered `/sw.js` since the root service-worker generator was retired in August, leaving precaching, the offline experience, and the update-toast contract dormant. The bundle now owns registration, update detection (`ocd:sw-update-ready`), and the accepted-update reload gate; covered by a runtime-wiring contract test and validated end-to-end in Edge via dist-browser-smoke.
+- `locale.js` persisted the UI direction under the retired `plasma_dir` key, so switching to an RTL locale silently reverted on reload; it now writes `ocd_dir`.
+
 - Flashcards Studio is now reachable: `#/flashcards` route registered (the sidebar link previously dead-ended), command-palette entry added, and review supports the advertised Space / 1 / 2 / 4 / 5 keyboard flow with screen-reader announcements.
 - Create-card moved from blocking `window.prompt()` dialogs to an inline, validated form with focus management.
 - SM-2 scheduling fixed to pure UTC day arithmetic so `nextReviewDate` no longer shifts a day depending on the local timezone.

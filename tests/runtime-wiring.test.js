@@ -126,6 +126,13 @@ describe('runtime wiring', () => {
     }
   });
 
+  it('service worker lifecycle owns the update-toast contract', () => {
+    // Registration + update detection live here so app.js can stay purely
+    // reactive to ocd:sw-update-ready / controllerchange.
+    expect(indexSource).toContain("navigator.serviceWorker.register('/sw.js')");
+    expect(indexSource).toContain('ocd:sw-update-ready');
+    expect(indexSource).toContain('__ocdSwUpdateAccepted');
+  });
   it('waveformScrubber is wired through the lazy player feature loader', () => {
     // The player probes window.OpenCourseDeck.WaveformScrubber at runtime;
     // shipping it inside the player chunk keeps it out of the eager bundle

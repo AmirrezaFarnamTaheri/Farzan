@@ -78,7 +78,7 @@ export function setCurrentLang(lang) {
     // Persist so boot (src/index.js reads 'ocd_dir') restores the same
     // direction on reload; otherwise switching to an RTL locale lasts only
     // until the next refresh.
-    try { localStorage.setItem('plasma_dir', dir); } catch { /* storage blocked */ }
+    try { localStorage.setItem('ocd_dir', dir); } catch { /* storage blocked */ }
   }
 }
 

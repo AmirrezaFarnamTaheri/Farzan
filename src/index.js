@@ -136,6 +136,44 @@ try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 initBeforeUnloadGuard();
 initErrorBoundary();
 initOfflineBanner();
+
+// ── Service worker lifecycle ───────────────────────────────────────────────
+// The generated dist/sw.js precaches the release and waits (skipWaiting:false)
+// so an update can never interrupt an in-flight note/canvas/backup write.
+// This side owns the contract that app.js update toast relies on:
+//   1. dispatch ocd:sw-update-ready when a worker installs over a live page
+//   2. reload on controllerchange once the user accepts the update
+function initServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const secure = location.protocol === 'https:' ||
+    ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  if (!secure) return;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (window.__ocdSwUpdateAccepted && !window.__ocdSwReloading) {
+      window.__ocdSwReloading = true;
+      window.location.reload();
+    }
+  });
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      const announceIfWaiting = () => {
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          document.dispatchEvent(new CustomEvent('ocd:sw-update-ready', { detail: { registration } }));
+        }
+      };
+      registration.addEventListener('updatefound', () => {
+        registration.installing?.addEventListener('statechange', (event) => {
+          if (event.target?.state === 'installed') announceIfWaiting();
+        });
+      });
+      // A waiting worker may already be parked from a previous session.
+      announceIfWaiting();
+    }).catch(() => { /* dev without a root sw.js, or storage blocked */ });
+  });
+}
+initServiceWorker();
 pd.ProductReadiness = enforceProductReadiness(document);
 
 import('../app.js').then(async () => {
