@@ -1,3 +1,5 @@
+> **Status note (2026-08):** This roadmap is a historical planning artifact from the July 2026 build sprint. Phases 0-2 are fully landed; later phases are partially superseded by shipped work documented in CHANGELOG.md and docs/HISTORY.md. Consult it for intent, not current state.
+
 # OpenCourseDeck — Complete Roadmap
 
 > Every implementation, feature, widget, capability, performance refinement, subsystem, and visual component. Nothing omitted.

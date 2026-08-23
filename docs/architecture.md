@@ -58,3 +58,25 @@
 - Feature chunks stay lazy through `loadFeature()` (player, notes, pdf, canvas,
   progress, flashcards); `runtime-wiring.test.js` pins which modules may ship in
   the eager bundle versus a feature chunk.
+
+### Module lifecycle conventions
+
+Two sanctioned patterns exist for route-scoped teardown; both are correct, pick
+per situation and stay consistent within a file:
+
+- **`RouteListeners` helper** (`src/lib/routeListeners.js`) — used by materials,
+  settings, and studio views for ad-hoc global listeners; call `.clear()` in the
+  route controller unmount.
+- **Hand-rolled disposer arrays / explicit `removeEventListener` in `unmount()`**
+  — used by the remaining views (coursesRoute player disposer array is the
+  reference example). Element-local listeners that die with the view innerHTML
+  need no teardown at all.
+
+### Internationalization status
+
+The locale engine (`src/core/locale.js`, dictionaries in `src/locales/`, en-US +
+fa-IR) is bundled and registered on `OpenCourseDeck.locale`, but view strings are
+not yet keyed through it — the UI is English-only at runtime despite shipping a
+Persian dictionary. Wiring view strings through the locale lookup is tracked as
+future work; do not add new user-facing strings to the dictionaries without also
+consuming them.

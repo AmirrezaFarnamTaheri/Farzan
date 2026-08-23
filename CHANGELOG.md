@@ -17,6 +17,9 @@ First tagged release of OpenCourseDeck (tag `v1.1.2`).
 
 ## [Unreleased]
 
+- Decomposition slice: the Modal overlay primitive moved verbatim into `src/ui/overlays.js` and the keyboard-shortcut system now lives in `src/core/keyboardShortcuts.js` (its missing-import blocker resolved), closing the duplicated-implementation finding from the forensic audit.
+- Route lifecycle conventions and internationalization status documented in docs/architecture.md; ROADMAP.md and conductor track 14 carry historical status banners.
+
 - PWA offline layer restored: nothing registered `/sw.js` since the root service-worker generator was retired in August, leaving precaching, the offline experience, and the update-toast contract dormant. The bundle now owns registration, update detection (`ocd:sw-update-ready`), and the accepted-update reload gate; covered by a runtime-wiring contract test and validated end-to-end in Edge via dist-browser-smoke.
 - `locale.js` persisted the UI direction under the retired `plasma_dir` key, so switching to an RTL locale silently reverted on reload; it now writes `ocd_dir`.
 

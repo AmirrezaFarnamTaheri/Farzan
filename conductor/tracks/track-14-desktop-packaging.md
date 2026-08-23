@@ -1,3 +1,5 @@
+> **Status note (2026-08):** Track 14 is COMPLETE: Tauri v2 native packaging shipped (src-tauri/, native:* scripts, desktop-release + native-windows workflows). Retained as process record.
+
 # Track 14 Specification & Implementation Plan — Native Tauri Desktop Packaging
 
 ## Overview
