@@ -70,6 +70,7 @@ export function initCommandPalette() {
     { label: 'Notes', hash: '#/notes', cat: 'nav' },
     { label: 'PDF', hash: '#/pdf', cat: 'nav' },
     { label: 'Studio', hash: '#/studio', cat: 'nav' },
+    { label: 'Flashcards', hash: '#/flashcards', cat: 'nav' },
     { label: 'Progress', hash: '#/progress', cat: 'nav' },
     { label: 'Materials', hash: '#/materials', cat: 'nav' },
     { label: 'Help', hash: '#/help', cat: 'nav' },

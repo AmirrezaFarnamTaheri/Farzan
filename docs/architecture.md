@@ -46,3 +46,15 @@
 - Startup timings are available through `?debug=1` and include bundle import, bundle-to-ready, and app init durations.
 - High-impact lazy-init candidates are `notes.js`, `pdf.js`, `player.js`, `canvas.js`, and progress charts.
 - Known hotspots are tracked in `docs/roadmap.md`.
+
+### Rendering performance
+
+- Route sections (`#view-container > .view`) use `content-visibility: auto` with a
+  720px intrinsic-size hint, so offscreen route content skips layout and paint and
+  the scrollbar stays stable before first paint.
+- `prefers-reduced-motion`, `forced-colors`, and `reduced-transparency` each have
+  dedicated guards in `src/styles/enhancements.css`; glass surfaces degrade to
+  solid cards instead of stacking blur over the WebGL background.
+- Feature chunks stay lazy through `loadFeature()` (player, notes, pdf, canvas,
+  progress, flashcards); `runtime-wiring.test.js` pins which modules may ship in
+  the eager bundle versus a feature chunk.

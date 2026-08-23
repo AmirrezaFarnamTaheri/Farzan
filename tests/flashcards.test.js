@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../flashcards.js';
 
 describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
@@ -16,6 +16,17 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
   });
 
   describe('SM-2 Algorithm Calculation', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('schedules nextReviewDate on the UTC calendar regardless of local timezone', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T23:30:00Z'));
+      const { calculateSM2 } = window.OpenCourseDeck.Flashcards;
+      const result = calculateSM2(4, 0, 0, 2.5);
+      expect(result.nextReviewDate).toBe('2026-01-02');
+    });
     const { calculateSM2 } = window.OpenCourseDeck.Flashcards;
 
     it('resets repetitions and sets 1-day interval when grade < 3 (failure)', () => {
@@ -130,5 +141,110 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
       expect(exported.cards.length).toBe(2);
       expect(exported.cards[0].sfld).toBe('Cardiovascular');
     });
+  });
+});
+
+
+describe('Flashcards Studio UI (keyboard-driven review)', () => {
+  beforeEach(() => {
+    window.OpenCourseDeck?.Flashcards?.manager?.reset();
+    document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
+  });
+
+  it('reveals the answer with Space and rates grades 1/2/4/5 from the keyboard', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    await manager.addCard({ front: 'Front of card', back: 'Back of card', deck: 'General' });
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+
+    const flipBtn = container.querySelector('#fc-flip-btn');
+    expect(flipBtn).toBeTruthy();
+    const backEl = container.querySelector('#fc-card-back');
+    expect(backEl.classList.contains('hidden')).toBe(true);
+
+    // Space flips the card without scrolling the page.
+    const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    container.dispatchEvent(spaceEvent);
+    expect(spaceEvent.defaultPrevented).toBe(true);
+    expect(backEl.classList.contains('hidden')).toBe(false);
+    expect(container.querySelector('#fc-grade-btns').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('aria-announcer').textContent).toContain('Answer shown');
+
+    // Grade 1 (Again) reviews the due card and records the SM-2 state change.
+    // Note: whether the failed card leaves today's queue is timezone-dependent
+    // (nextReviewDate mixes local midnight with UTC date strings), so assert
+    // persisted review state instead of deck membership.
+    container.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, cancelable: true }));
+    await vi.waitFor(() => {
+      expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
+    });
+    const cards = await manager.getCards();
+    expect(cards[0].lastReviewedAt).toBeTruthy(); // the keypress reached reviewCard
+    expect(cards[0].repetitions).toBe(0); // grade < 3 resets progress
+    expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
+  });
+
+  it('ignores shortcut keys while typing in an input', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    await manager.addCard({ front: 'F', back: 'B', deck: 'General' });
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+
+    const input = document.createElement('input');
+    container.appendChild(input);
+    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+
+    input.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(container.querySelector('#fc-card-back').classList.contains('hidden')).toBe(true);
+  });
+
+});
+
+
+describe('Flashcards Studio create-card form', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  beforeEach(() => {
+    window.OpenCourseDeck?.Flashcards?.manager?.reset();
+    document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
+  });
+
+  it('adds a card through the inline form without any blocking prompt', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    window.prompt = () => { throw new Error('window.prompt must not be used'); };
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+
+    container.querySelector('#fc-add-btn').click();
+    const form = container.querySelector('#fc-new-form');
+    expect(form.classList.contains('hidden')).toBe(false);
+
+    form.querySelector('#fc-new-front').value = '  What is SM-2? ';
+    form.querySelector('#fc-new-back').value = 'A spaced-repetition algorithm';
+    form.querySelector('#fc-new-deck').value = '';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(async () => {
+      expect((await manager.getCards())).toHaveLength(1);
+    });
+    const added = (await manager.getCards())[0];
+    expect(added.front).toBe('What is SM-2?'); // values are trimmed
+    expect(added.deck).toBe('General'); // empty deck falls back to General
+    expect(document.getElementById('aria-announcer').textContent).toContain('Card added');
+  });
+
+  it('rejects an empty submission and keeps the form open', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+    container.querySelector('#fc-add-btn').click();
+    const form = container.querySelector('#fc-new-form');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(document.getElementById('aria-announcer').textContent).toContain('required');
+    expect(await manager.getCards()).toHaveLength(0);
+    expect(form.classList.contains('hidden')).toBe(false);
   });
 });

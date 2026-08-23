@@ -8,15 +8,18 @@
   const STORE_NAME = 'ocd_flashcards';
   const LEGACY_STORE_NAME = 'plasma-flashcards-store';
   let memoryStore = [];
+// Keyboard handling re-attaches on every studio render; this controller
+// tears down the previous listener so re-renders never stack handlers.
+let studioKeyController = null;
 
   /**
    * SM-2 Spaced Repetition Engine
    */
   function calculateSM2(grade, repetitions = 0, interval = 0, easeFactor = 2.5) {
     const validGrade = Math.max(0, Math.min(5, Math.floor(Number(grade) || 0)));
-    let newRepetitions = repetitions;
-    let newInterval = interval;
-    let newEaseFactor = easeFactor;
+    let newRepetitions;
+    let newInterval;
+    let newEaseFactor;
 
     if (validGrade >= 3) {
       if (repetitions === 0) {
@@ -35,11 +38,9 @@
     newEaseFactor = easeFactor + (0.1 - (5 - validGrade) * (0.08 + (5 - validGrade) * 0.02));
     if (newEaseFactor < 1.3) newEaseFactor = 1.3;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const nextDate = new Date(today);
-    nextDate.setDate(nextDate.getDate() + newInterval);
-    const nextReviewDate = nextDate.toISOString().split('T')[0];
+    // Pure UTC day arithmetic: getDueCards() compares against the UTC calendar
+    // date, so scheduling must not mix a local midnight into a UTC string.
+    const nextReviewDate = new Date(Date.now() + newInterval * 86400000).toISOString().split('T')[0];
 
     return {
       repetitions: newRepetitions,
@@ -209,6 +210,22 @@
           </div>
         </header>
 
+        <!-- Inline create-card form (no blocking window.prompt) -->
+        <form id="fc-new-form" class="hidden bg-card/60 backdrop-blur border border-border/50 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3" novalidate>
+          <input id="fc-new-front" name="front" autocomplete="off" placeholder="Front — question"
+                 class="sm:col-span-2 px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400" />
+          <textarea id="fc-new-back" name="back" rows="2" placeholder="Back — answer"
+                    class="px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400"></textarea>
+          <input id="fc-new-deck" name="deck" autocomplete="off" placeholder="Deck" value="General"
+                 class="px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400" />
+          <div class="flex gap-2 items-start">
+            <button type="submit" id="fc-new-save"
+                    class="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg shadow-md hover:opacity-90 transition">Save card</button>
+            <button type="button" id="fc-new-cancel"
+                    class="px-4 py-2 border border-border/60 rounded-lg text-sm hover:bg-card/80 transition">Cancel</button>
+          </div>
+        </form>
+
         <!-- Stats Bar -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="stat-card p-4 bg-card/60 backdrop-blur border border-border/50 rounded-xl">
@@ -285,15 +302,65 @@
       });
     }
 
+    // Keyboard: the action buttons advertise Space / 1 / 2 / 4 / 5; honor it.
+if (studioKeyController) studioKeyController.abort();
+studioKeyController = new AbortController();
+container.addEventListener('keydown', (event) => {
+  const target = event.target;
+  if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
+  if (target?.isContentEditable) return;
+  const flipBtnLive = container.querySelector('#fc-flip-btn:not(.hidden)');
+  const gradeRow = container.querySelector('#fc-grade-btns');
+  const gradeVisible = Boolean(gradeRow && !gradeRow.classList.contains('hidden'));
+  const announce = (message) => {
+    const region = document.getElementById('aria-announcer');
+    if (region) region.textContent = message;
+  };
+  if ((event.key === ' ' || event.key === 'Enter') && flipBtnLive) {
+    event.preventDefault();
+    announce('Answer shown. Rate the card with keys 1, 2, 4, or 5.');
+    flipBtnLive.click();
+    return;
+  }
+  if (gradeVisible && ['1', '2', '4', '5'].includes(event.key)) {
+    const btn = gradeRow.querySelector('button[data-grade="' + event.key + '"]');
+    if (!btn) return;
+    event.preventDefault();
+    announce('Card rated: ' + btn.textContent.replace(/\s*\(\d\)\s*/, ' ').trim());
+    btn.click();
+  }
+}, { signal: studioKeyController.signal });
     const addBtn = container.querySelector('#fc-add-btn');
-    if (addBtn) {
-      addBtn.addEventListener('click', async () => {
-        const front = prompt('Card Front (Question):');
-        if (!front) return;
-        const back = prompt('Card Back (Answer):');
-        if (!back) return;
-        const deck = prompt('Deck Name (default: General):', 'General') || 'General';
+    const newForm = container.querySelector('#fc-new-form');
+    if (addBtn && newForm) {
+      const frontInput = newForm.querySelector('#fc-new-front');
+      const backInput = newForm.querySelector('#fc-new-back');
+      const deckInput = newForm.querySelector('#fc-new-deck');
+      const announce = (message) => {
+        const region = document.getElementById('aria-announcer');
+        if (region) region.textContent = message;
+      };
+      addBtn.addEventListener('click', () => {
+        newForm.classList.toggle('hidden');
+        if (!newForm.classList.contains('hidden')) frontInput.focus();
+      });
+      newForm.querySelector('#fc-new-cancel').addEventListener('click', () => {
+        newForm.classList.add('hidden');
+        announce('Card creation cancelled.');
+        addBtn.focus();
+      });
+      newForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const front = frontInput.value.trim();
+        const back = backInput.value.trim();
+        const deck = deckInput.value.trim() || 'General';
+        if (!front || !back) {
+          announce('Front and back are both required.');
+          (!front ? frontInput : backInput).focus();
+          return;
+        }
         await manager.addCard({ front, back, deck });
+        announce('Card added to deck ' + deck + '.');
         renderStudio(container);
       });
     }

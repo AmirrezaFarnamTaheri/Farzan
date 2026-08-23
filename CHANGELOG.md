@@ -17,6 +17,12 @@ First tagged release of OpenCourseDeck (tag `v1.1.2`).
 
 ## [Unreleased]
 
+- Flashcards Studio is now reachable: `#/flashcards` route registered (the sidebar link previously dead-ended), command-palette entry added, and review supports the advertised Space / 1 / 2 / 4 / 5 keyboard flow with screen-reader announcements.
+- Create-card moved from blocking `window.prompt()` dialogs to an inline, validated form with focus management.
+- SM-2 scheduling fixed to pure UTC day arithmetic so `nextReviewDate` no longer shifts a day depending on the local timezone.
+- Rendering performance: route sections use `content-visibility: auto`; new `forced-colors` and `reduced-transparency` guards join the existing reduced-motion handling.
+- dist-browser-smoke: `CHROME_BIN` now accepts absolute executable paths (Windows dev boxes); verified against Microsoft Edge.
+
 - Release engineering: SBOM generation and verification, release attestation, digest-verified partial-release reconciliation, canonical release metadata (2026-08-01 series).
 - Performance: optimized course progress aggregation; removed unused helpers (2026-08-06).
 - De-branding: legacy PlasmaDeck/Farzan-era naming removed from docs, configs, guard scripts, and code identifiers; active preference keys migrated to a neutral `ocd_*` localStorage namespace with automatic one-time migration of existing user data.

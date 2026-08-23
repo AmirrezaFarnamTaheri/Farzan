@@ -365,3 +365,51 @@
     flex: 1 1 auto;
   }
 }
+
+/* ──────────────────────────────────────────────────────────
+   Accessibility & input-modality guards
+   ────────────────────────────────────────────────────────── */
+
+/* Screen-reader-only utility (announcers, labels for icon buttons). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Windows High Contrast / forced colors: drop decorative shadows so text and
+   borders stay legible; the system palette takes over surface styling. */
+@media (forced-colors: active) {
+  *,
+  *::before,
+  *::after {
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Reduced transparency: glass surfaces degrade to solid cards instead of
+   stacking blurs over a moving background. */
+@media (reduced-transparency: reduce) {
+  [class*="backdrop-blur"],
+  .stat-card {
+    backdrop-filter: none !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   Rendering performance
+   ────────────────────────────────────────────────────────── */
+
+/* Route sections below the fold skip layout/paint until scrolled near.
+   The intrinsic-size hint keeps the scrollbar stable before first paint. */
+#view-container > .view {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}

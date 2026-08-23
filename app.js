@@ -3432,6 +3432,16 @@ import { Pointer } from './src/lib/pointer.js';
       return mountProgressView({ setView: set });
     }
 
+    async function flashcards() {
+      // The spaced-repetition studio ships as a root feature module and is
+      // mounted straight into the sanitized route container.
+      const el = set('');
+      if (!el) return undefined;
+      const { renderStudio } = await import('./flashcards.js');
+      await renderStudio(el);
+      return undefined;
+    }
+
     async function courses() {
       const { mountCoursesView } = await import('./src/views/coursesRoute.js');
       return mountCoursesView({
@@ -3522,7 +3532,7 @@ import { Pointer } from './src/lib/pointer.js';
       return mountNotFoundView({ setView: set, hash });
     }
 
-    return { home, courses, myCourses, materials, tags, playlists, bookmarks, achievements, settings, help, notes, pdf, studio, progress, notFound };
+    return { home, courses, myCourses, materials, tags, playlists, bookmarks, achievements, settings, help, notes, pdf, studio, flashcards, progress, notFound };
   })();
 
 
@@ -3971,6 +3981,7 @@ import { Pointer } from './src/lib/pointer.js';
       .on('#/notes', async (_hash, ctx) => { await loadRouteFeatures('notes'); if (!ctx?.isCurrent?.()) return undefined; return Views.notes(); })
       .on('#/pdf', async (_hash, ctx) => { await loadRouteFeatures('pdf'); if (!ctx?.isCurrent?.()) return undefined; return Views.pdf(); })
       .on('#/studio', async (_hash, ctx) => { await loadRouteFeatures('canvas'); if (!ctx?.isCurrent?.()) return undefined; return Views.studio(); })
+      .on('#/flashcards', async (_hash, ctx) => { await loadRouteFeatures('flashcards'); if (!ctx?.isCurrent?.()) return undefined; return Views.flashcards(); })
       .on('#/progress', async (_hash, ctx) => { await loadRouteFeatures('progress'); if (!ctx?.isCurrent?.()) return undefined; return Views.progress(); })
       .on('#/help', () => Views.help())
       .on('#/settings', () => Views.settings())

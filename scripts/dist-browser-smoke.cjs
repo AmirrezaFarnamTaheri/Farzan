@@ -259,6 +259,9 @@ function findChrome() {
     'chromium-browser',
   ].filter(Boolean);
   for (const candidate of candidates) {
+    // Absolute CHROME_BIN values (common on Windows dev boxes) are honored
+    // directly; PATH lookup stays for POSIX environments.
+    if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return candidate;
     const result = childProcess.spawnSync('sh', ['-lc', `command -v ${JSON.stringify(candidate)}`], { encoding: 'utf8' });
     if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
   }
