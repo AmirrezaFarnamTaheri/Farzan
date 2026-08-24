@@ -552,3 +552,8 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   .fc-grade-row { grid-template-columns: repeat(2, 1fr); }
   .fc-stats { grid-template-columns: 1fr; }
 }
+
+/* Sidebar: allow the nav to shrink so overflow-y actually engages (items
+   were clipping behind the storage widget). */
+.sidebar { min-height: 0; }
+.sidebar-nav { min-height: 0; flex: 1 1 auto; }

@@ -26,7 +26,14 @@ export const TopbarSearch = {
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape') this.resultsBox.classList.remove('active');
     });
-  },
+    // Cached search data goes stale on any notes/folders mutation.
+    const bus = window.OpenCourseDeck?.bus;
+    for (const evt of ['note:save', 'note:delete', 'folder:save', 'folder:delete']) {
+      bus?.on?.(evt, () => {
+        this._universalData = null;
+        this._workerIndexedData = null;
+      });
+    }  },
 
   async _onInput(query) {
     if (!query || query.length < 2) {
@@ -40,8 +47,10 @@ export const TopbarSearch = {
   },
 
   async _search(query) {
-    const q = query.toLowerCase();
     const data = await this._loadUniversalData();
+    const viaWorker = await this._searchViaWorker(query, data);
+    if (viaWorker) return viaWorker;
+    const q = query.toLowerCase();
 
     if (Fuse) {
       if (this._indexedData !== data) {
@@ -71,8 +80,28 @@ export const TopbarSearch = {
     ).slice(0, 10);
   },
 
+  // Heavy fuzzy search runs in the vendored search worker; the main-thread
+  // Fuse below is the fallback when workers are unavailable or broken.
+  async _searchViaWorker(query, data) {
+    if (this._workerBroken) return null;
+    const runInWorker = window.OpenCourseDeck?.WorkerPool?.runInWorker;
+    if (typeof runInWorker !== 'function') return null;
+    try {
+      if (this._workerIndexedData !== data) {
+        this._workerIndexedData = data;
+        await runInWorker('search', { type: 'init', data: { items: data, options: { keys: [ { name: 'label', weight: 0.55 }, { name: 'description', weight: 0.2 }, { name: 'searchText', weight: 0.2 }, { name: 'tags', weight: 0.05 } ], threshold: 0.35, ignoreLocation: true, includeMatches: true } } }, { timeout: 15000 });
+      }
+      const res = await runInWorker('search', { type: 'search', data: { query, options: { limit: 10 } } }, { timeout: 5000 });
+      return (res?.results || []).map((item, i) => ({ ...item, matches: res.matches?.[i]?.matches || [] }));
+    } catch (error) {
+      if (error?.code === 'WORKER_BUSY') return null; // transient: main thread covers this keystroke
+      this._workerBroken = true; // unavailable/broken: stay on the main thread
+      return null;
+    }
+  },
+
   async _loadUniversalData() {
-    const catalog = await window.DataStore?.init() || { courses: [], topics: [] };
+    if (this._universalData) return this._universalData;    const catalog = await window.DataStore?.init() || { courses: [], topics: [] };
     const notes = await window.DB?.getNotes() || [];
     // const timestamps = ...
     // const annotations = ...
@@ -111,6 +140,7 @@ export const TopbarSearch = {
     });
 
     // ... add more if needed
+    this._universalData = results;
     return results;
   },
 
