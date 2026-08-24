@@ -731,7 +731,10 @@ export function mountSettingsView(deps = {}) {
     const update = async () => {
       let estimate;
       try {
-        estimate = await navigator.storage?.estimate?.() ?? null;
+        estimate = await Promise.race([
+          navigator.storage?.estimate?.() ?? null,
+          new Promise((resolve) => setTimeout(() => resolve(null), 3500)),
+        ]) ?? null;
       } catch {
         estimate = null;
       }

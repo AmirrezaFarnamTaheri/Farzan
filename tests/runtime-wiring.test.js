@@ -126,6 +126,15 @@ describe('runtime wiring', () => {
     }
   });
 
+  it('feature-route loading passes arrays, not spread strings (route-death regression)', () => {
+    const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+    const indexSource2 = fs.readFileSync(path.join(root, 'src', 'index.js'), 'utf8');
+    // loadRouteFeatures once spread 'player' into loadFeatures(names=[]), making
+    // names.map undefined and killing every feature route in real builds.
+    expect(appSource).not.toContain('loader(...names)');
+    expect(appSource).toContain('await loader(names);');
+    expect(indexSource2).toContain("typeof names === 'string'");
+  });
   it('service worker lifecycle owns the update-toast contract', () => {
     // Registration + update detection live here so app.js can stay purely
     // reactive to ocd:sw-update-ready / controllerchange.

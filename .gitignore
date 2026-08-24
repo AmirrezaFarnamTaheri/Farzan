@@ -27,3 +27,4 @@ downloads/
 .edge-tmp*
 .shots.sh
 screenshots/_topbar-zoom.png
+.edge-cdp*
