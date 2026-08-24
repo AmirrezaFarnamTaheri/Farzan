@@ -129,7 +129,12 @@ pd.loadFeature = (name, { signal = null, force = false } = {}) => {
   if (signal.aborted) return Promise.reject(abortError(signal.reason?.message || 'Feature load aborted'));
   return Promise.race([entry.promise, new Promise((_, reject) => signal.addEventListener('abort', () => reject(abortError(signal.reason?.message || 'Feature load aborted')), { once: true }))]);
 };
-pd.loadFeatures = (names = [], options = {}) => Promise.all(names.map(name => pd.loadFeature(name, options)));
+pd.loadFeatures = (names = [], options = {}) => {
+  // Tolerate a bare string (loadRouteFeatures historically spread one in),
+  // otherwise .map on a string throws and every feature route dies.
+  if (typeof names === 'string') names = [names];
+  return Promise.all(names.map(name => pd.loadFeature(name, options)));
+};
 
 try { performance.mark?.('pd:bundle:evaluated'); } catch {}
 

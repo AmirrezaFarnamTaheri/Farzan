@@ -2974,6 +2974,7 @@ import { Pointer } from './src/lib/pointer.js';
       '#/notes': 'Notes',
       '#/pdf': 'PDF',
       '#/studio': 'Studio',
+      '#/flashcards': 'Flashcards',
       '#/progress': 'Progress',
       '#/help': 'Help',
       '#/achievements': 'Achievements',
@@ -2993,7 +2994,7 @@ import { Pointer } from './src/lib/pointer.js';
     if (!names.length) return;
     const loader = OpenCourseDeck.loadFeatures;
     if (typeof loader === 'function') {
-      await loader(...names);
+      await loader(names); // pass the array through; loadFeatures expects a list
       return;
     }
     await Promise.all(names.map(name => OpenCourseDeck.loadFeature?.(name)).filter(Boolean));
@@ -3151,7 +3152,9 @@ import { Pointer } from './src/lib/pointer.js';
       // mounted straight into the sanitized route container.
       const el = set('');
       if (!el) return undefined;
-      const { renderStudio } = await import('./flashcards.js');
+      await import('./flashcards.js'); // side-effect module: registers window.OpenCourseDeck.Flashcards
+      const renderStudio = window.OpenCourseDeck?.Flashcards?.renderStudio;
+      if (typeof renderStudio !== 'function') throw new Error('Flashcards studio failed to register');
       await renderStudio(el);
       return undefined;
     }
@@ -3565,7 +3568,35 @@ import { Pointer } from './src/lib/pointer.js';
     ThemeManager.init();
     Prefs.init();
     Sidebar.init();
-    TopbarSearch.init();
+
+    // Sidebar storage meter: resolve with a timeout so the label never
+    // sticks on "Calculating…" (headless, blocked, or slow estimate).
+    (async () => {
+      const label = document.getElementById('storage-label');
+      const bar = document.getElementById('storage-bar');
+      if (!label) return;
+      const finish = (text, pct) => {
+        label.textContent = text;
+        if (bar && typeof pct === 'number') bar.style.width = pct + '%';
+      };
+      try {
+        const est = await Promise.race([
+          navigator.storage?.estimate?.() ?? null,
+          new Promise((resolve) => setTimeout(() => resolve(null), 3500)),
+        ]);
+        if (!document.body.contains(label)) return;
+        const usage = Number(est?.usage);
+        const quota = Number(est?.quota);
+        if (Number.isFinite(usage) && Number.isFinite(quota) && quota > 0) {
+          const pct = Math.min(100, Math.round((usage / quota) * 100));
+          finish('Storage: ' + pct + '% used', pct);
+        } else {
+          finish('Local storage ready', 0);
+        }
+      } catch {
+        finish('Local storage ready', 0);
+      }
+    })();    TopbarSearch.init();
 
     Ripple.init();
 

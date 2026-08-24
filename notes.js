@@ -382,9 +382,9 @@
     getFolders() {
       if (Array.isArray(this._folders)) return this._folders.slice();
       this._folders = this._readArray(FOLDERS_KEY, [
-        { id: 'default', name: 'Personal',  icon: 'Folder', color: '' },
-        { id: 'work',    name: 'Work',      icon: 'Briefcase', color: '' },
-        { id: 'archive', name: 'Archive',   icon: 'Archive', color: '' },
+        { id: 'default', name: 'Personal',  icon: '📁', color: '' },
+        { id: 'work',    name: 'Work',      icon: '💼', color: '' },
+        { id: 'archive', name: 'Archive',   icon: '🗄️', color: '' },
       ]);
       return this._folders.slice();
     },

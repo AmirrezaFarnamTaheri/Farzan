@@ -306,7 +306,14 @@ void main() {
       const canvas = document.querySelector('[data-webgl-laser]');
       if (canvas && !canvas._laserInitialized) {
         canvas._laserInitialized = true;
-        pd.Laser._cleanup = initWebGLLaser(canvas);
+        pd.Laser._cleanup = initWebGLLaser(canvas, {
+          // Dead-center beam read as a stuck scrollbar over content; the left
+          // rail is structural whitespace, so the beam lives there.
+          xOffset: -0.33,
+          coreWidth: 0.003,
+          glowWidth: 0.028,
+          smokeDensity: 0.4,
+        });
       }
     };
     if (document.readyState === 'loading') {

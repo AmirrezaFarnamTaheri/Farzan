@@ -185,113 +185,92 @@ let studioKeyController = null;
   /**
    * Render Spaced Repetition Flashcards Studio UI
    */
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[ch]);
+
   async function renderStudio(container) {
     if (!container) return;
 
     const cards = await manager.getCards();
     const dueCards = await manager.getDueCards();
-    const decks = [...new Set(cards.map(c => c.deck))];
+    const decks = [...new Set(cards.map((c) => c.deck))];
+    const due = dueCards[0];
+
+    const reviewArea = dueCards.length === 0 ? `
+          <div class="fc-empty">
+            <div class="fc-empty-icon" aria-hidden="true">🎉</div>
+            <h2 class="fc-empty-title">All Due Cards Reviewed!</h2>
+            <p class="fc-sub">Great job! Check back tomorrow for your next memory review cycle.</p>
+          </div>
+        ` : `
+          <div class="fc-progress-line">Card 1 of ${dueCards.length} · ${esc(due.deck)}</div>
+          <div id="fc-card-front" class="fc-card fc-card-front">${esc(due.front)}</div>
+          <div id="fc-card-back" class="fc-card fc-card-back" hidden>${esc(due.back)}</div>
+          <div class="fc-flip-row">
+            <button id="fc-flip-btn" class="btn btn-primary fc-flip-btn" type="button">Show Answer <span class="fc-kbd">Space</span></button>
+          </div>
+          <div id="fc-grade-btns" class="fc-grade-row" hidden>
+            <button data-grade="1" class="fc-grade fc-grade-again" type="button">Again <span class="fc-kbd">1</span></button>
+            <button data-grade="2" class="fc-grade fc-grade-hard" type="button">Hard <span class="fc-kbd">2</span></button>
+            <button data-grade="4" class="fc-grade fc-grade-good" type="button">Good <span class="fc-kbd">4</span></button>
+            <button data-grade="5" class="fc-grade fc-grade-easy" type="button">Easy <span class="fc-kbd">5</span></button>
+          </div>
+        `;
 
     container.innerHTML = `
-      <div class="flashcard-studio-wrap p-6 max-w-5xl mx-auto space-y-6">
-        <header class="flex items-center justify-between border-b border-border/40 pb-4">
+      <div class="fc-wrap">
+        <header class="fc-header">
           <div>
-            <h1 class="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-              ⚡ Spaced Repetition Studio
-            </h1>
-            <p class="text-sm text-muted-foreground mt-1">
-              SuperMemo-2 (SM-2) memory consolidation engine
-            </p>
+            <h1 class="fc-title"><span class="fc-title-icon" aria-hidden="true">⚡</span> Spaced Repetition Studio</h1>
+            <p class="fc-sub">SuperMemo-2 (SM-2) memory consolidation engine</p>
           </div>
-          <div class="flex gap-3">
-            <button id="fc-add-btn" class="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg shadow-md hover:opacity-90 transition">
-              + New Card
-            </button>
-          </div>
+          <button id="fc-add-btn" class="btn btn-primary" type="button">+ New Card</button>
         </header>
 
-        <!-- Inline create-card form (no blocking window.prompt) -->
-        <form id="fc-new-form" class="hidden bg-card/60 backdrop-blur border border-border/50 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3" novalidate>
-          <input id="fc-new-front" name="front" autocomplete="off" placeholder="Front — question"
-                 class="sm:col-span-2 px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400" />
-          <textarea id="fc-new-back" name="back" rows="2" placeholder="Back — answer"
-                    class="px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400"></textarea>
-          <input id="fc-new-deck" name="deck" autocomplete="off" placeholder="Deck" value="General"
-                 class="px-3 py-2 bg-background/60 border border-border/50 rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-purple-400" />
-          <div class="flex gap-2 items-start">
-            <button type="submit" id="fc-new-save"
-                    class="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg shadow-md hover:opacity-90 transition">Save card</button>
-            <button type="button" id="fc-new-cancel"
-                    class="px-4 py-2 border border-border/60 rounded-lg text-sm hover:bg-card/80 transition">Cancel</button>
+        <form id="fc-new-form" class="fc-form" hidden novalidate>
+          <div class="fc-field">
+            <label for="fc-new-front">Front — question</label>
+            <input id="fc-new-front" name="front" autocomplete="off" placeholder="What are you asking?" />
+          </div>
+          <div class="fc-field">
+            <label for="fc-new-back">Back — answer</label>
+            <textarea id="fc-new-back" name="back" rows="2" placeholder="The answer to recall"></textarea>
+          </div>
+          <div class="fc-field fc-field-deck">
+            <label for="fc-new-deck">Deck</label>
+            <input id="fc-new-deck" name="deck" autocomplete="off" value="General" />
+          </div>
+          <div class="fc-actions">
+            <button id="fc-new-save" class="btn btn-primary" type="submit">Save card</button>
+            <button id="fc-new-cancel" class="btn btn-ghost" type="button">Cancel</button>
           </div>
         </form>
 
-        <!-- Stats Bar -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="stat-card p-4 bg-card/60 backdrop-blur border border-border/50 rounded-xl">
-            <div class="text-xs font-semibold text-muted-foreground uppercase">Total Cards</div>
-            <div class="text-2xl font-bold mt-1">${cards.length}</div>
-          </div>
-          <div class="stat-card p-4 bg-card/60 backdrop-blur border border-border/50 rounded-xl">
-            <div class="text-xs font-semibold text-purple-400 uppercase">Due Today</div>
-            <div class="text-2xl font-bold mt-1 text-purple-300">${dueCards.length}</div>
-          </div>
-          <div class="stat-card p-4 bg-card/60 backdrop-blur border border-border/50 rounded-xl">
-            <div class="text-xs font-semibold text-cyan-400 uppercase">Decks</div>
-            <div class="text-2xl font-bold mt-1 text-cyan-300">${decks.length || 1}</div>
-          </div>
+        <div class="fc-stats">
+          <div class="fc-stat"><span class="fc-stat-label">Total Cards</span><span class="fc-stat-value">${cards.length}</span></div>
+          <div class="fc-stat fc-stat-accent"><span class="fc-stat-label">Due Today</span><span class="fc-stat-value">${dueCards.length}</span></div>
+          <div class="fc-stat"><span class="fc-stat-label">Decks</span><span class="fc-stat-value">${decks.length || 1}</span></div>
         </div>
 
-        <!-- Review Deck Container -->
-        <div id="fc-review-area" class="review-area bg-card/80 backdrop-blur border border-border/60 rounded-2xl p-8 text-center min-h-[320px] flex flex-col justify-center items-center shadow-xl">
-          ${dueCards.length === 0 ? `
-            <div class="text-center space-y-3">
-              <div class="text-4xl">🎉</div>
-              <h3 class="text-lg font-bold">All Due Cards Reviewed!</h3>
-              <p class="text-sm text-muted-foreground">Great job! Check back tomorrow for your next memory review cycle.</p>
-            </div>
-          ` : `
-            <div class="w-full max-w-xl space-y-6">
-              <div class="text-xs font-semibold text-purple-400 uppercase tracking-widest">
-                Card 1 of ${dueCards.length} • ${dueCards[0].deck}
-              </div>
-              <div id="fc-card-front" class="text-xl font-medium px-4 py-6 bg-background/50 rounded-xl border border-border/40 min-h-[120px] flex items-center justify-center">
-                ${dueCards[0].front}
-              </div>
-              <div id="fc-card-back" class="hidden text-lg text-emerald-300 px-4 py-6 bg-emerald-950/20 rounded-xl border border-emerald-500/30 min-h-[100px] items-center justify-center">
-                ${dueCards[0].back}
-              </div>
-              <div id="fc-action-row" class="pt-2">
-                <button id="fc-flip-btn" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-white rounded-lg shadow-lg hover:scale-105 transition">
-                  Show Answer (Space)
-                </button>
-                <div id="fc-grade-btns" class="hidden grid grid-cols-4 gap-2 mt-4">
-                  <button data-grade="1" class="py-2 bg-red-950/60 border border-red-500/40 text-red-300 rounded font-semibold text-xs hover:bg-red-900/60">Again (1)</button>
-                  <button data-grade="2" class="py-2 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded font-semibold text-xs hover:bg-amber-900/60">Hard (2)</button>
-                  <button data-grade="4" class="py-2 bg-blue-950/60 border border-blue-500/40 text-blue-300 rounded font-semibold text-xs hover:bg-blue-900/60">Good (4)</button>
-                  <button data-grade="5" class="py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 rounded font-semibold text-xs hover:bg-emerald-900/60">Easy (5)</button>
-                </div>
-              </div>
-            </div>
-          `}
+        <div id="fc-review-area" class="fc-review">
+          ${reviewArea}
         </div>
       </div>
     `;
 
-    // Interactive event listeners
     const flipBtn = container.querySelector('#fc-flip-btn');
     const backEl = container.querySelector('#fc-card-back');
     const gradeRow = container.querySelector('#fc-grade-btns');
 
     if (flipBtn && backEl && gradeRow) {
       flipBtn.addEventListener('click', () => {
-        backEl.classList.remove('hidden');
-        backEl.classList.add('flex');
-        flipBtn.classList.add('hidden');
-        gradeRow.classList.remove('hidden');
+        backEl.hidden = false;
+        flipBtn.hidden = true;
+        gradeRow.hidden = false;
       });
 
-      gradeRow.querySelectorAll('button[data-grade]').forEach(btn => {
+      gradeRow.querySelectorAll('button[data-grade]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const grade = parseInt(btn.getAttribute('data-grade'), 10);
           if (dueCards.length > 0) {
@@ -303,33 +282,33 @@ let studioKeyController = null;
     }
 
     // Keyboard: the action buttons advertise Space / 1 / 2 / 4 / 5; honor it.
-if (studioKeyController) studioKeyController.abort();
-studioKeyController = new AbortController();
-container.addEventListener('keydown', (event) => {
-  const target = event.target;
-  if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
-  if (target?.isContentEditable) return;
-  const flipBtnLive = container.querySelector('#fc-flip-btn:not(.hidden)');
-  const gradeRow = container.querySelector('#fc-grade-btns');
-  const gradeVisible = Boolean(gradeRow && !gradeRow.classList.contains('hidden'));
-  const announce = (message) => {
-    const region = document.getElementById('aria-announcer');
-    if (region) region.textContent = message;
-  };
-  if ((event.key === ' ' || event.key === 'Enter') && flipBtnLive) {
-    event.preventDefault();
-    announce('Answer shown. Rate the card with keys 1, 2, 4, or 5.');
-    flipBtnLive.click();
-    return;
-  }
-  if (gradeVisible && ['1', '2', '4', '5'].includes(event.key)) {
-    const btn = gradeRow.querySelector('button[data-grade="' + event.key + '"]');
-    if (!btn) return;
-    event.preventDefault();
-    announce('Card rated: ' + btn.textContent.replace(/\s*\(\d\)\s*/, ' ').trim());
-    btn.click();
-  }
-}, { signal: studioKeyController.signal });
+    if (studioKeyController) studioKeyController.abort();
+    studioKeyController = new AbortController();
+    container.addEventListener('keydown', (event) => {
+      const target = event.target;
+      if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
+      if (target?.isContentEditable) return;
+      const flipBtnLive = container.querySelector('#fc-flip-btn:not([hidden])');
+      const gradeRowLive = container.querySelector('#fc-grade-btns:not([hidden])');
+      const announce = (message) => {
+        const region = document.getElementById('aria-announcer');
+        if (region) region.textContent = message;
+      };
+      if ((event.key === ' ' || event.key === 'Enter') && flipBtnLive) {
+        event.preventDefault();
+        announce('Answer shown. Rate the card with keys 1, 2, 4, or 5.');
+        flipBtnLive.click();
+        return;
+      }
+      if (gradeRowLive && ['1', '2', '4', '5'].includes(event.key)) {
+        const btn = gradeRowLive.querySelector('button[data-grade="' + event.key + '"]');
+        if (!btn) return;
+        event.preventDefault();
+        announce('Card rated: ' + btn.textContent.replace(/\s*\(\d\)\s*/, ' ').trim());
+        btn.click();
+      }
+    }, { signal: studioKeyController.signal });
+
     const addBtn = container.querySelector('#fc-add-btn');
     const newForm = container.querySelector('#fc-new-form');
     if (addBtn && newForm) {
@@ -341,11 +320,11 @@ container.addEventListener('keydown', (event) => {
         if (region) region.textContent = message;
       };
       addBtn.addEventListener('click', () => {
-        newForm.classList.toggle('hidden');
-        if (!newForm.classList.contains('hidden')) frontInput.focus();
+        newForm.hidden = !newForm.hidden;
+        if (!newForm.hidden) frontInput.focus();
       });
       newForm.querySelector('#fc-new-cancel').addEventListener('click', () => {
-        newForm.classList.add('hidden');
+        newForm.hidden = true;
         announce('Card creation cancelled.');
         addBtn.focus();
       });
@@ -365,6 +344,7 @@ container.addEventListener('keydown', (event) => {
       });
     }
   }
+
 
   const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
   pd.Flashcards = {

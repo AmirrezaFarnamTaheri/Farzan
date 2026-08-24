@@ -22,3 +22,8 @@ opencoursedeck-server.pid
 .code-review-graph/
 .cocoindex_code/
 downloads/
+
+# Local screenshot/CDP scratch
+.edge-tmp*
+.shots.sh
+screenshots/_topbar-zoom.png

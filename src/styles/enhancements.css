@@ -1,3 +1,4 @@
+.hidden { display: none !important; }
 /* Product-surface refinements layered above the base system. */
 
 .view-courses .page-header {
@@ -412,4 +413,142 @@
 #view-container > .view {
   content-visibility: auto;
   contain-intrinsic-size: auto 720px;
+}
+
+/* Topbar accent picker: guaranteed-visible color dots.
+   The utilities-layer rules were being out-cascaded in real renders
+   (empty 24px pills); re-declare here in the final layer with the
+   inline --dot-color as the single source of truth. */
+.accent-dot.accent-dot {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 3px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.12));
+}
+.accent-dot.accent-dot::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--dot-color, var(--accent, #7c3aed));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.accent-dot.accent-dot:hover { transform: scale(1.12); }
+.accent-dot.accent-dot:focus-visible { outline: 2px solid var(--accent, #7c3aed); outline-offset: 2px; }
+.accent-dot.accent-dot[aria-current="true"]::before {
+  box-shadow: 0 0 0 2px var(--bg, #0f0f1a) inset, 0 0 0 2px var(--dot-color, #7c3aed);
+}
+.accent-dot.accent-dot { width: 22px !important; height: 22px !important; min-width: 22px !important; min-height: 22px !important; padding: 3px !important; }
+.accent-dot.accent-dot::before { background: var(--dot-color, var(--accent, #7c3aed)) !important; content: "" !important; display: block !important; width: 100% !important; height: 100% !important; border-radius: 50% !important; }
+
+/* Settings: appearance card grid — let long labels wrap instead of clipping. */
+.settings-grid article,
+article:has(#btn-theme-toggle) { min-width: 0; }
+#btn-theme-toggle {
+  white-space: normal;
+  height: auto;
+  min-height: 36px;
+  max-width: 100%;
+}
+
+/* Studio: give the whiteboard a visible surface (was transparent/zero-contrast). */
+.studio-canvas {
+  display: block;
+  background:
+    linear-gradient(var(--border-soft, rgba(255,255,255,0.08)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft, rgba(255,255,255,0.08)) 1px, transparent 1px),
+    var(--bg-card, rgba(24,24,37,0.9));
+  background-size: 28px 28px, 28px 28px, auto;
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.12));
+  border-radius: 14px;
+}
+
+/* Laser ambience: keep the beam behind glass at a calmer intensity. */
+.laser-canvas { opacity: 0.55; }
+
+/* ──────────────────────────────────────────────────────────
+   Flashcards Studio (fc-*) — token-based, no utility framework
+   ────────────────────────────────────────────────────────── */
+.fc-wrap { max-width: 960px; margin: 0 auto; display: grid; gap: var(--space-5, 24px); }
+.fc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4, 16px); }
+.fc-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.fc-title-icon { margin-right: 4px; }
+.fc-sub { color: var(--text-muted, #94a3b8); font-size: 0.9rem; margin: 4px 0 0; }
+
+.fc-form {
+  display: grid; gap: var(--space-3, 12px);
+  background: var(--bg-card, rgba(24,24,37,0.7));
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.1));
+  border-radius: 14px; padding: var(--space-4, 16px);
+}
+.fc-form[hidden] { display: none; }
+.fc-field { display: grid; gap: 6px; }
+.fc-field label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted, #94a3b8); }
+.fc-field input, .fc-field textarea {
+  width: 100%; background: var(--bg-surface, rgba(15,15,26,0.6));
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.12));
+  border-radius: 10px; padding: 9px 12px; color: var(--text-primary, #f8fafc);
+  font: inherit; resize: vertical;
+}
+.fc-field input:focus-visible, .fc-field textarea:focus-visible { outline: 2px solid var(--accent, #7c3aed); outline-offset: 1px; }
+.fc-field-deck input { max-width: 280px; }
+.fc-actions { display: flex; gap: 10px; }
+
+.fc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3, 12px); }
+.fc-stat {
+  background: var(--bg-card, rgba(24,24,37,0.7));
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.1));
+  border-radius: 14px; padding: 14px 16px;
+  display: grid; gap: 2px;
+}
+.fc-stat-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted, #94a3b8); }
+.fc-stat-value { font-size: 1.7rem; font-weight: 800; }
+.fc-stat-accent .fc-stat-value { color: var(--accent, #7c3aed); }
+
+.fc-review {
+  background: var(--bg-card, rgba(24,24,37,0.6));
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.1));
+  border-radius: 16px; padding: var(--space-6, 28px);
+  min-height: 320px; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; text-align: center;
+  gap: var(--space-4, 16px);
+}
+.fc-progress-line { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent, #7c3aed); align-self: flex-start; }
+.fc-card {
+  width: 100%; max-width: 620px; min-height: 110px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px 22px; border-radius: 12px; font-size: 1.05rem; line-height: 1.5;
+}
+.fc-card-front { background: rgba(255,255,255,0.04); border: 1px solid var(--border-soft, rgba(255,255,255,0.12)); }
+.fc-card-back { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.35); color: #6ee7b7; }
+.fc-card-back[hidden] { display: none; }
+.fc-flip-row { display: flex; }
+.fc-flip-btn .fc-kbd, .fc-grade .fc-kbd {
+  margin-left: 6px; opacity: 0.75; font-size: 0.72rem;
+  border: 1px solid currentColor; border-radius: 6px; padding: 0 5px;
+}
+.fc-grade-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 620px; }
+.fc-grade-row[hidden] { display: none; }
+.fc-grade {
+  padding: 10px 8px; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+  cursor: pointer; background: transparent;
+}
+.fc-grade-again { border: 1px solid rgba(239,68,68,0.45); color: #f87171; }
+.fc-grade-hard  { border: 1px solid rgba(245,158,11,0.45); color: #fbbf24; }
+.fc-grade-good  { border: 1px solid rgba(59,130,246,0.45); color: #93c5fd; }
+.fc-grade-easy  { border: 1px solid rgba(16,185,129,0.45); color: #6ee7b7; }
+.fc-grade:hover { filter: brightness(1.25); }
+.fc-empty-icon { font-size: 2.4rem; }
+.fc-empty-title { font-size: 1.15rem; font-weight: 700; margin: 8px 0 4px; }
+@media (max-width: 640px) {
+  .fc-grade-row { grid-template-columns: repeat(2, 1fr); }
+  .fc-stats { grid-template-columns: 1fr; }
 }

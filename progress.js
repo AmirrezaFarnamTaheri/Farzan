@@ -186,6 +186,19 @@ const ProgressStats = (() => {
   function _renderCharts(stats) {
     if (!window.Chart) return;
 
+    // Empty library: say so instead of painting silent zero-data charts.
+    const chartEmptyHints = [
+      ['#chart-overall', 'No topics yet — charts fill in as you study.'],
+      ['#chart-courses', 'Course comparison appears once you have topics.'],
+    ];
+    if (!stats.totalTopics) {
+      for (const [sel, text] of chartEmptyHints) {
+        const frame = q(sel)?.closest('.progress-chart-frame');
+        if (frame) frame.innerHTML = '<p class="progress-chart-empty">' + text + '</p>';
+      }
+      return;
+    }
+
     // Destroy previous instances to avoid leaks on re-render
     if (window.__ocdCharts) {
       try { window.__ocdCharts.overall?.destroy?.(); } catch {}
@@ -208,6 +221,7 @@ const ProgressStats = (() => {
     if (dCtx) {
       window.__ocdCharts.overall = new Chart(dCtx, {
         type: 'doughnut',
+        animation: false, // first-frame paint; also honors reduced motion
         data: {
           labels: ['Completed', 'In Progress', 'Not Started'],
           datasets: [{
@@ -228,6 +242,7 @@ const ProgressStats = (() => {
     if (bCtx) {
       window.__ocdCharts.courses = new Chart(bCtx, {
         type: 'bar',
+        animation: false, // first-frame paint; also honors reduced motion
         data: {
           labels  : stats.byCourse.map(c => c.title),
           datasets: [{

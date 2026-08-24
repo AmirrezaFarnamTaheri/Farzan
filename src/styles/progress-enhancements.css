@@ -338,3 +338,13 @@
     text-align: left;
   }
 }
+
+.progress-chart-empty {
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary, #8b93a7);
+  font-size: var(--text-sm, 0.9rem);
+  text-align: center;
+  padding: var(--space-4);
+}

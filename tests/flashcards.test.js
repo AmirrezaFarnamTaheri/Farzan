@@ -160,14 +160,14 @@ describe('Flashcards Studio UI (keyboard-driven review)', () => {
     const flipBtn = container.querySelector('#fc-flip-btn');
     expect(flipBtn).toBeTruthy();
     const backEl = container.querySelector('#fc-card-back');
-    expect(backEl.classList.contains('hidden')).toBe(true);
+    expect(backEl.hidden).toBe(true);
 
     // Space flips the card without scrolling the page.
     const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
     container.dispatchEvent(spaceEvent);
     expect(spaceEvent.defaultPrevented).toBe(true);
-    expect(backEl.classList.contains('hidden')).toBe(false);
-    expect(container.querySelector('#fc-grade-btns').classList.contains('hidden')).toBe(false);
+    expect(backEl.hidden).toBe(false);
+    expect(container.querySelector('#fc-grade-btns').hidden).toBe(false);
     expect(document.getElementById('aria-announcer').textContent).toContain('Answer shown');
 
     // Grade 1 (Again) reviews the due card and records the SM-2 state change.
@@ -196,7 +196,7 @@ describe('Flashcards Studio UI (keyboard-driven review)', () => {
 
     input.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(false);
-    expect(container.querySelector('#fc-card-back').classList.contains('hidden')).toBe(true);
+    expect(container.querySelector('#fc-card-back').hidden).toBe(true);
   });
 
 });
