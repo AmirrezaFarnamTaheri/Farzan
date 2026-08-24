@@ -21,6 +21,11 @@
     /* Alias for dividers / connectors (some sections use --border-color / --text-muted) */
     --border-color:     var(--border-strong);
     --border-focus:     var(--accent);
+    /* Interoperability aliases for style.css tokens */
+    --bg-app:           var(--bg);
+    --bg-surface:       var(--surface);
+    --bg-surface-hover: var(--surface-hover);
+    --border-subtle:    var(--border);
 
     /* ── Text Colors ── */
     --text-primary:     #f0f0ff;

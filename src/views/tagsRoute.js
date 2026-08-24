@@ -1,24 +1,27 @@
 export function mountTagsView({ setView } = {}) {
   setView(`
     <section class="view view-tags">
-      <div class="page-header">
-        <div class="page-title-row">
-          <h1 class="page-title">Tags</h1>
-          <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+      <div class="page-header tags-header">
+        <div>
+          <span class="eyebrow">Taxonomy & Index</span>
+          <div class="page-title-row">
+            <h1 class="page-title">Tags</h1>
+            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+          </div>
+          <p class="page-subtitle">Browse note tags and catalog tags across your entire learning workspace.</p>
         </div>
-        <p class="page-subtitle">Browse note tags and catalog tags from one place.</p>
       </div>
       <div class="stat-grid" data-tag-metrics></div>
-      <div class="card card-filled">
+      <div class="card card-filled tags-controls-card">
         <div class="card-body">
           <input class="input" type="search" data-tag-search placeholder="Search tags..." />
-          <div class="filter-row" data-tag-filters aria-label="Tag filters" style="margin-top:12px">
+          <div class="filter-row tags-filter-row" data-tag-filters aria-label="Tag filters">
             <button class="filter-chip active" type="button" data-tag-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-tag-filter="mixed" aria-pressed="false">Mixed</button>
             <button class="filter-chip" type="button" data-tag-filter="note" aria-pressed="false">Notes</button>
             <button class="filter-chip" type="button" data-tag-filter="catalog" aria-pressed="false">Catalog</button>
           </div>
-          <div class="grid grid-3" data-tag-list>
+          <div class="grid grid-3 tags-grid" data-tag-list>
             <p>Loading tags...</p>
           </div>
         </div>

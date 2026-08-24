@@ -28,3 +28,8 @@ downloads/
 .shots.sh
 screenshots/_topbar-zoom.png
 .edge-cdp*
+build-exe.cmd
+build-native.log
+fetch-missing.cjs
+fetch-missing.sh
+.dom2.html

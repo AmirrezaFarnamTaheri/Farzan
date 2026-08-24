@@ -4,17 +4,17 @@
    ============================================================ */
 
 :root {
-  /* OKLCH Color Tokens */
-  --bg-app: oklch(0.14 0.02 260);
-  --bg-surface: oklch(0.18 0.025 260);
-  --bg-surface-hover: oklch(0.22 0.03 260);
-  --fg-primary: oklch(0.96 0.01 260);
-  --fg-muted: oklch(0.70 0.02 260);
-  --border-subtle: oklch(0.26 0.02 260);
+  /* OKLCH Color Tokens & Theme Aliases */
+  --bg-app: var(--bg, oklch(0.14 0.02 260));
+  --bg-surface: var(--surface, oklch(0.18 0.025 260));
+  --bg-surface-hover: var(--surface-hover, oklch(0.22 0.03 260));
+  --fg-primary: var(--text-primary, oklch(0.96 0.01 260));
+  --fg-muted: var(--text-secondary, oklch(0.70 0.02 260));
+  --border-subtle: var(--border, oklch(0.26 0.02 260));
 
   /* Brand Core */
-  --brand-primary: oklch(0.65 0.20 160);
-  --brand-surface: oklch(0.25 0.08 160);
+  --brand-primary: var(--accent, oklch(0.65 0.20 160));
+  --brand-surface: var(--accent-muted, oklch(0.25 0.08 160));
 
   /* Accent */
   --accent-cyan: oklch(0.72 0.16 210);

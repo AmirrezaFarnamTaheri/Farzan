@@ -53,40 +53,45 @@ export function mountPdfView() {
   setView(`
     <section class="view view-pdf">
       <div class="page-header">
-        <h1 class="page-title">PDF</h1>
-        <p class="page-subtitle">Drop a PDF here or load via file picker.</p>
+        <span class="eyebrow">Document Reader</span>
+        <h1 class="page-title">PDF Annotator</h1>
+        <p class="page-subtitle">Drop a PDF here, annotate key chapters, or load via file picker.</p>
       </div>
 
       <div class="pdf-shell">
         <aside class="pdf-sidebar" data-pdf-thumbnails></aside>
         <div class="pdf-main">
-          <div class="pdf-toolbar">
-            <input class="input" data-pdf-search-input placeholder="Search..." />
-            <div data-pdf-search-results class="pdf-search-results"></div>
-            <div class="pdf-toolbar-row">
-              <button class="btn btn-ghost" data-pdf-action="prev" data-pdf-prev>Prev</button>
-              <input class="input input-sm" data-pdf-current-page value="1" style="width:80px" />
-              <span>/ <span data-pdf-total-pages>0</span></span>
-              <button class="btn btn-ghost" data-pdf-action="next" data-pdf-next>Next</button>
-              <span class="pdf-zoom" data-pdf-zoom>100%</span>
+          <div class="pdf-toolbar card card-filled" style="padding:var(--space-3);margin-bottom:var(--space-3)">
+            <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center;margin-bottom:var(--space-2)">
+              <div style="display:inline-flex;gap:var(--space-2);align-items:center">
+                <input class="input input-sm" data-pdf-search-input placeholder="Search in document..." style="width:180px" />
+                <div data-pdf-search-results class="pdf-search-results"></div>
+              </div>
+              <div style="display:inline-flex;gap:4px;align-items:center">
+                <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                <input class="input input-sm" data-pdf-current-page value="1" style="width:52px;text-align:center" aria-label="Current page" />
+                <span class="text-xs text-secondary">/ <span data-pdf-total-pages>0</span></span>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                <span class="pdf-zoom badge" data-pdf-zoom>100%</span>
+              </div>
+              <div style="display:inline-flex;gap:var(--space-1);flex-wrap:wrap;align-items:center">
+                <input type="file" data-pdf-open style="display:none" />
+                <button class="btn btn-primary btn-sm" data-pdf-action="open"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> <span>Open</span></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="fit-width" title="Fit Width">Fit width</button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="fit-page" title="Fit Page">Fit page</button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-ccw" title="Rotate Counter-Clockwise"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-cw" title="Rotate Clockwise"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="download" title="Download"><i class="fa-solid fa-download" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" type="button" data-pdf-save-selection>Save selection</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-pdf-ai-summary hidden>Summarize PDF</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-pdf-export-annotations>Export annotations</button>
+              </div>
             </div>
-            <div class="pdf-toolbar-row" style="gap:8px;flex-wrap:wrap;margin-top:8px">
-              <input type="file" data-pdf-open style="display:none" />
-              <button class="btn btn-ghost" data-pdf-action="open">Open</button>
-              <button class="btn btn-ghost" data-pdf-action="zoom-out">-</button>
-              <button class="btn btn-ghost" data-pdf-action="zoom-in">+</button>
-              <button class="btn btn-ghost" data-pdf-action="fit-width">Fit width</button>
-              <button class="btn btn-ghost" data-pdf-action="fit-page">Fit page</button>
-              <button class="btn btn-ghost" data-pdf-action="rotate-ccw">CCW</button>
-              <button class="btn btn-ghost" data-pdf-action="rotate-cw">CW</button>
-              <button class="btn btn-ghost" data-pdf-action="download">Download</button>
-              <button class="btn btn-ghost" type="button" data-pdf-save-selection>Save selection</button>
-              <button class="btn btn-ghost" type="button" data-pdf-ai-summary hidden>Summarize PDF</button>
-              <button class="btn btn-ghost" type="button" data-pdf-export-annotations>Export annotations</button>
-            </div>
-            <div class="pdf-page-note" data-pdf-page-note>
-              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page"></textarea>
-              <div class="button-row">
+            <div class="pdf-page-note" data-pdf-page-note style="margin-top:var(--space-2);border-top:1px solid var(--border);padding-top:var(--space-2)">
+              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page..."></textarea>
+              <div class="button-row" style="margin-top:var(--space-2);display:flex;align-items:center;gap:var(--space-2)">
                 <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note>Save page note</button>
                 <span class="text-sm" data-pdf-page-note-status aria-live="polite"></span>
               </div>

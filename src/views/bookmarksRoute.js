@@ -15,23 +15,26 @@ export function mountBookmarksView(deps = {}) {
 
   setView(`
     <section class="view view-bookmarks">
-      <div class="page-header">
-        <div class="page-title-row">
-          <h1 class="page-title">Bookmarks</h1>
-          <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+      <div class="page-header bookmarks-header">
+        <div>
+          <span class="eyebrow">Saved References</span>
+          <div class="page-title-row">
+            <h1 class="page-title">Bookmarks</h1>
+            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+          </div>
+          <p class="page-subtitle">Quick access to saved study timestamps, note bookmarks, and PDF annotations.</p>
         </div>
-        <p class="page-subtitle">Quick links into your study materials, notes, timestamps, and PDF annotations.</p>
       </div>
       <div class="stat-grid" data-bookmark-metrics></div>
-      <div class="card card-filled">
+      <div class="card card-filled bookmarks-section-card">
         <div class="card-body">
-          <div class="filter-row" data-bookmark-filters aria-label="Bookmark filters">
+          <div class="filter-row bookmarks-filter-row" data-bookmark-filters aria-label="Bookmark filters">
             <button class="filter-chip active" type="button" data-bookmark-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-bookmark-filter="timestamp" aria-pressed="false">Timestamps</button>
             <button class="filter-chip" type="button" data-bookmark-filter="note" aria-pressed="false">Notes</button>
             <button class="filter-chip" type="button" data-bookmark-filter="pdf" aria-pressed="false">PDF</button>
           </div>
-          <div class="grid grid-3" data-bookmark-list>
+          <div class="grid grid-3 bookmarks-grid" data-bookmark-list>
             <p>Loading bookmarks...</p>
           </div>
         </div>

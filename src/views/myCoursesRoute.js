@@ -3,27 +3,35 @@ const STORAGE_KEY = 'plasma-my-courses';
 export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toast } = {}) {
   setView(`
     <section class="view view-my-courses">
-      <div class="page-header">
-        <h1 class="page-title">My Courses</h1>
-        <p class="page-subtitle">Create and organize your own course outlines.</p>
+      <div class="page-header my-courses-header">
+        <div>
+          <span class="eyebrow">Custom Curriculum</span>
+          <h1 class="page-title">My Courses</h1>
+          <p class="page-subtitle">Create and organize your own custom course outlines.</p>
+        </div>
       </div>
-      <div class="card card-filled" style="margin-bottom:16px">
+      <div class="card card-filled my-courses-create-card">
         <div class="card-body">
-          <div data-my-course-form style="display:grid;gap:10px">
-            <label style="display:grid;gap:6px">
-              <span class="text-sm">Course title</span>
-              <input class="input" data-my-course-title required maxlength="120" placeholder="Course title" />
+          <div class="my-courses-form" data-my-course-form>
+            <label class="my-courses-field">
+              <span class="text-sm font-semibold">Course title</span>
+              <input class="input" data-my-course-title required maxlength="120" placeholder="e.g. Advanced Neurology Review" />
             </label>
-            <label style="display:grid;gap:6px">
-              <span class="text-sm">Description</span>
-              <textarea class="input" data-my-course-description rows="3" maxlength="600" placeholder="What this course covers"></textarea>
+            <label class="my-courses-field">
+              <span class="text-sm font-semibold">Description</span>
+              <textarea class="input" data-my-course-description rows="3" maxlength="600" placeholder="What concepts, lectures, and resources this course covers"></textarea>
             </label>
-            <button class="btn btn-primary" type="button" data-my-course-save>Save Course</button>
+            <div>
+              <button class="btn btn-primary" type="button" data-my-course-save>
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Save Course
+              </button>
+            </div>
           </div>
         </div>
       </div>
       <div class="stat-grid" data-my-course-metrics></div>
-      <div class="card card-filled">
+      <div class="card card-filled my-courses-list-card">
         <div class="card-body">
           <div class="grid grid-3" data-my-course-list>
             <p>Loading courses...</p>

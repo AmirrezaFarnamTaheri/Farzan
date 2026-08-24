@@ -20,8 +20,9 @@ export async function mountCoursesView(deps = {}) {
   setView(`
     <section class="view view-courses">
       <div class="page-header">
-        <h1 class="page-title">Courses</h1>
-        <p class="page-subtitle">Browse your catalog.</p>
+        <span class="eyebrow">Curriculum & Media</span>
+        <h1 class="page-title">Course Catalog</h1>
+        <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
       </div>
 
       <div class="courses-shell">

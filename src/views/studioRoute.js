@@ -17,60 +17,112 @@ printStudioBoardPdf,
 
   setView(`
     <section class="view view-studio">
-      <div class="page-header">
-        <h1 class="page-title">Studio</h1>
-        <p class="page-subtitle">Whiteboard canvas with portable board storage, templates, and drag/drop media.</p>
-      </div>
-      <div class="card card-filled">
-        <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <input class="input input-sm" data-studio-text placeholder="Board note" style="min-width:220px" />
-          <button class="btn btn-ghost" data-studio-tool="select" aria-pressed="false">Select</button>
-          <button class="btn btn-ghost" data-studio-tool="pen" aria-pressed="true">Pen</button>
-          <button class="btn btn-primary" data-studio-add-text>Add note</button>
-          <button class="btn btn-ghost" data-studio-add-card>Add card</button>
-          <button class="btn btn-ghost" data-studio-add-rect>Add rectangle</button>
-          <button class="btn btn-ghost" data-studio-add-circle>Add circle</button>
-          <button class="btn btn-ghost" data-studio-add-arrow>Add arrow</button>
-          <input class="input input-sm" data-studio-image-url placeholder="Image URL" style="min-width:220px" />
-          <button class="btn btn-ghost" data-studio-add-image>Add image</button>
-          <select class="select input-sm" data-studio-template aria-label="Studio template">
-            <option value="study-map">Study map</option>
-            <option value="cornell">Cornell notes</option>
-          </select>
-          <button class="btn btn-ghost" data-studio-apply-template>Apply template</button>
-          <button class="btn btn-ghost" data-studio-clear>Clear board</button>
-          <button class="btn btn-primary" data-studio-save>Save board</button>
-          <button class="btn btn-ghost" data-studio-load>Load saved board</button>
-          <button class="btn btn-ghost" data-studio-import-json>Import JSON</button>
-          <button class="btn btn-ghost" data-studio-export-json>Export JSON</button>
-          <button class="btn btn-ghost" data-studio-export-svg>Export SVG</button>
-          <button class="btn btn-ghost" data-studio-export-png>Export PNG</button>
-          <button class="btn btn-ghost" data-studio-export-pdf>Export PDF</button>
-          <input type="file" data-studio-import-file accept=".json,application/json" hidden />
-          <span class="text-sm" data-studio-status aria-live="polite" style="opacity:.72">Ready</span>
+      <div class="page-header studio-header">
+        <div>
+          <span class="eyebrow">Interactive Canvas</span>
+          <h1 class="page-title">Studio</h1>
+          <p class="page-subtitle">Whiteboard canvas with portable board storage, Cornell templates, and vector shapes.</p>
+        </div>
+        <div class="studio-status-pill" aria-live="polite">
+          <span data-studio-status>Ready</span>
         </div>
       </div>
-      <div class="card card-filled">
-        <div class="card-body" style="display:grid;gap:14px">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <input class="input input-sm" data-studio-layer-name placeholder="Layer name" style="min-width:220px" />
-            <button class="btn btn-ghost" data-studio-add-layer>Add layer</button>
+
+      <div class="card card-filled studio-toolbar-panel">
+        <div class="studio-toolbar-clusters">
+          <div class="studio-tool-group" role="group" aria-label="Canvas tools">
+            <button class="btn btn-ghost btn-sm" data-studio-tool="select" aria-pressed="false" title="Select Tool">
+              <i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i>
+              <span>Select</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-tool="pen" aria-pressed="true" title="Pen Tool">
+              <i class="fa-solid fa-pen" aria-hidden="true"></i>
+              <span>Pen</span>
+            </button>
           </div>
-          <div class="grid grid-2" style="gap:14px">
-            <div>
-              <h3 style="margin:0 0 8px;font-size:var(--text-sm)">Layers</h3>
-              <div data-studio-layers class="stack-sm"></div>
-            </div>
-            <div>
-              <h3 style="margin:0 0 8px;font-size:var(--text-sm)">Elements</h3>
-              <div data-studio-elements class="stack-sm"></div>
-              <div data-studio-properties style="margin-top:12px"></div>
-            </div>
+
+          <div class="studio-tool-group" role="group" aria-label="Notes and cards">
+            <input class="input input-sm" data-studio-text placeholder="Board note..." style="width:160px" aria-label="Board note text" />
+            <button class="btn btn-primary btn-sm" data-studio-add-text title="Add Note">
+              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+              <span>Note</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-add-card title="Add Card">
+              <i class="fa-solid fa-clone" aria-hidden="true"></i>
+              <span>Card</span>
+            </button>
+          </div>
+
+          <div class="studio-tool-group" role="group" aria-label="Geometric shapes">
+            <button class="btn btn-ghost btn-sm" data-studio-add-rect title="Rectangle">
+              <i class="fa-regular fa-square" aria-hidden="true"></i>
+              <span>Rect</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-add-circle title="Circle">
+              <i class="fa-regular fa-circle" aria-hidden="true"></i>
+              <span>Circle</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-add-arrow title="Arrow">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              <span>Arrow</span>
+            </button>
+          </div>
+
+          <div class="studio-tool-group" role="group" aria-label="Media and templates">
+            <input class="input input-sm" data-studio-image-url placeholder="Image URL..." style="width:140px" aria-label="Image URL" />
+            <button class="btn btn-ghost btn-sm" data-studio-add-image title="Add Image">
+              <i class="fa-solid fa-image" aria-hidden="true"></i>
+            </button>
+            <select class="select input-sm" data-studio-template aria-label="Studio template">
+              <option value="study-map">Study map</option>
+              <option value="cornell">Cornell notes</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" data-studio-apply-template title="Apply Template">Apply</button>
+          </div>
+
+          <div class="studio-tool-group" role="group" aria-label="Board management">
+            <button class="btn btn-primary btn-sm" data-studio-save title="Save Board">
+              <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+              <span>Save</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-load title="Load Saved Board">Load</button>
+            <button class="btn btn-ghost btn-sm" data-studio-clear title="Clear Board">Clear</button>
+            <button class="btn btn-ghost btn-sm" data-studio-export-pdf title="Export PDF">
+              <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+              <span>PDF</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-export-png title="Export PNG">PNG</button>
+            <button class="btn btn-ghost btn-sm" data-studio-export-svg title="Export SVG">SVG</button>
+            <button class="btn btn-ghost btn-sm" data-studio-export-json title="Export JSON">JSON</button>
+            <button class="btn btn-ghost btn-sm" data-studio-import-json title="Import JSON">Import</button>
+            <input type="file" data-studio-import-file accept=".json,application/json" hidden />
           </div>
         </div>
       </div>
-      <div class="studio-shell">
-        <canvas id="studio-canvas" class="studio-canvas"></canvas>
+
+      <div class="studio-workspace-grid">
+        <div class="studio-canvas-card">
+          <div class="studio-shell">
+            <canvas id="studio-canvas" class="studio-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="card card-filled studio-sidebar-card">
+          <div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+              <input class="input input-sm" data-studio-layer-name placeholder="New layer name" style="flex:1" aria-label="New layer name" />
+              <button class="btn btn-ghost btn-sm" data-studio-add-layer>Add layer</button>
+            </div>
+            <h3 style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">Layers</h3>
+            <div data-studio-layers class="stack-sm"></div>
+          </div>
+
+          <div style="border-top:1px solid var(--glass-border);padding-top:12px">
+            <h3 style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">Elements & Properties</h3>
+            <div data-studio-elements class="stack-sm"></div>
+            <div data-studio-properties style="margin-top:12px"></div>
+          </div>
+        </div>
       </div>
     </section>
   `);

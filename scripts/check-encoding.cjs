@@ -42,6 +42,7 @@ const IGNORED_DIRS = new Set([
   'tauri-dev',
   'electron-builder-master',
   'Electron.NET-main',
+  '.edge-cdp3',
 ]);
 
 // These files are byte-for-byte or deterministically generated third-party

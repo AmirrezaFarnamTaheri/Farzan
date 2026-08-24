@@ -11,20 +11,23 @@ export async function mountMaterialsView(deps = {}) {
 
   setView(`
     <section class="view view-materials">
-      <div class="page-header">
-        <h1 class="page-title">Materials</h1>
-        <p class="page-subtitle">All videos and PDFs in your catalog.</p>
+      <div class="page-header materials-header">
+        <div>
+          <span class="eyebrow">Curriculum Index</span>
+          <h1 class="page-title">Materials</h1>
+          <p class="page-subtitle">All videos and PDFs in your catalog, searchable and filterable by source.</p>
+        </div>
       </div>
-      <div class="card card-filled">
+      <div class="card card-filled materials-controls-card">
         <div class="card-body">
           <input class="input" id="materials-search" type="search" placeholder="Search topics..." />
-          <div class="filter-row" aria-label="Material filters" style="margin-top:12px">
+          <div class="filter-row materials-filter-row" aria-label="Material filters">
             <button class="filter-chip active" type="button" data-material-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-material-filter="video" aria-pressed="false">Video</button>
             <button class="filter-chip" type="button" data-material-filter="pdf" aria-pressed="false">PDF</button>
             <button class="filter-chip" type="button" data-material-filter="none" aria-pressed="false">No media</button>
           </div>
-          <div class="grid grid-2" style="gap:10px;margin-top:12px">
+          <div class="grid grid-2 materials-select-row">
             <label class="stack-xs">
               <span class="text-sm text-muted">Course</span>
               <select class="select" id="materials-course-filter" aria-label="Filter materials by course">
@@ -40,8 +43,8 @@ export async function mountMaterialsView(deps = {}) {
           </div>
         </div>
       </div>
-      <div id="materials-pager" style="margin-top:12px"></div>
-      <div id="materials-list" class="materials-list" style="margin-top:12px"></div>
+      <div id="materials-pager" class="materials-pager"></div>
+      <div id="materials-list" class="materials-list"></div>
     </section>
   `);
 

@@ -63,10 +63,21 @@
     backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border) !important;
     box-shadow: var(--shadow-sm);
-    transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
+    transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
   }
 
-  .card:hover {
-    transform: translateY(-4px) scale(1.01);
+  .card.card-interactive:hover,
+  a.card:hover,
+  button.card:hover,
+  .card[role="button"]:hover,
+  .course-card:hover,
+  .course-item:hover,
+  .playlist-card:hover,
+  .tag-card:hover,
+  .flashcard-card:hover,
+  .home-pulse-item:hover,
+  .settings-control-card:hover {
+    transform: translateY(-3px);
     box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow) !important;
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border)) !important;
   }

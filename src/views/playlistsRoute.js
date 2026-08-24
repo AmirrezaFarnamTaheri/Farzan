@@ -9,26 +9,32 @@ export function mountPlaylistsView({
 } = {}) {
   setView(`
     <section class="view view-playlists">
-      <div class="page-header">
-        <div class="page-title-row">
-          <h1 class="page-title">Playlists</h1>
-          <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+      <div class="page-header playlists-header">
+        <div>
+          <span class="eyebrow">Study Queues</span>
+          <div class="page-title-row">
+            <h1 class="page-title">Playlists</h1>
+            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+          </div>
+          <p class="page-subtitle">Study queues from the active player, saved timestamps, and catalog video sources.</p>
         </div>
-        <p class="page-subtitle">Study queues from the active player, saved timestamps, and catalog video sources.</p>
       </div>
       <div class="stat-grid" data-playlist-metrics></div>
-      <div class="card card-filled" style="margin-bottom:16px">
+      <div class="card card-filled playlists-create-card">
         <div class="card-body">
-          <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-            <label style="display:grid;gap:6px;min-width:240px">
-              <span class="text-sm">Playlist name</span>
-              <input class="input" data-playlist-name placeholder="Name a saved playlist" />
+          <div class="playlists-form">
+            <label class="playlists-field">
+              <span class="text-sm font-semibold">Playlist name</span>
+              <input class="input" data-playlist-name placeholder="e.g. Focus Sprint & Review Queue" />
             </label>
-            <button class="btn btn-primary" data-save-playlist>Save first catalog queue</button>
+            <button class="btn btn-primary" type="button" data-save-playlist>
+              <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+              Save first catalog queue
+            </button>
           </div>
         </div>
       </div>
-      <div class="card card-filled">
+      <div class="card card-filled playlists-list-card">
         <div class="card-body">
           <div class="grid grid-3" data-playlist-list>
             <p>Loading playlists...</p>

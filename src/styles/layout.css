@@ -138,6 +138,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .view {
+    animation: none !important;
+  }
+}
+
 .sidebar-overlay {
   position: fixed;
   inset: 0;

@@ -7,22 +7,25 @@ export function mountAchievementsView(deps = {}) {
 
   setView(`
     <section class="view view-achievements">
-      <div class="page-header">
-        <div class="page-title-row">
-          <h1 class="page-title">Achievements</h1>
-          <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+      <div class="page-header achievements-header">
+        <div>
+          <span class="eyebrow">Milestones & Mastery</span>
+          <div class="page-title-row">
+            <h1 class="page-title">Achievements</h1>
+            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
+          </div>
+          <p class="page-subtitle">Milestones and spaced retention cues based on your learning history.</p>
         </div>
-        <p class="page-subtitle">Milestones based on your current progress.</p>
       </div>
       <div class="stat-grid" data-achievement-metrics></div>
-      <div class="card card-filled" style="margin-top:16px">
+      <div class="card card-filled achievements-section-card">
         <div class="card-body">
           <div class="grid grid-3" data-achievement-list>
             <p>Loading achievements...</p>
           </div>
         </div>
       </div>
-      <div class="card card-filled" style="margin-top:16px">
+      <div class="card card-filled achievements-review-card">
         <div class="card-body">
           <h2 class="h3">Review queue</h2>
           <div class="grid grid-3" data-review-list>
