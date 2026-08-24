@@ -33,3 +33,4 @@ build-native.log
 fetch-missing.cjs
 fetch-missing.sh
 .dom2.html
+build-native.log
