@@ -2,6 +2,8 @@
 // OpenCourseDeck — db.js
 // IndexedDB database engine for OpenCourseDeck
 // ============================================================
+import { withMutationRetry } from './src/core/mutationRetry.js';
+
 (() => {
 'use strict';
 
@@ -175,13 +177,19 @@ tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted')
 }
 
 async add(store, data) {
+// Whole-mutation retry: a fresh transaction per attempt clears transient
+// failures (version-change aborts, quota pressure, inactive transactions).
+return withMutationRetry(async () => {
 const { tx, objectStore } = await this._transaction(store,"readwrite");
 return this._waitForTransaction(tx, objectStore.add(data));
+});
 }
 
 async put(store, data) {
+return withMutationRetry(async () => {
 const { tx, objectStore } = await this._transaction(store,"readwrite");
 return this._waitForTransaction(tx, objectStore.put(data));
+});
 }
 
 async get(store,id) {
@@ -203,13 +211,17 @@ r.onerror=()=>rej(r.error);
 }
 
 async delete(store,id){
+return withMutationRetry(async () => {
 const { tx, objectStore } = await this._transaction(store,"readwrite");
 return this._waitForTransaction(tx, objectStore.delete(id), () => true);
+});
 }
 
 async clear(store){
+return withMutationRetry(async () => {
 const { tx, objectStore } = await this._transaction(store,"readwrite");
 return this._waitForTransaction(tx, objectStore.clear(), () => true);
+});
 }
 
 async query(store, filterFn){
@@ -270,6 +282,7 @@ r.onerror=()=>rej(r.error);
 }
 
 async bulkAdd(store, list){
+return withMutationRetry(async () => {
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
 const s = tx.objectStore(store);
@@ -279,9 +292,11 @@ tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
 tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
 });
+});
 }
 
 async bulkPut(store,list){
+return withMutationRetry(async () => {
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
 const s = tx.objectStore(store);
@@ -291,9 +306,11 @@ tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
 tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
 });
+});
 }
 
 async bulkPutWithCheckpoint(store,list,checkpoint){
+return withMutationRetry(async () => {
 const db = await this.open();
 const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
 const tx = db.transaction(stores,"readwrite");
@@ -304,6 +321,7 @@ return new Promise((res,rej)=>{
 tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
 tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+});
 });
 }
 

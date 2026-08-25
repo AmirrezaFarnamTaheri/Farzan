@@ -4,6 +4,12 @@ import './core/storageMigrate.js';
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
 import { initEndpointApprovalGuard } from './core/endpointApprovalGuard.js';
 import { createOperationContext } from './core/operationContext.js';
+import {
+  withMutationRetry,
+  isRetryableMutationError,
+  computeBackoffDelay,
+  configureMutationRetry,
+} from './core/mutationRetry.js';
 import '../data.js';
 import '../db.js';
 import '../ui.js';
@@ -62,6 +68,10 @@ locale.locale('en-US', enUS);
 locale.locale('fa-IR', faIR);
 pd.AI = initAIClient(window);
 pd.workers = workerAssets;
+// Automatic mutation retry primitives — db.js write paths already retry
+// transient IndexedDB failures through withMutationRetry; this namespace
+// exposes the same machinery (plus the quota-eviction hook) to features.
+pd.mutationRetry = { withMutationRetry, isRetryableMutationError, computeBackoffDelay, configureMutationRetry };
 
 const featureLoaders = {
   player: async () => {
