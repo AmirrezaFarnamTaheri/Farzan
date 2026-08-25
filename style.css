@@ -58,15 +58,6 @@
   --brand-surface: oklch(0.92 0.04 160);
 }
 
-/* WebGL Laser Background Effect (skills-webgl-laser) */
-.laser-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-}
 
 #ocd-app, .bg-orbs {
   position: relative;

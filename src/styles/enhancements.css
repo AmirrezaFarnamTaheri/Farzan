@@ -471,8 +471,6 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   border-radius: 14px;
 }
 
-/* Laser ambience: keep the beam behind glass at a calmer intensity. */
-.laser-canvas { opacity: 0.55; }
 
 /* ──────────────────────────────────────────────────────────
    Flashcards Studio (fc-*) — token-based, no utility framework
@@ -557,3 +555,49 @@ article:has(#btn-theme-toggle) { min-width: 0; }
    were clipping behind the storage widget). */
 .sidebar { min-height: 0; }
 .sidebar-nav { min-height: 0; flex: 1 1 auto; }
+
+/* ── Compact tool-page headers ─────────────────────────────
+   Operate-surface scale: the display-serif treatment belongs to the
+   home hero only; tool pages get a single-line working header. */
+.view .page-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 18px;
+}
+.view .page-header .eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted, #94a3b8);
+  margin: 0;
+}
+.view .page-header .page-title {
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+  font-size: 1.4rem;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.view .page-header .page-subtitle {
+  width: 100%;
+  font-size: 0.875rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0;
+}
+.view .page-header .page-header-actions { margin-left: auto; }
+
+/* Learning cues: advanced block collapsed by default */
+.learning-marker-details { margin-top: 10px; }
+.learning-marker-details > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #94a3b8);
+  padding: 6px 0;
+  user-select: none;
+}
+.learning-marker-details > summary:hover { color: var(--text-primary, #f8fafc); }
+.learning-marker-details[open] > summary { margin-bottom: 8px; }

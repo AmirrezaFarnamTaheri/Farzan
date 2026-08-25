@@ -76,7 +76,10 @@ export async function mountCoursesView(deps = {}) {
                     <button class="btn btn-ghost btn-sm" type="button" data-save-timestamp>Save bookmark</button>
                     <button class="btn btn-primary btn-sm" type="button" data-save-timestamp-note>Save linked note</button>
                   </div>
+                  <details class="learning-marker-details">
+                    <summary>Learning cues &amp; chapters (advanced)</summary>
                   <div class="learning-marker-form" style="margin-top:10px">
+
                     <input class="input input-sm" data-learning-marker-text placeholder="Chapter title or transcript line" />
                     <div class="button-row">
                       <button class="btn btn-ghost btn-sm" type="button" data-save-chapter-cue>Add chapter</button>

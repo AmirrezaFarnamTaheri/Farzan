@@ -34,3 +34,8 @@ fetch-missing.cjs
 fetch-missing.sh
 .dom2.html
 build-native.log
+/.cargo
+/.cargo
+/.cargo/registry
+/.cargo/registry/src
+.edge-run/

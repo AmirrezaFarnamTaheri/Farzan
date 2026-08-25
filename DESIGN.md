@@ -8,7 +8,7 @@ OpenCourseDeck is a local-first, high-performance interactive learning studio co
 - **Artifact Classification**: Pro-grade Interactive Learning Studio / Local Workspace
 - **Target Audience**: Students, researchers, engineers, and lifelong self-directed learners
 - **Aesthetic Essence**: *Atmospheric Studio · Archival Serif · Precision Telemetry*
-- **Signature Move**: GPU WebGL shader canvas (`laser.js`) rendering 5-octave FBM atmospheric smoke with a white-hot vertical core dynamically colored to the active accent.
+- **Signature Move**: layered glass depth — translucent surface cards over a deep void backdrop, OKLCH accent glows reserved for primary actions, Playfair Display reserved for the home hero only
 
 ---
 

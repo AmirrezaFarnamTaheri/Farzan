@@ -184,8 +184,6 @@
   <!-- ═══════════════════════════════════════════
        MAIN APPLICATION LAYOUT
   ════════════════════════════════════════════ -->
-  <!-- WebGL Laser Background Effect -->
-  <canvas class="laser-canvas" id="laser-canvas" data-webgl-laser aria-hidden="true"></canvas>
 
   <div class="bg-orbs" aria-hidden="true">
     <div class="orb orb-1"></div>
@@ -387,56 +385,7 @@
             aria-label="Add content" title="Add content">
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
           </button>
-          <!-- Theme Quick Switcher -->
-          <div class="theme-quick-wrap" id="theme-quick-wrap">
-            <button class="theme-quick-btn" data-theme-set="dark"
-              aria-label="Dark theme" title="Dark theme">
-              <i class="fa-solid fa-moon" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="light"
-              aria-label="Light theme" title="Light theme">
-              <i class="fa-solid fa-sun" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="midnight"
-              aria-label="Midnight theme" title="Midnight theme">
-              <i class="fa-solid fa-star-and-crescent" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="forest"
-              aria-label="Forest theme" title="Forest theme">
-              <i class="fa-solid fa-leaf" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="ocean"
-              aria-label="Ocean theme" title="Ocean theme">
-              <i class="fa-solid fa-water" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="sunset"
-              aria-label="Sunset theme" title="Sunset theme">
-              <i class="fa-solid fa-cloud-sun" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="rose"
-              aria-label="Rose theme" title="Rose theme">
-              <i class="fa-solid fa-heart" aria-hidden="true"></i>
-            </button>
-            <button class="theme-quick-btn" data-theme-set="paper"
-              aria-label="Paper theme" title="Paper theme">
-              <i class="fa-solid fa-scroll" aria-hidden="true"></i>
-            </button>
-          </div>
-          <!-- Accent Color Picker -->
-          <div class="accent-picker" id="accent-picker" role="group" aria-label="Accent color">
-            <button class="accent-dot" data-accent="violet"
-              aria-label="Plasma accent" style="--dot-color:#7c3aed"></button>
-            <button class="accent-dot" data-accent="cyan"
-              aria-label="Cyan accent" style="--dot-color:#06b6d4"></button>
-            <button class="accent-dot" data-accent="amber"
-              aria-label="Amber accent" style="--dot-color:#f59e0b"></button>
-            <button class="accent-dot" data-accent="rose"
-              aria-label="Rose accent" style="--dot-color:#f43f5e"></button>
-            <button class="accent-dot" data-accent="emerald"
-              aria-label="Emerald accent" style="--dot-color:#10b981"></button>
-            <button class="accent-dot" data-accent="sakura"
-              aria-label="Sakura accent" style="--dot-color:#ec4899"></button>
-          </div>
+
         </div>
       </header>
 
@@ -745,8 +694,6 @@
     src="./vendor/fuse.min.js"
     defer></script>
 
-  <!-- WebGL Laser Background Effect (skills-webgl-laser) -->
-  <script id="lib-laser" src="./laser.js" defer></script>
 
   <!-- ═══════════════════════════════════════════
        APPLICATION SCRIPTS (module type)
