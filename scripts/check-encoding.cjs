@@ -43,7 +43,16 @@ const IGNORED_DIRS = new Set([
   'electron-builder-master',
   'Electron.NET-main',
   '.edge-cdp3',
+  '.edge-cdp4',
+  // Local reference-material trees: third-party repos we mine for ideas.
+  // They are not shipped and their bytes are upstream-owned, never ours.
+  '.toport',
+  'TO PORT FARZAN',
 ]);
+
+// Browser-profile scratch dirs are numbered (.edge-cdp3, .edge-cdp4, ...) and
+// have already recurred once; ignore them by prefix instead of enumerating.
+const IGNORED_DIR_PREFIXES = ['.edge-'];
 
 // These files are byte-for-byte or deterministically generated third-party
 // minified artifacts. Scanning them reports upstream byte sequences that
@@ -178,6 +187,7 @@ function walk(dir, sink) {
   }
   for (const entry of entries) {
     if (IGNORED_DIRS.has(entry.name)) continue;
+    if (IGNORED_DIR_PREFIXES.some((prefix) => entry.name.startsWith(prefix))) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       walk(full, sink);
@@ -238,5 +248,6 @@ module.exports = {
   CP1252_OVERRIDES,
   EXTENSIONS,
   IGNORED_DIRS,
+  IGNORED_DIR_PREFIXES,
   IGNORED_FILES,
 };
