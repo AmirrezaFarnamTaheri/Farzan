@@ -1,0 +1,348 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="today-title today-desc">
+  <title id="today-title">OpenCourseDeck — Today Screen</title>
+  <desc id="today-desc">Comprehensive wireframe of OpenCourseDeck Today view with active continue learning hero, review queue card, and four-node learning trail.</desc>
+  <defs>
+    <!-- Multi-tier shadows -->
+    <filter id="shadow-xs" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0F172A" flood-opacity="0.05"/>
+    </filter>
+    <filter id="shadow-sm" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="3" flood-color="#0F172A" flood-opacity="0.07"/>
+      <feDropShadow dx="0" dy="0.5" stdDeviation="1" flood-color="#0F172A" flood-opacity="0.03"/>
+    </filter>
+    <filter id="shadow-md" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.09"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="2.5" flood-color="#0F172A" flood-opacity="0.04"/>
+    </filter>
+    <filter id="shadow-lg" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="#0F172A" flood-opacity="0.14"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.06"/>
+    </filter>
+    <filter id="shadow-modal" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="25" stdDeviation="35" flood-color="#0F172A" flood-opacity="0.30"/>
+    </filter>
+    <filter id="glow-lapis" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#2563EB" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow-mark" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#EA580C" flood-opacity="0.40"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="grad-rail" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B"/>
+      <stop offset="100%" stop-color="#1C2541"/>
+    </linearGradient>
+    <linearGradient id="grad-rail-card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="grad-lapis" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="grad-terracotta" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C2410C"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="grad-emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <linearGradient id="grad-dark-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+
+    <!-- Canvas Dot Pattern -->
+    <pattern id="dot-pattern" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="1.2" fill="#E2DDD2"/>
+    </pattern>
+
+    <style>
+      .tf  {{ font-family: 'Fraunces', Georgia, serif; }}
+      .tm  {{ font-family: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }}
+      .tmo {{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }}
+      
+      .st-rule   {{ stroke: #DEDAD1; stroke-width: 1; fill: none; }}
+      .st-thread {{ stroke: #2563EB; stroke-width: 2.5; stroke-dasharray: 6 4; fill: none; }}
+    </style>
+  </defs>
+  <rect width="1440" height="960" fill="#F8F6F1"/>
+  <rect width="1440" height="960" fill="url(#dot-pattern)"/>
+  <!-- ==================== COMPLETE NAVIGATION RAIL ==================== -->
+  <g id="rail">
+    <rect width="248" height="960" fill="url(#grad-rail)"/>
+    <line x1="248" y1="0" x2="248" y2="960" stroke="#1E293B" stroke-width="1.2"/>
+    <g id="rail-brand" transform="translate(14, 18)">
+      <rect width="220" height="58" rx="12" fill="url(#grad-rail-card)" stroke="rgba(255,255,255,0.09)" stroke-width="1" filter="url(#shadow-sm)"/>
+      <rect x="10" y="10" width="38" height="38" rx="10" fill="url(#grad-lapis)" filter="url(#glow-lapis)"/>
+      <polygon points="29,16 21,30 27,30 23,42 37,27 31,27" fill="#FFFFFF"/>
+      <text x="58" y="28" class="tm" font-size="14.5" font-weight="800" fill="#F8FAFC">OpenCourseDeck</text>
+      <text x="58" y="44" class="tmo" font-size="9.5" font-weight="600" fill="#94A3B8">LOCAL STUDIO · v2.4</text>
+    </g>
+    <g id="rail-search" transform="translate(14, 86)">
+      <rect width="220" height="36" rx="8" fill="#141E33" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <circle cx="24" cy="18" r="5" stroke="#94A3B8" stroke-width="1.5" fill="none"/>
+      <line x1="28" y1="22" x2="33" y2="27" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="42" y="22" class="tm" font-size="12.5" fill="#64748B">Quick search…</text>
+      <rect x="182" y="8" width="28" height="20" rx="4" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <text x="187" y="22" class="tmo" font-size="10" font-weight="700" fill="#94A3B8">⌘K</text>
+    </g>
+    <text x="24" y="148" class="tm" font-size="10" font-weight="800" fill="#64748B" letter-spacing="0.12em">WORKSPACES</text>
+    <g id="nav-today">
+      <rect x="12" y="166" width="224" height="36" rx="9" fill="url(#grad-lapis)" filter="url(#glow-lapis)"/>
+      <g transform="translate(24, 175) scale(0.75)">
+        <path d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h4a1 1 0 001-1V10" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="189" class="tm" font-size="13" font-weight="700" fill="#FFFFFF">Today</text>
+      <circle cx="218" cy="184" r="3" fill="#BFDBFE"/>
+    </g>
+    <g id="nav-library">
+      <g transform="translate(24, 215) scale(0.75)">
+        <path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="229" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Library</text>
+    </g>
+    <g id="nav-learn">
+      <g transform="translate(24, 255) scale(0.75)">
+        <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="269" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Learn</text>
+    </g>
+    <g id="nav-make">
+      <g transform="translate(24, 295) scale(0.75)">
+        <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="309" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Make</text>
+    </g>
+    <g id="nav-studio">
+      <g transform="translate(24, 335) scale(0.75)">
+        <path d="M12 2l10 6-10 6-10-6 10-6zm-10 11l10 6 10-6m-20 5l10 6 10-6" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="349" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Studio</text>
+    </g>
+    <g id="nav-flashcards">
+      <g transform="translate(24, 375) scale(0.75)">
+        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="389" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Flashcards</text>
+    </g>
+    <g id="nav-insights">
+      <g transform="translate(24, 415) scale(0.75)">
+        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text x="52" y="429" class="tm" font-size="13" font-weight="500" fill="#CBD5E1">Insights</text>
+    </g>
+    <g id="rail-now-playing" transform="translate(14, 690)">
+      <rect width="220" height="74" rx="10" fill="url(#grad-rail-card)" stroke="rgba(255,255,255,0.08)" stroke-width="1" filter="url(#shadow-sm)"/>
+      <rect x="10" y="10" width="54" height="36" rx="6" fill="#020617"/>
+      <polygon points="34,24 42,28 34,32" fill="#3B82F6"/>
+      <text x="72" y="24" class="tm" font-size="11.5" font-weight="700" fill="#F8FAFC">Lec 04: Replication</text>
+      <text x="72" y="38" class="tmo" font-size="9.5" fill="#94A3B8">MIT 6.824 · 26:10</text>
+      <rect x="10" y="56" width="200" height="4" rx="2" fill="#1E293B"/>
+      <rect x="10" y="56" width="136" height="4" rx="2" fill="url(#grad-lapis)"/>
+    </g>
+    <g id="rail-storage" transform="translate(14, 778)">
+      <rect width="220" height="88" rx="10" fill="url(#grad-rail-card)" stroke="rgba(255,255,255,0.08)" stroke-width="1" filter="url(#shadow-sm)"/>
+      <text x="12" y="22" class="tmo" font-size="10" font-weight="700" fill="#94A3B8">VAULT STORAGE (INDEXEDDB)</text>
+      <rect x="12" y="32" width="196" height="6" rx="3" fill="#1E293B"/>
+      <rect x="12" y="32" width="58" height="6" rx="3" fill="#10B981"/>
+      <text x="12" y="54" class="tmo" font-size="10" fill="#CBD5E1">14.2 MB / 500 MB (3%)</text>
+      <text x="12" y="72" class="tmo" font-size="9.5" font-weight="700" fill="#38BDF8">🔒 Zero-Cloud Local Vault</text>
+    </g>
+    <g id="rail-profile" transform="translate(14, 880)">
+      <line x1="0" y1="0" x2="220" y2="0" stroke="#1E293B" stroke-width="1.2"/>
+      <circle cx="20" cy="38" r="16" fill="#1E293B" stroke="#2563EB" stroke-width="2"/>
+      <text x="14" y="43" class="tm" font-size="11.5" font-weight="800" fill="#93C5FD">FZ</text>
+      <text x="46" y="33" class="tm" font-size="13" font-weight="700" fill="#F8FAFC">Farzan</text>
+      <text x="46" y="48" class="tmo" font-size="10" fill="#94A3B8">Pro Scholar · 142 Cards</text>
+      <circle cx="200" cy="38" r="14" fill="#141E33" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <text x="194" y="43" class="tm" font-size="14" fill="#94A3B8">⚙</text>
+    </g>
+  </g>
+  <!-- ==================== TOP BAR WITH NOTIFICATIONS ==================== -->
+  <g id="topbar">
+    <rect x="248" y="0" width="1192" height="68" fill="#FFFEFB" stroke="#DEDAD1" stroke-width="1"/>
+    <text x="280" y="41" class="tf" font-size="21" font-weight="700" fill="#18212E">Today · Research Desk</text>
+    <g id="keyboard-cues" transform="translate(670, 21)">
+      <rect width="230" height="28" rx="6" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1"/>
+      <text x="12" y="18" class="tmo" font-size="11" font-weight="500" fill="#64748B"><tspan font-weight="700" fill="#2563EB">N</tspan> Note   <tspan font-weight="700" fill="#C2410C">R</tspan> Review   <tspan font-weight="700" fill="#2563EB">/</tspan> Search   <tspan font-weight="700" fill="#047857">C</tspan> Canvas</text>
+    </g>
+    <g id="topbar-notifications" transform="translate(1040, 20)">
+      <circle cx="16" cy="14" r="16" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1"/>
+      <path d="M12 11a4 4 0 018 0c0 4.5 2 6 2 6H10s2-1.5 2-6m3 9a2 2 0 01-2-2h4a2 2 0 01-2 2" stroke="#475569" stroke-width="1.6" fill="none"/>
+      <circle cx="24" cy="6" r="4.5" fill="#EF4444"/>
+    </g>
+    <g id="topbar-actions" transform="translate(1085, 16)">
+      <rect width="90" height="36" rx="8" fill="#F1F5F9" stroke="#DEDAD1" stroke-width="1"/>
+      <text x="14" y="23" class="tm" font-size="12.5" font-weight="600" fill="#18212E">+ Import</text>
+      <rect x="100" y="0" width="135" height="36" rx="8" fill="url(#grad-lapis)" filter="url(#shadow-sm)"/>
+      <text x="114" y="23" class="tm" font-size="12.5" font-weight="700" fill="#FFFFFF">+ Quick Capture</text>
+    </g>
+  </g>
+
+  <g id="today-content" transform="translate(280, 88)">
+    
+    <!-- TOP ROW: HERO CONTINUE LEARNING (740px) + SM-2 REVIEW QUEUE (360px) -->
+    <g id="hero-continue-card" filter="url(#shadow-md)">
+      <rect width="740" height="236" rx="16" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1"/>
+      
+      <!-- Video Lecture Preview Thumbnail -->
+      <g transform="translate(20, 20)">
+        <rect width="256" height="156" rx="10" fill="url(#grad-dark-screen)"/>
+        <rect x="14" y="14" width="228" height="128" rx="6" fill="#090D16"/>
+        <rect x="22" y="22" width="76" height="8" rx="3" fill="#3B82F6"/>
+        <line x1="22" y1="38" x2="160" y2="38" stroke="#475569" stroke-width="1.5"/>
+        
+        <!-- Distributed Cluster Nodes Graphic -->
+        <g transform="translate(20, 56)">
+          <circle cx="50" cy="30" r="14" fill="#1D4ED8" stroke="#93C5FD" stroke-width="2"/>
+          <text x="44" y="34" class="tmo" font-size="10" font-weight="700" fill="#FFFFFF">L1</text>
+          
+          <circle cx="120" cy="15" r="10" fill="#047857" stroke="#A7F3D0" stroke-width="1.5"/>
+          <text x="115" y="18" class="tmo" font-size="8" font-weight="700" fill="#FFFFFF">F1</text>
+
+          <circle cx="120" cy="45" r="10" fill="#047857" stroke="#A7F3D0" stroke-width="1.5"/>
+          <text x="115" y="48" class="tmo" font-size="8" font-weight="700" fill="#FFFFFF">F2</text>
+          
+          <line x1="64" y1="30" x2="110" y2="15" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <line x1="64" y1="30" x2="110" y2="45" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </g>
+        
+        <!-- Center Play Button Glass Badge -->
+        <circle cx="128" cy="78" r="20" fill="rgba(15, 23, 42, 0.85)" stroke="#FFFFFF" stroke-width="1.5" filter="url(#shadow-sm)"/>
+        <polygon points="124,70 136,78 124,86" fill="#FFFFFF"/>
+        
+        <!-- Duration tag -->
+        <rect x="186" y="126" width="58" height="20" rx="4" fill="rgba(0,0,0,0.85)"/>
+        <text x="193" y="140" class="tmo" font-size="10.5" font-weight="700" fill="#FFFFFF">38:14</text>
+      </g>
+      
+      <!-- Meta details -->
+      <g transform="translate(296, 22)">
+        <rect width="112" height="24" rx="6" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1"/>
+        <text x="10" y="16" class="tmo" font-size="11" font-weight="700" fill="#2563EB">CURRENT STUDY</text>
+        
+        <text x="0" y="52" class="tf" font-size="22" font-weight="700" fill="#18212E">MIT 6.824: Distributed Systems</text>
+        <text x="0" y="74" class="tm" font-size="13.5" font-weight="500" fill="#5D6875">Lecture 04: Primary-Backup State Machine Replication</text>
+        
+        <!-- Dual-tone Progress Bar -->
+        <g transform="translate(0, 94)">
+          <rect width="416" height="8" rx="4" fill="#EDE9DC"/>
+          <rect width="283" height="8" rx="4" fill="url(#grad-lapis)"/>
+          <text x="0" y="24" class="tmo" font-size="11" font-weight="600" fill="#18212E">26:10 / 38:14</text>
+          <text x="358" y="24" class="tmo" font-size="11" font-weight="700" fill="#2563EB">68% Complete</text>
+        </g>
+        
+        <!-- Action Button Row -->
+        <g transform="translate(0, 138)">
+          <rect width="168" height="42" rx="9" fill="url(#grad-lapis)" filter="url(#shadow-sm)"/>
+          <polygon points="26,16 36,21 26,26" fill="#FFFFFF"/>
+          <text x="44" y="26" class="tm" font-size="13.5" font-weight="700" fill="#FFFFFF">Resume Lecture</text>
+          
+          <rect x="180" y="0" width="134" height="42" rx="9" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1.5"/>
+          <text x="202" y="26" class="tm" font-size="13.5" font-weight="600" fill="#18212E">Open Cornell Notes</text>
+        </g>
+      </g>
+    </g>
+    
+    <!-- SM-2 Spaced Repetition Queue Card -->
+    <g id="hero-review-card" transform="translate(760, 0)" filter="url(#shadow-md)">
+      <rect width="360" height="236" rx="16" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1"/>
+      <rect x="0" y="0" width="360" height="6" rx="3" fill="url(#grad-terracotta)"/>
+      
+      <g transform="translate(24, 24)">
+        <rect width="108" height="24" rx="6" fill="#FFF7ED" stroke="#FFEDD5" stroke-width="1"/>
+        <text x="10" y="16" class="tmo" font-size="11" font-weight="700" fill="#C2410C">SM-2 QUEUE</text>
+        
+        <text x="0" y="52" class="tf" font-size="21" font-weight="700" fill="#18212E">Spaced Review Due</text>
+        <text x="0" y="72" class="tm" font-size="13" fill="#5D6875">3 cards require memory reinforcement</text>
+        
+        <g transform="translate(0, 90)">
+          <circle cx="26" cy="26" r="24" fill="#FFF7ED" stroke="#FDBA74" stroke-width="2"/>
+          <text x="19" y="33" class="tf" font-size="20" font-weight="800" fill="#C2410C">3</text>
+          
+          <text x="64" y="20" class="tm" font-size="13.5" font-weight="700" fill="#18212E">Retention Stability: 94.2%</text>
+          <text x="64" y="38" class="tmo" font-size="11" font-weight="600" fill="#047857">✓ Target decay curve optimal</text>
+        </g>
+        
+        <g transform="translate(0, 148)">
+          <rect width="312" height="42" rx="9" fill="url(#grad-terracotta)" filter="url(#shadow-sm)"/>
+          <text x="74" y="26" class="tm" font-size="13.5" font-weight="700" fill="#FFFFFF">⚡ Start Review Session (3m)</text>
+        </g>
+      </g>
+    </g>
+    
+    <!-- ROW 2: ACTIVE LEARNING TRAIL (4-Stage Knowledge Pipeline) -->
+    <g id="learning-trail-container" transform="translate(0, 270)">
+      <text x="0" y="24" class="tf" font-size="21" font-weight="700" fill="#18212E">Active Learning Trail</text>
+      <text x="0" y="45" class="tm" font-size="13" fill="#5D6875">Connected evidence pipeline: Lecture Moment → Cornell Note → Unresolved Spark → SM-2 Flashcard</text>
+      
+      <path d="M 130 142 C 260 142, 280 142, 400 142 C 530 142, 550 142, 670 142 C 800 142, 820 142, 950 142" class="st-thread"/>
+      
+      <!-- Node 1: Source -->
+      <g id="trail-node-source" transform="translate(0, 68)" filter="url(#shadow-sm)">
+        <rect width="255" height="152" rx="14" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1"/>
+        <rect x="16" y="16" width="34" height="34" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
+        <path d="M25 33l5 5 9-9" stroke="#047857" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="58" y="29" class="tmo" font-size="10.5" font-weight="700" fill="#047857">STAGE 1 · SOURCE</text>
+        <text x="58" y="44" class="tm" font-size="11" fill="#64748B">26:10 Timestamp</text>
+        <text x="16" y="80" class="tm" font-size="14" font-weight="700" fill="#18212E">Raft Consensus State</text>
+        <text x="16" y="100" class="tm" font-size="12" fill="#5D6875">Leader election terms &amp; split-brain safety rules...</text>
+        <rect x="16" y="118" width="78" height="20" rx="4" fill="#ECFDF5"/>
+        <text x="22" y="132" class="tmo" font-size="10" font-weight="700" fill="#047857">✓ Verified Anchor</text>
+      </g>
+      
+      <!-- Node 2: Cornell Note -->
+      <g id="trail-node-note" transform="translate(280, 68)" filter="url(#shadow-sm)">
+        <rect width="255" height="152" rx="14" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1"/>
+        <rect x="16" y="16" width="34" height="34" rx="8" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1"/>
+        <path d="M25 39l12-12m-6-4l4 4" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+        <text x="58" y="29" class="tmo" font-size="10.5" font-weight="700" fill="#2563EB">STAGE 2 · NOTE</text>
+        <text x="58" y="44" class="tm" font-size="11" fill="#64748B">Cornell Cue Column</text>
+        <text x="16" y="80" class="tm" font-size="14" font-weight="700" fill="#18212E">Quorum Invariant</text>
+        <text x="16" y="100" class="tm" font-size="12" fill="#5D6875">Majority (N/2 + 1) guarantees overlapping log entries...</text>
+        <rect x="16" y="118" width="88" height="20" rx="4" fill="#EFF6FF"/>
+        <text x="22" y="132" class="tmo" font-size="10" font-weight="700" fill="#2563EB">2 Linked Cues</text>
+      </g>
+      
+      <!-- Node 3: Question / Spark -->
+      <g id="trail-node-question" transform="translate(560, 68)" filter="url(#shadow-sm)">
+        <rect width="255" height="152" rx="14" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1"/>
+        <rect x="16" y="16" width="34" height="34" rx="8" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
+        <circle cx="33" cy="30" r="6" stroke="#D97706" stroke-width="2" fill="none"/>
+        <line x1="33" y1="36" x2="33" y2="40" stroke="#D97706" stroke-width="2"/>
+        <text x="58" y="29" class="tmo" font-size="10.5" font-weight="700" fill="#D97706">STAGE 3 · QUERY</text>
+        <text x="58" y="44" class="tm" font-size="11" fill="#64748B">Unresolved Spark</text>
+        <text x="16" y="80" class="tm" font-size="14" font-weight="700" fill="#18212E">Partition Boundary?</text>
+        <text x="16" y="100" class="tm" font-size="12" fill="#5D6875">How does Raft reject client requests on minority side?</text>
+        <rect x="16" y="118" width="82" height="20" rx="4" fill="#FEF3C7"/>
+        <text x="22" y="132" class="tmo" font-size="10" font-weight="700" fill="#D97706">Open Inquiry</text>
+      </g>
+      
+      <!-- Node 4: Scheduled Review -->
+      <g id="trail-node-review" transform="translate(840, 68)" filter="url(#shadow-sm)">
+        <rect width="255" height="152" rx="14" fill="#FFFFFF" stroke="#C2410C" stroke-width="1.5"/>
+        <rect x="16" y="16" width="34" height="34" rx="8" fill="#FFF7ED" stroke="#FFEDD5" stroke-width="1"/>
+        <rect x="23" y="23" width="20" height="16" rx="3" stroke="#C2410C" stroke-width="2" fill="none"/>
+        <text x="58" y="29" class="tmo" font-size="10.5" font-weight="700" fill="#C2410C">STAGE 4 · REVIEW</text>
+        <text x="58" y="44" class="tmo" font-size="11" font-weight="700" fill="#C2410C">Due in 2 Hours</text>
+        <text x="16" y="80" class="tm" font-size="14" font-weight="700" fill="#18212E">Raft Election Safety</text>
+        <text x="16" y="100" class="tm" font-size="12" fill="#5D6875">Q: At most one leader can be elected in a given term...</text>
+        <rect x="16" y="118" width="102" height="22" rx="5" fill="url(#grad-terracotta)"/>
+        <text x="22" y="133" class="tmo" font-size="10" font-weight="700" fill="#FFFFFF">⚡ Review Deck</text>
+      </g>
+    </g>
+    
+    <!-- ROW 3: LOCAL VAULT FOOTER INVARIANT -->
+    <g id="today-footer-bar" transform="translate(0, 508)">
+      <rect width="1120" height="66" rx="12" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1" filter="url(#shadow-xs)"/>
+      <circle cx="32" cy="33" r="14" fill="#2563EB"/>
+      <text x="28" y="38" class="tm" font-size="13" font-weight="800" fill="#FFFFFF">i</text>
+      <text x="58" y="32" class="tm" font-size="13.5" font-weight="700" fill="#18212E">Local Desk Invariant:</text>
+      <text x="180" y="32" class="tm" font-size="13" fill="#5D6875">All transcripts, Cornell notes, vector canvases, and SM-2 repetition schedules remain strictly in your browser's IndexedDB.</text>
+      <text x="980" y="33" class="tmo" font-size="11.5" font-weight="700" fill="#2563EB">Export Vault (.zip) →</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "OpenCourseDeck — redesigned learning system",
+    "subtitle": "A local-first learning trail from source to retained knowledge",
+    "output": "opencoursedeck-redesign-architecture.html",
+    "visual_preset": "classic",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "study-session",
+        "label": "A focused study session",
+        "focus": ["learner", "sources", "study-session", "artifact-controller", "learning-vault", "review-queue"],
+        "note": "Follow one learner from a source into linked evidence and a clear next review."
+      },
+      {
+        "id": "privacy-boundary",
+        "label": "Privacy by default",
+        "focus": ["artifact-controller", "learning-vault", "ai-consent", "selected-model"],
+        "note": "Learning data stays in the local vault; a model is reachable only after explicit consent."
+      },
+      {
+        "id": "review-loop",
+        "label": "The retention loop",
+        "focus": ["learning-vault", "review-scheduler", "review-queue", "learner"],
+        "note": "Source-linked cards are scheduled, reviewed, and written back to the learner record."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "learner",
+      "type": "external",
+      "label": "Learner",
+      "sublabel": "desktop or mobile app",
+      "pos": [40, 300],
+      "size": [120, 60]
+    },
+    {
+      "id": "sources",
+      "type": "external",
+      "label": "Learning sources",
+      "sublabel": "courses, PDFs, media",
+      "pos": [225, 300],
+      "size": [130, 60]
+    },
+    {
+      "id": "study-session",
+      "type": "frontend",
+      "label": "Study session",
+      "sublabel": "source viewer + evidence panel",
+      "pos": [420, 300],
+      "size": [135, 60]
+    },
+    {
+      "id": "artifact-controller",
+      "type": "backend",
+      "label": "Learning trail",
+      "sublabel": "links notes, questions, cards",
+      "pos": [620, 300],
+      "size": [135, 60]
+    },
+    {
+      "id": "learning-vault",
+      "type": "database",
+      "label": "Local learning vault",
+      "sublabel": "sources + artifacts + progress",
+      "tag": "on device",
+      "pos": [820, 300],
+      "size": [145, 60]
+    },
+    {
+      "id": "review-scheduler",
+      "type": "backend",
+      "label": "Review scheduler",
+      "sublabel": "spaced repetition queue",
+      "pos": [1030, 300],
+      "size": [135, 60]
+    },
+    {
+      "id": "review-queue",
+      "type": "frontend",
+      "label": "Daily review",
+      "sublabel": "due cards + recall results",
+      "pos": [1230, 300],
+      "size": [135, 60]
+    },
+    {
+      "id": "ai-consent",
+      "type": "security",
+      "label": "AI consent gate",
+      "sublabel": "explicit destination approval",
+      "tag": "optional",
+      "pos": [620, 130],
+      "size": [135, 60]
+    },
+    {
+      "id": "selected-model",
+      "type": "external",
+      "label": "Selected model",
+      "sublabel": "local or approved provider",
+      "pos": [820, 130],
+      "size": [145, 60]
+    },
+    {
+      "id": "portable-export",
+      "type": "cloud",
+      "label": "Portable export",
+      "sublabel": "backup or learner-owned file",
+      "pos": [820, 465],
+      "size": [145, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "OpenCourseDeck local workspace",
+      "wraps": ["study-session", "artifact-controller", "learning-vault", "review-scheduler", "review-queue", "ai-consent", "portable-export"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Learner-controlled privacy boundary",
+      "wraps": ["learning-vault", "ai-consent"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "learner-opens-source",
+      "from": "learner",
+      "to": "sources",
+      "variant": "emphasis"
+    },
+    {
+      "id": "source-enters-session",
+      "from": "sources",
+      "to": "study-session",
+      "variant": "emphasis"
+    },
+    {
+      "id": "session-captures-evidence",
+      "from": "study-session",
+      "to": "artifact-controller",
+      "variant": "emphasis"
+    },
+    {
+      "id": "trail-persists-artifacts",
+      "from": "artifact-controller",
+      "to": "learning-vault",
+      "variant": "emphasis"
+    },
+    {
+      "id": "vault-builds-queue",
+      "from": "learning-vault",
+      "to": "review-scheduler",
+      "label": "due cards"
+    },
+    {
+      "id": "scheduler-presents-review",
+      "from": "review-scheduler",
+      "to": "review-queue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "review-records-recall",
+      "from": "review-queue",
+      "to": "learning-vault",
+      "label": "recall result",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [[1298, 410], [892, 410]]
+    },
+    {
+      "id": "trail-requests-ai",
+      "from": "artifact-controller",
+      "to": "ai-consent",
+      "label": "request assistance",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDx": -76
+    },
+    {
+      "id": "consent-selects-model",
+      "from": "ai-consent",
+      "to": "selected-model",
+      "label": "approved only",
+      "variant": "security",
+      "labelAt": [788, 214]
+    },
+    {
+      "id": "vault-exports-data",
+      "from": "learning-vault",
+      "to": "portable-export",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 80
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary learning path",
+      "items": ["Study a source in context", "Capture source-linked evidence", "Review cards when recall is due"]
+    },
+    {
+      "dot": "emerald",
+      "title": "Local-first default",
+      "items": ["Sources, artifacts, and progress live in the learner-controlled vault", "Exports remain portable and learner-owned"]
+    },
+    {
+      "dot": "rose",
+      "title": "Explicit AI boundary",
+      "items": ["Assistance is optional", "A model destination is selected only after consent"]
+    }
+  ]
+}

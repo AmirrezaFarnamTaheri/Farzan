@@ -39,3 +39,4 @@ build-native.log
 /.cargo/registry
 /.cargo/registry/src
 .edge-run/
+.toport/
