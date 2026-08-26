@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenCourseDeck — Pixel Art & Telemetry Badges Showcase</title>
+  <style>
+    :root {
+      --bg-dark: #0f0f1a;
+      --surface-dark: #1a1a2e;
+      --border-dark: rgba(255,255,255,0.1);
+      --text-dark: #f0f0ff;
+      --text-muted: #8c8ca1;
+      --accent: #2457D6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 32px;
+      line-height: 1.5;
+    }
+    h1 { font-family: "Georgia", serif; font-size: 28px; margin-bottom: 8px; font-weight: normal; color: #fff; }
+    p.lead { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+    
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      align-items: center;
+      background: var(--surface-dark);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-dark);
+    }
+    .btn {
+      background: #252540;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #383860; }
+    .btn.active { background: var(--accent); border-color: var(--accent); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(36, 87, 214, 0.4);
+      transform: translateY(-2px);
+    }
+    .sprite-viewport {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 128px;
+      height: 128px;
+      background: repeating-conic-gradient(#141424 0% 25%, #1c1c30 0% 50%) 50% / 16px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 16px;
+    }
+    body.theme-paper .sprite-viewport {
+      background: repeating-conic-gradient(#f0ece1 0% 25%, #faf8f0 0% 50%) 50% / 16px 16px;
+      border-color: #dedad1;
+    }
+    .card h3 { font-size: 15px; margin-bottom: 4px; font-weight: 600; color: #fff; }
+    .card p { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .card .meta {
+      font-family: monospace;
+      font-size: 11px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    
+    img.pixelated, svg.pixelated {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    
+    /* Integer scaling controls */
+    .scale-1x img { width: 16px; height: 16px; }
+    .scale-2x img { width: 32px; height: 32px; }
+    .scale-4x img { width: 64px; height: 64px; }
+    .scale-8x img { width: 96px; height: 96px; }
+
+    .atlas-section {
+      margin-top: 32px;
+      background: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .atlas-section h2 { font-size: 18px; margin-bottom: 12px; }
+    .atlas-preview {
+      display: inline-block;
+      padding: 16px;
+      background: #141424;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenCourseDeck Pixel Art Telemetry & Trail Assets</h1>
+  <p class="lead">Crafted strictly according to <code>agent-skills-dot</code> guidelines: integer coordinates, crispEdges, zero anti-aliasing, and structured palette tokens.</p>
+  
+  <div class="toolbar">
+    <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">Scale:</span>
+    <button class="btn" onclick="setScale('scale-1x', this)">1x (Native)</button>
+    <button class="btn" onclick="setScale('scale-2x', this)">2x</button>
+    <button class="btn active" onclick="setScale('scale-4x', this)">4x</button>
+    <button class="btn" onclick="setScale('scale-8x', this)">8x (Macro)</button>
+    <div style="flex: 1;"></div>
+    <button class="btn" onclick="toggleBackdrop(this)">Toggle Paper Backdrop</button>
+  </div>
+
+  <div class="grid scale-4x" id="spriteGrid">
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="streak_flame_16.svg" alt="Streak Flame">
+      </div>
+      <h3>Study Streak Flame</h3>
+      <p>Daily momentum & study streak telemetry badge</p>
+      <span class="meta">16x16 · 6 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="memory_crystal_16.svg" alt="Memory Crystal">
+      </div>
+      <h3>Memory Crystal</h3>
+      <p>SM-2 spaced repetition retention & review health</p>
+      <span class="meta">16x16 · 7 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="focus_hourglass_16.svg" alt="Focus Hourglass">
+      </div>
+      <h3>Focus Hourglass</h3>
+      <p>Pomodoro session timer and focus depth state</p>
+      <span class="meta">16x16 · 8 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="node_source_16.svg" alt="Source Node">
+      </div>
+      <h3>Trail Node: Source</h3>
+      <p>Video lecture & PDF document anchor point</p>
+      <span class="meta">16x16 · 6 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="node_note_16.svg" alt="Note Node">
+      </div>
+      <h3>Trail Node: Note</h3>
+      <p>Cornell note & timestamped annotation artifact</p>
+      <span class="meta">16x16 · 6 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="node_question_16.svg" alt="Question Node">
+      </div>
+      <h3>Trail Node: Question</h3>
+      <p>Unresolved query & insight spark artifact</p>
+      <span class="meta">16x16 · 6 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="node_review_16.svg" alt="Review Node">
+      </div>
+      <h3>Trail Node: Review Card</h3>
+      <p>Spaced repetition flashcard scheduled review</p>
+      <span class="meta">16x16 · 5 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="mastery_crest_32.svg" alt="Mastery Crest">
+      </div>
+      <h3>Scholar Mastery Crest</h3>
+      <p>Course completion and milestone achievement</p>
+      <span class="meta">32x32 · 12 colors</span>
+    </div>
+
+    <div class="card">
+      <div class="sprite-viewport">
+        <img class="pixelated" src="desk_studio_32.svg" alt="Study Desk Studio">
+      </div>
+      <h3>Study Desk Studio</h3>
+      <p>OpenCourseDeck primary workspace badge</p>
+      <span class="meta">32x32 · 10 colors</span>
+    </div>
+  </div>
+
+  <div class="atlas-section">
+    <h2>Unified Spritesheet Atlas (128 × 64 px)</h2>
+    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">Packed 32px grid atlas with accompanying <code>spritesheet.json</code> for engine / web canvas blitting.</p>
+    <div class="atlas-preview">
+      <img class="pixelated" style="width: 512px; height: 256px;" src="spritesheet.svg" alt="Atlas Spritesheet">
+    </div>
+  </div>
+
+  <script>
+    function setScale(scaleClass, btn) {
+      const grid = document.getElementById('spriteGrid');
+      grid.className = 'grid ' + scaleClass;
+      document.querySelectorAll('.toolbar .btn').forEach(b => {
+        if (b.innerText.includes('x')) b.classList.remove('active');
+      });
+      btn.classList.add('active');
+    }
+    function toggleBackdrop(btn) {
+      document.body.classList.toggle('theme-paper');
+      btn.classList.toggle('active');
+    }
+  </script>
+</body>
+</html>

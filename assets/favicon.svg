@@ -1,11 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="geometricPrecision">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7c3aed"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+    <linearGradient id="fav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
     </linearGradient>
   </defs>
-  <rect x="6" y="6" width="52" height="52" rx="14" fill="url(#g)"/>
-  <path d="M34 10 18 36h14l-2 18 16-26H32z" fill="#fff" opacity="0.95"/>
+  <rect width="32" height="32" rx="8" fill="url(#fav-grad)"/>
+  <polygon points="16,6 9,18 14,18 11,26 23,14 18,14" fill="#FFFFFF"/>
 </svg>
-

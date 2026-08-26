@@ -476,7 +476,7 @@
     cursor: not-allowed;
     pointer-events: none;
   }
-  .btn i { font-size: var(--text-base); flex-shrink: 0; }
+  .btn .icon { width: var(--text-base); height: var(--text-base); flex-shrink: 0; }
 
   /* --- Size Variants --- */
   .btn-xs {
@@ -1218,15 +1218,14 @@
     overflow: hidden;
   }
   .nav-item-text { flex: 1 1 auto; min-width: 0; }
-  .nav-item i { /* fontawesome icon inside nav */
-    width: 24px;
-    text-align: center;
-    font-size: var(--text-lg);
+  .nav-item .icon { /* stroke icon inside nav */
+    width: 22px;
+    height: 22px;
     flex-shrink: 0;
     color: inherit;
     opacity: 0.95;
   }
-  .nav-item.active i { color: var(--accent); }
+  .nav-item.active .icon { color: var(--accent); }
 
   /* Topbar button alias */
   .topbar-action-btn {
@@ -1552,9 +1551,9 @@
     cursor: pointer;
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
   }
-  .add-content-item i {
+  .add-content-item .icon {
     width: 1.25rem;
-    text-align: center;
+    height: 1.25rem;
     color: var(--text-tertiary);
     transition: color var(--duration-fast);
   }
@@ -1565,8 +1564,8 @@
     border-color: color-mix(in srgb, var(--accent) 24%, transparent);
     color: var(--text-primary);
   }
-  .add-content-item:hover i,
-  .add-content-item:focus-visible i {
+  .add-content-item:hover .icon,
+  .add-content-item:focus-visible .icon {
     color: var(--accent);
   }
 
@@ -1937,13 +1936,13 @@
     transition: color var(--duration-fast);
   }
   .table th.sortable:hover { color: var(--text-primary); }
-  .table th.sortable i {
+  .table th.sortable .icon {
     font-size: var(--text-xs);
     margin-left: var(--space-1);
     opacity: 0.5;
     transition: opacity var(--duration-fast);
   }
-  .table th.sorted i { opacity: 1; color: var(--accent); }
+  .table th.sorted .icon { opacity: 1; color: var(--accent); }
 
   /* Body */
   .table tbody tr {
@@ -1986,7 +1985,7 @@
     padding: var(--space-12) var(--space-4);
     color: var(--text-tertiary);
   }
-  .table-empty i {
+  .table-empty .icon {
     font-size: 2.5rem;
     display: block;
     margin-bottom: var(--space-3);
@@ -2348,15 +2347,14 @@
     background: color-mix(in srgb, var(--error) 10%, transparent);
     color: var(--error);
   }
-  .dropdown-item i {
-    font-size: var(--text-base);
+  .dropdown-item .icon {
     width: 18px;
-    text-align: center;
+    height: 18px;
     flex-shrink: 0;
     color: var(--text-tertiary);
     transition: color var(--duration-fast);
   }
-  .dropdown-item:hover i { color: inherit; }
+  .dropdown-item:hover .icon { color: inherit; }
 
   .dropdown-divider {
     height: 1px;
@@ -2823,8 +2821,8 @@
     color: var(--accent-light);
     border-bottom-color: var(--accent);
   }
-  .tab i,
-  .tab-item i { font-size: var(--text-base); }
+  .tab .icon,
+  .tab-item .icon { font-size: var(--text-base); }
   .tab .tab-count,
   .tab-item .tab-count {
     background: var(--surface-3);

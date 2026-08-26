@@ -11,8 +11,11 @@ function escapeHtmlText(value) {
 export function sanitizePdfRouteHtml(html) {
   const purify = window.DOMPurify;
   if (purify?.sanitize) {
+    // `use` is required so sprite-backed inline icons survive sanitization — DOMPurify
+    // drops <use> from its default allow-list. This template is app-authored (trusted);
+    // user-content sanitizers keep the strict default.
     return purify.sanitize(String(html ?? ''), {
-      ADD_TAGS: ['canvas'],
+      ADD_TAGS: ['canvas', 'use'],
       ADD_ATTR: ['tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-live', 'aria-atomic'],
       FORBID_TAGS: ['template'],
     });
@@ -68,22 +71,22 @@ export function mountPdfView() {
                 <div data-pdf-search-results class="pdf-search-results"></div>
               </div>
               <div style="display:inline-flex;gap:4px;align-items:center">
-                <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
                 <input class="input input-sm" data-pdf-current-page value="1" style="width:52px;text-align:center" aria-label="Current page" />
                 <span class="text-xs text-secondary">/ <span data-pdf-total-pages>0</span></span>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
                 <span class="pdf-zoom badge" data-pdf-zoom>100%</span>
               </div>
               <div style="display:inline-flex;gap:var(--space-1);flex-wrap:wrap;align-items:center">
                 <input type="file" data-pdf-open style="display:none" />
-                <button class="btn btn-primary btn-sm" data-pdf-action="open"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> <span>Open</span></button>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus" aria-hidden="true"></i></button>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i></button>
+                <button class="btn btn-primary btn-sm" data-pdf-action="open"><svg class="icon" aria-hidden="true"><use href="#i-folder-open"/></svg> <span>Open</span></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><svg class="icon" aria-hidden="true"><use href="#i-zoom-out"/></svg></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><svg class="icon" aria-hidden="true"><use href="#i-zoom-in"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="fit-width" title="Fit Width">Fit width</button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="fit-page" title="Fit Page">Fit page</button>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-ccw" title="Rotate Counter-Clockwise"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-cw" title="Rotate Clockwise"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="download" title="Download"><i class="fa-solid fa-download" aria-hidden="true"></i></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-ccw" title="Rotate Counter-Clockwise"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="rotate-cw" title="Rotate Clockwise"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="download" title="Download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg></button>
                 <button class="btn btn-ghost btn-sm" type="button" data-pdf-save-selection>Save selection</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-pdf-ai-summary hidden>Summarize PDF</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-pdf-export-annotations>Export annotations</button>

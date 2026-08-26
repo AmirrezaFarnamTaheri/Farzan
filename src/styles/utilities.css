@@ -371,3 +371,26 @@ mark {
 .theme-quick-btn[data-theme-set="sunset"]   { background: #180a00; }
 .theme-quick-btn[data-theme-set="rose"]     { background: #180010; }
 .theme-quick-btn[data-theme-set="paper"]    { background: #faf8f0; }
+
+/* ── Vector icon system ─────────────────────────────────────────────
+   Inline sprite symbols referenced via <use href="#i-*">. Icons scale
+   with surrounding text (1em box), inherit currentColor strokes, and
+   stay optically aligned like the Font Awesome era did. */
+svg.icon {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+  overflow: visible;
+  fill: none;
+}
+button .icon,
+a .icon,
+[role="button"] .icon { pointer-events: none; }
+
+.icon--spin { animation: icon-spin 0.9s linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .icon--spin { animation-duration: 3s; }
+}

@@ -1,23 +1,194 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="og-title og-desc">
+  <title id="og-title">OpenCourseDeck — The Local-First Research &amp; Study Desk</title>
+  <desc id="og-desc">High-performance interactive studio for desktop video courses, Cornell notes, 2D vector sketching, and SM-2 spaced repetition.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b1020"/>
-      <stop offset="1" stop-color="#111827"/>
+    <!-- Multi-tier shadows -->
+    <filter id="shadow-xs" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0F172A" flood-opacity="0.05"/>
+    </filter>
+    <filter id="shadow-sm" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="3" flood-color="#0F172A" flood-opacity="0.07"/>
+      <feDropShadow dx="0" dy="0.5" stdDeviation="1" flood-color="#0F172A" flood-opacity="0.03"/>
+    </filter>
+    <filter id="shadow-md" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.09"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="2.5" flood-color="#0F172A" flood-opacity="0.04"/>
+    </filter>
+    <filter id="shadow-lg" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="#0F172A" flood-opacity="0.14"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.06"/>
+    </filter>
+    <filter id="shadow-modal" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="25" stdDeviation="35" flood-color="#0F172A" flood-opacity="0.30"/>
+    </filter>
+    <filter id="glow-lapis" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#2563EB" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow-mark" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#EA580C" flood-opacity="0.40"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="grad-rail" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B"/>
+      <stop offset="100%" stop-color="#1C2541"/>
     </linearGradient>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7c3aed"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+    <linearGradient id="grad-rail-card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
     </linearGradient>
+    <linearGradient id="grad-lapis" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="grad-lapis-subtle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EFF6FF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+    <linearGradient id="grad-terracotta" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C2410C"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="grad-emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <linearGradient id="grad-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B45309"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="grad-dark-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="grad-card-header" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+
+    <!-- Canvas Dot Pattern -->
+    <pattern id="dot-pattern" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="1.2" fill="#E2DDD2"/>
+    </pattern>
+
+    <style>
+      .tf  {{ font-family: 'Fraunces', Georgia, serif; }}
+      .tm  {{ font-family: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }}
+      .tmo {{ font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Courier New', monospace; }}
+      
+      .c-ink       {{ fill: #18212E; }}
+      .c-muted     {{ fill: #5D6875; }}
+      .c-faint     {{ fill: #8A9BAF; }}
+      .c-white     {{ fill: #FFFFFF; }}
+      .c-lapis     {{ fill: #2563EB; }}
+      .c-mark      {{ fill: #C2410C; }}
+      .c-success   {{ fill: #047857; }}
+      
+      .st-rule     {{ stroke: #DEDAD1; stroke-width: 1; fill: none; }}
+      .st-focus    {{ stroke: #2563EB; stroke-width: 2; fill: none; }}
+      .st-thread   {{ stroke: #2563EB; stroke-width: 2.5; stroke-dasharray: 6 4; fill: none; }}
+    </style>
   </defs>
-  <rect width="1200" height="630" fill="url(#bg)"/>
-  <circle cx="280" cy="210" r="220" fill="url(#g)" opacity="0.35"/>
-  <circle cx="980" cy="480" r="260" fill="url(#g)" opacity="0.25"/>
-  <rect x="110" y="130" width="980" height="370" rx="36" fill="#0f172a" opacity="0.7" stroke="#1f2937"/>
-  <text x="170" y="270" font-family="Inter, system-ui, sans-serif" font-size="68" font-weight="800" fill="#fff">OpenCourseDeck</text>
-  <text x="170" y="340" font-family="Inter, system-ui, sans-serif" font-size="30" font-weight="500" fill="#cbd5e1">Your personal interactive learning studio</text>
-  <g transform="translate(850 190)">
-    <rect x="0" y="0" width="180" height="180" rx="44" fill="url(#g)"/>
-    <path d="M110 14 52 110h46l-10 58 58-96H92z" fill="#fff" opacity="0.96"/>
+  <!-- Backdrop -->
+  <rect width="1200" height="630" fill="#0B132B"/>
+  <circle cx="950" cy="200" r="350" fill="#1C2541" opacity="0.6"/>
+  <circle cx="300" cy="500" r="250" fill="#1D4ED8" opacity="0.15"/>
+
+  <!-- Grid overlay -->
+  <g opacity="0.12">
+    <line x1="0" y1="100" x2="1200" y2="100" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="0" y1="200" x2="1200" y2="200" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="0" y1="300" x2="1200" y2="300" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="0" y1="400" x2="1200" y2="400" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="0" y1="500" x2="1200" y2="500" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="200" y1="0" x2="200" y2="630" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="400" y1="0" x2="400" y2="630" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="800" y1="0" x2="800" y2="630" stroke="#FFFFFF" stroke-width="1"/>
+    <line x1="1000" y1="0" x2="1000" y2="630" stroke="#FFFFFF" stroke-width="1"/>
+  </g>
+
+  <!-- Content Block Left -->
+  <g transform="translate(80, 100)">
+    <!-- Logo Badge -->
+    <g transform="translate(0, 0)">
+      <rect width="48" height="48" rx="12" fill="url(#grad-lapis)" filter="url(#glow-lapis)"/>
+      <polygon points="24,10 14,30 22,30 17,44 34,24 26,24" fill="#FFFFFF"/>
+      <text x="64" y="32" class="tm" font-size="22" font-weight="800" fill="#FFFFFF">OpenCourseDeck</text>
+      <rect x="260" y="12" width="118" height="26" rx="13" fill="#1E293B" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+      <text x="272" y="29" class="tmo" font-size="11" font-weight="700" fill="#93C5FD">LOCAL-FIRST</text>
+    </g>
+
+    <!-- Main Headline -->
+    <text x="0" y="130" class="tf" font-size="52" font-weight="800" fill="#FFFFFF" letter-spacing="-0.03em">The Desk That Keeps</text>
+    <text x="0" y="190" class="tf" font-size="52" font-weight="800" fill="#93C5FD" letter-spacing="-0.03em">Your Evidence Together.</text>
+
+    <!-- Subtitle -->
+    <text x="0" y="246" class="tm" font-size="18" fill="#CBD5E1" font-weight="400">Desktop Video Courses · Cornell Smart Notes · 2D Vector Canvas · SM-2 Review</text>
+
+    <!-- 4 Feature Pills -->
+    <g transform="translate(0, 280)">
+      <rect width="130" height="36" rx="8" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <text x="14" y="23" class="tm" font-size="13" font-weight="600" fill="#E2E8F0">🎥 Video Studio</text>
+
+      <rect x="142" y="0" width="130" height="36" rx="8" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <text x="156" y="23" class="tm" font-size="13" font-weight="600" fill="#E2E8F0">📝 Cornell Notes</text>
+
+      <rect x="284" y="0" width="130" height="36" rx="8" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <text x="298" y="23" class="tm" font-size="13" font-weight="600" fill="#E2E8F0">🧠 SM-2 Spaced</text>
+
+      <rect x="426" y="0" width="130" height="36" rx="8" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <text x="440" y="23" class="tm" font-size="13" font-weight="600" fill="#E2E8F0">🔒 Zero Cloud</text>
+    </g>
+  </g>
+
+  <!-- Right Perspective Product Card Preview -->
+  <g transform="translate(700, 110)" filter="url(#shadow-modal)">
+    <rect width="420" height="420" rx="18" fill="#F8F6F1" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+    
+    <!-- Mini UI Screen Mock -->
+    <rect x="16" y="16" width="388" height="50" rx="10" fill="#0B132B"/>
+    <circle cx="36" cy="41" r="10" fill="#2563EB"/>
+    <text x="56" y="46" class="tm" font-size="14" font-weight="700" fill="#FFFFFF">MIT 6.824 Study Session</text>
+    
+    <!-- Mini Continue Card -->
+    <g transform="translate(16, 80)">
+      <rect width="388" height="180" rx="12" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1" filter="url(#shadow-sm)"/>
+      <rect x="16" y="16" width="140" height="90" rx="6" fill="#020617"/>
+      <circle cx="86" cy="61" r="14" fill="#2563EB"/>
+      <polygon points="83,55 91,61 83,67" fill="#FFFFFF"/>
+      
+      <g transform="translate(168, 16)">
+        <text x="0" y="18" class="tf" font-size="15" font-weight="700" fill="#18212E">Distributed Raft</text>
+        <text x="0" y="36" class="tm" font-size="11" fill="#64748B">Lecture 04 · 68%</text>
+        <rect y="50" width="180" height="6" rx="3" fill="#EDE9DC"/>
+        <rect y="50" width="122" height="6" rx="3" fill="url(#grad-lapis)"/>
+        <rect y="68" width="100" height="28" rx="6" fill="#2563EB"/>
+        <text x="14" y="86" class="tm" font-size="11" font-weight="700" fill="#FFFFFF">Resume →</text>
+      </g>
+    </g>
+
+    <!-- Mini Learning Trail -->
+    <g transform="translate(16, 276)">
+      <rect width="388" height="110" rx="12" fill="#FFFFFF" stroke="#DEDAD1" stroke-width="1" filter="url(#shadow-sm)"/>
+      <text x="16" y="24" class="tmo" font-size="10.5" font-weight="700" fill="#2563EB">ACTIVE LEARNING TRAIL</text>
+      <circle cx="36" cy="64" r="14" fill="#ECFDF5"/>
+      <text x="32" y="68" class="tm" font-size="11" font-weight="700" fill="#047857">1</text>
+
+      <line x1="50" y1="64" x2="110" y2="64" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 2"/>
+
+      <circle cx="124" cy="64" r="14" fill="#EFF6FF"/>
+      <text x="120" y="68" class="tm" font-size="11" font-weight="700" fill="#2563EB">2</text>
+
+      <line x1="138" y1="64" x2="198" y2="64" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 2"/>
+
+      <circle cx="212" cy="64" r="14" fill="#FEF3C7"/>
+      <text x="208" y="68" class="tm" font-size="11" font-weight="700" fill="#D97706">3</text>
+
+      <line x1="226" y1="64" x2="286" y2="64" stroke="#C2410C" stroke-width="2" stroke-dasharray="3 2"/>
+
+      <circle cx="300" cy="64" r="14" fill="#FFF7ED"/>
+      <text x="296" y="68" class="tm" font-size="11" font-weight="700" fill="#C2410C">4</text>
+    </g>
   </g>
 </svg>
-

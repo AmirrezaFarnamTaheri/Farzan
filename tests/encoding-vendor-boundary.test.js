@@ -11,7 +11,6 @@ describe('encoding scan vendor boundary', () => {
   it('excludes only immutable third-party minified artifacts', () => {
     expect(IGNORED_FILES).toEqual(new Set([
       'vendor/chart.umd.js',
-      'vendor/fontawesome/css/all.min.css',
       'vendor/fuse.min.js',
       'vendor/pdf.min.mjs',
       'vendor/pdf.worker.min.mjs',

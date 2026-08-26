@@ -8,11 +8,11 @@ export function mountNotFoundView({ setView, hash } = {}) {
       </div>
       <div class="card card-filled notfound-card">
         <div class="card-body notfound-body">
-          <div class="notfound-icon"><i class="fa-solid fa-compass-drafting" aria-hidden="true"></i></div>
+          <div class="notfound-icon"><svg class="icon" aria-hidden="true"><use href="#i-compass"/></svg></div>
           <p class="notfound-message">The route you requested could not be located or may have moved.</p>
           <div class="notfound-actions">
-            <a class="btn btn-primary" href="#/"><i class="fa-solid fa-house" aria-hidden="true"></i> Return Home</a>
-            <a class="btn btn-ghost" href="#/courses"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Browse Courses</a>
+            <a class="btn btn-primary" href="#/"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Return Home</a>
+            <a class="btn btn-ghost" href="#/courses"><svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg> Browse Courses</a>
           </div>
         </div>
       </div>

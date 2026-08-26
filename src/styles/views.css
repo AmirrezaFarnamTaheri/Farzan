@@ -172,7 +172,7 @@
   transform: translateY(-1px);
 }
 
-.home-focus-action i,
+.home-focus-action .icon,
 .home-widget-arrow {
   color: var(--accent-light);
 }
@@ -304,7 +304,7 @@
   transform: translateX(2px);
 }
 
-.home-tool-list a > i {
+.home-tool-list a > .icon {
   display: grid;
   place-items: center;
   width: 36px;
@@ -474,7 +474,7 @@
   text-align: center;
 }
 
-.home-empty-state i {
+.home-empty-state .icon {
   color: var(--accent-light);
   font-size: var(--text-2xl);
 }

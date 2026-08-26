@@ -23,7 +23,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
             </label>
             <div>
               <button class="btn btn-primary" type="button" data-my-course-save>
-                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
                 Save Course
               </button>
             </div>

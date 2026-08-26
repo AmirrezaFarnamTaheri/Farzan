@@ -17,11 +17,11 @@ export function mountHelpView(deps = {}) {
         </div>
         <div class="page-actions">
           <button class="btn btn-primary" id="help-backup-btn">
-            <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-file-export"/></svg>
             Export backup
           </button>
           <button class="btn btn-ghost" id="help-shortcuts-btn">
-            <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg>
             Shortcuts
           </button>
         </div>

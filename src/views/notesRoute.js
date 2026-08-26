@@ -9,18 +9,18 @@ export function mountNotesView({ setView } = {}) {
         </div>
         <div class="notes-header-actions">
           <button class="btn btn-primary" type="button" data-action="new-note">
-            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New note
           </button>
           <details class="notes-export-menu">
             <summary class="btn btn-ghost">
-              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-more-h"/></svg>
               More actions
             </summary>
             <div class="notes-export-popover">
-              <button type="button" data-action="export-all"><i class="fa-solid fa-file-code" aria-hidden="true"></i>Export JSON</button>
-              <button type="button" data-action="export-md"><i class="fa-brands fa-markdown" aria-hidden="true"></i>Export Markdown</button>
-              <button type="button" data-action="import-notes"><i class="fa-solid fa-upload" aria-hidden="true"></i>Import notes</button>
+              <button type="button" data-action="export-all"><svg class="icon" aria-hidden="true"><use href="#i-file-code"/></svg>Export JSON</button>
+              <button type="button" data-action="export-md"><svg class="icon" aria-hidden="true"><use href="#i-markdown"/></svg>Export Markdown</button>
+              <button type="button" data-action="import-notes"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>Import notes</button>
             </div>
           </details>
         </div>
@@ -34,19 +34,19 @@ export function mountNotesView({ setView } = {}) {
               <h2>Your notes</h2>
             </div>
             <button class="notes-quick-add" type="button" data-action="new-note" aria-label="Create a new note" title="Create a new note">
-              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             </button>
           </div>
 
           <div class="notes-search" role="search">
             <label class="notes-search-field">
-              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
               <span class="sr-only">Search notes</span>
               <input class="input" type="search" placeholder="Search notes…" data-notes-search autocomplete="off" />
             </label>
             <div class="notes-semantic-actions">
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden>
-                <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                <svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>
                 Semantic search
               </button>
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-clear hidden>Clear</button>
@@ -79,9 +79,9 @@ export function mountNotesView({ setView } = {}) {
             </div>
 
             <div class="notes-document-meta" aria-label="Note information">
-              <span><i class="fa-solid fa-align-left" aria-hidden="true"></i><span data-note-words>0 words</span></span>
-              <span><i class="fa-solid fa-font" aria-hidden="true"></i><span data-note-chars>0 characters</span></span>
-              <span><i class="fa-regular fa-clock" aria-hidden="true"></i><span data-note-date>Not saved yet</span></span>
+              <span><svg class="icon" aria-hidden="true"><use href="#i-align-left"/></svg><span data-note-words>0 words</span></span>
+              <span><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg><span data-note-chars>0 characters</span></span>
+              <span><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span data-note-date>Not saved yet</span></span>
             </div>
           </div>
 
@@ -95,27 +95,27 @@ export function mountNotesView({ setView } = {}) {
               </div>
 
               <div class="notes-tool-group" aria-label="Lists and blocks">
-                <button class="notes-tool-btn" type="button" data-cmd="ul" aria-label="Bulleted list" title="Bulleted list"><i class="fa-solid fa-list-ul" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="ol" aria-label="Numbered list" title="Numbered list"><i class="fa-solid fa-list-ol" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="blockquote" aria-label="Block quote" title="Block quote"><i class="fa-solid fa-quote-left" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="code" aria-label="Inline code" title="Inline code"><i class="fa-solid fa-code" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd-block data-cmd="codeblock" aria-label="Code block" title="Code block"><i class="fa-solid fa-file-code" aria-hidden="true"></i></button>
+                <button class="notes-tool-btn" type="button" data-cmd="ul" aria-label="Bulleted list" title="Bulleted list"><svg class="icon" aria-hidden="true"><use href="#i-list-bullet"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="ol" aria-label="Numbered list" title="Numbered list"><svg class="icon" aria-hidden="true"><use href="#i-list-ordered"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="blockquote" aria-label="Block quote" title="Block quote"><svg class="icon" aria-hidden="true"><use href="#i-quote"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="code" aria-label="Inline code" title="Inline code"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd-block data-cmd="codeblock" aria-label="Code block" title="Code block"><svg class="icon" aria-hidden="true"><use href="#i-file-code"/></svg></button>
               </div>
 
               <div class="notes-tool-group" aria-label="Insert content">
-                <button class="notes-tool-btn" type="button" data-cmd="link" aria-label="Insert link" title="Insert link"><i class="fa-solid fa-link" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="image" aria-label="Insert image" title="Insert image"><i class="fa-regular fa-image" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="hr" aria-label="Insert divider" title="Insert divider"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
+                <button class="notes-tool-btn" type="button" data-cmd="link" aria-label="Insert link" title="Insert link"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="image" aria-label="Insert image" title="Insert image"><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="hr" aria-label="Insert divider" title="Insert divider"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
               </div>
 
               <div class="notes-tool-group" aria-label="History and cleanup">
-                <button class="notes-tool-btn" type="button" data-cmd="undo" aria-label="Undo" title="Undo"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="redo" aria-label="Redo" title="Redo"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
-                <button class="notes-tool-btn" type="button" data-cmd="clearFormat" aria-label="Clear formatting" title="Clear formatting"><i class="fa-solid fa-eraser" aria-hidden="true"></i></button>
+                <button class="notes-tool-btn" type="button" data-cmd="undo" aria-label="Undo" title="Undo"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="redo" aria-label="Redo" title="Redo"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg></button>
+                <button class="notes-tool-btn" type="button" data-cmd="clearFormat" aria-label="Clear formatting" title="Clear formatting"><svg class="icon" aria-hidden="true"><use href="#i-eraser"/></svg></button>
               </div>
 
               <button class="notes-ai-action" type="button" data-ai-summarize hidden>
-                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                <svg class="icon" aria-hidden="true"><use href="#i-magic"/></svg>
                 Summarize
               </button>
             </div>
@@ -158,7 +158,7 @@ export function mountNotesView({ setView } = {}) {
 
           <footer class="notes-footer">
             <div class="notes-tags" data-tags-cloud aria-label="Note tags"></div>
-            <span class="notes-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>Stored locally on this device</span>
+            <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally on this device</span>
           </footer>
         </main>
       </div>

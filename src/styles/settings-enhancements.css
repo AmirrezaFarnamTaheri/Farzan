@@ -59,7 +59,7 @@
   text-decoration: none;
 }
 
-.settings-nav i {
+.settings-nav .icon {
   color: var(--accent-light);
 }
 

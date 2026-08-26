@@ -24,11 +24,11 @@ export function mountSettingsView(deps = {}) {
         </div>
         <div class="settings-header-actions">
           <button class="btn btn-primary" id="btn-export-json-2" type="button">
-            <i class="fa-solid fa-download" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
             Export backup
           </button>
           <button class="btn btn-ghost" id="btn-import-json-2" type="button">
-            <i class="fa-solid fa-upload" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
             Import backup
           </button>
         </div>
@@ -36,17 +36,17 @@ export function mountSettingsView(deps = {}) {
 
       <div class="settings-layout">
         <nav class="settings-nav" aria-label="Settings sections">
-          <a href="#settings-appearance"><i class="fa-solid fa-palette" aria-hidden="true"></i><span>Appearance</span></a>
-          <a href="#settings-ai"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>AI & privacy</span></a>
-          <a href="#settings-storage"><i class="fa-solid fa-hard-drive" aria-hidden="true"></i><span>Storage</span></a>
-          <a href="#settings-data"><i class="fa-solid fa-box-archive" aria-hidden="true"></i><span>Data controls</span></a>
+          <a href="#settings-appearance"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Appearance</span></a>
+          <a href="#settings-ai"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>AI & privacy</span></a>
+          <a href="#settings-storage"><svg class="icon" aria-hidden="true"><use href="#i-drive"/></svg><span>Storage</span></a>
+          <a href="#settings-data"><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg><span>Data controls</span></a>
         </nav>
 
         <div class="settings-content">
           <section class="card card-filled settings-section" id="settings-appearance" aria-labelledby="settings-appearance-title">
             <div class="card-body">
               <div class="settings-section-heading">
-                <div class="settings-section-icon"><i class="fa-solid fa-palette" aria-hidden="true"></i></div>
+                <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
                 <div>
                   <span class="eyebrow">Workspace comfort</span>
                   <h2 id="settings-appearance-title">Appearance</h2>
@@ -86,7 +86,7 @@ export function mountSettingsView(deps = {}) {
                     <span>Switch between the available light and dark presentation.</span>
                   </div>
                   <button class="btn btn-ghost" id="btn-theme-toggle" type="button">
-                    <i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>
+                    <svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg>
                     Toggle theme
                   </button>
                 </article>
@@ -97,7 +97,7 @@ export function mountSettingsView(deps = {}) {
           <section class="card card-filled settings-section settings-ai-section" id="settings-ai" aria-labelledby="settings-ai-title">
             <div class="card-body">
               <div class="settings-section-heading settings-section-heading-status">
-                <div class="settings-section-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
+                <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
                 <div>
                   <span class="eyebrow">Optional and private by default</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
@@ -191,7 +191,7 @@ export function mountSettingsView(deps = {}) {
 
               <div class="settings-action-row">
                 <button class="btn btn-primary" type="button" data-ai-save>
-                  <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                  <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
                   Save AI options
                 </button>
                 <button class="btn btn-ghost" type="button" data-ai-open-local-source>Open model page</button>
@@ -211,7 +211,7 @@ export function mountSettingsView(deps = {}) {
           <section class="card card-filled settings-section" id="settings-storage" aria-labelledby="settings-storage-title">
             <div class="card-body">
               <div class="settings-section-heading settings-section-heading-status">
-                <div class="settings-section-icon"><i class="fa-solid fa-hard-drive" aria-hidden="true"></i></div>
+                <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-drive"/></svg></div>
                 <div>
                   <span class="eyebrow">Local-first health</span>
                   <h2 id="settings-storage-title">Storage</h2>
@@ -238,7 +238,7 @@ export function mountSettingsView(deps = {}) {
           <section class="card card-filled settings-section" id="settings-data" aria-labelledby="settings-data-title">
             <div class="card-body">
               <div class="settings-section-heading">
-                <div class="settings-section-icon settings-section-icon-danger"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></div>
+                <div class="settings-section-icon settings-section-icon-danger"><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg></div>
                 <div>
                   <span class="eyebrow">Selective cleanup</span>
                   <h2 id="settings-data-title">Data controls</h2>
@@ -259,7 +259,7 @@ export function mountSettingsView(deps = {}) {
                   </select>
                 </label>
                 <button class="btn btn-danger" id="btn-clear-scope" type="button">
-                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                  <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
                   Wipe selected data
                 </button>
               </div>

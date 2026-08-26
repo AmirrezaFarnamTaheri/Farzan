@@ -139,7 +139,7 @@
   align-items: center;
 }
 
-.notes-search-field > i {
+.notes-search-field > .icon {
   position: absolute;
   left: var(--space-3);
   color: var(--text-tertiary);
@@ -287,7 +287,7 @@
   gap: var(--space-2);
 }
 
-.notes-document-meta i {
+.notes-document-meta .icon {
   color: var(--accent-light);
 }
 
@@ -451,7 +451,7 @@
   font-size: var(--text-xs);
 }
 
-.notes-privacy-note i {
+.notes-privacy-note .icon {
   color: var(--success);
 }
 

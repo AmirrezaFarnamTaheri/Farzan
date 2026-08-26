@@ -3096,8 +3096,12 @@ import { Pointer } from './src/lib/pointer.js';
       const purify = window.DOMPurify;
       if (purify?.sanitize) {
         // Intentional rich route-template boundary; dynamic rows inside routes use DOM nodes.
+        // `use` is required so sprite-backed inline icons (<svg><use href="#i-..."/></svg>)
+        // survive sanitization — DOMPurify drops <use> from its default allow-list. Route
+        // templates are app-authored (trusted), so this is safe; user-content sanitizers
+        // (notes editor, bookmarks) keep the strict default and leave `use` stripped.
         el.innerHTML = purify.sanitize(String(html ?? ''), {
-          ADD_TAGS: ['canvas'],
+          ADD_TAGS: ['canvas', 'use'],
           ADD_ATTR: ['tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-live', 'aria-atomic'],
           FORBID_TAGS: ['template'],
         });

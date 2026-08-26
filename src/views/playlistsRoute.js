@@ -28,7 +28,7 @@ export function mountPlaylistsView({
               <input class="input" data-playlist-name placeholder="e.g. Focus Sprint & Review Queue" />
             </label>
             <button class="btn btn-primary" type="button" data-save-playlist>
-              <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
               Save first catalog queue
             </button>
           </div>

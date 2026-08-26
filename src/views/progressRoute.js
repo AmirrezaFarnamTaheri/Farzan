@@ -10,16 +10,16 @@ export function mountProgressView({ setView } = {}) {
 
         <div class="progress-toolbar" aria-label="Progress data actions">
           <button class="btn btn-primary" id="btn-export-json" type="button">
-            <i class="fa-solid fa-download" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
             Export backup
           </button>
           <button class="btn btn-ghost" id="btn-import-json" type="button">
-            <i class="fa-solid fa-upload" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
             Import
           </button>
           <details class="progress-export-menu">
             <summary class="btn btn-ghost" aria-label="More export formats">
-              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-more-h"/></svg>
               More exports
             </summary>
             <div class="progress-export-popover">
@@ -32,7 +32,7 @@ export function mountProgressView({ setView } = {}) {
             </div>
           </details>
           <button class="btn btn-danger" id="btn-reset-all" type="button">
-            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
             Reset all
           </button>
         </div>
@@ -40,28 +40,28 @@ export function mountProgressView({ setView } = {}) {
 
       <div class="progress-metric-grid" aria-label="Learning summary">
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg></span>
           <span class="progress-metric-label">Total topics</span>
           <strong id="stat-total-topics">0</strong>
           <span class="progress-metric-note">Available in your catalog</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"/></svg></span>
           <span class="progress-metric-label">Completed</span>
           <strong id="stat-done-topics">0</strong>
           <span class="progress-metric-note">Topics marked done</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-spinner" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon icon--spin" aria-hidden="true"><use href="#i-spinner"/></svg></span>
           <span class="progress-metric-label">In progress</span>
           <strong id="stat-in-progress">0</strong>
           <span class="progress-metric-note">Active learning threads</span>
         </article>
 
         <article class="progress-metric progress-metric-featured">
-          <span class="progress-metric-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
           <span class="progress-metric-label">Completion</span>
           <strong id="stat-completion-pct">0%</strong>
           <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
@@ -70,21 +70,21 @@ export function mountProgressView({ setView } = {}) {
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
           <span class="progress-metric-label">Watched</span>
           <strong id="stat-watched-time">0:00</strong>
           <span class="progress-metric-note">Recorded learning time</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-fire" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
           <span class="progress-metric-label">Current streak</span>
           <strong><span id="stat-streak">0</span><small> days</small></strong>
           <span class="progress-metric-note">Consecutive active days</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar-check"/></svg></span>
           <span class="progress-metric-label">Active days</span>
           <strong id="stat-active-days">0</strong>
           <span class="progress-metric-note">Days with saved activity</span>

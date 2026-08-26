@@ -55,8 +55,6 @@
   <link rel="stylesheet" href="./vendor/fonts/fonts.css" />
   
 
-  <!-- Font Awesome Icons (vendored) -->
-  <link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" />
   
 
   <!-- Main Stylesheet -->
@@ -143,13 +141,127 @@
 </head>
 
 <body>
+<!-- Icon sprite (injected from assets/icons/icon-sprite.svg) -->
+<svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true" style="display:none">
+<!-- ============================================================
+  OpenCourseDeck — Vector Icon System (single source of truth)
+  Language: 24x24 grid · stroke 2 outer / 1.5 inner detail ·
+  round caps + joins · currentColor · fills only for deliberate
+  accents. Referenced as <svg class="icon"><use href="#i-x"/></svg>.
+  ============================================================ -->
+
+<!-- ── Product surfaces ── -->
+<symbol id="i-home" viewBox="0 0 24 24"><title>Today Desk</title><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-library" viewBox="0 0 24 24"><title>Library &amp; Curriculum</title><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="6" y1="6" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><title>Video Studio</title><rect x="2" y="4" width="20" height="15" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><polygon points="10,8 16,11.5 10,15" fill="currentColor"/><line x1="6" y1="21" x2="18" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-notes" viewBox="0 0 24 24"><title>Cornell Notes</title><rect x="3" y="3" width="18" height="18" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><line x1="9" y1="3" x2="9" y2="16" stroke="currentColor" stroke-width="2"/><line x1="3" y1="16" x2="21" y2="16" stroke="currentColor" stroke-width="2"/><line x1="12" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="12" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="18.5" x2="18" y2="18.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-flashcards" viewBox="0 0 24 24"><title>SM-2 Flashcards</title><rect x="2" y="6" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 3h14a2 2 0 0 1 2 2v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="6" y1="11" x2="14" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="15" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-canvas" viewBox="0 0 24 24"><title>Concept Canvas</title><circle cx="6" cy="6" r="3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="8" r="3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="18" r="3" stroke="currentColor" stroke-width="2" fill="none"/><line x1="8.5" y1="7.5" x2="15.5" y2="7.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="7.5" y1="8.5" x2="10.5" y2="15.5" stroke="currentColor" stroke-width="1.5"/><line x1="16.5" y1="9.5" x2="13.5" y2="15.5" stroke="currentColor" stroke-width="1.5"/></symbol>
+<symbol id="i-insights" viewBox="0 0 24 24"><title>Insights &amp; Telemetry</title><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 20h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><title>Settings &amp; Preferences</title><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><title>Help &amp; Onboarding</title><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M9.3 9a2.8 2.8 0 0 1 5.44.93c0 1.87-2.74 2.32-2.74 3.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="12" y1="17" x2="12" y2="17.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+
+<!-- ── Learning signals ── -->
+<symbol id="i-flame" viewBox="0 0 24 24"><title>Streak Momentum</title><path d="M12 2c1 3.5 5 7 5 11a6 6 0 0 1-12 0c0-3.5 3-7.5 4.5-10 1.5 2 2.5 3.5 2.5 5.5 1-1 1-3.5 0-6.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-retention" viewBox="0 0 24 24"><title>Retention Stability</title><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><title>Idea &amp; Synthesis Spark</title><path d="M12 3l1.8 5.4L19 10.2l-5.2 1.8L12 17.4l-1.8-5.4L5 10.2l5.2-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" fill="currentColor"/><path d="M5 2l.5 1.5L7 4l-1.5.5L5 6l-.5-1.5L3 4l1.5-.5L5 2z" fill="currentColor"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><title>Achievement Trophy</title><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 6H4a1 1 0 0 0-1 1c0 2.2 1.8 4 4 4M17 6h3a1 1 0 0 1 1 1c0 2.2-1.8 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-sprout" viewBox="0 0 24 24"><title>Growing Mastery</title><path d="M12 21v-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13C12 9 9 7 4 7c0 5 3 7 8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 11c0-4 2.5-6 8-6 0 3.5-2 6-8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 21h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-verified" viewBox="0 0 24 24"><title>Mastery Verified</title><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l2.5 2.5L16 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-hourglass" viewBox="0 0 24 24"><title>Focus Session</title><path d="M6 3h12M6 21h12M7 3v3c0 2.5 5 4.5 5 6s-5 3.5-5 6v3M17 3v3c0 2.5-5 4.5-5 6s5 3.5 5 6v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+
+<!-- ── Actions ── -->
+<symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m12 5 7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-more-h" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></symbol>
+<symbol id="i-more-v" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="19" r="1.4" fill="currentColor"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3.5 13a9 9 0 1 0 2.1-7.4L3 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="M21 7v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M20.5 13a9 9 0 1 1-2.1-7.4L21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5.5 6l1 13a2 2 0 0 0 2 1.9h7a2 2 0 0 0 2-1.9l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="10" y1="10.5" x2="10" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="14" y1="10.5" x2="14" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m7 8 5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-expand" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-cursor" viewBox="0 0 24 24"><path d="M4 3l7.5 17 2.2-7.3L21 10.5 4 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24"><title>Loading</title><path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+
+<!-- ── Objects & files ── -->
+<symbol id="i-search" viewBox="0 0 24 24"><title>Search</title><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11" y1="8.5" x2="11" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3 8V6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 10.8 5 18.4A2 2 0 0 0 6.9 20h13a1 1 0 0 0 1-1.3L18.6 11a2 2 0 0 0-1.9-1.4H4a1.6 1.6 0 0 0-1.5 2.2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><path d="M4 9v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="9.5" y1="13.5" x2="14.5" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-file-pdf" viewBox="0 0 24 24"><path d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M8.5 15c2-1.2 4.5-3.5 5.5-5.5M9 12.5c1.8 1.5 4.5 2 7 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></symbol>
+<symbol id="i-file-code" viewBox="0 0 24 24"><path d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="m10 12-2 2.5L10 17M14 12l2 2.5L14 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-file-import" viewBox="0 0 24 24"><path d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M9 14h6M12.5 11l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-file-export" viewBox="0 0 24 24"><path d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M15 14H9M11.5 11l-3 3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="9" cy="9" r="1.8" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="m21 15-4.5-4.5L7 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-drive" viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12" stroke="currentColor" stroke-width="2"/><path d="M5.5 4.5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6l3.5-7.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="6" y1="16" x2="6.01" y2="16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="10" y1="16" x2="10.01" y2="16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5.5L12 13 2 7.5 12 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="m2 12.5 10 5.5 10-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="m2 17.5 10 5.5 10-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.45"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9l7-7V5a2 2 0 0 0-2-2h-4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14 21v-4a2 2 0 0 1 2-2h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="7.5" y1="8.5" x2="14" y2="8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7.5" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-reader" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-curriculum" viewBox="0 0 24 24"><title>Courses</title><path d="m12 3 10 4.5L12 12 2 7.5 12 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M6 9.7V15c0 1.7 2.7 3.5 6 3.5s6-1.8 6-3.5V9.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M22 7.5V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-tags" viewBox="0 0 24 24"><path d="M12.6 2.6 21 11a2 2 0 0 1 0 2.8l-6.2 6.2a2 2 0 0 1-2.8 0L3.6 11.6A2 2 0 0 1 3 10.2V5a2 2 0 0 1 2-2h5.2a2 2 0 0 1 1.4.6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="8" y1="8" x2="8.01" y2="8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M11 13h4M13 11v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+
+<!-- ── Text & editing ── -->
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-studio" viewBox="0 0 24 24"><title>Canvas Studio</title><path d="M14.9 3.1 20.9 9.1a1.6 1.6 0 0 1 0 2.26L11 21.3a1.6 1.6 0 0 1-2.26 0L2.7 15.3A1.6 1.6 0 0 1 2.7 13L12.6 3.1a1.6 1.6 0 0 1 2.26 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="m7.2 10.9 2 2M10.2 7.9l2 2M13.2 4.9l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a1.8 1.8 0 0 1 0-2.6L13.6 3.2a1.8 1.8 0 0 1 2.6 0l5 5a1.8 1.8 0 0 1 0 2.6L11 21H7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5.5 11.5 13 19" stroke="currentColor" stroke-width="2"/><path d="M11 21h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-align-left" viewBox="0 0 24 24"><path d="M4 6h16M4 10h10M4 14h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-list-bullet" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></symbol>
+<symbol id="i-list-ordered" viewBox="0 0 24 24"><line x1="10" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="10" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="10" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 4.5 5.5 4v4M4 11.2c.4-.9 2-.9 2 .1 0 .7-2 .9-2 2.2 0 .5.4 1 1.4 1M3.9 17h3M5.4 17v3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-quote" viewBox="0 0 24 24"><path d="M10 8c0 3.5-2 6-5 7l-.7-1.3C6 12.7 6.8 11.6 7 10H4V4h6v4zM20 8c0 3.5-2 6-5 7l-.7-1.3c1.7-1 2.5-2.1 2.7-3.7H14V4h6v4z" fill="currentColor"/></symbol>
+<symbol id="i-type" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="9" y1="20" x2="15" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-markdown" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 15V9l2.5 3L11 9v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M17.5 9v6M15.5 13l2 2 2-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="8 6 2 12 8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="12" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+
+<!-- ── System & status ── -->
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M10 20a2.2 2.2 0 0 0 4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><polyline points="12,7 12,12 15.5,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="12,7 12,12 15.5,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-calendar-check" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m9 15.5 2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4.5 5v6c0 5 3.2 8.6 7.5 11 4.3-2.4 7.5-6 7.5-11V5L12 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 2v20" stroke="currentColor" stroke-width="1.5"/><path d="M12 2 4.5 5v6c0 5 3.2 8.6 7.5 11" fill="currentColor" opacity="0.28" stroke="none"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="12" y1="15" x2="12" y2="17.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 3a9 9 0 0 1 0 18V3z" fill="currentColor"/></symbol>
+<symbol id="i-drive-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 7 7 0 0 0-13.4 2A4 4 0 0 0 6 19h11.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.2-1.8 3.5-3.5 3.5h-2.2a2.3 2.3 0 0 0-1.7 3.8c.4.5.4 1.2-.1 1.7-.6.6-1.5 1-2.5 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="7.5" cy="11.5" r="1.3" fill="currentColor"/><circle cx="11" cy="7.5" r="1.3" fill="currentColor"/><circle cx="16" cy="8.5" r="1.3" fill="currentColor"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><line x1="5" y1="21" x2="5" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="10" x2="5" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="21" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="8" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="19" y1="21" x2="19" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="19" y1="12" x2="19" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="2.5" y1="14" x2="7.5" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9.5" y1="8" x2="14.5" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16.5" y1="16" x2="21.5" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-brain" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44A2.5 2.5 0 0 1 4.5 16 2.5 2.5 0 0 1 3 13a2.5 2.5 0 0 1 .62-4.35A2.5 2.5 0 0 1 5.5 4.6 2.5 2.5 0 0 1 9.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44A2.5 2.5 0 0 0 19.5 16 2.5 2.5 0 0 0 21 13a2.5 2.5 0 0 0-.62-4.35A2.5 2.5 0 0 0 18.5 4.6 2.5 2.5 0 0 0 14.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-magic" viewBox="0 0 24 24"><path d="M19.8 4.2 8.5 15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m17 2 1.2 2.8L21 6l-2.8 1.2L17 10l-1.2-2.8L13 6l2.8-1.2L17 2z" fill="currentColor"/><path d="M5 15l.7 1.8L7.5 17.5l-1.8.7L5 20l-.7-1.8L2.5 17.5l1.8-.7L5 15z" fill="currentColor"/><path d="M12 19l.6 1.4 1.4.6-1.4.6L12 23l-.6-1.4-1.4-.6 1.4-.6L12 19z" fill="currentColor"/></symbol>
+<symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 3a6.5 6.5 0 0 0-3.7 11.9c.8.6 1.2 1.3 1.2 2.1h5c0-.8.4-1.5 1.2-2.1A6.5 6.5 0 0 0 12 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8a1 1 0 0 1 1.5-.9l11 6.4a1 1 0 0 1 0 1.7l-11 6.4a1 1 0 0 1-1.5-.9V4.8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
+<symbol id="i-video-cam" viewBox="0 0 24 24"><path d="M15 8.5V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1.5l7 4.5V4l-7 4.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-export-vault" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="7 10 12 15 17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-chart-columns" viewBox="0 0 24 24"><rect x="4" y="12" width="4" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="10" y="6" width="4" height="14" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="16" y="9" width="4" height="11" rx="1" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
+<symbol id="i-circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12.5l2.5 2.5L16 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
+<symbol id="i-square" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="9.5" y1="14.5" x2="7" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="14.5" y1="9.5" x2="16" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><polygon points="13,2 4,13 11,13 11,22 20,11 13,11" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-clone" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+</svg>
+
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <!-- ═══════════════════════════════════════════
        LOADING SPLASH SCREEN
   ════════════════════════════════════════════ -->
   <div id="app-loading" role="status" aria-label="Loading OpenCourseDeck">
-    <div class="splash-logo" aria-hidden="true">⚡</div>
+    <div class="splash-logo" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
     <div class="splash-label">OpenCourseDeck</div>
     <div class="splash-bar-wrap">
       <div class="splash-bar"></div>
@@ -169,7 +281,7 @@
       font-family:Inter,system-ui,sans-serif;
       text-align:center;gap:1rem;padding:2rem;
       z-index:999999;">
-      <div style="font-size:3rem;">⚡</div>
+      <div style="font-size:3rem;line-height:1;"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
       <h1 style="font-size:1.5rem;font-weight:800;margin:0;">OpenCourseDeck requires JavaScript</h1>
       <p style="color:rgba(255,255,255,0.6);max-width:400px;line-height:1.6;margin:0;">
         Please enable JavaScript in your browser to use OpenCourseDeck.
@@ -199,17 +311,17 @@
 
       <!-- Logo -->
       <div class="sidebar-logo" aria-label="OpenCourseDeck home">
-        <div class="sidebar-logo-icon" aria-hidden="true">⚡</div>
+        <div class="sidebar-logo-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
         <span class="sidebar-logo-text">OpenCourseDeck</span>
         <button class="sidebar-collapse-btn" id="sidebar-collapse-btn"
           aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+B)">
-          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>
         </button>
       </div>
 
       <!-- Search -->
       <div class="sidebar-search-wrap" role="search">
-        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
         <input type="search" id="sidebar-search" class="sidebar-search"
           placeholder="Quick search… (Ctrl+K)"
           aria-label="Quick search courses and lessons"
@@ -223,31 +335,31 @@
         <div class="nav-group">
           <span class="nav-group-label">Library</span>
           <a href="#/home" class="nav-item" data-route="/home" aria-label="Home dashboard">
-            <i class="fa-solid fa-house" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span class="nav-item-text">Home</span>
             <span class="nav-badge" id="nav-badge-home" aria-label="0 items" hidden>0</span>
           </a>
           <a href="#/courses" class="nav-item" data-route="/courses" aria-label="Browse courses">
-            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
             <span class="nav-item-text">Courses</span>
             <span class="nav-badge" id="nav-badge-courses" aria-label="" hidden></span>
           </a>
           <a href="#/my-courses" class="nav-item" data-route="/my-courses" aria-label="My custom courses">
-            <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-folder-open"/></svg>
             <span class="nav-item-text">My Courses</span>
             <span class="nav-badge" id="nav-badge-my-courses" aria-label="" hidden></span>
           </a>
           <a href="#/materials" class="nav-item" data-route="/materials" aria-label="My materials library">
-            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg>
             <span class="nav-item-text">Materials</span>
             <span class="nav-badge" id="nav-badge-materials" aria-label="" hidden></span>
           </a>
           <a href="#/tags" class="nav-item" data-route="/tags" aria-label="Browse by tags">
-            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg>
             <span class="nav-item-text">Tags</span>
           </a>
           <a href="#/playlists" class="nav-item" data-route="/playlists" aria-label="Playlists">
-            <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-list-ordered"/></svg>
             <span class="nav-item-text">Playlists</span>
             <span class="nav-badge" id="nav-badge-playlists" aria-label="" hidden></span>
           </a>
@@ -256,25 +368,25 @@
         <div class="nav-group">
           <span class="nav-group-label">Tools</span>
           <a href="#/studio" class="nav-item" data-route="/studio" aria-label="Canvas studio">
-            <i class="fa-solid fa-pen-ruler" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg>
             <span class="nav-item-text">Studio</span>
           </a>
           <a href="#/notes" class="nav-item" data-route="/notes" aria-label="All notes">
-            <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>
             <span class="nav-item-text">Notes</span>
             <span class="nav-badge" id="nav-badge-notes" aria-label="" hidden></span>
           </a>
           <a href="#/pdf" class="nav-item" data-route="/pdf" aria-label="PDF documents">
-            <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg>
             <span class="nav-item-text">PDF</span>
           </a>
           <a href="#/bookmarks" class="nav-item" data-route="/bookmarks" aria-label="Bookmarks">
-            <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
             <span class="nav-item-text">Bookmarks</span>
             <span class="nav-badge" id="nav-badge-bookmarks" aria-label="" hidden></span>
           </a>
           <a href="#/flashcards" class="nav-item" data-route="/flashcards" aria-label="Spaced repetition flashcards">
-            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg>
             <span class="nav-item-text">Flashcards</span>
             <span class="nav-badge" id="nav-badge-flashcards" aria-label="" hidden></span>
           </a>
@@ -283,11 +395,11 @@
         <div class="nav-group">
           <span class="nav-group-label">Insights</span>
           <a href="#/progress" class="nav-item" data-route="/progress" aria-label="Progress and analytics">
-            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg>
             <span class="nav-item-text">Progress</span>
           </a>
           <a href="#/achievements" class="nav-item" data-route="/achievements" aria-label="Achievements">
-            <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-trophy"/></svg>
             <span class="nav-item-text">Achievements</span>
             <span class="nav-badge nav-badge--gold" id="nav-badge-achievements" aria-label="" hidden></span>
           </a>
@@ -296,11 +408,11 @@
         <div class="nav-group">
           <span class="nav-group-label">System</span>
           <a href="#/help" class="nav-item" data-route="/help" aria-label="Help and onboarding">
-            <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-help"/></svg>
             <span class="nav-item-text">Help</span>
           </a>
           <a href="#/settings" class="nav-item" data-route="/settings" aria-label="Settings">
-            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
             <span class="nav-item-text">Settings</span>
           </a>
         </div>
@@ -317,7 +429,7 @@
             <span class="now-playing-course" id="now-playing-course"></span>
           </div>
           <button class="now-playing-btn" id="now-playing-stop" aria-label="Stop playback">
-            <i class="fa-solid fa-stop" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg>
           </button>
         </div>
 
@@ -334,15 +446,15 @@
         <div class="sidebar-footer-actions">
           <button class="footer-btn" id="theme-toggle-btn"
             aria-label="Toggle theme" title="Toggle theme (Ctrl+T)">
-            <i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg>
           </button>
           <button class="footer-btn" id="fullscreen-btn"
             aria-label="Toggle fullscreen" title="Toggle fullscreen (F11)">
-            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>
           </button>
           <button class="footer-btn" id="command-palette-btn"
             aria-label="Open command palette" title="Command palette (Ctrl+K)">
-            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>
           </button>
         </div>
       </div>
@@ -357,7 +469,7 @@
         <div class="topbar-left">
           <button class="topbar-menu-btn" id="mobile-menu-btn"
             aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar">
-            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
           </button>
           <!-- Breadcrumb -->
           <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb navigation">
@@ -372,18 +484,18 @@
           <!-- Quick actions -->
           <button class="topbar-action-btn" id="topbar-search-btn"
             aria-label="Search" title="Search (Ctrl+K)">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
           </button>
           <button class="topbar-action-btn" id="topbar-notifications-btn"
             type="button"
             data-notifications-toggle
             aria-label="Notifications" title="Notifications">
-            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
             <span class="topbar-notif-badge topbar-notif-dot" id="topbar-notif-dot" hidden aria-hidden="true"></span>
           </button>
           <button class="topbar-action-btn" id="topbar-add-btn"
             aria-label="Add content" title="Add content">
-            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
           </button>
 
         </div>
@@ -412,7 +524,7 @@
         <h2 class="modal-title" id="modal-title"></h2>
         <button class="modal-close-btn" id="modal-close-btn"
           aria-label="Close dialog" title="Close (Escape)">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
         </button>
       </div>
       <div class="modal-body" id="modal-body" tabindex="0"></div>
@@ -425,7 +537,7 @@
     role="dialog" aria-modal="true" aria-label="Command palette" aria-hidden="true">
     <div class="command-palette" id="command-palette">
       <div class="cp-search-wrap">
-        <i class="fa-solid fa-terminal cp-icon" aria-hidden="true"></i>
+        <svg class="icon cp-icon" aria-hidden="true"><use href="#i-terminal"/></svg>
         <input type="text" id="cp-input" class="cp-input"
           placeholder="Type a command or search…"
           autocomplete="off" spellcheck="false"
@@ -478,7 +590,7 @@
       <div class="slideover-header">
         <h3 class="slideover-title" id="slideover-title"></h3>
         <button class="slideover-close" id="slideover-close" aria-label="Close panel">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
         </button>
       </div>
       <div class="slideover-body" id="slideover-body"></div>
@@ -492,7 +604,7 @@
       <div class="shortcut-panel-header">
         <h2>Keyboard Shortcuts</h2>
         <button id="shortcut-close" aria-label="Close shortcuts">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
         </button>
       </div>
       <div class="shortcut-panel-body" id="shortcut-panel-body">
@@ -511,7 +623,7 @@
           Clear all
         </button>
         <button id="notif-close" type="button" class="notif-close-btn" data-drawer-close aria-label="Close notifications">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
         </button>
       </div>
     </div>
@@ -524,27 +636,27 @@
   <div id="add-content-menu" class="add-content-menu" aria-hidden="true"
     role="menu" aria-label="Add content options">
     <button class="add-content-item" data-action="add-video" role="menuitem">
-      <i class="fa-solid fa-video" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-video-cam"/></svg>
       <span>Add Video</span>
     </button>
     <button class="add-content-item" data-action="add-pdf" role="menuitem">
-      <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg>
       <span>Add PDF</span>
     </button>
     <button class="add-content-item" data-action="create-topic" role="menuitem">
-      <i class="fa-solid fa-folder-plus" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-folder-plus"/></svg>
       <span>Create Topic</span>
     </button>
     <button class="add-content-item" data-action="create-course" role="menuitem">
-      <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
       <span>Create Course</span>
     </button>
     <button class="add-content-item" data-action="add-link" role="menuitem">
-      <i class="fa-solid fa-link" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
       <span>Add URL / Embed</span>
     </button>
     <button class="add-content-item" data-action="import-backup" role="menuitem">
-      <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-file-import"/></svg>
       <span>Import Backup</span>
     </button>
   </div>
@@ -572,7 +684,7 @@
         <img class="course-card-img" alt="" loading="lazy" decoding="async" />
         <div class="course-card-overlay">
           <button class="course-card-play" aria-label="Resume course">
-            <i class="fa-solid fa-play" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
           </button>
         </div>
         <div class="course-card-badges" aria-hidden="true"></div>
@@ -614,14 +726,14 @@
       </div>
       <div class="lesson-row-actions">
         <button class="lesson-row-btn lesson-row-notes" aria-label="Open notes">
-          <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>
         </button>
         <button class="lesson-row-btn lesson-row-bookmark" aria-label="Bookmark">
-          <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
         </button>
         <button class="lesson-row-btn lesson-row-more" aria-label="More options"
           aria-haspopup="menu">
-          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+          <svg class="icon" aria-hidden="true"><use href="#i-more-v"/></svg>
         </button>
       </div>
     </li>
@@ -632,7 +744,7 @@
       <span class="tag-badge-dot" aria-hidden="true"></span>
       <span class="tag-badge-text"></span>
       <button class="tag-badge-remove" aria-label="Remove tag" hidden>
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
       </button>
     </span>
   </template>
@@ -645,7 +757,7 @@
         <div class="toast-sub" hidden></div>
       </div>
       <button class="toast-close" aria-label="Dismiss notification">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
       </button>
       <div class="toast-progress" aria-hidden="true">
         <div class="toast-progress-bar"></div>
@@ -704,6 +816,5 @@
        SERVICE WORKER REGISTRATION
   ════════════════════════════════════════════ -->
   <!-- Boot script imports dist/opencoursedeck.js and logs early failures -->
-
 </body>
 </html>

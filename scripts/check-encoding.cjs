@@ -60,7 +60,6 @@ const IGNORED_DIR_PREFIXES = ['.edge-'];
 // wrappers such as vendor/pdf.min.js remain in scope.
 const IGNORED_FILES = new Set([
   'vendor/chart.umd.js',
-  'vendor/fontawesome/css/all.min.css',
   'vendor/fuse.min.js',
   'vendor/pdf.min.mjs',
   'vendor/pdf.worker.min.mjs',

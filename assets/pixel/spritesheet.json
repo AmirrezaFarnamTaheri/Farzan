@@ -1,0 +1,151 @@
+{
+  "name": "OpenCourseDeck Pixel Asset Atlas",
+  "version": "1.0.0",
+  "dimensions": {
+    "width": 128,
+    "height": 64
+  },
+  "grid_size": 32,
+  "rendering": {
+    "image_rendering": "pixelated",
+    "shape_rendering": "crispEdges",
+    "nearest_filtering": true
+  },
+  "palette": {
+    "F_OUT": "#18212E",
+    "C_OUT": "#0B192C",
+    "F_DK": "#7C2D12",
+    "F_DP": "#C75822",
+    "F_MD": "#EA580C",
+    "F_BR": "#F97316",
+    "F_YL": "#FDE047",
+    "F_HL": "#FFFBEB",
+    "C_DK": "#0B1E48",
+    "C_DP": "#1D4ED8",
+    "C_BS": "#2457D6",
+    "C_LT": "#60A5FA",
+    "C_HL": "#BFDBFE",
+    "C_WH": "#FFFFFF",
+    "W_DK": "#451A03",
+    "W_BS": "#78350F",
+    "W_LT": "#B45309",
+    "G_ED": "#334155",
+    "G_SH": "#94A3B8",
+    "G_WH": "#F1F5F9",
+    "S_GD": "#F59E0B",
+    "S_LT": "#FDE047",
+    "AU_DK": "#78350F",
+    "AU_MD": "#D97706",
+    "AU_LT": "#F59E0B",
+    "AU_BR": "#FDE68A",
+    "AU_WH": "#FEF3C7",
+    "RB_DK": "#064E3B",
+    "RB_MD": "#059669",
+    "RB_LT": "#34D399",
+    "K_CS": "#334155",
+    "K_CL": "#64748B",
+    "K_SC": "#0284C7",
+    "K_GL": "#38BDF8",
+    "P_BS": "#FEF3C7",
+    "P_SH": "#FDE68A",
+    "Q_FT": "#2457D6",
+    "Q_LT": "#60A5FA",
+    "B_GL": "#FDE047",
+    "B_WH": "#FFFFFF",
+    "B_OR": "#F97316",
+    "CD_BS": "#FFFFFF",
+    "CD_SH": "#CBD5E1",
+    "CD_CK": "#087B5D",
+    "CD_CL": "#10B981"
+  },
+  "frames": {
+    "streak_flame": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "telemetry"
+    },
+    "memory_crystal": {
+      "frame": {
+        "x": 32,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "retention"
+    },
+    "focus_hourglass": {
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "pomodoro"
+    },
+    "mastery_crest": {
+      "frame": {
+        "x": 96,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "milestones"
+    },
+    "trail_source": {
+      "frame": {
+        "x": 0,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "learning_trail"
+    },
+    "trail_note": {
+      "frame": {
+        "x": 32,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "learning_trail"
+    },
+    "trail_question": {
+      "frame": {
+        "x": 64,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "learning_trail"
+    },
+    "trail_review": {
+      "frame": {
+        "x": 96,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "category": "learning_trail"
+    }
+  }
+}

@@ -1,3 +1,23 @@
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Build a sprite-backed inline icon: <svg class="icon ..."><use href="#i-id"/></svg>.
+ * Replaces the Font Awesome `<i>` glyph pattern with the same sprite set used by
+ * the static template, so icons inherit currentColor and scale with font-size.
+ * @param {string} id  sprite symbol id, e.g. 'i-play'
+ * @param {string} [extraClass] optional modifier class (e.g. 'home-widget-arrow')
+ * @returns {SVGSVGElement}
+ */
+function svgIcon(id, extraClass = '') {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', extraClass ? `icon ${extraClass}` : 'icon');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', `#${id}`);
+  svg.appendChild(use);
+  return svg;
+}
+
 export function mountHomeView(deps = {}) {
   const {
     setView,
@@ -14,15 +34,15 @@ export function mountHomeView(deps = {}) {
           <p class="home-subtitle">Continue where you left off, capture ideas, and keep every learning artifact on your device.</p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
-              <i class="fa-solid fa-play" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
               <span>Continue studying</span>
             </button>
             <a class="btn btn-ghost" href="#/courses">
-              <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
               Browse courses
             </a>
             <a class="btn btn-ghost" href="#/notes">
-              <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>
               Write notes
             </a>
           </div>
@@ -51,7 +71,7 @@ export function mountHomeView(deps = {}) {
           </div>
           <button class="home-focus-action" type="button" data-home-focus-action>
             <span>Browse the catalog</span>
-            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
           </button>
         </section>
       </div>
@@ -68,22 +88,22 @@ export function mountHomeView(deps = {}) {
             </div>
             <div class="home-pulse-grid" data-home-pulse aria-live="polite">
               <div class="home-pulse-item">
-                <span class="home-pulse-icon"><i class="fa-solid fa-spinner" aria-hidden="true"></i></span>
+                <span class="home-pulse-icon"><svg class="icon icon--spin" aria-hidden="true"><use href="#i-spinner"/></svg></span>
                 <strong data-pulse-active>0</strong>
                 <span>In progress</span>
               </div>
               <div class="home-pulse-item">
-                <span class="home-pulse-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+                <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"/></svg></span>
                 <strong data-pulse-complete>0</strong>
                 <span>Completed</span>
               </div>
               <div class="home-pulse-item">
-                <span class="home-pulse-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+                <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></span>
                 <strong data-pulse-week>0</strong>
                 <span>Activities this week</span>
               </div>
               <div class="home-pulse-item">
-                <span class="home-pulse-icon"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i></span>
+                <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart-columns"/></svg></span>
                 <strong data-pulse-average>0%</strong>
                 <span>Average progress</span>
               </div>
@@ -104,9 +124,9 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <span class="eyebrow">Quick tools</span>
             <div class="home-tool-list">
-              <a href="#/pdf"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
-              <a href="#/studio"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
-              <a href="#/settings"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span><strong>Preferences</strong><small>Tune appearance and behavior.</small></span></a>
+              <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
+              <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
+              <a href="#/settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span><strong>Preferences</strong><small>Tune appearance and behavior.</small></span></a>
             </div>
           </div>
         </section>
@@ -204,10 +224,8 @@ function createActivityItem({ icon, title, detail, time, href }) {
 
   const iconWrap = document.createElement('span');
   iconWrap.className = 'home-activity-icon';
-  const iconElement = document.createElement('i');
-  iconElement.className = icon;
-  iconElement.setAttribute('aria-hidden', 'true');
-  iconWrap.appendChild(iconElement);
+  iconWrap.appendChild(svgIcon(icon));
+  iconWrap.setAttribute('aria-hidden', 'true');
 
   const copy = document.createElement('span');
   copy.className = 'home-activity-copy';
@@ -317,7 +335,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const widgetData = [
     {
       id: 'continue',
-      icon: 'fa-solid fa-play',
+      icon: 'i-play',
       label: 'Continue studying',
       title: focusTitle,
       detail: latestProgress ? `${Math.round(focusPercent)}% complete` : latestTimestamp ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'Start with the course catalog.',
@@ -327,7 +345,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     },
     {
       id: 'review',
-      icon: 'fa-solid fa-rotate-right',
+      icon: 'i-redo',
       label: 'Due review',
       title: topicMap.get(dueReview?.record?.topicId)?.title || dueReview?.record?.topicTitle || 'Nothing due',
       detail: dueReview ? 'Revisit a completed topic to reinforce retention.' : 'Completed topics are still fresh.',
@@ -336,7 +354,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     },
     {
       id: 'recent',
-      icon: 'fa-solid fa-lightbulb',
+      icon: 'i-lightbulb',
       label: 'Recent insight',
       title: latestNote?.title || latestTimestamp?.title || 'No notes yet',
       detail: latestNote?.sourceType === 'pdf'
@@ -362,10 +380,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
     const icon = document.createElement('span');
     icon.className = 'home-widget-icon';
-    const iconGlyph = document.createElement('i');
-    iconGlyph.className = widget.icon;
-    iconGlyph.setAttribute('aria-hidden', 'true');
-    icon.appendChild(iconGlyph);
+    icon.appendChild(svgIcon(widget.icon));
+    icon.setAttribute('aria-hidden', 'true');
 
     const copy = document.createElement('span');
     copy.className = 'home-widget-copy';
@@ -378,9 +394,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     detail.textContent = widget.detail;
     copy.append(eyebrow, title, detail);
 
-    const arrow = document.createElement('i');
-    arrow.className = 'fa-solid fa-arrow-right home-widget-arrow';
-    arrow.setAttribute('aria-hidden', 'true');
+    const arrow = svgIcon('i-arrow-right', 'home-widget-arrow');
 
     card.append(icon, copy, arrow);
     card.addEventListener('click', () => {
@@ -403,21 +417,21 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
   const activity = [
     ...notes.map(note => ({
-      icon: 'fa-solid fa-note-sticky',
+      icon: 'i-note',
       title: note.title || 'Untitled note',
       detail: 'Note updated',
       time: getRecordTime(note),
       href: '#/notes',
     })),
     ...timestamps.map(item => ({
-      icon: 'fa-solid fa-clock',
+      icon: 'i-clock',
       title: item.title || topicMap.get(item.topicId)?.title || 'Saved timestamp',
       detail: `Position ${formatDuration(item.position)}`,
       time: getRecordTime(item),
       href: '#/courses',
     })),
     ...progress.filter(item => getRecordTime(item)).map(item => ({
-      icon: Number(item.percent) >= 100 ? 'fa-solid fa-circle-check' : 'fa-solid fa-chart-line',
+      icon: Number(item.percent) >= 100 ? 'i-circle-check' : 'i-chart-columns',
       title: topicMap.get(item.topicId)?.title || item.topicTitle || 'Learning progress',
       detail: Number(item.percent) >= 100 ? 'Topic completed' : `${Math.round(Number(item.percent) || 0)}% complete`,
       time: getRecordTime(item),
@@ -429,9 +443,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   if (!activity.length) {
     const empty = document.createElement('div');
     empty.className = 'home-empty-state';
-    const icon = document.createElement('i');
-    icon.className = 'fa-solid fa-seedling';
-    icon.setAttribute('aria-hidden', 'true');
+    const icon = svgIcon('i-sprout');
     const title = document.createElement('strong');
     title.textContent = 'Your learning trail starts here';
     const detail = document.createElement('span');

@@ -62,17 +62,6 @@ function bundleFuseForClassicWorker() {
   console.log('[vendor-libs]', destRel, '<- bundled fuse.js classic-worker facade');
 }
 
-function copyDir(src, dest) {
-  if (!fs.existsSync(src)) return;
-  fs.mkdirSync(dest, { recursive: true });
-  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, ent.name);
-    const d = path.join(dest, ent.name);
-    if (ent.isDirectory()) copyDir(s, d);
-    else if (ent.isFile()) fs.copyFileSync(s, d);
-  }
-}
-
 function writeText(destRel, text) {
   const dest = path.join(vendor, destRel);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -132,16 +121,6 @@ function main() {
 `);
   ok += 2;
 
-  // Font Awesome (CSS + webfonts)
-  copyFileFromNodeModules(
-    '@fortawesome/fontawesome-free/css/all.min.css',
-    'fontawesome/css/all.min.css'
-  );
-  copyDir(
-    path.join(root, 'node_modules', '@fortawesome', 'fontawesome-free', 'webfonts'),
-    path.join(vendor, 'fontawesome', 'webfonts')
-  );
-  ok += 1;
 
   // Fonts: retain only used weights and WOFF2 subsets referenced by Fontsource CSS.
   // This preserves language coverage while preventing hundreds of unused italic/weight/WOFF files

@@ -32,11 +32,11 @@ printStudioBoardPdf,
         <div class="studio-toolbar-clusters">
           <div class="studio-tool-group" role="group" aria-label="Canvas tools">
             <button class="btn btn-ghost btn-sm" data-studio-tool="select" aria-pressed="false" title="Select Tool">
-              <i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-cursor"/></svg>
               <span>Select</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-tool="pen" aria-pressed="true" title="Pen Tool">
-              <i class="fa-solid fa-pen" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>
               <span>Pen</span>
             </button>
           </div>
@@ -44,26 +44,26 @@ printStudioBoardPdf,
           <div class="studio-tool-group" role="group" aria-label="Notes and cards">
             <input class="input input-sm" data-studio-text placeholder="Board note..." style="width:160px" aria-label="Board note text" />
             <button class="btn btn-primary btn-sm" data-studio-add-text title="Add Note">
-              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
               <span>Note</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-add-card title="Add Card">
-              <i class="fa-solid fa-clone" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-clone"/></svg>
               <span>Card</span>
             </button>
           </div>
 
           <div class="studio-tool-group" role="group" aria-label="Geometric shapes">
             <button class="btn btn-ghost btn-sm" data-studio-add-rect title="Rectangle">
-              <i class="fa-regular fa-square" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-square"/></svg>
               <span>Rect</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-add-circle title="Circle">
-              <i class="fa-regular fa-circle" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-circle"/></svg>
               <span>Circle</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-add-arrow title="Arrow">
-              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
               <span>Arrow</span>
             </button>
           </div>
@@ -71,7 +71,7 @@ printStudioBoardPdf,
           <div class="studio-tool-group" role="group" aria-label="Media and templates">
             <input class="input input-sm" data-studio-image-url placeholder="Image URL..." style="width:140px" aria-label="Image URL" />
             <button class="btn btn-ghost btn-sm" data-studio-add-image title="Add Image">
-              <i class="fa-solid fa-image" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-image"/></svg>
             </button>
             <select class="select input-sm" data-studio-template aria-label="Studio template">
               <option value="study-map">Study map</option>
@@ -82,13 +82,13 @@ printStudioBoardPdf,
 
           <div class="studio-tool-group" role="group" aria-label="Board management">
             <button class="btn btn-primary btn-sm" data-studio-save title="Save Board">
-              <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
               <span>Save</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-load title="Load Saved Board">Load</button>
             <button class="btn btn-ghost btn-sm" data-studio-clear title="Clear Board">Clear</button>
             <button class="btn btn-ghost btn-sm" data-studio-export-pdf title="Export PDF">
-              <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+              <svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg>
               <span>PDF</span>
             </button>
             <button class="btn btn-ghost btn-sm" data-studio-export-png title="Export PNG">PNG</button>
