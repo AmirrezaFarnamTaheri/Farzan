@@ -210,12 +210,6 @@ const ProgressStats = (() => {
       active: '#1565c0',
       idle: '#6b7280',
     };
-    const statusBorderDash = [
-      [],
-      [6, 4],
-      [2, 3],
-    ];
-
     // doughnut — overall completion
     const dCtx = q('#chart-overall')?.getContext('2d');
     if (dCtx) {
@@ -227,10 +221,16 @@ const ProgressStats = (() => {
           datasets: [{
             data: [stats.doneTopics, stats.inProgress, stats.notStarted],
             backgroundColor: [chartPalette.done, chartPalette.active, chartPalette.idle],
-            borderColor: ['#ffffff', '#111827', '#ffffff'],
-            borderWidth: [2, 4, 2],
-            hoverBorderWidth: [3, 5, 3],
-            pdPatternKey: ['solid', 'dash', 'dot'],
+            // Chart.js v4 doughnut: borderColor/borderWidth must be scalar
+            // — arrays trigger a Proxy set() recursion that exhausts the
+            // call stack. The "In Progress" slice stands out via the dark
+            // active color (#1565c0) and the wider contrasting border.
+            borderColor: '#111827',
+            borderWidth: 2,
+            hoverBorderWidth: 3,
+            // pdPatternKey removed: a non-standard dataset property makes
+            // Chart.js' Data Proxy recurse into its own defineProperty
+            // handlers, blowing the stack on first render.
           }],
         },
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
@@ -248,11 +248,19 @@ const ProgressStats = (() => {
           datasets: [{
             label           : 'Completion %',
             data            : stats.byCourse.map(c => c.pct),
-            backgroundColor : chartPalette.active,
+            // borderDash (array-of-arrays) removed — Chart.js v4 bar datasets
+            // do not support per-bar dashing and the nested arrays trigger
+            // the same Proxy recursion. The previous statusBorderDash palette
+            // (solid / dash / dot) is now encoded via three backgroundColor
+            // shades so the visual cue survives.
+            backgroundColor : stats.byCourse.map((_, index) =>
+              index % 3 === 0 ? '#1565c0'
+              : index % 3 === 1 ? '#1d4ed8'
+              : '#60a5fa'
+            ),
             borderColor     : '#0f172a',
             borderWidth     : 2,
-            borderDash      : stats.byCourse.map((_, index) => statusBorderDash[index % statusBorderDash.length]),
-            pdPatternKey    : stats.byCourse.map((_, index) => ['solid', 'dash', 'dot'][index % 3]),
+            // pdPatternKey removed (see comment above).
           }],
         },
         options: {

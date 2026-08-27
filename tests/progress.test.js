@@ -297,7 +297,13 @@ describe('progress backup exports', () => {
     expect(window.__progressXss).toBeUndefined();
   });
 
-  it('adds non-color chart distinction metadata to progress charts', async () => {
+  it('keeps Chart.js dataset options free of recursion-triggering properties', async () => {
+    // Chart.js v4 Proxy traps recurse when a dataset is given non-standard
+    // properties (e.g. pdPatternKey) or array-of-arrays borderDash. This test
+    // pins the *safe* shape: scalar border options on the doughnut, distinct
+    // backgroundColor shades for the bar instead of a borderDash array, and
+    // no pdPatternKey anywhere. The original distinction intent is preserved
+    // by the three backgroundColor shades per bar.
     const chartConfigs = [];
     window.Chart = vi.fn(function Chart(_ctx, config) {
       chartConfigs.push(config);
@@ -336,12 +342,21 @@ describe('progress backup exports', () => {
 
     expect(chartConfigs).toHaveLength(2);
     const doughnutDataset = chartConfigs[0].data.datasets[0];
-    expect(doughnutDataset.pdPatternKey).toEqual(['solid', 'dash', 'dot']);
-    expect(doughnutDataset.borderWidth).toEqual([2, 4, 2]);
+    expect(doughnutDataset.pdPatternKey).toBeUndefined();
+    expect(Array.isArray(doughnutDataset.borderColor)).toBe(false);
+    expect(Array.isArray(doughnutDataset.borderWidth)).toBe(false);
+    expect(typeof doughnutDataset.borderColor).toBe('string');
+    expect(typeof doughnutDataset.borderWidth).toBe('number');
 
     const barDataset = chartConfigs[1].data.datasets[0];
-    expect(barDataset.pdPatternKey).toEqual(['solid', 'dash', 'dot']);
-    expect(barDataset.borderDash).toEqual([[], [6, 4], [2, 3]]);
+    expect(barDataset.pdPatternKey).toBeUndefined();
+    expect(barDataset.borderDash).toBeUndefined();
+    // Three backgroundColor shades preserve the visual distinction that the
+    // removed borderDash palette used to provide.
+    expect(Array.isArray(barDataset.backgroundColor)).toBe(true);
+    expect(barDataset.backgroundColor).toHaveLength(3);
+    const unique = new Set(barDataset.backgroundColor);
+    expect(unique.size).toBeGreaterThan(1);
 
     delete window.Chart;
   });
