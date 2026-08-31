@@ -1,11 +1,11 @@
 :root {
     /* ── Accent (overridden per data-accent) ── */
-    --accent:           #7c3aed;
-    --accent-light:     #9d5ff5;
-    --accent-dark:      #5b21b6;
-    --accent-muted:     rgba(124, 58, 237, 0.15);
-    --accent-glow:      rgba(124, 58, 237, 0.35);
-    --accent-rgb:       124, 58, 237;
+    --accent:           #2563eb;
+    --accent-light:     #3b82f6;
+    --accent-dark:      #1d4ed8;
+    --accent-muted:     rgba(37, 99, 235, 0.15);
+    --accent-glow:      rgba(37, 99, 235, 0.35);
+    --accent-rgb:       37, 99, 235;
 
     /* ── Surface Colors (overridden per data-theme) ── */
     --bg:               #0f0f1a;

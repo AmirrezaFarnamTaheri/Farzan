@@ -1,44 +1,20 @@
-.bg-orbs {
+.bg-orbs, .ambient-desk-surface {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -1;
     overflow: hidden;
     background: var(--bg);
+    background-image: 
+      radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 65%),
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+    background-position: center top, 0 0, 0 0;
+    opacity: 0.65;
   }
   .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.4;
-    animation: orb-float 20s infinite ease-in-out alternate;
-  }
-  .orb-1 {
-    width: 60vw; height: 60vw;
-    top: -20vw; left: -10vw;
-    background: radial-gradient(circle, var(--accent-glow), transparent 70%);
-    animation-delay: 0s;
-  }
-  .orb-2 {
-    width: 50vw; height: 50vw;
-    bottom: -10vw; right: -10vw;
-    background: radial-gradient(circle, var(--info-muted), transparent 70%);
-    animation-delay: -5s;
-    animation-duration: 25s;
-  }
-  .orb-3 {
-    width: 40vw; height: 40vw;
-    top: 30vh; left: 40vw;
-    background: radial-gradient(circle, var(--success-muted), transparent 70%);
-    animation-delay: -10s;
-    animation-duration: 30s;
-  }
-
-  @keyframes orb-float {
-    0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(5%, 10%) scale(1.1); }
-    66% { transform: translate(-5%, 5%) scale(0.9); }
-    100% { transform: translate(0, 0) scale(1); }
+    display: none;
   }
 
   .ocd-app {

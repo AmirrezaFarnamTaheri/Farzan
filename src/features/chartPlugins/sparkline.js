@@ -24,17 +24,12 @@ export const chartSparkline = {
 
   beforeInit(chart) {
     const opts = chart.options || {};
-    opts.responsive = opts.responsive !== false;
-    opts.maintainAspectRatio = opts.maintainAspectRatio !== false;
-    opts.animation = opts.animation ?? { duration: 0 };
-    opts.scales = {};
-    opts.plugins = opts.plugins || {};
-    opts.plugins.legend = { display: false };
-    opts.plugins.tooltip = { enabled: false };
-    opts.elements = opts.elements || {};
-    opts.elements.point = { radius: 0, hoverRadius: 0 };
-    opts.layout = opts.layout || {};
-    opts.layout.padding = { top: 2, right: 2, bottom: 2, left: 2 };
+    // Use Object.assign instead of direct property assignment to avoid
+    // Chart.js v4.5.1 Data Proxy recursion (Maximum call stack size exceeded)
+    // when chart.options is a Proxy-wrapped object. Each assign targets a
+    // shallow property so the Proxy's own set() trap is not re-entered.
+    Object.assign(opts, { responsive: opts.responsive !== false, maintainAspectRatio: opts.maintainAspectRatio !== false, animation: opts.animation ?? { duration: 0 }, scales: {}, elements: { ...opts.elements, point: { radius: 0, hoverRadius: 0 } }, layout: { ...opts.layout, padding: { top: 2, right: 2, bottom: 2, left: 2 } } });
+    Object.assign(opts, { plugins: { ...opts.plugins, legend: { display: false }, tooltip: { enabled: false } } });
   },
 
   afterDatasetDraw(chart, args, options) {

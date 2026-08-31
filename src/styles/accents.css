@@ -1,4 +1,12 @@
-[data-accent="violet"] {
+[data-accent="lapis"] {
+    --accent:       #2563eb;
+    --accent-light: #3b82f6;
+    --accent-dark:  #1d4ed8;
+    --accent-muted: rgba(37,99,235,0.15);
+    --accent-glow:  rgba(37,99,235,0.35);
+    --accent-rgb:   37, 99, 235;
+  }
+  [data-accent="violet"] {
     --accent:       #7c3aed;
     --accent-light: #9d5ff5;
     --accent-dark:  #5b21b6;

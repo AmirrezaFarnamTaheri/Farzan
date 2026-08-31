@@ -1,3 +1,5 @@
+import { ProceduralTrophy } from '../features/proceduralTrophy.js';
+
 export function mountAchievementsView(deps = {}) {
   const {
     setView,
@@ -132,9 +134,17 @@ export function mountAchievementsView(deps = {}) {
     listRoot.replaceChildren();
     achievementsList.forEach(achievement => {
       const card = document.createElement('article');
-      card.className = `card ${achievement.unlocked ? 'card-filled' : ''}`.trim();
+      card.className = `card achievement-card ${achievement.unlocked ? 'card-filled' : 'card-locked'}`.trim();
       card.dataset.achievementId = achievement.id;
       card.dataset.achievementState = achievement.unlocked ? 'unlocked' : 'locked';
+
+      const trophyType = achievement.id === 'course-complete' ? 'cornell-master' : achievement.id === 'deep-focus' || achievement.id === 'first-finish' ? 'scholar' : 'prism';
+      const trophyWrap = document.createElement('div');
+      trophyWrap.className = 'achievement-trophy-wrap';
+      trophyWrap.innerHTML = ProceduralTrophy.renderTrophySvg(trophyType, { size: 64 });
+      if (!achievement.unlocked) {
+        trophyWrap.style.filter = 'grayscale(1) opacity(0.35)';
+      }
 
       const body = document.createElement('div');
       body.className = 'card-body';
@@ -148,7 +158,7 @@ export function mountAchievementsView(deps = {}) {
       status.textContent = achievement.unlocked ? 'Unlocked' : 'Locked';
       status.setAttribute('aria-label', `Achievement status: ${status.textContent}`);
       body.append(title, detail, status);
-      card.appendChild(body);
+      card.append(trophyWrap, body);
       listRoot.appendChild(card);
     });
 

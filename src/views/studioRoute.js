@@ -1,3 +1,5 @@
+import { SpatialKnowledgeGraph } from '../features/spatialKnowledgeGraph.js';
+
 export function mountStudioView(deps = {}) {
   const {
 setView,
@@ -19,9 +21,8 @@ printStudioBoardPdf,
     <section class="view view-studio">
       <div class="page-header studio-header">
         <div>
-          <span class="eyebrow">Interactive Canvas</span>
           <h1 class="page-title">Studio</h1>
-          <p class="page-subtitle">Whiteboard canvas with portable board storage, Cornell templates, and vector shapes.</p>
+          <p class="page-subtitle">Whiteboard canvas with portable board storage, Cornell templates, and 3D concept maps.</p>
         </div>
         <div class="studio-status-pill" aria-live="polite">
           <span data-studio-status>Ready</span>
@@ -38,6 +39,10 @@ printStudioBoardPdf,
             <button class="btn btn-ghost btn-sm" data-studio-tool="pen" aria-pressed="true" title="Pen Tool">
               <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>
               <span>Pen</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-studio-mode="3d" aria-pressed="false" title="3D Spatial Knowledge Graph">
+              <svg class="icon" aria-hidden="true"><use href="#i-canvas"/></svg>
+              <span>3D Graph</span>
             </button>
           </div>
 
@@ -546,8 +551,66 @@ printStudioBoardPdf,
       persistBoardChange('Board updated');
     }, 120);
   });
+  let spatialGraphInstance = null;
+  const toggle3DGraph = async () => {
+    const shell = document.querySelector('.studio-shell');
+    const btn3D = document.querySelector('[data-studio-mode="3d"]');
+    if (!shell) return;
+
+    if (spatialGraphInstance) {
+      spatialGraphInstance.dispose();
+      spatialGraphInstance = null;
+      if (canvas) canvas.style.display = 'block';
+      const existingGraph = shell.querySelector('.spatial-graph-wrapper');
+      if (existingGraph) existingGraph.remove();
+
+      if (btn3D) {
+        btn3D.classList.remove('active', 'btn-primary');
+        btn3D.classList.add('btn-ghost');
+        btn3D.setAttribute('aria-pressed', 'false');
+      }
+      setStatus('Returned to 2D Whiteboard');
+    } else {
+      if (canvas) canvas.style.display = 'none';
+      const graphWrap = document.createElement('div');
+      graphWrap.className = 'spatial-graph-wrapper';
+      graphWrap.style.width = '100%';
+      graphWrap.style.height = '100%';
+      graphWrap.style.minHeight = '500px';
+      shell.appendChild(graphWrap);
+
+      let notes = [];
+      try {
+        notes = await window.DB?.getAllNotes?.() ?? [];
+      } catch {}
+
+      spatialGraphInstance = new SpatialKnowledgeGraph();
+      spatialGraphInstance.mount(graphWrap, notes);
+      spatialGraphInstance.on('node:select', (item) => {
+        setStatus(`3D Node selected: ${item.title || item.id}`);
+      });
+
+      if (btn3D) {
+        btn3D.classList.add('active', 'btn-primary');
+        btn3D.classList.remove('btn-ghost');
+        btn3D.setAttribute('aria-pressed', 'true');
+      }
+      setStatus('3D Spatial Graph active (drag to rotate)');
+    }
+  };
+
+  const btn3D = document.querySelector('[data-studio-mode="3d"]');
+  if (btn3D) {
+    on(btn3D, 'click', () => {
+      toggle3DGraph().catch(() => {});
+    });
+  }
+
   document.querySelectorAll('[data-studio-tool]').forEach((button) => {
     on(button, 'click', () => {
+      if (spatialGraphInstance) {
+        toggle3DGraph().catch(() => {});
+      }
       const selected = window.OpenCourseDeck?.Canvas?.setTool?.(button.dataset.studioTool);
       setStatus(`${selected === 'pen' ? 'Pen' : 'Select'} tool active`);
       updateToolButtons();
@@ -810,6 +873,7 @@ printStudioBoardPdf,
       routeListeners.forEach(({ target, type, handler, options }) => {
         try { target.removeEventListener(type, handler, options); } catch {}
       });
+      try { spatialGraphInstance?.dispose?.(); } catch {}
       try { window.OpenCourseDeck?.Canvas?.destroy?.(); } catch {}
     },
   };

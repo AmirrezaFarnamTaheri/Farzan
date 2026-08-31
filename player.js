@@ -828,6 +828,24 @@
       if (v > 0) this._media.muted = false;
     }
 
+    setVolumeBoost(multiplier = 1.0) {
+      const boost = Math.max(0.5, Math.min(3.0, Number(multiplier) || 1.0));
+      this._state.volumeBoost = boost;
+      if (!this._audioEnhancer && this._media) {
+        const EnhancerClass = window.OpenCourseDeck?.AudioEnhancer;
+        if (typeof EnhancerClass === 'function') {
+          try {
+            this._audioEnhancer = new EnhancerClass(this._media);
+            this._audioEnhancer.init();
+          } catch {}
+        }
+      }
+      if (this._audioEnhancer) {
+        this._audioEnhancer.setVolumeBoost(boost);
+      }
+      this._emit('volume:boost', boost);
+    }
+
     toggleMute() {
       this._media.muted = !this._media.muted;
     }
@@ -1978,6 +1996,10 @@
       if (this._audioCtx) {
         try { this._audioCtx.close(); } catch {}
         this._audioCtx = null;
+      }
+      if (this._audioEnhancer) {
+        try { this._audioEnhancer.dispose(); } catch {}
+        this._audioEnhancer = null;
       }
       if (this._vizAnimId) cancelAnimationFrame(this._vizAnimId);
       this._vizAnimId = null;

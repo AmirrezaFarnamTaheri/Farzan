@@ -30,7 +30,6 @@ export function mountNotesView({ setView } = {}) {
         <aside class="notes-sidebar" aria-label="Notes library">
           <div class="notes-sidebar-head">
             <div>
-              <span class="eyebrow">Library</span>
               <h2>Your notes</h2>
             </div>
             <button class="notes-quick-add" type="button" data-action="new-note" aria-label="Create a new note" title="Create a new note">

@@ -59,7 +59,7 @@
 }
 
 
-#ocd-app, .bg-orbs {
+#ocd-app, .ambient-desk-surface {
   position: relative;
   z-index: 1;
 }
@@ -77,12 +77,58 @@ html, body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+  text-rendering: optimizeLegibility;
+}
+
+/* Custom Archival Precision Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface, rgba(0, 0, 0, 0.2));
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-primary, #2563eb);
 }
 
 /* Telemetry & Numeric Formats */
 .tabular-nums {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum", "zero";
+}
+
+/* Card Micro-Edge Refraction & Luxury Depth */
+.card {
+  position: relative;
+  transition: transform var(--duration-fast) var(--ease-studio),
+              border-color var(--duration-fast) var(--ease-studio),
+              box-shadow var(--duration-fast) var(--ease-studio);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* Interactive Component State Matrix */
@@ -107,6 +153,7 @@ button:hover, .btn:hover {
   background-color: var(--bg-surface-hover);
   border-color: var(--brand-primary);
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 button:focus-visible, .btn:focus-visible {
@@ -115,7 +162,7 @@ button:focus-visible, .btn:focus-visible {
 }
 
 button:active, .btn:active {
-  transform: scale(0.98);
+  transform: translateY(1px) scale(0.98);
 }
 
 button:disabled, .btn:disabled {

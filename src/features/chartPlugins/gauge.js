@@ -33,15 +33,12 @@ export const chartGauge = {
 
   beforeInit(chart) {
     const opts = chart.options || {};
-    opts.rotation = -90;
-    opts.circumference = 180;
-    opts.cutout = opts.cutout ?? '72%';
-    opts.responsive = opts.responsive !== false;
-    opts.maintainAspectRatio = opts.maintainAspectRatio !== false;
-    opts.plugins = opts.plugins || {};
-    opts.plugins.legend = { display: false };
-    opts.plugins.tooltip = { enabled: false };
-    opts.animation = opts.animation ?? false;
+    // Use Object.assign instead of direct property assignment to avoid
+    // Chart.js v4.5.1 Data Proxy recursion (Maximum call stack size exceeded)
+    // when chart.options is a Proxy-wrapped object. Each assign targets a
+    // shallow property so the Proxy's own set() trap is not re-entered.
+    Object.assign(opts, { rotation: -90, circumference: 180, cutout: opts.cutout ?? '72%', responsive: opts.responsive !== false, maintainAspectRatio: opts.maintainAspectRatio !== false, animation: opts.animation ?? false });
+    Object.assign(opts, { plugins: { ...opts.plugins, legend: { display: false }, tooltip: { enabled: false } } });
   },
 
   afterDraw(chart, args, options) {

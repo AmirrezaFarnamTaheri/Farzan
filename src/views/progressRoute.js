@@ -96,7 +96,6 @@ export function mountProgressView({ setView } = {}) {
           <div class="card-body">
             <div class="progress-card-heading">
               <div>
-                <span class="eyebrow">Overall mix</span>
                 <h2 id="progress-overall-title">Topic status</h2>
               </div>
               <span class="progress-card-hint">Completed vs active</span>
@@ -111,7 +110,6 @@ export function mountProgressView({ setView } = {}) {
           <div class="card-body">
             <div class="progress-card-heading">
               <div>
-                <span class="eyebrow">Course comparison</span>
                 <h2 id="progress-courses-title">Completion by course</h2>
               </div>
               <span class="progress-card-hint">Relative progress</span>
@@ -126,7 +124,6 @@ export function mountProgressView({ setView } = {}) {
           <div class="card-body">
             <div class="progress-card-heading">
               <div>
-                <span class="eyebrow">Detailed breakdown</span>
                 <h2 id="progress-table-title">Course performance</h2>
               </div>
               <span class="progress-card-hint">Scroll horizontally on small screens</span>

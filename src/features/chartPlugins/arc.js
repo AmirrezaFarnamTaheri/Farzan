@@ -27,13 +27,12 @@ export const chartArc = {
 
   beforeInit(chart) {
     const opts = chart.options || {};
-    opts.cutout = opts.cutout ?? '78%';
-    opts.responsive = opts.responsive !== false;
-    opts.maintainAspectRatio = opts.maintainAspectRatio !== false;
-    opts.plugins = opts.plugins || {};
-    opts.plugins.legend = { display: false };
-    opts.plugins.tooltip = { enabled: false };
-    opts.animation = opts.animation ?? false;
+    // Use Object.assign instead of direct property assignment to avoid
+    // Chart.js v4.5.1 Data Proxy recursion (Maximum call stack size exceeded)
+    // when chart.options is a Proxy-wrapped object. Each assign targets a
+    // shallow property so the Proxy's own set() trap is not re-entered.
+    Object.assign(opts, { cutout: opts.cutout ?? '78%', responsive: opts.responsive !== false, maintainAspectRatio: opts.maintainAspectRatio !== false, animation: opts.animation ?? false });
+    Object.assign(opts, { plugins: { ...opts.plugins, legend: { display: false }, tooltip: { enabled: false } } });
   },
 
   afterInit(chart) {

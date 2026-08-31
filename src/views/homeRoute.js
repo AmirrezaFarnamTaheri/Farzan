@@ -56,7 +56,6 @@ export function mountHomeView(deps = {}) {
         <section class="home-focus-panel" aria-labelledby="home-focus-title" aria-live="polite">
           <div class="home-focus-head">
             <div>
-              <span class="eyebrow">Today’s focus</span>
               <h2 id="home-focus-title">Pick up where you left off</h2>
             </div>
             <span class="home-focus-status" data-home-focus-status>Ready</span>
@@ -81,7 +80,6 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <span class="eyebrow">Learning pulse</span>
                 <h2 class="home-card-title">Your library at a glance</h2>
               </div>
               <a class="btn btn-ghost btn-sm" href="#/progress">Open analytics</a>
@@ -113,7 +111,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <span class="eyebrow">Library snapshot</span>
+            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Library snapshot</h3>
             <div class="home-stat"><strong id="home-course-count">—</strong><span>Courses</span></div>
             <div class="home-stat"><strong id="home-topic-count">—</strong><span>Topics</span></div>
             <p class="home-card-note">Your catalog stays available offline after the first successful load.</p>
@@ -122,7 +120,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <span class="eyebrow">Quick tools</span>
+            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Quick tools</h3>
             <div class="home-tool-list">
               <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
               <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
@@ -135,7 +133,6 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <span class="eyebrow">Next best actions</span>
                 <h2 class="home-card-title">Continue, review, and capture</h2>
               </div>
               <kbd>Ctrl+K</kbd>
@@ -152,7 +149,6 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <span class="eyebrow">Recent activity</span>
                 <h2 class="home-card-title">Your latest learning trail</h2>
               </div>
             </div>

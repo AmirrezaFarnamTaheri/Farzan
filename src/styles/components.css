@@ -3364,3 +3364,61 @@
   [data-ripple]:has(> .ripple-wave) {
     overflow: hidden;
   }
+
+  /* Spatial 3D Knowledge Graph */
+  .spatial-graph-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+    background: radial-gradient(circle at 50% 50%, var(--surface-raised) 0%, var(--bg) 100%);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .spatial-graph-canvas {
+    display: block;
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* Procedural 3D Milestone Trophies */
+  .achievement-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    transition: transform var(--duration-fast), border-color var(--duration-fast);
+  }
+
+  .achievement-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-light);
+  }
+
+  .achievement-trophy-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter var(--duration-normal);
+  }
+
+  .procedural-trophy {
+    display: block;
+    transition: transform var(--duration-normal) var(--ease-spring);
+  }
+
+  .achievement-card:hover .procedural-trophy {
+    transform: scale(1.08) rotate(3deg);
+  }
+
+  /* Connected Knowledge Trail Overlay */
+  .knowledge-trail-overlay {
+    pointer-events: none;
+    overflow: visible;
+  }
