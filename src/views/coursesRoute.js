@@ -20,15 +20,27 @@ export async function mountCoursesView(deps = {}) {
   setView(`
     <section class="view view-courses">
       <div class="page-header">
-        <span class="eyebrow">Curriculum & Media</span>
-        <h1 class="page-title">Course Catalog</h1>
-        <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
+        <div>
+          <span class="eyebrow">Curriculum & Media</span>
+          <h1 class="page-title">Course Catalog</h1>
+          <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" type="button" data-courses-add>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            Add to library
+          </button>
+        </div>
       </div>
 
       <div class="courses-shell">
         <aside class="courses-sidebar">
-          <input class="input" id="courses-search" type="search" placeholder="Search courses..." />
-          <div class="filter-row" aria-label="Course filters" style="margin-top:12px">
+          <label class="courses-search-field">
+            <span class="sr-only">Search courses</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input class="input" id="courses-search" type="search" placeholder="Search courses..." />
+          </label>
+          <div class="filter-row" aria-label="Course filters">
             <button class="filter-chip active" type="button" data-course-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-course-filter="video" aria-pressed="false">Video</button>
             <button class="filter-chip" type="button" data-course-filter="pdf" aria-pressed="false">PDF</button>
@@ -48,9 +60,11 @@ export async function mountCoursesView(deps = {}) {
 
         <main class="courses-main">
           <div id="course-detail" class="course-detail">
-            <div class="card card-filled">
-              <div class="card-body">
-                Select a course on the left.
+            <div class="card card-filled catalog-placeholder">
+              <div class="card-body catalog-empty">
+                <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
+                <strong>Select a course</strong>
+                <p>Select a course on the left. Add a video or PDF anytime from the plus menu.</p>
               </div>
             </div>
           </div>
@@ -178,6 +192,10 @@ export async function mountCoursesView(deps = {}) {
   };
   if (!listEl || !detailEl) return;
 
+  document.querySelector('[data-courses-add]')?.addEventListener('click', () => {
+    window.OpenCourseDeck?.AddContent?.openMenu?.();
+  });
+
   // Ensure player auto-inits for the inserted element
   try { window.OpenCourseDeck?.Player?.init?.(); } catch { /* ignore */ }
 
@@ -239,9 +257,11 @@ export async function mountCoursesView(deps = {}) {
       'data-status': key,
     }, label);
   };
-  const badgeNode = (label) => createElement('span', { class: 'badge' }, label);
-  const actionButton = (action, label) => createElement('button', {
-    class: 'btn btn-ghost btn-sm',
+  const badgeNode = (label, extraClass = '') => createElement('span', {
+    class: extraClass ? `badge ${extraClass}` : 'badge',
+  }, label);
+  const actionButton = (action, label, extraClass = 'btn-ghost') => createElement('button', {
+    class: `btn ${extraClass} btn-sm`,
     type: 'button',
     'data-action': action,
   }, label);
@@ -700,9 +720,13 @@ export async function mountCoursesView(deps = {}) {
 
   const buildCourseButton = (course) => {
     const meta = courseMetaById.get(course.id) || { topicCount: 0, mediaClass: 'none', sourceCount: 0 };
-    const btn = createElement('button', { class: 'course-item', 'data-course-id': course.id });
+    const btn = createElement('button', {
+      class: `course-item course-item--${meta.mediaClass}`,
+      'data-course-id': course.id,
+    });
     const mediaMeta = createElement('div', { class: 'topic-meta' });
-    mediaMeta.append(badgeNode(meta.mediaClass === 'mixed' ? 'video + pdf' : meta.mediaClass === 'none' ? 'no media' : meta.mediaClass));
+    const mediaLabel = meta.mediaClass === 'mixed' ? 'video + pdf' : meta.mediaClass === 'none' ? 'no media' : meta.mediaClass;
+    mediaMeta.append(badgeNode(mediaLabel, meta.mediaClass === 'none' ? '' : 'badge-primary'));
     btn.append(
       createElement('div', { class: 'course-item-title' }, course.title),
       createElement('div', { class: 'course-item-meta' }, `${meta.topicCount} topics - ${meta.sourceCount || 0} source(s)`),
@@ -770,10 +794,17 @@ export async function mountCoursesView(deps = {}) {
     if (!filtered.length) {
       cancelDetailRender();
       courseFacetState.selectedCourseId = '';
-      const card = createElement('div', { class: 'card card-ghost' });
-      card.appendChild(createElement('div', { class: 'card-body' }, 'No courses match this search or filter.'));
+      const card = createElement('div', { class: 'catalog-empty catalog-empty--compact' });
+      card.appendChild(createElement('p', {}, 'No courses match this search or filter.'));
       listEl.appendChild(card);
-      detailEl.replaceChildren(createElement('div', { class: 'card card-filled' }, createElement('div', { class: 'card-body' }, 'Pick a different search or course filter to continue.')));
+      const emptyDetail = createElement('div', { class: 'card card-filled catalog-placeholder' });
+      const emptyBody = createElement('div', { class: 'card-body catalog-empty' });
+      emptyBody.append(
+        createElement('strong', {}, 'Nothing matches'),
+        createElement('p', {}, 'Pick a different search or course filter to continue.'),
+      );
+      emptyDetail.appendChild(emptyBody);
+      detailEl.replaceChildren(emptyDetail);
       return;
     }
     filtered.forEach((course) => {

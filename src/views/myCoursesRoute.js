@@ -9,10 +9,20 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           <h1 class="page-title">My Courses</h1>
           <p class="page-subtitle">Create and organize your own custom course outlines.</p>
         </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" type="button" data-my-courses-add>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            Add media
+          </button>
+        </div>
       </div>
       <div class="card card-filled my-courses-create-card">
         <div class="card-body">
           <div class="my-courses-form" data-my-course-form>
+            <div class="my-courses-create-copy">
+              <h2 class="my-courses-create-title">Start a course</h2>
+              <p class="text-muted text-sm">Name the track first. Add lectures from the plus menu or by dropping files onto the page.</p>
+            </div>
             <label class="my-courses-field">
               <span class="text-sm font-semibold">Course title</span>
               <input class="input" data-my-course-title required maxlength="120" placeholder="e.g. Advanced Neurology Review" />
@@ -21,7 +31,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
               <span class="text-sm font-semibold">Description</span>
               <textarea class="input" data-my-course-description rows="3" maxlength="600" placeholder="What concepts, lectures, and resources this course covers"></textarea>
             </label>
-            <div>
+            <div class="button-row">
               <button class="btn btn-primary" type="button" data-my-course-save>
                 <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
                 Save Course
@@ -40,6 +50,10 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       </div>
     </section>
   `);
+
+  document.querySelector('[data-my-courses-add]')?.addEventListener('click', () => {
+    window.OpenCourseDeck?.AddContent?.openMenu?.();
+  });
 
   document.querySelector('[data-my-course-save]')?.addEventListener('click', async (event) => {
     event.preventDefault();
@@ -85,9 +99,16 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     list.replaceChildren();
     if (!courses.length) {
       const empty = document.createElement('div');
-      empty.className = 'empty-state';
+      empty.className = 'empty-state my-courses-empty';
+      const icon = document.createElement('div');
+      icon.className = 'empty-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = '<svg class="icon"><use href="#i-folder-plus"/></svg>';
       const copy = document.createElement('p');
       copy.textContent = 'No custom courses yet.';
+      const hint = document.createElement('p');
+      hint.className = 'empty-text';
+      hint.textContent = 'Save an outline here, then drop videos or PDFs onto the page to fill it.';
       const actions = document.createElement('div');
       actions.className = 'button-row';
       const create = document.createElement('button');
@@ -102,7 +123,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       catalog.href = '#/courses';
       catalog.textContent = 'Open catalog';
       actions.append(create, catalog);
-      empty.append(copy, actions);
+      empty.append(icon, copy, hint, actions);
       list.appendChild(empty);
       return;
     }
@@ -118,26 +139,30 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
 
   function courseCard(course) {
     const card = document.createElement('article');
-    card.className = 'card';
+    card.className = 'card my-course-card';
     card.dataset.myCourseId = course.id;
     const body = document.createElement('div');
-    body.className = 'card-body';
+    body.className = 'card-body my-course-card-body';
     const title = document.createElement('h2');
-    title.className = 'h3';
+    title.className = 'my-course-title';
     title.textContent = course.title || 'Untitled course';
     const description = document.createElement('p');
+    description.className = 'my-course-desc';
     description.textContent = course.description || 'No description';
     const meta = document.createElement('p');
-    meta.className = 'text-muted text-sm';
+    meta.className = 'text-muted text-sm my-course-meta';
     meta.textContent = course.updatedAt ? `Updated ${new Date(course.updatedAt).toLocaleDateString()}` : 'Saved course';
     const actions = document.createElement('div');
     actions.className = 'button-row';
     const open = document.createElement('a');
-    open.className = 'btn btn-ghost btn-sm';
+    open.className = 'btn btn-primary btn-sm';
     open.href = '#/courses';
     open.textContent = 'Open in catalog';
+    open.addEventListener('click', () => {
+      try { sessionStorage.setItem('ocd_pending_library_course', course.id); } catch {}
+    });
     const remove = document.createElement('button');
-    remove.className = 'btn btn-ghost btn-sm';
+    remove.className = 'btn btn-danger-ghost btn-sm';
     remove.type = 'button';
     remove.textContent = 'Delete';
     remove.addEventListener('click', async () => {

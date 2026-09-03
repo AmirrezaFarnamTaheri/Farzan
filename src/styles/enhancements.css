@@ -589,6 +589,27 @@ article:has(#btn-theme-toggle) { min-width: 0; }
 }
 .view .page-header .page-header-actions { margin-left: auto; }
 
+.view-courses .page-header,
+.view-my-courses .page-header {
+  align-items: flex-end;
+}
+
+.view-courses .catalog-placeholder {
+  min-height: 240px;
+}
+
+.view-courses .catalog-placeholder:hover {
+  transform: none;
+}
+
+.view-courses .course-item {
+  padding-left: calc(var(--space-4) + 6px);
+}
+
+.view-my-courses .my-courses-list-card .grid-3:has(.my-courses-empty) {
+  display: block;
+}
+
 /* Learning cues: advanced block collapsed by default */
 .learning-marker-details { margin-top: 10px; }
 .learning-marker-details > summary {

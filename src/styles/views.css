@@ -602,6 +602,7 @@
 }
 
 .course-item {
+  position: relative;
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
@@ -610,7 +611,24 @@
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   cursor: pointer;
+  overflow: hidden;
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.course-item::after {
+  content: '';
+  position: absolute;
+  inset: var(--space-3) auto var(--space-3) 0;
+  width: 3px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: color-mix(in srgb, var(--text-tertiary) 55%, transparent);
+  opacity: 0.7;
+}
+
+.course-item--video::after { background: var(--accent); }
+.course-item--pdf::after { background: var(--info, #38bdf8); }
+.course-item--mixed::after {
+  background: linear-gradient(180deg, var(--accent), var(--info, #38bdf8));
 }
 
 .course-item:hover {
@@ -852,6 +870,168 @@
 .my-courses-field {
   display: grid;
   gap: var(--space-1);
+}
+
+.my-courses-create-card {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--glass-border));
+}
+
+.my-courses-create-copy {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: var(--space-1);
+}
+
+.my-courses-create-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.view-my-courses .stat-card {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+  gap: var(--space-2);
+}
+
+.view-my-courses .stat-card-value {
+  font-size: var(--text-3xl);
+}
+
+.my-courses-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+}
+
+.my-courses-empty .empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 0;
+  border-radius: var(--radius-xl);
+  background: var(--accent-muted);
+  color: var(--accent-light);
+  font-size: 1.5rem;
+  opacity: 1;
+}
+
+.my-courses-empty .button-row {
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+.my-course-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+
+.my-course-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.my-course-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.my-course-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  flex: 1;
+  line-height: var(--leading-relaxed);
+}
+
+.my-course-meta {
+  margin-top: var(--space-3);
+}
+
+.my-course-card .button-row {
+  margin-top: var(--space-4);
+}
+
+.my-course-card.is-new {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--glass-border));
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.12);
+}
+
+.courses-search-field {
+  position: relative;
+  display: block;
+}
+
+.courses-search-field > .icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.courses-search-field .input {
+  padding-left: calc(var(--space-3) * 2 + 1em);
+}
+
+.catalog-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.catalog-empty--compact {
+  padding: var(--space-6) var(--space-3);
+}
+
+.catalog-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-muted);
+  color: var(--accent-light);
+  font-size: 1.35rem;
+}
+
+.catalog-empty strong {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+}
+
+.catalog-empty p {
+  margin: 0;
+  max-width: 36ch;
+}
+
+.badge-status-done {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.badge-status-in-progress {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+.badge-status-not-started {
+  background: var(--surface-3);
+  color: var(--text-tertiary);
 }
 
 /* Playlists */

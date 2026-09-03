@@ -635,33 +635,64 @@
     role="menu" aria-label="Add content options">
     <div class="add-content-heading">Library</div>
     <button class="add-content-item" data-action="add-video" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-video-cam"/></svg>
-      <span>Add Video</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-video-cam"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Add Video</span>
+        <small>Keep a lecture on this device</small>
+      </span>
     </button>
     <button class="add-content-item" data-action="add-pdf" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg>
-      <span>Add PDF</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-file-pdf"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Add PDF</span>
+        <small>Store a reading in My Library</small>
+      </span>
     </button>
     <div class="add-content-divider" role="separator"></div>
     <div class="add-content-heading">Organize</div>
     <button class="add-content-item" data-action="create-topic" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-folder-plus"/></svg>
-      <span>Create Topic</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-folder-plus"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Create Topic</span>
+        <small>Add a lesson to a course</small>
+      </span>
     </button>
     <button class="add-content-item" data-action="create-course" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
-      <span>Create Course</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-curriculum"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Create Course</span>
+        <small>Start a custom track</small>
+      </span>
     </button>
     <div class="add-content-divider" role="separator"></div>
     <div class="add-content-heading">Import</div>
     <button class="add-content-item" data-action="add-link" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
-      <span>Add URL / Embed</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-link"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Add URL / Embed</span>
+        <small>Link a remote video, PDF, or page</small>
+      </span>
     </button>
     <button class="add-content-item" data-action="import-backup" role="menuitem">
-      <svg class="icon" aria-hidden="true"><use href="#i-file-import"/></svg>
-      <span>Import Backup</span>
+      <span class="add-content-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-file-import"/></svg>
+      </span>
+      <span class="add-content-copy">
+        <span>Import Backup</span>
+        <small>Restore progress and notes</small>
+      </span>
     </button>
+    <p class="add-content-footnote">Or drop files anywhere on the page.</p>
   </div>
 
   <!-- Hidden file inputs for file operations -->

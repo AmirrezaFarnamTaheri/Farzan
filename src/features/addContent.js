@@ -453,7 +453,7 @@ function bindDropTarget() {
     overlay.id = 'library-drop-overlay';
     overlay.className = 'library-drop-overlay';
     overlay.setAttribute('aria-hidden', 'true');
-    overlay.innerHTML = '<div class="library-drop-card"><strong>Drop videos or PDFs</strong><span>They stay in My Library on this device.</span></div>';
+    overlay.innerHTML = '<div class="library-drop-card"><span class="library-drop-icon" aria-hidden="true"><svg class="icon"><use href="#i-upload"/></svg></span><strong>Drop videos or PDFs</strong><span class="library-drop-hint">They stay in My Library on this device.</span></div>';
     document.body.appendChild(overlay);
   }
   let depth = 0;
