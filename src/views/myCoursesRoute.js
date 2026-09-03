@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'plasma-my-courses';
+const STORAGE_KEY = 'ocd_my_courses';
 
 export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toast } = {}) {
   setView(`
@@ -56,6 +56,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       updatedAt: Date.now(),
     };
     await saveCourses([record, ...courses]);
+    try {
+      await window.OpenCourseDeck?.UserLibrary?.upsertCourse?.({
+        id: record.id,
+        title: record.title,
+        description: record.description,
+      });
+    } catch {}
     titleInput.value = '';
     if (descriptionInput) descriptionInput.value = '';
     Toast?.success?.('Course saved');
@@ -101,6 +108,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     remove.addEventListener('click', async () => {
       const next = (await loadCourses()).filter(item => item.id !== course.id);
       await saveCourses(next);
+      try { await window.OpenCourseDeck?.UserLibrary?.removeCourse?.(course.id); } catch {}
       Toast?.info?.('Course deleted');
       await renderCourses();
     });

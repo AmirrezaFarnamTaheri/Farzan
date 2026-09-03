@@ -97,6 +97,12 @@ export function initCommandPalette() {
     { label: 'UI: Density compact', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'compact'), cat: 'tools' },
     { label: 'UI: Density comfortable', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'comfortable'), cat: 'tools' },
     { label: 'UI: Density spacious', action: () => app().Prefs?.set?.(app().Prefs?.KEYS?.density, 'spacious'), cat: 'tools' },
+    // Library
+    { label: 'Add video', action: () => app().AddContent?.addVideo?.(), cat: 'action' },
+    { label: 'Add PDF', action: () => app().AddContent?.addPdf?.(), cat: 'action' },
+    { label: 'Create topic', action: () => app().AddContent?.createTopic?.(), cat: 'action' },
+    { label: 'Create course', action: () => app().AddContent?.createCourse?.(), cat: 'action' },
+    { label: 'Add URL', action: () => app().AddContent?.addLink?.(), cat: 'action' },
     // Actions
     { label: 'Export backup', action: () => window.ProgressStats?.exportJSON?.(), cat: 'action' },
     { label: 'Show keyboard shortcuts', action: () => window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.(), cat: 'action' },

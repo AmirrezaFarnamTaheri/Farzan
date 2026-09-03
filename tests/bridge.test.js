@@ -137,7 +137,9 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
     await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
     await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
+    await window.DB.saveSetting('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'My Library' } } });
     localStorage.setItem('plasma-pdf-annotations', JSON.stringify([{ id: 'ann-1' }]));
+    localStorage.setItem('ocd_user_library', JSON.stringify({ version: 1, courses: { leftover: true } }));
 
     await window.DB.clearAll();
 
@@ -151,6 +153,8 @@ describe('bridge DB safety helpers', () => {
     expect(localStorage.getItem('plasma-playlists')).toBeNull();
     expect(localStorage.getItem('plasma-studio-board')).toBeNull();
     expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
+    expect(localStorage.getItem('ocd_user_library')).toBeNull();
+    expect(await window.DB.getSetting('ocd_user_library')).toBeNull();
   });
 
   it('clearUserData removes only the requested data scope', async () => {

@@ -412,7 +412,7 @@ describe('app shell resilience helpers', () => {
     view.querySelector('[data-my-course-description]').value = 'Focused rhythm practice';
     view.querySelector('[data-my-course-save]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-my-courses', expect.any(Array)));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_my_courses', expect.any(Array)));
     const savedCourses = saveSetting.mock.calls[0][1];
     expect(savedCourses[0]).toEqual(expect.objectContaining({
       title: 'Cardiology review',
@@ -424,7 +424,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]').textContent).toContain('Cardiology review'));
     document.querySelector('[data-my-course-id] button').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('plasma-my-courses', []));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_my_courses', []));
   });
 
   it('renders playlists from active queue, timestamps, and catalog video sources', async () => {
@@ -1163,7 +1163,7 @@ describe('app shell resilience helpers', () => {
       hasKey: true,
     })));
     expect(saveSetting.mock.calls.at(-1)[1].apiKey).toBeUndefined();
-    expect(sessionStorage.getItem('plasma-ai-api-key-session')).toBe('session-key');
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('session-key');
     expect(window.OpenCourseDeck.AISettings.mode).toBe('custom-api');
     expect(document.querySelector('[data-ai-summary]').textContent).toContain('Available for this session');
     expect(document.querySelector('[data-ai-key-storage]').disabled).toBe(true);
@@ -1531,6 +1531,8 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.safeMediaUrl('http://media.example.test/video.mp4')).toBe('http://media.example.test/video.mp4');
     expect(window.OpenCourseDeck.safeMediaUrl('/media/local.pdf')).toContain('/media/local.pdf');
     expect(window.OpenCourseDeck.safeMediaUrl('blob:https://example.test/id')).toBe('blob:https://example.test/id');
+    expect(window.OpenCourseDeck.safeMediaUrl('library-file:abc')).toBe('library-file:abc');
+    expect(window.OpenCourseDeck.safeMediaUrl({ url: 'library-file:abc', label: 'Lecture' })).toBe('library-file:abc');
     expect(window.OpenCourseDeck.safeMediaUrl('javascript:alert(1)')).toBeNull();
     expect(window.OpenCourseDeck.safeMediaUrl('vbscript:msgbox(1)')).toBeNull();
   });
@@ -2089,7 +2091,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-learning-marker-text]').value = 'QRS morphology';
     document.querySelector('[data-save-chapter-cue]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('plasma-course-media-cues', expect.objectContaining({
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', expect.objectContaining({
       'topic-1': expect.objectContaining({
         chapters: expect.arrayContaining([expect.objectContaining({ time: 95, title: 'QRS morphology', authored: true })]),
       }),
@@ -2102,7 +2104,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-learning-marker-text]').value = 'Axis deviation becomes clear.';
     document.querySelector('[data-save-transcript-cue]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('plasma-course-media-cues', expect.objectContaining({
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_course_media_cues', expect.objectContaining({
       'topic-1': expect.objectContaining({
         chapters: expect.arrayContaining([expect.objectContaining({ title: 'QRS morphology' })]),
         transcript: expect.arrayContaining([expect.objectContaining({ start: 95, text: 'Axis deviation becomes clear.', authored: true })]),
@@ -2195,7 +2197,7 @@ describe('app shell resilience helpers', () => {
       kind: 'setting',
       action: 'save',
       record: {
-        key: 'plasma-course-media-cues',
+        key: 'ocd_course_media_cues',
         value: {
           'topic-1': {
             chapters: [{ time: 45, title: 'Synced chapter', authored: true }],

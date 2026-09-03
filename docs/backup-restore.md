@@ -8,6 +8,9 @@ OpenCourseDeck stores user data locally in the browser. Backups are the safest w
 - Notes: notes storage plus compatibility mirrors where needed.
 - Preferences: localStorage keys such as theme, accent, density, sidebar state, and font scale.
 - Catalog files: normal project files, not browser storage.
+- Flashcards: `ocd_flashcards` (IndexedDB settings plus a localStorage mirror).
+- User library metadata: `ocd_user_library` (course/topic overlay). JSON backups restore metadata; local file blobs in `opencoursedeck-library-files` are origin-scoped and are not inside the JSON backup.
+- JSON backup format version `1.4` includes flashcards and library settings. Versions `1.0`–`1.3` still import.
 
 ### Export A Backup
 

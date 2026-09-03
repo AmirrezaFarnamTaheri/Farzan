@@ -105,8 +105,17 @@ export async function mountCoursesView(deps = {}) {
     </section>
   `);
 
-  // Ensure catalog loaded
+  // Ensure catalog loaded and user-library courses overlay the catalog.
   await window.DataStore?.init?.();
+  try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+
+  const playableMediaUrl = async (value) => {
+    const lib = window.OpenCourseDeck?.UserLibrary;
+    if (typeof lib?.resolvePlayable === 'function') {
+      return lib.resolvePlayable(value, safeMediaUrl);
+    }
+    return safeMediaUrl(value);
+  };
   const listEl = document.getElementById('courses-list');
   const searchEl = document.getElementById('courses-search');
   const sourceScopeEl = document.getElementById('courses-source-scope');
@@ -172,7 +181,7 @@ export async function mountCoursesView(deps = {}) {
   // Ensure player auto-inits for the inserted element
   try { window.OpenCourseDeck?.Player?.init?.(); } catch { /* ignore */ }
 
-  const MEDIA_CUES_KEY = 'plasma-course-media-cues';
+  const MEDIA_CUES_KEY = 'ocd_course_media_cues';
   let authoredMediaCues = {};
   try {
     const savedCues = await window.DB?.getSetting?.(MEDIA_CUES_KEY);
@@ -991,7 +1000,7 @@ export async function mountCoursesView(deps = {}) {
       }
 
       if (action === 'open-pdf') {
-        const url = safeMediaUrl(topic.pdfs?.[0]);
+        const url = await playableMediaUrl(topic.pdfs?.[0]);
         if (!url) return;
         Router.navigate('#/pdf');
         // Wait a tick for the view to mount, then load
@@ -1002,7 +1011,7 @@ export async function mountCoursesView(deps = {}) {
       }
 
       if (action === 'play-video') {
-        const url = safeMediaUrl(topic.videos?.[0]);
+        const url = await playableMediaUrl(topic.videos?.[0]);
         if (!url) return;
         // Ensure player exists and has an instance
         const el = playerEl;
@@ -1228,8 +1237,8 @@ export async function mountCoursesView(deps = {}) {
     const t = allTopics.find(x => x.topicId === pendingTopicId);
     if (t && selectCourse(t.courseId)) {
       // Autoplay after detail is rendered
-      setTimeout(() => {
-        const url = safeMediaUrl(t.videos?.[0]);
+      setTimeout(async () => {
+        const url = await playableMediaUrl(t.videos?.[0]);
         if (!url) return;
         const el = playerEl;
         const inst = el?._pdPlayer;

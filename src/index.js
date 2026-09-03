@@ -40,6 +40,7 @@ import faIR from './locales/fa-IR.js';
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
+import { initAddContent } from './features/addContent.js';
 
 installBridgeHardening(window);
 installAuxiliaryDbLifecycle(window);
@@ -193,6 +194,7 @@ pd.ProductReadiness = enforceProductReadiness(document);
 
 import('../app.js').then(async () => {
   try {
+    initAddContent(window);
     const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all([
       import('./features/translator.js'),
       import('./features/translationCache.js'),

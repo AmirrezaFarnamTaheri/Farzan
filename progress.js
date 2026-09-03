@@ -337,10 +337,15 @@ const ProgressStats = (() => {
     const notesSettings= await DB.getSetting?.('ocd_notes_settings') ?? null;
     const playlistsSettings= await DB.getSetting?.('ocd_playlists') ?? null;
     const studioSettings= await DB.getSetting?.('ocd_studio_board') ?? null;
+    const flashcardsSettings= await DB.getSetting?.('ocd_flashcards')
+      ?? (typeof window.OpenCourseDeck?.Flashcards?.getCards === 'function'
+        ? await window.OpenCourseDeck.Flashcards.getCards()
+        : null);
+    const librarySettings= await DB.getSetting?.('ocd_user_library') ?? null;
 
     const payload = {
       exportedAt  : new Date().toISOString(),
-      version     : '1.3',
+      version     : '1.4',
       meta        : {
         storage: await _storageEstimate(),
       },
@@ -351,6 +356,8 @@ const ProgressStats = (() => {
         notes: notesSettings,
         playlists: playlistsSettings,
         studio: studioSettings,
+        flashcards: flashcardsSettings,
+        library: librarySettings,
       },
       annotations : allAnnotations,
       timestamps  : allTimestamps,
@@ -425,11 +432,12 @@ const ProgressStats = (() => {
       const filename = `notes/${slug}${count > 1 ? `-${count}` : ''}.md`;
       return { filename, note, topic };
     });
-    return { allNotes, allTimestamps, allAnnotations, noteFiles };
+    const flashcards = await Promise.resolve(DB.getSetting?.('ocd_flashcards')).catch(() => []);
+    return { allNotes, allTimestamps, allAnnotations, noteFiles, flashcards: Array.isArray(flashcards) ? flashcards : [] };
   }
 
   async function exportVaultMarkdown() {
-    const { allNotes, allTimestamps, allAnnotations, noteFiles } = await _vaultExportData();
+    const { allNotes, allTimestamps, allAnnotations, noteFiles, flashcards } = await _vaultExportData();
 
     const lines = [
       '# OpenCourseDeck Vault Export',
@@ -438,6 +446,7 @@ const ProgressStats = (() => {
       `Notes: ${allNotes.length}`,
       `Timestamps: ${allTimestamps.length}`,
       `PDF annotations: ${allAnnotations.length}`,
+      `Flashcards: ${flashcards.length}`,
       '',
       '## Manifest',
       '',
@@ -516,7 +525,7 @@ const ProgressStats = (() => {
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
         const timestampRecords = _asArray(payload.timestamps).filter((timestamp) => _isObjectRecord(timestamp) && timestamp.id != null);
-        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3'].includes(String(payload.version));
+        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4'].includes(String(payload.version));
         if (!versionSupported) throw new Error(`Unsupported backup version: ${payload.version}`);
         const invalidCount =
           rawProgress.length - progressRecords.length +
@@ -527,7 +536,9 @@ const ProgressStats = (() => {
         const settingsCount =
           (payload.settings?.notes ? 1 : 0) +
           (Array.isArray(payload.settings?.playlists) ? 1 : 0) +
-          (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) ? 1 : 0);
+          (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) ? 1 : 0) +
+          (Array.isArray(payload.settings?.flashcards) ? 1 : 0) +
+          (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) ? 1 : 0);
         const preview = {
           version: payload.version ?? 'legacy',
           fileName: file.name ?? 'backup.json',
@@ -667,6 +678,28 @@ const ProgressStats = (() => {
               _recordImportError(result, 'settings', 'ocd_studio_board', err);
             }
         } else if (payload.settings?.studio) {
+          result.skipped += 1;
+        }
+        if (Array.isArray(payload.settings?.flashcards) && DB.saveSetting) {
+            try {
+              await DB.saveSetting('ocd_flashcards', payload.settings.flashcards);
+              try { window.localStorage?.setItem?.('ocd_flashcards', JSON.stringify(payload.settings.flashcards)); } catch {}
+              result.settings += 1;
+            } catch (err) {
+              _recordImportError(result, 'settings', 'ocd_flashcards', err);
+            }
+        } else if (payload.settings?.flashcards) {
+          result.skipped += 1;
+        }
+        if (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) && DB.saveSetting) {
+            try {
+              await DB.saveSetting('ocd_user_library', payload.settings.library);
+              try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+              result.settings += 1;
+            } catch (err) {
+              _recordImportError(result, 'settings', 'ocd_user_library', err);
+            }
+        } else if (payload.settings?.library) {
           result.skipped += 1;
         }
         if (annotationRecords.length && DB.saveAnnotations) {
@@ -894,7 +927,7 @@ const ProgressStats = (() => {
   }
 
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library'];
     const annotations = await Promise.resolve(DB.getAllAnnotations?.()).catch(() => []);
     return {
       progress: await Promise.resolve(DB.getAllProgress?.()).catch(() => []),

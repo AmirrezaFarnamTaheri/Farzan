@@ -173,10 +173,18 @@ import { Pointer } from './src/lib/pointer.js';
     }
   }
 
+  function unwrapMediaValue(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'object') return String(value.url || value.src || '').trim();
+    return String(value).trim();
+  }
+
   function safeMediaUrl(value) {
-    if (!value) return null;
+    const raw = unwrapMediaValue(value);
+    if (!raw) return null;
+    if (raw.startsWith('library-file:')) return raw;
     try {
-      const raw = String(value).trim();
       const url = new URL(raw, document.baseURI);
       if (url.protocol === 'data:') return /^data:(?:video|audio|application\/pdf)\//i.test(raw) ? url.href : null;
       return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : null;
@@ -898,7 +906,7 @@ import { Pointer } from './src/lib/pointer.js';
     _hasDataOverride: false,
 
     init() {
-      this.input = $('.topbar-search input, .topbar-search [data-search-input]');
+      this.input = $('#sidebar-search') || $('.topbar-search input, .topbar-search [data-search-input]');
       if (!this.input) return;
 
       this.resultsBox = createElement('div', {
@@ -3646,7 +3654,7 @@ import { Pointer } from './src/lib/pointer.js';
 
     KeyboardShortcuts.init();
 KeyboardShortcuts.register('ctrl+shift+f', () => {
-  const input = $('.topbar-search input');
+  const input = $('#sidebar-search') || $('.topbar-search input');
   if (input) { input.focus(); input.select(); }
 }, 'Focus global search');
 KeyboardShortcuts.register('ctrl+/', () => KeyboardShortcuts.showHelp(), 'Show keyboard shortcuts');

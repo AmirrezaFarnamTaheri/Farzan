@@ -8,6 +8,7 @@
   const STORE_NAME = 'ocd_flashcards';
   const LEGACY_STORE_NAME = 'plasma-flashcards-store';
   let memoryStore = [];
+  let hydratePromise = null;
 // Keyboard handling re-attaches on every studio render; this controller
 // tears down the previous listener so re-renders never stack handlers.
 let studioKeyController = null;
@@ -56,11 +57,18 @@ let studioKeyController = null;
     }
 
     getStorage() {
+      if (Array.isArray(memoryStore) && memoryStore.length) return memoryStore;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
           const raw = window.localStorage.getItem(STORE_NAME)
             ?? window.localStorage.getItem(LEGACY_STORE_NAME);
-          if (raw) return JSON.parse(raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              memoryStore = parsed;
+              return memoryStore;
+            }
+          }
         }
       } catch {}
       return memoryStore;
@@ -73,19 +81,40 @@ let studioKeyController = null;
           window.localStorage.setItem(STORE_NAME, JSON.stringify(cards));
         }
       } catch {}
+      try { window.DB?.saveSetting?.(STORE_NAME, cards); } catch {}
+    }
+
+    async hydrate() {
+      if (hydratePromise) return hydratePromise;
+      hydratePromise = (async () => {
+        if (Array.isArray(memoryStore) && memoryStore.length) return memoryStore;
+        try {
+          const fromDb = await window.DB?.getSetting?.(STORE_NAME);
+          if (Array.isArray(fromDb) && fromDb.length) {
+            memoryStore = fromDb;
+            try { window.localStorage?.setItem?.(STORE_NAME, JSON.stringify(fromDb)); } catch {}
+            return memoryStore;
+          }
+        } catch {}
+        return this.getStorage();
+      })();
+      return hydratePromise;
     }
 
     reset() {
       memoryStore = [];
+      hydratePromise = null;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') {
           window.localStorage.removeItem(STORE_NAME);
           window.localStorage.removeItem(LEGACY_STORE_NAME);
         }
       } catch {}
+      try { window.DB?.saveSetting?.(STORE_NAME, []); } catch {}
     }
 
     async getCards() {
+      await this.hydrate();
       return this.getStorage();
     }
 

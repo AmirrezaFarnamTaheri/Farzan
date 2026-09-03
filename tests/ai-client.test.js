@@ -67,6 +67,8 @@ describe('AI client', () => {
       localModelSource: GEMMA_MODEL_OPTIONS[0].url,
     });
     expect(client.gemmaModelOptions.map(option => option.id)).toContain('gemma-4-local');
+    expect(client.gemmaModelOptions[0].label).toBe('On-device extractive summary');
+    expect(client.gemmaModelOptions.map(option => option.label).join(' ')).not.toMatch(/Gemma 4|Gemma 3n/);
   });
 
   it('reports imported local model file metadata', async () => {
@@ -237,7 +239,7 @@ describe('AI client', () => {
   });
 
   it('requires explicit approval before sending a session key to a custom endpoint', async () => {
-    sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
+    sessionStorage.setItem('ocd_ai_api_key_session', 'sk-session');
     const root = {
       DB: { getSetting: vi.fn(async () => ({
         mode: 'custom-api',
@@ -263,7 +265,7 @@ describe('AI client', () => {
   });
 
   it('calls an approved OpenAI-compatible API endpoint with a session-only key', async () => {
-    sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
+    sessionStorage.setItem('ocd_ai_api_key_session', 'sk-session');
     const fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({ choices: [{ message: { content: 'Remote summary' } }] }),
@@ -302,7 +304,7 @@ describe('AI client', () => {
   });
 
   it('rejects insecure or credential-bearing custom endpoints', async () => {
-    sessionStorage.setItem('plasma-ai-api-key-session', 'sk-session');
+    sessionStorage.setItem('ocd_ai_api_key_session', 'sk-session');
     const root = {
       DB: { getSetting: vi.fn() },
       fetch: vi.fn(),

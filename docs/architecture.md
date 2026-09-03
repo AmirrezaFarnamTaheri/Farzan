@@ -1,4 +1,4 @@
-﻿## Architecture
+## Architecture
 
 ### Runtime model (current)
 
@@ -13,13 +13,14 @@
 - `index.html` provides native landmarks and a skip link to `#main-content`.
 - Avoid `role="application"` on the app root; native browser and screen-reader navigation should stay available.
 - Overlay primitives live in `app.js` and use helpers from `src/lib/dom.js`.
-- Modal, drawer, and command palette openings inert `#plasma-app`, trap focus inside the overlay, and restore focus to the opener on close.
+- Modal, drawer, and command palette openings inert `#ocd-app`, trap focus inside the overlay, and restore focus to the opener on close.
 - Route changes focus `#main-content` and announce through `#aria-announcer`.
 
 ### Storage
 
 - Phase 1 migration introduces IndexedDB-backed `window.DB` facade (see `bridge.js`).
 - A one-time migration reads legacy localStorage keys and writes them into IndexedDB.
+- When a passphrase is set on `OpenCourseDB`, `put`/`add`/`bulkPut`/`get`/`getAll`/`getAllByIndex`/`queryIndex` encrypt and decrypt AES-GCM v2 envelopes. IndexedDB keyPath and index fields (`id`, `courseId`, …) stay in plaintext on the envelope so indexes still work. Library file blobs in `opencoursedeck-library-files` are not encrypted.
 
 ### Key modules
 
@@ -39,7 +40,8 @@
 - These visualization namespaces are bundled and exposed for runtime use; deeper route-level UX integration is still separate from namespace exposure.
 - Plugin runtime state currently exposes `OpenCourseDeck.plugins` as an app-level object. `src/features/pluginHost.js` exists and is tested, but it is not imported by `src/index.js` or `app.js`, so `OpenCourseDeck.PluginHost` is not part of the active runtime bundle by default.
 - Translation modules ARE part of the active runtime bundle: `src/index.js` imports `src/features/translator.js` and `src/features/translationCache.js` and exposes them as `OpenCourseDeck.TranslatorRegistry` and `OpenCourseDeck.TranslationCache`. The registry is wired, but no view calls it yet (notes and the player have no translate action).
-- Player-adjacent source modules such as `MediaStorage` and `WaveformScrubber` expose namespaces when their modules are imported, and `player.js` checks for those namespaces. They are not imported by the active entrypoint in the current runtime, so the player falls back when those namespaces are absent.
+- Player-adjacent source modules `MediaStorage` and `WaveformScrubber` are imported by the lazy `player` feature loader in `src/index.js` (`pd.loadFeature('player')`). `player.js` still probes those namespaces at runtime and falls back if a custom embed loads the player without the feature loader.
+- User library creation is a shipped product surface: `src/features/addContent.js` and `src/features/userLibrary.js` are initialized after the app shell resolves. Add video/PDF/topic/course/URL writes a user overlay (`ocd_user_library`) that `DataStore.mergeRaw(..., { userOwned: true })` keeps separate from the catalog so a catalog reload cannot resurrect a deleted user course. File blobs live in the `opencoursedeck-library-files` IndexedDB and play through `library-file:` refs resolved to blob URLs.
 
 ### Performance notes
 

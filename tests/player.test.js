@@ -496,4 +496,17 @@ describe('MediaPlayer queue rendering', () => {
     expect(sessionStorage.getItem('pd-player')).toBeNull();
     expect(document.querySelector('#player').childElementCount).toBe(0);
   });
+
+  it('resolves library-file refs through UserLibrary before assigning media src', async () => {
+    window.OpenCourseDeck.UserLibrary = {
+      resolvePlayable: vi.fn(async () => 'blob:https://example.test/library-video'),
+    };
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ title: 'Local lecture', src: 'library-file:abc' }]);
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('#player video').getAttribute('src')).toBe('blob:https://example.test/library-video');
+    });
+    expect(window.OpenCourseDeck.UserLibrary.resolvePlayable).toHaveBeenCalled();
+  });
 });

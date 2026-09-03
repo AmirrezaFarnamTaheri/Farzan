@@ -176,19 +176,57 @@ tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted')
 });
 }
 
+_storeDef(store) {
+return (this.schema || []).find(item => item.name === store) || {};
+}
+
+_plaintextIndexFields(store, data) {
+if (!data || typeof data !== 'object') return {};
+const def = this._storeDef(store);
+const fields = [def.key || 'id', ...((def.indexes || []).map(index => index.field))].filter(Boolean);
+const out = {};
+for (const field of fields) {
+if (data[field] !== undefined) out[field] = data[field];
+}
+return out;
+}
+
+async _seal(store, data) {
+if (!this.encryptionPassphrase || !data || typeof data !== 'object' || data.__encrypted) return data;
+const sealed = await this.encryptPayload(data);
+if (!sealed || !sealed.__encrypted) return data;
+return { ...sealed, ...this._plaintextIndexFields(store, data) };
+}
+
+async _open(data) {
+if (!data || !data.__encrypted) return data;
+try {
+return await this.decryptPayload(data);
+} catch {
+return data;
+}
+}
+
+async _openAll(list) {
+if (!Array.isArray(list)) return list;
+return Promise.all(list.map(item => this._open(item)));
+}
+
 async add(store, data) {
 // Whole-mutation retry: a fresh transaction per attempt clears transient
 // failures (version-change aborts, quota pressure, inactive transactions).
 return withMutationRetry(async () => {
+const payload = await this._seal(store, data);
 const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.add(data));
+return this._waitForTransaction(tx, objectStore.add(payload));
 });
 }
 
 async put(store, data) {
 return withMutationRetry(async () => {
+const payload = await this._seal(store, data);
 const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.put(data));
+return this._waitForTransaction(tx, objectStore.put(payload));
 });
 }
 
@@ -196,7 +234,7 @@ async get(store,id) {
 const { objectStore } = await this._transaction(store);
 return new Promise((res,rej)=>{
 const r=objectStore.get(id);
-r.onsuccess=()=>res(r.result);
+r.onsuccess=()=>res(this._open(r.result));
 r.onerror=()=>rej(r.error);
 });
 }
@@ -205,7 +243,7 @@ async getAll(store) {
 const { objectStore } = await this._transaction(store);
 return new Promise((res,rej)=>{
 const r=objectStore.getAll();
-r.onsuccess=()=>res(r.result);
+r.onsuccess=()=>res(this._openAll(r.result));
 r.onerror=()=>rej(r.error);
 });
 }
@@ -234,7 +272,7 @@ const { objectStore } = await this._transaction(store);
 return new Promise((res,rej)=>{
 try {
 const r = objectStore.index(indexName).getAll(value);
-r.onsuccess=()=>res(r.result);
+r.onsuccess=()=>res(this._openAll(r.result));
 r.onerror=()=>rej(r.error);
 } catch (err) {
 rej(err);
@@ -262,7 +300,7 @@ return;
 req.onsuccess=()=>{
 const cursor = req.result;
 if (!cursor || (limit && out.length >= limit)) {
-res(out);
+res(this._openAll(out));
 return;
 }
 out.push(cursor.value);
@@ -283,10 +321,11 @@ r.onerror=()=>rej(r.error);
 
 async bulkAdd(store, list){
 return withMutationRetry(async () => {
+const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
 const s = tx.objectStore(store);
-list.forEach(item => s.add(item));
+sealed.forEach(item => s.add(item));
 return new Promise((res,rej)=>{
 tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
@@ -297,10 +336,11 @@ tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
 
 async bulkPut(store,list){
 return withMutationRetry(async () => {
+const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
 const s = tx.objectStore(store);
-list.forEach(item=>s.put(item));
+sealed.forEach(item=>s.put(item));
 return new Promise((res,rej)=>{
 tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
@@ -311,12 +351,14 @@ tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
 
 async bulkPutWithCheckpoint(store,list,checkpoint){
 return withMutationRetry(async () => {
+const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
+const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) : null;
 const db = await this.open();
 const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
 const tx = db.transaction(stores,"readwrite");
 const target = tx.objectStore(store);
-list.forEach(item=>target.put(item));
-if(checkpoint) tx.objectStore('settings').put(checkpoint);
+sealed.forEach(item=>target.put(item));
+if(sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
 return new Promise((res,rej)=>{
 tx.oncomplete=()=>res(true);
 tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));

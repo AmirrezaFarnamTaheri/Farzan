@@ -125,4 +125,47 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
 
     const decrypted = await db.decryptPayload(envelope);
     expect(decrypted).toEqual({ legacy: true });
-  });});
+  });
+
+  it('encrypts put/get write paths while keeping IndexedDB indexes queryable', async () => {
+    await indexedDB.deleteDatabase('ocd-test-db-write-crypto');
+    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const db = new OpenCourseDB('ocd-test-db-write-crypto', 1, [
+      { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }] },
+    ]);
+    db.setPassphrase('secret-study-key');
+
+    await db.put('progress', { topicId: 'topic-1', courseId: 'course-a', percent: 40, notes: 'private' });
+    await db.put('progress', { topicId: 'topic-2', courseId: 'course-a', percent: 80, notes: 'also private' });
+    await db.put('progress', { topicId: 'topic-3', courseId: 'course-b', percent: 10, notes: 'other' });
+
+    const raw = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('ocd-test-db-write-crypto', 1);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const tx = req.result.transaction('progress', 'readonly');
+        const getReq = tx.objectStore('progress').get('topic-1');
+        getReq.onsuccess = () => {
+          const value = getReq.result;
+          req.result.close();
+          resolve(value);
+        };
+        getReq.onerror = () => reject(getReq.error);
+      };
+    });
+    expect(raw.__encrypted).toBe(true);
+    expect(raw.topicId).toBe('topic-1');
+    expect(raw.courseId).toBe('course-a');
+    expect(raw.notes).toBeUndefined();
+    expect(raw.ciphertext).toBeDefined();
+
+    await expect(db.get('progress', 'topic-1')).resolves.toEqual(expect.objectContaining({
+      topicId: 'topic-1',
+      courseId: 'course-a',
+      notes: 'private',
+    }));
+    const byCourse = await db.getAllByIndex('progress', 'courseId', 'course-a');
+    expect(byCourse.map((item) => item.topicId).sort()).toEqual(['topic-1', 'topic-2']);
+    expect(byCourse.every((item) => item.__encrypted !== true)).toBe(true);
+  });
+});

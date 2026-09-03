@@ -114,4 +114,22 @@ describe('catalog normalization', () => {
     expect(window.DataStore.getState()).toMatchObject({ status: 'authoritative', source: './catalog-recovered.json' });
     expect(window.DataStore.allCourses()).toEqual([expect.objectContaining({ id: 'recovered' })]);
   });
+
+  it('overlays user-owned courses without resurrecting them after catalog reload', async () => {
+    await window.DataStore.init();
+    expect(typeof window.DataStore.mergeRaw).toBe('function');
+    window.DataStore.mergeRaw({
+      'user-library': {
+        title: 'My Library',
+        sources: [{ label: 'My Library', topics: [{ title: 'Local lecture', url: 'local-1', videos: ['library-file:abc'] }] }],
+      },
+    }, { userOwned: true });
+    expect(window.DataStore.allCourses().some((course) => course.id === 'user-library')).toBe(true);
+    expect(window.DataStore.allTopics().some((topic) => topic.title === 'Local lecture')).toBe(true);
+
+    window.DataStore.mergeRaw({}, { userOwned: true });
+    expect(window.DataStore.allCourses().some((course) => course.id === 'user-library')).toBe(false);
+    expect(window.DataStore.allTopics().some((topic) => topic.title === 'Local lecture')).toBe(false);
+    expect(window.DataStore.allCourses().some((course) => course.id === 'courseA')).toBe(true);
+  });
 });

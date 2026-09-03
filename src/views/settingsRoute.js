@@ -101,7 +101,7 @@ export function mountSettingsView(deps = {}) {
                 <div>
                   <span class="eyebrow">Optional and private by default</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
-                  <p>Use the built-in local summary mode or explicitly approve a private API destination. API keys remain in this browser session only.</p>
+                  <p>Local mode is an on-device extractive summary unless you register a runtime. Gemma package names are catalog labels only. API keys remain in this browser session only.</p>
                 </div>
                 <span class="badge badge-info" data-ai-status aria-live="polite">Loading</span>
               </div>
@@ -168,8 +168,8 @@ export function mountSettingsView(deps = {}) {
                   <label class="settings-field">
                     <span>Local package</span>
                     <select class="select" data-ai-local-package>
-                      <option value="gemma-4-local">Gemma 4</option>
-                      <option value="gemma-3n-local">Gemma 3n</option>
+                      <option value="gemma-4-local">On-device extractive summary</option>
+                      <option value="gemma-3n-local">On-device extractive summary (compact)</option>
                     </select>
                   </label>
                   <label class="settings-field">
@@ -381,11 +381,11 @@ export function mountSettingsView(deps = {}) {
       || !endpointOrigin || !endpointWarning || !customFields || !localFields || !localPackage
       || !localSource || !localFileInput || !status || !summary) return null;
 
-    const keyName = 'plasma-ai-api-key-session';
+    const keyName = 'ocd_ai_api_key_session';
     const ai = window.OpenCourseDeck?.AI;
     const gemmaOptions = ai?.gemmaModelOptions || [
-      { id: 'gemma-4-local', label: 'Gemma 4', url: 'https://ai.google.dev/gemma' },
-      { id: 'gemma-3n-local', label: 'Gemma 3n', url: 'https://ai.google.dev/gemma' },
+      { id: 'gemma-4-local', label: 'On-device extractive summary', url: 'https://ai.google.dev/gemma' },
+      { id: 'gemma-3n-local', label: 'On-device extractive summary (compact)', url: 'https://ai.google.dev/gemma' },
     ];
     const maxModelBytes = Number(ai?.limits?.maxModelBytes) || 2 * 1024 * 1024 * 1024;
     if (modelLimit) modelLimit.textContent = `${safeFormatBytes(maxModelBytes)} maximum`;

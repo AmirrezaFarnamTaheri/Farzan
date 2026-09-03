@@ -1055,13 +1055,23 @@
       this._state.queueIndex = index;
       this._history.push(index);
 
-      const source = safeMediaUrl(track.src ?? track.url);
-      if (source) {
-        this._media.src = source;
+      const rawSrc = track.src ?? track.url;
+      const unwrapped = typeof rawSrc === 'string'
+        ? rawSrc.trim()
+        : String(rawSrc?.url || rawSrc?.src || '').trim();
+      const applySource = (source) => {
+        if (this._destroyed || this._queue[this._state.queueIndex] !== track) return;
+        if (source) this._media.src = source;
+        else this._media.removeAttribute('src');
+        this._media.load();
+      };
+      if (unwrapped.startsWith('library-file:') && typeof window.OpenCourseDeck?.UserLibrary?.resolvePlayable === 'function') {
+        Promise.resolve(window.OpenCourseDeck.UserLibrary.resolvePlayable(rawSrc, safeMediaUrl))
+          .then((resolved) => applySource(resolved || null))
+          .catch(() => applySource(null));
       } else {
-        this._media.removeAttribute('src');
+        applySource(safeMediaUrl(rawSrc));
       }
-      this._media.load();
       this._loadTextTracks(track);
 
       // Update info UI

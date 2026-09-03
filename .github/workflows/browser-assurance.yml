@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 25
     defaults:
       run:
-        working-directory: far
         shell: bash --noprofile --norc -eo pipefail {0}
     steps:
       - name: Check out browser-assurance source

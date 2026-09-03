@@ -226,6 +226,19 @@ describe('GitHub Actions hardening', () => {
     ]));
   });
 
+  it('rejects leftover working-directory: far on verification and browser-assurance', () => {
+    const brokenVerify = `${workflows['verify.yml']}\n    defaults:\n      run:\n        working-directory: far\n`;
+    const brokenBrowser = `${workflows['browser-assurance.yml']}\n    defaults:\n      run:\n        working-directory: far\n`;
+    expect(validateVerificationWorkflow(brokenVerify)).toEqual(expect.arrayContaining([
+      expect.stringContaining('working-directory: far'),
+    ]));
+    expect(validateBrowserAssuranceWorkflow(brokenBrowser)).toEqual(expect.arrayContaining([
+      expect.stringContaining('working-directory: far'),
+    ]));
+    expect(workflows['verify.yml']).not.toMatch(/working-directory:\s*far\b/);
+    expect(workflows['browser-assurance.yml']).not.toMatch(/working-directory:\s*far\b/);
+  });
+
   it('requires shared checkout credentials to be ephemeral', () => {
     const broken = workflows['verify.yml'].replace('          persist-credentials: false\n', '');
     expect(validateVerificationWorkflow(broken)).toEqual(expect.arrayContaining([

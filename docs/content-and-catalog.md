@@ -35,6 +35,12 @@ Catalog fetches intentionally use `cache: 'no-cache'` so the browser can revalid
 - Avoid remote CDN URLs when possible; the project is designed to be self-contained.
 - Keep large media outside git unless the repository intentionally tracks it.
 
+### User library overlay
+
+The catalog JSON is not the only source of courses. User-created courses, topics, videos, PDFs, and URLs live in the `ocd_user_library` setting and overlay the catalog through `DataStore.mergeRaw`. Catalog reloads replace only the catalog half; deleting a user course removes it from the overlay so it does not come back on the next catalog fetch.
+
+Local video and PDF files are stored as blobs in the `opencoursedeck-library-files` IndexedDB. Catalog topics reference them as `library-file:<id>` (or `{ url, label }` objects). Courses, Materials, and Playlists resolve those refs to blob URLs before playback.
+
 ### Switching Catalogs
 
 Switching catalog files does not erase browser data, but it can orphan progress or notes if IDs change. If you are experimenting, export a backup before switching.
