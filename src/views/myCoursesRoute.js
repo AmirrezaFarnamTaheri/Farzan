@@ -69,6 +69,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     await renderCourses();
   });
 
+  let pendingLibraryCourse = '';
+  try {
+    pendingLibraryCourse = sessionStorage.getItem('ocd_pending_library_course') || '';
+  } catch {}
+
   renderCourses();
 
   async function renderCourses() {
@@ -79,12 +84,36 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     metrics.replaceChildren(metric('Courses', courses.length), metric('With descriptions', courses.filter(course => course.description).length));
     list.replaceChildren();
     if (!courses.length) {
-      const empty = document.createElement('p');
-      empty.textContent = 'No custom courses yet.';
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      const copy = document.createElement('p');
+      copy.textContent = 'No custom courses yet.';
+      const actions = document.createElement('div');
+      actions.className = 'button-row';
+      const create = document.createElement('button');
+      create.className = 'btn btn-primary btn-sm';
+      create.type = 'button';
+      create.textContent = 'Create a course';
+      create.addEventListener('click', () => {
+        document.querySelector('[data-my-course-title]')?.focus?.();
+      });
+      const catalog = document.createElement('a');
+      catalog.className = 'btn btn-ghost btn-sm';
+      catalog.href = '#/courses';
+      catalog.textContent = 'Open catalog';
+      actions.append(create, catalog);
+      empty.append(copy, actions);
       list.appendChild(empty);
       return;
     }
-    courses.forEach((course) => list.appendChild(courseCard(course)));
+    if (pendingLibraryCourse && courses.some((course) => course.id === pendingLibraryCourse)) {
+      try { sessionStorage.removeItem('ocd_pending_library_course'); } catch {}
+    }
+    courses.forEach((course) => {
+      const card = courseCard(course);
+      if (course.id === pendingLibraryCourse) card.classList.add('is-new');
+      list.appendChild(card);
+    });
   }
 
   function courseCard(course) {

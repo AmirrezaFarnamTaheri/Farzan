@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { initAddContent } from '../src/features/addContent.js';
+import { initAddContent, isOwnedDropTarget } from '../src/features/addContent.js';
 
 describe('add content chrome', () => {
   beforeEach(() => {
@@ -66,6 +66,29 @@ describe('add content chrome', () => {
     expect(first.focus).toHaveBeenCalled();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.getElementById('add-content-menu').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('marks the closed add menu inert', () => {
+    initAddContent(window);
+    const menu = document.getElementById('add-content-menu');
+    expect(menu.hasAttribute('inert')).toBe(true);
+    document.getElementById('topbar-add-btn').click();
+    expect(menu.hasAttribute('inert')).toBe(false);
+    expect(menu.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('does not claim owned drop zones', () => {
+    initAddContent(window);
+    const viewer = document.createElement('div');
+    viewer.setAttribute('data-pdf-viewer', '');
+    document.body.appendChild(viewer);
+    const event = new Event('drop', { bubbles: true });
+    Object.defineProperty(event, 'composedPath', { value: () => [viewer, document.body, document] });
+    expect(isOwnedDropTarget(event)).toBe(true);
+
+    const stray = new Event('drop', { bubbles: true });
+    Object.defineProperty(stray, 'composedPath', { value: () => [document.body, document] });
+    expect(isOwnedDropTarget(stray)).toBe(false);
   });
 
   it('passes the chosen backup file into ProgressStats.importJSON', async () => {

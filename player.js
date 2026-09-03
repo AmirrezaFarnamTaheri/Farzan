@@ -1836,13 +1836,25 @@
         return;
       }
       if (!this._waveformScrubber) this._waveformScrubber = new ScrubberClass();
-      const audioUrl = track?.src || track?.url;
-      if (!audioUrl) {
+      let audioUrl = track?.src || track?.url;
+      const raw = typeof audioUrl === 'string'
+        ? audioUrl.trim()
+        : String(audioUrl?.url || audioUrl?.src || '').trim();
+      if (raw.startsWith('library-file:') && typeof window.OpenCourseDeck?.UserLibrary?.resolvePlayable === 'function') {
+        try {
+          audioUrl = await window.OpenCourseDeck.UserLibrary.resolvePlayable(audioUrl, safeMediaUrl);
+        } catch {
+          audioUrl = '';
+        }
+      } else if (audioUrl) {
+        audioUrl = safeMediaUrl(audioUrl) || audioUrl;
+      }
+      if (!audioUrl || String(audioUrl).startsWith('library-file:')) {
         canvas.style.display = 'none';
         return;
       }
       canvas.style.display = '';
-      const cacheId = track?.id || audioUrl;
+      const cacheId = track?.id || raw || audioUrl;
       try {
         await this._waveformScrubber.render(canvas, audioUrl, {
           cacheId,

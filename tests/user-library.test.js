@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { indexedDB } from 'fake-indexeddb';
 import {
+  addMediaFiles,
   addPdfFile,
   addRemoteLink,
   addTopic,
@@ -99,6 +100,38 @@ describe('user library overlay', () => {
     expect(topic.videos).toEqual([]);
     expect(topic.pdfs).toEqual([]);
     expect(topic.iframes[0].url).toBe('https://example.test/embed');
+  });
+
+  it('reuses a course when adding media by matching title', async () => {
+    const created = await upsertCourse({ title: 'Anatomy review' });
+    const file = new File(['fake-video'], 'lecture.mp4', { type: 'video/mp4' });
+    const topic = await addVideoFile(file, { courseTitle: 'Anatomy review', title: 'Week 1 lecture' });
+    expect(topic.courseId).toBe(created.id);
+    const library = await loadLibrary();
+    expect(Object.keys(library.courses)).toEqual([created.id]);
+  });
+
+  it('persists a batch of media files once', async () => {
+    const files = [
+      new File(['a'], 'a.mp4', { type: 'video/mp4' }),
+      new File(['b'], 'b.mp4', { type: 'video/mp4' }),
+    ];
+    window.DB.saveSetting.mockClear();
+    await addMediaFiles(files, { kind: 'video' });
+    const libraryWrites = window.DB.saveSetting.mock.calls.filter(([key]) => key === 'ocd_user_library');
+    expect(libraryWrites).toHaveLength(1);
+    const library = await loadLibrary();
+    expect(library.courses['user-library'].sources[0].topics).toHaveLength(2);
+  });
+
+  it('deletes stored blobs when a course is removed', async () => {
+    const file = new File(['fake-video'], 'lecture.mp4', { type: 'video/mp4' });
+    const topic = await addVideoFile(file);
+    const library = await loadLibrary();
+    const ref = library.courses[topic.courseId].sources[0].topics[0].videos[0];
+    expect(await resolveMediaUrl(ref)).toMatch(/^blob:/);
+    await removeCourse(topic.courseId);
+    expect(await resolveMediaUrl(ref)).toBe('');
   });
 
   it('rejects files over the library size cap', async () => {

@@ -1532,11 +1532,13 @@
   }
   #add-content-menu.add-content-menu[aria-hidden="true"] {
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
     transform: translateY(-6px) scale(0.98);
   }
   #add-content-menu.add-content-menu[aria-hidden="false"] {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
     transform: translateY(0) scale(1);
   }

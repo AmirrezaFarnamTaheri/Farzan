@@ -161,7 +161,16 @@ export class WaveformScrubber {
         // size ceiling rather than pulling a multi-hundred-MB lecture video
         // twice and decoding it. Content-Length is checked first so an
         // oversized file is rejected before the body is buffered.
-        const resp = await fetch(audioUrl);
+        let sourceUrl = audioUrl;
+        const raw = typeof audioUrl === 'string'
+          ? audioUrl.trim()
+          : String(audioUrl?.url || audioUrl?.src || '').trim();
+        if (raw.startsWith('library-file:')) {
+          const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
+          sourceUrl = typeof resolve === 'function' ? await resolve(audioUrl) : '';
+        }
+        if (!sourceUrl || String(sourceUrl).startsWith('library-file:')) return;
+        const resp = await fetch(sourceUrl);
         if (!resp.ok) return;
         const declaredLength = Number(resp.headers?.get?.('content-length'));
         if (Number.isFinite(declaredLength) && declaredLength > MAX_WAVEFORM_SOURCE_BYTES) return;

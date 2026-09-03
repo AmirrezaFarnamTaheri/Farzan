@@ -124,6 +124,16 @@ function revokeCachedUrl(id) {
   blobUrls.delete(id);
 }
 
+function revokeAllCachedUrls() {
+  for (const id of [...blobUrls.keys()]) revokeCachedUrl(id);
+}
+
+function closeFileDb() {
+  try { fileDb?.close(); } catch { /* ignore */ }
+  fileDb = null;
+  fileDbPromise = null;
+}
+
 export async function loadLibrary() {
   try {
     const saved = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
@@ -133,12 +143,13 @@ export async function loadLibrary() {
   }
 }
 
-async function persistLibrary(library) {
+async function persistLibrary(library, extra = {}) {
   const next = cloneLibrary(library);
   await window.DB?.saveSetting?.(LIBRARY_SETTING_KEY, next);
   overlayLibrary(next);
   window.OpenCourseDeck?.bus?.emit?.('library:changed', {
     courses: Object.keys(next.courses).length,
+    ...extra,
   });
   return next;
 }
@@ -154,11 +165,15 @@ async function overlayFromStorage() {
   overlayLibrary(await loadLibrary());
 }
 
-function ensureCourse(library, { id, title, description = '' } = {}) {
+function normalizeCourseTitle(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function ensureCourse(library, { id, title, description = '', overwriteTitle = false } = {}) {
   const courseId = id || DEFAULT_COURSE_ID;
   const existing = library.courses[courseId];
   if (existing && typeof existing === 'object') {
-    if (title) existing.title = title;
+    if (overwriteTitle && title) existing.title = title;
     if (description) existing.description = description;
     if (!Array.isArray(existing.sources) || !existing.sources.length) {
       existing.sources = [{ label: 'My Library', topics: [] }];
@@ -173,6 +188,58 @@ function ensureCourse(library, { id, title, description = '' } = {}) {
   };
   library.courses[courseId] = course;
   return course;
+}
+
+function findCourseIdByTitle(library, title) {
+  const needle = normalizeCourseTitle(title);
+  if (!needle) return '';
+  for (const [id, course] of Object.entries(library.courses || {})) {
+    if (normalizeCourseTitle(course?.title) === needle) return id;
+  }
+  return '';
+}
+
+function resolveOrCreateCourse(library, { courseId, courseTitle } = {}) {
+  const requestedId = String(courseId || '').trim();
+  if (requestedId) {
+    return { id: requestedId, course: ensureCourse(library, { id: requestedId, title: courseTitle }) };
+  }
+  const title = String(courseTitle || '').trim();
+  const isDefaultTitle = !title || normalizeCourseTitle(title) === normalizeCourseTitle(DEFAULT_COURSE_TITLE);
+  if (isDefaultTitle) {
+    return {
+      id: DEFAULT_COURSE_ID,
+      course: ensureCourse(library, { id: DEFAULT_COURSE_ID, title: DEFAULT_COURSE_TITLE }),
+    };
+  }
+  const existingId = findCourseIdByTitle(library, title);
+  if (existingId) {
+    return { id: existingId, course: ensureCourse(library, { id: existingId }) };
+  }
+  const id = makeId('course');
+  return { id, course: ensureCourse(library, { id, title }) };
+}
+
+function collectLibraryFileIds(course, into = new Set()) {
+  for (const source of course?.sources || []) {
+    for (const topic of source?.topics || []) {
+      for (const list of [topic?.videos, topic?.pdfs, topic?.iframes]) {
+        for (const item of list || []) {
+          const raw = unwrapMediaRef(item);
+          if (raw.startsWith(FILE_PREFIX)) into.add(raw.slice(FILE_PREFIX.length));
+        }
+      }
+    }
+  }
+  return into;
+}
+
+async function deleteLibraryFile(id) {
+  if (!id) return;
+  revokeCachedUrl(id);
+  try {
+    await withFileStore('readwrite', (store) => store.delete(id));
+  } catch { /* ignore missing stores during reset */ }
 }
 
 function courseTopics(course) {
@@ -253,15 +320,30 @@ export async function upsertCourse({ id, title, description = '' } = {}) {
   if (!String(title || '').trim() && !id) throw new TypeError('Course title is required');
   const library = await loadLibrary();
   const courseId = id || makeId('course');
-  ensureCourse(library, { id: courseId, title: String(title || '').trim() || undefined, description: String(description || '').trim() });
-  await persistLibrary(library);
+  ensureCourse(library, {
+    id: courseId,
+    title: String(title || '').trim() || undefined,
+    description: String(description || '').trim(),
+    overwriteTitle: Boolean(String(title || '').trim()),
+  });
+  await persistLibrary(library, { courseId });
   return { id: courseId, title: library.courses[courseId].title };
 }
 
 export async function removeCourse(courseId) {
   const library = await loadLibrary();
+  const course = library.courses[courseId];
+  const doomed = collectLibraryFileIds(course);
+  const stillUsed = new Set();
+  for (const [id, remaining] of Object.entries(library.courses || {})) {
+    if (id === courseId) continue;
+    collectLibraryFileIds(remaining, stillUsed);
+  }
   delete library.courses[courseId];
-  await persistLibrary(library);
+  await persistLibrary(library, { courseId });
+  for (const id of doomed) {
+    if (!stillUsed.has(id)) await deleteLibraryFile(id);
+  }
   return true;
 }
 
@@ -276,8 +358,7 @@ export async function addTopic({
   const topicTitle = String(title || '').trim();
   if (!topicTitle) throw new TypeError('Topic title is required');
   const library = await loadLibrary();
-  const id = courseId || DEFAULT_COURSE_ID;
-  const course = ensureCourse(library, { id, title: courseTitle });
+  const { id, course } = resolveOrCreateCourse(library, { courseId, courseTitle });
   const topics = courseTopics(course);
   const topicId = makeId('topic');
   topics.push({
@@ -287,30 +368,47 @@ export async function addTopic({
     pdfs: Array.isArray(pdfs) ? pdfs : [],
     iframes: Array.isArray(iframes) ? iframes : [],
   });
-  await persistLibrary(library);
+  await persistLibrary(library, { courseId: id });
   return { courseId: id, topicId, title: topicTitle };
 }
 
+export async function addMediaFiles(files, { kind = 'video', courseId, courseTitle, title } = {}) {
+  const list = [...(files || [])].filter(Boolean);
+  if (!list.length) return [];
+  const type = kind === 'pdf' ? 'pdf' : 'video';
+  const library = await loadLibrary();
+  const resolved = resolveOrCreateCourse(library, { courseId, courseTitle });
+  const topics = courseTopics(resolved.course);
+  const sharedTitle = list.length === 1 ? String(title || '').trim() : '';
+  const results = [];
+  for (const file of list) {
+    const stored = await putLibraryFile(file, { kind: type });
+    const topicTitle = sharedTitle
+      || String(file.name || stored.name).replace(/\.[^.]+$/, '')
+      || (type === 'pdf' ? 'PDF' : 'Video');
+    const topicId = makeId('topic');
+    const media = [{ url: stored.ref, label: stored.name }];
+    topics.push({
+      title: topicTitle,
+      url: topicId,
+      videos: type === 'video' ? media : [],
+      pdfs: type === 'pdf' ? media : [],
+      iframes: [],
+    });
+    results.push({ courseId: resolved.id, topicId, title: topicTitle });
+  }
+  await persistLibrary(library, { courseId: resolved.id });
+  return results;
+}
+
 export async function addVideoFile(file, options = {}) {
-  const stored = await putLibraryFile(file, { kind: 'video' });
-  const title = String(options.title || stored.name.replace(/\.[^.]+$/, '') || 'Video').trim();
-  return addTopic({
-    courseId: options.courseId,
-    courseTitle: options.courseTitle,
-    title,
-    videos: [{ url: stored.ref, label: stored.name }],
-  });
+  const [result] = await addMediaFiles([file], { ...options, kind: 'video' });
+  return result;
 }
 
 export async function addPdfFile(file, options = {}) {
-  const stored = await putLibraryFile(file, { kind: 'pdf' });
-  const title = String(options.title || stored.name.replace(/\.[^.]+$/, '') || 'PDF').trim();
-  return addTopic({
-    courseId: options.courseId,
-    courseTitle: options.courseTitle,
-    title,
-    pdfs: [{ url: stored.ref, label: stored.name }],
-  });
+  const [result] = await addMediaFiles([file], { ...options, kind: 'pdf' });
+  return result;
 }
 
 export async function addRemoteLink({ url, title, kind = 'video', courseId, courseTitle } = {}) {
@@ -347,6 +445,7 @@ export function initUserLibrary(root = window) {
     addTopic,
     addVideoFile,
     addPdfFile,
+    addMediaFiles,
     addRemoteLink,
     putLibraryFile,
     revokeCachedUrl,
@@ -358,6 +457,12 @@ export function initUserLibrary(root = window) {
     bus?.on?.('data:loaded', overlayFromStorage);
     bus?.on?.('data:degraded', overlayFromStorage);
     bus?.on?.('app:ready', overlayFromStorage);
+    const resetCaches = () => {
+      revokeAllCachedUrls();
+      closeFileDb();
+    };
+    bus?.on?.('storage:cleared', resetCaches);
+    root.addEventListener?.('pagehide', resetCaches);
   }
 
   if (root.DataStore?.isLoaded?.()) overlayFromStorage();

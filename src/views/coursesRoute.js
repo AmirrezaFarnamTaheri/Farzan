@@ -189,12 +189,18 @@ export async function mountCoursesView(deps = {}) {
   } catch {
     authoredMediaCues = {};
   }
-  const allCourses = window.DataStore?.allCourses?.() ?? [];
-  const allTopics = window.DataStore?.allTopics?.() ?? [];
-  const topicsByCourse = allTopics.reduce((acc, t) => {
-    (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
-    return acc;
-  }, {});
+  let allCourses = [];
+  let allTopics = [];
+  let topicsByCourse = {};
+  const rebuildCatalogIndexes = () => {
+    allCourses = window.DataStore?.allCourses?.() ?? [];
+    allTopics = window.DataStore?.allTopics?.() ?? [];
+    topicsByCourse = allTopics.reduce((acc, t) => {
+      (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
+      return acc;
+    }, {});
+  };
+  rebuildCatalogIndexes();
   const courseFacetState = {
     query: '',
     filter: 'all',
@@ -239,21 +245,25 @@ export async function mountCoursesView(deps = {}) {
     type: 'button',
     'data-action': action,
   }, label);
-  const courseMetaById = new Map(allCourses.map((course) => {
-    const topics = topicsByCourse[course.id] ?? [];
-    const hasVideo = topics.some((topic) => (topic.videos?.length ?? 0) > 0);
-    const hasPdf = topics.some((topic) => (topic.pdfs?.length ?? 0) > 0);
-    const hasNoMedia = topics.some((topic) => (topic.videos?.length ?? 0) === 0 && (topic.pdfs?.length ?? 0) === 0);
-    const sourceCount = new Set(topics.map(sourceKey)).size;
-    return [course.id, {
-      topicCount: topics.length,
-      hasVideo,
-      hasPdf,
-      hasNoMedia,
-      mediaClass: hasVideo && hasPdf ? 'mixed' : hasVideo ? 'video' : hasPdf ? 'pdf' : 'none',
-      sourceCount,
-    }];
-  }));
+  let courseMetaById = new Map();
+  const rebuildCourseMeta = () => {
+    courseMetaById = new Map(allCourses.map((course) => {
+      const topics = topicsByCourse[course.id] ?? [];
+      const hasVideo = topics.some((topic) => (topic.videos?.length ?? 0) > 0);
+      const hasPdf = topics.some((topic) => (topic.pdfs?.length ?? 0) > 0);
+      const hasNoMedia = topics.some((topic) => (topic.videos?.length ?? 0) === 0 && (topic.pdfs?.length ?? 0) === 0);
+      const sourceCount = new Set(topics.map(sourceKey)).size;
+      return [course.id, {
+        topicCount: topics.length,
+        hasVideo,
+        hasPdf,
+        hasNoMedia,
+        mediaClass: hasVideo && hasPdf ? 'mixed' : hasVideo ? 'video' : hasPdf ? 'pdf' : 'none',
+        sourceCount,
+      }];
+    }));
+  };
+  rebuildCourseMeta();
   const seekPlayerToPendingPosition = (inst, position) => {
     const seconds = Number(position);
     if (!inst?.seekTo || !Number.isFinite(seconds) || seconds <= 0) return;
@@ -704,6 +714,7 @@ export async function mountCoursesView(deps = {}) {
   const buildTopicRow = (topic, status, { toggle = false } = {}) => {
     const hasVideo = (topic.videos?.length ?? 0) > 0;
     const hasPdf = (topic.pdfs?.length ?? 0) > 0;
+    const hasEmbed = (topic.iframes?.length ?? 0) > 0;
     const row = createElement('div', {
       class: 'topic-row',
       'data-topic-id': topic.topicId,
@@ -719,11 +730,13 @@ export async function mountCoursesView(deps = {}) {
     meta.appendChild(statusBadgeNode(status));
     if (hasVideo) meta.appendChild(badgeNode('video'));
     if (hasPdf) meta.appendChild(badgeNode('pdf'));
-    if (!hasVideo && !hasPdf) meta.appendChild(badgeNode('no media'));
+    if (hasEmbed) meta.appendChild(badgeNode('embed'));
+    if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('no media'));
 
     const actions = createElement('div', { class: 'topic-actions' });
     if (hasVideo) actions.appendChild(actionButton('play-video', 'Play'));
     if (hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
+    if (hasEmbed) actions.appendChild(actionButton('open-embed', 'Open'));
     if (toggle) actions.appendChild(actionButton('toggle-done', status === 'done' ? 'Undone' : 'Done'));
     row.append(copy, meta, actions);
     return row;
@@ -1010,6 +1023,15 @@ export async function mountCoursesView(deps = {}) {
         return;
       }
 
+      if (action === 'open-embed') {
+        const raw = topic.iframes?.[0];
+        const href = typeof raw === 'string' ? raw : (raw?.url || raw?.src || '');
+        const url = safeExternalUrl(href);
+        if (!url) return;
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
       if (action === 'play-video') {
         const url = await playableMediaUrl(topic.videos?.[0]);
         if (!url) return;
@@ -1173,6 +1195,11 @@ export async function mountCoursesView(deps = {}) {
   const pendingSession = consumePendingCourseSession();
   const pendingTopicId = sessionStorage.getItem('ocd_pending_topic');
   const pendingPosition = Number(sessionStorage.getItem('ocd_pending_position') || 0);
+  let pendingLibraryCourse = '';
+  try {
+    pendingLibraryCourse = sessionStorage.getItem('ocd_pending_library_course') || '';
+    if (pendingLibraryCourse) sessionStorage.removeItem('ocd_pending_library_course');
+  } catch {}
   if (pendingTopicId) sessionStorage.removeItem('ocd_pending_topic');
   if (pendingPosition) sessionStorage.removeItem('ocd_pending_position');
 
@@ -1184,6 +1211,17 @@ export async function mountCoursesView(deps = {}) {
     renderCourseDetail(courseId);
     return true;
   };
+
+  const onLibraryChanged = (payload = {}) => {
+    rebuildCatalogIndexes();
+    rebuildCourseMeta();
+    const preferred = payload.courseId || courseFacetState.selectedCourseId;
+    renderCourses(courseFacetState.query);
+    if (preferred && selectCourse(preferred)) return;
+    if (courseFacetState.selectedCourseId) renderCourseDetail(courseFacetState.selectedCourseId);
+  };
+  window.OpenCourseDeck?.bus?.on?.('library:changed', onLibraryChanged);
+  routeDisposers.push(() => window.OpenCourseDeck?.bus?.off?.('library:changed', onLibraryChanged));
 
   const courseFilterRoot = document.querySelector('.courses-sidebar');
   if (courseFilterRoot && !courseFilterRoot.dataset.pdCourseFacetBound) {
@@ -1231,6 +1269,10 @@ export async function mountCoursesView(deps = {}) {
       }, 120);
       return routeController;
     }
+  }
+
+  if (pendingLibraryCourse && selectCourse(pendingLibraryCourse)) {
+    return routeController;
   }
 
   if (pendingTopicId) {

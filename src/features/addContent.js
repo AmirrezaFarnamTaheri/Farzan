@@ -1,4 +1,5 @@
 import {
+  addMediaFiles,
   addPdfFile,
   addRemoteLink,
   addTopic,
@@ -148,6 +149,7 @@ function setMenuOpen(open, { restoreFocus = false } = {}) {
   const trigger = document.getElementById('topbar-add-btn');
   if (!menu) return;
   menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  menu.toggleAttribute('inert', !open);
   trigger?.setAttribute('aria-expanded', open ? 'true' : 'false');
   trigger?.classList.toggle('is-open', Boolean(open));
   if (open) {
@@ -189,11 +191,24 @@ function alreadyOn(route) {
   return hash === route || hash.startsWith(`${route}?`) || hash.startsWith(`${route}/`);
 }
 
+function rememberLibraryCourse(courseId) {
+  const id = String(courseId || '').trim();
+  if (!id) return;
+  try { sessionStorage.setItem('ocd_pending_library_course', id); } catch { /* ignore */ }
+}
+
 async function afterAdd(result, message, { route = '#/courses' } = {}) {
   toast('success', message);
   announce(message);
+  rememberLibraryCourse(result?.courseId || result?.id);
+  // Stay on a live Courses view: remounting would tear down the player.
+  if (alreadyOn('#/courses')) return result;
   if (route && !alreadyOn(route)) {
     try { window.OpenCourseDeck?.Router?.navigate?.(route); } catch { /* ignore */ }
+    return result;
+  }
+  if (alreadyOn('#/my-courses')) {
+    try { window.OpenCourseDeck?.Router?.refresh?.(); } catch { /* ignore */ }
   }
   return result;
 }
@@ -301,19 +316,14 @@ async function addFilesOfKind(files, kind) {
     toast('info', `${skipped} file${skipped === 1 ? '' : 's'} skipped — only ${kind === 'video' ? 'videos' : 'PDFs'} can be added here`);
   }
   if (!accepted.length) return { count: 0 };
-  const errors = [];
-  for (const file of accepted) {
-    try {
-      if (kind === 'video') await addVideoFile(file);
-      else await addPdfFile(file);
-    } catch (error) {
-      errors.push(error);
-    }
+  try {
+    const results = typeof addMediaFiles === 'function'
+      ? await addMediaFiles(accepted, { kind })
+      : await Promise.all(accepted.map((file) => (kind === 'pdf' ? addPdfFile(file) : addVideoFile(file))));
+    return { count: results.length, courseId: results[results.length - 1]?.courseId };
+  } catch (error) {
+    throw error;
   }
-  const saved = accepted.length - errors.length;
-  if (!saved) throw errors[0] || new Error(`Could not add ${kind}`);
-  if (errors.length) toast('error', `${errors.length} ${kind}${errors.length === 1 ? '' : 's'} failed to save`);
-  return { count: saved };
 }
 
 async function handleVideoFiles(files, { navigate = true } = {}) {
@@ -404,6 +414,36 @@ function hasFiles(event) {
   return [...(event.dataTransfer?.types || [])].includes('Files');
 }
 
+const OWNED_DROP_SELECTOR = [
+  '[data-pdf-viewer]',
+  '[data-file-input]',
+  '[data-drop-zone]',
+  '#studio-canvas',
+  'input[type="file"]',
+  'textarea',
+  '[contenteditable="true"]',
+].join(', ');
+
+function eventPath(event) {
+  if (typeof event.composedPath === 'function') {
+    try { return event.composedPath(); } catch { /* fall through */ }
+  }
+  const path = [];
+  let node = event.target;
+  while (node) {
+    path.push(node);
+    node = node.parentNode || node.host;
+  }
+  return path;
+}
+
+export function isOwnedDropTarget(event) {
+  return eventPath(event).some((node) => {
+    if (!node || node.nodeType !== 1) return false;
+    return Boolean(node.matches?.(OWNED_DROP_SELECTOR) || node.closest?.(OWNED_DROP_SELECTOR));
+  });
+}
+
 function bindDropTarget() {
   if (document.documentElement.dataset.pdLibraryDropBound === 'true') return;
   document.documentElement.dataset.pdLibraryDropBound = 'true';
@@ -422,22 +462,23 @@ function bindDropTarget() {
     overlay.setAttribute('aria-hidden', on ? 'false' : 'true');
   };
   document.addEventListener('dragenter', (event) => {
-    if (!hasFiles(event)) return;
+    if (!hasFiles(event) || isOwnedDropTarget(event)) return;
     event.preventDefault();
     depth += 1;
     show(true);
   });
   document.addEventListener('dragover', (event) => {
-    if (!hasFiles(event)) return;
+    if (!hasFiles(event) || isOwnedDropTarget(event)) return;
     event.preventDefault();
     try { event.dataTransfer.dropEffect = 'copy'; } catch { /* ignore */ }
   });
-  document.addEventListener('dragleave', () => {
+  document.addEventListener('dragleave', (event) => {
+    if (isOwnedDropTarget(event)) return;
     depth = Math.max(0, depth - 1);
     if (!depth) show(false);
   });
   document.addEventListener('drop', async (event) => {
-    if (!hasFiles(event)) return;
+    if (!hasFiles(event) || isOwnedDropTarget(event)) return;
     event.preventDefault();
     depth = 0;
     show(false);
@@ -456,7 +497,12 @@ function bindDropTarget() {
         else toast('info', 'Backup import is unavailable');
       }
       const count = added.reduce((sum, item) => sum + (item?.count || 0), 0);
-      if (count) await afterAdd({ count }, count === 1 ? 'File added to My Library' : `${count} files added to My Library`);
+      if (count) {
+        await afterAdd(
+          { count, courseId: added.at(-1)?.courseId },
+          count === 1 ? 'File added to My Library' : `${count} files added to My Library`,
+        );
+      }
       if (skipped) toast('info', `${skipped} file${skipped === 1 ? '' : 's'} skipped (videos, PDFs, and backups only)`);
     } catch (error) {
       toast('error', error?.message || 'Could not add dropped files');
@@ -501,7 +547,10 @@ export function initAddContent(root = window) {
     openMenu: openAddMenu,
     closeMenu: closeAddMenu,
     classifyLibraryFile,
+    isOwnedDropTarget,
   };
+
+  setMenuOpen(false);
 
   bindChrome();
   bindDropTarget();

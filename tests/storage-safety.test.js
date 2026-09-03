@@ -148,6 +148,28 @@ describe('storage safety', () => {
     expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('localStorage'));
   });
 
+  it('clears the pending library course and notifies listeners', async () => {
+    const root = createRoot();
+    root.OpenCourseDeck.bus = { emit: vi.fn() };
+    root.indexedDB = {
+      deleteDatabase: vi.fn(() => {
+        const request = {};
+        queueMicrotask(() => request.onsuccess?.());
+        return request;
+      }),
+    };
+    root.sessionStorage.setItem('ocd_pending_library_course', 'course-1');
+    installStorageSafety(root);
+
+    await root.DB.clearAll();
+
+    expect(root.sessionStorage.removeItem).toHaveBeenCalledWith('ocd_pending_library_course');
+    expect(root.OpenCourseDeck.bus.emit).toHaveBeenCalledWith(
+      'storage:cleared',
+      expect.objectContaining({ operation: 'clear-all' }),
+    );
+  });
+
   it('surfaces friendly blocked-storage guidance while preserving technical receipt details', async () => {
     const root = createRoot();
     root.indexedDB = {

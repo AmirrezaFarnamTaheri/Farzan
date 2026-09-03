@@ -97,6 +97,37 @@ describe('PDF viewer safe messages', () => {
     expect(window.PlasmaPDFState.searchResults).toEqual([expect.objectContaining({ page: 1 })]);
   });
 
+  it('resolves library-file sources before getDocument', async () => {
+    const makePage = () => ({
+      rotate: 0,
+      getViewport: vi.fn(() => ({ width: 100, height: 100 })),
+      render: vi.fn(() => ({ promise: Promise.resolve() })),
+      getTextContent: vi.fn(async () => ({ items: [] })),
+    });
+    globalThis.pdfjsLib = {
+      getDocument: vi.fn(() => ({
+        promise: Promise.resolve({
+          numPages: 1,
+          fingerprints: ['lib-pdf'],
+          getPage: vi.fn(async () => makePage()),
+        }),
+      })),
+    };
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));
+    window.PlasmaPDFViewer._loadAnnotations = vi.fn(async () => {});
+    window.PlasmaPDFViewer._buildThumbnails = vi.fn(async () => {});
+    window.OpenCourseDeck.UserLibrary = {
+      resolvePlayable: vi.fn(async () => 'blob:https://example.test/library.pdf'),
+    };
+
+    await window.PlasmaPDFViewer.load('library-file:abc');
+
+    expect(window.OpenCourseDeck.UserLibrary.resolvePlayable).toHaveBeenCalled();
+    expect(globalThis.pdfjsLib.getDocument).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'blob:https://example.test/library.pdf',
+    }));
+  });
+
   it('uses canonical PDF identity and migrates transport-keyed annotations', async () => {
     const sourceUrl = 'https://cdn.example.test/course.pdf?token=one';
     const makePage = () => ({
