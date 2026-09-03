@@ -149,6 +149,8 @@
           courses: STATE.courses,
           topics: STATE.topics,
           path: _activeCatalogPath,
+          catalogRaw: _catalogRaw,
+          overlayRaw: _overlayRaw,
           authoritative: STATE.status === 'authoritative',
         };
         STATE.status = 'loading';
@@ -199,17 +201,12 @@
         } catch (err) {
           console.warn('[DataStore] Failed to load catalog JSON:', err);
           STATE.lastError = { name: err?.name || 'Error', message: err?.message || String(err), at: Date.now() };
-          const usingLastKnownGood = Boolean(previous.authoritative && previous.raw);
-          const raw = usingLastKnownGood ? previous.raw : DEMO_FALLBACK;
-          _catalogRaw = raw;
-          if (usingLastKnownGood) {
-            STATE.raw = raw;
-            STATE.courses = previous.courses;
-            STATE.topics = previous.topics;
-            _recompose();
-          } else {
-            _recompose();
+          const usingLastKnownGood = Boolean(previous.authoritative && previous.catalogRaw);
+          _catalogRaw = usingLastKnownGood ? previous.catalogRaw : DEMO_FALLBACK;
+          if (previous.overlayRaw && typeof previous.overlayRaw === 'object') {
+            _overlayRaw = previous.overlayRaw;
           }
+          _recompose();
           STATE.loaded = true;
           STATE.status = 'degraded';
           _activeCatalogPath = usingLastKnownGood ? previous.path : 'demo-fallback';

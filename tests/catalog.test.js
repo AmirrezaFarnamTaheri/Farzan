@@ -132,4 +132,26 @@ describe('catalog normalization', () => {
     expect(window.DataStore.allTopics().some((topic) => topic.title === 'Local lecture')).toBe(false);
     expect(window.DataStore.allCourses().some((course) => course.id === 'courseA')).toBe(true);
   });
+
+  it('does not bake the user overlay into last-known-good catalog on failed refresh', async () => {
+    await window.DataStore.init();
+    window.DataStore.mergeRaw({
+      'user-library': {
+        title: 'My Library',
+        sources: [{ label: 'My Library', topics: [{ title: 'Local lecture', url: 'local-1', videos: [] }] }],
+      },
+    }, { userOwned: true });
+    expect(window.DataStore.allCourses().some((course) => course.id === 'user-library')).toBe(true);
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+    await window.DataStore.retry();
+    expect(window.DataStore.getState()).toMatchObject({ status: 'degraded' });
+    expect(window.DataStore.allCourses().some((course) => course.id === 'courseA')).toBe(true);
+    expect(window.DataStore.allCourses().some((course) => course.id === 'user-library')).toBe(true);
+
+    window.DataStore.mergeRaw({}, { userOwned: true });
+    expect(window.DataStore.allCourses().some((course) => course.id === 'user-library')).toBe(false);
+    expect(window.DataStore.allCourses().some((course) => course.id === 'courseA')).toBe(true);
+  });
 });

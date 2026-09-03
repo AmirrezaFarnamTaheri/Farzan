@@ -101,6 +101,12 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     const meta = document.createElement('p');
     meta.className = 'text-muted text-sm';
     meta.textContent = course.updatedAt ? `Updated ${new Date(course.updatedAt).toLocaleDateString()}` : 'Saved course';
+    const actions = document.createElement('div');
+    actions.className = 'button-row';
+    const open = document.createElement('a');
+    open.className = 'btn btn-ghost btn-sm';
+    open.href = '#/courses';
+    open.textContent = 'Open in catalog';
     const remove = document.createElement('button');
     remove.className = 'btn btn-ghost btn-sm';
     remove.type = 'button';
@@ -112,7 +118,8 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       Toast?.info?.('Course deleted');
       await renderCourses();
     });
-    body.append(title, description, meta, remove);
+    actions.append(open, remove);
+    body.append(title, description, meta, actions);
     card.appendChild(body);
     return card;
   }

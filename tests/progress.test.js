@@ -584,6 +584,22 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.notes).toBe(1);
   });
 
+  it('imports a File argument without opening another picker', async () => {
+    const payload = {
+      version: '1.4',
+      notes: [{ id: 'note-file', title: 'From file', content: '<p>Body</p>', updatedAt: 12 }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'direct.json', { type: 'application/json' });
+    const createSpy = vi.spyOn(document, 'createElement');
+
+    await window.ProgressStats.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult).toBeTruthy());
+
+    expect(createSpy.mock.calls.some(([tag]) => tag === 'input')).toBe(false);
+    expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'note-file' }));
+  });
+
   it('rejects unsupported backup versions before writing records', async () => {
     const payload = {
       version: '9.9',

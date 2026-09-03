@@ -441,11 +441,12 @@
         <!-- Footer Actions -->
         <div class="sidebar-footer-actions">
           <button class="footer-btn" id="theme-toggle-btn"
+            data-theme-toggle
             aria-label="Toggle theme" title="Toggle theme (Ctrl+T)">
             <svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg>
           </button>
           <button class="footer-btn" id="fullscreen-btn"
-            aria-label="Toggle fullscreen" title="Toggle fullscreen (F11)">
+            aria-label="Enter fullscreen" aria-pressed="false" title="Toggle fullscreen (F11)">
             <svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>
           </button>
           <button class="footer-btn" id="command-palette-btn"
@@ -490,7 +491,8 @@
             <span class="topbar-notif-badge topbar-notif-dot" id="topbar-notif-dot" hidden aria-hidden="true"></span>
           </button>
           <button class="topbar-action-btn" id="topbar-add-btn"
-            aria-label="Add content" title="Add content">
+            aria-label="Add content" title="Add content"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="add-content-menu">
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
           </button>
 
@@ -811,6 +813,10 @@
   <!-- ═══════════════════════════════════════════
        SERVICE WORKER REGISTRATION
   ════════════════════════════════════════════ -->
+  <!-- Boot script imports dist/opencoursedeck.js and logs early failures -->
+</body>
+</html>
+══════ -->
   <!-- Boot script imports dist/opencoursedeck.js and logs early failures -->
 </body>
 </html>

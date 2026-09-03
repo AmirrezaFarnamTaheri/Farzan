@@ -6,8 +6,10 @@ import {
   addTopic,
   addVideoFile,
   initUserLibrary,
+  isSafeRemoteUrl,
   loadLibrary,
   overlayLibrary,
+  putLibraryFile,
   removeCourse,
   resolveMediaUrl,
   unwrapMediaRef,
@@ -84,6 +86,25 @@ describe('user library overlay', () => {
     const library = await loadLibrary();
     const titles = library.courses['user-library'].sources[0].topics.map((topic) => topic.title);
     expect(titles).toEqual(expect.arrayContaining(['notes', 'Empty topic', 'Remote lecture']));
+  });
+
+  it('rejects javascript URLs and keeps embeds out of the video list', async () => {
+    expect(isSafeRemoteUrl('javascript:alert(1)')).toBe(false);
+    expect(isSafeRemoteUrl('https://example.test/watch')).toBe(true);
+    await expect(addRemoteLink({ url: 'javascript:alert(1)', title: 'Nope' })).rejects.toThrow(/http/i);
+
+    await addRemoteLink({ url: 'https://example.test/embed', title: 'Embed lecture', kind: 'embed' });
+    const library = await loadLibrary();
+    const topic = library.courses['user-library'].sources[0].topics.find((item) => item.title === 'Embed lecture');
+    expect(topic.videos).toEqual([]);
+    expect(topic.pdfs).toEqual([]);
+    expect(topic.iframes[0].url).toBe('https://example.test/embed');
+  });
+
+  it('rejects files over the library size cap', async () => {
+    const file = new File(['x'], 'huge.mp4', { type: 'video/mp4' });
+    Object.defineProperty(file, 'size', { value: 2 * 1024 * 1024 * 1024 });
+    await expect(putLibraryFile(file, { kind: 'video' })).rejects.toThrow(/too large/i);
   });
 
   it('registers the UserLibrary namespace', () => {

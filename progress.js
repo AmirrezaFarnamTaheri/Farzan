@@ -501,15 +501,27 @@ const ProgressStats = (() => {
     return { saved: archive.files.length, files: archive.files.map(file => file.path) };
   }
 
-  /** Import JSON backup */
-  async function importJSON() {
+  /** Import JSON backup. Pass a File to skip the picker (Add Content menu). */
+  async function importJSON(fileOrEvent) {
+    const provided = fileOrEvent instanceof File || fileOrEvent instanceof Blob
+      ? fileOrEvent
+      : null;
+    if (provided) return importJSONFile(provided);
+
     const input = document.createElement('input');
     input.type  = 'file';
     input.accept= '.json,application/json';
     input.onchange = async () => {
       const file = input.files[0];
       if (!file) return;
-      try {
+      await importJSONFile(file);
+    };
+    input.click();
+  }
+
+  async function importJSONFile(file) {
+    if (!file) return;
+    try {
         const text    = await file.text();
         const payload = JSON.parse(text);
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -761,12 +773,10 @@ const ProgressStats = (() => {
         } else {
           pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.invalid} invalid skipped.`, 'success');
         }
-      } catch (err) {
-        console.error('[Progress] import error', err);
-        pdToast('Import error: ' + err.message, 'error');
-      }
-    };
-    input.click();
+    } catch (err) {
+      console.error('[Progress] import error', err);
+      pdToast('Import error: ' + err.message, 'error');
+    }
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -1220,6 +1230,7 @@ const ProgressStats = (() => {
     exportVaultZip,
     exportVaultDirectory,
     importJSON,
+    importJSONFile,
   };
 })();
 

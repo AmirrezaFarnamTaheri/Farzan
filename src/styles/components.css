@@ -1502,16 +1502,16 @@
     color: var(--danger);
   }
 
-  /* ── Add content quick menu (+ button target area is wired separately) ── */
+  /* ── Add content quick menu (JS anchors under the topbar + button) ── */
   #add-content-menu.add-content-menu {
     position: fixed;
     z-index: var(--z-dropdown);
+    top: calc(var(--topbar-h, 56px) + var(--space-2));
     right: max(var(--space-4), env(safe-area-inset-right));
-    bottom: max(calc(var(--space-4) + 52px), env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
-    min-width: 240px;
+    gap: 2px;
+    min-width: 260px;
     padding: var(--space-2);
     border-radius: var(--radius-xl);
     border: 1px solid var(--glass-border);
@@ -1527,15 +1527,37 @@
       opacity var(--duration-base),
       transform var(--duration-base) var(--ease-spring);
   }
+  #add-content-menu.add-content-menu.is-anchored {
+    right: auto;
+  }
   #add-content-menu.add-content-menu[aria-hidden="true"] {
     opacity: 0;
     pointer-events: none;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(-6px) scale(0.98);
   }
   #add-content-menu.add-content-menu[aria-hidden="false"] {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0) scale(1);
+  }
+  #topbar-add-btn.is-open {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border));
+    color: var(--text-primary);
+  }
+  .add-content-heading {
+    padding: var(--space-2) var(--space-4) var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .add-content-divider {
+    height: 1px;
+    margin: var(--space-1) var(--space-2);
+    background: var(--glass-border);
+    opacity: 0.8;
   }
   .add-content-item {
     display: flex;
@@ -1567,6 +1589,44 @@
   .add-content-item:hover .icon,
   .add-content-item:focus-visible .icon {
     color: var(--accent);
+  }
+
+  .library-drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: grid;
+    place-items: center;
+    padding: var(--space-6);
+    background: color-mix(in srgb, var(--bg) 55%, rgba(0, 0, 0, 0.35));
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-base);
+  }
+  .library-drop-overlay.is-visible {
+    opacity: 1;
+    pointer-events: none;
+  }
+  .library-drop-card {
+    display: grid;
+    gap: var(--space-2);
+    min-width: min(360px, calc(100vw - var(--space-8)));
+    padding: var(--space-7) var(--space-8);
+    border-radius: var(--radius-2xl);
+    border: 2px dashed color-mix(in srgb, var(--accent) 55%, var(--glass-border));
+    background: color-mix(in srgb, var(--glass-bg-strong) 88%, transparent);
+    color: var(--text-primary);
+    text-align: center;
+    box-shadow: var(--shadow-xl);
+  }
+  .library-drop-card strong {
+    font-size: var(--text-lg);
+  }
+  .library-drop-card span {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
   }
 
   /* ── Slide-over detail panel (optional shell; matches index.html) ── */

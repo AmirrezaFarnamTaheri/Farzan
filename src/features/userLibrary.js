@@ -4,20 +4,35 @@ const FILE_STORE = 'files';
 const FILE_PREFIX = 'library-file:';
 const DEFAULT_COURSE_ID = 'user-library';
 const DEFAULT_COURSE_TITLE = 'My Library';
+const REMOTE_PROTOCOLS = new Set(['http:', 'https:']);
+/** Tiny-file numeric fallback for IDB clones that flatten Blob (tests / some polyfills). */
+const BYTES_FALLBACK_MAX = 256 * 1024;
+/** Hard cap so a single lecture cannot exhaust the origin quota. */
+export const MAX_LIBRARY_FILE_BYTES = 1536 * 1024 * 1024;
 
 const blobUrls = new Map();
 let overlayBound = false;
+let fileDb = null;
+let fileDbPromise = null;
 
 function emptyLibrary() {
   return { version: 1, courses: {} };
 }
 
+function cloneValue(value) {
+  if (value == null) return value;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(value); } catch { /* fall through */ }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
 function cloneLibrary(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return emptyLibrary();
   const courses = value.courses && typeof value.courses === 'object' && !Array.isArray(value.courses)
-    ? value.courses
+    ? cloneValue(value.courses)
     : {};
-  return { version: 1, courses: { ...courses } };
+  return { version: Number(value.version) || 1, courses };
 }
 
 export function unwrapMediaRef(value) {
@@ -31,13 +46,26 @@ export function isLibraryFileRef(value) {
   return unwrapMediaRef(value).startsWith(FILE_PREFIX);
 }
 
+export function isSafeRemoteUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(raw);
+    return REMOTE_PROTOCOLS.has(String(parsed.protocol || '').toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 function makeId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function openFileDb() {
+  if (fileDb) return Promise.resolve(fileDb);
+  if (fileDbPromise) return fileDbPromise;
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve, reject) => {
+  fileDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(FILE_DB_NAME, 1);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -45,16 +73,37 @@ function openFileDb() {
         db.createObjectStore(FILE_STORE, { keyPath: 'id' });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Unable to open library file storage'));
+    request.onsuccess = () => {
+      fileDb = request.result;
+      fileDb.onclose = () => { fileDb = null; fileDbPromise = null; };
+      fileDb.onversionchange = () => {
+        try { fileDb.close(); } catch { /* ignore */ }
+        fileDb = null;
+        fileDbPromise = null;
+      };
+      resolve(fileDb);
+    };
+    request.onerror = () => {
+      fileDbPromise = null;
+      reject(request.error || new Error('Unable to open library file storage'));
+    };
   });
+  return fileDbPromise;
 }
 
 async function withFileStore(mode, fn) {
   const db = await openFileDb();
   if (!db) return null;
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(FILE_STORE, mode);
+    let tx;
+    try {
+      tx = db.transaction(FILE_STORE, mode);
+    } catch (error) {
+      fileDb = null;
+      fileDbPromise = null;
+      reject(error);
+      return;
+    }
     const store = tx.objectStore(FILE_STORE);
     const request = fn(store);
     let result;
@@ -62,19 +111,17 @@ async function withFileStore(mode, fn) {
       request.onsuccess = () => { result = request.result; };
       request.onerror = () => reject(request.error);
     }
-    tx.oncomplete = () => {
-      try { db.close(); } catch {}
-      resolve(result);
-    };
-    tx.onerror = () => {
-      try { db.close(); } catch {}
-      reject(tx.error || new Error('Library file transaction failed'));
-    };
-    tx.onabort = () => {
-      try { db.close(); } catch {}
-      reject(tx.error || new Error('Library file transaction aborted'));
-    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error || new Error('Library file transaction failed'));
+    tx.onabort = () => reject(tx.error || new Error('Library file transaction aborted'));
   });
+}
+
+function revokeCachedUrl(id) {
+  const url = blobUrls.get(id);
+  if (!url) return;
+  try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+  blobUrls.delete(id);
 }
 
 export async function loadLibrary() {
@@ -139,24 +186,35 @@ function courseTopics(course) {
 
 export async function putLibraryFile(file, { kind = 'file' } = {}) {
   if (!file) throw new TypeError('A file is required');
+  const size = Math.max(0, Number(file.size) || 0);
+  if (size > MAX_LIBRARY_FILE_BYTES) {
+    throw new Error(`This file is too large to keep in the local library (max ${Math.round(MAX_LIBRARY_FILE_BYTES / (1024 * 1024))} MB).`);
+  }
   const id = makeId(kind);
   const type = String(file.type || 'application/octet-stream');
-  const buffer = file instanceof Blob && typeof file.arrayBuffer === 'function'
-    ? await file.arrayBuffer()
-    : file;
-  const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer);
-  const blob = new Blob([bytes], { type });
+  const blob = file instanceof Blob ? file : new Blob([file], { type });
   const record = {
     id,
-    name: String(file.name || `${kind}`).slice(0, 200),
+    name: String(file.name || kind).slice(0, 200),
     type,
-    size: Math.max(0, Number(file.size) || bytes.byteLength || 0),
+    size: size || blob.size || 0,
     kind,
     createdAt: Date.now(),
     blob,
-    bytes: Array.from(bytes),
   };
-  await withFileStore('readwrite', (store) => store.put(record));
+  // Avoid Array.from(bytes) on lecture-sized files (2× RAM + a giant number array).
+  if (record.size > 0 && record.size <= BYTES_FALLBACK_MAX) {
+    const buffer = await blob.arrayBuffer();
+    record.bytes = Array.from(new Uint8Array(buffer));
+  }
+  try {
+    await withFileStore('readwrite', (store) => store.put(record));
+  } catch (error) {
+    if (error?.name === 'QuotaExceededError') {
+      throw new Error('Not enough storage for this file. Free space or try a smaller file.');
+    }
+    throw error;
+  }
   return { id, ref: `${FILE_PREFIX}${id}`, name: record.name, type: record.type, size: record.size };
 }
 
@@ -166,6 +224,17 @@ export async function resolvePlayableUrl(value, sanitize) {
   return typeof sanitize === 'function' ? sanitize(resolved) : resolved;
 }
 
+function blobFromRecord(record) {
+  if (record?.blob instanceof Blob) return record.blob;
+  if (record?.buffer instanceof ArrayBuffer) {
+    return new Blob([record.buffer], { type: record.type || 'application/octet-stream' });
+  }
+  if (record?.bytes) {
+    return new Blob([Uint8Array.from(record.bytes)], { type: record.type || 'application/octet-stream' });
+  }
+  return null;
+}
+
 export async function resolveMediaUrl(value) {
   const raw = unwrapMediaRef(value);
   if (!raw) return '';
@@ -173,10 +242,7 @@ export async function resolveMediaUrl(value) {
   const id = raw.slice(FILE_PREFIX.length);
   if (blobUrls.has(id)) return blobUrls.get(id);
   const record = await withFileStore('readonly', (store) => store.get(id));
-  let blob = record?.blob instanceof Blob ? record.blob : null;
-  if (!blob && record?.bytes && typeof Blob === 'function') {
-    blob = new Blob([Uint8Array.from(record.bytes)], { type: record.type || 'application/octet-stream' });
-  }
+  const blob = blobFromRecord(record);
   if (!blob || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return '';
   const url = URL.createObjectURL(blob);
   blobUrls.set(id, url);
@@ -249,16 +315,17 @@ export async function addPdfFile(file, options = {}) {
 
 export async function addRemoteLink({ url, title, kind = 'video', courseId, courseTitle } = {}) {
   const href = String(url || '').trim();
-  if (!href) throw new TypeError('A URL is required');
+  if (!isSafeRemoteUrl(href)) throw new TypeError('Enter an http or https URL');
+  const type = ['video', 'pdf', 'embed'].includes(kind) ? kind : 'video';
   const label = String(title || href).trim();
   const media = [{ url: href, label }];
   return addTopic({
     courseId,
     courseTitle,
     title: label,
-    videos: kind === 'pdf' ? [] : media,
-    pdfs: kind === 'pdf' ? media : [],
-    iframes: kind === 'embed' ? media : [],
+    videos: type === 'video' ? media : [],
+    pdfs: type === 'pdf' ? media : [],
+    iframes: type === 'embed' ? media : [],
   });
 }
 
@@ -267,8 +334,10 @@ export function initUserLibrary(root = window) {
   pd.UserLibrary = {
     settingKey: LIBRARY_SETTING_KEY,
     filePrefix: FILE_PREFIX,
+    maxFileBytes: MAX_LIBRARY_FILE_BYTES,
     unwrap: unwrapMediaRef,
     isLibraryFileRef,
+    isSafeRemoteUrl,
     resolve: resolveMediaUrl,
     resolvePlayable: resolvePlayableUrl,
     load: loadLibrary,
@@ -280,6 +349,7 @@ export function initUserLibrary(root = window) {
     addPdfFile,
     addRemoteLink,
     putLibraryFile,
+    revokeCachedUrl,
   };
 
   if (!overlayBound) {

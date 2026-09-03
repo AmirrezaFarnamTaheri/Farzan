@@ -405,7 +405,7 @@ describe('app shell resilience helpers', () => {
 
     await window.OpenCourseDeck.Views.myCourses();
     const view = document.querySelector('#view-container .view-my-courses');
-    await vi.waitFor(() => expect(view.textContent).toContain('No custom courses yet.'));
+    await vi.waitFor(() => expect(view.textContent).toContain('No custom courses yet'));
     expect(view.textContent).not.toContain('coming next');
 
     view.querySelector('[data-my-course-title]').value = 'Cardiology review';

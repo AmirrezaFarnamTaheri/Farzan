@@ -41,6 +41,10 @@ export function mountHomeView(deps = {}) {
               <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
               Browse courses
             </a>
+            <button class="btn btn-ghost" type="button" data-home-add>
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+              Add to library
+            </button>
             <a class="btn btn-ghost" href="#/notes">
               <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>
               Write notes
@@ -163,11 +167,19 @@ export function mountHomeView(deps = {}) {
 
   renderCatalogCounts();
   renderHomeDashboard({ Router, setPendingCourseMedia });
+  document.querySelector('[data-home-add]')?.addEventListener('click', () => {
+    if (typeof window.OpenCourseDeck?.AddContent?.openMenu === 'function') {
+      window.OpenCourseDeck.AddContent.openMenu();
+      return;
+    }
+    document.getElementById('topbar-add-btn')?.click();
+  });
 }
 
 async function renderCatalogCounts() {
   try {
     await window.DataStore?.init?.();
+    try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch { /* overlay is optional */ }
     const courses = window.DataStore?.allCourses?.() ?? [];
     const topics = window.DataStore?.allTopics?.() ?? [];
     const courseCount = document.getElementById('home-course-count');

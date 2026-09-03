@@ -4,6 +4,7 @@ import {
   addTopic,
   addVideoFile,
   initUserLibrary,
+  isSafeRemoteUrl,
   upsertCourse,
 } from './userLibrary.js';
 
@@ -20,7 +21,13 @@ function announce(message) {
   if (region) region.textContent = message;
 }
 
-function field({ label, type = 'text', name, value = '', placeholder = '', required = false, tag = 'input' }) {
+function progressImporter() {
+  return window.ProgressStats?.importJSON
+    || window.OpenCourseDeck?.ProgressStats?.importJSON
+    || null;
+}
+
+function field({ label, type = 'text', name, value = '', placeholder = '', required = false, tag = 'input', options }) {
   const wrap = document.createElement('label');
   wrap.className = 'form-group';
   wrap.style.display = 'grid';
@@ -29,6 +36,23 @@ function field({ label, type = 'text', name, value = '', placeholder = '', requi
   const caption = document.createElement('span');
   caption.className = 'form-label';
   caption.textContent = label;
+
+  if (tag === 'select' || Array.isArray(options)) {
+    const select = document.createElement('select');
+    select.className = 'select';
+    select.name = name;
+    select.required = required;
+    (options || []).forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if (String(opt.value) === String(value)) option.selected = true;
+      select.appendChild(option);
+    });
+    wrap.append(caption, select);
+    return { wrap, input: select };
+  }
+
   const input = document.createElement(tag);
   input.className = tag === 'textarea' ? 'textarea' : 'input';
   if (tag !== 'textarea') input.type = type;
@@ -56,6 +80,7 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   });
 
   const footer = document.createElement('div');
+  footer.className = 'modal-footer';
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.className = 'btn btn-ghost';
@@ -92,16 +117,60 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   return modal;
 }
 
-function setMenuOpen(open) {
+function menuItems() {
+  return [...document.querySelectorAll('#add-content-menu [role="menuitem"], #add-content-menu [data-action]')]
+    .filter((el) => !el.hidden && el.getAttribute('aria-disabled') !== 'true');
+}
+
+function positionMenu() {
+  const menu = document.getElementById('add-content-menu');
+  const trigger = document.getElementById('topbar-add-btn');
+  if (!menu || !trigger) return;
+  menu.classList.add('is-anchored');
+  const rect = trigger.getBoundingClientRect();
+  const width = menu.offsetWidth || 260;
+  const height = menu.offsetHeight || 320;
+  const gap = 8;
+  let left = rect.right - width;
+  left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+  let top = rect.bottom + gap;
+  if (top + height > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - height - gap);
+  }
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.right = 'auto';
+  menu.style.bottom = 'auto';
+}
+
+function setMenuOpen(open, { restoreFocus = false } = {}) {
   const menu = document.getElementById('add-content-menu');
   const trigger = document.getElementById('topbar-add-btn');
   if (!menu) return;
   menu.setAttribute('aria-hidden', open ? 'false' : 'true');
   trigger?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  trigger?.classList.toggle('is-open', Boolean(open));
+  if (open) {
+    positionMenu();
+    requestAnimationFrame(() => {
+      positionMenu();
+      menuItems()[0]?.focus?.();
+    });
+    return;
+  }
+  if (restoreFocus) trigger?.focus?.();
 }
 
 function isMenuOpen() {
   return document.getElementById('add-content-menu')?.getAttribute('aria-hidden') === 'false';
+}
+
+export function openAddMenu() {
+  setMenuOpen(true);
+}
+
+export function closeAddMenu({ restoreFocus = false } = {}) {
+  setMenuOpen(false, { restoreFocus });
 }
 
 function pickFile(inputId) {
@@ -111,11 +180,31 @@ function pickFile(inputId) {
   input.click();
 }
 
-async function afterAdd(result, message) {
+function currentHash() {
+  return String(window.location.hash || '');
+}
+
+function alreadyOn(route) {
+  const hash = currentHash();
+  return hash === route || hash.startsWith(`${route}?`) || hash.startsWith(`${route}/`);
+}
+
+async function afterAdd(result, message, { route = '#/courses' } = {}) {
   toast('success', message);
   announce(message);
-  try { window.OpenCourseDeck?.Router?.navigate?.('#/courses'); } catch {}
+  if (route && !alreadyOn(route)) {
+    try { window.OpenCourseDeck?.Router?.navigate?.(route); } catch { /* ignore */ }
+  }
   return result;
+}
+
+export function classifyLibraryFile(file) {
+  const type = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  if (type.startsWith('video/') || /\.(mp4|webm|ogg|ogv|mov|m4v|avi|mkv)$/i.test(name)) return 'video';
+  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (type.includes('json') || /\.(json|ocdbackup|plasmabackup)$/i.test(name)) return 'backup';
+  return '';
 }
 
 export async function addVideo() {
@@ -161,8 +250,8 @@ export function createCourse() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         }, ...list.filter((item) => item?.id !== result.id)]);
-      } catch {}
-      await afterAdd(result, `Course “${result.title}” created`);
+      } catch { /* my-courses list is a convenience mirror */ }
+      await afterAdd(result, `Course “${result.title}” created`, { route: '#/my-courses' });
     },
   });
 }
@@ -174,9 +263,20 @@ export function addLink() {
     fields: [
       { label: 'URL', name: 'url', type: 'url', placeholder: 'https://…', required: true },
       { label: 'Title', name: 'title', placeholder: 'Optional label' },
-      { label: 'Kind (video, pdf, or embed)', name: 'kind', value: 'video' },
+      {
+        label: 'Kind',
+        name: 'kind',
+        tag: 'select',
+        value: 'video',
+        options: [
+          { value: 'video', label: 'Video' },
+          { value: 'pdf', label: 'PDF' },
+          { value: 'embed', label: 'Embed / iframe' },
+        ],
+      },
     ],
     onSubmit: async ({ url, title, kind }) => {
+      if (!isSafeRemoteUrl(url)) throw new Error('Enter an http or https URL');
       const type = ['video', 'pdf', 'embed'].includes(kind) ? kind : 'video';
       const result = await addRemoteLink({ url, title, kind: type });
       await afterAdd(result, 'Link added to your library');
@@ -185,29 +285,55 @@ export function addLink() {
 }
 
 export function importBackup() {
-  try {
-    window.ProgressStats?.importJSON?.();
-  } catch {
-    pickFile('file-input-backup');
+  const importer = progressImporter();
+  if (typeof importer === 'function') {
+    importer();
+    return;
   }
+  pickFile('file-input-backup');
 }
 
-async function handleVideoFiles(files) {
+async function addFilesOfKind(files, kind) {
   const list = [...files].filter(Boolean);
-  if (!list.length) return;
-  for (const file of list) {
-    await addVideoFile(file);
+  const accepted = list.filter((file) => classifyLibraryFile(file) === kind);
+  const skipped = list.length - accepted.length;
+  if (skipped) {
+    toast('info', `${skipped} file${skipped === 1 ? '' : 's'} skipped — only ${kind === 'video' ? 'videos' : 'PDFs'} can be added here`);
   }
-  await afterAdd({ count: list.length }, list.length === 1 ? 'Video added to My Library' : `${list.length} videos added`);
+  if (!accepted.length) return { count: 0 };
+  const errors = [];
+  for (const file of accepted) {
+    try {
+      if (kind === 'video') await addVideoFile(file);
+      else await addPdfFile(file);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  const saved = accepted.length - errors.length;
+  if (!saved) throw errors[0] || new Error(`Could not add ${kind}`);
+  if (errors.length) toast('error', `${errors.length} ${kind}${errors.length === 1 ? '' : 's'} failed to save`);
+  return { count: saved };
 }
 
-async function handlePdfFiles(files) {
-  const list = [...files].filter(Boolean);
-  if (!list.length) return;
-  for (const file of list) {
-    await addPdfFile(file);
-  }
-  await afterAdd({ count: list.length }, list.length === 1 ? 'PDF added to My Library' : `${list.length} PDFs added`);
+async function handleVideoFiles(files, { navigate = true } = {}) {
+  const result = await addFilesOfKind(files, 'video');
+  if (!result.count) return result;
+  const message = result.count === 1 ? 'Video added to My Library' : `${result.count} videos added`;
+  if (navigate) return afterAdd(result, message);
+  toast('success', message);
+  announce(message);
+  return result;
+}
+
+async function handlePdfFiles(files, { navigate = true } = {}) {
+  const result = await addFilesOfKind(files, 'pdf');
+  if (!result.count) return result;
+  const message = result.count === 1 ? 'PDF added to My Library' : `${result.count} PDFs added`;
+  if (navigate) return afterAdd(result, message);
+  toast('success', message);
+  announce(message);
+  return result;
 }
 
 function bindFileInput(id, handler) {
@@ -225,9 +351,17 @@ function bindFileInput(id, handler) {
   });
 }
 
+function syncFullscreenButton() {
+  const btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  const on = Boolean(document.fullscreenElement);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+}
+
 function bindChrome() {
   const themeBtn = document.getElementById('theme-toggle-btn');
-  if (themeBtn && themeBtn.dataset.pdChromeBound !== 'true') {
+  if (themeBtn && themeBtn.dataset.pdChromeBound !== 'true' && !themeBtn.hasAttribute('data-theme-toggle')) {
     themeBtn.dataset.pdChromeBound = 'true';
     themeBtn.addEventListener('click', () => {
       window.OpenCourseDeck?.ThemeManager?.toggle?.();
@@ -237,14 +371,18 @@ function bindChrome() {
   const fullscreenBtn = document.getElementById('fullscreen-btn');
   if (fullscreenBtn && fullscreenBtn.dataset.pdChromeBound !== 'true') {
     fullscreenBtn.dataset.pdChromeBound = 'true';
+    syncFullscreenButton();
     fullscreenBtn.addEventListener('click', async () => {
       try {
         if (document.fullscreenElement) await document.exitFullscreen?.();
         else await document.documentElement.requestFullscreen?.();
       } catch {
         toast('info', 'Fullscreen is not available in this browser');
+      } finally {
+        syncFullscreenButton();
       }
     });
+    document.addEventListener('fullscreenchange', syncFullscreenButton);
   }
 
   const searchBtn = document.getElementById('topbar-search-btn');
@@ -262,6 +400,94 @@ function bindChrome() {
   }
 }
 
+function hasFiles(event) {
+  return [...(event.dataTransfer?.types || [])].includes('Files');
+}
+
+function bindDropTarget() {
+  if (document.documentElement.dataset.pdLibraryDropBound === 'true') return;
+  document.documentElement.dataset.pdLibraryDropBound = 'true';
+  let overlay = document.getElementById('library-drop-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'library-drop-overlay';
+    overlay.className = 'library-drop-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML = '<div class="library-drop-card"><strong>Drop videos or PDFs</strong><span>They stay in My Library on this device.</span></div>';
+    document.body.appendChild(overlay);
+  }
+  let depth = 0;
+  const show = (on) => {
+    overlay.classList.toggle('is-visible', on);
+    overlay.setAttribute('aria-hidden', on ? 'false' : 'true');
+  };
+  document.addEventListener('dragenter', (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth += 1;
+    show(true);
+  });
+  document.addEventListener('dragover', (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    try { event.dataTransfer.dropEffect = 'copy'; } catch { /* ignore */ }
+  });
+  document.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (!depth) show(false);
+  });
+  document.addEventListener('drop', async (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth = 0;
+    show(false);
+    const files = [...(event.dataTransfer?.files || [])];
+    const videos = files.filter((file) => classifyLibraryFile(file) === 'video');
+    const pdfs = files.filter((file) => classifyLibraryFile(file) === 'pdf');
+    const backups = files.filter((file) => classifyLibraryFile(file) === 'backup');
+    const skipped = files.length - videos.length - pdfs.length - backups.length;
+    try {
+      const added = [];
+      if (videos.length) added.push(await handleVideoFiles(videos, { navigate: false }));
+      if (pdfs.length) added.push(await handlePdfFiles(pdfs, { navigate: false }));
+      if (backups[0]) {
+        const importer = progressImporter();
+        if (typeof importer === 'function') await importer(backups[0]);
+        else toast('info', 'Backup import is unavailable');
+      }
+      const count = added.reduce((sum, item) => sum + (item?.count || 0), 0);
+      if (count) await afterAdd({ count }, count === 1 ? 'File added to My Library' : `${count} files added to My Library`);
+      if (skipped) toast('info', `${skipped} file${skipped === 1 ? '' : 's'} skipped (videos, PDFs, and backups only)`);
+    } catch (error) {
+      toast('error', error?.message || 'Could not add dropped files');
+    }
+  });
+}
+
+function bindMenuKeyboard() {
+  if (document.documentElement.dataset.pdAddMenuKeysBound === 'true') return;
+  document.documentElement.dataset.pdAddMenuKeysBound = 'true';
+  document.addEventListener('keydown', (event) => {
+    if (!isMenuOpen()) return;
+    const items = menuItems();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setMenuOpen(false, { restoreFocus: true });
+      return;
+    }
+    if (!items.length) return;
+    const index = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      let next = 0;
+      if (event.key === 'ArrowDown') next = index < 0 ? 0 : (index + 1) % items.length;
+      else if (event.key === 'ArrowUp') next = index <= 0 ? items.length - 1 : index - 1;
+      else if (event.key === 'End') next = items.length - 1;
+      items[next]?.focus?.();
+    }
+  });
+}
+
 export function initAddContent(root = window) {
   initUserLibrary(root);
   const pd = root.OpenCourseDeck = root.OpenCourseDeck || {};
@@ -272,15 +498,21 @@ export function initAddContent(root = window) {
     createCourse,
     addLink,
     importBackup,
+    openMenu: openAddMenu,
+    closeMenu: closeAddMenu,
+    classifyLibraryFile,
   };
 
   bindChrome();
+  bindDropTarget();
   bindFileInput('file-input-video', handleVideoFiles);
   bindFileInput('file-input-pdf', handlePdfFiles);
   bindFileInput('file-input-backup', async (files) => {
     const file = files[0];
     if (!file) return;
-    try { window.ProgressStats?.importJSON?.(); } catch {}
+    const importer = progressImporter();
+    if (typeof importer !== 'function') throw new Error('Backup import is unavailable');
+    await importer(file);
   });
 
   const addBtn = document.getElementById('topbar-add-btn');
@@ -289,6 +521,7 @@ export function initAddContent(root = window) {
     addBtn.dataset.pdAddBound = 'true';
     addBtn.setAttribute('aria-haspopup', 'menu');
     addBtn.setAttribute('aria-expanded', 'false');
+    addBtn.setAttribute('aria-controls', 'add-content-menu');
     addBtn.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -317,6 +550,8 @@ export function initAddContent(root = window) {
     });
   }
 
+  bindMenuKeyboard();
+
   if (document.documentElement.dataset.pdAddMenuBound !== 'true') {
     document.documentElement.dataset.pdAddMenuBound = 'true';
     document.addEventListener('click', (event) => {
@@ -325,9 +560,7 @@ export function initAddContent(root = window) {
       if (target?.closest?.('#add-content-menu, #topbar-add-btn')) return;
       setMenuOpen(false);
     });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && isMenuOpen()) setMenuOpen(false);
-    });
+    window.addEventListener('resize', () => { if (isMenuOpen()) positionMenu(); });
   }
 
   return pd.AddContent;

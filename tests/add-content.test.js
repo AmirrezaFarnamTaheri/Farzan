@@ -54,4 +54,28 @@ describe('add content chrome', () => {
     expect(click).toHaveBeenCalled();
     expect(document.getElementById('add-content-menu').getAttribute('aria-hidden')).toBe('true');
   });
+
+  it('moves through add-menu items with the keyboard', () => {
+    initAddContent(window);
+    const first = document.querySelector('[data-action="add-video"]');
+    const second = document.querySelector('[data-action="create-course"]');
+    first.focus = vi.fn();
+    second.focus = vi.fn();
+    document.getElementById('topbar-add-btn').click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(first.focus).toHaveBeenCalled();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.getElementById('add-content-menu').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('passes the chosen backup file into ProgressStats.importJSON', async () => {
+    const importer = vi.fn(async () => {});
+    window.ProgressStats = { importJSON: importer };
+    initAddContent(window);
+    const input = document.getElementById('file-input-backup');
+    const file = new File(['{"version":"1.4"}'], 'backup.json', { type: 'application/json' });
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(importer).toHaveBeenCalledWith(file));
+  });
 });
