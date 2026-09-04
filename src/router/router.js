@@ -24,6 +24,17 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
       return this._handle?.({ force: true, detail });
     },
 
+    /**
+     * Resolves once the most recent navigation (including the initial one
+     * kicked off by init()) has finished mounting. Route mounts are async
+     * (dynamic view imports), so callers that render into the view container
+     * directly should await this to avoid being clobbered by an in-flight
+     * mount.
+     */
+    ready() {
+      return this._handlePromise.then(() => undefined, () => undefined);
+    },
+
     destroy() {
       this._currentAbortController?.abort?.();
       if (this._hashChangeHandler) {

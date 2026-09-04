@@ -199,7 +199,7 @@
       this._media.className   = 'pd-media-element';
 
       if (this._opts.type === 'video') {
-        this._media.style.cssText = 'width:100%;display:block;background:#000;border-radius:inherit;';
+        this._media.style.cssText = 'width:100%;display:block;';
       } else {
         this._media.style.display = 'none';
       }
@@ -219,11 +219,11 @@
         <div class="pd-info">
           <div class="pd-artwork">
             <img class="pd-art-img" src="" alt="" aria-hidden="true">
-            <div class="pd-art-placeholder" aria-hidden="true">Audio</div>
+            <div class="pd-art-placeholder" aria-hidden="true">${this._opts.type === 'video' ? 'Video' : 'Audio'}</div>
           </div>
           <div class="pd-meta">
-            <div class="pd-title" aria-live="polite">—</div>
-            <div class="pd-artist">—</div>
+            <div class="pd-title" aria-live="polite">Nothing playing</div>
+            <div class="pd-artist">Pick a lesson to start</div>
           </div>
           <button class="pd-btn pd-like-btn" aria-label="Like track" data-pd="like">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -995,6 +995,7 @@
       this._history = [];
       this._state.queueIndex = 0;
       this._media.removeAttribute('src');
+      this._container.classList.remove('pd-has-source');
       this._media.load();
       this._updateTrackUI({});
       this._renderLearningPanel();
@@ -1063,6 +1064,7 @@
         if (this._destroyed || this._queue[this._state.queueIndex] !== track) return;
         if (source) this._media.src = source;
         else this._media.removeAttribute('src');
+        this._container.classList.toggle('pd-has-source', Boolean(source));
         this._media.load();
       };
       if (unwrapped.startsWith('library-file:') && typeof window.OpenCourseDeck?.UserLibrary?.resolvePlayable === 'function') {
@@ -1093,10 +1095,10 @@
 
     _updateTrackUI(track) {
       if (!this._dom) return;
-      const { title = '—', artist = '—', artwork = '', album = '' } = track;
+      const { title = 'Nothing playing', artist = '', artwork = '', album = '' } = track;
 
       this._dom.title.textContent  = title;
-      this._dom.artist.textContent = artist || album || '—';
+      this._dom.artist.textContent = artist || album || (track.title ? '—' : 'Pick a lesson to start');
 
       const artworkUrl = safeImageUrl(artwork);
       if (artworkUrl) {

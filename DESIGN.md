@@ -56,8 +56,10 @@
 
 ## Color System (OKLCH & sRGB Fallback)
 
-- **Strategy**: Blue Ocean differentiation — rejecting generic AI purple gradients in favor of high-contrast Archival Parchment (`#F8F6F1`) and Royal Lapis (`#2563EB`) accented with Terracotta Amber (`#C2410C`) for spaced repetition and Jade Emerald (`#047857`) for verified mastery.
+- **Strategy**: High-contrast neutral canvases (Archival Parchment `#F8F6F1` in light themes, Void Obsidian `#0f0f1a` in dark themes) with a single user-selectable accent. Terracotta Amber (`#C2410C`) marks spaced repetition and Jade Emerald (`#047857`) marks verified mastery regardless of accent.
 - **Distribution**: 60% Neutral Canvas / 30% Surface Containers & Structure / 10% Purposeful Accents.
+- **Accent**: The shipped default is **Violet** (`#7c3aed`, `data-accent="violet"`) — it is also the PWA `theme_color` and the brand-mark gradient. Users may switch to Lapis, Cyan, Amber, Rose, Emerald or Sakura in Settings; each accent defines the full `--accent*` family in `src/styles/accents.css`.
+- **Text on accent**: Never hard-code `#fff` on an accent fill. Use `--accent-contrast` (aliased as `--text-on-accent`); light accents (Amber, Cyan, Emerald) override it with a dark ink so filled buttons, pills and badges stay AA-compliant.
 
 ### Color Tokens
 
@@ -71,8 +73,10 @@
 | Ink Faint | `--fg-faint` | `oklch(68.0% 0.015 240)` | `#8A9BAF` | Inactive cues & line timestamps |
 | Border Subtle | `--border-subtle` | `oklch(88.0% 0.008 85)` | `#DEDAD1` | Card outlines & dividers |
 | Border Strong | `--border-strong` | `oklch(78.0% 0.015 240)` | `#CBD5E1` | Active inputs & modal borders |
-| Lapis Accent | `--accent-lapis` | `oklch(53.0% 0.220 260)` | `#2563EB` | Primary buttons, active tabs, focus ring |
-| Lapis Soft | `--accent-lapis-soft` | `oklch(96.0% 0.035 260)` | `#EFF6FF` | Selected pills & active lecture backgrounds |
+| Accent (default Violet) | `--accent` | `oklch(54.0% 0.250 295)` | `#7C3AED` | Primary buttons, active tabs, focus ring |
+| Accent Soft | `--accent-muted` | `rgba(--accent-rgb, 0.15)` | — | Selected pills & active lecture backgrounds |
+| Accent Contrast | `--accent-contrast` | — | `#FFFFFF` (dark ink on light accents) | Text/icons placed on an accent fill |
+| Lapis (alt accent) | `[data-accent="lapis"] --accent` | `oklch(53.0% 0.220 260)` | `#2563EB` | Optional accent preset |
 | Terracotta (SM-2) | `--accent-mark` | `oklch(58.0% 0.190 45)` | `#C2410C` | Spaced repetition queue & due alerts |
 | Emerald (Mastery) | `--accent-success` | `oklch(52.0% 0.160 155)` | `#047857` | Completed milestones & verified proofs |
 | Warning | `--accent-warning` | `oklch(75.0% 0.160 75)` | `#D97706` | Unresolved queries & review reminders |
@@ -108,7 +112,7 @@
 Every interactive control satisfies all 8 states:
 1. **Default**: Clean surface with 1px border or subtle elevation.
 2. **Hover**: 150ms ease-out transition, subtle border illumination, 0 layout shifts.
-3. **Focus-Visible**: High-contrast 2px solid ring in `--accent-lapis` with 2px offset.
+3. **Focus-Visible**: High-contrast 2px solid ring in `--accent` with 2px offset.
 4. **Active**: Micro-press tactile feedback (`transform: scale(0.98)`).
 5. **Disabled**: `opacity: 0.45; pointer-events: none; cursor: not-allowed;`.
 6. **Loading**: Inline pulse indicator or skeleton loader without altering container dimensions.
@@ -158,6 +162,11 @@ Every interactive control satisfies all 8 states:
 
 ## Changelog
 
+- **2026-09-04**:
+  - Reconciled the documented palette with the shipped app: Violet is the default accent; Lapis is an optional preset.
+  - Introduced `--accent-contrast` (aliased by `--text-on-accent`) with dark-ink overrides for Amber, Cyan and Emerald so text on accent fills stays AA.
+  - Unified the sprite icon system (`svg.icon`, `1em`, `currentColor`) across navigation, notes, flashcards, settings and the player; emoji removed from UI chrome.
+  - Performance: Chart.js is loaded on demand for the Progress route, Inter is trimmed to weights 400–800, and release builds ship a single flattened stylesheet.
 - **2026-08-25**:
   - Completed comprehensive `/frontend-design-deslop` overhaul.
   - Upgraded all 6 screen wireframes in `screenshots/` to museum-grade vector graphics with strict XML 1.0 compliance (0 comment errors).

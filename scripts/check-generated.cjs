@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const esbuild = require('esbuild');
-const { createBuildOptions, rewriteReleaseStaticFile } = require('./build.cjs');
+const { createBuildOptions, renderReleaseStyles, rewriteReleaseStaticFile } = require('./build.cjs');
 const { stripSourceMapText } = require('./build-sw-dist.cjs');
 
 const root = path.join(__dirname, '..');
@@ -151,8 +151,10 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
     if (expected !== normalize(fs.readFileSync(to, 'utf8'))) changed.push(file);
   }
 
+  // src/styles is flattened into a single bundled index.css at release time
+  // (see build.cjs bundleReleaseStyles); it is verified separately by
+  // checkReleaseStyles() rather than byte-compared here.
   const dirPairs = STATIC_DIRS.map((dir) => [path.join(rootDir, dir), path.join(actualOutdir, dir), dir]);
-  dirPairs.push([path.join(rootDir, 'src', 'styles'), path.join(actualOutdir, 'src', 'styles'), 'src/styles']);
   for (const [from, to, label] of dirPairs) {
     for (const rel of walkFiles(from)) {
       const relLabel = `${label}/${rel}`;
@@ -180,6 +182,16 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
   };
 }
 
+async function checkReleaseStyles({ rootDir = root, actualOutdir = outdir } = {}) {
+  const expected = await renderReleaseStyles(rootDir);
+  const staged = path.join(actualOutdir, 'src', 'styles', 'index.css');
+  if (expected == null) return { clean: true, missing: [], changed: [] };
+  if (!fs.existsSync(staged)) return { clean: false, missing: ['src/styles/index.css'], changed: [] };
+  const actual = fs.readFileSync(staged, 'utf8');
+  if (actual !== expected) return { clean: false, missing: [], changed: ['src/styles/index.css'] };
+  return { clean: true, missing: [], changed: [] };
+}
+
 async function checkGenerated({ actualOutdir = outdir } = {}) {
   const options = {
     ...createBuildOptions(outdir, false),
@@ -204,6 +216,10 @@ async function main() {
 
   const result = await checkGenerated();
   const staticResult = checkStaticArtifacts();
+  const stylesResult = await checkReleaseStyles();
+  staticResult.missing.push(...stylesResult.missing);
+  staticResult.changed.push(...stylesResult.changed);
+  staticResult.clean = staticResult.clean && stylesResult.clean;
   if (result.clean && staticResult.clean) {
     console.log('[check-generated] dist/ matches a fresh production build.');
     return;
@@ -227,6 +243,7 @@ if (require.main === module) {
 
 module.exports = {
   checkGenerated,
+  checkReleaseStyles,
   checkStaticArtifacts,
   compareDirs,
   compareInventories,

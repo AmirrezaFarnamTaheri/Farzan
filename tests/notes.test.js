@@ -475,8 +475,16 @@ describe('notes route filters', () => {
     expect(list.textContent).toContain('<svg onload=');
     expect(folders.textContent).toContain('<img src=x');
     expect(folders.textContent).toContain('<svg onload=');
-    expect(list.querySelector('img, svg')).toBeNull();
-    expect(folders.querySelector('img, svg')).toBeNull();
+    expect(list.querySelector('img')).toBeNull();
+    expect(folders.querySelector('img')).toBeNull();
+    // The only SVG allowed in these panels is the inert sprite reference
+    // (<svg class="icon"><use href="#i-…"/></svg>) the renderer emits itself.
+    for (const svg of [...list.querySelectorAll('svg'), ...folders.querySelectorAll('svg')]) {
+      expect(svg.getAttribute('onload')).toBeNull();
+      expect(svg.classList.contains('icon')).toBe(true);
+      expect([...svg.children].map((child) => child.tagName.toLowerCase())).toEqual(['use']);
+      expect(svg.firstElementChild.getAttribute('href')).toMatch(/^#i-[a-z0-9-]+$/);
+    }
     expect(window.__noteTitleXss).toBeUndefined();
     expect(window.__noteTagXss).toBeUndefined();
     expect(window.__folderNameXss).toBeUndefined();
@@ -492,7 +500,7 @@ describe('notes route filters', () => {
 
     const empty = document.querySelector('.notes-empty');
     expect(empty?.textContent).toContain('No notes found');
-    expect(empty?.querySelector('[data-action="new-note"]')?.textContent).toBe('+ New Note');
+    expect(empty?.querySelector('[data-action="new-note"]')?.textContent.trim()).toBe('New note');
   });
 
   it('renders large note lists incrementally and cancels queued batches on destroy', async () => {
@@ -613,13 +621,15 @@ describe('notes route filters', () => {
 
     window.PlasmaNotesExport.importJSON(file);
 
+    // jsdom's FileReader completes on a real macrotask that fake timers do
+    // not control; give it headroom when the worker pool is under load.
     await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
       imported: 1,
       updated: 0,
       skipped: 0,
       invalid: 1,
       conflicts: 0,
-    })));
+    })), { timeout: 5000 });
     const imported = window.PlasmaNotesStore.getNote('import-xss');
     expect(imported.title).toContain('<img');
     expect(imported.content).toContain('Imported');

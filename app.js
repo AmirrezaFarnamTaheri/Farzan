@@ -151,6 +151,20 @@ import { Pointer } from './src/lib/pointer.js';
     return el;
   }
 
+  /**
+   * Sprite-backed inline icon: <svg class="icon"><use href="#i-{id}"/></svg>
+   */
+  function spriteIcon(id, className = 'icon') {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS(svgNS, 'use');
+    use.setAttribute('href', `#i-${id}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
   function safeExternalUrl(value) {
     if (!value) return null;
     try {
@@ -1012,7 +1026,7 @@ import { Pointer } from './src/lib/pointer.js';
           return {
             ...item,
             id: `semantic-note:${item.sourceId}`,
-            icon: '🧠',
+            icon: 'brain',
             category: 'Semantic note',
             description: `Semantic match${hit.score ? ` · ${Math.round(hit.score * 100)}%` : ''}`,
           };
@@ -1044,9 +1058,11 @@ import { Pointer } from './src/lib/pointer.js';
       (catalog.courses || []).forEach((course) => {
         if (!course?.id) return;
         results.push({
-          icon: '📚',
+          icon: 'library',
           label: String(course.title || course.name || course.id),
-          description: 'Course',
+          description: Array.isArray(course.topics) && course.topics.length
+            ? `${course.topics.length} topic${course.topics.length === 1 ? '' : 's'}`
+            : '',
           category: 'Course',
           href: '#/courses',
         });
@@ -1056,7 +1072,7 @@ import { Pointer } from './src/lib/pointer.js';
         const title = String(topic.title || topic.topicTitle || topic.topicId);
         const source = String(topic.sourceLabel || topic.courseTitle || topic.courseId || 'Catalog topic');
         results.push({
-          icon: topic.pdfs?.length ? '📄' : topic.videos?.length ? '▶' : '🔎',
+          icon: topic.pdfs?.length ? 'file-pdf' : topic.videos?.length ? 'play' : 'search',
           label: title,
           description: source,
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
@@ -1070,7 +1086,7 @@ import { Pointer } from './src/lib/pointer.js';
         if (!note?.id) return;
         results.push({
           id: `note:${note.id}`,
-          icon: '📝',
+          icon: 'note',
           label: String(note.title || 'Untitled note'),
           description: note.topicId ? `Linked to ${note.topicId}` : 'Note',
           searchText: this._plainText(note.content || note.text || ''),
@@ -1084,7 +1100,7 @@ import { Pointer } from './src/lib/pointer.js';
         const target = timestamp?.topicId || timestamp?.id;
         if (!target) return;
         results.push({
-          icon: '⏱',
+          icon: 'clock',
           label: String(timestamp.title || timestamp.topicTitle || target),
           description: timestamp.position != null ? `Timestamp at ${this._formatDuration(timestamp.position)}` : 'Saved timestamp',
           category: 'Timestamp',
@@ -1098,7 +1114,7 @@ import { Pointer } from './src/lib/pointer.js';
         const target = annotation?.docId || annotation?.id;
         if (!target) return;
         results.push({
-          icon: '✏',
+          icon: 'pen',
           label: String(annotation.title || annotation.text || target),
           description: `PDF annotation${annotation.page ? ` · page ${annotation.page}` : ''}`,
           category: 'PDF annotation',
@@ -1147,12 +1163,13 @@ import { Pointer } from './src/lib/pointer.js';
             tabindex: '-1',
             'data-index': String(i),
           });
-          const icon = createElement('span', { class: 'search-result-icon' }, item.icon ?? 'Search');
+          const iconId = /^[a-z][a-z0-9-]*$/.test(String(item.icon || '')) ? item.icon : 'search';
+          const icon = createElement('span', { class: 'search-result-icon', 'aria-hidden': 'true' }, spriteIcon(iconId));
           const text = createElement('span', { class: 'search-result-text' });
           const label = createElement('span', { class: 'search-result-label' });
           this._appendHighlighted(label, item.label ?? '', query);
           text.appendChild(label);
-          if (item.description) {
+          if (item.description && item.description !== item.category) {
             text.appendChild(createElement('span', { class: 'search-result-desc' }, item.description));
           }
           el.append(icon, text);
@@ -1698,7 +1715,8 @@ import { Pointer } from './src/lib/pointer.js';
       }
 
       const id   = uid('toast');
-      const icon = { info: 'i', success: 'OK', warning: '!', error: 'X' }[type] ?? 'i';
+      const iconId = { info: 'info', success: 'circle-check', warning: 'alert-triangle', error: 'alert-circle' }[type] ?? 'info';
+      const icon = spriteIcon(iconId);
 
       const toast = createElement('div', {
         id,
@@ -1715,7 +1733,7 @@ import { Pointer } from './src/lib/pointer.js';
       this._appendAction(content, action);
       toast.append(iconEl, content);
       if (dismissible) {
-        toast.appendChild(createElement('button', { class: 'toast-close', 'aria-label': 'Dismiss notification' }, '×'));
+        toast.appendChild(createElement('button', { class: 'toast-close', type: 'button', 'aria-label': 'Dismiss notification' }, spriteIcon('close')));
       }
       if (duration > 0) {
         toast.appendChild(createElement('div', { class: 'toast-timer' }));
@@ -2868,7 +2886,7 @@ import { Pointer } from './src/lib/pointer.js';
 
     _feedback(btn, success) {
       const original = [...btn.childNodes];
-      btn.replaceChildren(document.createTextNode(success ? '✓ Copied!' : 'Copy failed'));
+      btn.replaceChildren(success ? spriteIcon('check') : spriteIcon('alert-circle'), document.createTextNode(success ? ' Copied' : ' Copy failed'));
       btn.disabled  = true;
       setTimeout(() => {
         btn.replaceChildren(...original);
@@ -3336,7 +3354,7 @@ import { Pointer } from './src/lib/pointer.js';
           try {
             OpenCourseDeck.bus.emit('settings:save', { data });
             if (saveIndicator) {
-              saveIndicator.textContent = '✅ Saved';
+              saveIndicator.textContent = 'Saved';
               setTimeout(() => { saveIndicator.textContent = ''; }, 2000);
             }
           } catch {
@@ -3353,7 +3371,7 @@ import { Pointer } from './src/lib/pointer.js';
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
           const confirmed = await Modal.confirmAsync({
-            title:     '⚠️ Delete Account',
+            title:     'Delete account',
             message:   'This action is <strong>irreversible</strong>. All your data will be permanently deleted. Are you absolutely sure?',
             confirmLabel: 'Delete account',
             cancelLabel: 'Cancel',
@@ -3510,13 +3528,26 @@ import { Pointer } from './src/lib/pointer.js';
     const breadcrumbList = document.getElementById('breadcrumb-list');
     if (breadcrumbList) {
       OpenCourseDeck.bus.on?.('route:change', ({ hash }) => {
+        const normalized = String(hash || '#/home').split('?')[0].replace(/\/$/, '') || '#/home';
+        const isHome = normalized === '#/home' || normalized === '#' || normalized === '';
+        const title = routeTitle(normalized);
+        if (isHome || title === 'OpenCourseDeck') {
+          // "Home › Home" is noise; on the dashboard just show the current page.
+          breadcrumbList.replaceChildren(
+            createElement('li', { class: 'breadcrumb-item' },
+              createElement('span', { class: 'breadcrumb-current', 'aria-current': 'page' }, isHome ? 'Home' : title)
+            )
+          );
+          return;
+        }
         const home = createElement('li', { class: 'breadcrumb-item' },
           createElement('a', { href: '#/home', class: 'breadcrumb-link' }, 'Home')
         );
+        const sep = createElement('li', { class: 'breadcrumb-sep', 'aria-hidden': 'true' }, spriteIcon('chevron-right'));
         const current = createElement('li', { class: 'breadcrumb-item' },
-          createElement('span', { class: 'breadcrumb-current' }, routeTitle(hash))
+          createElement('span', { class: 'breadcrumb-current', 'aria-current': 'page' }, title)
         );
-        breadcrumbList.replaceChildren(home, current);
+        breadcrumbList.replaceChildren(home, sep, current);
       });
     }
 

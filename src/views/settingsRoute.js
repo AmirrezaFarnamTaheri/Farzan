@@ -85,9 +85,9 @@ export function mountSettingsView(deps = {}) {
                     <strong>Color theme</strong>
                     <span>Switch between the available light and dark presentation.</span>
                   </div>
-                  <button class="btn btn-ghost" id="btn-theme-toggle" type="button">
-                    <svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg>
-                    Toggle theme
+                  <button class="btn btn-ghost" id="btn-theme-toggle" type="button" data-theme-toggle>
+                    <svg class="icon" aria-hidden="true" data-theme-icon><use href="#i-contrast"/></svg>
+                    <span data-theme-label>Toggle theme</span>
                   </button>
                 </article>
               </div>
@@ -123,7 +123,7 @@ export function mountSettingsView(deps = {}) {
                 <label class="settings-field">
                   <span>API key lifetime</span>
                   <select class="select" data-ai-key-storage disabled aria-describedby="ai-key-storage-help">
-                    <option value="session">Current browser session only</option>
+                    <option value="session">This browser session</option>
                   </select>
                   <small id="ai-key-storage-help">Keys are never written to IndexedDB or localStorage.</small>
                 </label>
@@ -277,8 +277,10 @@ export function mountSettingsView(deps = {}) {
     routeListeners.push({ target, type, handler, options });
   };
 
-  const themeBtn = document.getElementById('btn-theme-toggle');
-  on(themeBtn, 'click', () => ThemeManager?.toggle?.());
+  // #btn-theme-toggle carries data-theme-toggle, so ThemeManager's delegated
+  // click handler drives it (and keeps its icon/label in sync). Only sync the
+  // label now in case the route rendered after the last theme change.
+  ThemeManager?.syncToggles?.();
 
   const updateFontLabel = () => {
     const element = document.getElementById('font-scale-label');

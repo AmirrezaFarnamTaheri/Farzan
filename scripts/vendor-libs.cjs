@@ -126,7 +126,8 @@ function main() {
   // This preserves language coverage while preventing hundreds of unused italic/weight/WOFF files
   // from dominating the offline release and service-worker precache.
   const fonts = [
-    { pkg: '@fontsource/inter', out: 'fonts/inter', weights: [300, 400, 500, 600, 700, 800, 900] },
+    // 300/900 were only referenced by unused .font-light/.font-black utilities.
+    { pkg: '@fontsource/inter', out: 'fonts/inter', weights: [400, 500, 600, 700, 800] },
     { pkg: '@fontsource/jetbrains-mono', out: 'fonts/jetbrains-mono', weights: [400, 600, 700] },
     { pkg: '@fontsource/playfair-display', out: 'fonts/playfair-display', weights: [400, 700, 800] },
   ];
