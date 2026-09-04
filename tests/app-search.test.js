@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 describe('app topbar search rendering', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
+    try { window.OpenCourseDeck?.Router?.destroy?.(); } catch {}
     vi.resetModules();
     window.matchMedia = vi.fn(() => ({
       matches: false,

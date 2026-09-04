@@ -18,6 +18,28 @@ export const ThemeManager = {
   /**
    * Apply a theme to <html>
    */
+  /**
+   * Refresh every [data-theme-toggle] button's icon, label and aria-label so
+   * they reflect the direction of the NEXT toggle. Safe to call from views
+   * that render toggle buttons after the theme was last applied.
+   */
+  syncToggles(isLightTheme = document.documentElement.classList.contains('light'),
+              effective = document.documentElement.getAttribute('data-theme') || 'dark') {
+    const nextLabel = isLightTheme ? 'Switch to dark mode' : 'Switch to light mode';
+    $$('[data-theme-toggle]').forEach((btn) => {
+      const icon = $('[data-theme-icon]', btn);
+      if (icon) {
+        // Vector sprite when available (index.html icon set), text fallback otherwise.
+        const use = icon.querySelector?.('use');
+        if (use) use.setAttribute('href', isLightTheme ? '#i-moon' : '#i-sun');
+        else icon.textContent = isLightTheme ? 'Dark' : 'Light';
+      }
+      const label = $('[data-theme-label]', btn);
+      if (label) label.textContent = isLightTheme ? 'Use dark theme' : 'Use light theme';
+      btn.setAttribute('aria-label', nextLabel);
+      btn.setAttribute('data-current-theme', effective);
+    });
+  },
   apply(theme) {
     const OpenCourseDeck = window.OpenCourseDeck ?? {};
 
@@ -46,12 +68,7 @@ export const ThemeManager = {
     // getEffective() returns the theme NAME, so midnight/forest/ocean/sunset/
     // rose (all dark) would otherwise be labelled as light and show the wrong
     // icon and aria-label.
-    $$('[data-theme-toggle]').forEach((btn) => {
-      const icon = $('[data-theme-icon]', btn);
-      if (icon) icon.textContent = isLightTheme ? '🌙' : '☀️';
-      btn.setAttribute('aria-label', isLightTheme ? 'Switch to dark mode' : 'Switch to light mode');
-      btn.setAttribute('data-current-theme', effective);
-    });
+    this.syncToggles(isLightTheme, effective);
 
     // Update theme-selector buttons/radios
     $$('[data-theme-option]').forEach((el) => {

@@ -251,7 +251,16 @@
         } else if (source instanceof ArrayBuffer) {
           src = { data: source };
         } else {
-          src = { url: source };
+          const raw = typeof source === 'string'
+            ? source.trim()
+            : String(source?.url || source?.src || '').trim();
+          if (raw.startsWith('library-file:') && typeof window.OpenCourseDeck?.UserLibrary?.resolvePlayable === 'function') {
+            const resolved = await window.OpenCourseDeck.UserLibrary.resolvePlayable(source);
+            if (!resolved) throw new Error('Library PDF is unavailable');
+            src = { url: resolved };
+          } else {
+            src = { url: typeof source === 'string' ? source : raw || source };
+          }
         }
 
         const loadingTask = pdfjsLib.getDocument({

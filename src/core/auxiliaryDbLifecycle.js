@@ -4,6 +4,7 @@ export const AUXILIARY_DATABASES = Object.freeze([
   'opencoursedeck-ai-models',
   'opencoursedeck-templates',
   'opencoursedeck-waveforms',
+  'opencoursedeck-library-files',
 ]);
 
 const AUXILIARY_SET = new Set(AUXILIARY_DATABASES);

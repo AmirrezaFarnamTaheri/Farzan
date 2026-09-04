@@ -10,26 +10,26 @@ describe('product readiness gating', () => {
     `;
   });
 
-  it('disables unresolved product actions explicitly', () => {
+  it('keeps library creation actions available', () => {
     const receipt = enforceProductReadiness(document);
     const topbar = document.getElementById('topbar-add-btn');
     const addVideo = document.querySelector('[data-action="add-video"]');
 
-    expect(topbar.disabled).toBe(true);
-    expect(topbar.getAttribute('aria-disabled')).toBe('true');
-    expect(addVideo.disabled).toBe(true);
-    expect(addVideo.dataset.capabilityState).toBe('unavailable');
-    expect(receipt.unavailableActions).toContain('create-course');
+    expect(topbar.disabled).toBe(false);
+    expect(topbar.getAttribute('aria-disabled')).not.toBe('true');
+    expect(addVideo.disabled).toBe(false);
+    expect(addVideo.dataset.capabilityState).not.toBe('unavailable');
+    expect(receipt.unavailableActions).toEqual([]);
   });
 
-  it('prevents unavailable action handlers from executing', () => {
+  it('does not intercept add-content clicks', () => {
     const handler = vi.fn();
     const addVideo = document.querySelector('[data-action="add-video"]');
     addVideo.addEventListener('click', handler);
     enforceProductReadiness(document);
 
     addVideo.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(handler).not.toHaveBeenCalled();
-    expect(addVideo.disabled).toBe(true);
+    expect(handler).toHaveBeenCalled();
+    expect(addVideo.disabled).toBe(false);
   });
 });

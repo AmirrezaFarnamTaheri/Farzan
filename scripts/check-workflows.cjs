@@ -85,8 +85,16 @@ function validateCiWorkflow(workflow) {
   return errors;
 }
 
+function rejectFarWorkingDirectory(filename, workflow) {
+  if (/working-directory:\s*far\b/.test(workflow)) {
+    return [`${filename}: working-directory: far is leftover from the pre-promotion layout; commands must run at the repository root`];
+  }
+  return [];
+}
+
 function validateVerificationWorkflow(workflow) {
   const errors = [];
+  errors.push(...rejectFarWorkingDirectory('verify.yml', workflow));
   requireText(errors, workflow, 'workflow_call:', 'verify.yml: reusable workflow_call trigger is missing');
   requireText(errors, workflow, 'source_ref:', 'verify.yml: exact source_ref input is missing');
   requireText(errors, workflow, 'release_mode:', 'verify.yml: release_mode input is missing');
@@ -123,6 +131,7 @@ function validateVerificationWorkflow(workflow) {
 
 function validateBrowserAssuranceWorkflow(workflow) {
   const errors = [];
+  errors.push(...rejectFarWorkingDirectory('browser-assurance.yml', workflow));
   requireText(errors, workflow, 'pull_request:', 'browser-assurance.yml: pull-request trigger is missing');
   requireText(errors, workflow, '- name: Check out browser-assurance source', 'browser-assurance.yml: checkout step is missing');
   requireText(errors, workflow, 'persist-credentials: false', 'browser-assurance.yml: checkout must disable persisted credentials');

@@ -3,6 +3,7 @@ import '../flashcards.js';
 
 describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
   beforeEach(() => {
+    try { delete window.DB; } catch { window.DB = undefined; }
     window.OpenCourseDeck?.Flashcards?.manager?.reset();
   });
 
@@ -147,6 +148,7 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
 
 describe('Flashcards Studio UI (keyboard-driven review)', () => {
   beforeEach(() => {
+    try { delete window.DB; } catch { window.DB = undefined; }
     window.OpenCourseDeck?.Flashcards?.manager?.reset();
     document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
   });
@@ -209,6 +211,7 @@ describe('Flashcards Studio create-card form', () => {
   });
 
   beforeEach(() => {
+    try { delete window.DB; } catch { window.DB = undefined; }
     window.OpenCourseDeck?.Flashcards?.manager?.reset();
     document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
   });
@@ -246,5 +249,30 @@ describe('Flashcards Studio create-card form', () => {
     expect(document.getElementById('aria-announcer').textContent).toContain('required');
     expect(await manager.getCards()).toHaveLength(0);
     expect(form.classList.contains('hidden')).toBe(false);
+  });
+});
+
+describe('Flashcards vault persistence', () => {
+  beforeEach(() => {
+    window.OpenCourseDeck?.Flashcards?.manager?.reset();
+    window.DB = {
+      store: {},
+      getSetting: vi.fn(async (key) => window.DB.store[key] ?? null),
+      saveSetting: vi.fn(async (key, value) => {
+        window.DB.store[key] = value;
+        return value;
+      }),
+    };
+  });
+
+  it('mirrors cards into the ocd_flashcards setting used by JSON backups', async () => {
+    const { addCard, getCards } = window.OpenCourseDeck.Flashcards;
+    await addCard({ front: 'Vault Q', back: 'Vault A', deck: 'Backup' });
+    expect(window.DB.saveSetting).toHaveBeenCalledWith(
+      'ocd_flashcards',
+      expect.arrayContaining([expect.objectContaining({ front: 'Vault Q' })]),
+    );
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards'))[0].front).toBe('Vault Q');
+    expect((await getCards())[0].back).toBe('Vault A');
   });
 });

@@ -47,6 +47,25 @@ describe('command palette', () => {
     expect(window.OpenCourseDeck.ThemeManager.set).not.toHaveBeenCalled();
   });
 
+  it('runs library creation commands through AddContent', () => {
+    window.OpenCourseDeck.AddContent = {
+      addVideo: vi.fn(),
+      addPdf: vi.fn(),
+      createTopic: vi.fn(),
+      createCourse: vi.fn(),
+      addLink: vi.fn(),
+    };
+    initCommandPalette();
+    window.OpenCourseDeck.CommandPalette.open();
+
+    const input = document.getElementById('cp-input');
+    input.value = 'Create course';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(window.OpenCourseDeck.AddContent.createCourse).toHaveBeenCalled();
+  });
+
   it('late-binds optional app globals and tolerates missing services', () => {
     window.OpenCourseDeck = { bus: { emit: vi.fn() } };
     expect(() => initCommandPalette()).not.toThrow();

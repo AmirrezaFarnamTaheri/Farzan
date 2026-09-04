@@ -43,7 +43,6 @@ jobs:
       SOURCE_VERSION: ${{ inputs.source_version }}
     defaults:
       run:
-        working-directory: far
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:

@@ -24,6 +24,7 @@ describe('runtime wiring', () => {
     './features/errorBoundary.js',
     './features/offlineBanner.js',
     './features/commandPalette.js',
+    './features/addContent.js',
     './core/bridgeHardening.js',
     './core/pdfIdentityHardening.js',
     './core/storageSafety.js',

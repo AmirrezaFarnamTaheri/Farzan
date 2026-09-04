@@ -49,6 +49,14 @@ export async function mountMaterialsView(deps = {}) {
   `);
 
   await window.DataStore?.init?.();
+  try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+  const playableMediaUrl = async (value) => {
+    const lib = window.OpenCourseDeck?.UserLibrary;
+    if (typeof lib?.resolvePlayable === 'function') {
+      return lib.resolvePlayable(value, safeMediaUrl);
+    }
+    return safeMediaUrl(value);
+  };
   const viewRoot = document.querySelector('.view-materials');
   const pagerEl = document.getElementById('materials-pager');
   const listEl = document.getElementById('materials-list');
@@ -209,7 +217,7 @@ export async function mountMaterialsView(deps = {}) {
     render(state.query);
   });
 
-  on(viewRoot, 'click', (e) => {
+  on(viewRoot, 'click', async (e) => {
       const target = eventTargetEl(e);
       if (!target) return;
       const filterBtn = target.closest('[data-material-filter]');
@@ -231,13 +239,13 @@ export async function mountMaterialsView(deps = {}) {
       const t = topics.find(x => x.topicId === row.dataset.topicId);
       if (!t) return;
       if (btn.dataset.action === 'open-pdf') {
-        const url = safeMediaUrl(t.pdfs?.[0]);
+        const url = await playableMediaUrl(t.pdfs?.[0]);
         if (!url) return;
         Router.navigate('#/pdf');
         setTimeout(() => { try { window.PlasmaPDFViewer?.load?.(url); } catch {} }, 50);
       }
       if (btn.dataset.action === 'play-video') {
-        const url = safeMediaUrl(t.videos?.[0]);
+        const url = await playableMediaUrl(t.videos?.[0]);
         if (!url) return;
         // Jump to courses and autoplay the exact topic
         setPendingCourseMedia(t.topicId);

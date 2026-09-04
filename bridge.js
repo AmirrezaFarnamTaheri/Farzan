@@ -43,9 +43,42 @@
     };
 
     let _activeCatalogPath = null;
+    let _catalogRaw = null;
+    let _overlayRaw = {};
 
     function catalogPath() {
       return _activeCatalogPath;
+    }
+
+    function _recompose() {
+      const catalog = (_catalogRaw && typeof _catalogRaw === 'object' && !Array.isArray(_catalogRaw))
+        ? _catalogRaw
+        : {};
+      const overlay = (_overlayRaw && typeof _overlayRaw === 'object' && !Array.isArray(_overlayRaw))
+        ? _overlayRaw
+        : {};
+      STATE.raw = { ...catalog, ...overlay };
+      const norm = _normalize(STATE.raw);
+      STATE.courses = norm.courses;
+      STATE.topics = norm.topics;
+    }
+
+    function mergeRaw(coursesMap, { userOwned = false } = {}) {
+      const incoming = (coursesMap && typeof coursesMap === 'object' && !Array.isArray(coursesMap))
+        ? coursesMap
+        : {};
+      if (userOwned) {
+        _overlayRaw = { ...incoming };
+      } else {
+        _catalogRaw = { ...(_catalogRaw && typeof _catalogRaw === 'object' ? _catalogRaw : {}), ...incoming };
+      }
+      _recompose();
+      STATE.loaded = true;
+      return {
+        courses: STATE.courses.length,
+        topics: STATE.topics.length,
+        userOwned: Boolean(userOwned),
+      };
     }
 
     function _normalize(raw) {
@@ -116,6 +149,8 @@
           courses: STATE.courses,
           topics: STATE.topics,
           path: _activeCatalogPath,
+          catalogRaw: _catalogRaw,
+          overlayRaw: _overlayRaw,
           authoritative: STATE.status === 'authoritative',
         };
         STATE.status = 'loading';
@@ -149,10 +184,8 @@
           const resolvedPath = targetCatalog.startsWith('./') ? targetCatalog : `./${targetCatalog}`;
           updateStatus('Loading catalog content...');
           const raw = await fetchWithRetry(resolvedPath);
-          const norm = _normalize(raw);
-          STATE.raw = raw;
-          STATE.courses = norm.courses;
-          STATE.topics = norm.topics;
+          _catalogRaw = raw;
+          _recompose();
           STATE.loaded = true;
           STATE.status = 'authoritative';
           STATE.lastError = null;
@@ -168,14 +201,12 @@
         } catch (err) {
           console.warn('[DataStore] Failed to load catalog JSON:', err);
           STATE.lastError = { name: err?.name || 'Error', message: err?.message || String(err), at: Date.now() };
-          const usingLastKnownGood = Boolean(previous.authoritative && previous.raw);
-          const raw = usingLastKnownGood ? previous.raw : DEMO_FALLBACK;
-          const norm = usingLastKnownGood
-            ? { courses: previous.courses, topics: previous.topics }
-            : _normalize(raw);
-          STATE.raw = raw;
-          STATE.courses = norm.courses;
-          STATE.topics = norm.topics;
+          const usingLastKnownGood = Boolean(previous.authoritative && previous.catalogRaw);
+          _catalogRaw = usingLastKnownGood ? previous.catalogRaw : DEMO_FALLBACK;
+          if (previous.overlayRaw && typeof previous.overlayRaw === 'object') {
+            _overlayRaw = previous.overlayRaw;
+          }
+          _recompose();
           STATE.loaded = true;
           STATE.status = 'degraded';
           _activeCatalogPath = usingLastKnownGood ? previous.path : 'demo-fallback';
@@ -217,7 +248,7 @@
     function allTopics() { return STATE.topics.slice(); }
     function isLoaded() { return STATE.loaded; }
 
-    return { init, retry, getState, isLoaded, allCourses, allTopics, catalogPath };
+    return { init, retry, getState, isLoaded, allCourses, allTopics, catalogPath, mergeRaw };
   })();
 
   window.DataStore = window.DataStore ?? DataStore;
@@ -723,15 +754,23 @@
       ocd_canvas_board: 'plasma-canvas-board',
       ocd_notes_settings: 'plasma-notes-settings',
       ocd_ai_settings: 'plasma-ai-settings',
+      ocd_my_courses: 'plasma-my-courses',
+      ocd_course_media_cues: 'plasma-course-media-cues',
+      ocd_flashcards: 'plasma-flashcards-store',
     };
 
     async function getSetting(key) {
       const idb = _getIdb();
+      const legacyKey = SETTING_KEY_ALIASES[key];
       if (idb) {
         await _migrateOnce();
         try {
           const entry = await idb.get('settings', key);
           if (entry) return entry.value;
+          if (legacyKey) {
+            const legacy = await idb.get('settings', legacyKey);
+            if (legacy) return legacy.value;
+          }
         } catch {}
       }
       const direct = _read(key, null);
@@ -739,7 +778,6 @@
       // Rename support: fall back to the pre-rename plasma-era twin so
       // existing user data stays readable until the next save writes
       // the canonical ocd_* key.
-      const legacyKey = SETTING_KEY_ALIASES[key];
       return legacyKey ? _read(legacyKey, null) : null;
     }
 
@@ -897,7 +935,7 @@
       if (includeAnnotations) stores.push('annotations');
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS, KEY_MIGRATED, MIGRATED_IDS_KEY];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
-      if (includeSettings) localKeys.push('ocd_notes_settings');
+      if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_ai_settings');
       if (includeAnnotations) localKeys.push('plasma-pdf-annotations');
       if (includePrefs) localKeys.push(
         'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
@@ -907,7 +945,7 @@
         'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists', 'ocd_playlists', 'ocd_notes', 'ocd_folders',
         'ocd_notes_settings', 'ocd_theme', 'ocd_accent', 'ocd_density',
         'ocd_font_scale', 'ocd_dir', 'ocd_sidebar_collapsed', 'ocd_flashcards',
-        'ocd_ai_settings',
+        'ocd_ai_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues',
         'plasma-studio-board', 'plasma-canvas-board', MIGRATION_REPORT_KEY,
       );
 
@@ -940,14 +978,14 @@
       }
       if (scope === 'playlists') {
         return _deletionOutcome('clear-playlists', scope, [
-          await _deleteIdbSettings(idb, ['plasma-playlists']),
-          _storageRemoval(localStorage, ['plasma-playlists'], 'localStorage'),
+          await _deleteIdbSettings(idb, ['plasma-playlists', 'ocd_playlists']),
+          _storageRemoval(localStorage, ['plasma-playlists', 'ocd_playlists'], 'localStorage'),
         ]);
       }
       if (scope === 'studio') {
         return _deletionOutcome('clear-studio', scope, [
-          await _deleteIdbSettings(idb, ['plasma-studio-board', 'plasma-canvas-board']),
-          _storageRemoval(localStorage, ['plasma-studio-board', 'plasma-canvas-board'], 'localStorage'),
+          await _deleteIdbSettings(idb, ['plasma-studio-board', 'plasma-canvas-board', 'ocd_studio_board', 'ocd_canvas_board']),
+          _storageRemoval(localStorage, ['plasma-studio-board', 'plasma-canvas-board', 'ocd_studio_board', 'ocd_canvas_board'], 'localStorage'),
         ]);
       }
       if (scope === 'all') return clearAll();

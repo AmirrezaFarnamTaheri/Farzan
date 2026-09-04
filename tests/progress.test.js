@@ -20,7 +20,10 @@ describe('progress backup exports', () => {
       getSetting: vi.fn(async (key) => {
         if (key === 'ocd_playlists') return [{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }];
         if (key === 'ocd_studio_board') return { version: 1, layers: [{ id: 'layer-1', elements: [] }] };
-        return { view: 'list' };
+        if (key === 'ocd_flashcards') return [{ id: 'fc_1', front: 'Q', back: 'A' }];
+        if (key === 'ocd_user_library') return { version: 1, courses: { 'user-library': { title: 'My Library', sources: [] } } };
+        if (key === 'ocd_notes_settings') return { view: 'list' };
+        return null;
       }),
       saveProgress: vi.fn(async () => true),
       saveNote: vi.fn(async () => true),
@@ -60,7 +63,7 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.3');
+    expect(payload.version).toBe('1.4');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
@@ -69,6 +72,8 @@ describe('progress backup exports', () => {
     expect(payload.settings.notes).toEqual({ view: 'list' });
     expect(payload.settings.playlists).toEqual([{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }]);
     expect(payload.settings.studio).toEqual({ version: 1, layers: [{ id: 'layer-1', elements: [] }] });
+    expect(payload.settings.flashcards).toEqual([{ id: 'fc_1', front: 'Q', back: 'A' }]);
+    expect(payload.settings.library).toEqual({ version: 1, courses: { 'user-library': { title: 'My Library', sources: [] } } });
     expect(payload.meta.storage.available).toBe(900);
     expect(payload.meta.sizeBytes).toBeGreaterThan(0);
   });
@@ -111,6 +116,7 @@ describe('progress backup exports', () => {
     expect(markdown).toContain('Current body');
     expect(markdown).toContain('## Timestamp Index');
     expect(markdown).toContain('## PDF Annotation Index');
+    expect(markdown).toContain('Flashcards: 1');
   });
 
   it('keeps vault note filenames unique and includes a machine-readable manifest', async () => {
@@ -217,7 +223,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-json').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.3');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.4');
 
     downloadedBlob = null;
     document.getElementById('btn-export-csv').click();
@@ -368,13 +374,20 @@ describe('progress backup exports', () => {
 
     const tracker = document.querySelector('[data-steps]');
     expect(tracker.querySelectorAll('.step-item')).toHaveLength(3);
-    expect(tracker.querySelector('.step-dot').textContent).toBe('✓');
-    expect(tracker.querySelectorAll('script,img,svg')).toHaveLength(0);
+    const doneDot = tracker.querySelector('.step-item.done .step-dot');
+    expect(doneDot.textContent).toBe('');
+    expect(doneDot.querySelector('svg.icon use')?.getAttribute('href')).toBe('#i-check');
+    expect(tracker.querySelectorAll('script,img')).toHaveLength(0);
+    // Only inert sprite references may appear (no inline SVG payloads).
+    tracker.querySelectorAll('svg').forEach((svg) => {
+      expect(svg.classList.contains('icon')).toBe(true);
+      expect([...svg.children].map((c) => c.tagName.toLowerCase())).toEqual(['use']);
+    });
   });
 
   it('records import preview counts and per-record errors', async () => {
     const payload = {
-      version: '1.3',
+      version: '1.4',
       progress: [
         { topicId: 'ok-topic', courseId: 'course-1', updatedAt: 10 },
         { topicId: 'bad-topic', courseId: 'course-1', updatedAt: 11 },
@@ -384,6 +397,8 @@ describe('progress backup exports', () => {
       settings: {
         playlists: [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }],
         studio: { version: 1, layers: [{ id: 'layer-1', elements: [] }] },
+        flashcards: [{ id: 'fc_import', front: 'Imported Q', back: 'Imported A' }],
+        library: { version: 1, courses: { 'user-library': { title: 'Imported Library', sources: [] } } },
       },
       annotations: [],
       timestamps: [],
@@ -411,13 +426,13 @@ describe('progress backup exports', () => {
 
     expect(input.accept).toContain('application/json');
     expect(window.OpenCourseDeck.lastImportResult.preview).toEqual(expect.objectContaining({
-      version: '1.3',
+      version: '1.4',
       fileName: 'backup.json',
       progress: 2,
       notes: 1,
-      settings: 2,
+      settings: 4,
       invalid: 0,
-      totalValid: 5,
+      totalValid: 7,
     }));
     expect(window.OpenCourseDeck.lastImportPreview).toEqual(window.OpenCourseDeck.lastImportResult.preview);
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith(expect.objectContaining({
@@ -430,9 +445,11 @@ describe('progress backup exports', () => {
       message: expect.stringContaining('Invalid records that will be skipped: 0'),
     }));
     expect(window.OpenCourseDeck.lastImportResult.progress).toBe(1);
-    expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
+    expect(window.OpenCourseDeck.lastImportResult.settings).toBe(4);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_playlists', [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }]);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', { version: 1, layers: [{ id: 'layer-1', elements: [] }] });
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', [{ id: 'fc_import', front: 'Imported Q', back: 'Imported A' }]);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'Imported Library', sources: [] } } });
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'progress', id: 'bad-topic', message: 'write failed' }),
     ]);
@@ -572,6 +589,22 @@ describe('progress backup exports', () => {
       content: '<p>Body</p>',
     }));
     expect(window.OpenCourseDeck.lastImportResult.notes).toBe(1);
+  });
+
+  it('imports a File argument without opening another picker', async () => {
+    const payload = {
+      version: '1.4',
+      notes: [{ id: 'note-file', title: 'From file', content: '<p>Body</p>', updatedAt: 12 }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'direct.json', { type: 'application/json' });
+    const createSpy = vi.spyOn(document, 'createElement');
+
+    await window.ProgressStats.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult).toBeTruthy());
+
+    expect(createSpy.mock.calls.some(([tag]) => tag === 'input')).toBe(false);
+    expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'note-file' }));
   });
 
   it('rejects unsupported backup versions before writing records', async () => {

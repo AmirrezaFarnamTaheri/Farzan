@@ -25,7 +25,7 @@ function mountSettings(saved = null) {
   window.OpenCourseDeck = {
     AI: {
       gemmaModelOptions: [
-        { id: 'gemma-4-local', label: 'Gemma 4', url: 'https://ai.google.dev/gemma' },
+        { id: 'gemma-4-local', label: 'On-device extractive summary', url: 'https://ai.google.dev/gemma' },
       ],
       limits: { maxModelBytes: 1024 * 1024 },
       importLocalModelFile: vi.fn(),
@@ -118,7 +118,7 @@ describe('settings route', () => {
       hasKey: true,
     });
     expect(saved).not.toHaveProperty('apiKey');
-    expect(sessionStorage.getItem('plasma-ai-api-key-session')).toBe('sk-session');
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('sk-session');
     controller.unmount();
   });
 
@@ -136,7 +136,7 @@ describe('settings route', () => {
 
     document.querySelector('[data-ai-save]').click();
     await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringContaining('HTTPS')));
-    expect(sessionStorage.getItem('plasma-ai-api-key-session')).toBeNull();
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBeNull();
     expect(saveSetting).not.toHaveBeenCalled();
     controller.unmount();
   });

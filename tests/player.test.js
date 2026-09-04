@@ -90,8 +90,8 @@ describe('MediaPlayer queue rendering', () => {
 
     expect(player.queue).toEqual([]);
     expect(player.trackIndex).toBe(0);
-    expect(document.querySelector('#player .pd-title').textContent).toBe('—');
-    expect(document.querySelector('#player .pd-artist').textContent).toBe('—');
+    expect(document.querySelector('#player .pd-title').textContent).toBe('Nothing playing');
+    expect(document.querySelector('#player .pd-artist').textContent).toBe('Pick a lesson to start');
     expect(document.querySelector('#player audio').hasAttribute('src')).toBe(false);
     expect(() => player.next()).not.toThrow();
     expect(() => player.prev()).not.toThrow();
@@ -495,5 +495,18 @@ describe('MediaPlayer queue rendering', () => {
     expect(seekTo).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('pd-player')).toBeNull();
     expect(document.querySelector('#player').childElementCount).toBe(0);
+  });
+
+  it('resolves library-file refs through UserLibrary before assigning media src', async () => {
+    window.OpenCourseDeck.UserLibrary = {
+      resolvePlayable: vi.fn(async () => 'blob:https://example.test/library-video'),
+    };
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ title: 'Local lecture', src: 'library-file:abc' }]);
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('#player video').getAttribute('src')).toBe('blob:https://example.test/library-video');
+    });
+    expect(window.OpenCourseDeck.UserLibrary.resolvePlayable).toHaveBeenCalled();
   });
 });

@@ -288,7 +288,7 @@
     // COMPONENT: ALERT
     // ════════════════════════════════════════════════════
     const Alert = {
-      ICONS: { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' },
+      ICONS: { info: 'info', success: 'circle-check', warning: 'alert-triangle', error: 'alert-circle' },
 
       create({ message = '', type = 'info', title = '', dismissible = true,
                icon = null, actions = null } = {}) {
@@ -296,13 +296,15 @@
         el.className = `alert alert-${type}`;
         el.setAttribute('role', type === 'error' ? 'alert' : 'status');
         el.innerHTML = `
-          <span class="alert-icon" aria-hidden="true">${esc(icon ?? this.ICONS[type] ?? 'ℹ️')}</span>
+          <span class="alert-icon" aria-hidden="true">${icon != null
+            ? esc(icon)
+            : `<svg class="icon"><use href="#i-${esc(this.ICONS[type] ?? 'info')}"/></svg>`}</span>
           <div class="alert-content">
             ${title ? `<div class="alert-title">${esc(title)}</div>` : ''}
             <div class="alert-message">${esc(message)}</div>
             <div class="alert-actions"></div>
           </div>
-          ${dismissible ? '<button class="alert-close" aria-label="Dismiss">×</button>' : ''}
+          ${dismissible ? '<button class="alert-close" type="button" aria-label="Dismiss"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>' : ''}
         `;
 
         const actionsContainer = el.querySelector('.alert-actions');
@@ -867,11 +869,11 @@
             await navigator.clipboard.writeText(text);
 
             btn.classList.add('copied');
-            const original = btn.innerHTML;
-            btn.innerHTML = '✓ Copied';
+            const original = Array.from(btn.childNodes);
+            btn.replaceChildren(document.createTextNode('Copied'));
 
             setTimeout(() => {
-              btn.innerHTML = original;
+              btn.replaceChildren(...original);
               btn.classList.remove('copied');
             }, 1500);
 

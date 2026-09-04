@@ -81,6 +81,7 @@ async function renderPlaylists(deps) {
     (async () => {
       try {
         await window.DataStore?.init?.();
+        try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
         return window.DataStore?.allTopics?.() ?? [];
       } catch {
         return [];

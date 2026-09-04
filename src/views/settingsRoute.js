@@ -85,9 +85,9 @@ export function mountSettingsView(deps = {}) {
                     <strong>Color theme</strong>
                     <span>Switch between the available light and dark presentation.</span>
                   </div>
-                  <button class="btn btn-ghost" id="btn-theme-toggle" type="button">
-                    <svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg>
-                    Toggle theme
+                  <button class="btn btn-ghost" id="btn-theme-toggle" type="button" data-theme-toggle>
+                    <svg class="icon" aria-hidden="true" data-theme-icon><use href="#i-contrast"/></svg>
+                    <span data-theme-label>Toggle theme</span>
                   </button>
                 </article>
               </div>
@@ -101,7 +101,7 @@ export function mountSettingsView(deps = {}) {
                 <div>
                   <span class="eyebrow">Optional and private by default</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
-                  <p>Use the built-in local summary mode or explicitly approve a private API destination. API keys remain in this browser session only.</p>
+                  <p>Local mode is an on-device extractive summary unless you register a runtime. Gemma package names are catalog labels only. API keys remain in this browser session only.</p>
                 </div>
                 <span class="badge badge-info" data-ai-status aria-live="polite">Loading</span>
               </div>
@@ -123,7 +123,7 @@ export function mountSettingsView(deps = {}) {
                 <label class="settings-field">
                   <span>API key lifetime</span>
                   <select class="select" data-ai-key-storage disabled aria-describedby="ai-key-storage-help">
-                    <option value="session">Current browser session only</option>
+                    <option value="session">This browser session</option>
                   </select>
                   <small id="ai-key-storage-help">Keys are never written to IndexedDB or localStorage.</small>
                 </label>
@@ -168,8 +168,8 @@ export function mountSettingsView(deps = {}) {
                   <label class="settings-field">
                     <span>Local package</span>
                     <select class="select" data-ai-local-package>
-                      <option value="gemma-4-local">Gemma 4</option>
-                      <option value="gemma-3n-local">Gemma 3n</option>
+                      <option value="gemma-4-local">On-device extractive summary</option>
+                      <option value="gemma-3n-local">On-device extractive summary (compact)</option>
                     </select>
                   </label>
                   <label class="settings-field">
@@ -277,8 +277,10 @@ export function mountSettingsView(deps = {}) {
     routeListeners.push({ target, type, handler, options });
   };
 
-  const themeBtn = document.getElementById('btn-theme-toggle');
-  on(themeBtn, 'click', () => ThemeManager?.toggle?.());
+  // #btn-theme-toggle carries data-theme-toggle, so ThemeManager's delegated
+  // click handler drives it (and keeps its icon/label in sync). Only sync the
+  // label now in case the route rendered after the last theme change.
+  ThemeManager?.syncToggles?.();
 
   const updateFontLabel = () => {
     const element = document.getElementById('font-scale-label');
@@ -381,11 +383,11 @@ export function mountSettingsView(deps = {}) {
       || !endpointOrigin || !endpointWarning || !customFields || !localFields || !localPackage
       || !localSource || !localFileInput || !status || !summary) return null;
 
-    const keyName = 'plasma-ai-api-key-session';
+    const keyName = 'ocd_ai_api_key_session';
     const ai = window.OpenCourseDeck?.AI;
     const gemmaOptions = ai?.gemmaModelOptions || [
-      { id: 'gemma-4-local', label: 'Gemma 4', url: 'https://ai.google.dev/gemma' },
-      { id: 'gemma-3n-local', label: 'Gemma 3n', url: 'https://ai.google.dev/gemma' },
+      { id: 'gemma-4-local', label: 'On-device extractive summary', url: 'https://ai.google.dev/gemma' },
+      { id: 'gemma-3n-local', label: 'On-device extractive summary (compact)', url: 'https://ai.google.dev/gemma' },
     ];
     const maxModelBytes = Number(ai?.limits?.maxModelBytes) || 2 * 1024 * 1024 * 1024;
     if (modelLimit) modelLimit.textContent = `${safeFormatBytes(maxModelBytes)} maximum`;

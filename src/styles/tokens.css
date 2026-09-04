@@ -1,11 +1,16 @@
 :root {
     /* ── Accent (overridden per data-accent) ── */
-    --accent:           #2563eb;
-    --accent-light:     #3b82f6;
-    --accent-dark:      #1d4ed8;
-    --accent-muted:     rgba(37, 99, 235, 0.15);
-    --accent-glow:      rgba(37, 99, 235, 0.35);
-    --accent-rgb:       37, 99, 235;
+    /* Defaults mirror [data-accent="violet"] so nothing flashes lapis before
+       the accent attribute is applied. */
+    --accent:           #7c3aed;
+    --accent-light:     #9d5ff5;
+    --accent-dark:      #5b21b6;
+    --accent-muted:     rgba(124, 58, 237, 0.15);
+    --accent-glow:      rgba(124, 58, 237, 0.35);
+    --accent-rgb:       124, 58, 237;
+    /* Foreground for text placed directly on --accent; light accents
+       (amber, cyan, emerald) override this in accents.css. */
+    --accent-contrast:  #ffffff;
 
     /* ── Surface Colors (overridden per data-theme) ── */
     --bg:               #0f0f1a;
@@ -26,6 +31,9 @@
     --bg-surface:       var(--surface);
     --bg-surface-hover: var(--surface-hover);
     --border-subtle:    var(--border);
+    --bg-card:          var(--surface-2);
+    --border-soft:      var(--border-strong);
+    --surface-raised:   var(--surface-3);
 
     /* ── Text Colors ── */
     --text-primary:     #f0f0ff;
@@ -34,7 +42,7 @@
     --text-muted:       var(--text-tertiary);
     --text-disabled:    rgba(240, 240, 255, 0.22);
     --text-inverse:     #0f0f1a;
-    --text-on-accent:   #ffffff;
+    --text-on-accent:   var(--accent-contrast);
 
     /* ── Semantic Colors ── */
     --success:          #10b981;
@@ -94,7 +102,9 @@
     --space-4:  16px;
     --space-5:  20px;
     --space-6:  24px;
+    --space-7:  28px;
     --space-8:  32px;
+    --space-9:  36px;
     --space-10: 40px;
     --space-12: 48px;
     --space-16: 64px;
@@ -154,9 +164,10 @@
     --grid-gap: var(--space-4);
 
     /* ── Layout ── */
-    --sidebar-width:           260px;
-    --sidebar-collapsed-width: 64px;
-    --topbar-height:           56px;
+    --sidebar-width:           300px;
+    --sidebar-collapsed-width: 88px;
+    --topbar-height:           64px;
+    --topbar-h:                var(--topbar-height);
     --content-max-width:       1400px;
 
     /* ── Z-Index Scale ── */

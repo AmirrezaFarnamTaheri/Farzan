@@ -1,10 +1,4 @@
-const UNAVAILABLE_ACTIONS = Object.freeze([
-  'add-video',
-  'add-pdf',
-  'create-topic',
-  'create-course',
-  'add-url',
-]);
+const UNAVAILABLE_ACTIONS = Object.freeze([]);
 
 function disableElement(element, reason) {
   if (!element) return;
@@ -15,19 +9,11 @@ function disableElement(element, reason) {
 }
 
 export function enforceProductReadiness(root = document) {
-  const reason = 'This workflow is not available in this release.';
-  disableElement(root.getElementById?.('topbar-add-btn'), reason);
-
-  for (const action of UNAVAILABLE_ACTIONS) {
-    root.querySelectorAll?.(`[data-action="${action}"]`).forEach((element) => {
-      disableElement(element, reason);
-      element.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }, { capture: true });
-    });
-  }
-
+  // Library creation (add video/PDF/topic/course/URL) is a shipped product
+  // surface. Keep the gate so callers still receive a receipt, but do not
+  // disable the add-content chrome.
+  void root;
+  void disableElement;
   return {
     unavailableActions: [...UNAVAILABLE_ACTIONS],
   };

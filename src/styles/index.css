@@ -8,6 +8,7 @@
 @import './base.css' layer(base);
 @import './layout.css' layer(layout);
 @import './components.css' layer(components);
+@import './player.css' layer(components);
 @import './views.css' layer(views);
 @import './utilities.css' layer(utilities);
 @import './animations.css' layer(animations);

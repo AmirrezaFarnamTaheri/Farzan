@@ -58,6 +58,38 @@
     );
   }
 
+  // Sprite-backed inline icon (see index.html icon sprite). Folder icons are
+  // stored as free text for backwards compatibility; legacy emoji values map
+  // onto sprite ids so old libraries render with the vector set.
+  const FOLDER_ICON_ALIASES = {
+    'Folder': 'folder', '📁': 'folder', '📂': 'folder-open',
+    '💼': 'briefcase', '🗄️': 'archive', '🗄': 'archive', '📦': 'archive',
+    '🗒️': 'notes', '🗒': 'notes', '📝': 'note', '📄': 'file-text',
+    '📌': 'pin', '⭐': 'spark', '🔥': 'flame', '🏆': 'trophy', '💡': 'lightbulb',
+  };
+  function spriteIcon(id, className = 'icon') {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS(svgNS, 'use');
+    use.setAttribute('href', `#i-${id}`);
+    svg.appendChild(use);
+    return svg;
+  }
+  function folderIconNode(icon) {
+    const raw = String(icon || '').trim();
+    const id = FOLDER_ICON_ALIASES[raw] || (/^[a-z][a-z0-9-]*$/.test(raw) && document.getElementById(`i-${raw}`) ? raw : null);
+    if (id) return spriteIcon(id);
+    if (!raw) return spriteIcon('folder');
+    // Legacy/custom icons (usually a single emoji) render as inert text;
+    // .folder-icon clips anything longer than the glyph slot.
+    const span = document.createElement('span');
+    span.className = 'folder-icon-text';
+    span.textContent = raw;
+    return span;
+  }
+
   function plainTextFromHtml(html) {
     const tmp = document.createElement('div');
     tmp.innerHTML = String(html || '');
@@ -181,7 +213,7 @@
         ...folder,
         id,
         name: String(folder.name || 'Untitled Folder').trim().slice(0, 120) || 'Untitled Folder',
-        icon: String(folder.icon || 'Folder').trim().slice(0, 64) || 'Folder',
+        icon: String(folder.icon || 'folder').trim().slice(0, 64) || 'folder',
         color: String(folder.color || '').trim().slice(0, 64),
       };
     },
@@ -382,9 +414,9 @@
     getFolders() {
       if (Array.isArray(this._folders)) return this._folders.slice();
       this._folders = this._readArray(FOLDERS_KEY, [
-        { id: 'default', name: 'Personal',  icon: '📁', color: '' },
-        { id: 'work',    name: 'Work',      icon: '💼', color: '' },
-        { id: 'archive', name: 'Archive',   icon: '🗄️', color: '' },
+        { id: 'default', name: 'Personal',  icon: 'folder', color: '' },
+        { id: 'work',    name: 'Work',      icon: 'briefcase', color: '' },
+        { id: 'archive', name: 'Archive',   icon: 'archive', color: '' },
       ]);
       return this._folders.slice();
     },
@@ -418,7 +450,7 @@
       this.saveFolders(Array.isArray(fallbackFolders) ? fallbackFolders : this._folders);
     },
 
-    createFolder(name, icon = 'Folder', color = '') {
+    createFolder(name, icon = 'folder', color = '') {
       const cleanName = String(name || '').trim();
       if (!cleanName) return null;
       const folders = this.getFolders();
@@ -925,14 +957,14 @@
       this._hideSlashMenu();
 
       const items = [
-        { label: '📝 Paragraph',     cmd: 'paragraph'  },
+        { label: 'Paragraph',        cmd: 'paragraph'  },
         { label: '# Heading 1',      cmd: 'h1'         },
         { label: '## Heading 2',     cmd: 'h2'         },
         { label: '### Heading 3',    cmd: 'h3'         },
-        { label: '• Bullet List',    cmd: 'ul'         },
-        { label: '1. Numbered List', cmd: 'ol'         },
-        { label: '❝ Blockquote',     cmd: 'blockquote' },
-        { label: '</> Code Block',   cmd: 'codeblock'  },
+        { label: '• Bullet list',    cmd: 'ul'         },
+        { label: '1. Numbered list', cmd: 'ol'         },
+        { label: '> Blockquote',     cmd: 'blockquote' },
+        { label: '</> Code block',   cmd: 'codeblock'  },
         { label: '⊞ Table',          cmd: 'table'      },
         { label: '─ Divider',        cmd: 'hr'         },
       ];
@@ -1012,7 +1044,7 @@
     _showSaveIndicator() {
       const el = $('[data-save-status]');
       if (!el) return;
-      el.textContent = '✅ Saved';
+      el.textContent = 'Saved';
       el.classList.add('visible');
       clearTimeout(el._timer);
       el._timer = setTimeout(() => { el.classList.remove('visible'); }, 2000);
@@ -1108,14 +1140,16 @@
         empty.className = 'notes-empty';
         const icon = document.createElement('div');
         icon.className = 'empty-icon';
-        icon.textContent = '📄';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.appendChild(spriteIcon('file-text'));
         const text = document.createElement('div');
         text.className = 'empty-text';
         text.textContent = 'No notes found';
         const button = document.createElement('button');
         button.className = 'btn btn-primary btn-sm';
         button.dataset.action = 'new-note';
-        button.textContent = '+ New Note';
+        button.type = 'button';
+        button.append(spriteIcon('plus'), document.createTextNode(' New note'));
         empty.append(icon, text, button);
         this._container.appendChild(empty);
         return;
@@ -1177,7 +1211,8 @@
         const pin = document.createElement('span');
         pin.className = 'note-pin';
         pin.title = 'Pinned';
-        pin.textContent = '📌';
+        pin.setAttribute('aria-label', 'Pinned');
+        pin.appendChild(spriteIcon('pin'));
         header.appendChild(pin);
       }
 
@@ -1225,16 +1260,16 @@
       item.addEventListener('contextmenu', e => {
         e.preventDefault();
         ContextMenu.show(e.clientX, e.clientY, [
-          { label: note.pinned ? '📌 Unpin' : '📌 Pin',
+          { label: note.pinned ? 'Unpin' : 'Pin',
             action: () => { Store.updateNote(note.id, { pinned: !note.pinned }); NotesList.render(); } },
-          { label: '🎨 Set Color', action: () => NotesApp.promptColor(note.id) },
-          { label: '🏷️ Edit Tags', action: () => NotesApp.promptTags(note.id) },
-          { label: '📁 Move to Folder', action: () => NotesApp.promptMoveFolder(note.id) },
-          { label: '📋 Duplicate', action: () => NotesApp.duplicateNote(note.id) },
-          { label: '📥 Export as TXT', action: () => NotesApp.exportNote(note.id, 'txt') },
-          { label: '📥 Export as HTML', action: () => NotesApp.exportNote(note.id, 'html') },
+          { label: 'Set color', action: () => NotesApp.promptColor(note.id) },
+          { label: 'Edit tags', action: () => NotesApp.promptTags(note.id) },
+          { label: 'Move to folder', action: () => NotesApp.promptMoveFolder(note.id) },
+          { label: 'Duplicate', action: () => NotesApp.duplicateNote(note.id) },
+          { label: 'Export as TXT', action: () => NotesApp.exportNote(note.id, 'txt') },
+          { label: 'Export as HTML', action: () => NotesApp.exportNote(note.id, 'html') },
           { type: 'divider' },
-          { label: '🗑️ Delete', danger: true, action: () => NotesApp.deleteNote(note.id) },
+          { label: 'Delete', danger: true, action: () => NotesApp.deleteNote(note.id) },
         ]);
       });
 
@@ -1345,7 +1380,7 @@
       this._container.replaceChildren();
       this._container.appendChild(this._buildFolderItem({
         id: '',
-        icon: '🗒️',
+        icon: 'notes',
         name: 'All Notes',
         count: notes.length,
         active: !NotesList._filter.folderId && !NotesList._filter._pinned,
@@ -1353,7 +1388,7 @@
       }));
       this._container.appendChild(this._buildFolderItem({
         id: '__pinned__',
-        icon: '📌',
+        icon: 'pin',
         name: 'Pinned',
         count: notes.filter(n => n.pinned).length,
         active: NotesList._filter._pinned,
@@ -1388,7 +1423,8 @@
 
       const iconEl = document.createElement('span');
       iconEl.className = 'folder-icon';
-      iconEl.textContent = icon;
+      iconEl.setAttribute('aria-hidden', 'true');
+      iconEl.appendChild(folderIconNode(icon));
       item.appendChild(iconEl);
 
       const nameEl = document.createElement('span');

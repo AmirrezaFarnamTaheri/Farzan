@@ -20,15 +20,27 @@ export async function mountCoursesView(deps = {}) {
   setView(`
     <section class="view view-courses">
       <div class="page-header">
-        <span class="eyebrow">Curriculum & Media</span>
-        <h1 class="page-title">Course Catalog</h1>
-        <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
+        <div>
+          <span class="eyebrow">Curriculum & Media</span>
+          <h1 class="page-title">Course Catalog</h1>
+          <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" type="button" data-courses-add>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            Add to library
+          </button>
+        </div>
       </div>
 
       <div class="courses-shell">
         <aside class="courses-sidebar">
-          <input class="input" id="courses-search" type="search" placeholder="Search courses..." />
-          <div class="filter-row" aria-label="Course filters" style="margin-top:12px">
+          <label class="courses-search-field">
+            <span class="sr-only">Search courses</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input class="input" id="courses-search" type="search" placeholder="Search courses..." />
+          </label>
+          <div class="filter-row" aria-label="Course filters">
             <button class="filter-chip active" type="button" data-course-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-course-filter="video" aria-pressed="false">Video</button>
             <button class="filter-chip" type="button" data-course-filter="pdf" aria-pressed="false">PDF</button>
@@ -48,9 +60,11 @@ export async function mountCoursesView(deps = {}) {
 
         <main class="courses-main">
           <div id="course-detail" class="course-detail">
-            <div class="card card-filled">
-              <div class="card-body">
-                Select a course on the left.
+            <div class="card card-filled catalog-placeholder">
+              <div class="card-body catalog-empty">
+                <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
+                <strong>Select a course</strong>
+                <p>Select a course on the left. Add a video or PDF anytime from the plus menu.</p>
               </div>
             </div>
           </div>
@@ -105,8 +119,17 @@ export async function mountCoursesView(deps = {}) {
     </section>
   `);
 
-  // Ensure catalog loaded
+  // Ensure catalog loaded and user-library courses overlay the catalog.
   await window.DataStore?.init?.();
+  try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+
+  const playableMediaUrl = async (value) => {
+    const lib = window.OpenCourseDeck?.UserLibrary;
+    if (typeof lib?.resolvePlayable === 'function') {
+      return lib.resolvePlayable(value, safeMediaUrl);
+    }
+    return safeMediaUrl(value);
+  };
   const listEl = document.getElementById('courses-list');
   const searchEl = document.getElementById('courses-search');
   const sourceScopeEl = document.getElementById('courses-source-scope');
@@ -169,10 +192,14 @@ export async function mountCoursesView(deps = {}) {
   };
   if (!listEl || !detailEl) return;
 
+  document.querySelector('[data-courses-add]')?.addEventListener('click', () => {
+    window.OpenCourseDeck?.AddContent?.openMenu?.();
+  });
+
   // Ensure player auto-inits for the inserted element
   try { window.OpenCourseDeck?.Player?.init?.(); } catch { /* ignore */ }
 
-  const MEDIA_CUES_KEY = 'plasma-course-media-cues';
+  const MEDIA_CUES_KEY = 'ocd_course_media_cues';
   let authoredMediaCues = {};
   try {
     const savedCues = await window.DB?.getSetting?.(MEDIA_CUES_KEY);
@@ -180,12 +207,18 @@ export async function mountCoursesView(deps = {}) {
   } catch {
     authoredMediaCues = {};
   }
-  const allCourses = window.DataStore?.allCourses?.() ?? [];
-  const allTopics = window.DataStore?.allTopics?.() ?? [];
-  const topicsByCourse = allTopics.reduce((acc, t) => {
-    (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
-    return acc;
-  }, {});
+  let allCourses = [];
+  let allTopics = [];
+  let topicsByCourse = {};
+  const rebuildCatalogIndexes = () => {
+    allCourses = window.DataStore?.allCourses?.() ?? [];
+    allTopics = window.DataStore?.allTopics?.() ?? [];
+    topicsByCourse = allTopics.reduce((acc, t) => {
+      (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
+      return acc;
+    }, {});
+  };
+  rebuildCatalogIndexes();
   const courseFacetState = {
     query: '',
     filter: 'all',
@@ -224,27 +257,33 @@ export async function mountCoursesView(deps = {}) {
       'data-status': key,
     }, label);
   };
-  const badgeNode = (label) => createElement('span', { class: 'badge' }, label);
-  const actionButton = (action, label) => createElement('button', {
-    class: 'btn btn-ghost btn-sm',
+  const badgeNode = (label, extraClass = '') => createElement('span', {
+    class: extraClass ? `badge ${extraClass}` : 'badge',
+  }, label);
+  const actionButton = (action, label, extraClass = 'btn-ghost') => createElement('button', {
+    class: `btn ${extraClass} btn-sm`,
     type: 'button',
     'data-action': action,
   }, label);
-  const courseMetaById = new Map(allCourses.map((course) => {
-    const topics = topicsByCourse[course.id] ?? [];
-    const hasVideo = topics.some((topic) => (topic.videos?.length ?? 0) > 0);
-    const hasPdf = topics.some((topic) => (topic.pdfs?.length ?? 0) > 0);
-    const hasNoMedia = topics.some((topic) => (topic.videos?.length ?? 0) === 0 && (topic.pdfs?.length ?? 0) === 0);
-    const sourceCount = new Set(topics.map(sourceKey)).size;
-    return [course.id, {
-      topicCount: topics.length,
-      hasVideo,
-      hasPdf,
-      hasNoMedia,
-      mediaClass: hasVideo && hasPdf ? 'mixed' : hasVideo ? 'video' : hasPdf ? 'pdf' : 'none',
-      sourceCount,
-    }];
-  }));
+  let courseMetaById = new Map();
+  const rebuildCourseMeta = () => {
+    courseMetaById = new Map(allCourses.map((course) => {
+      const topics = topicsByCourse[course.id] ?? [];
+      const hasVideo = topics.some((topic) => (topic.videos?.length ?? 0) > 0);
+      const hasPdf = topics.some((topic) => (topic.pdfs?.length ?? 0) > 0);
+      const hasNoMedia = topics.some((topic) => (topic.videos?.length ?? 0) === 0 && (topic.pdfs?.length ?? 0) === 0);
+      const sourceCount = new Set(topics.map(sourceKey)).size;
+      return [course.id, {
+        topicCount: topics.length,
+        hasVideo,
+        hasPdf,
+        hasNoMedia,
+        mediaClass: hasVideo && hasPdf ? 'mixed' : hasVideo ? 'video' : hasPdf ? 'pdf' : 'none',
+        sourceCount,
+      }];
+    }));
+  };
+  rebuildCourseMeta();
   const seekPlayerToPendingPosition = (inst, position) => {
     const seconds = Number(position);
     if (!inst?.seekTo || !Number.isFinite(seconds) || seconds <= 0) return;
@@ -681,9 +720,13 @@ export async function mountCoursesView(deps = {}) {
 
   const buildCourseButton = (course) => {
     const meta = courseMetaById.get(course.id) || { topicCount: 0, mediaClass: 'none', sourceCount: 0 };
-    const btn = createElement('button', { class: 'course-item', 'data-course-id': course.id });
+    const btn = createElement('button', {
+      class: `course-item course-item--${meta.mediaClass}`,
+      'data-course-id': course.id,
+    });
     const mediaMeta = createElement('div', { class: 'topic-meta' });
-    mediaMeta.append(badgeNode(meta.mediaClass === 'mixed' ? 'video + pdf' : meta.mediaClass === 'none' ? 'no media' : meta.mediaClass));
+    const mediaLabel = meta.mediaClass === 'mixed' ? 'video + pdf' : meta.mediaClass === 'none' ? 'no media' : meta.mediaClass;
+    mediaMeta.append(badgeNode(mediaLabel, meta.mediaClass === 'none' ? '' : 'badge-primary'));
     btn.append(
       createElement('div', { class: 'course-item-title' }, course.title),
       createElement('div', { class: 'course-item-meta' }, `${meta.topicCount} topics - ${meta.sourceCount || 0} source(s)`),
@@ -695,6 +738,7 @@ export async function mountCoursesView(deps = {}) {
   const buildTopicRow = (topic, status, { toggle = false } = {}) => {
     const hasVideo = (topic.videos?.length ?? 0) > 0;
     const hasPdf = (topic.pdfs?.length ?? 0) > 0;
+    const hasEmbed = (topic.iframes?.length ?? 0) > 0;
     const row = createElement('div', {
       class: 'topic-row',
       'data-topic-id': topic.topicId,
@@ -710,11 +754,13 @@ export async function mountCoursesView(deps = {}) {
     meta.appendChild(statusBadgeNode(status));
     if (hasVideo) meta.appendChild(badgeNode('video'));
     if (hasPdf) meta.appendChild(badgeNode('pdf'));
-    if (!hasVideo && !hasPdf) meta.appendChild(badgeNode('no media'));
+    if (hasEmbed) meta.appendChild(badgeNode('embed'));
+    if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('no media'));
 
     const actions = createElement('div', { class: 'topic-actions' });
     if (hasVideo) actions.appendChild(actionButton('play-video', 'Play'));
     if (hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
+    if (hasEmbed) actions.appendChild(actionButton('open-embed', 'Open'));
     if (toggle) actions.appendChild(actionButton('toggle-done', status === 'done' ? 'Undone' : 'Done'));
     row.append(copy, meta, actions);
     return row;
@@ -748,10 +794,17 @@ export async function mountCoursesView(deps = {}) {
     if (!filtered.length) {
       cancelDetailRender();
       courseFacetState.selectedCourseId = '';
-      const card = createElement('div', { class: 'card card-ghost' });
-      card.appendChild(createElement('div', { class: 'card-body' }, 'No courses match this search or filter.'));
+      const card = createElement('div', { class: 'catalog-empty catalog-empty--compact' });
+      card.appendChild(createElement('p', {}, 'No courses match this search or filter.'));
       listEl.appendChild(card);
-      detailEl.replaceChildren(createElement('div', { class: 'card card-filled' }, createElement('div', { class: 'card-body' }, 'Pick a different search or course filter to continue.')));
+      const emptyDetail = createElement('div', { class: 'card card-filled catalog-placeholder' });
+      const emptyBody = createElement('div', { class: 'card-body catalog-empty' });
+      emptyBody.append(
+        createElement('strong', {}, 'Nothing matches'),
+        createElement('p', {}, 'Pick a different search or course filter to continue.'),
+      );
+      emptyDetail.appendChild(emptyBody);
+      detailEl.replaceChildren(emptyDetail);
       return;
     }
     filtered.forEach((course) => {
@@ -991,7 +1044,7 @@ export async function mountCoursesView(deps = {}) {
       }
 
       if (action === 'open-pdf') {
-        const url = safeMediaUrl(topic.pdfs?.[0]);
+        const url = await playableMediaUrl(topic.pdfs?.[0]);
         if (!url) return;
         Router.navigate('#/pdf');
         // Wait a tick for the view to mount, then load
@@ -1001,8 +1054,17 @@ export async function mountCoursesView(deps = {}) {
         return;
       }
 
+      if (action === 'open-embed') {
+        const raw = topic.iframes?.[0];
+        const href = typeof raw === 'string' ? raw : (raw?.url || raw?.src || '');
+        const url = safeExternalUrl(href);
+        if (!url) return;
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
       if (action === 'play-video') {
-        const url = safeMediaUrl(topic.videos?.[0]);
+        const url = await playableMediaUrl(topic.videos?.[0]);
         if (!url) return;
         // Ensure player exists and has an instance
         const el = playerEl;
@@ -1164,6 +1226,11 @@ export async function mountCoursesView(deps = {}) {
   const pendingSession = consumePendingCourseSession();
   const pendingTopicId = sessionStorage.getItem('ocd_pending_topic');
   const pendingPosition = Number(sessionStorage.getItem('ocd_pending_position') || 0);
+  let pendingLibraryCourse = '';
+  try {
+    pendingLibraryCourse = sessionStorage.getItem('ocd_pending_library_course') || '';
+    if (pendingLibraryCourse) sessionStorage.removeItem('ocd_pending_library_course');
+  } catch {}
   if (pendingTopicId) sessionStorage.removeItem('ocd_pending_topic');
   if (pendingPosition) sessionStorage.removeItem('ocd_pending_position');
 
@@ -1175,6 +1242,17 @@ export async function mountCoursesView(deps = {}) {
     renderCourseDetail(courseId);
     return true;
   };
+
+  const onLibraryChanged = (payload = {}) => {
+    rebuildCatalogIndexes();
+    rebuildCourseMeta();
+    const preferred = payload.courseId || courseFacetState.selectedCourseId;
+    renderCourses(courseFacetState.query);
+    if (preferred && selectCourse(preferred)) return;
+    if (courseFacetState.selectedCourseId) renderCourseDetail(courseFacetState.selectedCourseId);
+  };
+  window.OpenCourseDeck?.bus?.on?.('library:changed', onLibraryChanged);
+  routeDisposers.push(() => window.OpenCourseDeck?.bus?.off?.('library:changed', onLibraryChanged));
 
   const courseFilterRoot = document.querySelector('.courses-sidebar');
   if (courseFilterRoot && !courseFilterRoot.dataset.pdCourseFacetBound) {
@@ -1224,12 +1302,16 @@ export async function mountCoursesView(deps = {}) {
     }
   }
 
+  if (pendingLibraryCourse && selectCourse(pendingLibraryCourse)) {
+    return routeController;
+  }
+
   if (pendingTopicId) {
     const t = allTopics.find(x => x.topicId === pendingTopicId);
     if (t && selectCourse(t.courseId)) {
       // Autoplay after detail is rendered
-      setTimeout(() => {
-        const url = safeMediaUrl(t.videos?.[0]);
+      setTimeout(async () => {
+        const url = await playableMediaUrl(t.videos?.[0]);
         if (!url) return;
         const el = playerEl;
         const inst = el?._pdPlayer;

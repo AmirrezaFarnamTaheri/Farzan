@@ -1,5 +1,5 @@
-const AI_SETTINGS_KEY = 'plasma-ai-settings';
-const AI_SESSION_KEY = 'plasma-ai-api-key-session';
+const AI_SETTINGS_KEY = 'ocd_ai_settings';
+const AI_SESSION_KEY = 'ocd_ai_api_key_session';
 const AI_MODEL_DB = 'opencoursedeck-ai-models';
 const AI_MODEL_DB_VERSION = 2;
 const AI_MODEL_STORE = 'models';
@@ -13,12 +13,12 @@ const MAX_MODEL_BYTES = 2 * 1024 * 1024 * 1024;
 export const GEMMA_MODEL_OPTIONS = [
   {
     id: 'gemma-4-local',
-    label: 'Gemma 4',
+    label: 'On-device extractive summary',
     url: 'https://ai.google.dev/gemma',
   },
   {
     id: 'gemma-3n-local',
-    label: 'Gemma 3n',
+    label: 'On-device extractive summary (compact)',
     url: 'https://ai.google.dev/gemma',
   },
 ];
@@ -274,7 +274,11 @@ export function createAIClient(root = window) {
   }
 
   async function getApiKey() {
-    return String(root.sessionStorage?.getItem?.(AI_SESSION_KEY) || '').trim();
+    return String(
+      root.sessionStorage?.getItem?.(AI_SESSION_KEY)
+      || root.sessionStorage?.getItem?.('plasma-ai-api-key-session')
+      || '',
+    ).trim();
   }
 
   async function status() {

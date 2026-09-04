@@ -201,7 +201,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     }
   }
 
-  handlePointerUp(e) {
+  handlePointerUp() {
     if (this.isDragging) {
       this.isDragging = false;
       if (this.canvas) this.canvas.style.cursor = this.hoveredNode ? 'pointer' : 'grab';

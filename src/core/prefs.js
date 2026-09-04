@@ -12,6 +12,7 @@ export const Prefs = {
   },
   set(key, val) {
     try { localStorage.setItem(key, String(val)); } catch { /* ignore */ }
+    this.applyAll();
   },
   applyAll() {
     const root = document.documentElement;

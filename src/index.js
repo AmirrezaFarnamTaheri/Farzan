@@ -22,6 +22,7 @@ import { installStoreHardening } from './core/storeHardening.js';
 import { installAIAuthority } from './core/aiAuthority.js';
 import { installPdfIdentityHardening } from './core/pdfIdentityHardening.js';
 import { enforceProductReadiness } from './core/productReadiness.js';
+import { loadVendorScript } from './core/vendorLoader.js';
 
 import * as easing from './lib/easing.js';
 import { HElement, h } from './lib/hElement.js';
@@ -40,6 +41,7 @@ import faIR from './locales/fa-IR.js';
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
+import { initAddContent } from './features/addContent.js';
 
 installBridgeHardening(window);
 installAuxiliaryDbLifecycle(window);
@@ -52,6 +54,7 @@ initEndpointApprovalGuard(document);
 const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
 pd.easing = easing;
+pd.loadVendorScript = loadVendorScript;
 pd.HElement = HElement;
 pd.h = h;
 pd.AuxiliaryDbLifecycle = window.OpenCourseDeck.AuxiliaryDbLifecycle;
@@ -87,7 +90,15 @@ const featureLoaders = {
     return module;
   },
   canvas: () => import('../canvas.js'),
-  progress: () => import('../progress.js'),
+  progress: async () => {
+    // Chart.js is only consumed by the analytics dashboard; fetch it here
+    // instead of on every page load. A failed fetch must not block the
+    // route — progress.js already degrades to table-only when Chart is absent.
+    await loadVendorScript('chartjs').catch((error) => {
+      console.warn('[OpenCourseDeck] Chart.js unavailable; rendering progress without charts', error);
+    });
+    return import('../progress.js');
+  },
   flashcards: () => import('../flashcards.js'),
 };
 const featureEntries = new Map();
@@ -193,6 +204,7 @@ pd.ProductReadiness = enforceProductReadiness(document);
 
 import('../app.js').then(async () => {
   try {
+    initAddContent(window);
     const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all([
       import('./features/translator.js'),
       import('./features/translationCache.js'),

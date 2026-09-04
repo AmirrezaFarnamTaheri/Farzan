@@ -64,6 +64,7 @@ export function mountProgressView({ setView } = {}) {
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
           <span class="progress-metric-label">Completion</span>
           <strong id="stat-completion-pct">0%</strong>
+          <span class="progress-metric-note">Across all tracked topics</span>
           <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
             <div class="mini-bar" id="stat-overall-bar" style="width:0%"></div>
           </div>
@@ -79,14 +80,14 @@ export function mountProgressView({ setView } = {}) {
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
           <span class="progress-metric-label">Current streak</span>
-          <strong><span id="stat-streak">0</span><small> days</small></strong>
+          <strong><span id="stat-streak">0</span><small id="stat-streak-unit"> days</small></strong>
           <span class="progress-metric-note">Consecutive active days</span>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar-check"/></svg></span>
           <span class="progress-metric-label">Active days</span>
-          <strong id="stat-active-days">0</strong>
+          <strong><span id="stat-active-days">0</span><small id="stat-active-days-unit"> days</small></strong>
           <span class="progress-metric-note">Days with saved activity</span>
         </article>
       </div>

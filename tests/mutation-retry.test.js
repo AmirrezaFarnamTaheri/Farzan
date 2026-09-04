@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
   computeBackoffDelay,
@@ -190,18 +190,38 @@ describe('withMutationRetry', () => {
 });
 
 describe('OpenCourseDB automatic mutation retry integration', () => {
-  const DB_NAME = 'mutation-retry-test-db';
+  // Each test gets its own database and closes it afterwards, so
+  // `deleteDatabase` can never be blocked by a still-open connection from
+  // the previous test.
+  let dbSeq = 0;
+  let openDbs = [];
+  let OpenCourseDB;
 
-  beforeEach(async () => {
-    await indexedDB.deleteDatabase(DB_NAME);
+  beforeAll(async () => {
+    // db.js registers its constructors as a side effect on window.OpenCourseDeck.
+    // Under the vmThreads pool the module cache can outlive the per-file
+    // window, so a plain top-level import may be served from cache without
+    // re-running against *this* file's globals. Force a fresh evaluation.
+    vi.resetModules();
+    window.OpenCourseDeck = window.OpenCourseDeck || {};
+    await import('../db.js');
+    ({ OpenCourseDB } = window.OpenCourseDeck.DB);
+  });
+
+  afterEach(() => {
+    for (const db of openDbs) {
+      try { db.db?.close?.(); } catch {}
+    }
+    openDbs = [];
   });
 
   function makeDb() {
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
-    return new OpenCourseDB(DB_NAME, 1, [
+    const db = new OpenCourseDB(`mutation-retry-test-db-${Date.now()}-${dbSeq++}`, 1, [
       { name: 'items', key: 'id', autoIncrement: false },
       { name: 'settings', key: 'id', autoIncrement: false },
     ]);
+    openDbs.push(db);
+    return db;
   }
 
   it('put() survives a transient transaction failure and persists the record', async () => {
