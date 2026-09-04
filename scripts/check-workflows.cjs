@@ -14,7 +14,7 @@ const EXPECTED_ACTION_PINS = new Map([
   ['actions/upload-artifact', { sha: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a', version: 'v7.0.1' }],
   ['actions/download-artifact', { sha: '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c', version: 'v8.0.1' }],
   ['actions/github-script', { sha: '3a2844b7e9c422d3c10d287c895573f7108da1b3', version: 'v9.0.0' }],
-  ['actions/attest', { sha: 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6', version: 'v4.2.0' }],
+  ['actions/attest', { sha: '1e69f48acb82d1966a394da916b4c1698aa569d6', version: 'v4.2.2' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
 ]);
 
