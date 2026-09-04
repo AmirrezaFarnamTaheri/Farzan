@@ -5,13 +5,15 @@
     z-index: -1;
     overflow: hidden;
     background: var(--bg);
-    background-image: 
-      radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 65%),
+    background-image:
+      radial-gradient(1100px 700px at 12% -10%, rgba(var(--accent-rgb), 0.16), transparent 62%),
+      radial-gradient(900px 600px at 100% 20%, color-mix(in srgb, var(--accent-cyan, #06b6d4) 10%, transparent), transparent 60%),
       linear-gradient(to right, var(--border) 1px, transparent 1px),
       linear-gradient(to bottom, var(--border) 1px, transparent 1px);
-    background-size: 100% 100%, 32px 32px, 32px 32px;
-    background-position: center top, 0 0, 0 0;
-    opacity: 0.65;
+    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+    background-position: center top, center top, 0 0, 0 0;
+    background-attachment: scroll;
+    contain: strict;
   }
   .orb {
     display: none;
@@ -34,9 +36,12 @@
     border-right: none;
   }
 
+  /* Cards sit on a static canvas, so a backdrop blur costs a full extra
+     compositing pass per card and changes nothing visible. Blur is reserved
+     for surfaces that actually float over moving content (sidebar, topbar,
+     modals, popovers). */
   .card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
     background: var(--glass-bg) !important;
-    backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border) !important;
     box-shadow: var(--shadow-sm);
     transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);

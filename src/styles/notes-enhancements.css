@@ -168,11 +168,14 @@
 
 .notes-library-section {
   display: grid;
+  align-content: start;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
 }
 
 .notes-library-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
@@ -409,6 +412,13 @@
   line-height: 1.75;
 }
 
+.notes-editor:focus,
+.notes-editor:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+  box-shadow: var(--shadow-md), 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .notes-editor:empty::before {
   content: 'Start writing, paste a passage, or capture an insight from your course…';
   color: var(--text-tertiary);
@@ -559,23 +569,160 @@
   }
 }
 
-/* Folder list rows: name left, count right (was concatenating "All Notes0"). */
+/* Folder list rows: icon, name, count, optional delete. */
 .folder-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
 }
+.folder-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.folder-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.folder-item .folder-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: var(--text-base);
+}
+.folder-item .folder-icon-text {
+  display: block;
+  max-width: 22px;
+  overflow: hidden;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.folder-item.active .folder-icon { color: var(--accent-light); }
 .folder-item .folder-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .folder-item .folder-count {
   flex: 0 0 auto;
   margin-left: auto;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.folder-item.active .folder-count { background: var(--accent-muted); color: var(--accent-light); }
+.folder-item .folder-delete-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast);
+}
+.folder-item:hover .folder-delete-btn,
+.folder-item:focus-within .folder-delete-btn { opacity: 1; }
+.folder-item .folder-delete-btn:hover { background: var(--danger-muted); color: var(--danger); }
+.folder-add-btn { margin-top: var(--space-2); justify-self: start; }
+
+/* Note list rows */
+.note-item {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 3px);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
+}
+.note-item:hover {
+  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  transform: translateY(-1px);
+}
+.note-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-left-color: var(--accent);
+}
+.note-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.note-item-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.note-item-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.note-pin {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--accent-light);
+  font-size: var(--text-sm);
+}
+.note-item-date {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.note-item-excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.note-item-excerpt:empty { display: none; }
+.note-item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.note-tag {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-muted);
+  color: var(--accent-light);
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.65;
-  background: var(--bg-surface, rgba(255,255,255,0.06));
-  border-radius: 999px;
-  padding: 1px 8px;
 }
-.folder-item .folder-delete-btn { flex: 0 0 auto; }
+.notes-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+.notes-empty .empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-tertiary);
+  font-size: 22px;
+}
+.notes-empty .empty-text { font-weight: 600; color: var(--text-secondary); }
+.notes-render-status { color: var(--text-tertiary); text-align: center; padding: var(--space-2); }

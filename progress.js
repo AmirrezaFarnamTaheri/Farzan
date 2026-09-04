@@ -3,6 +3,18 @@
 // ============================================================
 'use strict';
 
+/** Sprite-backed inline icon: <svg class="icon"><use href="#i-{id}"/></svg> */
+function spriteIcon(id, className = 'icon') {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', className);
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(svgNS, 'use');
+  use.setAttribute('href', `#i-${id}`);
+  svg.appendChild(use);
+  return svg;
+}
+
 const ProgressStats = (() => {
 
   /* ── helpers ────────────────────────────────────────────── */
@@ -166,8 +178,12 @@ const ProgressStats = (() => {
     _setText('#stat-in-progress',       stats.inProgress);
     _setText('#stat-completion-pct',    `${stats.completionPct}%`);
     _setText('#stat-watched-time',      stats.watchedFmt);
-    _setText('#stat-streak',            `${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`);
-    _setText('#stat-active-days',       `${stats.activeDays} ${stats.activeDays === 1 ? 'day' : 'days'}`);
+    // The route template renders the unit in a sibling <small>; keep the
+    // number and the unit separate so the metric never reads "0 days days".
+    _setText('#stat-streak',            stats.streak);
+    _setText('#stat-streak-unit',       ` ${stats.streak === 1 ? 'day' : 'days'}`);
+    _setText('#stat-active-days',       stats.activeDays);
+    _setText('#stat-active-days-unit',  ` ${stats.activeDays === 1 ? 'day' : 'days'}`);
 
     // overall progress bar
     const bar = q('#stat-overall-bar');
@@ -184,18 +200,27 @@ const ProgressStats = (() => {
   }
 
   function _renderCharts(stats) {
-    if (!window.Chart) return;
+    const showFrameMessage = (sel, text) => {
+      const frame = q(sel)?.closest('.progress-chart-frame');
+      if (!frame) return;
+      const note = document.createElement('p');
+      note.className = 'progress-chart-empty';
+      note.textContent = text;
+      frame.replaceChildren(note);
+    };
+
+    if (!window.Chart) {
+      // Chart.js is fetched on demand; if it failed (offline first visit,
+      // blocked asset) the numbers above and the table below still work.
+      showFrameMessage('#chart-overall', 'Charts are unavailable right now.');
+      showFrameMessage('#chart-courses', 'Charts are unavailable right now.');
+      return;
+    }
 
     // Empty library: say so instead of painting silent zero-data charts.
-    const chartEmptyHints = [
-      ['#chart-overall', 'No topics yet — charts fill in as you study.'],
-      ['#chart-courses', 'Course comparison appears once you have topics.'],
-    ];
     if (!stats.totalTopics) {
-      for (const [sel, text] of chartEmptyHints) {
-        const frame = q(sel)?.closest('.progress-chart-frame');
-        if (frame) frame.innerHTML = '<p class="progress-chart-empty">' + text + '</p>';
-      }
+      showFrameMessage('#chart-overall', 'No topics yet — charts fill in as you study.');
+      showFrameMessage('#chart-courses', 'Course comparison appears once you have topics.');
       return;
     }
 
@@ -205,10 +230,28 @@ const ProgressStats = (() => {
       try { window.__ocdCharts.courses?.destroy?.(); } catch {}
     }
     window.__ocdCharts = window.__ocdCharts ?? {};
+    // Read the live design tokens so charts follow the active theme/accent
+    // instead of painting fixed Material-era hexes on every surface.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const token = (name, fallback) => (rootStyle.getPropertyValue(name) || '').trim() || fallback;
     const chartPalette = {
-      done: '#2e7d32',
-      active: '#1565c0',
-      idle: '#6b7280',
+      done: token('--success', '#10b981'),
+      active: token('--accent', '#7c3aed'),
+      idle: token('--surface-hover', 'rgba(148, 163, 184, 0.35)'),
+      surface: token('--surface-2', '#111827'),
+      text: token('--text-secondary', '#9ca3af'),
+      grid: token('--border', 'rgba(148, 163, 184, 0.15)'),
+      font: token('--font-sans', 'Inter, system-ui, sans-serif'),
+    };
+    const accentRgb = token('--accent-rgb', '124, 58, 237');
+    const legendStyle = {
+      color: chartPalette.text,
+      font: { family: chartPalette.font, size: 12, weight: '600' },
+      boxWidth: 10,
+      boxHeight: 10,
+      usePointStyle: true,
+      pointStyle: 'circle',
+      padding: 16,
     };
     // doughnut — overall completion
     const dCtx = q('#chart-overall')?.getContext('2d');
@@ -223,17 +266,22 @@ const ProgressStats = (() => {
             backgroundColor: [chartPalette.done, chartPalette.active, chartPalette.idle],
             // Chart.js v4 doughnut: borderColor/borderWidth must be scalar
             // — arrays trigger a Proxy set() recursion that exhausts the
-            // call stack. The "In Progress" slice stands out via the dark
-            // active color (#1565c0) and the wider contrasting border.
-            borderColor: '#111827',
-            borderWidth: 2,
+            // call stack. Slices separate via the surface-coloured gap.
+            borderColor: chartPalette.surface,
+            borderWidth: 3,
             hoverBorderWidth: 3,
+            hoverOffset: 6,
             // pdPatternKey removed: a non-standard dataset property makes
             // Chart.js' Data Proxy recurse into its own defineProperty
             // handlers, blowing the stack on first render.
           }],
         },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: { legend: { position: 'bottom', labels: legendStyle } },
+        },
       });
     }
 
@@ -254,18 +302,32 @@ const ProgressStats = (() => {
             // (solid / dash / dot) is now encoded via three backgroundColor
             // shades so the visual cue survives.
             backgroundColor : stats.byCourse.map((_, index) =>
-              index % 3 === 0 ? '#1565c0'
-              : index % 3 === 1 ? '#1d4ed8'
-              : '#60a5fa'
+              `rgba(${accentRgb}, ${index % 3 === 0 ? 0.92 : index % 3 === 1 ? 0.72 : 0.52})`
             ),
-            borderColor     : '#0f172a',
-            borderWidth     : 2,
+            hoverBackgroundColor: chartPalette.active,
+            borderRadius    : 6,
+            borderSkipped   : false,
+            maxBarThickness : 44,
             // pdPatternKey removed (see comment above).
           }],
         },
         options: {
           responsive: true,
-          scales: { y: { min: 0, max: 100 } },
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: chartPalette.text, font: { family: chartPalette.font, size: 12 }, maxRotation: 0, autoSkip: true },
+              border: { color: chartPalette.grid },
+            },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: chartPalette.grid },
+              border: { display: false },
+              ticks: { color: chartPalette.text, font: { family: chartPalette.font, size: 11 }, stepSize: 25, callback: v => `${v}%` },
+            },
+          },
           plugins: { legend: { display: false } },
         },
       });
@@ -286,7 +348,7 @@ const ProgressStats = (() => {
         updatedAt : Date.now(),
       })
     ));
-    pdToast('All topics in this course marked as complete ✓', 'success');
+    pdToast('All topics in this course marked as complete', 'success');
   }
 
   /** Reset all progress for a course */
@@ -366,7 +428,7 @@ const ProgressStats = (() => {
     payload.meta.sizeBytes = new Blob([json]).size;
     json = JSON.stringify(payload, null, 2);
     _downloadText(json, `opencoursedeck-backup-${_isoDate()}.json`, 'application/json');
-    pdToast('JSON backup downloaded ✓', 'success');
+    pdToast('JSON backup downloaded', 'success');
   }
 
   /** Export progress as CSV */
@@ -395,7 +457,7 @@ const ProgressStats = (() => {
 
     const csv = rows.map(r => r.map(_csvCell).join(',')).join('\n');
     _downloadText(csv, `opencoursedeck-progress-${_isoDate()}.csv`, 'text/csv');
-    pdToast('CSV export downloaded ✓', 'success');
+    pdToast('CSV export downloaded', 'success');
   }
 
   /** Export notes as Markdown */
@@ -413,7 +475,7 @@ const ProgressStats = (() => {
     });
 
     _downloadText(lines.join('\n'), `opencoursedeck-notes-${_isoDate()}.md`, 'text/markdown');
-    pdToast('Notes exported as Markdown ✓', 'success');
+    pdToast('Notes exported as Markdown', 'success');
   }
 
   /** Export a vault-style Markdown manifest with portable note files */
@@ -472,19 +534,19 @@ const ProgressStats = (() => {
     });
 
     _downloadText(lines.join('\n'), `opencoursedeck-vault-${_isoDate()}.md`, 'text/markdown');
-    pdToast('Vault Markdown export downloaded ✓', 'success');
+    pdToast('Vault Markdown export downloaded', 'success');
   }
 
   async function exportVaultArchive() {
     const archive = await _vaultArchivePayload();
     _downloadText(JSON.stringify(archive, null, 2), `opencoursedeck-vault-archive-${_isoDate()}.json`, 'application/json');
-    pdToast('Vault archive export downloaded ✓', 'success');
+    pdToast('Vault archive export downloaded', 'success');
   }
 
   async function exportVaultZip() {
     const archive = await _vaultArchivePayload();
     _downloadBlob(_zipFiles(archive.files), `opencoursedeck-vault-${_isoDate()}.zip`);
-    pdToast(`Vault ZIP export downloaded (${archive.files.length} files) ✓`, 'success');
+    pdToast(`Vault ZIP export downloaded (${archive.files.length} files)`, 'success');
   }
 
   async function exportVaultDirectory() {
@@ -497,7 +559,7 @@ const ProgressStats = (() => {
     for (const file of archive.files) {
       await _writeVaultFile(root, file.path, file.content);
     }
-    pdToast(`Vault folder export complete (${archive.files.length} files) ✓`, 'success');
+    pdToast(`Vault folder export complete (${archive.files.length} files)`, 'success');
     return { saved: archive.files.length, files: archive.files.map(file => file.path) };
   }
 
@@ -1640,7 +1702,7 @@ window.OpenCourseDeck.ProgressStatsInit = async () => {
           item.className = `step-item ${i < current ? 'done' : i === current ? 'active' : ''}`;
           const dot = document.createElement('div');
           dot.className = 'step-dot';
-          dot.textContent = i < current ? '✓' : String(i);
+          if (i < current) dot.replaceChildren(spriteIcon('check')); else dot.textContent = String(i);
           item.appendChild(dot);
           if (i < total) {
             const connector = document.createElement('div');

@@ -374,8 +374,15 @@ describe('progress backup exports', () => {
 
     const tracker = document.querySelector('[data-steps]');
     expect(tracker.querySelectorAll('.step-item')).toHaveLength(3);
-    expect(tracker.querySelector('.step-dot').textContent).toBe('✓');
-    expect(tracker.querySelectorAll('script,img,svg')).toHaveLength(0);
+    const doneDot = tracker.querySelector('.step-item.done .step-dot');
+    expect(doneDot.textContent).toBe('');
+    expect(doneDot.querySelector('svg.icon use')?.getAttribute('href')).toBe('#i-check');
+    expect(tracker.querySelectorAll('script,img')).toHaveLength(0);
+    // Only inert sprite references may appear (no inline SVG payloads).
+    tracker.querySelectorAll('svg').forEach((svg) => {
+      expect(svg.classList.contains('icon')).toBe(true);
+      expect([...svg.children].map((c) => c.tagName.toLowerCase())).toEqual(['use']);
+    });
   });
 
   it('records import preview counts and per-record errors', async () => {

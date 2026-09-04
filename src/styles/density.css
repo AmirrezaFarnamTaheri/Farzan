@@ -4,6 +4,7 @@
     --density-gap:    var(--space-2);
     --density-card-p: var(--space-3);
     --density-row-h:  40px;
+    --nav-item-h:     36px;
     --density-icon:   16px;
   }
   [data-density="comfortable"] {
@@ -12,6 +13,7 @@
     --density-gap:    var(--space-4);
     --density-card-p: var(--space-5);
     --density-row-h:  52px;
+    --nav-item-h:     40px;
     --density-icon:   18px;
   }
   [data-density="spacious"] {
@@ -20,5 +22,6 @@
     --density-gap:    var(--space-6);
     --density-card-p: var(--space-8);
     --density-row-h:  64px;
+    --nav-item-h:     46px;
     --density-icon:   20px;
   }

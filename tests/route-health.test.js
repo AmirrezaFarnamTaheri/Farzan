@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 async function loadApp() {
+  // Detach the previous instance's hashchange listener (see app-core.test.js).
+  try { window.OpenCourseDeck?.Router?.destroy?.(); } catch {}
   vi.resetModules();
   document.body.innerHTML = `
     <div id="ocd-app">

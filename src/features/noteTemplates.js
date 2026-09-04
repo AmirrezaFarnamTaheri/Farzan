@@ -187,12 +187,13 @@ export async function deleteTemplate(id) {
 
 export function getTemplatePickerItems() {
   const builtin = Object.values(BUILTIN_TEMPLATES).map((t) => ({
-    label: `📄 ${t.title}`,
+    label: t.title,
+    icon: 'file-text',
     id: t.id,
     builtin: true,
   }));
   return loadUserTemplates().then(user => {
-    const userItems = user.map(t => ({ label: `✍️ ${t.title}`, id: t.id, builtin: false }));
+    const userItems = user.map(t => ({ label: t.title, icon: 'pen', id: t.id, builtin: false }));
     return [...builtin, ...userItems];
   });
 }

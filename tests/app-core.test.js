@@ -4,6 +4,11 @@ import { initEndpointApprovalGuard } from '../src/core/endpointApprovalGuard.js'
 let intersectionCallbacks;
 
 async function loadApp(html = '<div id="ocd-app"><main id="view-container"></main></div>') {
+  // Tear down the previous app instance's router before booting a new one.
+  // Its `hashchange` listener otherwise stays attached to the shared window
+  // and, when a later test flips the hash, a stale router mounts its route
+  // over whatever view the running test just rendered.
+  try { window.OpenCourseDeck?.Router?.destroy?.(); } catch {}
   vi.resetModules();
   intersectionCallbacks = [];
   document.body.innerHTML = html;
@@ -27,6 +32,10 @@ async function loadApp(html = '<div id="ocd-app"><main id="view-container"></mai
   window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() } };
   initEndpointApprovalGuard(document);
   await import('../app.js');
+  // Router.init() mounts the initial route asynchronously (dynamic view
+  // import). Wait for it so a test that mounts its own view right away is not
+  // replaced mid-test by the late-arriving help route.
+  await window.OpenCourseDeck.Router?.ready?.();
 }
 
 describe('app shell resilience helpers', () => {

@@ -278,7 +278,7 @@ export async function putLibraryFile(file, { kind = 'file' } = {}) {
     await withFileStore('readwrite', (store) => store.put(record));
   } catch (error) {
     if (error?.name === 'QuotaExceededError') {
-      throw new Error('Not enough storage for this file. Free space or try a smaller file.');
+      throw new Error('Not enough storage for this file. Free space or try a smaller file.', { cause: error });
     }
     throw error;
   }

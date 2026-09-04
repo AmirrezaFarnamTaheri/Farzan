@@ -228,9 +228,11 @@ let studioKeyController = null;
 
     const reviewArea = dueCards.length === 0 ? `
           <div class="fc-empty">
-            <div class="fc-empty-icon" aria-hidden="true">🎉</div>
-            <h2 class="fc-empty-title">All Due Cards Reviewed!</h2>
-            <p class="fc-sub">Great job! Check back tomorrow for your next memory review cycle.</p>
+            <div class="fc-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-verified"/></svg></div>
+            <h2 class="fc-empty-title">${cards.length ? 'All due cards reviewed' : 'No cards yet'}</h2>
+            <p class="fc-sub">${cards.length
+              ? 'Nice work. Check back tomorrow for your next memory review cycle.'
+              : 'Create your first card and OpenCourseDeck will schedule reviews for you with SM-2.'}</p>
           </div>
         ` : `
           <div class="fc-progress-line">Card 1 of ${dueCards.length} · ${esc(due.deck)}</div>
@@ -248,13 +250,17 @@ let studioKeyController = null;
         `;
 
     container.innerHTML = `
-      <div class="fc-wrap">
-        <header class="fc-header">
+      <section class="view view-flashcards fc-wrap">
+        <header class="page-header fc-header">
           <div>
-            <h1 class="fc-title"><span class="fc-title-icon" aria-hidden="true">⚡</span> Spaced Repetition Studio</h1>
-            <p class="fc-sub">SuperMemo-2 (SM-2) memory consolidation engine</p>
+            <span class="eyebrow">Spaced repetition</span>
+            <h1 class="page-title fc-title">Flashcards</h1>
+            <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
           </div>
-          <button id="fc-add-btn" class="btn btn-primary" type="button">+ New Card</button>
+          <button id="fc-add-btn" class="btn btn-primary" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            New card
+          </button>
         </header>
 
         <form id="fc-new-form" class="fc-form" hidden novalidate>
@@ -277,15 +283,15 @@ let studioKeyController = null;
         </form>
 
         <div class="fc-stats">
-          <div class="fc-stat"><span class="fc-stat-label">Total Cards</span><span class="fc-stat-value">${cards.length}</span></div>
-          <div class="fc-stat fc-stat-accent"><span class="fc-stat-label">Due Today</span><span class="fc-stat-value">${dueCards.length}</span></div>
-          <div class="fc-stat"><span class="fc-stat-label">Decks</span><span class="fc-stat-value">${decks.length || 1}</span></div>
+          <div class="fc-stat"><span class="fc-stat-label">Total cards</span><span class="fc-stat-value">${cards.length}</span></div>
+          <div class="fc-stat fc-stat-accent"><span class="fc-stat-label">Due today</span><span class="fc-stat-value">${dueCards.length}</span></div>
+          <div class="fc-stat"><span class="fc-stat-label">Decks</span><span class="fc-stat-value">${decks.length}</span></div>
         </div>
 
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
-      </div>
+      </section>
     `;
 
     const flipBtn = container.querySelector('#fc-flip-btn');

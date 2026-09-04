@@ -90,8 +90,8 @@ describe('MediaPlayer queue rendering', () => {
 
     expect(player.queue).toEqual([]);
     expect(player.trackIndex).toBe(0);
-    expect(document.querySelector('#player .pd-title').textContent).toBe('—');
-    expect(document.querySelector('#player .pd-artist').textContent).toBe('—');
+    expect(document.querySelector('#player .pd-title').textContent).toBe('Nothing playing');
+    expect(document.querySelector('#player .pd-artist').textContent).toBe('Pick a lesson to start');
     expect(document.querySelector('#player audio').hasAttribute('src')).toBe(false);
     expect(() => player.next()).not.toThrow();
     expect(() => player.prev()).not.toThrow();

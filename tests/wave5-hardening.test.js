@@ -20,6 +20,8 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 // ───────────────────────────────────────────────────────────
 
 async function loadApp() {
+  // Detach the previous instance's hashchange listener (see app-core.test.js).
+  try { window.OpenCourseDeck?.Router?.destroy?.(); } catch {}
   vi.resetModules();
   document.body.innerHTML = '<div id="ocd-app"><main id="view-container"></main></div>';
   window.location.hash = '#/help';

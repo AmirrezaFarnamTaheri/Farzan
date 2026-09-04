@@ -64,6 +64,39 @@ function rewriteReleaseStaticFile(file, content) {
   return content;
 }
 
+/**
+ * The source stylesheet is 18 layered `@import`s, which browsers discover and
+ * fetch serially. For the release we flatten them into one minified file at
+ * the same path (src/styles/index.css) so index.html, the service-worker
+ * precache manifest and the release-graph assertions stay unchanged.
+ */
+async function renderReleaseStyles(sourceRoot = root) {
+  const entry = path.join(sourceRoot, 'src', 'styles', 'index.css');
+  if (!fs.existsSync(entry)) return null;
+  const result = await esbuild.build({
+    entryPoints: [entry],
+    bundle: true,
+    minify: true,
+    write: false,
+    logLevel: 'warning',
+    target: ['es2020'],
+    // The stylesheet only references inline data: URLs (no external assets),
+    // so a virtual outfile is enough for esbuild to resolve relative paths.
+    outfile: path.join(sourceRoot, 'src', 'styles', 'index.bundle.css'),
+    loader: { '.svg': 'dataurl' },
+  });
+  return result.outputFiles[0].text;
+}
+
+async function bundleReleaseStyles(sourceRoot = root, outputDir = outdir) {
+  const css = await renderReleaseStyles(sourceRoot);
+  if (css == null) return;
+  const destination = path.join(outputDir, 'src', 'styles');
+  fs.rmSync(destination, { recursive: true, force: true });
+  fs.mkdirSync(destination, { recursive: true });
+  fs.writeFileSync(path.join(destination, 'index.css'), css, 'utf8');
+}
+
 function stageStaticAssets(sourceRoot = root, outputDir = outdir) {
   const staticDirs = ['assets', 'data', 'docs', 'vendor'];
   for (const dir of staticDirs) {
@@ -128,6 +161,7 @@ async function main() {
 
   await esbuild.build(options);
   stageStaticAssets();
+  await bundleReleaseStyles();
   removeProductionSourceMaps();
   assertReleaseGraph();
   console.log('[build] done');
@@ -142,6 +176,8 @@ if (require.main === module) {
 
 module.exports = {
   assertReleaseGraph,
+  bundleReleaseStyles,
+  renderReleaseStyles,
   createBuildOptions,
   main,
   removeProductionSourceMaps,

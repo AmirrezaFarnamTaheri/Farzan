@@ -251,7 +251,7 @@ function createServer(options = {}) {
 
 function startServer(options = {}) {
   const port = Number(options.port || process.env.PORT || 5173);
-  const host = options.host || '127.0.0.1';
+  const host = options.host || process.env.HOST || '127.0.0.1';
   const server = createServer(options);
   server.listen(port, host, () => {
     console.log(`[opencoursedeck] dev server http://${host}:${port}/`);

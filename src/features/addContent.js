@@ -316,14 +316,10 @@ async function addFilesOfKind(files, kind) {
     toast('info', `${skipped} file${skipped === 1 ? '' : 's'} skipped — only ${kind === 'video' ? 'videos' : 'PDFs'} can be added here`);
   }
   if (!accepted.length) return { count: 0 };
-  try {
-    const results = typeof addMediaFiles === 'function'
-      ? await addMediaFiles(accepted, { kind })
-      : await Promise.all(accepted.map((file) => (kind === 'pdf' ? addPdfFile(file) : addVideoFile(file))));
-    return { count: results.length, courseId: results[results.length - 1]?.courseId };
-  } catch (error) {
-    throw error;
-  }
+  const results = typeof addMediaFiles === 'function'
+    ? await addMediaFiles(accepted, { kind })
+    : await Promise.all(accepted.map((file) => (kind === 'pdf' ? addPdfFile(file) : addVideoFile(file))));
+  return { count: results.length, courseId: results[results.length - 1]?.courseId };
 }
 
 async function handleVideoFiles(files, { navigate = true } = {}) {
