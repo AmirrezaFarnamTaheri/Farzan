@@ -944,7 +944,7 @@
         'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
         'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists', 'ocd_playlists', 'ocd_notes', 'ocd_folders',
         'ocd_notes_settings', 'ocd_theme', 'ocd_accent', 'ocd_density',
-        'ocd_font_scale', 'ocd_dir', 'ocd_sidebar_collapsed', 'ocd_flashcards',
+        'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_sidebar_collapsed', 'ocd_flashcards',
         'ocd_ai_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues',
         'plasma-studio-board', 'plasma-canvas-board', MIGRATION_REPORT_KEY,
       );

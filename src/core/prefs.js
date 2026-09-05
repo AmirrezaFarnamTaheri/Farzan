@@ -6,6 +6,7 @@ export const Prefs = {
     density: 'ocd_density',
     fontScale: 'ocd_font_scale',
     dir: 'ocd_dir',
+    lang: 'ocd_lang',
   },
   get(key, fallback = null) {
     try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
@@ -20,10 +21,12 @@ export const Prefs = {
     const density = this.get(this.KEYS.density, root.getAttribute('data-density') || 'comfortable');
     const fontScale = this.get(this.KEYS.fontScale, root.style.getPropertyValue('--font-scale')?.trim() || '1');
     const dir = this.get(this.KEYS.dir, root.getAttribute('dir') || 'ltr');
+    const lang = this.get(this.KEYS.lang, root.getAttribute('lang') || 'en-US');
 
     root.setAttribute('data-accent', accent);
     root.setAttribute('data-density', density);
     root.setAttribute('dir', dir);
+    root.setAttribute('lang', lang);
     root.style.setProperty('--font-scale', String(fontScale));
   },
   init({ ThemeManager, bus } = {}) {
