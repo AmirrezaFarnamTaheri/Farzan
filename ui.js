@@ -854,6 +854,7 @@
     // ════════════════════════════════════════════════════
     const Clipboard = {
       init() {
+        if (window.OpenCourseDeck?._hasAppClipboard) return;
         document.addEventListener('click', async e => {
           const btn = e.target.closest('[data-copy]');
           if (!btn) return;

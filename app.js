@@ -2864,6 +2864,7 @@ import { Pointer } from './src/lib/pointer.js';
 
   const Clipboard = {
     init() {
+      if (window.OpenCourseDeck) window.OpenCourseDeck._hasAppClipboard = true;
       document.addEventListener('click', async e => {
         const target = eventTargetEl(e);
         if (!target) return;
