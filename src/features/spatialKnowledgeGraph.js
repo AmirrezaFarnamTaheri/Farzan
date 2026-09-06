@@ -159,6 +159,45 @@ export class SpatialKnowledgeGraph extends EventEmitter {
         this.edges.push({ source: this.nodes[i], target: this.nodes[crossIdx] });
       }
     }
+
+    // Procedural 3D Armillary Gyroscope Coordinate Rings
+    const ringRadius = 240;
+    const ringSegments = 48;
+    this.coordinateRings = [
+      // Equatorial Ring (XZ plane, y=0)
+      {
+        points: Array.from({ length: ringSegments }, (_, idx) => {
+          const a = (idx / ringSegments) * Math.PI * 2;
+          return { x: ringRadius * Math.cos(a), y: 0, z: ringRadius * Math.sin(a) };
+        }),
+        colorFactor: 0.2,
+      },
+      // Polar Meridian Ring (YZ plane, x=0)
+      {
+        points: Array.from({ length: ringSegments }, (_, idx) => {
+          const a = (idx / ringSegments) * Math.PI * 2;
+          return { x: 0, y: ringRadius * Math.cos(a) * 0.85, z: ringRadius * Math.sin(a) };
+        }),
+        colorFactor: 0.16,
+      },
+      // Oblique Ecliptic Ring (inclined at 35 degrees)
+      {
+        points: Array.from({ length: ringSegments }, (_, idx) => {
+          const a = (idx / ringSegments) * Math.PI * 2;
+          const rx = ringRadius * Math.cos(a);
+          const rz = ringRadius * Math.sin(a);
+          return { x: rx * 0.82, y: rx * 0.58, z: rz };
+        }),
+        colorFactor: 0.24,
+      },
+    ];
+
+    // Energetic Signal Pulses flowing across edges
+    this.pulses = this.edges.map((edge, idx) => ({
+      edge,
+      progress: (idx * 0.19) % 1,
+      speed: 0.003 + (idx % 4) * 0.0015,
+    }));
   }
 
   bindEvents() {
@@ -288,18 +327,27 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       node.alpha = Math.max(0.15, Math.min(1, (z2 + 250) / 400));
     }
 
-    // Render Background Constellation Dust
+    // Render Background Constellation Dust with 3D Depth Drift & Twinkling
     if (!this.stars) {
-      this.stars = Array.from({ length: 40 }, () => ({
-        x: (Math.random() - 0.5) * 600,
-        y: (Math.random() - 0.5) * 600,
-        z: (Math.random() - 0.5) * 400,
-        size: Math.random() * 1.5 + 0.5,
-        alpha: Math.random() * 0.4 + 0.1
+      this.stars = Array.from({ length: 48 }, () => ({
+        x: (Math.random() - 0.5) * 700,
+        y: (Math.random() - 0.5) * 700,
+        z: (Math.random() - 0.5) * 500,
+        size: Math.random() * 1.5 + 0.6,
+        alpha: Math.random() * 0.45 + 0.15,
+        twinklePhase: Math.random() * Math.PI * 2,
       }));
     }
 
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() * 0.002 : Date.now() * 0.002;
+
     for (const star of this.stars) {
+      if (!prefersReducedMotion) {
+        star.z -= 0.25;
+        if (star.z < -250) star.z += 500;
+      }
+
       const x1 = star.x * cosY + star.z * sinY;
       const z1 = -star.x * sinY + star.z * cosY;
       const y2 = star.y * cosX - z1 * sinX;
@@ -308,10 +356,43 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       const sx = cx + x1 * scale;
       const sy = cy + y2 * scale;
 
+      const twinkle = 0.75 + 0.25 * Math.sin(now + star.twinklePhase);
       ctx.beginPath();
-      ctx.arc(sx, sy, star.size * scale, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(148, 163, 184, ${star.alpha * scale})`;
+      ctx.arc(sx, sy, Math.max(0.5, star.size * scale), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(165, 180, 205, ${Math.max(0.05, star.alpha * scale * twinkle)})`;
       ctx.fill();
+    }
+
+    const accentRgb = getThemeAccentRgb();
+
+    // Render 3D Armillary Gyroscope Coordinate Rings
+    if (this.coordinateRings) {
+      ctx.save();
+      ctx.setLineDash([4, 6]);
+      for (const ring of this.coordinateRings) {
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i <= ring.points.length; i++) {
+          const pt = ring.points[i % ring.points.length];
+          const x1 = pt.x * cosY + pt.z * sinY;
+          const z1 = -pt.x * sinY + pt.z * cosY;
+          const y2 = pt.y * cosX - z1 * sinX;
+          const z2 = pt.y * sinX + z1 * cosX;
+          const scale = fov / (fov + z2);
+          const sx = cx + x1 * scale;
+          const sy = cy + y2 * scale;
+          if (!started) {
+            ctx.moveTo(sx, sy);
+            started = true;
+          } else {
+            ctx.lineTo(sx, sy);
+          }
+        }
+        ctx.strokeStyle = `rgba(${accentRgb}, ${ring.colorFactor})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Render 3D Bezier Spline Edges
@@ -328,10 +409,37 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       const midY = (s.screenY + t.screenY) / 2 - 15 * s.screenScale;
       ctx.quadraticCurveTo(midX, midY, t.screenX, t.screenY);
 
-      const accentRgb = getThemeAccentRgb();
       ctx.strokeStyle = `rgba(${accentRgb}, ${avgAlpha * 0.4})`;
       ctx.lineWidth = Math.max(1, (s.screenScale + t.screenScale) * 0.85);
       ctx.stroke();
+    }
+
+    // Render Energetic 3D Pulses along edges
+    if (this.pulses && !prefersReducedMotion) {
+      for (const pulse of this.pulses) {
+        pulse.progress += pulse.speed;
+        if (pulse.progress >= 1) pulse.progress -= 1;
+
+        const s = pulse.edge.source;
+        const t = pulse.edge.target;
+        const tVal = pulse.progress;
+        const midX = (s.screenX + t.screenX) / 2;
+        const midY = (s.screenY + t.screenY) / 2 - 15 * s.screenScale;
+
+        const px = (1 - tVal) * (1 - tVal) * s.screenX + 2 * (1 - tVal) * tVal * midX + tVal * tVal * t.screenX;
+        const py = (1 - tVal) * (1 - tVal) * s.screenY + 2 * (1 - tVal) * tVal * midY + tVal * tVal * t.screenY;
+        const pScale = (s.screenScale + t.screenScale) * 0.5;
+
+        ctx.beginPath();
+        ctx.arc(px, py, 2.2 * pScale, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(px, py, 5.5 * pScale, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${accentRgb}, 0.35)`;
+        ctx.fill();
+      }
     }
 
     // Depth Sorting: Render back to front
@@ -412,5 +520,8 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.ctx = null;
     this.nodes = [];
     this.edges = [];
+    this.coordinateRings = [];
+    this.pulses = [];
+    this.stars = [];
   }
 }

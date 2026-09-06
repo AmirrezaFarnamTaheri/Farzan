@@ -33,7 +33,7 @@
   - *Inner Core*: Concentric inner container with mathematically calculated curvature (`--radius-bezel-inner`: `calc(var(--radius-xl) - 4px)` = 20px) and a subtle top specular highlight (`box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08)` in dark mode, `rgba(255, 255, 255, 0.7)` in light mode).
 - **Defining trait**: Strict separation between the deep control rail (void obsidian) and the warm, high-contrast study canvas (archival paper).
 - **Signature move**: Connected Knowledge Trail — a visual bezier spline linking video timestamps directly to Cornell cue columns, unresolved inquiries, and scheduled SM-2 flashcard reviews.
-- **Spatial 3D Constellation**: Zero-dependency 3D orbital projection (`SpatialKnowledgeGraph`) displaying concept relations on a Fibonacci sphere with depth sorting, drag rotation, and `prefers-reduced-motion` compliance.
+- **Spatial 3D Constellation & Procedural 3D Objects**: Zero-dependency 3D orbital projection (`SpatialKnowledgeGraph`) with Armillary gyroscope coordinate wireframe rings, energetic signal photon pulses, 3D particle depth drift, spherical volume lighting, and a complete 6-model procedural 3D trophy suite (`ProceduralTrophy`: Cornell Master Medallion, Scholar Laurels Codex, Deep Voyager Astrolabe, Knowledge Prism, Memory Crystal, and Cornell Study Desk).
 
 ---
 
@@ -177,13 +177,14 @@ Every interactive control satisfies all 8 states:
 
 - **2026-09-06**:
   - Implemented comprehensive `/frontend-design-deslop`, `/hallmark`, `/design-taste-frontend`, `/high-end-visual-design`, `/skills-threejs`, and `/img2threejs` upgrades.
-  - Upgraded Spatial 3D Knowledge Graph engine (`src/features/spatialKnowledgeGraph.js`) with true 3D spherical volume lighting, specular highlights, dynamic theme accent token detection (`--accent-rgb`), and retina-sharp typography.
-  - Added procedural 3D 'Voyager' astrolabe badge with celestial gimbal rings, horizon ring, and glowing core star to `ProceduralTrophy` (`src/features/proceduralTrophy.js`).
+  - Reviewed, reconstructed, and redesigned all 3D objects and spatial visual components across the application:
+    - Reconstructed `SpatialKnowledgeGraph` with procedural 3D Armillary Gyroscope coordinate wireframe rings, energetic 3D photon pulses propagating along quadratic bezier edges, 3D starfield drift with twinkling luminosity, dynamic Blinn-Phong specular lighting, and DPI-responsive typography.
+    - Expanded and reconstructed the entire procedural 3D trophy suite (`ProceduralTrophy`) with 6 distinct high-fidelity PBR-like models: Cornell Master Medallion, Scholar Laurels Codex, Deep Voyager Astrolabe, Knowledge Prism, Memory Crystal, and Cornell Study Desk.
+    - Re-mapped all 6 achievements in `achievementsRoute.js` to their dedicated 3D procedural models.
   - Implemented Double-Bezel (Doppelrand) nested architecture on cards and feature containers (`.card`, `.achievement-card`, `.course-item`) with concentric curvature, inner specular highlights, and active micro-press tactile physics.
   - Implemented full 8-state interactive matrix on form controls (`.input`, `.textarea`, `.select`, `.filter-chip`), adding high-contrast `:focus-visible` rings, studio easing (`--ease-studio`), and tactile micro-press feedback.
   - Enforced Typography Purity: Roman font-style on all headings, descender clearance reserve (`line-height: 1.12` min + bottom padding reservation), and tabular numerals (`tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"`).
   - Added `min-h-[100dvh]` and `overflow-x: clip` to prevent mobile viewport jumping and horizontal drift.
-  - Integrated zero-dependency 3D Spatial Knowledge Graph on Fibonacci sphere with depth sorting, orbit dragging, and reduced-motion fallback.
   - Full 72-file / 760-test Vitest test suite verified passing.
 - **2026-09-04**:
   - Reconciled the documented palette with the shipped app: Violet is the default accent; Lapis is an optional preset.
