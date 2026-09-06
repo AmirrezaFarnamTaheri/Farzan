@@ -275,7 +275,9 @@ export class SpatialKnowledgeGraph extends EventEmitter {
   }
 
   startLoop() {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
 
     const frame = () => {
       if (this.isDisposed) return;
@@ -460,8 +462,8 @@ export class SpatialKnowledgeGraph extends EventEmitter {
           node.screenY,
           r * 2.2
         );
-        glowGrad.addColorStop(0, `rgba(${getThemeAccentRgb()}, 0.35)`);
-        glowGrad.addColorStop(1, `rgba(${getThemeAccentRgb()}, 0)`);
+        glowGrad.addColorStop(0, `rgba(${accentRgb}, 0.35)`);
+        glowGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
         ctx.beginPath();
         ctx.arc(node.screenX, node.screenY, r * 2.2, 0, Math.PI * 2);
         ctx.fillStyle = glowGrad;

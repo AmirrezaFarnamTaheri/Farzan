@@ -218,6 +218,11 @@ let studioKeyController = null;
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[ch]);
 
+  function announce(message) {
+    const region = document.getElementById('aria-announcer');
+    if (region) region.textContent = message;
+  }
+
   async function renderStudio(container) {
     if (!container) return;
 
@@ -325,10 +330,6 @@ let studioKeyController = null;
       if (target?.isContentEditable) return;
       const flipBtnLive = container.querySelector('#fc-flip-btn:not([hidden])');
       const gradeRowLive = container.querySelector('#fc-grade-btns:not([hidden])');
-      const announce = (message) => {
-        const region = document.getElementById('aria-announcer');
-        if (region) region.textContent = message;
-      };
       if ((event.key === ' ' || event.key === 'Enter') && flipBtnLive) {
         event.preventDefault();
         announce('Answer shown. Rate the card with keys 1, 2, 4, or 5.');
@@ -350,10 +351,6 @@ let studioKeyController = null;
       const frontInput = newForm.querySelector('#fc-new-front');
       const backInput = newForm.querySelector('#fc-new-back');
       const deckInput = newForm.querySelector('#fc-new-deck');
-      const announce = (message) => {
-        const region = document.getElementById('aria-announcer');
-        if (region) region.textContent = message;
-      };
       addBtn.addEventListener('click', () => {
         newForm.hidden = !newForm.hidden;
         if (!newForm.hidden) frontInput.focus();

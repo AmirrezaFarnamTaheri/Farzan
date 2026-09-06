@@ -588,6 +588,7 @@ article:has(#btn-theme-toggle) { min-width: 0; }
 .fc-stat-accent .fc-stat-value { color: var(--accent-light); }
 
 .fc-review {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -601,6 +602,8 @@ article:has(#btn-theme-toggle) { min-width: 0; }
     radial-gradient(900px 320px at 50% 0%, rgba(var(--accent-rgb), 0.08), transparent 70%),
     color-mix(in srgb, var(--surface) 78%, transparent);
   text-align: center;
+  perspective: 1200px;
+  transform-style: preserve-3d;
 }
 .fc-progress-line {
   align-self: flex-start;
@@ -609,8 +612,11 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   color: var(--accent-light);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero";
 }
 .fc-card {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -622,22 +628,56 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   font-size: var(--text-lg);
   line-height: 1.55;
   overflow-wrap: anywhere;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: transform var(--duration-fast) var(--ease-studio), box-shadow var(--duration-fast) var(--ease-studio);
 }
 .fc-card-front {
-  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-3) 90%, transparent), color-mix(in srgb, var(--surface-2) 75%, transparent));
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-md), 0 1px 0 var(--glass-highlight) inset;
   color: var(--text-primary);
   font-weight: 600;
 }
 .fc-card-back {
-  background: var(--success-muted);
-  border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--success-muted) 85%, var(--surface-2)), color-mix(in srgb, var(--surface-2) 90%, transparent));
+  border: 1px solid color-mix(in srgb, var(--success) 45%, var(--border-strong));
+  box-shadow: var(--shadow-md), 0 1px 0 rgba(255, 255, 255, 0.12) inset;
   color: var(--text-primary);
-  animation: fc-form-in var(--duration-base) var(--ease-out) both;
+  animation: fc-flip-in var(--duration-base) var(--ease-studio) both;
+}
+@keyframes fc-flip-in {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(18deg) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0);
+  }
 }
 .fc-card-back[hidden] { display: none; }
 .fc-flip-row { display: flex; }
+.fc-flip-btn {
+  min-height: var(--btn-h-md);
+  padding: 0 var(--space-5);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: transform var(--duration-fast) var(--ease-studio), background var(--duration-fast), box-shadow var(--duration-fast);
+}
+.fc-flip-btn:hover {
+  transform: translateY(-1px);
+}
+.fc-flip-btn:active {
+  transform: scale(0.97);
+}
+.fc-flip-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .fc-kbd {
   display: inline-block;
   margin-left: 6px;
@@ -657,18 +697,30 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   border-radius: var(--radius-md);
   border: 1px solid var(--grade-color, var(--border-strong));
   background: color-mix(in srgb, var(--grade-color, var(--accent)) 10%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
   color: var(--grade-color, var(--text-primary));
   font-weight: 700;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: background var(--duration-fast), transform var(--duration-fast), box-shadow var(--duration-fast);
+  transition: background var(--duration-fast) var(--ease-studio), transform var(--duration-fast) var(--ease-studio), box-shadow var(--duration-fast) var(--ease-studio);
 }
 .fc-grade:hover {
   background: color-mix(in srgb, var(--grade-color, var(--accent)) 22%, transparent);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--grade-color, var(--accent)) 22%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--grade-color, var(--accent)) 22%, transparent), 0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
-.fc-grade:active { transform: translateY(0); }
+.fc-grade:active {
+  transform: scale(0.97);
+}
+.fc-grade:focus-visible {
+  outline: 2px solid var(--grade-color, var(--accent));
+  outline-offset: 2px;
+}
+.fc-grade:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
 .fc-grade-again { --grade-color: var(--danger); }
 .fc-grade-hard  { --grade-color: var(--warning); }
 .fc-grade-good  { --grade-color: var(--info); }

@@ -1247,7 +1247,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
   };
 
@@ -1823,8 +1823,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return String(str).replace(/[&<>"']/g, m =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
 
     _appendAction(parent, action) {
@@ -2298,8 +2297,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return str.replace(/[&<>"']/g, m =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
   };
 
