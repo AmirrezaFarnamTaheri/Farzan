@@ -56,7 +56,21 @@ function consentError(provider) {
   return error;
 }
 
+// Native WHATWG DOM AbortSignal.timeout and AbortSignal.any
+// Source: https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static
+// Source: https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/any_static
 function createTimedSignal(externalSignal, timeoutMs) {
+  const duration = Math.max(1, Number(timeoutMs) || DEFAULT_TIMEOUT_MS);
+  if (typeof AbortSignal?.timeout === 'function' && typeof AbortSignal?.any === 'function') {
+    const timeoutSignal = AbortSignal.timeout(duration);
+    const combinedSignal = externalSignal ? AbortSignal.any([externalSignal, timeoutSignal]) : timeoutSignal;
+    return {
+      signal: combinedSignal,
+      didTimeout: () => timeoutSignal.aborted && timeoutSignal.reason?.name === 'TimeoutError',
+      cleanup() {},
+    };
+  }
+
   if (typeof AbortController !== 'function') {
     return { signal: externalSignal, didTimeout: () => false, cleanup() {} };
   }
@@ -68,7 +82,7 @@ function createTimedSignal(externalSignal, timeoutMs) {
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort(new DOMException('Translation timed out', 'TimeoutError'));
-  }, Math.max(1, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
+  }, duration);
   return {
     signal: controller.signal,
     didTimeout: () => timedOut,

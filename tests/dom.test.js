@@ -107,4 +107,13 @@ describe('dom utils', () => {
     expect(app.hasAttribute('inert')).toBe(false);
     expect(app.hasAttribute('aria-hidden')).toBe(false);
   });
+
+  it('uid generates prefixed unique identifiers using crypto.randomUUID or fallback', async () => {
+    const { uid } = await import('../src/lib/dom.js');
+    const id1 = uid('item');
+    const id2 = uid('item');
+    expect(id1).toMatch(/^item-[a-z0-9-]+$/);
+    expect(id2).toMatch(/^item-[a-z0-9-]+$/);
+    expect(id1).not.toBe(id2);
+  });
 });

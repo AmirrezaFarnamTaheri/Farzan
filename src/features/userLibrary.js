@@ -21,10 +21,8 @@ function emptyLibrary() {
 
 function cloneValue(value) {
   if (value == null) return value;
-  if (typeof structuredClone === 'function') {
-    try { return structuredClone(value); } catch { /* fall through */ }
-  }
-  return JSON.parse(JSON.stringify(value));
+  try { return structuredClone(value); }
+  catch { return JSON.parse(JSON.stringify(value)); }
 }
 
 function cloneLibrary(value) {
@@ -58,7 +56,9 @@ export function isSafeRemoteUrl(value) {
 }
 
 function makeId(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  return typeof crypto?.randomUUID === 'function'
+    ? `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+    : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function openFileDb() {

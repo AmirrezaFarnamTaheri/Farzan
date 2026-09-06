@@ -20,7 +20,9 @@
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
   function uid(prefix = 'n') {
-    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    return typeof crypto?.randomUUID === 'function'
+      ? `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+      : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
   function debounce(fn, ms = 300) {

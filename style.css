@@ -53,9 +53,11 @@
   font-feature-settings: "tnum", "zero";
 }
 
-/* Opt-in serif display heading */
+/* Opt-in serif display heading — enforces Roman style and descender clearance */
 .display-serif {
   font-family: var(--font-serif);
+  font-style: normal;
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1.12;
+  padding-bottom: 2px;
 }

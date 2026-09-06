@@ -1,9 +1,12 @@
 /**
- * EventEmitter — Map-based event emitter with wildcard support.
- * Based on wolf-table event.ts with bug fixes and wildcard '*' support.
+ * EventEmitter — Standard Web Platform EventTarget with fluent Node/wolf-table compat.
+ * Backed by WHATWG EventTarget standard:
+ * https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+ * https://dom.spec.whatwg.org/#interface-eventtarget
  */
-export class EventEmitter {
+export class EventEmitter extends EventTarget {
   constructor() {
+    super();
     /** @type {Map<string, Set<Function>>} */
     this._listeners = new Map();
   }
@@ -36,12 +39,11 @@ export class EventEmitter {
     if (set) {
       if (handler) {
         set.delete(handler);
-        // once() registers an internal wrapper, so removing by the original
-        // handler must also match wrappers that carry it. Without this,
-        // `once(e, h); off(e, h)` was a silent no-op and h still fired after
-        // its owner had torn down.
-        for (const registered of set) {
-          if (registered.listener === handler) set.delete(registered);
+        // once() registers an internal wrapper, so removing by original handler
+        for (const registered of [...set]) {
+          if (registered.listener === handler) {
+            set.delete(registered);
+          }
         }
         if (set.size === 0) this._listeners.delete(event);
       } else {
@@ -60,7 +62,7 @@ export class EventEmitter {
   emit(event, ...args) {
     const set = this._listeners.get(event);
     if (set) {
-      for (const handler of set) {
+      for (const handler of [...set]) {
         try { handler(...args); } catch (e) { console.error('[EventEmitter]', event, e); }
       }
     }
@@ -68,11 +70,15 @@ export class EventEmitter {
       const wildcardSet = this._listeners.get('*');
       if (wildcardSet) {
         const payload = { type: event, args };
-        for (const handler of wildcardSet) {
+        for (const handler of [...wildcardSet]) {
           try { handler(payload); } catch (e) { console.error('[EventEmitter] *', e); }
         }
       }
     }
+    // Also dispatch to standard DOM EventTarget listeners added via addEventListener()
+    try {
+      this.dispatchEvent(new CustomEvent(event, { detail: args }));
+    } catch {}
     return this;
   }
 
@@ -88,7 +94,6 @@ export class EventEmitter {
       this.off(event, wrapper);
       handler(...args);
     };
-    // Tag the wrapper so off(event, handler) can find and remove it.
     wrapper.listener = handler;
     return this.on(event, wrapper);
   }

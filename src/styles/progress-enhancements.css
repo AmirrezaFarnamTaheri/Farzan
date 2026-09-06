@@ -159,6 +159,7 @@
   color: var(--text-primary);
   font-size: clamp(1.55rem, 2.5vw, 2.25rem);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero";
   line-height: 1;
   text-overflow: ellipsis;
 }

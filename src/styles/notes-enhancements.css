@@ -5,8 +5,11 @@
 .notes-page-header .page-title {
   margin-top: var(--space-2);
   font-family: var(--font-serif);
+  font-style: normal;
   font-size: clamp(2.2rem, 4vw, 3.8rem);
+  line-height: 1.12;
   letter-spacing: -0.05em;
+  padding-bottom: 2px;
 }
 
 .notes-page-header .page-subtitle {
