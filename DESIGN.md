@@ -176,10 +176,12 @@ Every interactive control satisfies all 8 states:
 ## Changelog
 
 - **2026-09-06**:
-  - Implemented comprehensive `/frontend-design-deslop`, `/hallmark`, `/design-taste-frontend`, and `/high-end-visual-design` upgrades.
-  - Implemented Double-Bezel (Doppelrand) nested architecture on cards and feature containers with concentric outer (`24px`) and inner (`20px`) curvature and specular highlights.
-  - Added Button-in-Button trailing icon bubble architecture (`.btn-icon-bubble`) and tactile micro-press physics (`active: scale(0.98)`).
-  - Enforced Typography Purity: Roman font-style on all headings, descender clearance reserve (`line-height: 1.12` min + bottom padding reservation), and tabular numerals (`tabular-nums slashed-zero`).
+  - Implemented comprehensive `/frontend-design-deslop`, `/hallmark`, `/design-taste-frontend`, `/high-end-visual-design`, `/skills-threejs`, and `/img2threejs` upgrades.
+  - Upgraded Spatial 3D Knowledge Graph engine (`src/features/spatialKnowledgeGraph.js`) with true 3D spherical volume lighting, specular highlights, dynamic theme accent token detection (`--accent-rgb`), and retina-sharp typography.
+  - Added procedural 3D 'Voyager' astrolabe badge with celestial gimbal rings, horizon ring, and glowing core star to `ProceduralTrophy` (`src/features/proceduralTrophy.js`).
+  - Implemented Double-Bezel (Doppelrand) nested architecture on cards and feature containers (`.card`, `.achievement-card`, `.course-item`) with concentric curvature, inner specular highlights, and active micro-press tactile physics.
+  - Implemented full 8-state interactive matrix on form controls (`.input`, `.textarea`, `.select`, `.filter-chip`), adding high-contrast `:focus-visible` rings, studio easing (`--ease-studio`), and tactile micro-press feedback.
+  - Enforced Typography Purity: Roman font-style on all headings, descender clearance reserve (`line-height: 1.12` min + bottom padding reservation), and tabular numerals (`tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"`).
   - Added `min-h-[100dvh]` and `overflow-x: clip` to prevent mobile viewport jumping and horizontal drift.
   - Integrated zero-dependency 3D Spatial Knowledge Graph on Fibonacci sphere with depth sorting, orbit dragging, and reduced-motion fallback.
   - Full 72-file / 760-test Vitest test suite verified passing.

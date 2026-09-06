@@ -75,6 +75,37 @@ export const ProceduralTrophy = {
           </svg>
         `;
 
+      case 'voyager':
+        return `
+          <svg class="procedural-trophy" viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="Deep Voyager Astrolabe" role="img">
+            <defs>
+              <linearGradient id="voyager-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38BDF8" />
+                <stop offset="50%" stop-color="#6366F1" />
+                <stop offset="100%" stop-color="#4338CA" />
+              </linearGradient>
+              <linearGradient id="voyager-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FDE047" />
+                <stop offset="100%" stop-color="#CA8A04" />
+              </linearGradient>
+              <filter id="voyager-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.3" />
+              </filter>
+            </defs>
+            <g filter="url(#voyager-glow)">
+              <circle cx="50" cy="50" r="40" fill="#0b0f19" stroke="url(#voyager-grad)" stroke-width="2" />
+              <!-- Outer Astrolabe Gimbal Ring -->
+              <ellipse cx="50" cy="50" rx="32" ry="14" fill="none" stroke="url(#voyager-gold)" stroke-width="1.8" transform="rotate(-30 50 50)" />
+              <ellipse cx="50" cy="50" rx="32" ry="14" fill="none" stroke="url(#voyager-grad)" stroke-width="1.8" transform="rotate(30 50 50)" />
+              <!-- Horizon Ring -->
+              <ellipse cx="50" cy="50" rx="30" ry="8" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-dasharray="3 2" opacity="0.75" />
+              <!-- Celestial Core Star -->
+              <polygon points="50,38 53,47 62,50 53,53 50,62 47,53 38,50 47,47" fill="url(#voyager-gold)" />
+              <circle cx="50" cy="50" r="3" fill="#FFFFFF" />
+            </g>
+          </svg>
+        `;
+
       case 'prism':
       default:
         return `

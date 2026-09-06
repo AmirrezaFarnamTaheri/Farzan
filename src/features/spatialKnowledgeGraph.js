@@ -9,6 +9,29 @@
 
 import { EventEmitter } from '../lib/eventEmitter.js';
 
+function getThemeAccentRgb() {
+  if (typeof document === 'undefined') return '124, 58, 237';
+  try {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
+    if (raw) return raw;
+  } catch {}
+  return '124, 58, 237';
+}
+
+function shadeColor(color, percent) {
+  try {
+    const num = parseInt(color.replace('#', ''), 16);
+    if (Number.isNaN(num)) return color;
+    const amt = Math.round(2.55 * percent);
+    const R = Math.min(255, Math.max(0, (num >> 16) + amt));
+    const B = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
+    const G = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
+    return `#${(0x1000000 + R * 0x10000 + B * 0x100 + G).toString(16).slice(1)}`;
+  } catch {
+    return color;
+  }
+}
+
 export class SpatialKnowledgeGraph extends EventEmitter {
   constructor() {
     super();
@@ -305,8 +328,9 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       const midY = (s.screenY + t.screenY) / 2 - 15 * s.screenScale;
       ctx.quadraticCurveTo(midX, midY, t.screenX, t.screenY);
 
-      ctx.strokeStyle = `rgba(37, 99, 235, ${avgAlpha * 0.35})`;
-      ctx.lineWidth = Math.max(1, (s.screenScale + t.screenScale) * 0.8);
+      const accentRgb = getThemeAccentRgb();
+      ctx.strokeStyle = `rgba(${accentRgb}, ${avgAlpha * 0.4})`;
+      ctx.lineWidth = Math.max(1, (s.screenScale + t.screenScale) * 0.85);
       ctx.stroke();
     }
 
@@ -316,32 +340,55 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     for (const node of sortedNodes) {
       const r = Math.max(3, node.baseRadius * node.screenScale);
       const isHovered = this.hoveredNode === node;
+      const isSelected = this.selectedNode === node;
 
-      // Halo / Glow
-      if (isHovered) {
+      // Halo / Specular Glow for hovered or selected nodes
+      if (isHovered || isSelected) {
+        const glowGrad = ctx.createRadialGradient(
+          node.screenX,
+          node.screenY,
+          r * 0.6,
+          node.screenX,
+          node.screenY,
+          r * 2.2
+        );
+        glowGrad.addColorStop(0, `rgba(${getThemeAccentRgb()}, 0.35)`);
+        glowGrad.addColorStop(1, `rgba(${getThemeAccentRgb()}, 0)`);
         ctx.beginPath();
-        ctx.arc(node.screenX, node.screenY, r * 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(37, 99, 235, 0.25)';
+        ctx.arc(node.screenX, node.screenY, r * 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = glowGrad;
         ctx.fill();
       }
 
-      // Main Node Body
+      // Main Node Body with 3D Spherical Volume & Specular Highlight
+      const sphereGrad = ctx.createRadialGradient(
+        node.screenX - r * 0.35,
+        node.screenY - r * 0.35,
+        r * 0.05,
+        node.screenX,
+        node.screenY,
+        r
+      );
+      sphereGrad.addColorStop(0, '#ffffff');
+      sphereGrad.addColorStop(0.25, node.color);
+      sphereGrad.addColorStop(1, shadeColor(node.color, -35));
+
       ctx.beginPath();
       ctx.arc(node.screenX, node.screenY, r, 0, Math.PI * 2);
-      ctx.fillStyle = node.color;
-      ctx.globalAlpha = isHovered ? 1.0 : node.alpha;
+      ctx.fillStyle = sphereGrad;
+      ctx.globalAlpha = isHovered ? 1.0 : Math.max(0.25, node.alpha);
       ctx.fill();
 
-      // Node Stroke / Edge refraction
-      ctx.strokeStyle = isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.4)';
-      ctx.lineWidth = 1.5;
+      // Node Rim Light / Specular Edge
+      ctx.strokeStyle = isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = isHovered ? 2 : 1.2;
       ctx.stroke();
       ctx.globalAlpha = 1.0;
 
       // Typography Label for near/focused nodes
-      if (node.transformedZ > -80 || isHovered) {
-        ctx.font = `${Math.floor(11 * node.screenScale)}px Inter, system-ui, sans-serif`;
-        ctx.fillStyle = isHovered ? '#ffffff' : 'rgba(240, 240, 255, 0.85)';
+      if (node.transformedZ > -80 || isHovered || isSelected) {
+        ctx.font = `600 ${Math.floor(11 * node.screenScale)}px var(--font-sans, system-ui, -apple-system, sans-serif)`;
+        ctx.fillStyle = isHovered ? '#ffffff' : 'rgba(240, 240, 255, 0.88)';
         ctx.textAlign = 'center';
         ctx.fillText(node.title, node.screenX, node.screenY + r + 14 * node.screenScale);
       }

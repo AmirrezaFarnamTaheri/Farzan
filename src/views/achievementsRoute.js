@@ -138,7 +138,7 @@ export function mountAchievementsView(deps = {}) {
       card.dataset.achievementId = achievement.id;
       card.dataset.achievementState = achievement.unlocked ? 'unlocked' : 'locked';
 
-      const trophyType = achievement.id === 'course-complete' ? 'cornell-master' : achievement.id === 'deep-focus' || achievement.id === 'first-finish' ? 'scholar' : 'prism';
+      const trophyType = achievement.id === 'course-complete' ? 'cornell-master' : achievement.id === 'deep-focus' || achievement.id === 'first-finish' ? 'scholar' : achievement.id === 'catalog-roamer' ? 'voyager' : 'prism';
       const trophyWrap = document.createElement('div');
       trophyWrap.className = 'achievement-trophy-wrap';
       trophyWrap.innerHTML = ProceduralTrophy.renderTrophySvg(trophyType, { size: 64 });
