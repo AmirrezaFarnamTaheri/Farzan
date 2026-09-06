@@ -3,7 +3,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const espree = require('espree');
+const { spawnSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
 const requiredVendor = [
@@ -40,14 +40,11 @@ const jsFiles = fs
 
 for (const f of jsFiles) {
   const p = path.join(root, f);
-  try {
-    espree.parse(fs.readFileSync(p, 'utf8'), {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      allowHashBang: true,
-    });
-  } catch (err) {
-    console.error('[validate] Syntax error:', f, err?.message || err);
+  // Native Node.js syntax check (no third-party AST parser needed)
+  // Source: https://nodejs.org/api/cli.html#--check
+  const res = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' });
+  if (res.status !== 0) {
+    console.error('[validate] Syntax error in', f, res.stderr?.trim() || res.stdout?.trim());
     errors++;
   }
 }
