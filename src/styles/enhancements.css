@@ -8,8 +8,11 @@
 
 .view-courses .page-title {
   font-family: var(--font-serif);
+  font-style: normal;
   font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.12;
   letter-spacing: -0.045em;
+  padding-bottom: 2px;
 }
 
 .view-courses .page-subtitle {

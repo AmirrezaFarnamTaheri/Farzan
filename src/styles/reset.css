@@ -6,6 +6,7 @@
 
 html {
   height: 100%;
+  overflow-x: clip;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   tab-size: 2;
@@ -15,6 +16,7 @@ html {
 
 body {
   height: 100%;
+  overflow-x: clip;
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -54,6 +56,7 @@ ul, ol { list-style: none; }
 
 h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
+  font-style: normal;
   line-height: var(--leading-tight);
   letter-spacing: -0.03em;
   color: var(--text-primary);

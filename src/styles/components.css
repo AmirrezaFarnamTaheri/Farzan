@@ -197,7 +197,7 @@
   }
   .theme-toggle:hover .theme-toggle-icon { color: var(--accent-light); }
 
-/* Base Card */
+/* Base Card — Double-Bezel Architecture */
   .card {
     background:
       linear-gradient(
@@ -210,12 +210,16 @@
     padding: var(--density-pad-y) var(--density-pad-x);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.03) inset;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     transition:
-      background var(--duration-base) var(--ease-out),
-      border-color var(--duration-base) var(--ease-out),
-      box-shadow var(--duration-base) var(--ease-out),
-      transform var(--duration-base) var(--ease-out);
+      background var(--duration-base) var(--ease-studio),
+      border-color var(--duration-base) var(--ease-studio),
+      box-shadow var(--duration-base) var(--ease-studio),
+      transform var(--duration-base) var(--ease-studio);
+  }
+  [data-theme="light"] .card,
+  [data-theme="paper"] .card {
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
   .card::before {
     content: '';
@@ -223,7 +227,7 @@
     inset: 0;
     pointer-events: none;
     opacity: 0;
-    transition: opacity var(--duration-base) var(--ease-out);
+    transition: opacity var(--duration-base) var(--ease-studio);
     background:
       radial-gradient(1000px 400px at 10% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
       radial-gradient(800px 300px at 90% 80%, rgba(6, 182, 212, 0.12), transparent 50%);
@@ -235,7 +239,7 @@
   }
   .card:hover {
     border-color: color-mix(in srgb, var(--accent) 30%, var(--glass-border));
-    box-shadow: var(--shadow-md), 0 0 0 1px rgba(255,255,255,0.06) inset;
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     background:
       linear-gradient(
         180deg,
@@ -248,11 +252,11 @@
     cursor: pointer;
   }
   .card.interactive:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) inset;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) inset;
   }
   .card.interactive:active {
-    transform: translateY(-1px) scale(0.99);
+    transform: translateY(0) scale(0.995);
     box-shadow: var(--shadow-sm);
   }
 
@@ -452,7 +456,7 @@
       color var(--duration-fast),
       border-color var(--duration-fast),
       box-shadow var(--duration-fast),
-      transform var(--duration-fast),
+      transform var(--duration-fast) var(--ease-studio),
       opacity var(--duration-fast);
     outline: none;
   }
@@ -474,7 +478,41 @@
     transition: none;
   }
 
-  .btn:focus-visible {
+  /* Active Tactile Micro-press Physics */
+  .btn:active,
+  .btn.is-active {
+    transform: scale(0.98);
+  }
+
+  /* Button-in-Button Trailing Icon Bubble */
+  .btn .btn-icon-bubble,
+  .btn .icon-bubble {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.14);
+    margin-right: -4px;
+    margin-left: var(--space-2);
+    flex-shrink: 0;
+    transition: transform var(--duration-fast) var(--ease-studio);
+  }
+  .btn:hover .btn-icon-bubble,
+  .btn:hover .icon-bubble,
+  .btn.is-hover .btn-icon-bubble {
+    transform: translate(1px, -1px) scale(1.06);
+  }
+
+  /* 8-State Interactive Control Matrix */
+  .btn:hover,
+  .btn.is-hover {
+    filter: brightness(1.05);
+  }
+
+  .btn:focus-visible,
+  .btn.is-focus {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     box-shadow:
@@ -486,6 +524,16 @@
     opacity: 0.45;
     cursor: not-allowed;
     pointer-events: none;
+  }
+  .btn[data-state="error"],
+  .btn.has-error {
+    border-color: var(--error) !important;
+    color: var(--error) !important;
+    box-shadow: 0 0 0 2px var(--error-muted) !important;
+  }
+  .btn[data-state="success"],
+  .btn.is-success {
+    border-color: var(--success) !important;
   }
   .btn .icon { width: var(--text-base); height: var(--text-base); flex-shrink: 0; }
 
