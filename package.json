@@ -55,7 +55,7 @@
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.14",
     "fuse.js": "7.5.0",
-    "pdfjs-dist": "6.2.108"
+    "pdfjs-dist": "6.3.289"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
