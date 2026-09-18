@@ -9,7 +9,7 @@ OpenCourseDeck is an offline-first learning studio and PDF/video course reader b
 | **Core Runtime** | HTML5 / ES Modules | Vanilla JS module system (`src/index.js`, `boot.js`) |
 | **Storage & Security** | IndexedDB + Web Crypto API | `OpenCourseDB` (`db.js`), PBKDF2 key derivation, AES-256-GCM encryption |
 | **Spaced Repetition** | SuperMemo SM-2 Algorithm | `FlashcardDeckManager` (`flashcards.js`), Anki `.apkg` JSON import/export |
-| **Graphics Engine** | WebGL / Canvas 2D | Atmospheric shader background (`laser.js`), adaptive FPS auto-degrader |
+| **Graphics Engine** | Canvas 2D / WebGL | Procedural canvas visualizers (3D `SpatialKnowledgeGraph`, charts, waveform scrubber), with on-demand Chart.js and PDF.js |
 | **Offline AI** | Web Workers & Local Extractive Model | Extractive summarizer & auto-flashcard generator (`src/features/aiClient.js`) |
 | **Desktop Packaging** | Tauri (Rust) / NSIS | Desktop application bundle (`src-tauri/`, `Run-OpenCourseDeck.cmd`) |
 
@@ -17,7 +17,7 @@ OpenCourseDeck is an offline-first learning studio and PDF/video course reader b
 - **Browser Entrypoint**: `index.html` → `boot.js` → `dist/opencoursedeck.js` (bundle of `src/index.js`)
 - **Database Engine**: `db.js` (`OpenCourseDB`, `DBQuery`)
 - **Flashcard Studio**: `flashcards.js` (`calculateSM2`, `importAnkiDeck`)
-- **WebGL Atmospheric Background**: `laser.js` (`LaserCanvas`)
+- **3D Spatial Graph**: `src/features/spatialKnowledgeGraph.js` (`SpatialKnowledgeGraph`), rendered in the Studio view
 - **Desktop Launcher**: `Run-OpenCourseDeck.cmd`
 
 ## Common Developer Commands

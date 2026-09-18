@@ -37,7 +37,7 @@ Extract duplicated helpers from IIFE modules (`player.js`, `notes.js`, `pdf.js`,
 | `animateHeight` / `animH` (2 copies) | `app.js:622`, `ui.js:21` | `src/lib/dom.js` | — |
 | `debounce` (2 copies) | `src/lib/dom.js:17`, `notes.js:26` | Expose on `OpenCourseDeck.dom.debounce` | — |
 
-> **Status: DONE** — Created `src/lib/confirm.js` (13 lines), `src/lib/routeListeners.js` (19 lines). Updated `app.js` to expose `esc` on `OpenCourseDeck.dom`. Updated IIFE modules (`player.js`, `notes.js`, `pdf.js`, `ui.js`) to use `OpenCourseDeck.dom.$` etc. with fallback.
+> **Status: DONE, then superseded** — The extraction landed, but `src/lib/confirm.js` and `src/lib/routeListeners.js` were later deleted (commit c22e61b3): the IIFE modules kept their own inline `pdConfirm` and per-view `routeListeners` arrays. Only the `esc` / `OpenCourseDeck.dom` consolidation from this item survives; see `docs/architecture.md` for the per-view listener pattern that replaced `RouteListeners`.
 
 ### 0.2 EventEmitter
 | Item | Target | Ported From |

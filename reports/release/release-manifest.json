@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "product": "OpenCourseDeck",
   "version": "1.1.2",
-  "commit": "a8c21b3973e3c51893c4751327c618e900bcb302",
+  "commit": "e4074c1fcde63e4ad1fd6a2f633f6a532469f70d",
   "artifactRoot": "dist",
-  "generatedAt": "2026-09-18T13:25:45.936Z",
-  "artifactCount": 179,
+  "generatedAt": "2026-09-18T13:48:19.086Z",
+  "artifactCount": 177,
   "artifacts": [
     {
       "path": "assets/favicon.svg",
@@ -476,12 +476,6 @@
       "sha256": "947e96ff73024f53d7e33e07b90097d3b8497c03c12f57ae13a10c8f2f8d7ed1"
     },
     {
-      "path": "docs/10X_ARCHITECTURE_TRANSFORMATION.md",
-      "size": 5569,
-      "mode": 438,
-      "sha256": "1997f3196bcca16f17edb20e7a5c223d2b4aa3132ee81d281e1d3c267a3e5d88"
-    },
-    {
       "path": "docs/architecture.md",
       "size": 6790,
       "mode": 438,
@@ -519,9 +513,9 @@
     },
     {
       "path": "docs/plugin-system-plan.md",
-      "size": 8722,
+      "size": 9338,
       "mode": 438,
-      "sha256": "7b235b4559a3afc1b7276440d68941f64c689026fcc595342bf0523b79b00f46"
+      "sha256": "b9f2f1eb28a7f8626d31e3fb97887b365520773568e703b2f9f261daa7abf97d"
     },
     {
       "path": "docs/release-and-rollback.md",
@@ -537,21 +531,15 @@
     },
     {
       "path": "docs/roadmap.md",
-      "size": 4513,
+      "size": 4985,
       "mode": 438,
-      "sha256": "cfb876d8d8aba3c7bc790f589c9bcbb8804b7ec9b15840a5cbc0e22886c72667"
+      "sha256": "69850f66c33ec755118f6041f77853c6a749322199752d3503d6967850e862c8"
     },
     {
       "path": "docs/SHIPPING_CHECKLIST.md",
       "size": 2086,
       "mode": 438,
       "sha256": "a4a059d8190acfd2eeb180f7d85dbe831c286c1af7eada1e0873f9b8f53514c4"
-    },
-    {
-      "path": "docs/tauri-crate-downloads.md",
-      "size": 72791,
-      "mode": 438,
-      "sha256": "13e8760b11d3c18b595f985dca496ec388e65fbae4bebd8e0ad405445bd2ab17"
     },
     {
       "path": "docs/troubleshooting.md",
@@ -609,9 +597,9 @@
     },
     {
       "path": "sw.js",
-      "size": 18305,
+      "size": 18131,
       "mode": 438,
-      "sha256": "44bc71244002a04190373ed9e320f02c18028d4c34bada9ff0ecab88ad0e8a47"
+      "sha256": "395743eaa296aa65b16e52a235dcb899bc697da620174622746b1f8cf9c2e4d7"
     },
     {
       "path": "vendor/chart.umd.js",
