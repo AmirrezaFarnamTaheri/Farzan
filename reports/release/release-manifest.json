@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "product": "OpenCourseDeck",
   "version": "1.1.2",
-  "commit": "27fd4be3b94fc23fb29977f1eef16f6a0d78324c",
+  "commit": "121e5e3acf353649d5f0b564eea21800a0a72a70",
   "artifactRoot": "dist",
-  "generatedAt": "2026-09-18T16:29:40.221Z",
+  "generatedAt": "2026-09-18T18:14:51.688Z",
   "artifactCount": 177,
   "artifacts": [
     {
@@ -599,7 +599,7 @@
       "path": "sw.js",
       "size": 18131,
       "mode": 438,
-      "sha256": "c80bc0df80f60d378f87975ce657f6bf62293054d2794828e298c2c18b1b605f"
+      "sha256": "9cc62b936a2a858f31eac607db6f1481ca0dfd4362aa9c1e3680f5a8e64c6dc3"
     },
     {
       "path": "vendor/chart.umd.js",
@@ -1041,9 +1041,9 @@
     },
     {
       "path": "vendor/pdf.min.mjs",
-      "size": 454669,
+      "size": 458705,
       "mode": 438,
-      "sha256": "e0be3863c23c8af2305b16548febd58e7f8874a460253317d7771cddbc1c0f6d"
+      "sha256": "f80490490320511e5df18c580b9edd6b5db8058dceebaf6f161992e0a964b9e2"
     },
     {
       "path": "vendor/pdf.worker.min.js",
@@ -1053,15 +1053,15 @@
     },
     {
       "path": "vendor/pdf.worker.min.mjs",
-      "size": 1262398,
+      "size": 1265413,
       "mode": 438,
-      "sha256": "0613f41490dd6aaceed7a93fbbd38c85e6d6aa60474b6588c6e7709cfbe18cb3"
+      "sha256": "8ab0e5e30031b4a06ecfddd5ae9562f0227f830ee7ec9ed1a968b134243d2386"
     },
     {
       "path": "vendor/purify.min.js",
-      "size": 29165,
+      "size": 29330,
       "mode": 438,
-      "sha256": "1a83c283c3229acad7ad9f8f874572bcb031df0f79e114318a2957dc2ffcc117"
+      "sha256": "c5fbf946a4d77074cedd02116491fea15c6e3c652b4de8f523ef665cde4d89a4"
     },
     {
       "path": "workbox-a26db9c3.js",
