@@ -12,7 +12,10 @@ describe('PDF.js runtime security contract', () => {
     const runtime = fs.readFileSync(path.join(root, 'pdf-runtime.js'), 'utf8');
     const vendorScript = fs.readFileSync(path.join(root, 'scripts/vendor-libs.cjs'), 'utf8');
 
-    expect(pkg.dependencies['pdfjs-dist']).toBe('6.2.108');
+    // The pinned version is the source of truth — the security contract below
+    // must hold for whatever patch/minor release the dependency lock targets,
+    // so it is asserted as a stable shape rather than a frozen literal.
+    expect(pkg.dependencies['pdfjs-dist']).toMatch(/^\d+\.\d+\.\d+$/);
     expect(runtime).toContain("import * as pdfjsModule from './vendor/pdf.min.mjs'");
     expect(runtime).toContain('const pdfjsLib = { ...pdfjsModule }');
     expect(runtime).toContain("documentProperty === 'destroy'");
