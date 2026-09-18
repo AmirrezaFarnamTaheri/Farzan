@@ -151,6 +151,13 @@
     // Retired canvas-only autosave key; read once for adoption only.
     _legacyAutosaveKey: 'ocd_canvas_board',
     _autosaveDebounceMs: 1500,
+    // Monotonic board epoch. Every committed board change — a loadState
+    // replacement, a programmatic element edit, or an interactive stroke —
+    // bumps it, so an async restore whose read started *before* the change
+    // can prove its snapshot is stale and drop it instead of clobbering the
+    // newer state. This is the dual-restore race: two readers of
+    // ocd_studio_board with no ordering guard meant last writer won.
+    _boardEpoch: 0,
     _pointerId: null,
     _spaceDown: false,
     _panning:   false,
@@ -225,6 +232,9 @@
     },
 
     loadState(payload = {}, options = {}) {
+      // A committed load is the new baseline, so it invalidates any in-flight
+      // restore whose read predates it.
+      this._markBoardChanged();
       const data = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
       const viewport = data.viewport && typeof data.viewport === 'object' ? data.viewport : {};
       const style = data.style && typeof data.style === 'object' ? data.style : {};
@@ -302,6 +312,7 @@
       };
       layer.elements.push(created);
       State.selectedIds = new Set([id]);
+      this._markBoardChanged();
       this._scheduleRender();
       return cloneJSON(created, created);
     },
@@ -550,6 +561,7 @@
           const [removed] = layer.elements.splice(idx, 1);
           State.layers = layers;
           State.selectedIds.delete(elementId);
+          this._markBoardChanged();
           this._scheduleRender();
           return cloneJSON(removed, removed);
         }
@@ -581,6 +593,7 @@
         }
         State.layers = layers;
         State.selectedIds = new Set([elementId]);
+        this._markBoardChanged();
         this._scheduleRender();
         return cloneJSON(element, element);
       }
@@ -1005,13 +1018,42 @@
         bubbles: true,
         detail: { action, board: this.serialize() },
       }));
+      this._markBoardChanged();
       this._scheduleAutosave();
+    },
+
+    // Bumps the board epoch; see _boardEpoch. Every state-mutating entry point
+    // funnels through this or loadState, so an in-flight restore can compare
+    // the epoch it captured before its read against the current one.
+    _markBoardChanged() {
+      this._boardEpoch++;
+    },
+
+    // True when an interactive change is still inside the autosave debounce
+    // window — its serialized board has not been persisted yet, so applying a
+    // synced/remote board now would be clobbered by that pending write.
+    hasPendingAutosave() {
+      return Boolean(this._autosaveTimer);
+    },
+
+    boardEpoch() {
+      return this._boardEpoch;
     },
 
     // ── Autosave (debounced IndexedDB) ────────────────────
     _scheduleAutosave() {
       if (this._autosaveTimer) clearTimeout(this._autosaveTimer);
       this._autosaveTimer = setTimeout(() => this._autosave(), this._autosaveDebounceMs);
+    },
+
+    // Drop a pending autosave without flushing it. A restore supersedes the
+    // outgoing board: flushing would write the pre-restore snapshot back over
+    // the board the restore just wrote.
+    _cancelPendingAutosave() {
+      if (this._autosaveTimer) {
+        clearTimeout(this._autosaveTimer);
+        this._autosaveTimer = null;
+      }
     },
 
     _autosave() {
@@ -1036,7 +1078,17 @@
     },
 
     restoreBoard() {
+      // A restore supersedes whatever unsaved interactive change is still in
+      // the debounce window — flushing it would write the outgoing snapshot
+      // back over the board the caller is about to reload.
+      this._cancelPendingAutosave();
+      // Captured before the read: if the board changes while the read is in
+      // flight (a newer load, a sync refresh, or a local edit), the snapshot
+      // this read returns is stale and must not be applied. Without this,
+      // two concurrent restores of the same key raced on resolve order.
+      const epoch = this._boardEpoch;
       const doRestore = (board) => {
+        if (this._boardEpoch !== epoch) return false;
         if (!board || typeof board !== 'object') return false;
         this.loadState(board, { preserveViewport: true });
         return true;
@@ -1052,20 +1104,27 @@
           ? window.DB.getSetting(legacyKey).catch?.(() => null)
           : Promise.resolve(window.localStorage?.getItem?.(legacyKey) ?? null);
         readLegacy.then((raw) => {
+          if (this._boardEpoch !== epoch) return;
           if (!raw || typeof raw !== 'object') return;
           this._flushAutosave();
         }).catch?.(() => {});
       };
       if (window.DB?.getSetting) {
-        window.DB.getSetting(this._autosaveKey)
-          .then((board) => { doRestore(board); adoptLegacy(Boolean(board)); })
-          .catch?.(() => {});
-      } else {
-        try {
-          const raw = window.localStorage?.getItem(this._autosaveKey);
-          if (raw) doRestore(JSON.parse(raw));
-          adoptLegacy(Boolean(raw));
-        } catch {}
+        return Promise.resolve(window.DB.getSetting(this._autosaveKey))
+          .then((board) => {
+            const restored = doRestore(board);
+            adoptLegacy(Boolean(board));
+            return restored;
+          })
+          .catch?.(() => false) ?? Promise.resolve(false);
+      }
+      try {
+        const raw = window.localStorage?.getItem(this._autosaveKey);
+        const restored = raw ? doRestore(JSON.parse(raw)) : false;
+        adoptLegacy(Boolean(raw));
+        return Promise.resolve(restored);
+      } catch {
+        return Promise.resolve(false);
       }
     },
 

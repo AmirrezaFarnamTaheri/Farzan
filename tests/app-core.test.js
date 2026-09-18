@@ -656,6 +656,150 @@ describe('app shell resilience helpers', () => {
     expect(offSpy).toHaveBeenCalledWith('sync:message', expect.any(Function));
   });
 
+  it('restores the Studio board through the canvas instead of a second read of the key', async () => {
+    await loadApp();
+    const savedBoard = {
+      version: 1,
+      activeLayerIdx: 0,
+      layers: [{
+        id: 'layer-1',
+        name: 'Layer 1',
+        visible: true,
+        locked: false,
+        elements: [{ id: 'shape-1', type: 'rect', x: 1, y: 2, width: 3, height: 4 }],
+      }],
+    };
+    const canvasApi = {
+      init: vi.fn(),
+      destroy: vi.fn(),
+      loadState: vi.fn((board) => board),
+      // The canvas owns the canonical restore (saved viewport + stale-snapshot
+      // guard); the route delegates to it rather than reading the key itself.
+      restoreBoard: vi.fn(async () => true),
+      serialize: vi.fn(() => savedBoard),
+      getState: vi.fn(() => ({ tool: 'pen', selectedIds: ['shape-1'] })),
+      setTool: vi.fn(),
+    };
+    window.OpenCourseDeck.Canvas = canvasApi;
+    window.DB = {
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => true),
+    };
+
+    await window.OpenCourseDeck.Views.studio();
+
+    await vi.waitFor(() => expect(canvasApi.restoreBoard).toHaveBeenCalledTimes(1));
+    // The route must not read the board key itself — that duplicate reader is
+    // what raced the canvas's own restore on mount (last writer won).
+    expect(window.DB.getSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.loadState).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-status]').textContent).toBe('Saved board loaded');
+
+    // The Load button uses the same single path.
+    document.querySelector('[data-studio-load]').click();
+    await vi.waitFor(() => expect(canvasApi.restoreBoard).toHaveBeenCalledTimes(2));
+  });
+
+  it('defers a Studio sync refresh while a canvas autosave is pending', async () => {
+    await loadApp();
+    const remoteBoard = {
+      version: 1,
+      activeLayerIdx: 0,
+      layers: [{
+        id: 'layer-1',
+        name: 'Layer 1',
+        visible: true,
+        locked: false,
+        elements: [{ id: 'shape-remote', type: 'rect', x: 5, y: 6, width: 10, height: 20 }],
+      }],
+    };
+    const canvasApi = {
+      init: vi.fn(),
+      destroy: vi.fn(),
+      loadState: vi.fn((board) => board),
+      restoreBoard: vi.fn(async () => true),
+      serialize: vi.fn(() => remoteBoard),
+      getState: vi.fn(() => ({ tool: 'pen', selectedIds: [] })),
+      setTool: vi.fn(),
+      // An interactive change is still inside the canvas's 1500 ms autosave
+      // debounce, so its serialized board has not been persisted yet.
+      hasPendingAutosave: vi.fn(() => true),
+      boardEpoch: vi.fn(() => 1),
+    };
+    window.OpenCourseDeck.Canvas = canvasApi;
+    window.DB = {
+      getSetting: vi.fn(async (key) => (key === 'ocd_studio_board' ? remoteBoard : null)),
+      saveSetting: vi.fn(async () => true),
+    };
+
+    const controller = await window.OpenCourseDeck.Views.studio();
+    canvasApi.loadState.mockClear();
+
+    const result = await controller.refreshFromSync({
+      kind: 'setting',
+      action: 'save',
+      record: { key: 'ocd_studio_board', value: remoteBoard },
+    });
+
+    expect(result).toEqual({ refreshed: false, reason: 'pending-local-change' });
+    expect(canvasApi.loadState).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-status]').textContent).toContain('deferred');
+
+    controller.unmount();
+  });
+
+  it('drops a Studio sync refresh whose read raced a newer board', async () => {
+    await loadApp();
+    const remoteBoard = {
+      version: 1,
+      activeLayerIdx: 0,
+      layers: [{
+        id: 'layer-1',
+        name: 'Layer 1',
+        visible: true,
+        locked: false,
+        elements: [{ id: 'shape-remote', type: 'rect', x: 5, y: 6, width: 10, height: 20 }],
+      }],
+    };
+    // No pending autosave, but the board epoch advances while the sync read is
+    // in flight (a local edit won the race).
+    let epoch = 1;
+    const canvasApi = {
+      init: vi.fn(),
+      destroy: vi.fn(),
+      loadState: vi.fn((board) => board),
+      restoreBoard: vi.fn(async () => true),
+      serialize: vi.fn(() => remoteBoard),
+      getState: vi.fn(() => ({ tool: 'pen', selectedIds: [] })),
+      setTool: vi.fn(),
+      hasPendingAutosave: vi.fn(() => false),
+      boardEpoch: vi.fn(() => epoch),
+    };
+    window.OpenCourseDeck.Canvas = canvasApi;
+    window.DB = {
+      getSetting: vi.fn(async () => {
+        epoch = 2; // newer board lands while the sync read is outstanding
+        return remoteBoard;
+      }),
+      saveSetting: vi.fn(async () => true),
+    };
+
+    const controller = await window.OpenCourseDeck.Views.studio();
+    canvasApi.loadState.mockClear();
+
+    const result = await controller.refreshFromSync({
+      kind: 'setting',
+      action: 'save',
+      record: { key: 'ocd_studio_board', value: remoteBoard },
+    });
+
+    expect(result).toEqual({ refreshed: false, reason: 'board-changed-during-sync' });
+    expect(canvasApi.loadState).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-status]').textContent).toContain('deferred');
+
+    controller.unmount();
+  });
+
   it('adds Studio note and card elements, autosaves them, and clears the board with confirmation', async () => {
     await loadApp();
     const board = {

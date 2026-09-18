@@ -747,6 +747,12 @@ const ProgressStats = (() => {
         if (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) && DB.saveSetting) {
             try {
               await DB.saveSetting('ocd_studio_board', payload.settings.studio);
+              // The mounted canvas may be holding a stale in-memory board over
+              // the one just written; reload it the way the flashcards cache is
+              // dropped after a restore. restoreBoard() also cancels a pending
+              // autosave, which would otherwise write the outgoing board back
+              // over the restored one.
+              try { await window.OpenCourseDeck?.Canvas?.restoreBoard?.(); } catch {}
               result.settings += 1;
             } catch (err) {
               _recordImportError(result, 'settings', 'ocd_studio_board', err);
