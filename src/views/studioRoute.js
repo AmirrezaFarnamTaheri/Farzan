@@ -424,6 +424,22 @@ printStudioBoardPdf,
   }
   const loadSavedBoard = async (quiet = false) => {
     try {
+      // The canvas owns the canonical restore of ocd_studio_board: it applies
+      // the saved viewport and drops a snapshot whose read raced with a newer
+      // change. Reading the key here as well would duplicate the fetch and
+      // reintroduce the dual-restore race on mount (two readers of the same
+      // key, last writer wins).
+      const canvasApi = window.OpenCourseDeck?.Canvas;
+      if (canvasApi?.restoreBoard) {
+        const restored = await canvasApi.restoreBoard();
+        if (restored) {
+          setStatus('Saved board loaded');
+          renderInspector();
+        } else if (!quiet) {
+          setStatus('No saved board yet');
+        }
+        return;
+      }
       const board = await window.DB?.getSetting?.(boardKey);
       if (board && typeof board === 'object') {
         window.OpenCourseDeck?.Canvas?.loadState?.(board);
@@ -469,7 +485,13 @@ printStudioBoardPdf,
     if (payload?.kind !== 'setting' || payload?.record?.key !== boardKey) {
       return { refreshed: false, reason: 'ignored-kind' };
     }
-    if (interactiveSaveTimer) {
+    // Defer while local changes are unsaved — the route's save debounce or the
+    // canvas's own autosave debounce. Applying the remote board inside the
+    // canvas window would be clobbered by that pending write, so wait for the
+    // next sync message.
+    const epochRef = window.OpenCourseDeck?.Canvas?.boardEpoch;
+    const epochBefore = epochRef ? epochRef() : null;
+    if (interactiveSaveTimer || window.OpenCourseDeck?.Canvas?.hasPendingAutosave?.()) {
       setStatus('Studio sync deferred while local changes save');
       return { refreshed: false, reason: 'pending-local-change' };
     }
@@ -477,6 +499,13 @@ printStudioBoardPdf,
       const board = await window.DB?.getSetting?.(boardKey);
       if (!board || typeof board !== 'object' || Array.isArray(board)) {
         return { refreshed: false, reason: 'missing-board' };
+      }
+      if (epochRef && epochRef() !== epochBefore) {
+        // A newer board is already live in the canvas — a local edit or
+        // another load won while this read was in flight. Applying this
+        // snapshot now would clobber it.
+        setStatus('Studio sync deferred while board changed');
+        return { refreshed: false, reason: 'board-changed-during-sync' };
       }
       const loaded = window.OpenCourseDeck?.Canvas?.loadState?.(board, {
         preserveSelection: true,

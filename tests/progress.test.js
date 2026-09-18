@@ -455,6 +455,40 @@ describe('progress backup exports', () => {
     ]);
   });
 
+  it('reloads the live canvas after restoring a Studio board from a backup', async () => {
+    // The mounted canvas holds the board in memory; without a reload it would
+    // keep serving the pre-import board and its next autosave would write that
+    // stale board back over the restored one.
+    window.OpenCourseDeck.Canvas = { restoreBoard: vi.fn(async () => true) };
+    const payload = {
+      version: '1.4',
+      progress: [],
+      notes: [],
+      folders: [],
+      settings: { studio: { version: 1, layers: [{ id: 'imported-layer', elements: [] }] } },
+      annotations: [],
+      timestamps: [],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'studio-backup.json', { type: 'application/json' });
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const el = originalCreateElement(tagName, options);
+      if (tagName === 'input') {
+        Object.defineProperty(el, 'files', { configurable: true, value: [file] });
+        el.click = vi.fn(() => el.onchange?.());
+      }
+      return el;
+    });
+
+    await window.ProgressStats.importJSON();
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult).toBeTruthy());
+
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', payload.settings.studio);
+    expect(window.OpenCourseDeck.Canvas.restoreBoard).toHaveBeenCalledTimes(1);
+    delete window.OpenCourseDeck.Canvas;
+  });
+
   it('rolls back backup import writes when any store write fails', async () => {
     const payload = {
       version: '1.3',

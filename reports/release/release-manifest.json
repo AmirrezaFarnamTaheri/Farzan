@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "product": "OpenCourseDeck",
   "version": "1.1.2",
-  "commit": "e4074c1fcde63e4ad1fd6a2f633f6a532469f70d",
+  "commit": "140c23dbd556f2c5ae5fb16b9068af904e30e240",
   "artifactRoot": "dist",
-  "generatedAt": "2026-09-18T13:48:19.086Z",
+  "generatedAt": "2026-09-18T16:10:30.382Z",
   "artifactCount": 177,
   "artifacts": [
     {
@@ -266,10 +266,10 @@
       "sha256": "571cc2ea82f263c93855642c898b0a12f4ffb6be3c82163a4c0a57b0f2c5bd31"
     },
     {
-      "path": "chunks/app-7UHDW36D.js",
+      "path": "chunks/app-MC3ROWG5.js",
       "size": 145473,
       "mode": 438,
-      "sha256": "e81c49fe712d865a8f8418b91297dea8d3aee338b531d73ae72c9594db94740d"
+      "sha256": "aafc65daa0a073f245ab5f45b935fcce7b8fb6016fd920a7bdc13d66c786360f"
     },
     {
       "path": "chunks/bookmarksRoute-XJJJON5E.js",
@@ -278,10 +278,10 @@
       "sha256": "a8c7b77fe8c2b31f344d198496900616cd5e2f84244edc208ea0384199067a6a"
     },
     {
-      "path": "chunks/canvas-ZHSBD5BN.js",
-      "size": 50668,
+      "path": "chunks/canvas-6JPERUDN.js",
+      "size": 51249,
       "mode": 438,
-      "sha256": "b4a2fdff291bf32c259ebfeaf29e69aac5c8e6aec6636c76ae7b13f6bbc529d2"
+      "sha256": "00a0541e1d7d33a0a490e05c2cc37ee1f0fc890b590c32431d6cc718d590e59f"
     },
     {
       "path": "chunks/chunk-5DRZOBYG.js",
@@ -416,10 +416,10 @@
       "sha256": "e8d574ab73dfd0a210fb0dbe54a27d54f4226f7e07a028a65585a6d4a5a8c439"
     },
     {
-      "path": "chunks/progress-ZDG7WXJF.js",
-      "size": 38163,
+      "path": "chunks/progress-RWVEPE2Y.js",
+      "size": 38228,
       "mode": 438,
-      "sha256": "ef176981499f46785c25ea0294759cedc597b8cdd0d4a3472efefe4f1f0aa03b"
+      "sha256": "3fe8ffbb6ab07ba8907e67303d62779a16bb96aeb5253650064cb6c39f0a734a"
     },
     {
       "path": "chunks/progressRoute-MT7XTLML.js",
@@ -434,10 +434,10 @@
       "sha256": "225b880f13458d77d29f69fcc70444e82907a5446c8bfa2c7914c0311b2cdff1"
     },
     {
-      "path": "chunks/studioRoute-AN6EBXMM.js",
-      "size": 34593,
+      "path": "chunks/studioRoute-F2HL7NNQ.js",
+      "size": 34969,
       "mode": 438,
-      "sha256": "bcdfe5336b56369e2167874b06afbbe8bc7761247d2166a8b484eb5c31e1a378"
+      "sha256": "caf24a57a5fb923a19d52661e8978894e3641eeefeae9533d94f0c1831d731aa"
     },
     {
       "path": "chunks/tagsRoute-OUEUM333.js",
@@ -563,7 +563,7 @@
       "path": "opencoursedeck.js",
       "size": 222627,
       "mode": 438,
-      "sha256": "c5b14ce35d952448c7148996204d5217ef0d5a765368568f3f9df8416e0e8c21"
+      "sha256": "b8cb07934029facb609912d1461f5528f64060962b2fafc81e43050c11487a51"
     },
     {
       "path": "pdf-runtime.js",
@@ -599,7 +599,7 @@
       "path": "sw.js",
       "size": 18131,
       "mode": 438,
-      "sha256": "395743eaa296aa65b16e52a235dcb899bc697da620174622746b1f8cf9c2e4d7"
+      "sha256": "c80bc0df80f60d378f87975ce657f6bf62293054d2794828e298c2c18b1b605f"
     },
     {
       "path": "vendor/chart.umd.js",
