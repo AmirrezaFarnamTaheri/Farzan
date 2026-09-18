@@ -51,6 +51,42 @@ function safeJoin(base, requestedPath) {
   return pResolved;
 }
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+function hostnameOf(hostHeader) {
+  if (typeof hostHeader !== 'string' || !hostHeader) return '';
+  const value = hostHeader.trim().toLowerCase();
+  if (value.startsWith('[')) return value.slice(0, value.indexOf(']') + 1);
+  return value.split(':')[0];
+}
+
+// DNS-rebinding guard: a loopback-bound server only answers requests that
+// were addressed to a loopback name, so a remote page that re-points its own
+// hostname at 127.0.0.1 cannot read local files through the browser.
+function isAllowedHost(hostHeader, allowAnyHost) {
+  if (allowAnyHost) return true;
+  const name = hostnameOf(hostHeader);
+  return LOOPBACK_HOSTNAMES.has(name) || name.endsWith('.localhost');
+}
+
+// Dot-segments (.git, .env, .cargo, ...) are repository/tooling state, never
+// app assets. `.well-known` stays reachable for standard metadata.
+function isHiddenPath(relPath) {
+  return relPath.split(/[\\/]/).some((segment) => segment.startsWith('.') && segment !== '.well-known');
+}
+
+// Browsers attach Origin to cross-site POSTs; only same-origin pages may
+// append to debug.log. Non-browser clients (no Origin) are still accepted.
+function isSameOriginPost(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === String(req.headers.host || '').toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 function isDebugEnabled(reqUrl) {
   try {
     const qs = reqUrl.searchParams;
@@ -164,9 +200,19 @@ function createServer(options = {}) {
     ? path.resolve(serverRoot, options.debugLogPath)
     : path.join(serverRoot, 'debug.log');
 
+  const allowAnyHost = Boolean(options.allowAnyHost);
+
   return http.createServer((req, res) => {
-    const u = new URL(req.url, `http://${req.headers.host}`);
     const started = Date.now();
+    // Parse against a fixed base: the Host header is client-controlled and a
+    // malformed value (e.g. "a b") would otherwise throw and kill the server.
+    let u;
+    try {
+      u = new URL(req.url, 'http://localhost');
+    } catch {
+      console.log(`[opencoursedeck] ${req.method} <malformed url> -> 400`);
+      return send(res, 400, { 'Content-Type': 'text/plain' }, 'Bad Request');
+    }
     const finish = (status) => {
       try {
         const ms = Date.now() - started;
@@ -176,12 +222,18 @@ function createServer(options = {}) {
       }
     };
 
+    if (!isAllowedHost(req.headers.host, allowAnyHost)) {
+      finish(421);
+      return send(res, 421, { 'Content-Type': 'text/plain' },
+        'Misdirected Request: open OpenCourseDeck via localhost or 127.0.0.1, or start the server with HOST set to the address you are using.');
+    }
+
     if (u.pathname === '/__debug') {
       if (req.method !== 'POST') {
         finish(405);
         return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
       }
-      if (!isDebugEnabled(u)) {
+      if (!isDebugEnabled(u) || !isSameOriginPost(req)) {
         finish(204);
         return send(res, 204, { 'Content-Type': 'text/plain' }, '');
       }
@@ -220,7 +272,7 @@ function createServer(options = {}) {
       return send(res, 400, { 'Content-Type': 'text/plain' },
         'Bad Request: the URL path contains malformed percent-encoding. Remove stray "%" characters or encode them as "%25".');
     }
-    const filePath = safeJoin(serverRoot, rel);
+    const filePath = isHiddenPath(rel) ? null : safeJoin(serverRoot, rel);
     if (!filePath) {
       finish(403);
       return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
@@ -252,7 +304,8 @@ function createServer(options = {}) {
 function startServer(options = {}) {
   const port = Number(options.port || process.env.PORT || 5173);
   const host = options.host || process.env.HOST || '127.0.0.1';
-  const server = createServer(options);
+  const loopback = LOOPBACK_HOSTNAMES.has(host) || host === 'localhost';
+  const server = createServer({ allowAnyHost: !loopback, ...options });
   server.listen(port, host, () => {
     console.log(`[opencoursedeck] dev server http://${host}:${port}/`);
   });
@@ -269,4 +322,6 @@ module.exports = {
   safeJoin,
   cacheControlForPath,
   extractCsp,
+  isAllowedHost,
+  isHiddenPath,
 };
