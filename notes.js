@@ -1616,7 +1616,8 @@
           <h1>${safeTitle}</h1>${safeContent}</body></html>`;
         this._download(`${safeFilename(note.title)}.html`, html, 'text/html');
       } else if (format === 'txt') {
-        this._download(`${safeFilename(note.title)}.txt`, `${note.title}\n\n${inertTextContent(note.content)}`, 'text/plain');
+        const safeContent = Editor._sanitize(note.content);
+        this._download(`${safeFilename(note.title)}.txt`, `${note.title}\n\n${inertTextContent(safeContent)}`, 'text/plain');
       }
     },
 
@@ -1708,7 +1709,8 @@
     },
 
     _htmlToMd(html) {
-      return inertTextContent(html);
+      const sanitized = Editor._sanitize(html);
+      return inertTextContent(sanitized);
     },
 
     _download(filename, content, mime) {

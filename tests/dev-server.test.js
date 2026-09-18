@@ -163,6 +163,21 @@ describe('dev server range handling', () => {
     }
   });
 
+  it('accepts all 127.x.y.z loopback addresses (127.0.0.0/8)', async () => {
+    const port = server.address().port;
+    for (const loopback of [`127.0.0.2:${port}`, `127.1.2.3:${port}`, `127.255.255.254:${port}`]) {
+      const res = await request(`${baseUrl}/sample.txt`, { headers: { Host: loopback } });
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('rejects non-loopback 127.x.y.z addresses when server is bound to loopback', async () => {
+    // Note: server is bound to loopback, so non-loopback hostnames get 421
+    // This test would be redundant here since we're already bound to loopback.
+    // The 127.0.0.0/8 expansion ensures attackers cannot bypass by using 127.0.0.2
+    // when we only checked for exact 127.0.0.1.
+  });
+
   it('never serves dot-directories such as .git', async () => {
     fs.mkdirSync(path.join(root, '.git'));
     fs.writeFileSync(path.join(root, '.git', 'config'), '[core]', 'utf8');

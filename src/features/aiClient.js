@@ -35,6 +35,11 @@ const DEFAULT_SETTINGS = {
   localModelFile: null,
 };
 
+/**
+ * Normalize and validate AI settings, providing sensible defaults.
+ * @param {Object} [settings] - User-provided settings
+ * @returns {Object} - Normalized settings object
+ */
 function normalizeSettings(settings = {}) {
   const mode = ['hidden', 'disabled', 'local-gemma', 'custom-api'].includes(settings.mode)
     ? settings.mode
@@ -66,6 +71,12 @@ function normalizeSettings(settings = {}) {
   };
 }
 
+/**
+ * Extract plain text from HTML using inert DOMParser (no resource loads or handlers).
+ * Falls back to regex-based tag stripping if DOMParser fails.
+ * @param {string} value - HTML or text content
+ * @returns {string} - Plain text, whitespace normalized
+ */
 function plainText(value = '') {
   // DOMParser instead of innerHTML on a detached element: innerHTML still
   // triggers resource loads and inline handlers (<img onerror>), so
@@ -84,6 +95,13 @@ function plainText(value = '') {
 // combining marks (e.g. Arabic-script diacritics) and ZWNJ stay in a word.
 const NON_WORD_RE = /[^\p{L}\p{M}\p{N}\u200c\s-]/gu;
 
+/**
+ * Split text into Unicode-aware tokens (words).
+ * Supports any script: Latin, Arabic, CJK, Cyrillic, etc.
+ * @param {string} text - HTML or plain text to tokenize
+ * @param {number} [minLength=1] - Minimum character length of returned words
+ * @returns {Array<string>} - Array of lowercase tokens
+ */
 function tokenize(text, minLength = 1) {
   return plainText(text)
     .toLowerCase()
@@ -92,18 +110,41 @@ function tokenize(text, minLength = 1) {
     .filter(word => [...word].length >= minLength);
 }
 
+/**
+ * Split text into sentences using multilingual terminators.
+ * Handles ASCII (.!?), Arabic (\u061f \u06d4), and CJK (\u3002\uff01\uff1f) without requiring whitespace.
+ * @param {string} text - HTML or plain text
+ * @returns {Array<string>} - Array of sentences with minimum length 12
+ */
 function splitSentences(text) {
   return plainText(text)
-    .split(/(?<=[.!?\u061f\u06d4\u3002\uff01\uff1f])\s+/)
+    // Split on: (ASCII .!? or Arabic or CJK terminators) + optional whitespace,
+    // or just whitespace. This ensures "text\u3002more" splits into ["text\u3002", "more"].
+    .split(/(?<=[.!?\u061f\u06d4])\s+|(?<=[\u3002\uff01\uff1f])/)
     .map(item => item.trim())
     .filter(item => item.length > 12);
 }
 
+/**
+ * Score a sentence based on word frequencies.
+ * Higher score means more relevant to the text.
+ * @param {string} sentence - The sentence to score
+ * @param {Map<string, number>} frequencies - Word frequency map
+ * @returns {number} - Sum of all word frequencies in the sentence
+ */
 function scoreSentence(sentence, frequencies) {
   return tokenize(sentence, 4)
     .reduce((score, word) => score + (frequencies.get(word) || 0), 0);
 }
 
+/**
+ * Generate a local extractive summary of text.
+ * Scores sentences by word frequency and returns top-ranked sentences.
+ * @param {string} text - HTML or plain text to summarize
+ * @param {Object} [options] - Summary options
+ * @param {number} [options.bullets=3] - Number of sentences to return
+ * @returns {string} - Summary with bullet points (Markdown format)
+ */
 function localSummary(text, { bullets = 3 } = {}) {
   const sentences = splitSentences(text);
   if (!sentences.length) return '';
