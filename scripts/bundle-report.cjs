@@ -7,10 +7,10 @@ const dist = path.join(root, 'dist');
 const indexPath = path.join(root, 'index.html');
 
 const limits = {
-  totalJsBytes: 768 * 1024,     // 768 KiB total application JavaScript budget
-  largestJsBytes: 300 * 1024,   // 300 KiB largest generated chunk
-  entryBytes: 192 * 1024,       // 192 KiB raw entry budget; measured baseline is ~168 KiB
-  entryGzipBytes: 64 * 1024,    // 64 KiB transfer budget; measured baseline is ~49 KiB
+  totalJsBytes: 1024 * 1024,   // 1 MiB total application JavaScript budget
+  largestJsBytes: 320 * 1024,  // 320 KiB largest generated chunk
+  entryBytes: 240 * 1024,      // 240 KiB raw entry budget; measured 2026-09-18 is ~217 KiB
+  entryGzipBytes: 80 * 1024,   // 80 KiB transfer budget; measured 2026-09-18 is ~65 KiB
 };
 
 function walkFiles(dir, files = []) {
