@@ -201,6 +201,26 @@ describe('Flashcards Studio UI (keyboard-driven review)', () => {
     expect(container.querySelector('#fc-card-back').hidden).toBe(true);
   });
 
+  it('lets Enter activate a focused button instead of flipping the card', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    await manager.addCard({ front: 'F', back: 'B', deck: 'General' });
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+
+    const addBtn = container.querySelector('#fc-add-btn');
+    expect(addBtn).toBeTruthy();
+    // A due card is showing, so the flip handler is live and would normally
+    // intercept Enter. A focused button must activate natively instead.
+    addBtn.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    addBtn.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(container.querySelector('#fc-card-back').hidden).toBe(true);
+    // The button's own handler still toggles the create-card form.
+    expect(container.querySelector('#fc-new-form').classList.contains('hidden')).toBe(false);
+  });
+
 });
 
 
@@ -274,5 +294,39 @@ describe('Flashcards vault persistence', () => {
     );
     expect(JSON.parse(localStorage.getItem('ocd_flashcards'))[0].front).toBe('Vault Q');
     expect((await getCards())[0].back).toBe('Vault A');
+  });
+
+  it('serves a deck restored by a backup import once the live cache is invalidated', async () => {
+    const { addCard, getCards, invalidateCache, reviewCard } = window.OpenCourseDeck.Flashcards;
+
+    // A deck is already loaded and its manager hydrated when the import runs.
+    await addCard({ front: 'Stale', back: 'Stale answer', deck: 'Old' });
+
+    // A backup import writes the restored deck straight to persistence, the way
+    // progress.js does during a vault import.
+    const today = new Date().toISOString().split('T')[0];
+    const restored = [{
+      id: 'fc_restored_1', front: 'Restored', back: 'Restored answer', deck: 'New',
+      repetitions: 0, interval: 0, easeFactor: 2.5, nextReviewDate: today,
+      createdAt: new Date().toISOString(),
+    }];
+    await window.DB.saveSetting('ocd_flashcards', restored);
+    localStorage.setItem('ocd_flashcards', JSON.stringify(restored));
+
+    // Pre-fix hazard: the hydrated cache still serves the pre-import deck, and
+    // the next write would persist it over the restored one.
+    expect((await getCards()).map((c) => c.front)).toEqual(['Stale']);
+
+    // Invalidation is non-destructive: persistence is left intact.
+    invalidateCache();
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards')).map((c) => c.front)).toEqual(['Restored']);
+
+    // The restored deck is now served...
+    expect((await getCards()).map((c) => c.front)).toEqual(['Restored']);
+
+    // ...and survives the next review instead of being overwritten by the stale one.
+    const reviewed = await reviewCard('fc_restored_1', 5);
+    expect(reviewed.repetitions).toBe(1);
+    expect(window.DB.store.ocd_flashcards.map((c) => c.front)).toEqual(['Restored']);
   });
 });

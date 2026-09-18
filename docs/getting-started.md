@@ -4,7 +4,7 @@ This guide gets a new user from first launch to a useful study session.
 
 ### Start The App
 
-From the `far/` folder:
+From the repository root:
 
 ```bash
 npm install

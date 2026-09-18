@@ -43,8 +43,8 @@
   .card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
     background: var(--glass-bg) !important;
     border: 1px solid var(--glass-border) !important;
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: transform var(--duration-base) var(--ease-studio), box-shadow var(--duration-base) var(--ease-studio), border-color var(--duration-base) var(--ease-studio);
   }
 
   .card.card-interactive:hover,
@@ -58,7 +58,7 @@
   .flashcard-card:hover,
   .home-pulse-item:hover,
   .settings-control-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow) !important;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) !important;
     border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border)) !important;
   }

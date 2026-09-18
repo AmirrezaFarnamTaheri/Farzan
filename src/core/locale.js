@@ -19,13 +19,30 @@ const locales = {};
 let currentLang = '';
 
 /**
+ * Normalize language tag or alias to canonical form.
+ * @param {string} lang
+ * @returns {string}
+ */
+export function normalizeLang(lang) {
+  if (!lang) return 'en-US';
+  const l = String(lang).trim();
+  if (l === 'fa' || l === 'fa_IR' || l.toLowerCase().startsWith('fa-')) return 'fa-IR';
+  if (l === 'en' || l === 'en_US' || l.toLowerCase().startsWith('en-')) return 'en-US';
+  return l;
+}
+
+/**
  * Register a locale with its messages.
  * @param {string} lang — language code (e.g. 'en-US', 'fa-IR')
  * @param {Object<string, string>} messages — flat key→value map
  */
 export function locale(lang, messages) {
   if (!lang || !messages) return;
-  locales[lang] = messages;
+  const canonical = normalizeLang(lang);
+  locales[canonical] = messages;
+  if (canonical !== lang) {
+    locales[lang] = messages;
+  }
 }
 
 /**
@@ -52,33 +69,66 @@ export function tf(key, params) {
 }
 
 /**
+ * Format a number using Intl.NumberFormat according to current or target locale.
+ * @param {number} value
+ * @param {string} [lang]
+ * @returns {string}
+ */
+export function formatNumber(value, lang) {
+  const effectiveLang = lang ? normalizeLang(lang) : getCurrentLang();
+  try {
+    return new Intl.NumberFormat(effectiveLang).format(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
  * Get the current language code.
  * @returns {string}
  */
 export function getCurrentLang() {
   if (currentLang) return currentLang;
+  try {
+    const saved = localStorage.getItem('ocd_lang');
+    if (saved) {
+      currentLang = normalizeLang(saved);
+      return currentLang;
+    }
+  } catch { /* storage blocked */ }
   if (typeof document !== 'undefined') {
-    return document.documentElement.lang || 'en-US';
+    const docLang = document.documentElement.lang;
+    if (docLang) {
+      return normalizeLang(docLang);
+    }
   }
   return 'en-US';
 }
 
 /**
  * Set the current language. Updates <html lang="..."> and <html dir="...">.
+ * Persists both ocd_lang and ocd_dir in localStorage and emits change events.
  * @param {string} lang
  */
 export function setCurrentLang(lang) {
-  currentLang = lang;
+  const canonical = normalizeLang(lang);
+  currentLang = canonical;
   if (typeof document !== 'undefined') {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = canonical;
     // RTL languages
     const rtlLangs = new Set(['fa-IR', 'fa', 'ar', 'ar-SA', 'ar-EG', 'he', 'ur']);
-    const dir = rtlLangs.has(lang) ? 'rtl' : 'ltr';
+    const dir = rtlLangs.has(canonical) ? 'rtl' : 'ltr';
     document.documentElement.dir = dir;
-    // Persist so boot (src/index.js reads 'ocd_dir') restores the same
-    // direction on reload; otherwise switching to an RTL locale lasts only
-    // until the next refresh.
-    try { localStorage.setItem('ocd_dir', dir); } catch { /* storage blocked */ }
+    // Persist language and direction so boot restores both on reload
+    try {
+      localStorage.setItem('ocd_lang', canonical);
+      localStorage.setItem('ocd_dir', dir);
+    } catch { /* storage blocked */ }
+
+    try {
+      window.dispatchEvent(new CustomEvent('localechange', { detail: { lang: canonical, dir } }));
+      window.OpenCourseDeck?.bus?.emit?.('locale:change', { lang: canonical, dir });
+    } catch { /* ignore */ }
   }
 }
 

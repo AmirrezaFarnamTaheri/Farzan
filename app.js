@@ -35,10 +35,7 @@ import { CanvasZoom } from './src/features/canvasZoom.js';
 import './src/features/canvasTools/index.js';
 import { CourseGraph } from './src/features/courseGraph.js';
 import { KnowledgeGraph } from './src/features/knowledgeGraph.js';
-import { SpatialKnowledgeGraph } from './src/features/spatialKnowledgeGraph.js';
 import { AudioEnhancer } from './src/features/audioEnhancer.js';
-import { ProceduralTrophy } from './src/features/proceduralTrophy.js';
-import { KnowledgeTrail } from './src/features/knowledgeTrail.js';
 import * as ContextMenu from './src/ui/contextMenu.js';
 import * as CanvasExport from './src/lib/canvasExport.js';
 import { Clipboard as ClipboardBridge } from './src/lib/clipboard.js';
@@ -108,9 +105,6 @@ import { Pointer } from './src/lib/pointer.js';
     uid,
   };
   OpenCourseDeck.AudioEnhancer = AudioEnhancer;
-  OpenCourseDeck.SpatialKnowledgeGraph = SpatialKnowledgeGraph;
-  OpenCourseDeck.ProceduralTrophy = ProceduralTrophy;
-  OpenCourseDeck.KnowledgeTrail = KnowledgeTrail;
 
   // Expose globally (without clobbering)
   window.OpenCourseDeck = OpenCourseDeck;
@@ -1247,7 +1241,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
   };
 
@@ -1823,8 +1817,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return String(str).replace(/[&<>"']/g, m =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
 
     _appendAction(parent, action) {
@@ -2298,8 +2291,7 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _escHtml(str) {
-      return str.replace(/[&<>"']/g, m =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return escapeHtmlText(str);
     },
   };
 
@@ -2864,6 +2856,7 @@ import { Pointer } from './src/lib/pointer.js';
 
   const Clipboard = {
     init() {
+      if (window.OpenCourseDeck) window.OpenCourseDeck._hasAppClipboard = true;
       document.addEventListener('click', async e => {
         const target = eventTargetEl(e);
         if (!target) return;

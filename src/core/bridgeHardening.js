@@ -79,7 +79,13 @@ function moveFallbackDocument(storage, docId, records, legacyBefore) {
     }
   }
 
-  if (!records.length) delete nextDocuments[docId];
+  // The authoritative save defines the document's complete record set, so the
+  // fallback must mirror it exactly. Leaving a stale fallback entry in place
+  // would resurrect a removed annotation on the next read: mergeAnnotations
+  // only dedupes by identity, so any record absent from the primary set comes
+  // back from localStorage.
+  if (records.length) nextDocuments[docId] = records;
+  else delete nextDocuments[docId];
   if (Object.keys(nextDocuments).length) writeJson(storage, DOCUMENT_ANNOTATION_KEY, nextDocuments);
   else storage?.removeItem?.(DOCUMENT_ANNOTATION_KEY);
 }

@@ -166,6 +166,46 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.Modal._previousFocus).toBeInstanceOf(WeakMap);
   });
 
+  it('keeps scrolling locked until the last modal closes', async () => {
+    await loadApp(`
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <div id="first-modal" class="modal" hidden><button>First action</button></div>
+      <div id="second-modal" class="modal" hidden><button>Second action</button></div>
+    `);
+    const modal = window.OpenCourseDeck.Modal;
+    modal.open('first-modal');
+    modal.open('second-modal');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    modal.close('second-modal');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(window.OpenCourseDeck.state.openModals).toHaveLength(1);
+
+    modal.close('first-modal');
+    expect(window.OpenCourseDeck.state.openModals).toHaveLength(0);
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('restores scrolling when the last modal closes via backdrop or Escape', async () => {
+    await loadApp(`
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <div id="backdrop-modal" class="modal" hidden><button>Backdrop action</button></div>
+      <div id="escape-modal" class="modal" hidden><button>Escape action</button></div>
+    `);
+    const modal = window.OpenCourseDeck.Modal;
+
+    modal.open('backdrop-modal');
+    document.querySelector('.modal-backdrop').click();
+    expect(window.OpenCourseDeck.state.openModals).toHaveLength(0);
+    expect(document.body.style.overflow).toBe('');
+
+    modal.open('escape-modal');
+    expect(document.body.style.overflow).toBe('hidden');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(window.OpenCourseDeck.state.openModals).toHaveLength(0);
+    expect(document.body.style.overflow).toBe('');
+  });
+
   it('resolves styled async confirmations from confirm and cancel actions', async () => {
     await loadApp();
 

@@ -21,10 +21,8 @@ function emptyLibrary() {
 
 function cloneValue(value) {
   if (value == null) return value;
-  if (typeof structuredClone === 'function') {
-    try { return structuredClone(value); } catch { /* fall through */ }
-  }
-  return JSON.parse(JSON.stringify(value));
+  try { return structuredClone(value); }
+  catch { return JSON.parse(JSON.stringify(value)); }
 }
 
 function cloneLibrary(value) {
@@ -58,7 +56,9 @@ export function isSafeRemoteUrl(value) {
 }
 
 function makeId(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  return typeof crypto?.randomUUID === 'function'
+    ? `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+    : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function openFileDb() {
@@ -135,12 +135,16 @@ function closeFileDb() {
 }
 
 export async function loadLibrary() {
+  let saved;
   try {
-    const saved = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
-    return cloneLibrary(saved);
-  } catch {
-    return emptyLibrary();
+    saved = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
+  } catch (error) {
+    // A read failure must not masquerade as an empty library: every mutator
+    // loads and then persists, so an empty snapshot here would overwrite the
+    // user's real data. Verified absence (below) is the only safe empty.
+    throw new Error('Unable to read the user library from storage', { cause: error });
   }
+  return cloneLibrary(saved);
 }
 
 async function persistLibrary(library, extra = {}) {
@@ -162,7 +166,12 @@ export function overlayLibrary(library) {
 }
 
 async function overlayFromStorage() {
-  overlayLibrary(await loadLibrary());
+  try {
+    overlayLibrary(await loadLibrary());
+  } catch {
+    // Best-effort refresh: a transient read failure leaves any previously
+    // overlaid library in place and retries on a later storage event.
+  }
 }
 
 function normalizeCourseTitle(value) {

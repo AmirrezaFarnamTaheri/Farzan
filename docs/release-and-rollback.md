@@ -3,7 +3,7 @@
 ## Preconditions
 
 A release is eligible only when the immutable tag resolves to a commit reachable
-from `main`, `far/package.json` matches the semantic-version tag, the reusable
+from `main`, `package.json` matches the semantic-version tag, the reusable
 verification workflow succeeds, the production browser gate succeeds, release
 contents are reverified, and the release archive, checksums, manifest, custom
 integrity record, CycloneDX SBOM, and GitHub attestations are generated for the
@@ -16,7 +16,7 @@ as the locally verified asset before treating publication as complete.
 ## Standard release
 
 1. Merge reviewed work to `main` and confirm required checks.
-2. Update `far/package.json` and lockfile together.
+2. Update `package.json` and lockfile together.
 3. Dispatch the Release workflow from `main` with a blank tag, or push an
    existing correctly versioned immutable tag.
 4. Review the release identity summary before publication.

@@ -1,5 +1,8 @@
 # OpenCourseDeck Plugin System Plan
 
+> **Status (2026-09-18): partially implemented — Phase 1 only, and not wired into the runtime.**
+> `src/features/pluginHost.js` exists as a manifest parser/validator and `src/features/chartPlugins/` holds the chart extension points, but `pluginHost` has no importers, so nothing loads it at boot. The registry, worker sandbox, Settings → Extensions panel, and plugin lifecycle are **not built**; Phases 2–5 below remain unstarted. `PRODUCT.md` and `ROADMAP.md` already describe the plugin host as planned rather than shipped. Read this document as a design proposal, not a description of current behavior.
+
 ## Goal
 
 OpenCourseDeck should support user-installed extensions without weakening the local-first privacy model, CSP posture, route lifecycle discipline, or backup/export guarantees already established in the unified audit. The plugin system must begin as a conservative capability platform, not as arbitrary code execution inside the main app.

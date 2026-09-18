@@ -119,9 +119,12 @@ export class Clipboard {
   }
 
   _cloneData(data) {
+    if (data == null) return data;
     try { return structuredClone(data); }
-    catch { try { return JSON.parse(JSON.stringify(data)); }
-    catch { return data; } }
+    catch {
+      try { return JSON.parse(JSON.stringify(data)); }
+      catch { return data; }
+    }
   }
 
   /**

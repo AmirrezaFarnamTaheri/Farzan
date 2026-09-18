@@ -102,19 +102,38 @@ function openDB() {
   return _openingDB;
 }
 
-async function dbGet(mediaId) {
+// A cached connection can be closed out from under us: a storage reset closes
+// auxiliary databases through AuxiliaryDbLifecycle, and the browser may close
+// one directly. Operations on a closed handle throw InvalidStateError.
+function isClosedConnection(error) {
+  return error?.name === 'InvalidStateError' || error?.name === 'UnknownError';
+}
+
+// Run a storage operation, reopening the connection once if the cached handle
+// turned out to be closed. Without this, everything after a reset silently
+// fails until the page is reloaded.
+async function withDb(operation) {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
+    return await operation(db);
+  } catch (error) {
+    if (!isClosedConnection(error) || _cachedDB !== db) throw error;
+    _cachedDB = null;
+    return operation(await openDB());
+  }
+}
+
+async function dbGet(mediaId) {
+  return withDb((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).get(mediaId);
     req.onsuccess = () => resolve(req.result ?? null);
     req.onerror = () => reject(req.error || new Error('Media storage read failed'));
-  });
+  }));
 }
 
 async function dbPut(record) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return withDb((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).put(record);
     let requestError = null;
@@ -122,7 +141,7 @@ async function dbPut(record) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || requestError || new Error('Media storage transaction failed'));
     tx.onabort = () => reject(tx.error || requestError || new Error('Media storage transaction aborted'));
-  });
+  }));
 }
 
 if (typeof window !== 'undefined') window.OpenCourseDeck = window.OpenCourseDeck ?? {};

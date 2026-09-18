@@ -73,7 +73,7 @@ jobs:
           REQUESTED_TAG: ${{ inputs.tag }}
           TRIGGER_TAG: ${{ github.ref_name }}
         run: |
-          main_package_version="$(node -p "require("./package.json").version")"
+          main_package_version="$(node -p 'require("./package.json").version')"
           main_expected_tag="v${main_package_version}"
 
           if [[ "$EVENT_NAME" == "push" ]]; then

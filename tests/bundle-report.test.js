@@ -16,11 +16,12 @@ describe('bundle and CSP reporting', () => {
     const { evaluateReport } = await import('../scripts/bundle-report.cjs');
 
     const failures = evaluateReport({
+      files: [{ path: 'dist/opencoursedeck.js' }],
       totals: {
-        totalJsBytes: 999999,
-        largestJsBytes: 999999,
-        entryBytes: 999999,
-        entryGzipBytes: 999999,
+        totalJsBytes: 2 * 1024 * 1024,
+        largestJsBytes: 2 * 1024 * 1024,
+        entryBytes: 2 * 1024 * 1024,
+        entryGzipBytes: 2 * 1024 * 1024,
       },
       csp: {
         'script-src': ["'self'", "'unsafe-inline'"],

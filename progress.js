@@ -758,6 +758,9 @@ const ProgressStats = (() => {
             try {
               await DB.saveSetting('ocd_flashcards', payload.settings.flashcards);
               try { window.localStorage?.setItem?.('ocd_flashcards', JSON.stringify(payload.settings.flashcards)); } catch {}
+              // The deck manager caches an already-hydrated deck in memory;
+              // drop that cache so the restored deck is served next time.
+              try { window.OpenCourseDeck?.Flashcards?.invalidateCache?.(); } catch {}
               result.settings += 1;
             } catch (err) {
               _recordImportError(result, 'settings', 'ocd_flashcards', err);

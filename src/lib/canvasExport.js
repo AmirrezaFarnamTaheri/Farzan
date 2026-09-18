@@ -71,12 +71,14 @@ export function exportToJPEG(canvas, quality = 0.92) {
  * @param {number} [quality=0.92]
  */
 export function downloadCanvas(canvas, format = 'png', filename = 'export.png', quality = 0.92) {
-  let dataUrl;
-  if (format === 'jpeg' || format === 'jpg') {
-    dataUrl = exportToJPEG(canvas, quality, filename);
-  } else {
-    dataUrl = exportToPNG(canvas, filename);
+  const mime = (format === 'jpeg' || format === 'jpg') ? 'image/jpeg' : 'image/png';
+  if (typeof canvas?.toBlob === 'function') {
+    canvas.toBlob((blob) => {
+      if (blob) downloadBlob(blob, filename);
+    }, mime, quality);
+    return;
   }
+  const dataUrl = (mime === 'image/jpeg') ? exportToJPEG(canvas, quality) : exportToPNG(canvas);
   const blob = dataUrlToBlob(dataUrl);
   downloadBlob(blob, filename);
 }

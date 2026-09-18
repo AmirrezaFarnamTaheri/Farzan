@@ -11,8 +11,8 @@
 - [x] **Focus & Motion Safety**: Visible focus outlines (`outline: 2px solid var(--brand-primary)`), keyboard accessibility, and `@media (prefers-reduced-motion: reduce)` overrides implemented.
 
 ## 3. Desktop Application & Installer Packaging
-- [x] **Tauri Desktop Configuration**: `far/src-tauri/tauri.conf.json` configured for NSIS Windows single-file installer target (`OpenCourseDeck_1.1.2_x64-setup.exe`).
-- [x] **Root Launcher (`Run-OpenCourseDeck.cmd`)**: Canonical entry script created to auto-navigate to `far/` and spawn `npm run desktop`.
+- [x] **Tauri Desktop Configuration**: `src-tauri/tauri.conf.json` configured for NSIS Windows single-file installer target (`OpenCourseDeck_1.1.2_x64-setup.exe`).
+- [x] **Root Launcher (`Run-OpenCourseDeck.cmd`)**: Canonical entry script created to auto-navigate to the repository root and run `npm run build` then `npm start`.
 - [x] **Automated CI/CD Workflow**: `.github/workflows/desktop-release.yml` created for tag-triggered cross-platform compilation and release artifact uploads.
 
 ## 4. Rollback & Emergency Contingency Plan

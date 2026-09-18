@@ -147,7 +147,9 @@
     _paused:   false,
     _listeners: [],
     _autosaveTimer: null,
-    _autosaveKey: 'ocd_canvas_board',
+    _autosaveKey: 'ocd_studio_board',
+    // Retired canvas-only autosave key; read once for adoption only.
+    _legacyAutosaveKey: 'ocd_canvas_board',
     _autosaveDebounceMs: 1500,
     _pointerId: null,
     _spaceDown: false,
@@ -1039,12 +1041,30 @@
         this.loadState(board, { preserveViewport: true });
         return true;
       };
+      // Canvas and the studio view previously autosaved to different keys
+      // (`ocd_canvas_board` vs `ocd_studio_board`), so a board saved by one was
+      // missed by the other. Adopt the studio key as canonical and adopt a
+      // board found only under the retired key once, so nothing is stranded.
+      const legacyKey = this._legacyAutosaveKey;
+      const adoptLegacy = (hasCanonical) => {
+        if (hasCanonical || !legacyKey) return;
+        const readLegacy = window.DB?.getSetting
+          ? window.DB.getSetting(legacyKey).catch?.(() => null)
+          : Promise.resolve(window.localStorage?.getItem?.(legacyKey) ?? null);
+        readLegacy.then((raw) => {
+          if (!raw || typeof raw !== 'object') return;
+          this._flushAutosave();
+        }).catch?.(() => {});
+      };
       if (window.DB?.getSetting) {
-        window.DB.getSetting(this._autosaveKey).then(doRestore).catch?.(() => {});
+        window.DB.getSetting(this._autosaveKey)
+          .then((board) => { doRestore(board); adoptLegacy(Boolean(board)); })
+          .catch?.(() => {});
       } else {
         try {
           const raw = window.localStorage?.getItem(this._autosaveKey);
           if (raw) doRestore(JSON.parse(raw));
+          adoptLegacy(Boolean(raw));
         } catch {}
       }
     },

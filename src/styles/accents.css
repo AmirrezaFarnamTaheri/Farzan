@@ -61,3 +61,9 @@
     --accent-rgb:   236, 72, 153;
     --accent-contrast: #ffffff;
   }
+  /* Light accents already have a pale --accent-light; the 30%-toward-white
+     blend would wash them out to near-white. Their on-tint text keeps full
+     saturation but darkens instead, clearing AA against the light tint. */
+  [data-accent="cyan"]   { --accent-on-tint: #0e7490; }
+  [data-accent="amber"]  { --accent-on-tint: #b45309; }
+  [data-accent="emerald"]{ --accent-on-tint: #047857; }

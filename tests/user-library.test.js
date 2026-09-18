@@ -150,4 +150,32 @@ describe('user library overlay', () => {
       { userOwned: true },
     );
   });
+
+  it('does not overwrite the library when a transient read failure occurs', async () => {
+    const created = await upsertCourse({ title: 'Anatomy review' });
+    expect(Object.keys((await loadLibrary()).courses)).toEqual([created.id]);
+
+    // A transient storage read failure must not become an empty library that a
+    // mutator then persists over the user's real data.
+    const workingGet = window.DB.getSetting;
+    window.DB.getSetting = vi.fn(async () => { throw new Error('storage unavailable'); });
+    try {
+      await expect(upsertCourse({ title: 'Neurology review' }))
+        .rejects.toThrow(/Unable to read the user library/);
+      await expect(addTopic({ title: 'Topic under fire' }))
+        .rejects.toThrow(/Unable to read the user library/);
+      await expect(removeCourse(created.id))
+        .rejects.toThrow(/Unable to read the user library/);
+
+      // The best-effort overlay tolerates the same failure.
+      await expect(initUserLibrary(window).overlay()).resolves.toBeUndefined();
+    } finally {
+      window.DB.getSetting = workingGet;
+    }
+
+    // The persisted library survived the outage untouched.
+    const library = await loadLibrary();
+    expect(Object.keys(library.courses)).toEqual([created.id]);
+    expect(library.courses[created.id].title).toBe('Anatomy review');
+  });
 });

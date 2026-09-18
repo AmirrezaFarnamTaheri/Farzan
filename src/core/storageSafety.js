@@ -4,7 +4,7 @@ import { installPdfSecurity } from './pdfSecurity.js';
 import { committedReceipt, failedReceipt } from './mutationReceipt.js';
 
 const VALID_SCOPES = new Set(['progress', 'notes', 'media', 'playlists', 'studio', 'preferences', 'all']);
-const PREFERENCE_KEYS = ['ocd_accent', 'ocd_density', 'ocd_font_scale', 'ocd_dir', 'ocd_theme', 'ocd_sidebar_collapsed', 'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir', 'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session', 'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir'];
+const PREFERENCE_KEYS = ['ocd_accent', 'ocd_density', 'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_theme', 'ocd_sidebar_collapsed', 'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir', 'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session', 'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir'];
 const SESSION_KEYS = ['ocd_pending_topic', 'ocd_pending_position', 'ocd_pending_course_session', 'ocd_pending_library_course', 'ocd_pending_pdf_doc', 'ocd_pending_pdf_page', 'ocd_ai_api_key_session', 'ocd_ai_authority_session', 'plasma-ai-api-key-session', 'plasma-ai-authority-session', 'pd-player', 'pd-player-playlist'];
 
 function unavailableFailure(backend) {

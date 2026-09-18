@@ -80,6 +80,21 @@ export function mountSettingsView(deps = {}) {
                   </select>
                 </label>
 
+                <label class="settings-control-card settings-control-label" for="select-language">
+                  <span>
+                    <strong>Language</strong>
+                    <small>Choose workspace display language and text direction.</small>
+                  </span>
+                  <select class="select input-sm" id="select-language" aria-label="UI language">
+                    <option value="en-US">English (US)</option>
+                    <!-- Persian is disabled until view strings are keyed through
+                      the locale engine (docs/architecture.md). Selecting it now
+                      only rewrites html lang/dir, which misleads assistive
+                      technology without translating anything. -->
+                    <option value="fa-IR" disabled>فارسی (Persian) — coming soon</option>
+                  </select>
+                </label>
+
                 <article class="settings-control-card">
                   <div>
                     <strong>Color theme</strong>
@@ -302,6 +317,19 @@ export function mountSettingsView(deps = {}) {
       document.documentElement.setAttribute('data-density', density);
       Prefs?.set?.(Prefs?.KEYS?.density, density);
       window.OpenCourseDeck?.bus?.emit?.('density:change', { density });
+    });
+  }
+
+  const languageSelect = document.getElementById('select-language');
+  if (languageSelect) {
+    const activeLang = window.OpenCourseDeck?.locale?.getCurrentLang?.()
+      || document.documentElement.getAttribute('lang')
+      || 'en-US';
+    languageSelect.value = activeLang.startsWith('fa') ? 'fa-IR' : 'en-US';
+    on(languageSelect, 'change', () => {
+      const next = languageSelect.value;
+      window.OpenCourseDeck?.locale?.setCurrentLang?.(next);
+      Prefs?.set?.(Prefs?.KEYS?.lang || 'ocd_lang', next);
     });
   }
 

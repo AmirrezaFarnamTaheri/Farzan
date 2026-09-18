@@ -14,9 +14,9 @@
 
   * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 50%, var(--text-tertiary)) transparent; }
 
-.text-xs    { font-size: var(--text-xs); }
-  .text-sm    { font-size: var(--text-sm); }
-  .text-base  { font-size: var(--text-base); }
+.text-xs    { font-size: max(var(--text-floor), var(--text-xs)); }
+  .text-sm    { font-size: max(var(--text-floor), var(--text-sm)); }
+  .text-base  { font-size: max(var(--text-floor), var(--text-base)); }
   .text-lg    { font-size: var(--text-lg); }
   .text-xl    { font-size: var(--text-xl); }
   .text-2xl   { font-size: var(--text-2xl); }

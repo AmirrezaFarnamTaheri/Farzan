@@ -11,7 +11,9 @@
   // UTILITIES
   // ──────────────────────────────────────────────────────────
   const $ = (s, r = document) => r.querySelector(s);
-  const uid = (p = 'pd') => `${p}-${Math.random().toString(36).slice(2, 9)}`;
+  const uid = (p = 'pd') => (typeof crypto?.randomUUID === 'function'
+    ? `${p}-${crypto.randomUUID().slice(0, 8)}`
+    : `${p}-${Math.random().toString(36).slice(2, 9)}`);
 
   const clampPct = (value) => {
     const n = Number(value);

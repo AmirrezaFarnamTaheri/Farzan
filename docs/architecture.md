@@ -66,9 +66,11 @@
 Two sanctioned patterns exist for route-scoped teardown; both are correct, pick
 per situation and stay consistent within a file:
 
-- **`RouteListeners` helper** (`src/lib/routeListeners.js`) — used by materials,
-  settings, and studio views for ad-hoc global listeners; call `.clear()` in the
-  route controller unmount.
+- **Local `routeListeners` array** — used by the materials, settings, and studio
+  views. Each view declares its own `const routeListeners = []`, an `on()`
+  helper that registers and records `{ target, type, handler, options }`, and an
+  `unmount()` that walks the array calling `removeEventListener`. (This is a
+  per-view pattern, not a shared module.)
 - **Hand-rolled disposer arrays / explicit `removeEventListener` in `unmount()`**
   — used by the remaining views (coursesRoute player disposer array is the
   reference example). Element-local listeners that die with the view innerHTML

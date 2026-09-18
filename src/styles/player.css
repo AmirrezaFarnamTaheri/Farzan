@@ -149,7 +149,7 @@
   color: var(--text-primary);
 }
 
-.pd-btn:active { transform: scale(0.96); }
+.pd-btn:active { transform: scale(var(--press-scale)); }
 
 .pd-btn:focus-visible {
   outline: 2px solid var(--accent-light);

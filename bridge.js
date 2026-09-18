@@ -541,7 +541,18 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.get('progress', topicId)) ?? null; } catch {}
+        try {
+          const stored = await idb.get('progress', topicId);
+          if (stored) return stored;
+          // IDB has no record for this topic. saveProgress acknowledges a
+          // non-quota IDB write failure by writing the localStorage fallback and
+          // reporting success, but the one-shot migration never reconciles that
+          // record back into IDB. Honor the fallback here so an acknowledged
+          // save stays readable once IDB recovers.
+          const fallback = _read(KEY_PROGRESS, {});
+          if (fallback[topicId]) return fallback[topicId];
+          return null;
+        } catch {}
       }
       const map = _read(KEY_PROGRESS, {});
       return map[topicId] ?? null;
@@ -551,7 +562,18 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('progress')) ?? []; } catch {}
+        try {
+          const records = (await idb.getAll('progress')) ?? [];
+          // Layer acknowledged localStorage fallback records over IDB gaps (see
+          // getProgress). A fallback record only fills a topicId IDB does not
+          // already have, so real IDB data is never overwritten.
+          const fallback = _read(KEY_PROGRESS, {});
+          const seen = new Set(records.map((record) => record?.topicId));
+          for (const [topicId, record] of Object.entries(fallback)) {
+            if (topicId && record?.topicId && !seen.has(topicId)) records.push(record);
+          }
+          return records;
+        } catch {}
       }
       const map = _read(KEY_PROGRESS, {});
       return Object.values(map);
@@ -944,7 +966,7 @@
         'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
         'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists', 'ocd_playlists', 'ocd_notes', 'ocd_folders',
         'ocd_notes_settings', 'ocd_theme', 'ocd_accent', 'ocd_density',
-        'ocd_font_scale', 'ocd_dir', 'ocd_sidebar_collapsed', 'ocd_flashcards',
+        'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_sidebar_collapsed', 'ocd_flashcards',
         'ocd_ai_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues',
         'plasma-studio-board', 'plasma-canvas-board', MIGRATION_REPORT_KEY,
       );

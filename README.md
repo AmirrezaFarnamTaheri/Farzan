@@ -31,7 +31,7 @@ Open `http://localhost:5173/`.
 
 On Windows, the launcher is often easier:
 
-- `Run-OpenCourseDeck.cmd`: launches the local server with console logs visible. Stop it with `Ctrl+C` in that console.
+- `Run-OpenCourseDeck.cmd`: builds the bundle, then starts the local server with console logs visible. Stop it with `Ctrl+C` in that console. (A native app is built separately with Tauri — see [desktop/NATIVE_STRATEGY.md](desktop/NATIVE_STRATEGY.md); the `npm run desktop` Electron path needs `npm install --save-dev electron`, which is not part of the default install.)
 
 ### Regular Run
 

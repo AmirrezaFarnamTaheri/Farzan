@@ -56,7 +56,12 @@ export function eventTargetEl(e) {
   return t.parentElement ?? null;
 }
 
+// Native W3C Web Cryptography API randomUUID
+// Source: https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID
 export function uid(prefix = 'pd') {
+  if (typeof crypto?.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  }
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 

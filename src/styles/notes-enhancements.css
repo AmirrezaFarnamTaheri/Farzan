@@ -5,8 +5,11 @@
 .notes-page-header .page-title {
   margin-top: var(--space-2);
   font-family: var(--font-serif);
+  font-style: normal;
   font-size: clamp(2.2rem, 4vw, 3.8rem);
+  line-height: 1.12;
   letter-spacing: -0.05em;
+  padding-bottom: 2px;
 }
 
 .notes-page-header .page-subtitle {
@@ -123,7 +126,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--accent-muted);
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
 }
 
 .notes-search {
@@ -291,7 +294,7 @@
 }
 
 .notes-document-meta .icon {
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
 }
 
 .notes-toolbar {
@@ -348,7 +351,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--accent-muted);
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
   font-weight: 700;
   line-height: 1;
 }
@@ -606,7 +609,7 @@
   white-space: nowrap;
   text-overflow: clip;
 }
-.folder-item.active .folder-icon { color: var(--accent-light); }
+.folder-item.active .folder-icon { color: var(--accent-on-tint); }
 .folder-item .folder-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .folder-item .folder-count {
   flex: 0 0 auto;
@@ -619,7 +622,7 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.folder-item.active .folder-count { background: var(--accent-muted); color: var(--accent-light); }
+.folder-item.active .folder-count { background: color-mix(in srgb, var(--accent) 30%, var(--surface-3)); color: var(--accent-on-tint); }
 .folder-item .folder-delete-btn {
   flex: 0 0 auto;
   width: 24px;
@@ -678,7 +681,7 @@
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
   font-size: var(--text-sm);
 }
 .note-item-date {
@@ -701,8 +704,8 @@
 .note-tag {
   padding: 1px 8px;
   border-radius: var(--radius-full);
-  background: var(--accent-muted);
-  color: var(--accent-light);
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface-3));
+  color: var(--accent-on-tint);
   font-size: 11px;
   font-weight: 600;
 }
