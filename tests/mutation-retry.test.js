@@ -198,14 +198,9 @@ describe('OpenCourseDB automatic mutation retry integration', () => {
   let OpenCourseDB;
 
   beforeAll(async () => {
-    // db.js registers its constructors as a side effect on window.OpenCourseDeck.
-    // Under the vmThreads pool the module cache can outlive the per-file
-    // window, so a plain top-level import may be served from cache without
-    // re-running against *this* file's globals. Force a fresh evaluation.
-    vi.resetModules();
-    window.OpenCourseDeck = window.OpenCourseDeck || {};
-    await import('../db.js');
-    ({ OpenCourseDB } = window.OpenCourseDeck.DB);
+    // Use the named export: the module cache can outlive the per-file
+    // window under the vmThreads pool, so the window global is not reliable.
+    ({ OpenCourseDB } = await import('../db.js'));
   });
 
   afterEach(() => {

@@ -36,11 +36,25 @@ const mime = {
   '.wasm': 'application/wasm',
 };
 
+/**
+ * Send an HTTP response with security headers.
+ * @param {http.ServerResponse} res - The response object
+ * @param {number} status - HTTP status code
+ * @param {Object} headers - Response headers
+ * @param {string} body - Response body
+ */
 function send(res, status, headers, body) {
   res.writeHead(status, withNoSniff(headers));
   res.end(body);
 }
 
+/**
+ * Safely join a base directory with a requested path, preventing directory traversal.
+ * Returns null if the resolved path escapes the base directory.
+ * @param {string} base - Base directory path
+ * @param {string} requestedPath - Requested path (possibly with ../ or other escape attempts)
+ * @returns {string|null} - Resolved path if safe, null if it escapes base
+ */
 function safeJoin(base, requestedPath) {
   const baseResolved = path.resolve(base);
   const pResolved = path.resolve(baseResolved, requestedPath);
@@ -51,6 +65,82 @@ function safeJoin(base, requestedPath) {
   return pResolved;
 }
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/**
+ * Extract hostname from a Host header, stripping port and IPv6 brackets.
+ * @param {string} hostHeader - The Host header value
+ * @returns {string} - Hostname without port
+ */
+function hostnameOf(hostHeader) {
+  if (typeof hostHeader !== 'string' || !hostHeader) return '';
+  const value = hostHeader.trim().toLowerCase();
+  if (value.startsWith('[')) return value.slice(0, value.indexOf(']') + 1);
+  return value.split(':')[0];
+}
+
+/**
+ * Check if a hostname is a loopback address (IPv4 127.0.0.0/8 or IPv6 ::1).
+ * Recognizes localhost, 127.0.0.1, and .localhost suffix; also any 127.x.y.z address.
+ * @param {string} hostname - The hostname (or Host header) to check
+ * @returns {boolean} - True if loopback, false otherwise
+ */
+function isLoopbackAddress(hostname) {
+  const name = hostnameOf(hostname);
+  if (LOOPBACK_HOSTNAMES.has(name) || name.endsWith('.localhost')) return true;
+  // Check IPv4 127.x.y.z range
+  if (/^127(\.\d{1,3}){3}$/.test(name)) {
+    const parts = name.split('.');
+    return parts.slice(1).every(part => /^\d+$/.test(part) && Number(part) <= 255);
+  }
+  return false;
+}
+
+/**
+ * DNS-rebinding guard: verify the Host header against allowed loopback names.
+ * A loopback-bound server only answers requests addressed to loopback names,
+ * preventing a remote page from re-pointing its hostname to 127.0.0.1 and reading local files.
+ * @param {string} hostHeader - The Host header value
+ * @param {boolean} allowAnyHost - If true, allow any host (for non-loopback-bound servers)
+ * @returns {boolean} - True if host is allowed, false otherwise
+ */
+function isAllowedHost(hostHeader, allowAnyHost) {
+  if (allowAnyHost) return true;
+  return isLoopbackAddress(hostHeader);
+}
+
+/**
+ * Detect if a relative path contains hidden files (dot-segments).
+ * Dot-files like .git, .env are repository/tooling state, never app assets.
+ * Exemption: .well-known is reachable for ACME and other standard metadata.
+ * @param {string} relPath - Relative file path
+ * @returns {boolean} - True if path contains hidden segments, false otherwise
+ */
+function isHiddenPath(relPath) {
+  return relPath.split(/[\\/]/).some((segment) => segment.startsWith('.') && segment !== '.well-known');
+}
+
+/**
+ * Verify that a POST request to the debug endpoint is same-origin.
+ * Browsers attach Origin to cross-site POSTs. Non-browser clients (no Origin) are accepted.
+ * @param {http.IncomingMessage} req - The request object
+ * @returns {boolean} - True if same-origin or no Origin header, false if cross-origin
+ */
+function isSameOriginPost(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === String(req.headers.host || '').toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if debug logging is enabled via URL parameter or environment variable.
+ * @param {URL} reqUrl - Parsed request URL
+ * @returns {boolean} - True if debug logging is enabled
+ */
 function isDebugEnabled(reqUrl) {
   try {
     const qs = reqUrl.searchParams;
@@ -61,6 +151,12 @@ function isDebugEnabled(reqUrl) {
   }
 }
 
+/**
+ * Determine Cache-Control header value based on file extension.
+ * HTML and source files are not cached; media and fonts are cached for 1 hour.
+ * @param {string} relPath - Relative file path
+ * @returns {string} - Cache-Control header value
+ */
 function cacheControlForPath(relPath) {
   const ext = path.extname(relPath).toLowerCase();
   if (ext === '.html') return 'no-store';
@@ -72,10 +168,21 @@ function cacheControlForPath(relPath) {
   return 'no-store';
 }
 
+/**
+ * Add X-Content-Type-Options: nosniff to response headers to prevent MIME-type sniffing.
+ * @param {Object} headers - HTTP headers object
+ * @returns {Object} - Headers object with nosniff added
+ */
 function withNoSniff(headers) {
   return { ...headers, 'X-Content-Type-Options': 'nosniff' };
 }
 
+/**
+ * Extract the Content-Security-Policy from an HTML file's meta tag.
+ * Used to enforce CSP in served HTML files.
+ * @param {string} filePath - Path to the HTML file
+ * @returns {string|null} - CSP value if found, null otherwise
+ */
 function extractCsp(filePath) {
   try {
     const html = fs.readFileSync(filePath, 'utf8');
@@ -86,6 +193,15 @@ function extractCsp(filePath) {
   }
 }
 
+/**
+ * Stream a file to the response, handling range requests and cache headers.
+ * @param {http.IncomingMessage} req - The request object
+ * @param {http.ServerResponse} res - The response object
+ * @param {string} filePath - Path to the file to serve
+ * @param {string} type - MIME type of the file
+ * @param {string} relPath - Relative path (for cache control determination)
+ * @returns {number} - HTTP status code sent
+ */
 function streamFile(req, res, filePath, type, relPath) {
   const stat = fs.statSync(filePath);
   const range = req.headers.range;
@@ -148,6 +264,13 @@ function streamFile(req, res, filePath, type, relPath) {
   return 200;
 }
 
+/**
+ * Stream a file from disk to the HTTP response using fs.createReadStream.
+ * Handles errors by destroying the response (headers already sent).
+ * @param {string} filePath - Path to the file to stream
+ * @param {http.ServerResponse} res - The response object
+ * @param {Object} [streamOptions] - Options for fs.createReadStream (e.g., { start, end })
+ */
 function pipeFile(filePath, res, streamOptions) {
   const stream = fs.createReadStream(filePath, streamOptions);
   stream.on('error', (error) => {
@@ -158,15 +281,35 @@ function pipeFile(filePath, res, streamOptions) {
   stream.pipe(res);
 }
 
+/**
+ * Create an HTTP server that serves static files from a root directory.
+ * Enforces DNS-rebinding protection, blocks hidden paths (.git, .env),
+ * handles HTTP range requests, and provides optional debug logging.
+ * @param {Object} [options] - Server configuration
+ * @param {string} [options.root] - Root directory to serve from (default: project root)
+ * @param {string} [options.debugLogPath] - Path to debug log (default: debug.log)
+ * @param {boolean} [options.allowAnyHost] - If true, accept any Host header
+ * @returns {http.Server} - The created HTTP server (not yet listening)
+ */
 function createServer(options = {}) {
   const serverRoot = options.root ? path.resolve(options.root) : root;
   const debugLogPath = options.debugLogPath
     ? path.resolve(serverRoot, options.debugLogPath)
     : path.join(serverRoot, 'debug.log');
 
+  const allowAnyHost = Boolean(options.allowAnyHost);
+
   return http.createServer((req, res) => {
-    const u = new URL(req.url, `http://${req.headers.host}`);
     const started = Date.now();
+    // Parse against a fixed base: the Host header is client-controlled and a
+    // malformed value (e.g. "a b") would otherwise throw and kill the server.
+    let u;
+    try {
+      u = new URL(req.url, 'http://localhost');
+    } catch {
+      console.log(`[opencoursedeck] ${req.method} <malformed url> -> 400`);
+      return send(res, 400, { 'Content-Type': 'text/plain' }, 'Bad Request');
+    }
     const finish = (status) => {
       try {
         const ms = Date.now() - started;
@@ -176,12 +319,18 @@ function createServer(options = {}) {
       }
     };
 
+    if (!isAllowedHost(req.headers.host, allowAnyHost)) {
+      finish(421);
+      return send(res, 421, { 'Content-Type': 'text/plain' },
+        'Misdirected Request: open OpenCourseDeck via localhost or 127.0.0.1, or start the server with HOST set to the address you are using.');
+    }
+
     if (u.pathname === '/__debug') {
       if (req.method !== 'POST') {
         finish(405);
         return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
       }
-      if (!isDebugEnabled(u)) {
+      if (!isDebugEnabled(u) || !isSameOriginPost(req)) {
         finish(204);
         return send(res, 204, { 'Content-Type': 'text/plain' }, '');
       }
@@ -220,7 +369,7 @@ function createServer(options = {}) {
       return send(res, 400, { 'Content-Type': 'text/plain' },
         'Bad Request: the URL path contains malformed percent-encoding. Remove stray "%" characters or encode them as "%25".');
     }
-    const filePath = safeJoin(serverRoot, rel);
+    const filePath = isHiddenPath(rel) ? null : safeJoin(serverRoot, rel);
     if (!filePath) {
       finish(403);
       return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
@@ -249,10 +398,21 @@ function createServer(options = {}) {
   });
 }
 
+/**
+ * Create and start the development server on the specified host and port.
+ * Automatically enables DNS-rebinding protection if the server is bound to a loopback address.
+ * @param {Object} [options] - Server options (passed to createServer)
+ * @param {string} [options.port] - Port number (default: 5173 or PORT env var)
+ * @param {string} [options.host] - Host address (default: 127.0.0.1 or HOST env var)
+ * @param {string} [options.root] - Root directory to serve
+ * @param {string} [options.debugLogPath] - Path to debug log
+ * @returns {http.Server} - The listening HTTP server
+ */
 function startServer(options = {}) {
   const port = Number(options.port || process.env.PORT || 5173);
   const host = options.host || process.env.HOST || '127.0.0.1';
-  const server = createServer(options);
+  const loopback = isLoopbackAddress(host);
+  const server = createServer({ allowAnyHost: !loopback, ...options });
   server.listen(port, host, () => {
     console.log(`[opencoursedeck] dev server http://${host}:${port}/`);
   });
@@ -269,4 +429,7 @@ module.exports = {
   safeJoin,
   cacheControlForPath,
   extractCsp,
+  isAllowedHost,
+  isHiddenPath,
+  isLoopbackAddress,
 };

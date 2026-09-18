@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import '../db.js';
+import { PlasmaDB } from '../db.js';
 import { replaceDocumentAnnotations } from '../src/core/annotationPersistence.js';
 
 describe('annotation persistence', () => {
@@ -9,7 +9,6 @@ describe('annotation persistence', () => {
   });
 
   it('replaces one document annotation set in exactly one read-write transaction', async () => {
-    const { PlasmaDB } = window.OpenCourseDeck.DB;
     const idb = new PlasmaDB('annotation-persistence-test', 1, [
       { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }] },
     ]);

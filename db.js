@@ -4,7 +4,7 @@
 // ============================================================
 import { withMutationRetry } from './src/core/mutationRetry.js';
 
-(() => {
+const DBExports = (() => {
 'use strict';
 
 // KDF parameters. v2 envelopes carry a random per-database salt and the
@@ -427,8 +427,17 @@ return data;
 }
 }
 
+return { OpenCourseDB, PlasmaDB: OpenCourseDB, DBQuery };
+})();
+
 window.OpenCourseDeck = window.OpenCourseDeck || {};
 // Historical PlasmaDB name kept as an alias so existing integrations and
 // tests continue to resolve the same constructor.
-window.OpenCourseDeck.DB = { OpenCourseDB, PlasmaDB: OpenCourseDB, DBQuery };
-})();
+window.OpenCourseDeck.DB = DBExports;
+
+// Named ESM exports give consumers (and tests) a handle that does not depend
+// on the shared window global surviving — module evaluation is cached, so a
+// later `window.OpenCourseDeck = {...}` reset would otherwise hide the engine.
+export const { OpenCourseDB, DBQuery } = DBExports;
+export const PlasmaDB = DBExports.PlasmaDB;
+export default DBExports;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
-import '../db.js';
+import DBExports from '../db.js';
 
 describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   beforeEach(async () => {
@@ -8,7 +8,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('rejects failed bulk transactions instead of hanging', async () => {
-    const { OpenCourseDB: PlasmaDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false },
     ]);
@@ -17,7 +17,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('can read records by an IndexedDB index', async () => {
-    const { OpenCourseDB: PlasmaDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false, indexes: [{ field: 'kind' }] },
     ]);
@@ -33,7 +33,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('returns only after a single-record write is durably readable', async () => {
-    const { OpenCourseDB: PlasmaDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false },
     ]);
@@ -46,7 +46,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('honors descending cursor direction through both supported call shapes', async () => {
-    const { OpenCourseDB: PlasmaDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false, indexes: [{ field: 'updatedAt' }] },
     ]);
@@ -64,7 +64,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('encrypts and decrypts payloads using AES-256-GCM passphrase derivation', async () => {
-    const { OpenCourseDB: PlasmaDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db-crypto', 1, []);
     db.setPassphrase('secret-study-key');
 
@@ -79,7 +79,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('writes v2 envelopes with a random per-database salt and hardened KDF', async () => {
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('ocd-test-db-kdf', 1, []);
     db.setPassphrase('secret-study-key');
     const a = await db.encryptPayload({ n: 1 });
@@ -94,7 +94,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
   });
 
   it('still decrypts legacy envelopes written before the v2 format', async () => {
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('ocd-test-db-legacy', 1, []);
     db.setPassphrase('old-passphrase');
 
@@ -129,7 +129,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
 
   it('encrypts put/get write paths while keeping IndexedDB indexes queryable', async () => {
     await indexedDB.deleteDatabase('ocd-test-db-write-crypto');
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('ocd-test-db-write-crypto', 1, [
       { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }] },
     ]);

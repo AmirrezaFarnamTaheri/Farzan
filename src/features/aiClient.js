@@ -35,6 +35,11 @@ const DEFAULT_SETTINGS = {
   localModelFile: null,
 };
 
+/**
+ * Normalize and validate AI settings, providing sensible defaults.
+ * @param {Object} [settings] - User-provided settings
+ * @returns {Object} - Normalized settings object
+ */
 function normalizeSettings(settings = {}) {
   const mode = ['hidden', 'disabled', 'local-gemma', 'custom-api'].includes(settings.mode)
     ? settings.mode
@@ -66,6 +71,12 @@ function normalizeSettings(settings = {}) {
   };
 }
 
+/**
+ * Extract plain text from HTML using inert DOMParser (no resource loads or handlers).
+ * Falls back to regex-based tag stripping if DOMParser fails.
+ * @param {string} value - HTML or text content
+ * @returns {string} - Plain text, whitespace normalized
+ */
 function plainText(value = '') {
   // DOMParser instead of innerHTML on a detached element: innerHTML still
   // triggers resource loads and inline handlers (<img onerror>), so
@@ -78,28 +89,67 @@ function plainText(value = '') {
   }
 }
 
+// Unicode-aware word tokenizer. The previous /[^a-z0-9]/ filter erased every
+// non-Latin letter, so Persian (fa-IR) notes got unscored summaries,
+// zero embedding vectors and no keywords. Letters/digits of any script plus
+// combining marks (e.g. Arabic-script diacritics) and ZWNJ stay in a word.
+const NON_WORD_RE = /[^\p{L}\p{M}\p{N}\u200c\s-]/gu;
+
+/**
+ * Split text into Unicode-aware tokens (words).
+ * Supports any script: Latin, Arabic, CJK, Cyrillic, etc.
+ * @param {string} text - HTML or plain text to tokenize
+ * @param {number} [minLength=1] - Minimum character length of returned words
+ * @returns {Array<string>} - Array of lowercase tokens
+ */
+function tokenize(text, minLength = 1) {
+  return plainText(text)
+    .toLowerCase()
+    .replace(NON_WORD_RE, ' ')
+    .split(/\s+/)
+    .filter(word => [...word].length >= minLength);
+}
+
+/**
+ * Split text into sentences using multilingual terminators.
+ * Handles ASCII (.!?), Arabic (\u061f \u06d4), and CJK (\u3002\uff01\uff1f) without requiring whitespace.
+ * @param {string} text - HTML or plain text
+ * @returns {Array<string>} - Array of sentences with minimum length 12
+ */
 function splitSentences(text) {
   return plainText(text)
-    .split(/(?<=[.!?])\s+/)
+    // Split on: (ASCII .!? or Arabic or CJK terminators) + optional whitespace,
+    // or just whitespace. This ensures "text\u3002more" splits into ["text\u3002", "more"].
+    .split(/(?<=[.!?\u061f\u06d4])\s+|(?<=[\u3002\uff01\uff1f])/)
     .map(item => item.trim())
     .filter(item => item.length > 12);
 }
 
+/**
+ * Score a sentence based on word frequencies.
+ * Higher score means more relevant to the text.
+ * @param {string} sentence - The sentence to score
+ * @param {Map<string, number>} frequencies - Word frequency map
+ * @returns {number} - Sum of all word frequencies in the sentence
+ */
 function scoreSentence(sentence, frequencies) {
-  return sentence
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/\s+/)
-    .filter(word => word.length > 3)
+  return tokenize(sentence, 4)
     .reduce((score, word) => score + (frequencies.get(word) || 0), 0);
 }
 
+/**
+ * Generate a local extractive summary of text.
+ * Scores sentences by word frequency and returns top-ranked sentences.
+ * @param {string} text - HTML or plain text to summarize
+ * @param {Object} [options] - Summary options
+ * @param {number} [options.bullets=3] - Number of sentences to return
+ * @returns {string} - Summary with bullet points (Markdown format)
+ */
 function localSummary(text, { bullets = 3 } = {}) {
   const sentences = splitSentences(text);
   if (!sentences.length) return '';
   const frequencies = new Map();
-  sentences.join(' ').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-    .filter(word => word.length > 3)
+  tokenize(sentences.join(' '), 4)
     .forEach(word => frequencies.set(word, (frequencies.get(word) || 0) + 1));
   return sentences
     .map((sentence, index) => ({ sentence, index, score: scoreSentence(sentence, frequencies) }))
@@ -136,8 +186,7 @@ function summaryHtml(summary, sourceLabel = '') {
 
 function embedText(text) {
   const vector = new Array(EMBEDDING_DIMS).fill(0);
-  plainText(text).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-    .filter(word => word.length > 2)
+  tokenize(text, 3)
     .forEach((word) => {
       let hash = 2166136261;
       for (let i = 0; i < word.length; i += 1) hash = Math.imul(hash ^ word.charCodeAt(i), 16777619);
@@ -510,7 +559,7 @@ export function createAIClient(root = window) {
       vector: embedText(text),
       textPreview: plainText(text).slice(0, 500),
       metadata,
-      provider: 'local-hash-v1',
+      provider: 'local-hash-v2',
       updatedAt: Date.now(),
     };
     await modelStore(root, 'readwrite', store => store.put(record), AI_EMBEDDING_STORE);
@@ -554,8 +603,7 @@ export function createAIClient(root = window) {
 
   async function extractKeywords(text = '', { limit = 6 } = {}) {
     const frequencies = new Map();
-    plainText(text).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-      .filter(word => word.length > 4)
+    tokenize(text, 5)
       .forEach(word => frequencies.set(word, (frequencies.get(word) || 0) + 1));
     return Array.from(frequencies.entries())
       .sort((a, b) => b[1] - a[1])

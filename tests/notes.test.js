@@ -7,7 +7,7 @@ function seedNotes() {
     {
       id: 'pinned-note',
       title: 'Pinned note',
-      content: '<p>Important</p>',
+      content: '<p>Important</p><img src="https://tracker.example/pixel.gif" alt="">',
       folderId: 'default',
       tags: [],
       pinned: true,
@@ -48,7 +48,17 @@ function seedNotes() {
 }
 
 describe('notes route filters', () => {
+  let detachedHtmlWrites;
+
   beforeEach(async () => {
+    // Record innerHTML writes so tests can prove note bodies are never parsed
+    // into live-document elements just to extract text (that starts loads).
+    detachedHtmlWrites = [];
+    const innerHtml = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    vi.spyOn(Element.prototype, 'innerHTML', 'set').mockImplementation(function record(value) {
+      detachedHtmlWrites.push({ el: this, value: String(value) });
+      innerHtml.set.call(this, value);
+    });
     vi.useFakeTimers();
     vi.resetModules();
     localStorage.clear();
@@ -119,6 +129,19 @@ describe('notes route filters', () => {
     window.PlasmaNotesApp?.destroy?.();
     vi.useRealTimers();
     localStorage.clear();
+  });
+
+  it('extracts list excerpts without parsing note HTML into the live document', () => {
+    const list = document.querySelector('[data-notes-list]');
+    expect(list.textContent).toContain('Important');
+
+    // <template> content and DOMParser documents are inert; anything else
+    // owned by the live document starts fetching <img> sources on parse.
+    const leaked = detachedHtmlWrites.filter(({ el, value }) => el.ownerDocument === document
+      && el.localName !== 'template'
+      && !el.isConnected
+      && value.includes('tracker.example'));
+    expect(leaked).toEqual([]);
   });
 
   it('shows only pinned notes when the pinned folder is selected', () => {

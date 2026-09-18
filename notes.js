@@ -92,10 +92,21 @@
     return span;
   }
 
+  // Parse into an inert DOMParser document: assigning innerHTML to an element
+  // of the live document (even a detached one) starts image/media loads, so
+  // listing or exporting a note would ping any remote URL it references.
+  function inertTextContent(html) {
+    const source = String(html ?? '');
+    if (!source.includes('<') && !source.includes('&')) return source;
+    try {
+      return new DOMParser().parseFromString(source, 'text/html').body?.textContent ?? '';
+    } catch {
+      return source.replace(/<[^>]*>/g, ' ');
+    }
+  }
+
   function plainTextFromHtml(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = String(html || '');
-    return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+    return inertTextContent(html).replace(/\s+/g, ' ').trim();
   }
 
   function safeFilename(name, fallback = 'note') {
@@ -1323,9 +1334,7 @@
     },
 
     _stripHTML(html) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      return tmp.textContent ?? '';
+      return inertTextContent(html);
     },
 
     _plainText(note) {
@@ -1607,9 +1616,8 @@
           <h1>${safeTitle}</h1>${safeContent}</body></html>`;
         this._download(`${safeFilename(note.title)}.html`, html, 'text/html');
       } else if (format === 'txt') {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = Editor._sanitize(note.content);
-        this._download(`${safeFilename(note.title)}.txt`, `${note.title}\n\n${tmp.textContent}`, 'text/plain');
+        const safeContent = Editor._sanitize(note.content);
+        this._download(`${safeFilename(note.title)}.txt`, `${note.title}\n\n${inertTextContent(safeContent)}`, 'text/plain');
       }
     },
 
@@ -1701,9 +1709,8 @@
     },
 
     _htmlToMd(html) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = Editor._sanitize(html);
-      return tmp.textContent ?? '';
+      const sanitized = Editor._sanitize(html);
+      return inertTextContent(sanitized);
     },
 
     _download(filename, content, mime) {
