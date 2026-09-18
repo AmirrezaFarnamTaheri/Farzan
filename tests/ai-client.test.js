@@ -205,11 +205,37 @@ describe('AI client', () => {
 
     const results = await client.searchEmbeddings('memory retrieval study', { limit: 1 });
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ id: 'note-memory', metadata: { type: 'note' }, provider: 'local-hash-v1' });
+    expect(results[0]).toMatchObject({ id: 'note-memory', metadata: { type: 'note' }, provider: 'local-hash-v2' });
     expect(results[0].score).toBeGreaterThan(0);
 
     await client.clearEmbeddings();
     await expect(client.searchEmbeddings('memory')).resolves.toEqual([]);
+  });
+
+  it('indexes and searches Persian notes (non-Latin scripts are not discarded)', async () => {
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
+      indexedDB,
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+
+    await client.clearEmbeddings();
+    await client.upsertEmbedding({ id: 'fa-economics', text: 'تورم و نرخ بهره در اقتصاد کلان', metadata: { type: 'note' } });
+    await client.upsertEmbedding({ id: 'fa-cooking', text: 'دستور پخت نان با آرد و آب', metadata: { type: 'note' } });
+
+    const results = await client.searchEmbeddings('نرخ تورم', { limit: 2 });
+    expect(results.map(result => result.id)).toEqual(['fa-economics']);
+
+    const keywords = await client.extractKeywords('اقتصاد اقتصاد اقتصاد بانک مرکزی', { limit: 1 });
+    expect(keywords).toEqual(['اقتصاد']);
+    await client.clearEmbeddings();
+  });
+
+  it('splits Persian sentences on the Arabic question mark when summarizing', () => {
+    const client = createAIClient({ sessionStorage });
+    const summary = client._localSummary('سرمایه بانک‌ها باید کافی باشد؟ الزامات بازل این سرمایه را تعیین می‌کند. بانک‌های سایه خارج از این چارچوب هستند.', { bullets: 3 });
+    expect(summary.split('\n')).toHaveLength(3);
   });
 
   it('uses a registered local runtime when one is available', async () => {

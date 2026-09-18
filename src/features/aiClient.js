@@ -78,19 +78,29 @@ function plainText(value = '') {
   }
 }
 
+// Unicode-aware word tokenizer. The previous /[^a-z0-9]/ filter erased every
+// non-Latin letter, so Persian (fa-IR) notes got unscored summaries,
+// zero embedding vectors and no keywords. Letters/digits of any script plus
+// combining marks (e.g. Arabic-script diacritics) and ZWNJ stay in a word.
+const NON_WORD_RE = /[^\p{L}\p{M}\p{N}\u200c\s-]/gu;
+
+function tokenize(text, minLength = 1) {
+  return plainText(text)
+    .toLowerCase()
+    .replace(NON_WORD_RE, ' ')
+    .split(/\s+/)
+    .filter(word => [...word].length >= minLength);
+}
+
 function splitSentences(text) {
   return plainText(text)
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?\u061f\u06d4\u3002\uff01\uff1f])\s+/)
     .map(item => item.trim())
     .filter(item => item.length > 12);
 }
 
 function scoreSentence(sentence, frequencies) {
-  return sentence
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/\s+/)
-    .filter(word => word.length > 3)
+  return tokenize(sentence, 4)
     .reduce((score, word) => score + (frequencies.get(word) || 0), 0);
 }
 
@@ -98,8 +108,7 @@ function localSummary(text, { bullets = 3 } = {}) {
   const sentences = splitSentences(text);
   if (!sentences.length) return '';
   const frequencies = new Map();
-  sentences.join(' ').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-    .filter(word => word.length > 3)
+  tokenize(sentences.join(' '), 4)
     .forEach(word => frequencies.set(word, (frequencies.get(word) || 0) + 1));
   return sentences
     .map((sentence, index) => ({ sentence, index, score: scoreSentence(sentence, frequencies) }))
@@ -136,8 +145,7 @@ function summaryHtml(summary, sourceLabel = '') {
 
 function embedText(text) {
   const vector = new Array(EMBEDDING_DIMS).fill(0);
-  plainText(text).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-    .filter(word => word.length > 2)
+  tokenize(text, 3)
     .forEach((word) => {
       let hash = 2166136261;
       for (let i = 0; i < word.length; i += 1) hash = Math.imul(hash ^ word.charCodeAt(i), 16777619);
@@ -510,7 +518,7 @@ export function createAIClient(root = window) {
       vector: embedText(text),
       textPreview: plainText(text).slice(0, 500),
       metadata,
-      provider: 'local-hash-v1',
+      provider: 'local-hash-v2',
       updatedAt: Date.now(),
     };
     await modelStore(root, 'readwrite', store => store.put(record), AI_EMBEDDING_STORE);
@@ -554,8 +562,7 @@ export function createAIClient(root = window) {
 
   async function extractKeywords(text = '', { limit = 6 } = {}) {
     const frequencies = new Map();
-    plainText(text).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
-      .filter(word => word.length > 4)
+    tokenize(text, 5)
       .forEach(word => frequencies.set(word, (frequencies.get(word) || 0) + 1));
     return Array.from(frequencies.entries())
       .sort((a, b) => b[1] - a[1])
