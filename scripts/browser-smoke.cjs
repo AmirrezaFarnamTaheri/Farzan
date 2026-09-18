@@ -191,9 +191,9 @@ async function main() {
   };
 
   await navigate('#/home', 'Your study command deck is ready.', '.home-title');
-  await navigate('#/courses', 'Courses');
+  await navigate('#/courses', 'Course Catalog');
   await navigate('#/notes', 'Notes');
-  await navigate('#/pdf', 'PDF');
+  await navigate('#/pdf', 'PDF Annotator');
   await navigate('#/studio', 'Studio');
   await navigate('#/progress', 'Progress');
   await navigate('#/help', 'Help');

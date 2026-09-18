@@ -1,6 +1,8 @@
 import { afterEach, beforeEach } from 'vitest';
 
-const CANVAS_AUTOSAVE_KEY = 'ocd_canvas_board';
+// Canvas autosaves to the same key studioRoute restores from (ocd_studio_board);
+// a separate canvas-only key caused a dual-restore race on mount.
+const CANVAS_AUTOSAVE_KEY = 'ocd_studio_board';
 
 // Node >= 25 ships an experimental `localStorage` global on globalThis that
 // returns `undefined` unless --localstorage-file is passed. Vitest's jsdom

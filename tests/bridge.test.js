@@ -264,6 +264,40 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
+  it('keeps an acknowledged localStorage-fallback progress write readable once IndexedDB recovers', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    window.OpenCourseDeck.bus = { emit: vi.fn() };
+
+    // IDB writes fail transiently while reads already work: saveProgress falls
+    // back to localStorage and reports success.
+    const idbRecords = new Map();
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get(_store, key) { return idbRecords.get(key) ?? null; }
+      async getAll() { return [...idbRecords.values()]; }
+      async put() { throw new Error('Temporary IDB failure'); }
+    };
+
+    const saved = await window.DB.saveProgress('topic-fallback', 'course-a', { status: 'done' });
+    expect(saved.status).toBe('done');
+
+    // The acknowledged write must stay readable even though IDB never got it.
+    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
+      expect.objectContaining({ topicId: 'topic-fallback', status: 'done' }),
+    );
+    await expect(window.DB.getAllProgress()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ topicId: 'topic-fallback', status: 'done' })]),
+    );
+
+    // A record IDB later holds wins over the stale fallback.
+    idbRecords.set('topic-fallback', { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' });
+    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
+      { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' },
+    );
+    await expect(window.DB.getAllProgress()).resolves.toEqual(
+      [{ topicId: 'topic-fallback', status: 'reviewed', source: 'idb' }],
+    );
+  });
+
   it('does not mark migration complete when a compatibility section fails', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'legacy-note', title: 'Legacy note', updatedAt: 10 },

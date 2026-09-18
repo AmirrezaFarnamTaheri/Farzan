@@ -552,6 +552,9 @@ printStudioBoardPdf,
     }, 120);
   });
   let spatialGraphInstance = null;
+  // Set by unmount() so async work started while the route was alive (the 3D
+  // graph's note fetch) can bail out instead of mounting into detached DOM.
+  let unmounted = false;
   const toggle3DGraph = async () => {
     const shell = document.querySelector('.studio-shell');
     const btn3D = document.querySelector('[data-studio-mode="3d"]');
@@ -583,6 +586,11 @@ printStudioBoardPdf,
       try {
         notes = await window.DB?.getAllNotes?.() ?? [];
       } catch {}
+      // The await above can outlive the route: if unmount() already disposed the
+      // graph and tore the view down, mounting now would start a RAF loop and
+      // window-level listeners against detached DOM that nothing ever cleans up.
+      if (unmounted) return;
+      if (!shell.isConnected) return;
 
       spatialGraphInstance = new SpatialKnowledgeGraph();
       spatialGraphInstance.mount(graphWrap, notes);
@@ -868,6 +876,7 @@ printStudioBoardPdf,
   return {
     refreshFromSync,
     unmount() {
+      unmounted = true;
       unbindSyncRefresh();
       clearTimeout(interactiveSaveTimer);
       routeListeners.forEach(({ target, type, handler, options }) => {

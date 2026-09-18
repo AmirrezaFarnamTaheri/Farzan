@@ -14,8 +14,14 @@ module.exports = {
     'pdf-runtime.js',
     'manifest.json',
     'style.css',
+    // The app shell loads the flattened release stylesheet directly (index.html)
+    // and resolves workers from `src/workers/` at runtime (src/core/workerAssets.js).
+    // Both are fetch-time dependencies, so they must be precached or the offline
+    // shell renders unstyled and the catalog/search workers never start.
+    'src/styles/index.css',
 
     'opencoursedeck.js',
+    'src/workers/*.worker.js',
     'chunks/**',
     'assets/**',
     'vendor/**',

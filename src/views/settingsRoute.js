@@ -87,7 +87,11 @@ export function mountSettingsView(deps = {}) {
                   </span>
                   <select class="select input-sm" id="select-language" aria-label="UI language">
                     <option value="en-US">English (US)</option>
-                    <option value="fa-IR">فارسی (Persian)</option>
+                    <!-- Persian is disabled until view strings are keyed through
+                      the locale engine (docs/architecture.md). Selecting it now
+                      only rewrites html lang/dir, which misleads assistive
+                      technology without translating anything. -->
+                    <option value="fa-IR" disabled>فارسی (Persian) — coming soon</option>
                   </select>
                 </label>
 

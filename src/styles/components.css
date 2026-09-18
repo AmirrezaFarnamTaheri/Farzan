@@ -48,7 +48,7 @@
   }
   .breadcrumb-current {
     color: var(--text-primary);
-    font-weight: 650;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -195,7 +195,7 @@
     transform: rotate(0deg) scale(1);
     opacity: 1;
   }
-  .theme-toggle:hover .theme-toggle-icon { color: var(--accent-light); }
+  .theme-toggle:hover .theme-toggle-icon { color: var(--accent-on-tint); }
 
 /* Base Card — Double-Bezel Architecture */
   .card {
@@ -206,11 +206,13 @@
         color-mix(in srgb, var(--surface-3) 55%, transparent) 100%
       );
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
+    /* Double-bezel: outer shell radius uses the bezel token so cards read as
+       machined enclosures rather than flat plates. */
+    border-radius: var(--radius-bezel-outer, var(--radius-xl));
     padding: var(--density-pad-y) var(--density-pad-x);
     position: relative;
     overflow: hidden;
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow-sm), var(--inner-highlight, inset 0 1px 0 rgba(255, 255, 255, 0.08));
     transition:
       background var(--duration-base) var(--ease-studio),
       border-color var(--duration-base) var(--ease-studio),
@@ -256,7 +258,7 @@
     box-shadow: var(--shadow-md), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) inset;
   }
   .card.interactive:active {
-    transform: translateY(0) scale(0.995);
+    transform: translateY(0) scale(var(--press-scale));
     box-shadow: var(--shadow-sm);
   }
 
@@ -481,7 +483,7 @@
   /* Active Tactile Micro-press Physics */
   .btn:active,
   .btn.is-active {
-    transform: scale(0.98);
+    transform: scale(var(--press-scale));
   }
 
   /* Button-in-Button Trailing Icon Bubble */
@@ -647,7 +649,7 @@
   /* Outline */
   .btn-outline {
     background: color-mix(in srgb, var(--glass-bg) 20%, transparent);
-    color: var(--accent-light);
+    color: var(--accent-on-tint);
     border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border-strong));
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -1062,7 +1064,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    padding: 2px var(--space-2);
+    padding: var(--space-1_5) var(--space-2);
     border-radius: var(--radius-full);
     font-size: var(--text-xs);
     font-weight: 700;
@@ -1070,9 +1072,12 @@
     white-space: nowrap;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
+    /* Tabular figures: badges carry counts that change at runtime; fixed
+       digit widths stop the badge from shifting width on every update. */
+    font-variant-numeric: tabular-nums;
   }
   .badge-default  { background: var(--surface-3); color: var(--text-secondary); }
-  .badge-primary  { background: var(--accent-muted); color: var(--accent-light); }
+  .badge-primary  { background: color-mix(in srgb, var(--accent) 30%, var(--surface-3)); color: var(--accent-on-tint); }
   .badge-success  {
     background: color-mix(in srgb, var(--success) 12%, transparent);
     color: var(--success);
@@ -1166,20 +1171,20 @@
   }
 
   .filter-chip:active {
-    transform: scale(0.96);
+    transform: scale(var(--press-scale));
   }
 
   .filter-chip.active,
   .filter-chip[aria-pressed="true"] {
     border-color: color-mix(in srgb, var(--accent) 52%, var(--glass-border));
-    background: var(--accent-muted);
-    color: var(--accent-light);
+    background: color-mix(in srgb, var(--accent) 30%, var(--surface-3));
+    color: var(--accent-on-tint);
     box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.15);
   }
 
   .filter-chip.active:active,
   .filter-chip[aria-pressed="true"]:active {
-    transform: scale(0.96);
+    transform: scale(var(--press-scale));
   }
 
   .filter-chip:disabled,
@@ -1688,7 +1693,7 @@
     height: 36px;
     border-radius: var(--radius-md);
     background: var(--accent-muted);
-    color: var(--accent-light);
+    color: var(--accent-on-tint);
     flex-shrink: 0;
   }
   .add-content-item .icon {
@@ -1773,7 +1778,7 @@
     height: 56px;
     border-radius: var(--radius-xl);
     background: var(--accent-muted);
-    color: var(--accent-light);
+    color: var(--accent-on-tint);
     font-size: 1.6rem;
   }
   .library-drop-card strong {
@@ -2554,8 +2559,8 @@
     color: var(--text-primary);
   }
   .dropdown-item.active {
-    background: var(--accent-muted);
-    color: var(--accent-light);
+    background: color-mix(in srgb, var(--accent) 30%, var(--surface-3));
+    color: var(--accent-on-tint);
     font-weight: 600;
   }
   .dropdown-item.danger {
@@ -3061,7 +3066,7 @@
   .tab.active,
   .tab-item[aria-selected="true"],
   .tab-item.active {
-    color: var(--accent-light);
+    color: var(--accent-on-tint);
     border-bottom-color: var(--accent);
   }
   .tab .icon,
@@ -3078,8 +3083,8 @@
   .tab.active .tab-count,
   .tab-item[aria-selected="true"] .tab-count,
   .tab-item.active .tab-count {
-    background: var(--accent-muted);
-    color: var(--accent-light);
+    background: color-mix(in srgb, var(--accent) 30%, var(--surface-3));
+    color: var(--accent-on-tint);
   }
 
   /* Tab Panel */
@@ -3646,12 +3651,12 @@
 
   .achievement-card:hover {
     transform: translateY(-2px);
-    border-color: var(--accent-light);
+    border-color: var(--accent-on-tint);
     box-shadow: var(--inner-highlight, none), var(--shadow-sm);
   }
 
   .achievement-card:active {
-    transform: scale(0.985);
+    transform: scale(var(--press-scale));
   }
 
   .achievement-card:focus-visible {

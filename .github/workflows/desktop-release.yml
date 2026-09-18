@@ -33,20 +33,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
-        run: |
-          cd far
-          npm ci
+        run: npm ci
 
       - name: Validate build & tests
         run: |
-          cd far
           npm run validate
           npm test
 
       - name: Build Tauri Desktop Installer
-        run: |
-          cd far
-          npm run native:package
+        run: npm run native:package
 
       - name: Upload Release Artifacts
         uses: softprops/action-gh-release@v3

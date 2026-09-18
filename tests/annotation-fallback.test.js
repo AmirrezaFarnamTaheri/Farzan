@@ -70,4 +70,32 @@ describe('annotation fallback hardening', () => {
     await expect(db.getAllAnnotations()).resolves.toEqual([authoritative]);
     await expect(db.getAnnotations('doc-a')).resolves.toEqual([authoritative]);
   });
+
+  it('removes a deleted annotation from the fallback so it cannot reappear', async () => {
+    const localStorage = createStorage();
+    localStorage.setItem('plasma-pdf-annotations-by-document', JSON.stringify({
+      'doc-a': [
+        { id: 'keep', docId: 'doc-a', page: 1, text: 'kept', updatedAt: 1 },
+        { id: 'gone', docId: 'doc-a', page: 1, text: 'deleted', updatedAt: 1 },
+      ],
+    }));
+    const kept = { id: 'keep', docId: 'doc-a', page: 1, text: 'kept', updatedAt: 2 };
+    // The real bridge save replaces the whole document and never touches the
+    // legacy key, so legacyBefore === legacyAfter here.
+    const db = {
+      getAllAnnotations: vi.fn(async () => [kept]),
+      saveAnnotations: vi.fn(async () => [kept]),
+    };
+    const root = { document, DB: db, OpenCourseDeck: {}, localStorage };
+
+    installBridgeHardening(root);
+    await db.saveAnnotations('doc-a', { 1: [{ id: 'keep', text: 'kept' }] });
+
+    const documents = JSON.parse(localStorage.getItem('plasma-pdf-annotations-by-document') || '{}');
+    expect(documents['doc-a']).toEqual([kept]);
+    expect(documents['doc-a'].map((record) => record.id)).not.toContain('gone');
+
+    // The removed record must not merge back in from the fallback on read.
+    await expect(db.getAllAnnotations()).resolves.toEqual([kept]);
+  });
 });

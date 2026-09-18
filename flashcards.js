@@ -113,6 +113,16 @@ let studioKeyController = null;
       try { window.DB?.saveSetting?.(STORE_NAME, []); } catch {}
     }
 
+    // Drop the in-memory cache without touching persisted data. An external
+    // writer (a backup import) can replace the persisted deck out from under an
+    // already-hydrated manager; without this the next read serves the stale
+    // cache and the next add/review persists that stale deck over the restored
+    // one. reset() cannot be used here because it also wipes persistence.
+    invalidateCache() {
+      memoryStore = [];
+      hydratePromise = null;
+    }
+
     async getCards() {
       await this.hydrate();
       return this.getStorage();
@@ -331,6 +341,11 @@ let studioKeyController = null;
       const flipBtnLive = container.querySelector('#fc-flip-btn:not([hidden])');
       const gradeRowLive = container.querySelector('#fc-grade-btns:not([hidden])');
       if ((event.key === ' ' || event.key === 'Enter') && flipBtnLive) {
+        // Enter/Space on a focused button or link must activate that control,
+        // not be reinterpreted as a card flip; otherwise keyboard users cannot
+        // open the create-card form (or operate any button) while a due card
+        // is showing.
+        if (target?.closest?.('button, a, [role="button"], [role="link"]')) return;
         event.preventDefault();
         announce('Answer shown. Rate the card with keys 1, 2, 4, or 5.');
         flipBtnLive.click();
@@ -387,6 +402,7 @@ let studioKeyController = null;
     reviewCard: (id, grade) => manager.reviewCard(id, grade),
     getDueCards: (deck) => manager.getDueCards(deck),
     deleteCard: (id) => manager.deleteCard(id),
+    invalidateCache: () => manager.invalidateCache(),
     renderStudio,
   };
 })();

@@ -6,8 +6,8 @@ Production releases are built from an exact commit on `main`, verified completel
 
 The workflow supports two safe entry points:
 
-1. **Recommended manual release:** dispatch the Release workflow from `main`. Leave the tag field blank. The workflow derives `v<version>` from `far/package.json`, verifies the exact `main` commit, creates the missing tag only after verification succeeds, and publishes the release.
-2. **Existing-tag release or retry:** push a `vMAJOR.MINOR.PATCH` tag, or manually provide an existing tag. The workflow reads that tag's own commit and `far/package.json`, verifies that identity against `main` history, and never requires an older tag to match the newer package version currently on `main`.
+1. **Recommended manual release:** dispatch the Release workflow from `main`. Leave the tag field blank. The workflow derives `v<version>` from `package.json`, verifies the exact `main` commit, creates the missing tag only after verification succeeds, and publishes the release.
+2. **Existing-tag release or retry:** push a `vMAJOR.MINOR.PATCH` tag, or manually provide an existing tag. The workflow reads that tag's own commit and `package.json`, verifies that identity against `main` history, and never requires an older tag to match the newer package version currently on `main`.
 
 ## Release decision flow
 
@@ -25,7 +25,7 @@ All release runs share one concurrency group, so manual and tag-triggered releas
 
 ## Recommended release procedure
 
-1. Update `far/package.json` version.
+1. Update `package.json` version.
 2. Regenerate and commit all required `dist` and `vendor` outputs.
 3. Merge the release commit into `main`.
 4. Open **Actions → Release → Run workflow**.
@@ -33,7 +33,7 @@ All release runs share one concurrency group, so manual and tag-triggered releas
 6. Leave **Optional existing release tag** blank unless retrying a known existing tag.
 7. Run the workflow and review the generated summaries and attached diagnostics.
 
-For example, when `far/package.json` contains `1.1.2`, a blank manual request resolves to `v1.1.2`.
+For example, when `package.json` contains `1.1.2`, a blank manual request resolves to `v1.1.2`.
 
 ## Existing-tag procedure
 
@@ -47,7 +47,7 @@ git push origin v1.2.3
 The tag must:
 
 - use `vMAJOR.MINOR.PATCH` format;
-- match the `far/package.json` version in its own commit;
+- match the `package.json` version in its own commit;
 - resolve to a commit reachable from `main`;
 - remain immutable.
 
@@ -75,7 +75,7 @@ Do not repeatedly dispatch a nonexistent explicit tag. To create the current pac
 
 ### Version mismatch
 
-For a new blank-tag release, update `far/package.json` on `main`. For an existing-tag retry, the tag must match the package version in its own tagged commit. Create a new correctly versioned tag rather than moving an existing one.
+For a new blank-tag release, update `package.json` on `main`. For an existing-tag retry, the tag must match the package version in its own tagged commit. Create a new correctly versioned tag rather than moving an existing one.
 
 ### Main advanced after dispatch
 

@@ -346,12 +346,18 @@
 }
 
 .page-title {
-  font-size: var(--text-2xl);
+  /* Fluid display scale: grows from 1.75rem on small screens to 2.5rem on
+     wide ones without a breakpoint, and pairs Playfair Display for weight
+     with tight negative tracking. */
+  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);
+  font-family: var(--font-display);
   font-weight: 800;
   font-style: normal;
   color: var(--text-primary);
-  line-height: 1.15;
+  line-height: 1.12;
+  letter-spacing: var(--tracking-tight);
   padding-bottom: 2px;
+  text-wrap: balance;
 }
 
 .page-subtitle {

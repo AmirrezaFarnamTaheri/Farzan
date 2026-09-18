@@ -156,6 +156,10 @@
     renderToken:   0,
     queuedRender:  null,
     renderTask:    null,
+    // A load generation counter: a stale `load()` whose document arrives after
+    // a newer load (or after teardown) must not commit into State.
+    loadToken:     0,
+    loadingTask:   null,
     searchQuery:   '',
     searchResults: [],          // [{page, items}]
     searchIdx:     -1,
@@ -243,6 +247,8 @@
       this._clearError();
       State.renderToken += 1;
       State.queuedRender = null;
+      // Stamp this load so a late-arriving document can be detected and dropped.
+      const loadToken = ++State.loadToken;
 
       try {
         let src;
@@ -269,8 +275,16 @@
             if (total) this._updateProgress(loaded / total);
           },
         });
+        State.loadingTask = loadingTask;
 
-        State.pdfDoc    = await loadingTask.promise;
+        const pdfDoc = await loadingTask.promise;
+        // A newer load() or a teardown advanced the token while this document
+        // was loading; discard it instead of clobbering the current viewer.
+        if (loadToken !== State.loadToken) {
+          try { pdfDoc?.destroy?.(); } catch {}
+          return;
+        }
+        State.pdfDoc    = pdfDoc;
         State.totalPages = State.pdfDoc.numPages;
         State.currentPage = 1;
         State.rotation  = 0;
@@ -299,6 +313,7 @@
         console.error('[OpenCourseDeck PDF] Load error:', err);
         this._showError(`Failed to load PDF: ${err.message}`);
       } finally {
+        if (loadToken === State.loadToken) State.loadingTask = null;
         this._showLoading(false);
       }
     },
@@ -1515,6 +1530,10 @@
       try { State.renderTask.cancel(); } catch {}
       State.renderTask = null;
     }
+    // Cancel a document still loading, or it assigns State.pdfDoc after teardown
+    State.loadToken += 1;
+    try { State.loadingTask?.destroy?.(); } catch {}
+    State.loadingTask = null;
     try { State.pdfDoc?.destroy?.(); } catch {}
     Object.assign(State, {
       pdfDoc: null,

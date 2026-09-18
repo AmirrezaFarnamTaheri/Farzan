@@ -11,6 +11,12 @@
     /* Foreground for text placed directly on --accent; light accents
        (amber, cyan, emerald) override this in accents.css. */
     --accent-contrast:  #ffffff;
+    /* Text placed directly on an accent-tinted background (active chips,
+       badges, tags, dropdown items). --accent-light only reaches ~3.4:1
+       there because it is close in luminance to the accent tint itself;
+       blending 30% toward white clears WCAG AA at 4.5:1. Use this anywhere
+       accent-colored text sits on an accent wash. */
+    --accent-on-tint:   color-mix(in srgb, var(--accent-light) 70%, white);
 
     /* ── Surface Colors (overridden per data-theme) ── */
     --bg:               #0f0f1a;
@@ -108,6 +114,12 @@
     --space-10: 40px;
     --space-12: 48px;
     --space-16: 64px;
+    /* Half-steps: 6px and 56px appear hundreds of times across components
+       (nav-item padding, chip padding, badge offsets). Promoting them to
+       named tokens keeps those surfaces on-scale instead of drifting to
+       magic numbers. */
+    --space-1_5: 6px;
+    --space-14:  56px;
 
     /* ── Typography ── */
     --font-sans:  'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -123,6 +135,9 @@
     --text-2xl:  calc(1.5rem   * var(--font-scale));
     --text-3xl:  calc(1.875rem * var(--font-scale));
     --text-4xl:  calc(2.25rem  * var(--font-scale));
+    /* Readability floor: no rendered text should fall below 11px regardless
+       of font-scale multiplier or em nesting. Apply via the .text-* helpers. */
+    --text-floor: 11px;
 
     --leading-tight:  1.25;
     --leading-snug:   1.375;
@@ -167,6 +182,10 @@
     --input-bg:        var(--surface-2);
     --input-bg-focus:  var(--surface-3);
     --input-border:    var(--border-strong);
+    /* Single tactile press depth: every interactive control compresses by
+       the same amount on active, so the UI reads as machined to one
+       tolerance. (Was 0.96 chips / 0.98 buttons / 0.985 cards.) */
+    --press-scale: 0.97;
 
     /* ── Grid gutters ── */
     --grid-gap: var(--space-4);

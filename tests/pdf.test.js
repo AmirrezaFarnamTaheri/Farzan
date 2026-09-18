@@ -641,4 +641,62 @@ describe('PDF viewer safe messages', () => {
     expect(window.PlasmaPDFViewer.next).toHaveBeenCalledTimes(2);
     expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledTimes(2);
   });
+
+  it('discards a document that finishes loading after a newer load wins', async () => {
+    const makeDoc = (label) => ({ numPages: 1, fingerprints: [label], getPage: vi.fn(async () => ({
+      rotate: 0,
+      getViewport: vi.fn(() => ({ width: 100, height: 100 })),
+      render: vi.fn(() => ({ promise: Promise.resolve() })),
+      getTextContent: vi.fn(async () => ({ items: [] })),
+    })) });
+    let resolveSlow;
+    const slow = new Promise((resolve) => { resolveSlow = resolve; });
+    globalThis.pdfjsLib = {
+      getDocument: vi.fn()
+        .mockReturnValueOnce({ promise: slow, destroy: vi.fn() })
+        .mockReturnValueOnce({ promise: Promise.resolve(makeDoc('fast')), destroy: vi.fn() }),
+    };
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));
+    window.PlasmaPDFViewer._loadAnnotations = vi.fn(async () => {});
+    window.PlasmaPDFViewer._buildThumbnails = vi.fn(async () => {});
+    window.PlasmaPDFViewer.goTo = vi.fn();
+
+    // First (slow) load starts, then a second load completes before it.
+    const slowLoad = window.PlasmaPDFViewer.load('https://docs.example.test/slow.pdf');
+    await window.PlasmaPDFViewer.load('https://docs.example.test/fast.pdf');
+    expect(window.PlasmaPDFState.pdfDoc.fingerprints).toEqual(['fast']);
+
+    // The slow document arrives last — it must not clobber the winner.
+    const slowDoc = makeDoc('slow');
+    resolveSlow(slowDoc);
+    await slowLoad;
+
+    expect(window.PlasmaPDFState.pdfDoc.fingerprints).toEqual(['fast']);
+  });
+
+  it('cancels an in-flight load when the viewer is destroyed', async () => {
+    const destroy = vi.fn();
+    let resolveLoad;
+    globalThis.pdfjsLib = {
+      getDocument: vi.fn(() => ({
+        promise: new Promise((resolve) => { resolveLoad = resolve; }),
+        destroy,
+      })),
+    };
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));
+    window.PlasmaPDFViewer._loadAnnotations = vi.fn(async () => {});
+    window.PlasmaPDFViewer._buildThumbnails = vi.fn(async () => {});
+
+    const loadPromise = window.PlasmaPDFViewer.load('https://docs.example.test/late.pdf');
+    const pendingTask = window.PlasmaPDFState.loadingTask;
+    expect(pendingTask).toBeTruthy();
+
+    window.PlasmaPDFDestroy();
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+    // A late resolution must not assign a document after teardown.
+    resolveLoad({ numPages: 9, fingerprints: ['late'], getPage: vi.fn() });
+    await loadPromise;
+    expect(window.PlasmaPDFState.pdfDoc).toBeNull();
+  });
 });

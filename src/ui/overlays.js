@@ -138,7 +138,7 @@ export const Modal = {
       const stackNow = shell().state?.openModals;
       if (stackNow) shell().state.openModals = stackNow.filter(m => m !== modal);
 
-      if (!stackNow || !stackNow.length) {
+      if (!shell().state?.openModals?.length) {
         document.body.style.overflow = '';
       }
 

@@ -81,8 +81,8 @@
 .view-courses .filter-chip.active,
 .view-courses .filter-chip[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--accent) 52%, var(--glass-border));
-  background: var(--accent-muted);
-  color: var(--accent-light);
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface-3));
+  color: var(--accent-on-tint);
   box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.12);
 }
 
@@ -237,7 +237,7 @@
 
 .view-courses .topic-title {
   color: var(--text-primary);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .view-courses .topic-meta {
@@ -585,7 +585,7 @@ article:has(#btn-theme-toggle) { min-width: 0; }
     radial-gradient(240px 120px at 100% 0%, rgba(var(--accent-rgb), 0.18), transparent 70%),
     color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
-.fc-stat-accent .fc-stat-value { color: var(--accent-light); }
+.fc-stat-accent .fc-stat-value { color: var(--accent-on-tint); }
 
 .fc-review {
   position: relative;
@@ -611,7 +611,7 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   font-weight: 700;
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "zero";
 }
@@ -735,10 +735,10 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   margin-bottom: var(--space-3);
   border-radius: var(--radius-full);
   background: var(--accent-muted);
-  color: var(--accent-light);
+  color: var(--accent-on-tint);
   font-size: 30px;
 }
-.fc-empty-title { margin: 0; font-size: var(--text-xl); font-weight: 750; }
+.fc-empty-title { margin: 0; font-size: var(--text-xl); font-weight: 700; }
 
 @media (max-width: 640px) {
   .fc-grade-row { grid-template-columns: repeat(2, 1fr); }
@@ -779,7 +779,7 @@ article:has(#btn-theme-toggle) { min-width: 0; }
 .view .page-header .page-title {
   font-family: var(--font-sans, Inter, system-ui, sans-serif);
   font-size: 1.4rem;
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: -0.015em;
   margin: 0;
 }

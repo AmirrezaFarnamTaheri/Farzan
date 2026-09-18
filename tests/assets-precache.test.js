@@ -92,6 +92,35 @@ describe('static assets and service worker precache', () => {
     expect(urls.filter((rel) => !releaseExists(rel))).toEqual([]);
   });
 
+  it('precaches the release stylesheet and worker assets the app shell fetches at runtime', () => {
+    // The app shell loads the flattened release stylesheet directly (index.html)
+    // and resolves catalog/search workers from `src/workers/` at runtime
+    // (src/core/workerAssets.js). Both are fetch-time dependencies: if they are
+    // not precached, an offline reload renders unstyled and the workers backing
+    // catalog search never start.
+    const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    const config = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
+    const sw = fs.readFileSync(path.join(releaseRoot, 'sw.js'), 'utf8');
+    const urls = [...sw.matchAll(/\{url:"([^"]+)",revision:"[^"]+"\}/g)]
+      .map((match) => normalizeLocalRef(match[1]))
+      .filter(Boolean);
+
+    expect(html).toContain('./src/styles/index.css');
+    expect(config).toContain("'src/styles/index.css'");
+    expect(urls).toContain('src/styles/index.css');
+    expect(releaseExists('src/styles/index.css')).toBe(true);
+
+    expect(config).toContain("'src/workers/*.worker.js'");
+    const workers = fs.readdirSync(path.join(releaseRoot, 'src', 'workers'))
+      .filter((file) => file.endsWith('.worker.js'))
+      .map((file) => `src/workers/${file}`);
+    expect(workers.length).toBeGreaterThan(0);
+    for (const worker of workers) {
+      expect(urls).toContain(worker);
+      expect(releaseExists(worker)).toBe(true);
+    }
+  });
+
   it('uses offline-friendly runtime caching for catalog data and app bundles', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const config = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
