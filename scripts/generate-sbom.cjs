@@ -94,9 +94,19 @@ function normalizeRootDependency(document, rootRef, legacyRefs) {
   document.dependencies = [{ ref: rootRef, dependsOn: rootDependsOn }, ...remaining];
 }
 
+function resolveNpmCli() {
+  // Prefer the npm CLI entry beside the running node binary: it works when the
+  // shell cannot exec a .cmd shim (MSYS2/git-bash spawn EINVAL) and when a bare
+  // `npm` shim is a shell script node cannot exec without a shell.
+  const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (fs.existsSync(npmCli)) return { command: process.execPath, args: [npmCli] };
+  return { command: process.platform === 'win32' ? 'npm.cmd' : 'npm', args: [] };
+}
+
 function generateSbom({ cwd = root, destination = output, spawn = childProcess.spawnSync } = {}) {
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const result = spawn(npm, [
+  const npm = resolveNpmCli();
+  const result = spawn(npm.command, [
+    ...npm.args,
     'sbom',
     '--sbom-format', 'cyclonedx',
     '--sbom-type', 'application',
