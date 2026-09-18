@@ -68,9 +68,15 @@ export function mountBookmarksView(deps = {}) {
     if (!document.body.contains(listRoot)) return;
     const notesById = new Map(notes.map(note => [note.id, note]));
     const previewText = (value, limit = 140) => {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = sanitizeHtml(value || '');
-      const text = String(tmp.textContent || '').replace(/\s+/g, ' ').trim();
+      // Inert parse: a live-document element would start loading any
+      // <img>/<video> URL in the note body just to build a text preview.
+      let text;
+      try {
+        text = new DOMParser().parseFromString(sanitizeHtml(value || ''), 'text/html').body?.textContent || '';
+      } catch {
+        text = String(value || '').replace(/<[^>]*>/g, ' ');
+      }
+      text = text.replace(/\s+/g, ' ').trim();
       return text.length > limit ? `${text.slice(0, limit - 1)}...` : text;
     };
 
