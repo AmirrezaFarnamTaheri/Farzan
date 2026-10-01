@@ -3,7 +3,7 @@
 ### Setup
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run vendor
 ```
 

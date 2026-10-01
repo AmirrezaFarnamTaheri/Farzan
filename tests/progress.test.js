@@ -17,6 +17,8 @@ describe('progress backup exports', () => {
       getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1' }]),
       getAllFolders: vi.fn(async () => [{ id: 'folder-1', name: 'Folder' }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-1', page: 2 }]),
+      getAllWatchedSegments: vi.fn(async () => [{ id: 'ws-1', topicId: 'topic-1', start: 0, end: 30, updatedAt: 40 }]),
+      getAllPdfBookmarks: vi.fn(async () => [{ id: 'bm-1', docId: 'doc-1', page: 2, updatedAt: 41 }]),
       getSetting: vi.fn(async (key) => {
         if (key === 'ocd_playlists') return [{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }];
         if (key === 'ocd_studio_board') return { version: 1, layers: [{ id: 'layer-1', elements: [] }] };
@@ -32,6 +34,10 @@ describe('progress backup exports', () => {
       getAnnotations: vi.fn(async () => []),
       saveAnnotations: vi.fn(async () => true),
       saveTimestamp: vi.fn(async () => true),
+      addWatchedSegment: vi.fn(async (record) => record),
+      addPdfBookmark: vi.fn(async (record) => record),
+      deleteSetting: vi.fn(async () => true),
+      clearUserData: vi.fn(async () => true),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -63,12 +69,18 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.4');
+    expect(payload.version).toBe('1.5');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
     expect(payload.annotations).toHaveLength(1);
     expect(payload.timestamps).toHaveLength(1);
+    expect(payload.watchedSegments).toEqual([
+      { id: 'ws-1', topicId: 'topic-1', start: 0, end: 30, updatedAt: 40 },
+    ]);
+    expect(payload.pdfBookmarks).toEqual([
+      { id: 'bm-1', docId: 'doc-1', page: 2, updatedAt: 41 },
+    ]);
     expect(payload.settings.notes).toEqual({ view: 'list' });
     expect(payload.settings.playlists).toEqual([{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }]);
     expect(payload.settings.studio).toEqual({ version: 1, layers: [{ id: 'layer-1', elements: [] }] });
@@ -223,7 +235,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-json').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.4');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.5');
 
     downloadedBlob = null;
     document.getElementById('btn-export-csv').click();
@@ -452,6 +464,177 @@ describe('progress backup exports', () => {
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'Imported Library', sources: [] } } });
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'progress', id: 'bad-topic', message: 'write failed' }),
+    ]);
+  });
+
+  it('imports watched segments and PDF bookmarks with timestamp merge semantics', async () => {
+    window.DB.getAllWatchedSegments.mockResolvedValue([
+      { id: 'ws-existing', topicId: 'topic-1', updatedAt: 100 },
+      { id: 'ws-equal', topicId: 'topic-1', updatedAt: 50 },
+    ]);
+    window.DB.getAllPdfBookmarks.mockResolvedValue([
+      { id: 'bm-existing', docId: 'doc-1', updatedAt: 100 },
+      { id: 'bm-equal', docId: 'doc-1', updatedAt: 50 },
+    ]);
+    const payload = {
+      version: '1.5',
+      watchedSegments: [
+        { id: 'ws-new', topicId: 'topic-2', start: 10, end: 20, updatedAt: 75 },
+        { id: 'ws-equal', topicId: 'topic-1', start: 20, end: 30, updatedAt: 50 },
+        { id: 'ws-existing', topicId: 'topic-1', start: 30, end: 40, updatedAt: 90 },
+      ],
+      pdfBookmarks: [
+        { id: 'bm-new', docId: 'doc-2', page: 3, updatedAt: 75 },
+        { id: 'bm-equal', docId: 'doc-1', page: 4, updatedAt: 50 },
+        { id: 'bm-existing', docId: 'doc-1', page: 5, updatedAt: 90 },
+      ],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'media-backup.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    const result = window.OpenCourseDeck.lastImportResult;
+    expect(result.preview).toEqual(expect.objectContaining({
+      version: '1.5',
+      watchedSegments: 3,
+      pdfBookmarks: 3,
+      totalValid: 6,
+    }));
+    expect(result.watchedSegments).toBe(2);
+    expect(result.pdfBookmarks).toBe(2);
+    expect(result.skipped).toBe(2);
+    expect(window.DB.addWatchedSegment).toHaveBeenCalledWith(expect.objectContaining({ id: 'ws-new', updatedAt: 75 }));
+    expect(window.DB.addWatchedSegment).toHaveBeenCalledWith(expect.objectContaining({ id: 'ws-equal', updatedAt: 50 }));
+    expect(window.DB.addWatchedSegment).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'ws-existing' }));
+    expect(window.DB.addPdfBookmark).toHaveBeenCalledWith(expect.objectContaining({ id: 'bm-new', updatedAt: 75 }));
+    expect(window.DB.addPdfBookmark).toHaveBeenCalledWith(expect.objectContaining({ id: 'bm-equal', updatedAt: 50 }));
+    expect(window.DB.addPdfBookmark).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'bm-existing' }));
+  });
+
+  it('restores watched segments and PDF bookmarks when a later import store fails', async () => {
+    const oldWatchedSegment = { id: 'ws-old', topicId: 'topic-old', start: 0, end: 10, updatedAt: 20 };
+    const oldPdfBookmark = { id: 'bm-old', docId: 'doc-old', page: 1, updatedAt: 20 };
+    window.DB.getAllWatchedSegments.mockResolvedValue([oldWatchedSegment]);
+    window.DB.getAllPdfBookmarks.mockResolvedValue([oldPdfBookmark]);
+    window.DB.saveTimestamp.mockImplementation(async (timestamp) => {
+      if (timestamp?.id === 'ts-new') throw new Error('timestamp write failed');
+      return true;
+    });
+    const payload = {
+      version: '1.5',
+      watchedSegments: [{ id: 'ws-new', topicId: 'topic-new', start: 20, end: 40, updatedAt: 100 }],
+      pdfBookmarks: [{ id: 'bm-new', docId: 'doc-new', page: 2, updatedAt: 100 }],
+      timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'media-rollback.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    const result = window.OpenCourseDeck.lastImportResult;
+    expect(result.rollbackAttempted).toBe(true);
+    expect(result.rolledBack).toBe(true);
+    expect(result.rollbackComplete).toBe(true);
+    expect(result.rollbackErrors).toEqual([]);
+    expect(result.errors).toEqual([
+      expect.objectContaining({ store: 'timestamps', id: 'ts-new', message: 'timestamp write failed' }),
+    ]);
+    expect(window.DB.addWatchedSegment).toHaveBeenCalledWith(expect.objectContaining({ id: 'ws-new' }));
+    expect(window.DB.addPdfBookmark).toHaveBeenCalledWith(expect.objectContaining({ id: 'bm-new' }));
+    expect(window.DB.addWatchedSegment).toHaveBeenCalledWith(oldWatchedSegment);
+    expect(window.DB.addPdfBookmark).toHaveBeenCalledWith(oldPdfBookmark);
+    expect(window.DB.clearUserData).toHaveBeenNthCalledWith(3, 'media');
+    const oldWatchedCall = window.DB.addWatchedSegment.mock.calls.findIndex(([record]) => record.id === 'ws-old');
+    const oldBookmarkCall = window.DB.addPdfBookmark.mock.calls.findIndex(([record]) => record.id === 'bm-old');
+    expect(window.DB.addWatchedSegment.mock.invocationCallOrder[oldWatchedCall])
+      .toBeGreaterThan(window.DB.clearUserData.mock.invocationCallOrder[2]);
+    expect(window.DB.addPdfBookmark.mock.invocationCallOrder[oldBookmarkCall])
+      .toBeGreaterThan(window.DB.clearUserData.mock.invocationCallOrder[2]);
+  });
+
+  it('rejects the import before writes when a rollback snapshot read fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    window.DB.getAllWatchedSegments.mockRejectedValueOnce(new Error('watched snapshot unavailable'));
+    const payload = {
+      version: '1.5',
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', updatedAt: 100 }],
+      watchedSegments: [{ id: 'ws-new', topicId: 'topic-1', start: 0, end: 10, updatedAt: 100 }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'unreadable-snapshot.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('watched snapshot unavailable'),
+    );
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.DB.addWatchedSegment).not.toHaveBeenCalled();
+    expect(window.DB.addPdfBookmark).not.toHaveBeenCalled();
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+  });
+
+  it('reports incomplete rollback without claiming that partial changes were removed', async () => {
+    window.DB.saveNote.mockImplementation(async (note) => {
+      if (note.id === 'new-note') throw new Error('note write failed');
+      return true;
+    });
+    window.DB.clearUserData.mockImplementation(async (scope) => {
+      if (scope === 'progress') throw new Error('progress clear failed');
+      return true;
+    });
+    const payload = {
+      version: '1.4',
+      notes: [{ id: 'new-note', title: 'Incoming note', updatedAt: 100 }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'incomplete-rollback.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    const result = window.OpenCourseDeck.lastImportResult;
+    expect(result.rollbackAttempted).toBe(true);
+    expect(result.rolledBack).toBe(false);
+    expect(result.rollbackComplete).toBe(false);
+    expect(result.rollbackErrors).toEqual(expect.arrayContaining([
+      expect.stringContaining('progress clear failed'),
+    ]));
+    expect(window.DB.clearUserData).toHaveBeenCalledWith('media');
+    expect(window.DB.clearUserData).toHaveBeenCalledWith('notes');
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Rollback incomplete'),
+    );
+    expect(window.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('No partial backup changes were kept'),
+    );
+  });
+
+  it('deletes settings that were absent before a failed import during rollback', async () => {
+    window.DB.getSetting.mockResolvedValue(null);
+    window.DB.saveTimestamp.mockImplementation(async (timestamp) => {
+      if (timestamp?.id === 'ts-new') throw new Error('timestamp write failed');
+      return true;
+    });
+    const payload = {
+      version: '1.5',
+      settings: { notes: { view: 'grid' } },
+      timestamps: [{ id: 'ts-new', topicId: 'topic-1' }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify(payload)], 'absent-settings-rollback.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_notes_settings', { view: 'grid' });
+    expect(window.OpenCourseDeck.lastImportResult.rolledBack).toBe(true);
+    expect(window.DB.deleteSetting.mock.calls.map(([key]) => key).sort()).toEqual([
+      'ocd_flashcards',
+      'ocd_notes_settings',
+      'ocd_playlists',
+      'ocd_studio_board',
+      'ocd_user_library',
     ]);
   });
 

@@ -35,6 +35,8 @@ describe('Canvas board restore races', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    localStorage.clear();
+    delete window.DB;
     ctx = {
       setTransform: vi.fn(),
       clearRect: vi.fn(),
@@ -162,5 +164,75 @@ describe('Canvas board restore races', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it('adopts a legacy-only board and persists it canonically', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    const legacy = boardWith(['legacy']);
+    const saveSetting = vi.fn(async () => true);
+    window.DB = {
+      getSetting: vi.fn(async (key) => (key === 'ocd_canvas_board' ? legacy : null)),
+      saveSetting,
+    };
+
+    await expect(canvas.restoreBoard()).resolves.toBe(true);
+
+    expect(elementIds()).toEqual(['legacy']);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', expect.objectContaining({
+      layers: expect.arrayContaining([expect.objectContaining({ elements: [expect.objectContaining({ id: 'legacy' })] })]),
+    }));
+  });
+
+  it('discards a stale legacy board read when a newer board lands first', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    let resolveLegacy;
+    let legacyReadStarted;
+    const legacyRead = new Promise((resolve) => { legacyReadStarted = resolve; });
+    const saveSetting = vi.fn(async () => true);
+    window.DB = {
+      getSetting: vi.fn((key) => {
+        if (key !== 'ocd_canvas_board') return Promise.resolve(null);
+        legacyReadStarted();
+        return new Promise((resolve) => { resolveLegacy = resolve; });
+      }),
+      saveSetting,
+    };
+
+    const restore = canvas.restoreBoard();
+    await legacyRead;
+    canvas.loadState(boardWith(['fresh']));
+    resolveLegacy(boardWith(['stale-legacy']));
+
+    await expect(restore).resolves.toBe(false);
+    expect(elementIds()).toEqual(['fresh']);
+    expect(saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('cancels an outgoing autosave before adopting a legacy board', async () => {
+    vi.useFakeTimers();
+    try {
+      const canvas = window.OpenCourseDeck.Canvas;
+      const legacy = boardWith(['legacy']);
+      const saveSetting = vi.fn(async () => true);
+      window.DB = {
+        getSetting: vi.fn(async (key) => (key === 'ocd_canvas_board' ? legacy : null)),
+        saveSetting,
+      };
+      canvas.addElement({ id: 'outgoing', type: 'rect' });
+      canvas._emitInteractiveChange('draw');
+      expect(canvas.hasPendingAutosave()).toBe(true);
+
+      await expect(canvas.restoreBoard()).resolves.toBe(true);
+
+      expect(canvas.hasPendingAutosave()).toBe(false);
+      expect(elementIds()).toEqual(['legacy']);
+      expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', expect.objectContaining({
+        layers: expect.arrayContaining([expect.objectContaining({ elements: [expect.objectContaining({ id: 'legacy' })] })]),
+      }));
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(saveSetting).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -47,7 +47,7 @@ printStudioBoardPdf,
           </div>
 
           <div class="studio-tool-group" role="group" aria-label="Notes and cards">
-            <input class="input input-sm" data-studio-text placeholder="Board note..." style="width:160px" aria-label="Board note text" />
+            <input class="input input-sm w-40" data-studio-text placeholder="Board note..." aria-label="Board note text" />
             <button class="btn btn-primary btn-sm" data-studio-add-text title="Add Note">
               <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
               <span>Note</span>
@@ -74,7 +74,7 @@ printStudioBoardPdf,
           </div>
 
           <div class="studio-tool-group" role="group" aria-label="Media and templates">
-            <input class="input input-sm" data-studio-image-url placeholder="Image URL..." style="width:140px" aria-label="Image URL" />
+            <input class="input input-sm w-32" data-studio-image-url placeholder="Image URL..." aria-label="Image URL" />
             <button class="btn btn-ghost btn-sm" data-studio-add-image title="Add Image">
               <svg class="icon" aria-hidden="true"><use href="#i-image"/></svg>
             </button>
@@ -114,18 +114,18 @@ printStudioBoardPdf,
 
         <div class="card card-filled studio-sidebar-card">
           <div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-              <input class="input input-sm" data-studio-layer-name placeholder="New layer name" style="flex:1" aria-label="New layer name" />
+            <div class="button-row mb-3">
+              <input class="input input-sm flex-1" data-studio-layer-name placeholder="New layer name" aria-label="New layer name" />
               <button class="btn btn-ghost btn-sm" data-studio-add-layer>Add layer</button>
             </div>
-            <h3 style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">Layers</h3>
+            <h3 class="studio-panel-heading">Layers</h3>
             <div data-studio-layers class="stack-sm"></div>
           </div>
 
-          <div style="border-top:1px solid var(--glass-border);padding-top:12px">
-            <h3 style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">Elements & Properties</h3>
+          <div class="border-t-strong pt-3">
+            <h3 class="studio-panel-heading">Elements & Properties</h3>
             <div data-studio-elements class="stack-sm"></div>
-            <div data-studio-properties style="margin-top:12px"></div>
+            <div data-studio-properties class="mt-3"></div>
           </div>
         </div>
       </div>

@@ -141,6 +141,82 @@ function validateBrowserAssuranceWorkflow(workflow) {
   return errors;
 }
 
+function validateReadOnlyAssurancePermissions(filename, workflow) {
+  const errors = [];
+  if (!/^permissions:\n {2}contents: read$/m.test(workflow)) {
+    errors.push(`${filename}: top-level read-only repository permissions are required`);
+  }
+  if (/^\s+contents:\s+write\s*$/m.test(workflow)) {
+    errors.push(`${filename}: assurance workflow must not request contents: write`);
+  }
+  if (workflow.includes('softprops/action-gh-release')) {
+    errors.push(`${filename}: assurance workflow must not publish a GitHub Release`);
+  }
+  return errors;
+}
+
+function validateDesktopAssuranceWorkflow(workflow) {
+  const filename = 'desktop-release.yml';
+  const errors = [
+    ...rejectFarWorkingDirectory(filename, workflow),
+    ...validateReadOnlyAssurancePermissions(filename, workflow),
+  ];
+  requireText(errors, workflow, 'name: Desktop Release Assurance', `${filename}: assurance workflow name is missing`);
+  requireText(errors, workflow, '    needs: verify', `${filename}: native assurance must depend on shared verification`);
+  requireText(errors, workflow, 'uses: ./.github/workflows/verify.yml', `${filename}: shared verification workflow is missing`);
+  requireText(errors, workflow, "source_ref: ${{ github.event_name == 'push' && github.event.after || github.sha }}", `${filename}: shared verification must use the exact trigger commit`);
+  requireText(errors, workflow, 'release_mode: false', `${filename}: shared verification must remain in non-release assurance mode`);
+
+  const checkout = extractNamedStep(workflow, 'Check out assurance source');
+  if (!checkout) {
+    errors.push(`${filename}: assurance checkout step is missing`);
+  } else {
+    requireText(errors, checkout, "ref: ${{ github.event_name == 'push' && github.event.after || github.sha }}", `${filename}: assurance checkout must use the exact trigger commit`);
+    requireText(errors, checkout, 'persist-credentials: false', `${filename}: assurance checkout must disable persisted credentials`);
+    requireText(errors, checkout, 'fetch-depth: 0', `${filename}: tag assurance requires complete history`);
+  }
+
+  requireText(errors, workflow, 'runs-on: windows-latest', `${filename}: desktop assurance must remain explicitly Windows-scoped`);
+  requireText(errors, workflow, "node-version: '22'", `${filename}: desktop assurance must use the shared Node 22 toolchain`);
+  requireText(errors, workflow, 'npm ci --ignore-scripts --legacy-peer-deps', `${filename}: native assurance requires locked, script-disabled npm ci`);
+  requireText(errors, workflow, 'npm run native:preflight:strict', `${filename}: desktop assurance must run strict native preflight`);
+  requireText(errors, workflow, 'npm run tauri:check:locked', `${filename}: desktop assurance must run a locked Cargo graph check`);
+  requireText(errors, workflow, 'npm run native:package:locked', `${filename}: desktop assurance must use locked native packaging`);
+  requireText(errors, workflow, 'Get-FileHash -Algorithm SHA256', `${filename}: desktop assurance outputs must be hashed`);
+  requireText(errors, workflow, 'if-no-files-found: error', `${filename}: desktop assurance artifact upload must fail when outputs are absent`);
+  if (workflow.includes('dtolnay/rust-toolchain@stable')) {
+    errors.push(`${filename}: desktop assurance must not bypass the reviewed action allowlist with a mutable Rust setup action`);
+  }
+  return errors;
+}
+
+function validateNativeWindowsWorkflow(workflow) {
+  const filename = 'native-windows.yml';
+  const errors = [
+    ...rejectFarWorkingDirectory(filename, workflow),
+    ...validateReadOnlyAssurancePermissions(filename, workflow),
+  ];
+  requireText(errors, workflow, 'pull_request:', `${filename}: pull-request trigger is missing`);
+  requireText(errors, workflow, 'workflow_dispatch:', `${filename}: manual assurance trigger is missing`);
+
+  const checkout = extractNamedStep(workflow, 'Check out native source');
+  if (!checkout) {
+    errors.push(`${filename}: native checkout step is missing`);
+  } else {
+    requireText(errors, checkout, 'persist-credentials: false', `${filename}: native checkout must disable persisted credentials`);
+  }
+
+  requireText(errors, workflow, 'runs-on: windows-latest', `${filename}: native assurance must remain explicitly Windows-scoped`);
+  requireText(errors, workflow, "node-version: '22'", `${filename}: native assurance must use Node 22`);
+  requireText(errors, workflow, 'npm ci --ignore-scripts --legacy-peer-deps', `${filename}: native assurance requires locked, script-disabled npm ci`);
+  requireText(errors, workflow, 'npm run native:preflight:strict', `${filename}: native assurance must run strict native preflight`);
+  requireText(errors, workflow, 'npm run tauri:check:locked', `${filename}: native assurance must run a locked Cargo graph check`);
+  requireText(errors, workflow, 'npm run tauri:build:locked', `${filename}: native assurance must run a locked Cargo release build`);
+  requireText(errors, workflow, 'Get-FileHash -Algorithm SHA256', `${filename}: native executable must be hashed`);
+  requireText(errors, workflow, 'if-no-files-found: error', `${filename}: native artifact upload must fail when outputs are absent`);
+  return errors;
+}
+
 function validateReleaseWorkflow(workflow) {
   const errors = [];
   const guardIndex = workflow.indexOf('      - name: Require an authoritative trigger');
@@ -214,29 +290,52 @@ function validateMaintenanceWorkflow(workflow) {
   return errors;
 }
 
+const WORKFLOW_POLICIES = new Map([
+  ['actions-maintenance.yml', validateMaintenanceWorkflow],
+  ['browser-assurance.yml', validateBrowserAssuranceWorkflow],
+  ['ci.yml', validateCiWorkflow],
+  ['desktop-release.yml', validateDesktopAssuranceWorkflow],
+  ['native-windows.yml', validateNativeWindowsWorkflow],
+  ['release.yml', validateReleaseWorkflow],
+  ['verify.yml', validateVerificationWorkflow],
+]);
+
 function validateWorkflowSet(files) {
   const errors = [];
-  for (const [filename, workflow] of Object.entries(files)) errors.push(...validateActionPins(filename, workflow));
-  errors.push(...validateCiWorkflow(files['ci.yml'] || ''));
-  errors.push(...validateVerificationWorkflow(files['verify.yml'] || ''));
-  errors.push(...validateBrowserAssuranceWorkflow(files['browser-assurance.yml'] || ''));
-  errors.push(...validateReleaseWorkflow(files['release.yml'] || ''));
-  errors.push(...validateMaintenanceWorkflow(files['actions-maintenance.yml'] || ''));
+  for (const [filename, workflow] of Object.entries(files)) {
+    errors.push(...validateActionPins(filename, workflow));
+    if (!WORKFLOW_POLICIES.has(filename)) {
+      errors.push(`${filename}: workflow-specific policy is missing`);
+    }
+  }
+  for (const [filename, validate] of WORKFLOW_POLICIES) {
+    if (!Object.hasOwn(files, filename)) {
+      errors.push(`${filename}: required workflow is missing`);
+      continue;
+    }
+    errors.push(...validate(files[filename]));
+  }
   return errors;
 }
 
+function listWorkflowFiles() {
+  const directory = path.join(REPOSITORY_ROOT, '.github', 'workflows');
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+}
+
 function readWorkflow(filename) {
-  return fs.readFileSync(path.join(REPOSITORY_ROOT, '.github', 'workflows', filename), 'utf8');
+  return fs.readFileSync(path.join(REPOSITORY_ROOT, '.github', 'workflows', filename), 'utf8').replace(/\r\n/g, '\n');
+}
+
+function readWorkflowSet() {
+  return Object.fromEntries(listWorkflowFiles().map((filename) => [filename, readWorkflow(filename)]));
 }
 
 function main() {
-  const files = {
-    'ci.yml': readWorkflow('ci.yml'),
-    'verify.yml': readWorkflow('verify.yml'),
-    'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
-    'release.yml': readWorkflow('release.yml'),
-    'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
-  };
+  const files = readWorkflowSet();
   const errors = validateWorkflowSet(files);
   if (errors.length) {
     for (const error of errors) console.error(`[workflow-check] ${error}`);
@@ -252,10 +351,14 @@ module.exports = {
   EXPECTED_ACTION_PINS,
   extractNamedStep,
   extractWorkflowDispatchTagInput,
+  listWorkflowFiles,
+  readWorkflowSet,
   validateActionPins,
   validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
+  validateDesktopAssuranceWorkflow,
   validateMaintenanceWorkflow,
+  validateNativeWindowsWorkflow,
   validateReleaseWorkflow,
   validateVerificationWorkflow,
   validateWorkflowSet,

@@ -1,8 +1,8 @@
 # OpenCourseDeck Shipping & Production Launch Verification (`SHIPPING_CHECKLIST.md`)
 
 ## 1. Code Quality & Verification Evidence
-- [x] **JS Parsing & Bundle Syntax**: `npm run validate` passed clean with 16 root modules and vendor scripts verified.
-- [x] **Unit & Regression Testing**: Vitest suite passing with 25/25 tests green across 6 test files (`flashcards.test.js`, `laser.test.js`, `launcher.test.js`, `db.test.js`, `ai-client-ext.test.js`, `offline-sync.test.js`).
+- [x] **JS Parsing & Bundle Syntax**: `npm run validate` passes with 15 root JavaScript files and the vendored browser libraries verified.
+- [x] **Unit & Regression Testing**: The full Vitest suite is green across the current 76 test files.
 - [x] **No Console Artifacts / Leftover TODOs**: Core production engines cleaned of debug logging.
 
 ## 2. Design System & Accessibility (WCAG 2.2 AA)
@@ -13,7 +13,8 @@
 ## 3. Desktop Application & Installer Packaging
 - [x] **Tauri Desktop Configuration**: `src-tauri/tauri.conf.json` configured for NSIS Windows single-file installer target (`OpenCourseDeck_1.1.2_x64-setup.exe`).
 - [x] **Root Launcher (`Run-OpenCourseDeck.cmd`)**: Canonical entry script created to auto-navigate to the repository root and run `npm run build` then `npm start`.
-- [x] **Automated CI/CD Workflow**: `.github/workflows/desktop-release.yml` created for tag-triggered cross-platform compilation and release artifact uploads.
+- [x] **Automated native assurance**: `.github/workflows/desktop-release.yml` runs shared repository verification before a Windows-only, lockfile-enforced Tauri build and uploads the unsigned result as a workflow artifact.
+- [ ] **Canonical desktop publication**: GitHub Release publication does not yet include the desktop installer; signing and canonical release integration remain release blockers.
 
 ## 4. Rollback & Emergency Contingency Plan
 - **Instant Feature Rollback**: Single-button toggle to disable WebGL background laser rendering if legacy low-spec GPUs experience WebGL context loss.

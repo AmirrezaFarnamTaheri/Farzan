@@ -58,7 +58,18 @@
 .mt-4 { margin-top: var(--space-4); }
 .mt-6 { margin-top: var(--space-6); }
 .mb-2 { margin-bottom: var(--space-2); }
+.mb-3 { margin-bottom: var(--space-3); }
 .mb-4 { margin-bottom: var(--space-4); }
+.mt-3 { margin-top: var(--space-3); }
+.px-3 { padding-left: var(--space-3); padding-right: var(--space-3); }
+.py-3 { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.flex-wrap { flex-wrap: wrap; }
+.w-32 { width: 8rem; }
+.w-40 { width: 10rem; }
+.w-52 { width: 13rem; }
+.flex-1 { flex: 1; }
+.border-t { border-top: 1px solid var(--border); }
+.border-t-strong { border-top: 1px solid var(--border-strong); }
 .p-2 { padding: var(--space-2); }
 .p-3 { padding: var(--space-3); }
 .p-4 { padding: var(--space-4); }

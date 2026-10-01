@@ -14,6 +14,27 @@ const blobUrls = new Map();
 let overlayBound = false;
 let fileDb = null;
 let fileDbPromise = null;
+let libraryMutationTail = Promise.resolve();
+
+class LibraryFileStorageUnavailableError extends Error {
+  constructor() {
+    super('Library file storage is unavailable');
+    this.name = 'LibraryFileStorageUnavailableError';
+  }
+}
+
+function serializeLibraryMutation(operation) {
+  const runLocal = () => {
+    const result = libraryMutationTail.then(operation);
+    libraryMutationTail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  const locks = globalThis.navigator?.locks;
+  if (typeof locks?.request === 'function') {
+    return locks.request('opencoursedeck-user-library', runLocal);
+  }
+  return runLocal();
+}
 
 function emptyLibrary() {
   return { version: 1, courses: {} };
@@ -62,9 +83,9 @@ function makeId(prefix) {
 }
 
 function openFileDb() {
+  if (typeof indexedDB === 'undefined' || indexedDB == null) return Promise.resolve(null);
   if (fileDb) return Promise.resolve(fileDb);
   if (fileDbPromise) return fileDbPromise;
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   fileDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(FILE_DB_NAME, 1);
     request.onupgradeneeded = () => {
@@ -91,9 +112,12 @@ function openFileDb() {
   return fileDbPromise;
 }
 
-async function withFileStore(mode, fn) {
+async function withFileStore(mode, fn, { required = false } = {}) {
   const db = await openFileDb();
-  if (!db) return null;
+  if (!db) {
+    if (required) throw new LibraryFileStorageUnavailableError();
+    return null;
+  }
   return new Promise((resolve, reject) => {
     let tx;
     try {
@@ -105,7 +129,14 @@ async function withFileStore(mode, fn) {
       return;
     }
     const store = tx.objectStore(FILE_STORE);
-    const request = fn(store);
+    let request;
+    try {
+      request = fn(store);
+    } catch (error) {
+      try { tx.abort(); } catch { /* transaction may already be inactive */ }
+      reject(error);
+      return;
+    }
     let result;
     if (request) {
       request.onsuccess = () => { result = request.result; };
@@ -150,12 +181,23 @@ export async function loadLibrary() {
 async function persistLibrary(library, extra = {}) {
   const next = cloneLibrary(library);
   await window.DB?.saveSetting?.(LIBRARY_SETTING_KEY, next);
-  overlayLibrary(next);
-  window.OpenCourseDeck?.bus?.emit?.('library:changed', {
-    courses: Object.keys(next.courses).length,
-    ...extra,
-  });
+  // Metadata is committed before these best-effort notifications. A listener
+  // failure must not make callers compensate already-committed file records.
+  try { overlayLibrary(next); } catch { /* post-commit refresh is best effort */ }
+  try {
+    window.OpenCourseDeck?.bus?.emit?.('library:changed', {
+      courses: Object.keys(next.courses).length,
+      ...extra,
+    });
+  } catch { /* post-commit notification is best effort */ }
   return next;
+}
+
+export async function clearLibraryFiles() {
+  const cleared = await withFileStore('readwrite', (store) => store.clear(), { required: true });
+  revokeAllCachedUrls();
+  closeFileDb();
+  return cleared !== false;
 }
 
 export function overlayLibrary(library) {
@@ -251,6 +293,10 @@ async function deleteLibraryFile(id) {
   } catch { /* ignore missing stores during reset */ }
 }
 
+async function deleteLibraryFiles(ids) {
+  for (const id of new Set(ids)) await deleteLibraryFile(id);
+}
+
 function courseTopics(course) {
   if (!Array.isArray(course.sources) || !course.sources.length) {
     course.sources = [{ label: 'My Library', topics: [] }];
@@ -284,7 +330,7 @@ export async function putLibraryFile(file, { kind = 'file' } = {}) {
     record.bytes = Array.from(new Uint8Array(buffer));
   }
   try {
-    await withFileStore('readwrite', (store) => store.put(record));
+    await withFileStore('readwrite', (store) => store.put(record), { required: true });
   } catch (error) {
     if (error?.name === 'QuotaExceededError') {
       throw new Error('Not enough storage for this file. Free space or try a smaller file.', { cause: error });
@@ -327,33 +373,37 @@ export async function resolveMediaUrl(value) {
 
 export async function upsertCourse({ id, title, description = '' } = {}) {
   if (!String(title || '').trim() && !id) throw new TypeError('Course title is required');
-  const library = await loadLibrary();
-  const courseId = id || makeId('course');
-  ensureCourse(library, {
-    id: courseId,
-    title: String(title || '').trim() || undefined,
-    description: String(description || '').trim(),
-    overwriteTitle: Boolean(String(title || '').trim()),
+  return serializeLibraryMutation(async () => {
+    const library = await loadLibrary();
+    const courseId = id || makeId('course');
+    ensureCourse(library, {
+      id: courseId,
+      title: String(title || '').trim() || undefined,
+      description: String(description || '').trim(),
+      overwriteTitle: Boolean(String(title || '').trim()),
+    });
+    await persistLibrary(library, { courseId });
+    return { id: courseId, title: library.courses[courseId].title };
   });
-  await persistLibrary(library, { courseId });
-  return { id: courseId, title: library.courses[courseId].title };
 }
 
 export async function removeCourse(courseId) {
-  const library = await loadLibrary();
-  const course = library.courses[courseId];
-  const doomed = collectLibraryFileIds(course);
-  const stillUsed = new Set();
-  for (const [id, remaining] of Object.entries(library.courses || {})) {
-    if (id === courseId) continue;
-    collectLibraryFileIds(remaining, stillUsed);
-  }
-  delete library.courses[courseId];
-  await persistLibrary(library, { courseId });
-  for (const id of doomed) {
-    if (!stillUsed.has(id)) await deleteLibraryFile(id);
-  }
-  return true;
+  return serializeLibraryMutation(async () => {
+    const library = await loadLibrary();
+    const course = library.courses[courseId];
+    const doomed = collectLibraryFileIds(course);
+    const stillUsed = new Set();
+    for (const [id, remaining] of Object.entries(library.courses || {})) {
+      if (id === courseId) continue;
+      collectLibraryFileIds(remaining, stillUsed);
+    }
+    delete library.courses[courseId];
+    await persistLibrary(library, { courseId });
+    for (const id of doomed) {
+      if (!stillUsed.has(id)) await deleteLibraryFile(id);
+    }
+    return true;
+  });
 }
 
 export async function addTopic({
@@ -366,48 +416,66 @@ export async function addTopic({
 } = {}) {
   const topicTitle = String(title || '').trim();
   if (!topicTitle) throw new TypeError('Topic title is required');
-  const library = await loadLibrary();
-  const { id, course } = resolveOrCreateCourse(library, { courseId, courseTitle });
-  const topics = courseTopics(course);
-  const topicId = makeId('topic');
-  topics.push({
-    title: topicTitle,
-    url: topicId,
-    videos: Array.isArray(videos) ? videos : [],
-    pdfs: Array.isArray(pdfs) ? pdfs : [],
-    iframes: Array.isArray(iframes) ? iframes : [],
+  return serializeLibraryMutation(async () => {
+    const library = await loadLibrary();
+    const { id, course } = resolveOrCreateCourse(library, { courseId, courseTitle });
+    const topics = courseTopics(course);
+    const topicId = makeId('topic');
+    topics.push({
+      title: topicTitle,
+      url: topicId,
+      videos: Array.isArray(videos) ? videos : [],
+      pdfs: Array.isArray(pdfs) ? pdfs : [],
+      iframes: Array.isArray(iframes) ? iframes : [],
+    });
+    await persistLibrary(library, { courseId: id });
+    return { courseId: id, topicId, title: topicTitle };
   });
-  await persistLibrary(library, { courseId: id });
-  return { courseId: id, topicId, title: topicTitle };
 }
 
 export async function addMediaFiles(files, { kind = 'video', courseId, courseTitle, title } = {}) {
   const list = [...(files || [])].filter(Boolean);
   if (!list.length) return [];
   const type = kind === 'pdf' ? 'pdf' : 'video';
-  const library = await loadLibrary();
-  const resolved = resolveOrCreateCourse(library, { courseId, courseTitle });
-  const topics = courseTopics(resolved.course);
-  const sharedTitle = list.length === 1 ? String(title || '').trim() : '';
-  const results = [];
-  for (const file of list) {
-    const stored = await putLibraryFile(file, { kind: type });
-    const topicTitle = sharedTitle
-      || String(file.name || stored.name).replace(/\.[^.]+$/, '')
-      || (type === 'pdf' ? 'PDF' : 'Video');
-    const topicId = makeId('topic');
-    const media = [{ url: stored.ref, label: stored.name }];
-    topics.push({
-      title: topicTitle,
-      url: topicId,
-      videos: type === 'video' ? media : [],
-      pdfs: type === 'pdf' ? media : [],
-      iframes: [],
-    });
-    results.push({ courseId: resolved.id, topicId, title: topicTitle });
-  }
-  await persistLibrary(library, { courseId: resolved.id });
-  return results;
+  return serializeLibraryMutation(async () => {
+    const library = await loadLibrary();
+    const previousLibrary = cloneLibrary(library);
+    const resolved = resolveOrCreateCourse(library, { courseId, courseTitle });
+    const topics = courseTopics(resolved.course);
+    const sharedTitle = list.length === 1 ? String(title || '').trim() : '';
+    const results = [];
+    const storedIds = [];
+    try {
+      for (const file of list) {
+        const stored = await putLibraryFile(file, { kind: type });
+        storedIds.push(stored.id);
+        const topicTitle = sharedTitle
+          || String(file.name || stored.name).replace(/\.[^.]+$/, '')
+          || (type === 'pdf' ? 'PDF' : 'Video');
+        const topicId = makeId('topic');
+        const media = [{ url: stored.ref, label: stored.name }];
+        topics.push({
+          title: topicTitle,
+          url: topicId,
+          videos: type === 'video' ? media : [],
+          pdfs: type === 'pdf' ? media : [],
+          iframes: [],
+        });
+        results.push({ courseId: resolved.id, topicId, title: topicTitle });
+      }
+      await persistLibrary(library, { courseId: resolved.id });
+    } catch (error) {
+      // Restore the metadata snapshot before removing newly inserted blobs.
+      // If metadata persistence itself failed, this retry may also fail; the
+      // original error is still surfaced and never converted to success.
+      if (Object.keys(previousLibrary.courses).length) {
+        try { await persistLibrary(previousLibrary); } catch { /* preserve original error */ }
+      }
+      await deleteLibraryFiles(storedIds);
+      throw error;
+    }
+    return results;
+  });
 }
 
 export async function addVideoFile(file, options = {}) {
@@ -457,6 +525,7 @@ export function initUserLibrary(root = window) {
     addMediaFiles,
     addRemoteLink,
     putLibraryFile,
+    clearLibraryFiles,
     revokeCachedUrl,
   };
 
@@ -466,6 +535,13 @@ export function initUserLibrary(root = window) {
     bus?.on?.('data:loaded', overlayFromStorage);
     bus?.on?.('data:degraded', overlayFromStorage);
     bus?.on?.('app:ready', overlayFromStorage);
+    const refreshFromSettingSync = (payload) => {
+      if (payload?.kind !== 'setting' || payload?.action !== 'save') return;
+      if (payload?.record?.key !== LIBRARY_SETTING_KEY) return;
+      overlayFromStorage();
+    };
+    bus?.on?.('sync:message', refreshFromSettingSync);
+    bus?.on?.('setting:save', refreshFromSettingSync);
     const resetCaches = () => {
       revokeAllCachedUrls();
       closeFileDb();

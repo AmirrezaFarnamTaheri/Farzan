@@ -39,7 +39,7 @@ Private learners and study groups who collect video/PDF course materials from an
 - **Plugin host** *(planned)* — `src/features/pluginHost.js` validates plugin manifests, but it is not loaded into the runtime and Settings exposes no plugin UI.
 - **Theme system** — 8 themes (dark, light, midnight, forest, ocean, sunset, rose, paper), 6 accents, 3 density modes, font scaling
 - **Keyboard shortcuts** — full keyboard navigation, shortcuts cheatsheet
-- **Backup/restore** — JSON export/import of all user data
+- **Backup/restore** — JSON export/import of app data, settings, progress, notes, bookmarks, and library metadata; local library files remain device-local and are not embedded in the JSON archive
 - **Help route** — first-run checklist, storage diagnostics, runtime parity panel
 - **PWA** — installable, service worker for offline caching
 - **Desktop app** — Tauri native shell (primary), Electron fallback

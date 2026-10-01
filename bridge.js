@@ -646,16 +646,21 @@
       return true;
     }
 
-    // Issue 7: add await _migrateOnce()
     async function deleteTimestamp(id) {
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('timestamps', id); } catch {}
+        try {
+          await idb.delete('timestamps', id);
+        } catch (error) {
+          _signalSaveError('timestamp-delete', 'indexedDB', error, { canonical: true });
+          return false;
+        }
       }
       const list = _read(KEY_TIMESTAMPS, []);
       _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
       _broadcast('timestamp', 'delete', { id });
+      return true;
     }
 
     // Notes in this codebase live in localStorage via notes.js.
@@ -816,6 +821,27 @@
       }
       _write(key, value);
       return value;
+    }
+
+    async function deleteSetting(key) {
+      const idb = _getIdb();
+      const keys = [...new Set([key, SETTING_KEY_ALIASES[key]].filter(Boolean))];
+      if (idb) {
+        await _migrateOnce();
+        try {
+          for (const settingKey of keys) await idb.delete('settings', settingKey);
+        } catch (error) {
+          _signalSaveError('setting-delete', 'indexedDB', error, { canonical: true, key });
+          return false;
+        }
+      }
+      const local = _storageRemoval(localStorage, keys, 'localStorage');
+      if (local.failures.length) {
+        _signalSaveError('setting-delete', 'localStorage', local.failures[0], { key });
+        return false;
+      }
+      _broadcast('setting', 'delete', { key });
+      return true;
     }
 
     async function getAllAnnotations() {
@@ -1010,6 +1036,16 @@
           _storageRemoval(localStorage, ['plasma-studio-board', 'plasma-canvas-board', 'ocd_studio_board', 'ocd_canvas_board'], 'localStorage'),
         ]);
       }
+      if (scope === 'preferences') {
+        return _deletionOutcome('clear-preferences', scope, [
+          _storageRemoval(localStorage, [
+            'ocd_theme', 'ocd_accent', 'ocd_density', 'ocd_font_scale', 'ocd_dir',
+            'ocd_lang', 'ocd_sidebar_collapsed', 'plasma_theme', 'plasma_accent',
+            'plasma_density', 'plasma_font_scale', 'plasma_dir',
+            'plasma_sidebar_collapsed', 'plasma_intro_seen', 'plasma_session',
+          ], 'localStorage'),
+        ]);
+      }
       if (scope === 'all') return clearAll();
       throw new TypeError(`Unknown deletion scope: ${String(scope || '(empty)')}`);
     }
@@ -1129,6 +1165,16 @@
       return [];
     }
 
+    async function getAllWatchedSegments({ requireStorage = false } = {}) {
+      const idb = _getIdb();
+      if (!idb) {
+        if (requireStorage) throw new Error('Watched segment storage is unavailable');
+        return [];
+      }
+      await _migrateOnce();
+      return (await idb.getAll('watchedSegments')) ?? [];
+    }
+
     async function getWatchedPercent(topicId, duration) {
       const segments = await getWatchedSegments(topicId);
       if (!segments.length || !duration) return 0;
@@ -1162,7 +1208,7 @@
           throw e;
         }
       }
-      return next;
+      return null;
     }
 
     async function getPdfBookmarks(docId) {
@@ -1176,6 +1222,16 @@
         } catch {}
       }
       return [];
+    }
+
+    async function getAllPdfBookmarks({ requireStorage = false } = {}) {
+      const idb = _getIdb();
+      if (!idb) {
+        if (requireStorage) throw new Error('PDF bookmark storage is unavailable');
+        return [];
+      }
+      await _migrateOnce();
+      return (await idb.getAll('pdfBookmarks')) ?? [];
     }
 
     // Issue 9: only broadcast on success
@@ -1259,13 +1315,11 @@
         const records = data[key];
         if (!Array.isArray(records) || !records.length) continue;
         if (isOverwrite) {
-          try { await idb.clear(store); } catch {}
+          await idb.clear(store);
         }
         for (const record of records) {
           if (!record) continue;
-          try { await idb.put(store, record); } catch (e) {
-            console.warn(`[DB] importBackup failed for store ${store}:`, e);
-          }
+          await idb.put(store, record);
         }
       }
 
@@ -1296,6 +1350,7 @@
       getFoldersByParent,
       getSetting,
       saveSetting,
+      deleteSetting,
       getAllAnnotations,
       getAnnotations,
       saveAnnotations,
@@ -1303,9 +1358,11 @@
       countByIndex,
       addWatchedSegment,
       getWatchedSegments,
+      getAllWatchedSegments,
       getWatchedPercent,
       addPdfBookmark,
       getPdfBookmarks,
+      getAllPdfBookmarks,
       deletePdfBookmark,
       exportBackup,
       importBackup,

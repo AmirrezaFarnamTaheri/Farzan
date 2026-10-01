@@ -233,6 +233,7 @@ describe('app topbar search rendering', () => {
     await window.OpenCourseDeck.Views.materials();
 
     const list = document.getElementById('materials-list');
+    expect(document.getElementById('materials-search').getAttribute('aria-label')).toBe('Search materials');
     expect(list.textContent).toContain('<svg');
     expect(list.textContent).toContain('<img');
     expect(list.textContent).toContain('<script>');

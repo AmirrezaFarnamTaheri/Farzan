@@ -5,7 +5,12 @@ import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { checkStaticArtifacts, compareDirs, isGeneratedBundleFile } = require('../scripts/check-generated.cjs');
+const {
+  checkStaticArtifacts,
+  checkWorkboxArtifacts,
+  compareDirs,
+  isGeneratedBundleFile,
+} = require('../scripts/check-generated.cjs');
 const tempRoots = [];
 
 function makeDir() {
@@ -106,7 +111,7 @@ describe('static release artifact verification', () => {
     write(outDir, 'data/catalog.json', '{"currentCatalog":"data/starter.json"}');
 
     const result = checkStaticArtifacts({ rootDir, actualOutdir: outDir });
-    expect(result).toEqual({ clean: true, missing: [], changed: [] });
+    expect(result).toEqual({ clean: true, missing: [], changed: [], extra: [] });
   });
 
   it('reports staged static files that drifted from their source', () => {
@@ -120,5 +125,69 @@ describe('static release artifact verification', () => {
     expect(result.clean).toBe(false);
     expect(result.changed).toEqual(['data/catalog.json']);
     expect(result.missing).toEqual(['docs/guide.md']);
+  });
+
+  it('reports missing, changed, and extra worker files as well as unexpected static files', () => {
+    const rootDir = makeDir();
+    const outDir = makeDir();
+    write(rootDir, 'src/workers/search.worker.js', 'export const search = 1;');
+    write(rootDir, 'src/workers/catalog.worker.js', 'export const catalog = 1;');
+    write(outDir, 'src/workers/search.worker.js', 'export const search = 2;');
+    write(outDir, 'src/workers/extra.worker.js', 'export const extra = true;');
+    write(outDir, 'unlisted.txt', 'not staged from a declared source');
+
+    const result = checkStaticArtifacts({ rootDir, actualOutdir: outDir });
+    expect(result.clean).toBe(false);
+    expect(result.missing).toEqual(['src/workers/catalog.worker.js']);
+    expect(result.changed).toEqual(['src/workers/search.worker.js']);
+    expect(result.extra).toEqual(['src/workers/extra.worker.js', 'unlisted.txt']);
+  });
+});
+
+describe('service-worker artifact verification', () => {
+  it('matches generated Workbox output without modifying the release directory', async () => {
+    const outDir = makeDir();
+    write(outDir, 'sw.js', 'service worker');
+    write(outDir, 'workbox-a1b2c3.js', 'workbox runtime');
+
+    const generateServiceWorker = async ({ swDest }) => {
+      fs.writeFileSync(swDest, 'service worker');
+      fs.writeFileSync(path.join(path.dirname(swDest), 'workbox-a1b2c3.js'), 'workbox runtime');
+    };
+    const result = await checkWorkboxArtifacts({
+      actualOutdir: outDir,
+      config: {},
+      generateServiceWorker,
+    });
+
+    expect(result).toEqual({
+      clean: true,
+      missing: [],
+      extra: [],
+      duplicate: [],
+      changed: [],
+    });
+    expect(fs.readFileSync(path.join(outDir, 'sw.js'), 'utf8')).toBe('service worker');
+  });
+
+  it('reports missing, changed, and extra generated Workbox artifacts', async () => {
+    const outDir = makeDir();
+    write(outDir, 'sw.js', 'stale service worker');
+    write(outDir, 'workbox-b2c3d4.js', 'unexpected runtime');
+
+    const generateServiceWorker = async ({ swDest }) => {
+      fs.writeFileSync(swDest, 'fresh service worker');
+      fs.writeFileSync(path.join(path.dirname(swDest), 'workbox-a1b2c3.js'), 'expected runtime');
+    };
+    const result = await checkWorkboxArtifacts({
+      actualOutdir: outDir,
+      config: {},
+      generateServiceWorker,
+    });
+
+    expect(result.clean).toBe(false);
+    expect(result.missing).toEqual(['workbox-a1b2c3.js']);
+    expect(result.extra).toEqual(['workbox-b2c3d4.js']);
+    expect(result.changed).toEqual(['sw.js']);
   });
 });

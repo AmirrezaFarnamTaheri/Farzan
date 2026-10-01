@@ -5,7 +5,6 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     <section class="view view-my-courses">
       <div class="page-header my-courses-header">
         <div>
-          <span class="eyebrow">Custom Curriculum</span>
           <h1 class="page-title">My Courses</h1>
           <p class="page-subtitle">Create and organize your own custom course outlines.</p>
         </div>
@@ -166,6 +165,8 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     remove.type = 'button';
     remove.textContent = 'Delete';
     remove.addEventListener('click', async () => {
+      const confirm = window.OpenCourseDeck?.UI?.confirm;
+      if (typeof confirm === 'function' && !(await confirm(`Delete “${course.title || 'this course'}” and its local media? This cannot be undone.`))) return;
       const next = (await loadCourses()).filter(item => item.id !== course.id);
       await saveCourses(next);
       try { await window.OpenCourseDeck?.UserLibrary?.removeCourse?.(course.id); } catch {}

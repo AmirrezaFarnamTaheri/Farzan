@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexedDB } from 'fake-indexeddb';
+import { IDBObjectStore, indexedDB } from 'fake-indexeddb';
 import {
   addMediaFiles,
   addPdfFile,
   addRemoteLink,
   addTopic,
   addVideoFile,
+  clearLibraryFiles,
   initUserLibrary,
   isSafeRemoteUrl,
   loadLibrary,
@@ -16,6 +17,22 @@ import {
   unwrapMediaRef,
   upsertCourse,
 } from '../src/features/userLibrary.js';
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function trackStoredFileIds() {
+  const ids = [];
+  const originalPut = IDBObjectStore.prototype.put;
+  vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function putAndTrack(...args) {
+    if (args[0]?.id) ids.push(args[0].id);
+    return originalPut.apply(this, args);
+  });
+  return ids;
+}
 
 describe('user library overlay', () => {
   beforeEach(() => {
@@ -149,6 +166,127 @@ describe('user library overlay', () => {
       { demo: { title: 'Demo', sources: [] } },
       { userOwned: true },
     );
+  });
+
+  it('serializes concurrent whole-library mutations', async () => {
+    const firstReadStarted = deferred();
+    const releaseFirstRead = deferred();
+    const releaseFirstSave = deferred();
+    let readCount = 0;
+    let saveCount = 0;
+
+    window.DB.getSetting = vi.fn(async (key) => {
+      const saved = window.DB.store[key] ?? null;
+      readCount += 1;
+      if (readCount === 1) {
+        firstReadStarted.resolve();
+        await releaseFirstRead.promise;
+      }
+      return saved;
+    });
+    window.DB.saveSetting = vi.fn(async (key, value) => {
+      saveCount += 1;
+      if (saveCount === 1) await releaseFirstSave.promise;
+      window.DB.store[key] = value;
+      return value;
+    });
+
+    const firstMutation = upsertCourse({ title: 'First course' });
+    await firstReadStarted.promise;
+    const secondMutation = addTopic({ title: 'Second topic' });
+
+    // Let the unfixed implementation reach its second read/write before the
+    // first operation is released. The serialized implementation queues it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    releaseFirstRead.resolve();
+    releaseFirstSave.resolve();
+
+    const [created, topic] = await Promise.all([firstMutation, secondMutation]);
+    const library = await loadLibrary();
+    expect(library.courses[created.id]?.title).toBe('First course');
+    expect(library.courses[topic.courseId]?.sources?.[0]?.topics || [])
+      .toEqual(expect.arrayContaining([expect.objectContaining({ title: 'Second topic' })]));
+  });
+
+  it('compensates earlier files when a later batch file write fails', async () => {
+    const storedIds = [];
+    const originalPut = IDBObjectStore.prototype.put;
+    let putCount = 0;
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function putWithFailure(...args) {
+      if (args[0]?.id) storedIds.push(args[0].id);
+      putCount += 1;
+      if (putCount === 2) {
+        const error = new Error('forced second-file failure');
+        error.name = 'ConstraintError';
+        throw error;
+      }
+      return originalPut.apply(this, args);
+    });
+
+    await expect(addMediaFiles([
+      new File(['a'], 'a.mp4', { type: 'video/mp4' }),
+      new File(['b'], 'b.mp4', { type: 'video/mp4' }),
+    ])).rejects.toMatchObject({ name: 'ConstraintError' });
+
+    expect(storedIds).toHaveLength(2);
+    await expect(resolveMediaUrl(`library-file:${storedIds[0]}`)).resolves.toBe('');
+    expect((await loadLibrary()).courses).toEqual({});
+  });
+
+  it('compensates all files when library metadata persistence fails', async () => {
+    const storedIds = trackStoredFileIds();
+    window.DB.saveSetting.mockRejectedValueOnce(new Error('forced metadata failure'));
+
+    await expect(addMediaFiles([
+      new File(['a'], 'a.mp4', { type: 'video/mp4' }),
+      new File(['b'], 'b.mp4', { type: 'video/mp4' }),
+    ])).rejects.toThrow(/forced metadata failure/);
+
+    expect(storedIds).toHaveLength(2);
+    await expect(Promise.all(
+      storedIds.map((id) => resolveMediaUrl(`library-file:${id}`)),
+    )).resolves.toEqual(['', '']);
+    expect(window.DB.store.ocd_user_library).toBeUndefined();
+  });
+
+  it('clears the auxiliary library file database through the public API', async () => {
+    const [result] = await addMediaFiles([new File(['video'], 'clear-me.mp4', { type: 'video/mp4' })]);
+    const library = await loadLibrary();
+    const ref = library.courses[result.courseId].sources[0].topics[0].videos[0];
+
+    await expect(clearLibraryFiles()).resolves.toBe(true);
+    await expect(resolveMediaUrl(ref)).resolves.toBe('');
+  });
+
+  it('rejects file writes instead of returning refs when IndexedDB is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    const file = new File(['video'], 'lecture.mp4', { type: 'video/mp4' });
+    let stored;
+
+    try {
+      stored = await putLibraryFile(file, { kind: 'video' });
+    } catch (error) {
+      expect(error).toMatchObject({ name: 'LibraryFileStorageUnavailableError' });
+    }
+    expect(stored).toBeUndefined();
+    await expect(addMediaFiles([file])).rejects.toThrow(/storage is unavailable/i);
+  });
+
+  it('does not compensate committed files when a post-commit notification fails', async () => {
+    const storedIds = trackStoredFileIds();
+    window.OpenCourseDeck.bus.emit.mockImplementationOnce(() => {
+      throw new Error('forced listener failure');
+    });
+
+    const [result] = await addMediaFiles([
+      new File(['video'], 'lecture.mp4', { type: 'video/mp4' }),
+    ]);
+    expect(result.title).toBe('lecture');
+    expect(storedIds).toHaveLength(1);
+
+    const library = await loadLibrary();
+    const ref = library.courses[result.courseId].sources[0].topics[0].videos[0];
+    await expect(resolveMediaUrl(ref)).resolves.toMatch(/^blob:/);
   });
 
   it('does not overwrite the library when a transient read failure occurs', async () => {

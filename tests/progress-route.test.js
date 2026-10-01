@@ -10,6 +10,20 @@ describe('progress route workspace', () => {
     };
   });
 
+  it('shows a non-fabricated error state when history loading fails', async () => {
+    window.OpenCourseDeck.ProgressStatsInit = vi.fn(async () => { throw new Error('storage offline'); });
+    const controller = mountProgressView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+
+    await controller.ready;
+
+    const region = document.querySelector('[data-progress-loading]');
+    expect(region.getAttribute('aria-busy')).toBe('false');
+    expect(region.querySelector('[role="alert"]')?.textContent).toMatch(/could not be loaded/i);
+    expect(document.getElementById('stat-total-topics').textContent).toBe('—');
+  });
+
   it('preserves every export, import, reset, chart, metric, and table hook', () => {
     const controller = mountProgressView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },

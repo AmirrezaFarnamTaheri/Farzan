@@ -2,7 +2,6 @@ export function mountNotFoundView({ setView, hash } = {}) {
   setView(`
     <section class="view view-notfound">
       <div class="page-header notfound-header">
-        <span class="eyebrow">404</span>
         <h1 class="page-title">Page not found</h1>
         <p class="page-subtitle">No view for <code>${String(hash ?? '')}</code></p>
       </div>

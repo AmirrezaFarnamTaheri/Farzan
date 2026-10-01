@@ -11,7 +11,6 @@ export function mountPlaylistsView({
     <section class="view view-playlists">
       <div class="page-header playlists-header">
         <div>
-          <span class="eyebrow">Study Queues</span>
           <div class="page-title-row">
             <h1 class="page-title">Playlists</h1>
             <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>

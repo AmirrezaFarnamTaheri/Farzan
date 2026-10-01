@@ -7,10 +7,14 @@ import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
 const {
   extractWorkflowDispatchTagInput,
+  listWorkflowFiles,
+  readWorkflowSet,
   validateActionPins,
   validateBrowserAssuranceWorkflow,
   validateCiWorkflow,
+  validateDesktopAssuranceWorkflow,
   validateMaintenanceWorkflow,
+  validateNativeWindowsWorkflow,
   validateReleaseWorkflow,
   validateVerificationWorkflow,
   validateWorkflowSet,
@@ -19,17 +23,7 @@ const {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
 
-function readWorkflow(filename) {
-  return fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', filename), 'utf8').replace(/\r\n/g, '\n');
-}
-
-const workflows = {
-  'ci.yml': readWorkflow('ci.yml'),
-  'verify.yml': readWorkflow('verify.yml'),
-  'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
-  'release.yml': readWorkflow('release.yml'),
-  'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
-};
+const workflows = readWorkflowSet();
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 const eslintConfig = fs.readFileSync(path.join(repositoryRoot, 'eslint.config.js'), 'utf8');
@@ -60,11 +54,78 @@ describe('module and command contract', () => {
     expect(workboxBuildScript).toContain('generateSW(config)');
     expect(workboxBuildScript).not.toContain('workbox-cli');
   });
+
+  it('keeps font budgets in the full gate and exposes locked native packaging', () => {
+    expect(packageJson.scripts.ci.split(' && ')).toContain('npm run check:font-budget');
+    expect(packageJson.scripts['tauri:bundle:locked']).toContain('-- --locked');
+    expect(packageJson.scripts['native:package:locked']).toBe(
+      'npm run tauri:bundle:locked && node scripts/stage-native-exe.cjs',
+    );
+  });
 });
 
 describe('GitHub Actions hardening', () => {
   it('accepts the committed workflow set', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
+  });
+
+  it('discovers every workflow and rejects one without a registered policy', () => {
+    expect(listWorkflowFiles()).toEqual([
+      'actions-maintenance.yml',
+      'browser-assurance.yml',
+      'ci.yml',
+      'desktop-release.yml',
+      'native-windows.yml',
+      'release.yml',
+      'verify.yml',
+    ]);
+    expect(validateWorkflowSet({ ...workflows, 'unreviewed.yml': '' })).toEqual(expect.arrayContaining([
+      expect.stringContaining('unreviewed.yml: workflow-specific policy is missing'),
+    ]));
+  });
+
+  it('requires desktop publication to be read-only assurance behind shared verification', () => {
+    const broken = workflows['desktop-release.yml']
+      .replace('  contents: read', '  contents: write')
+      .replace('    needs: verify\n', '')
+      .replace('    uses: ./.github/workflows/verify.yml', '    runs-on: ubuntu-latest')
+      .replace("      source_ref: ${{ github.event_name == 'push' && github.event.after || github.sha }}", '      source_ref: main')
+      .replace('      release_mode: false', '      release_mode: true');
+
+    expect(validateDesktopAssuranceWorkflow(broken)).toEqual(expect.arrayContaining([
+      expect.stringContaining('read-only repository permissions'),
+      expect.stringContaining('must depend on shared verification'),
+      expect.stringContaining('shared verification workflow'),
+      expect.stringContaining('exact trigger commit'),
+      expect.stringContaining('non-release assurance mode'),
+    ]));
+    expect(workflows['desktop-release.yml']).not.toContain('softprops/action-gh-release');
+  });
+
+  it('requires locked, read-only Windows assurance in both native workflows', () => {
+    const desktop = workflows['desktop-release.yml']
+      .replace('npm ci --ignore-scripts --legacy-peer-deps', 'npm ci')
+      .replace('npm run native:preflight:strict', 'npm run native:preflight')
+      .replace('npm run tauri:check:locked', 'npm run tauri:check')
+      .replace('npm run native:package:locked', 'npm run native:package');
+    const native = workflows['native-windows.yml']
+      .replace('          persist-credentials: false\n', '')
+      .replace('npm ci --ignore-scripts --legacy-peer-deps', 'npm ci')
+      .replace('npm run tauri:check:locked', 'npm run tauri:check')
+      .replace('npm run tauri:build:locked', 'npm run tauri:build');
+
+    expect(validateDesktopAssuranceWorkflow(desktop)).toEqual(expect.arrayContaining([
+      expect.stringContaining('locked, script-disabled npm ci'),
+      expect.stringContaining('strict native preflight'),
+      expect.stringContaining('locked Cargo graph check'),
+      expect.stringContaining('locked native packaging'),
+    ]));
+    expect(validateNativeWindowsWorkflow(native)).toEqual(expect.arrayContaining([
+      expect.stringContaining('disable persisted credentials'),
+      expect.stringContaining('locked, script-disabled npm ci'),
+      expect.stringContaining('locked Cargo graph check'),
+      expect.stringContaining('locked Cargo release build'),
+    ]));
   });
 
   it('requires CI and release to share one verification implementation', () => {

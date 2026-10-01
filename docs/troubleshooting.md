@@ -47,7 +47,7 @@ Try:
 
 ### PDF Search Is Slow
 
-Large PDFs can be slow because the current search path scans page text. See [roadmap.md](roadmap.md) for the planned cached, cancelable search index.
+Large PDFs can be slow because the current search path scans page text. Use the page navigation controls while a search is running; repeated searches over a very large document may take longer than smaller documents.
 
 ### Notes Feel Slow With Many Items
 

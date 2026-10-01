@@ -1077,7 +1077,7 @@
       }
     },
 
-    restoreBoard() {
+    async restoreBoard() {
       // A restore supersedes whatever unsaved interactive change is still in
       // the debounce window — flushing it would write the outgoing snapshot
       // back over the board the caller is about to reload.
@@ -1087,45 +1087,58 @@
       // this read returns is stale and must not be applied. Without this,
       // two concurrent restores of the same key raced on resolve order.
       const epoch = this._boardEpoch;
-      const doRestore = (board) => {
-        if (this._boardEpoch !== epoch) return false;
-        if (!board || typeof board !== 'object') return false;
+      const parseBoard = (raw) => {
+        if (typeof raw === 'string') {
+          try { raw = JSON.parse(raw); } catch { return null; }
+        }
+        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+      };
+      const readSetting = (key) => window.DB?.getSetting
+        ? window.DB.getSetting(key)
+        : Promise.resolve(window.localStorage?.getItem?.(key) ?? null);
+      const persistBoard = async (board) => {
+        if (window.DB?.saveSetting) {
+          const saved = await window.DB.saveSetting(this._autosaveKey, board);
+          if (saved === false) throw new Error('Board persistence was not acknowledged');
+          return true;
+        }
+        if (window.localStorage) {
+          window.localStorage.setItem(this._autosaveKey, JSON.stringify(board));
+          return true;
+        }
+        return false;
+      };
+      const doRestore = async (raw, { persist = false } = {}) => {
+        const board = parseBoard(raw);
+        if (!board || this._boardEpoch !== epoch) return false;
+        // loadState() advances the epoch; only call it after the stale-read
+        // check. A canonical read is already persisted, while a legacy board
+        // must be adopted under the canonical key before it is acknowledged.
         this.loadState(board, { preserveViewport: true });
-        return true;
+        if (!persist) return true;
+        try {
+          return await persistBoard(this.serialize());
+        } catch {
+          return false;
+        }
       };
       // Canvas and the studio view previously autosaved to different keys
       // (`ocd_canvas_board` vs `ocd_studio_board`), so a board saved by one was
       // missed by the other. Adopt the studio key as canonical and adopt a
       // board found only under the retired key once, so nothing is stranded.
       const legacyKey = this._legacyAutosaveKey;
-      const adoptLegacy = (hasCanonical) => {
-        if (hasCanonical || !legacyKey) return;
-        const readLegacy = window.DB?.getSetting
-          ? window.DB.getSetting(legacyKey).catch?.(() => null)
-          : Promise.resolve(window.localStorage?.getItem?.(legacyKey) ?? null);
-        readLegacy.then((raw) => {
-          if (this._boardEpoch !== epoch) return;
-          if (!raw || typeof raw !== 'object') return;
-          this._flushAutosave();
-        }).catch?.(() => {});
+      const adoptLegacy = async () => {
+        if (!legacyKey || this._boardEpoch !== epoch) return false;
+        let raw;
+        try { raw = await readSetting(legacyKey); } catch { return false; }
+        return doRestore(raw, { persist: true });
       };
-      if (window.DB?.getSetting) {
-        return Promise.resolve(window.DB.getSetting(this._autosaveKey))
-          .then((board) => {
-            const restored = doRestore(board);
-            adoptLegacy(Boolean(board));
-            return restored;
-          })
-          .catch?.(() => false) ?? Promise.resolve(false);
-      }
-      try {
-        const raw = window.localStorage?.getItem(this._autosaveKey);
-        const restored = raw ? doRestore(JSON.parse(raw)) : false;
-        adoptLegacy(Boolean(raw));
-        return Promise.resolve(restored);
-      } catch {
-        return Promise.resolve(false);
-      }
+
+      let canonicalRaw;
+      try { canonicalRaw = await readSetting(this._autosaveKey); } catch { return false; }
+      const canonical = parseBoard(canonicalRaw);
+      if (canonical) return doRestore(canonical);
+      return adoptLegacy();
     },
 
     clearAutosave() {

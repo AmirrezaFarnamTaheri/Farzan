@@ -56,7 +56,6 @@ export function mountPdfView() {
   setView(`
     <section class="view view-pdf">
       <div class="page-header">
-        <span class="eyebrow">Document Reader</span>
         <h1 class="page-title">PDF Annotator</h1>
         <p class="page-subtitle">Drop a PDF here, annotate key chapters, or load via file picker.</p>
       </div>
@@ -64,21 +63,21 @@ export function mountPdfView() {
       <div class="pdf-shell">
         <aside class="pdf-sidebar" data-pdf-thumbnails></aside>
         <div class="pdf-main">
-          <div class="pdf-toolbar card card-filled" style="padding:var(--space-3);margin-bottom:var(--space-3)">
-            <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center;margin-bottom:var(--space-2)">
-              <div style="display:inline-flex;gap:var(--space-2);align-items:center">
-                <input class="input input-sm" data-pdf-search-input placeholder="Search in document..." style="width:180px" />
+          <div class="pdf-toolbar card card-filled p-3 mb-3">
+            <div class="button-row mb-2">
+              <div class="button-row">
+                <input class="input input-sm w-52" data-pdf-search-input placeholder="Search in document..." aria-label="Search PDF document" />
                 <div data-pdf-search-results class="pdf-search-results"></div>
               </div>
-              <div style="display:inline-flex;gap:4px;align-items:center">
-                <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
-                <input class="input input-sm" data-pdf-current-page value="1" style="width:52px;text-align:center" aria-label="Current page" />
+              <div class="button-row gap-1">
+                <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page" aria-label="Previous page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+                <input class="input input-sm w-32 text-center" data-pdf-current-page value="1" aria-label="Current page" />
                 <span class="text-xs text-secondary">/ <span data-pdf-total-pages>0</span></span>
-                <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page" aria-label="Next page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
                 <span class="pdf-zoom badge" data-pdf-zoom>100%</span>
               </div>
-              <div style="display:inline-flex;gap:var(--space-1);flex-wrap:wrap;align-items:center">
-                <input type="file" data-pdf-open style="display:none" />
+              <div class="button-row gap-1">
+                <input type="file" data-pdf-open hidden />
                 <button class="btn btn-primary btn-sm" data-pdf-action="open"><svg class="icon" aria-hidden="true"><use href="#i-folder-open"/></svg> <span>Open</span></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><svg class="icon" aria-hidden="true"><use href="#i-zoom-out"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><svg class="icon" aria-hidden="true"><use href="#i-zoom-in"/></svg></button>
@@ -92,9 +91,9 @@ export function mountPdfView() {
                 <button class="btn btn-ghost btn-sm" type="button" data-pdf-export-annotations>Export annotations</button>
               </div>
             </div>
-            <div class="pdf-page-note" data-pdf-page-note style="margin-top:var(--space-2);border-top:1px solid var(--border);padding-top:var(--space-2)">
-              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page..."></textarea>
-              <div class="button-row" style="margin-top:var(--space-2);display:flex;align-items:center;gap:var(--space-2)">
+            <div class="pdf-page-note mt-2 border-t pt-2" data-pdf-page-note>
+              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page..." aria-label="PDF page note"></textarea>
+              <div class="button-row mt-2">
                 <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note>Save page note</button>
                 <span class="text-sm" data-pdf-page-note-status aria-live="polite"></span>
               </div>

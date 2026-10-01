@@ -46,6 +46,15 @@
     color: var(--text-tertiary);
     font-weight: 500;
   }
+  .breadcrumb-link::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
+  }
   .breadcrumb-current {
     color: var(--text-primary);
     font-weight: 600;
@@ -1382,7 +1391,7 @@
     border-radius: var(--radius-2xl);
     border: 1px solid var(--glass-border);
     background: linear-gradient(180deg, var(--glass-bg-strong), color-mix(in srgb, var(--glass-bg) 65%, transparent));
-    box-shadow: var(--shadow-xl), var(--shadow-glow);
+    box-shadow: var(--shadow-xl);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     overflow: hidden;
@@ -1904,7 +1913,7 @@
       color-mix(in srgb, var(--glass-bg-strong) 92%, transparent),
       color-mix(in srgb, var(--surface-2) 96%, transparent)
     );
-    box-shadow: var(--shadow-xl), var(--shadow-glow);
+    box-shadow: var(--shadow-xl);
     overflow: hidden;
   }
   .shortcut-panel-header {
@@ -2698,7 +2707,7 @@
     height: 100%;
     border-radius: var(--radius-full);
     background: var(--accent);
-    transition: width var(--duration-slow) var(--ease-inout);
+    /* Progress updates are semantic state changes; avoid animating layout. */
     position: relative;
     overflow: hidden;
   }
@@ -2805,8 +2814,9 @@
     background: linear-gradient(90deg, var(--accent), var(--accent-light));
     z-index: calc(var(--z-modal) + 10);
     border-radius: 0 var(--radius-full) var(--radius-full) 0;
-    transition: width var(--duration-slow) var(--ease-inout), opacity var(--duration-base);
-    box-shadow: 0 0 8px var(--accent);
+    /* The page meter has no content reflow; opacity is the only animated property. */
+    transition: opacity var(--duration-base);
+    box-shadow: var(--shadow-xs);
   }
 
 /* Alert Banner */
@@ -2934,7 +2944,7 @@
     max-width: 100%;
     position: relative;
     overflow: hidden;
-    animation: toast-in var(--duration-base) var(--ease-spring) forwards;
+    animation: toast-in var(--duration-base) var(--ease-out) forwards;
   }
   .toast::before {
     content: '';
@@ -3015,10 +3025,52 @@
   .toast-error,   .toast.error   { --toast-color: var(--error); }
   .toast-warning, .toast.warning { --toast-color: var(--warning); }
   .toast-info,    .toast.info    { --toast-color: var(--info); }
-  .toast[class*="toast-"] { border-left: 3px solid var(--toast-color, var(--accent)); }
+  .toast[class*="toast-"] { border-color: color-mix(in srgb, var(--toast-color, var(--accent)) 34%, var(--border-strong)); }
   .toast .toast-timer { background: var(--toast-color, var(--accent)); }
 
-/* Tab List */
+.studio-panel-heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* PDF reader layout: the document is primary; thumbnails support it. */
+.pdf-shell {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  min-height: 0;
+  gap: var(--space-4);
+}
+.pdf-sidebar,
+.pdf-main,
+.pdf-viewer-wrap {
+  min-width: 0;
+  min-height: 0;
+}
+.pdf-sidebar,
+.pdf-viewer-wrap {
+  overflow: auto;
+}
+.pdf-main {
+  display: flex;
+  flex-direction: column;
+}
+.pdf-viewer {
+  min-height: 420px;
+}
+@media (max-width: 720px) {
+  .pdf-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .pdf-sidebar {
+    max-height: 148px;
+  }
+  .pdf-viewer {
+    min-height: 60vh;
+  }
+}
+
   .tabs {
     display: flex;
     flex-direction: column;
@@ -3208,8 +3260,7 @@
   .accordion-body {
     max-height: 0;
     overflow: hidden;
-    transition: max-height var(--duration-slow) var(--ease-inout),
-                padding var(--duration-base);
+    /* Disclosure state changes are instantaneous to avoid layout animation. */
     padding: 0 var(--space-5);
     font-size: var(--text-sm);
     color: var(--text-secondary);

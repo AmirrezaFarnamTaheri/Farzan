@@ -24,7 +24,7 @@
   position: sticky;
   top: 0;
   z-index: 70;
-  transition: width var(--duration-base) var(--ease-out), flex-basis var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+  transition: transform var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
 
 .sidebar.sidebar-collapsed {
@@ -174,7 +174,7 @@
   background:
     radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), transparent 55%),
     linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 35%, #06b6d4) 100%);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-logo-text {

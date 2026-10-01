@@ -29,6 +29,9 @@ module.exports = {
     'docs/**',
   ],
   swDest: 'dist/sw.js',
+  // Production output intentionally omits source maps. Keeping this explicit
+  // makes Workbox revisions describe the exact bytes that will be served.
+  sourcemap: false,
   maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
   // Keep a new worker waiting until existing clients naturally release it.
   // This prevents an update from taking control and reloading a page while a

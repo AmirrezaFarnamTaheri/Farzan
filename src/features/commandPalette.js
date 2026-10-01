@@ -104,7 +104,7 @@ export function initCommandPalette() {
     { label: 'Create course', action: () => app().AddContent?.createCourse?.(), cat: 'action' },
     { label: 'Add URL', action: () => app().AddContent?.addLink?.(), cat: 'action' },
     // Actions
-    { label: 'Export backup', action: () => window.ProgressStats?.exportJSON?.(), cat: 'action' },
+    { label: 'Export app-data JSON', action: () => window.ProgressStats?.exportJSON?.(), cat: 'action' },
     { label: 'Show keyboard shortcuts', action: () => window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.(), cat: 'action' },
     { label: 'Open first-run guide', hash: '#/help', cat: 'action' },
     { label: 'Reload app', action: () => window.location.reload(), cat: 'action' },

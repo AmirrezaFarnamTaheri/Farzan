@@ -47,7 +47,7 @@
 
 - Startup timings are available through `?debug=1` and include bundle import, bundle-to-ready, and app init durations.
 - High-impact lazy-init candidates are `notes.js`, `pdf.js`, `player.js`, `canvas.js`, and progress charts.
-- Known hotspots are tracked in `docs/roadmap.md`.
+- Known limitations are documented in the troubleshooting and release guides.
 
 ### Rendering performance
 

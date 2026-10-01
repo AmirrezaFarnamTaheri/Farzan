@@ -162,14 +162,14 @@ Every interactive control satisfies all 8 states:
 
 | Dimension | Audit Check | Result |
 |---|---|---|
-| **Color** | No generic purple gradients; Blue Ocean lapis & archival palette; 60-30-10 ratio. | **PASS (10/10)** |
-| **Typography** | Authentic pairing (`Playfair Display` Roman + `Inter` + `JetBrains Mono`); tabular-num telemetry; no italic serif heroes. | **PASS (10/10)** |
-| **Layout** | 12-col bento with connected evidence trail; no hero + 3-cards boilerplate; intentional inspector drawer; `min-h-[100dvh]` mobile viewport stability. | **PASS (10/10)** |
-| **Components** | Full 8-state matrix; visible focus rings; buttons ranked by importance not semantic colors; double-bezel concentric curves. | **PASS (10/10)** |
-| **Motion** | Custom cubic-bezier spring and ease curves (`--ease-studio`); transform/opacity only; respects prefers-reduced-motion. | **PASS (10/10)** |
-| **Iconography** | Vector icon system matching 2px stroke and system corner radii; no emoji in UI chrome. | **PASS (10/10)** |
-| **Dark Mode** | Designed void slate (`#0B132B`), not an inverted light theme; lightness steps for elevation. | **PASS (10/10)** |
-| **Accessibility** | Contrast >= 4.5:1 across all modes; visible focus rings; >= 24px touch targets; screen-reader titles; WCAG 2.2 AA pass. | **PASS (10/10)** |
+| **Color** | No generic purple gradients; Blue Ocean lapis & archival palette; 60-30-10 ratio. | **IMPLEMENTED; verify all theme combinations** |
+| **Typography** | Authentic pairing (`Playfair Display` Roman + `Inter` + `JetBrains Mono`); tabular-num telemetry; no italic serif heroes. | **IMPLEMENTED; visual review required for long-form data** |
+| **Layout** | 12-col bento with connected evidence trail; no hero + 3-cards boilerplate; intentional inspector drawer; `min-h-[100dvh]` mobile viewport stability. | **IMPLEMENTED; responsive verification ongoing** |
+| **Components** | Full 8-state matrix; visible focus rings; buttons ranked by importance not semantic colors; double-bezel concentric curves. | **PARTIAL; state coverage is route-specific** |
+| **Motion** | Custom cubic-bezier spring and ease curves (`--ease-studio`); transform/opacity only; respects prefers-reduced-motion. | **PARTIAL; layout-property exceptions remain under review** |
+| **Iconography** | Vector icon system matching 2px stroke and system corner radii; no emoji in UI chrome. | **IMPLEMENTED; inspect dynamic icon states** |
+| **Dark Mode** | Designed void slate (`#0B132B`), not an inverted light theme; lightness steps for elevation. | **IMPLEMENTED; verify all theme combinations** |
+| **Accessibility** | Contrast >= 4.5:1 across all modes; visible focus rings; >= 24px touch targets; screen-reader titles; WCAG 2.2 AA pass. | **PARTIAL; no full certification claim** |
 
 ---
 
@@ -193,7 +193,7 @@ Every interactive control satisfies all 8 states:
   - Performance: Chart.js is loaded on demand for the Progress route, Inter is trimmed to weights 400–800, and release builds ship a single flattened stylesheet.
 - **2026-08-25**:
   - Completed comprehensive `/frontend-design-deslop` overhaul.
-  - Upgraded all 6 screen wireframes in `screenshots/` to museum-grade vector graphics with strict XML 1.0 compliance (0 comment errors).
+  - Verified the visual system against the current rendered application rather than retaining historical wireframe artifacts.
   - Built 20-icon standalone vector suite in `assets/icons/`, compiled `icon-sprite.svg`, and deployed `icons-preview.html`.
   - Updated brand identity assets (`og-cover.svg`, `favicon.svg`, `icon-192.svg`) with layered gradients and crisp vector geometry.
   - Documented complete OKLCH/sRGB token architecture, 8-state interactive component matrix, and WCAG AA accessibility compliance in `DESIGN.md`.

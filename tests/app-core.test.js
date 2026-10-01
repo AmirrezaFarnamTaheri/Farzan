@@ -390,6 +390,7 @@ describe('app shell resilience helpers', () => {
     expect(ecg.querySelector('a[href="#/courses"]')).toBeTruthy();
 
     const search = view.querySelector('[data-tag-search]');
+    expect(search.getAttribute('aria-label')).toBe('Search tags');
     search.value = 'card';
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.waitFor(() => expect(view.querySelectorAll('[data-tag-name]')).toHaveLength(1));
@@ -1432,6 +1433,29 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-delete"]')).toBeNull());
   });
 
+  it('keeps a timestamp bookmark when deletion is not explicitly acknowledged', async () => {
+    await loadApp();
+    const deleteTimestamp = vi.fn(async () => false);
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB = {
+      getAllTimestamps: vi.fn(async () => [{ id: 'ts-kept', topicId: 'topic-1', title: 'Keep me', position: 12 }]),
+      getAllNotes: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+      deleteTimestamp,
+    };
+    await window.OpenCourseDeck.Views.bookmarks();
+    await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-kept"]')).toBeTruthy());
+    const success = vi.spyOn(window.OpenCourseDeck.Toast, 'success').mockImplementation(() => {});
+    const error = vi.spyOn(window.OpenCourseDeck.Toast, 'error').mockImplementation(() => {});
+
+    document.querySelector('[data-delete-timestamp="ts-kept"]').click();
+
+    await vi.waitFor(() => expect(deleteTimestamp).toHaveBeenCalledWith('ts-kept'));
+    expect(document.querySelector('[data-bookmark-id="ts-kept"]')).toBeTruthy();
+    expect(success).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('Timestamp delete failed');
+  });
+
   it('edits timestamp bookmarks from the Bookmarks route', async () => {
     await loadApp();
     const saveTimestamp = vi.fn(async () => true);
@@ -1479,6 +1503,8 @@ describe('app shell resilience helpers', () => {
     };
 
     const controller = await window.OpenCourseDeck.Views.pdf();
+    expect(document.querySelector('[data-pdf-search-input]').getAttribute('aria-label')).toBe('Search PDF document');
+    expect(document.querySelector('[data-pdf-page-note-input]').getAttribute('aria-label')).toBe('PDF page note');
     document.querySelector('[data-pdf-page-note-input]').value = '<b>Important rhythm page</b>';
     document.querySelector('[data-pdf-save-page-note]').click();
 
@@ -2197,6 +2223,8 @@ describe('app shell resilience helpers', () => {
     };
 
     await window.OpenCourseDeck.Views.courses();
+    expect(document.querySelector('[data-timestamp-note-title]').getAttribute('aria-label')).toBe('Timestamp note title');
+    expect(document.querySelector('[data-timestamp-note-body]').getAttribute('aria-label')).toBe('Timestamp note body');
     const player = document.getElementById('course-player');
     player._pdPlayer = {
       snapshot: vi.fn(() => ({
@@ -2258,6 +2286,8 @@ describe('app shell resilience helpers', () => {
     };
 
     await window.OpenCourseDeck.Views.courses();
+    expect(document.querySelector('[data-learning-marker-text]').getAttribute('aria-label')).toBe('Learning cue chapter or transcript text');
+    expect(document.querySelector('[data-learning-marker-json]').getAttribute('aria-label')).toBe('Learning cues JSON');
     const activeTrack = {
       title: 'Loaded lecture',
       topicId: 'topic-1',

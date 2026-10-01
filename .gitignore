@@ -23,10 +23,15 @@ opencoursedeck-server.pid
 .cocoindex_code/
 downloads/
 
+# Generated verification and release evidence
+reports/ci/
+reports/generated-diff/
+reports/release/
+reports/eslint.json
+
 # Local screenshot/CDP scratch
 .edge-tmp*
 .shots.sh
-screenshots/_topbar-zoom.png
 .edge-cdp*
 build-exe.cmd
 build-native.log

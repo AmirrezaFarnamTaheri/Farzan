@@ -264,6 +264,10 @@ describe('PDF viewer safe messages', () => {
     expect(sidebar.querySelector('.thumb-loading')).toBeNull();
     expect(sidebar.querySelectorAll('.thumb-item')).toHaveLength(2);
     expect(sidebar.querySelector('[data-thumb-page="1"] .thumb-label').textContent).toBe('1');
+    const firstThumb = sidebar.querySelector('[data-thumb-page="1"]');
+    expect(firstThumb.tagName).toBe('BUTTON');
+    expect(firstThumb.getAttribute('aria-label')).toBe('Go to page 1');
+    expect(firstThumb.querySelector('canvas').getAttribute('aria-hidden')).toBe('true');
     expect(sidebar.querySelector('script,img')).toBeNull();
   });
 

@@ -1,4 +1,4 @@
-name: Desktop Release Build
+name: Desktop Release Assurance
 
 on:
   push:
@@ -6,46 +6,116 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build-tauri:
+  verify:
+    name: Shared repository verification
+    uses: ./.github/workflows/verify.yml
     permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'windows-latest'
-            args: ''
+      contents: read
+    with:
+      source_ref: ${{ github.event_name == 'push' && github.event.after || github.sha }}
+      release_mode: false
+      node_version: '22'
 
-    runs-on: ${{ matrix.platform }}
+  build-tauri:
+    name: Windows installer assurance
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Check out assurance source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
+          ref: ${{ github.event_name == 'push' && github.event.after || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate build & tests
+      - name: Verify assurance source and tag identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_COMMIT: ${{ github.event_name == 'push' && github.event.after || github.sha }}
+          TRIGGER_TAG: ${{ github.ref_name }}
         run: |
-          npm run validate
-          npm test
+          $actualCommit = (git rev-parse HEAD).Trim()
+          if ($actualCommit -ne $env:EXPECTED_COMMIT) {
+            throw "Assurance checkout is $actualCommit; expected $env:EXPECTED_COMMIT."
+          }
+          if ($env:EVENT_NAME -eq 'push') {
+            $version = (node -p "require('./package.json').version").Trim()
+            $expectedTag = "v$version"
+            if ($env:TRIGGER_TAG -ne $expectedTag) {
+              throw "Tag $env:TRIGGER_TAG does not match package version $expectedTag."
+            }
+            $tagRef = "refs/tags/$($env:TRIGGER_TAG)"
+            $tagObject = (git rev-parse $tagRef).Trim()
+            $peeledCommit = (git rev-parse "$tagRef^{commit}").Trim()
+            if ($peeledCommit -ne $actualCommit) {
+              throw "Tag $env:TRIGGER_TAG peels to $peeledCommit; expected $actualCommit."
+            }
+            if ($env:EXPECTED_COMMIT -ne $tagObject -and $env:EXPECTED_COMMIT -ne $peeledCommit) {
+              throw "Push event identifies $env:EXPECTED_COMMIT, which matches neither the tag object nor its peeled commit."
+            }
+          }
 
-      - name: Build Tauri Desktop Installer
-        run: npm run native:package
+      - name: Report native toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version --verbose
+          node --version
+          npm --version
 
-      - name: Upload Release Artifacts
-        uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Install JavaScript dependencies reproducibly
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Build verified production frontend
+        run: |
+          npm run vendor
+          npm run native:prepare
+          npm run build:release
+
+      - name: Enforce strict native prerequisites
+        run: npm run native:preflight:strict
+
+      - name: Validate Cargo graph with lockfile
+        run: npm run tauri:check:locked
+
+      - name: Build and stage locked Windows installer
+        run: npm run native:package:locked
+
+      - name: Hash desktop assurance outputs
+        run: |
+          $files = @(Get-ChildItem -LiteralPath desktop-dist -Recurse -File)
+          if ($files.Count -eq 0) {
+            throw 'Desktop assurance produced no files.'
+          }
+          $root = (Resolve-Path .).Path
+          $lines = foreach ($file in $files) {
+            $relative = [IO.Path]::GetRelativePath($root, $file.FullName).Replace('\', '/')
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            "$hash  $relative"
+          }
+          $lines | Set-Content -Encoding ascii desktop-assurance-sha256.txt
+          $lines
+
+      - name: Upload unsigned desktop assurance artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: |
-            desktop-dist/*
+          name: desktop-assurance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            desktop-dist/**
+            desktop-assurance-sha256.txt
+          if-no-files-found: error
+          retention-days: 7

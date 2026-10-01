@@ -115,7 +115,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Library snapshot</h3>
+            <h3 class="home-card-title mb-4">Library snapshot</h3>
             <div class="home-stat"><strong id="home-course-count">—</strong><span>Courses</span></div>
             <div class="home-stat"><strong id="home-topic-count">—</strong><span>Topics</span></div>
             <p class="home-card-note">Your catalog stays available offline after the first successful load.</p>
@@ -124,7 +124,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Quick tools</h3>
+            <h3 class="home-card-title mb-4">Quick tools</h3>
             <div class="home-tool-list">
               <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
               <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>

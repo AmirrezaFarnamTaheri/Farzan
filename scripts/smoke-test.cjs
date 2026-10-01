@@ -36,6 +36,48 @@ function getStatus(url) {
   return request('GET', url);
 }
 
+function getResponse(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port || 80,
+      path: u.pathname + u.search,
+      method: 'GET',
+      headers,
+      timeout: 8000,
+    }, (res) => {
+      res.resume();
+      resolve({ status: res.statusCode ?? 0, headers: res.headers });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('timeout'));
+    });
+    req.end();
+  });
+}
+
+async function assertText(origin, resourcePath, required, label = resourcePath) {
+  const response = await defaultFetchText(`${origin}${resourcePath}`);
+  if (response.status !== 200) throw new Error(`${label} -> HTTP ${response.status}`);
+  for (const value of required) {
+    if (!response.body.includes(value)) throw new Error(`${label} is missing ${JSON.stringify(value)}`);
+  }
+  return response.body;
+}
+
+async function assertJson(origin, resourcePath, validate, label = resourcePath) {
+  const response = await defaultFetchText(`${origin}${resourcePath}`);
+  if (response.status !== 200) throw new Error(`${label} -> HTTP ${response.status}`);
+  let value;
+  try { value = JSON.parse(response.body); }
+  catch (error) { throw new Error(`${label} is invalid JSON: ${error.message}`, { cause: error }); }
+  validate?.(value);
+  return value;
+}
+
 function extractChunkPaths(source, basePath = '/dist/opencoursedeck.js') {
   const paths = new Set();
   const baseDir = path.posix.dirname(basePath);
@@ -144,10 +186,53 @@ async function smokeSourceRoot() {
       '/data/opencoursedeck-starter.json',
     ];
     await assertPaths(origin, paths);
+    const currentDocs = [
+      '/README.md',
+      '/CONTRIBUTING.md',
+      '/PRODUCT.md',
+      '/DESIGN.md',
+      '/SECURITY.md',
+      '/SUPPORT.md',
+      '/docs/getting-started.md',
+      '/docs/content-and-catalog.md',
+      '/docs/backup-restore.md',
+      '/docs/troubleshooting.md',
+      '/docs/release-and-rollback.md',
+      '/docs/RELEASING.md',
+      '/docs/SHIPPING_CHECKLIST.md',
+    ];
+    await assertPaths(origin, currentDocs);
+    for (const stalePath of [
+      '/ROADMAP.md',
+      '/docs/roadmap.md',
+      '/docs/HISTORY.md',
+      '/reports/review-2026-09-18.md',
+      '/reports/review-2026-09-25.md',
+      '/screenshots/home.png',
+    ]) {
+      const code = await getStatus(`${origin}${stalePath}`);
+      if (code !== 404) throw new Error(`${stalePath} -> expected 404, got ${code}`);
+    }
+    await assertText(origin, '/manifest.json', ['OpenCourseDeck', 'start_url']);
+    await assertJson(origin, '/data/catalog.json', (value) => {
+      if (!value || typeof value !== 'object' || typeof value.currentCatalog !== 'string') throw new Error('catalog.json has no currentCatalog pointer');
+    });
+    await assertJson(origin, '/data/opencoursedeck-starter.json', (value) => {
+      if (!value || typeof value !== 'object' || !Object.keys(value).length) throw new Error('starter catalog has no course entries');
+    });
+    await assertText(origin, '/dist/sw.js', ['opencoursedeck.js']);
+    const htmlResponse = await getResponse(`${origin}/index.html`);
+    if (htmlResponse.status !== 200) throw new Error(`/index.html -> HTTP ${htmlResponse.status}`);
+    if (htmlResponse.headers['x-content-type-options'] !== 'nosniff') throw new Error('index.html is missing X-Content-Type-Options: nosniff');
+    if (!htmlResponse.headers['content-security-policy']) throw new Error('index.html is missing Content-Security-Policy');
     const chunkCount = await assertChunks(origin, '/dist/opencoursedeck.js');
 
     const headCss = await request('HEAD', `${origin}/style.css`);
     if (headCss !== 200) throw new Error(`HEAD /style.css -> HTTP ${headCss}`);
+    const validRange = await getResponse(`${origin}/data/catalog.json`, { Range: 'bytes=0-15' });
+    if (validRange.status !== 206 || !validRange.headers['content-range']) throw new Error('valid byte range did not return 206 with Content-Range');
+    const invalidRange = await getResponse(`${origin}/data/catalog.json`, { Range: 'bytes=999999-' });
+    if (invalidRange.status !== 416) throw new Error(`invalid byte range -> expected 416, got ${invalidRange.status}`);
 
     const missing = await getStatus(`${origin}/__pd_smoke_missing_file_404`);
     if (missing !== 404) throw new Error(`missing asset -> expected 404, got ${missing}`);
@@ -155,7 +240,7 @@ async function smokeSourceRoot() {
     const badDebug = await request('GET', `${origin}/__debug`);
     if (badDebug !== 405) throw new Error(`GET /__debug -> expected 405, got ${badDebug}`);
 
-    return paths.length + chunkCount + 3;
+    return paths.length + currentDocs.length + 6 + chunkCount + 4;
   } finally {
     await close(server);
   }
@@ -184,8 +269,24 @@ async function smokeReleaseRoot() {
       '/data/opencoursedeck-starter.json',
     ];
     await assertPaths(origin, paths);
+    await assertText(origin, '/manifest.json', ['OpenCourseDeck', 'start_url']);
+    await assertJson(origin, '/data/catalog.json', (value) => {
+      if (!value || typeof value !== 'object' || typeof value.currentCatalog !== 'string') throw new Error('release catalog.json has no currentCatalog pointer');
+    });
+    await assertJson(origin, '/data/opencoursedeck-starter.json', (value) => {
+      if (!value || typeof value !== 'object' || !Object.keys(value).length) throw new Error('release starter catalog has no course entries');
+    });
+    await assertText(origin, '/sw.js', ['opencoursedeck.js']);
+    for (const stalePath of ['/docs/roadmap.md', '/docs/HISTORY.md', '/reports/review-2026-09-18.md', '/screenshots/home.png']) {
+      const code = await getStatus(`${origin}${stalePath}`);
+      if (code !== 404) throw new Error(`release ${stalePath} -> expected 404, got ${code}`);
+    }
+    const releaseHtml = await getResponse(`${origin}/index.html`);
+    if (releaseHtml.status !== 200) throw new Error(`release /index.html -> HTTP ${releaseHtml.status}`);
+    if (releaseHtml.headers['x-content-type-options'] !== 'nosniff') throw new Error('release index.html is missing X-Content-Type-Options: nosniff');
+    if (!releaseHtml.headers['content-security-policy']) throw new Error('release index.html is missing Content-Security-Policy');
     const chunkCount = await assertChunks(origin, '/opencoursedeck.js');
-    return paths.length + chunkCount;
+    return paths.length + chunkCount + 4;
   } finally {
     await close(server);
   }
@@ -205,8 +306,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  assertJson,
+  assertText,
   collectChunkPaths,
   extractChunkPaths,
+  getResponse,
   main,
   smokeReleaseRoot,
   smokeSourceRoot,

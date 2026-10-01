@@ -7,7 +7,7 @@ This guide gets a new user from first launch to a useful study session.
 From the repository root:
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run first-run
 npm start
 ```

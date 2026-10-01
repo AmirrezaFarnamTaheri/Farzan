@@ -40,4 +40,24 @@ describe('migration identity', () => {
       { title: 'Second' },
     ], 3, cryptoRoot)).rejects.toMatchObject({ code: 'MIGRATION_IDENTITY_COLLISION' });
   });
+
+  it('rejects a generated identity that collides with an explicit ID regardless of ordering', async () => {
+    const record = { title: 'Collision source' };
+    const [[, generatedId]] = await buildLegacyRecords('note', [record], 3, null);
+    const explicit = { id: generatedId, title: 'Explicit source' };
+
+    await expect(buildLegacyRecords('note', [record, explicit], 3, null)).rejects.toMatchObject({
+      code: 'MIGRATION_IDENTITY_COLLISION',
+    });
+    await expect(buildLegacyRecords('note', [explicit, record], 3, null)).rejects.toMatchObject({
+      code: 'MIGRATION_IDENTITY_COLLISION',
+    });
+  });
+
+  it('rejects duplicate explicit migration IDs', async () => {
+    await expect(buildLegacyRecords('note', [
+      { id: 'legacy-note', title: 'First' },
+      { id: 'legacy-note', title: 'Second' },
+    ], 3, null)).rejects.toMatchObject({ code: 'MIGRATION_IDENTITY_COLLISION' });
+  });
 });

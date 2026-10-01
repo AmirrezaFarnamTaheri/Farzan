@@ -11,7 +11,7 @@ export function mountProgressView({ setView } = {}) {
         <div class="progress-toolbar" aria-label="Progress data actions">
           <button class="btn btn-primary" id="btn-export-json" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-            Export backup
+            Export app-data JSON
           </button>
           <button class="btn btn-ghost" id="btn-import-json" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
@@ -38,56 +38,56 @@ export function mountProgressView({ setView } = {}) {
         </div>
       </div>
 
-      <div class="progress-metric-grid" aria-label="Learning summary">
+      <div class="progress-metric-grid" aria-label="Learning summary" aria-busy="true" data-progress-loading>
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg></span>
           <span class="progress-metric-label">Total topics</span>
-          <strong id="stat-total-topics">0</strong>
+          <strong id="stat-total-topics">—</strong>
           <span class="progress-metric-note">Available in your catalog</span>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"/></svg></span>
           <span class="progress-metric-label">Completed</span>
-          <strong id="stat-done-topics">0</strong>
+          <strong id="stat-done-topics">—</strong>
           <span class="progress-metric-note">Topics marked done</span>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon icon--spin" aria-hidden="true"><use href="#i-spinner"/></svg></span>
           <span class="progress-metric-label">In progress</span>
-          <strong id="stat-in-progress">0</strong>
+          <strong id="stat-in-progress">—</strong>
           <span class="progress-metric-note">Active learning threads</span>
         </article>
 
         <article class="progress-metric progress-metric-featured">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
           <span class="progress-metric-label">Completion</span>
-          <strong id="stat-completion-pct">0%</strong>
+          <strong id="stat-completion-pct">—</strong>
           <span class="progress-metric-note">Across all tracked topics</span>
           <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
-            <div class="mini-bar" id="stat-overall-bar" style="width:0%"></div>
+            <div class="mini-bar" id="stat-overall-bar"></div>
           </div>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
           <span class="progress-metric-label">Watched</span>
-          <strong id="stat-watched-time">0:00</strong>
+          <strong id="stat-watched-time">—</strong>
           <span class="progress-metric-note">Recorded learning time</span>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
           <span class="progress-metric-label">Current streak</span>
-          <strong><span id="stat-streak">0</span><small id="stat-streak-unit"> days</small></strong>
+          <strong><span id="stat-streak">—</span><small id="stat-streak-unit"></small></strong>
           <span class="progress-metric-note">Consecutive active days</span>
         </article>
 
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar-check"/></svg></span>
           <span class="progress-metric-label">Active days</span>
-          <strong><span id="stat-active-days">0</span><small id="stat-active-days-unit"> days</small></strong>
+          <strong><span id="stat-active-days">—</span><small id="stat-active-days-unit"></small></strong>
           <span class="progress-metric-note">Days with saved activity</span>
         </article>
       </div>
@@ -151,8 +151,22 @@ export function mountProgressView({ setView } = {}) {
     </section>
   `);
 
-  window.OpenCourseDeck?.ProgressStatsInit?.();
+  const loadingRegion = document.querySelector('[data-progress-loading]');
+  const ready = Promise.resolve(window.OpenCourseDeck?.ProgressStatsInit?.())
+    .then(() => {
+      loadingRegion?.setAttribute('aria-busy', 'false');
+    })
+    .catch((error) => {
+      loadingRegion?.setAttribute('aria-busy', 'false');
+      const alert = document.createElement('p');
+      alert.className = 'progress-load-error';
+      alert.setAttribute('role', 'alert');
+      alert.textContent = 'Learning history could not be loaded. Your stored data was not changed.';
+      loadingRegion?.prepend(alert);
+      console.error('[Progress] history load failed', error);
+    });
   return {
+    ready,
     unmount() {
       try { window.OpenCourseDeck?.ProgressStats?.destroy?.(); } catch {}
     },

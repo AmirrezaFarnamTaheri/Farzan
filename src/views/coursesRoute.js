@@ -21,7 +21,6 @@ export async function mountCoursesView(deps = {}) {
     <section class="view view-courses">
       <div class="page-header">
         <div>
-          <span class="eyebrow">Curriculum & Media</span>
           <h1 class="page-title">Course Catalog</h1>
           <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
         </div>
@@ -47,7 +46,7 @@ export async function mountCoursesView(deps = {}) {
             <button class="filter-chip" type="button" data-course-filter="mixed" aria-pressed="false">Mixed</button>
             <button class="filter-chip" type="button" data-course-filter="none" aria-pressed="false">No media</button>
           </div>
-          <label class="stack-xs" style="margin-top:12px">
+          <label class="stack-xs mt-3">
             <span class="text-sm text-muted">Source scope</span>
             <select class="select" id="courses-source-scope" aria-label="Filter courses by source count">
               <option value="all">All courses</option>
@@ -69,13 +68,13 @@ export async function mountCoursesView(deps = {}) {
             </div>
           </div>
 
-          <div class="card card-filled" style="margin-top:12px">
+          <div class="card card-filled mt-3">
             <div class="card-body">
               <div id="course-player" data-player data-player-options='{"type":"video","autoplay":false,"controls":true,"theme":"dark"}'></div>
             </div>
           </div>
 
-          <div class="card card-filled timestamp-note-card" style="margin-top:12px">
+          <div class="card card-filled timestamp-note-card mt-3">
             <div class="card-body">
               <div class="timestamp-note-grid">
                 <div class="timestamp-note-copy">
@@ -84,17 +83,17 @@ export async function mountCoursesView(deps = {}) {
                   <div class="timestamp-note-status" data-timestamp-note-status aria-live="polite"></div>
                 </div>
                 <div class="timestamp-note-form">
-                  <input class="input input-sm" data-timestamp-note-title placeholder="Title" />
-                  <textarea class="input timestamp-note-textarea" data-timestamp-note-body rows="3" placeholder="Note"></textarea>
+                  <input class="input input-sm" data-timestamp-note-title placeholder="Title" aria-label="Timestamp note title" />
+                  <textarea class="input timestamp-note-textarea" data-timestamp-note-body rows="3" placeholder="Note" aria-label="Timestamp note body"></textarea>
                   <div class="button-row">
                     <button class="btn btn-ghost btn-sm" type="button" data-save-timestamp>Save bookmark</button>
                     <button class="btn btn-primary btn-sm" type="button" data-save-timestamp-note>Save linked note</button>
                   </div>
                   <details class="learning-marker-details">
                     <summary>Learning cues &amp; chapters (advanced)</summary>
-                  <div class="learning-marker-form" style="margin-top:10px">
+                  <div class="learning-marker-form mt-2">
 
-                    <input class="input input-sm" data-learning-marker-text placeholder="Chapter title or transcript line" />
+                    <input class="input input-sm" data-learning-marker-text placeholder="Chapter title or transcript line" aria-label="Learning cue chapter or transcript text" />
                     <div class="button-row">
                       <button class="btn btn-ghost btn-sm" type="button" data-save-chapter-cue>Add chapter</button>
                       <button class="btn btn-ghost btn-sm" type="button" data-save-transcript-cue>Add transcript line</button>
@@ -106,7 +105,7 @@ export async function mountCoursesView(deps = {}) {
                       <button class="btn btn-ghost btn-sm" type="button" data-export-learning-cues>Export JSON</button>
                       <button class="btn btn-ghost btn-sm" type="button" data-import-learning-cues>Import JSON</button>
                     </div>
-                    <textarea class="input timestamp-note-textarea" data-learning-marker-json rows="3" placeholder="Chapter/transcript JSON"></textarea>
+                    <textarea class="input timestamp-note-textarea" data-learning-marker-json rows="3" placeholder="Chapter/transcript JSON" aria-label="Learning cues JSON"></textarea>
                     <div class="learning-marker-list" data-learning-marker-list></div>
                     <div class="timestamp-note-status" data-learning-marker-status aria-live="polite"></div>
                   </div>

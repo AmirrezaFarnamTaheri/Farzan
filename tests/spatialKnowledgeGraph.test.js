@@ -70,8 +70,9 @@ describe('SpatialKnowledgeGraph', () => {
 
     const canvas = container.querySelector('canvas.spatial-graph-canvas');
     expect(canvas).not.toBeNull();
-    expect(canvas.getAttribute('role')).toBe('img');
-    expect(canvas.getAttribute('aria-label')).toBe('3D Spatial Knowledge Graph');
+    expect(canvas.getAttribute('role')).toBe('application');
+    expect(canvas.tabIndex).toBe(0);
+    expect(canvas.getAttribute('aria-label')).toContain('arrow keys');
     expect(canvas.style.touchAction).toBe('none');
     expect(graph.nodes.length).toBeGreaterThanOrEqual(12);
     expect(graph.edges.length).toBeGreaterThan(0);

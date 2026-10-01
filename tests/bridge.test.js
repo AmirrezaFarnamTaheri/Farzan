@@ -184,6 +184,23 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getSetting('plasma-studio-board')).toEqual({ version: 1, layers: [] });
   });
 
+  it('clearUserData removes preferences without removing learning data', async () => {
+    await window.DB.saveProgress('topic-1', 'course-1', { status: 'done' });
+    await window.DB.saveNote({ id: 'note-1', title: 'Note' });
+    localStorage.setItem('ocd_theme', 'light');
+    localStorage.setItem('plasma_theme', 'dark');
+    localStorage.setItem('ocd_density', 'compact');
+
+    const result = await window.DB.clearUserData('preferences');
+
+    expect(result.scope).toBe('preferences');
+    expect(localStorage.getItem('ocd_theme')).toBeNull();
+    expect(localStorage.getItem('plasma_theme')).toBeNull();
+    expect(localStorage.getItem('ocd_density')).toBeNull();
+    expect(await window.DB.getAllProgress()).toHaveLength(1);
+    expect(await window.DB.getAllNotes()).toHaveLength(1);
+  });
+
   it('clearUserData can remove saved playlists and Studio boards independently', async () => {
     await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
     await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
@@ -596,6 +613,120 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ id: 'delete-ts' }),
     ]));
     expect(JSON.parse(localStorage.getItem('plasma_timestamps_v1'))).toEqual([]);
+  });
+
+  it('acknowledges timestamp deletion only after canonical and local mirrors are updated', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', position: 42 });
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([{ id: 'delete-ts', topicId: 'topic-1', position: 42 }]));
+    emit.mockClear();
+
+    await expect(window.DB.deleteTimestamp('delete-ts')).resolves.toBe(true);
+
+    expect(JSON.parse(localStorage.getItem('plasma_timestamps_v1'))).toEqual([]);
+    expect(emit).toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
+      kind: 'timestamp',
+      action: 'delete',
+      record: { id: 'delete-ts' },
+    }));
+  });
+
+  it('does not acknowledge timestamp deletion when canonical deletion fails', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([{ id: 'kept-ts', topicId: 'topic-1' }]));
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async delete() { throw new Error('timestamp delete failed'); }
+    };
+    emit.mockClear();
+
+    await expect(window.DB.deleteTimestamp('kept-ts')).resolves.toBe(false);
+
+    expect(JSON.parse(localStorage.getItem('plasma_timestamps_v1'))).toEqual([{ id: 'kept-ts', topicId: 'topic-1' }]);
+    expect(emit).not.toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
+      kind: 'timestamp',
+      action: 'delete',
+    }));
+  });
+
+  it('deletes a setting from canonical, legacy, and local mirrors', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    await window.DB.saveSetting('ocd_studio_board', { version: 1, layers: [{ id: 'canonical' }] });
+    await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [{ id: 'legacy' }] });
+    localStorage.setItem('ocd_studio_board', JSON.stringify({ version: 1, layers: [{ id: 'local-canonical' }] }));
+    localStorage.setItem('plasma-studio-board', JSON.stringify({ version: 1, layers: [{ id: 'local-legacy' }] }));
+    emit.mockClear();
+
+    await expect(window.DB.deleteSetting('ocd_studio_board')).resolves.toBe(true);
+
+    expect(localStorage.getItem('ocd_studio_board')).toBeNull();
+    expect(localStorage.getItem('plasma-studio-board')).toBeNull();
+    expect(await window.DB.getSetting('ocd_studio_board')).toBeNull();
+    expect(emit).toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
+      kind: 'setting',
+      action: 'delete',
+      record: { key: 'ocd_studio_board' },
+    }));
+  });
+
+  it('preserves setting mirrors and does not broadcast when canonical deletion fails', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    await window.DB.saveSetting('ocd_studio_board', { version: 1, layers: [{ id: 'canonical' }] });
+    await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [{ id: 'legacy' }] });
+    const canonical = JSON.stringify({ version: 1, layers: [{ id: 'local-canonical' }] });
+    const legacy = JSON.stringify({ version: 1, layers: [{ id: 'local-legacy' }] });
+    localStorage.setItem('ocd_studio_board', canonical);
+    localStorage.setItem('plasma-studio-board', legacy);
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get() { return null; }
+      async delete() { throw new Error('setting delete failed'); }
+    };
+    emit.mockClear();
+
+    await expect(window.DB.deleteSetting('ocd_studio_board')).resolves.toBe(false);
+
+    expect(localStorage.getItem('ocd_studio_board')).toBe(canonical);
+    expect(localStorage.getItem('plasma-studio-board')).toBe(legacy);
+    expect(emit).not.toHaveBeenCalledWith('sync:local-change', expect.objectContaining({
+      kind: 'setting',
+      action: 'delete',
+    }));
+  });
+
+  it('returns all watched segments and PDF bookmarks from canonical storage', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    await window.DB.addWatchedSegment({ id: 'watched-1', topicId: 'topic-1', start: 0, end: 12 });
+    await window.DB.addPdfBookmark({ id: 'bookmark-1', docId: 'doc-1', page: 4 });
+
+    expect(await window.DB.getAllWatchedSegments()).toEqual([
+      expect.objectContaining({ id: 'watched-1', topicId: 'topic-1' }),
+    ]);
+    expect(await window.DB.getAllPdfBookmarks()).toEqual([
+      expect.objectContaining({ id: 'bookmark-1', docId: 'doc-1', page: 4 }),
+    ]);
+  });
+
+  it('propagates canonical media getter failures instead of returning an empty snapshot', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async getAll() { throw new Error('media read failed'); }
+    };
+
+    await expect(window.DB.getAllWatchedSegments()).rejects.toThrow('media read failed');
+    await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow('media read failed');
+  });
+
+  it('does not report a PDF bookmark as saved when IndexedDB is unavailable', async () => {
+    delete window.OpenCourseDeck.DB.PlasmaDB;
+
+    await expect(window.DB.addPdfBookmark({ docId: 'doc-1', page: 2 })).resolves.toBeNull();
   });
 
   it('updates existing timestamp records by id', async () => {

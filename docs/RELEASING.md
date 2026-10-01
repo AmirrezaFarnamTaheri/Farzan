@@ -2,7 +2,7 @@
 
 ## Overview
 
-Production releases are built from an exact commit on `main`, verified completely, bound to an immutable semantic-version tag, and published with checksums, a manifest, and an attestation.
+Production releases are built from an exact commit on `main`, verified completely, bound to an immutable semantic-version tag, and published with checksums, a manifest, an attestation, and a CycloneDX SBOM.
 
 The workflow supports two safe entry points:
 
@@ -106,6 +106,7 @@ Each release publishes:
 - `opencoursedeck-vMAJOR.MINOR.PATCH.tar.gz`;
 - `opencoursedeck-vMAJOR.MINOR.PATCH-manifest.json`;
 - `opencoursedeck-vMAJOR.MINOR.PATCH-attestation.json`;
+- `opencoursedeck-vMAJOR.MINOR.PATCH-sbom.cdx.json`;
 - `SHA256SUMS`.
 
 Consumers should verify downloaded assets:

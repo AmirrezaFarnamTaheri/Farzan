@@ -22,10 +22,12 @@ It is designed for private study libraries and offline-friendly use. The app run
 ### First Run
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run first-run
 npm start
 ```
+
+`npm run first-run` performs the explicit vendor step before building the release bundle.
 
 Open `http://localhost:5173/`.
 
@@ -74,8 +76,9 @@ For details, see [backup-restore.md](docs/backup-restore.md).
 - [Getting started](docs/getting-started.md)
 - [Content and catalog](docs/content-and-catalog.md)
 - [Backup and restore](docs/backup-restore.md)
+- [Release and rollback](docs/release-and-rollback.md)
+- [Shipping checklist](docs/SHIPPING_CHECKLIST.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Roadmap and backlog](docs/roadmap.md)
 
 The app also includes an in-app Help route at `#/help` with the first-run checklist, storage summary, backup entry, shortcuts entry point, and links to these guides.
 

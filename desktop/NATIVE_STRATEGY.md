@@ -27,7 +27,7 @@ npm run native:exe
 Build and stage an NSIS package:
 
 ```sh
-npm run native:package
+npm run native:package:locked
 ```
 
 Security and packaging shape:
@@ -69,7 +69,7 @@ This uses an installed Edge or Chrome app window. It is a development convenienc
 
 - Run the complete web CI gate.
 - Run the permanent Native Windows Assurance workflow against the release commit.
-- Build the NSIS installer with `npm run native:package`.
+- Build the NSIS installer with `npm run native:package:locked`.
 - Add and verify publisher/signing metadata.
 - Smoke-test installer install, launch, upgrade, uninstall, and rollback.
 - Verify local data, PDF, media, backup import/export, and destructive-wipe behavior in the signed build.
