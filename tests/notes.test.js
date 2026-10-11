@@ -205,6 +205,24 @@ describe('notes route filters', () => {
     expect(document.queryCommandState).not.toHaveBeenCalled();
   });
 
+  it('keeps All Notes and folder counters in sync after new and duplicated notes', () => {
+    const total = window.PlasmaNotesStore.getNotes().length;
+    const allCounter = () => document.querySelector('[data-folder-id=""] .folder-count')?.textContent;
+    const defaultCounter = () => document.querySelector('[data-folder-id="default"] .folder-count')?.textContent;
+    expect(allCounter()).toBe(String(total));
+
+    window.PlasmaNotesApp.newNote('default');
+    expect(allCounter()).toBe(String(total + 1));
+    const firstNewNote = window.DB.saveNote.mock.calls.at(-1)[0];
+    expect(firstNewNote.folderId).toBe('default');
+
+    window.PlasmaNotesApp.duplicateNote(firstNewNote.id);
+    expect(allCounter()).toBe(String(total + 2));
+    expect(defaultCounter()).toBe(String(
+      window.PlasmaNotesStore.getNotes().filter(note => note.folderId === 'default').length
+    ));
+  });
+
   it('routes note create, update, and delete through the DB bridge when available', async () => {
     window.PlasmaNotesApp.newNote('default');
     const created = window.DB.saveNote.mock.calls.at(-1)[0];

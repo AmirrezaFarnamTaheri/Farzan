@@ -112,6 +112,8 @@ test('a written rich-text note autosaves and reopens',async({page})=>{
   await expect.poll(()=>page.evaluate(async()=>{const notes=await window.DB.getAllNotes();return notes.some(n=>n.title==='Visual QA saved Plasmato note'&&String(n.content).includes('course lecture'));}),{timeout:15000}).toBe(true);
   const editorTitleFont = await page.locator('[data-note-title-input]').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
   expect(editorTitleFont, 'Long note title should not obscure editor or saved indicator').toBeLessThanOrEqual(30);
+  const notesInStore = await page.evaluate(() => window.PlasmaNotesStore.getNotes().length);
+  await expect(page.locator('[data-folder-id=""] .folder-count')).toHaveText(String(notesInStore));
   await shot(page,'functional','04-written-note-persisted');
   await visit(page,'home');await visit(page,'notes');
   await expect(page.locator('[data-notes-list]')).toContainText('Visual QA saved Plasmato note');

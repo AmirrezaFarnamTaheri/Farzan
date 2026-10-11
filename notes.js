@@ -1959,6 +1959,9 @@
     newNote(folderId = NotesList._filter.folderId ?? 'default') {
       const note = Store.createNote({ folderId });
       NotesList.render();
+      // Folder counts are a separate view; refresh them after creating notes.
+      // Otherwise the list can show two notes while All Notes still says 0.
+      FoldersPanel.render();
       this.openNote(note.id);
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
     },
@@ -2002,6 +2005,7 @@
         title: `${note.title} (Copy)`,
       });
       NotesList.render();
+      FoldersPanel.render();
       this.openNote(copy.id);
     },
 
