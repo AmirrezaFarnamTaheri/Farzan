@@ -20,4 +20,4 @@ async function make(group) {
   await sharp({create:{width:cols*w+22,height:Math.ceil(files.length/cols)*h+24,channels:3,background:'#f1f5f8'}}).composite(composite).png().toFile(target);
   console.log('[visual-audit] sheet',group,'screenshots',files.length,'=>',target);
 }
-(async()=>{for(const name of ['desktop','tablet','mobile','functional'])await make(name);})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{for(const name of ['desktop','tablet','mobile','light-desktop','light-mobile','standalone','functional'])await make(name);})().catch(e=>{console.error(e);process.exitCode=1});
