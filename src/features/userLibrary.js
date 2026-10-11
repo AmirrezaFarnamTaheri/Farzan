@@ -78,9 +78,9 @@ function makeId(prefix) {
 }
 
 function openFileDb() {
+  if (typeof indexedDB === 'undefined' || indexedDB == null) return Promise.resolve(null);
   if (fileDb) return Promise.resolve(fileDb);
   if (fileDbPromise) return fileDbPromise;
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   fileDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(FILE_DB_NAME, 1);
     request.onupgradeneeded = () => {
@@ -107,9 +107,12 @@ function openFileDb() {
   return fileDbPromise;
 }
 
-async function withFileStore(mode, fn) {
+async function withFileStore(mode, fn, { required = false } = {}) {
   const db = await openFileDb();
-  if (!db) return null;
+  if (!db) {
+    if (required) throw new Error('Library file storage is unavailable; file data cannot be cleared.');
+    return null;
+  }
   return new Promise((resolve, reject) => {
     let tx;
     try {
@@ -120,16 +123,20 @@ async function withFileStore(mode, fn) {
       reject(error);
       return;
     }
-    const store = tx.objectStore(FILE_STORE);
-    const request = fn(store);
     let result;
-    if (request) {
-      request.onsuccess = () => { result = request.result; };
-      request.onerror = () => reject(request.error);
-    }
     tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error || new Error('Library file transaction failed'));
     tx.onabort = () => reject(tx.error || new Error('Library file transaction aborted'));
+    try {
+      const request = fn(tx.objectStore(FILE_STORE));
+      if (request) {
+        request.onsuccess = () => { result = request.result; };
+        request.onerror = () => reject(request.error || new Error('Library file request failed'));
+      }
+    } catch (error) {
+      try { tx.abort(); } catch { /* transaction already finished */ }
+      reject(error);
+    }
   });
 }
 
@@ -188,6 +195,18 @@ async function persistLibrary(library, extra = {}) {
     console.warn('[UserLibrary] Change notification failed after committed save:', error);
   }
   return next;
+}
+
+/**
+ * Reset the auxiliary file database as part of an explicitly confirmed "all
+ * local app data" reset. Do not claim success if the file store was unavailable.
+ */
+export async function clearLibraryFiles() {
+  const result = await withFileStore('readwrite', (store) => store.clear(), { required: true });
+  if (result === false) throw new Error('Library file deletion was not acknowledged');
+  revokeAllCachedUrls();
+  closeFileDb();
+  return true;
 }
 
 export function overlayLibrary(library) {
@@ -506,6 +525,7 @@ export function initUserLibrary(root = window) {
     addMediaFiles,
     addRemoteLink,
     putLibraryFile,
+    clearLibraryFiles,
     revokeCachedUrl,
   };
 

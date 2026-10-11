@@ -27,7 +27,7 @@ export function mountSettingsView(deps = {}) {
         <div class="settings-header-actions">
           <button class="btn btn-primary" id="btn-export-json-2" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-            Export backup
+            Export app-data JSON
           </button>
           <button class="btn btn-ghost" id="btn-import-json-2" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
@@ -268,7 +268,7 @@ export function mountSettingsView(deps = {}) {
                   <select class="select" id="select-clear-scope" aria-label="Data to wipe">
                     <option value="progress">Progress only</option>
                     <option value="notes">Notes and folders</option>
-                    <option value="media">Timestamps and PDF annotations</option>
+                    <option value="media">Bookmarks, annotations, and watch history</option>
                     <option value="playlists">Saved playlists</option>
                     <option value="studio">Studio boards</option>
                     <option value="preferences">Preferences only</option>
@@ -335,11 +335,11 @@ export function mountSettingsView(deps = {}) {
     });
   }
 
-  on(document.getElementById('btn-export-json-2'), 'click', () => {
-    try { window.ProgressStats?.exportJSON?.(); } catch { Toast?.error?.('Export failed'); }
+  on(document.getElementById('btn-export-json-2'), 'click', async () => {
+    try { await window.ProgressStats?.exportJSON?.(); } catch { Toast?.error?.('Export failed'); }
   });
-  on(document.getElementById('btn-import-json-2'), 'click', () => {
-    try { window.ProgressStats?.importJSON?.(); } catch { Toast?.error?.('Import failed'); }
+  on(document.getElementById('btn-import-json-2'), 'click', async () => {
+    try { await window.ProgressStats?.importJSON?.(); } catch { Toast?.error?.('Import failed'); }
   });
 
   const storageController = renderStorageHealth();
@@ -350,7 +350,7 @@ export function mountSettingsView(deps = {}) {
   const scopeLabels = {
     progress: 'progress records',
     notes: 'notes, folders, and note settings',
-    media: 'timestamps and PDF annotations',
+    media: 'bookmarks, annotations, and watch history',
     playlists: 'saved playlists',
     studio: 'Studio boards',
     preferences: 'preferences',
@@ -364,6 +364,9 @@ export function mountSettingsView(deps = {}) {
     try {
       if (window.DB?.clearUserData) await window.DB.clearUserData(scope);
       else if (scope === 'all') await window.DB?.clearAll?.();
+      if (scope === 'all') {
+        await window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles?.();
+      }
       if (scope === 'all' || scope === 'media') {
         sessionStorage.removeItem('ocd_pending_topic');
         sessionStorage.removeItem('ocd_pending_position');

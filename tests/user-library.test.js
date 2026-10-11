@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { indexedDB } from 'fake-indexeddb';
 import {
   addMediaFiles,
+  clearLibraryFiles,
   addPdfFile,
   addRemoteLink,
   addTopic,
@@ -162,10 +163,26 @@ describe('user library overlay', () => {
     expect(await resolveMediaUrl(stored)).toMatch(/^blob:/);
   });
 
+  it('clears every stored media file and invalidates its previously cached URL', async () => {
+    const file = new File(['lecture'], 'lecture.mp4', { type: 'video/mp4' });
+    const record = await putLibraryFile(file, { kind: 'video' });
+    const url = await resolveMediaUrl(record.ref);
+    expect(url).toMatch(/^blob:/);
+
+    await expect(clearLibraryFiles()).resolves.toBe(true);
+    expect(await resolveMediaUrl(record.ref)).toBe('');
+  });
+
+  it('rejects an unverified complete file reset if IndexedDB is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    await expect(clearLibraryFiles()).rejects.toThrow(/file storage is unavailable/);
+  });
+
   it('registers the UserLibrary namespace', () => {
     const api = initUserLibrary(window);
     expect(window.OpenCourseDeck.UserLibrary).toBe(api);
     expect(typeof api.overlay).toBe('function');
+    expect(typeof api.clearLibraryFiles).toBe('function');
     overlayLibrary({ version: 1, courses: { demo: { title: 'Demo', sources: [] } } });
     expect(window.DataStore.mergeRaw).toHaveBeenCalledWith(
       { demo: { title: 'Demo', sources: [] } },
