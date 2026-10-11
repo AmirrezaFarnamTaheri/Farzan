@@ -163,7 +163,10 @@
       }
       const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
       const original = await new Response(stream).arrayBuffer();
-      if (spec.sha256 && window.crypto?.subtle?.digest) {
+      if (spec.sha256) {
+        if (!window.crypto?.subtle?.digest) {
+          throw new Error('Verified catalogs require browser SHA-256 support');
+        }
         const digest = await window.crypto.subtle.digest('SHA-256', original);
         const actual = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
         if (actual.toLowerCase() !== spec.sha256.toLowerCase()) {

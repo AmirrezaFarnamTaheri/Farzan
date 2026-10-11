@@ -1223,7 +1223,13 @@ export async function mountCoursesView(deps = {}) {
 
   // Auto-select first course
   const pendingSession = consumePendingCourseSession();
-  const pendingTopicId = sessionStorage.getItem('ocd_pending_topic');
+  // Deep links must work across reloads and from the search palette even when
+  // the user is already on the Courses route. Retain the existing temporary
+  // handoff for the media player, but never depend on it for navigation.
+  const deepLink = new URLSearchParams(String(window.location.hash || '').split('?')[1] || '');
+  const requestedTopicId = deepLink.get('topic') || '';
+  const requestedCourseId = deepLink.get('id') || '';
+  const pendingTopicId = requestedTopicId || sessionStorage.getItem('ocd_pending_topic');
   const pendingPosition = Number(sessionStorage.getItem('ocd_pending_position') || 0);
   let pendingLibraryCourse = '';
   try {
@@ -1302,6 +1308,9 @@ export async function mountCoursesView(deps = {}) {
   }
 
   if (pendingLibraryCourse && selectCourse(pendingLibraryCourse)) {
+    return routeController;
+  }
+  if (requestedCourseId && selectCourse(requestedCourseId)) {
     return routeController;
   }
 

@@ -951,7 +951,8 @@ import { Pointer } from './src/lib/pointer.js';
       for (const event of [
         'note:create', 'note:save', 'note:delete',
         'pdf:annotate', 'sync:message', 'sync:local-change',
-        'storage:import-complete', 'data:loaded',
+        'storage:import-complete', 'data:loaded', 'data:degraded',
+        'library:changed', 'storage:cleared',
       ]) {
         bus?.on?.(event, invalidate);
       }
@@ -1065,7 +1066,7 @@ import { Pointer } from './src/lib/pointer.js';
             ? `${course.topics.length} topic${course.topics.length === 1 ? '' : 's'}`
             : '',
           category: 'Course',
-          href: '#/courses',
+          href: `#/courses?id=${encodeURIComponent(String(course.id))}`,
         });
       });
       (catalog.topics || []).forEach((topic) => {
@@ -1077,7 +1078,7 @@ import { Pointer } from './src/lib/pointer.js';
           label: title,
           description: source,
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
-          href: '#/courses',
+          href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {
             setPendingCourseMedia(topic.topicId);
           },
