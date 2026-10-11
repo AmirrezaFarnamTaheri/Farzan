@@ -1,0 +1,70 @@
+name: Plasmato Visual and Functional Acceptance
+on:
+  push:
+    branches:
+      - qa/plasmato-visual-acceptance-20261012
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  acceptance:
+    name: Capture 3 breakpoints and functional screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out visual QA branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies and stage app
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm run vendor
+          npm run build:release
+          npm run check:generated
+      - name: Run real Chrome Playwright acceptance scenarios
+        run: npm run test:e2e -- --grep "all 15 application panels|Plasmato courses|written rich-text note|user course is created|flashcard is|PDF genuinely|playlist gets|theme and font|global search|real locally generated MP4"
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+      - name: Generate contact sheets even on test failure
+        if: always()
+        run: node scripts/visual-contact-sheet.cjs
+      - name: Upload screenshots, traces and observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plasmato-visual-acceptance-${{ github.run_id }}
+          path: |
+            artifacts/visual-audit/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Publish contact sheets and working-state screenshots to evidence branch
+        if: always()
+        shell: bash
+        run: |
+          if ! ls artifacts/visual-audit/contact-sheet-*.png >/dev/null 2>&1; then
+            echo "No contact sheets were produced"
+            exit 0
+          fi
+          proof="evidence/plasmato-visual-${GITHUB_RUN_ID}"
+          work="$RUNNER_TEMP/plasmato-visual-evidence"
+          git worktree add -b "$proof" "$work" HEAD
+          mkdir -p "$work/visual-evidence"
+          cp artifacts/visual-audit/contact-sheet-*.png "$work/visual-evidence/"
+          if test -f artifacts/visual-audit/observations.jsonl; then
+            cp artifacts/visual-audit/observations.jsonl "$work/visual-evidence/"
+          fi
+          if test -d artifacts/visual-audit/screenshots/functional; then
+            cp artifacts/visual-audit/screenshots/functional/*.png "$work/visual-evidence/" || :
+          fi
+          git -C "$work" config user.name 'github-actions[bot]'
+          git -C "$work" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "$work" add visual-evidence
+          git -C "$work" commit -m "test: visual and functional evidence from run ${GITHUB_RUN_ID}"
+          git -C "$work" push --set-upstream origin "$proof"
