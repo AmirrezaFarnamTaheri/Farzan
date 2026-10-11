@@ -318,6 +318,19 @@
       });
     }
 
+    // A migrated IndexedDB store is authoritative. Returning a stale local
+    // mirror (or an empty collection) on read failure can erase newer data on
+    // the next read-modify-write. Preserve pre-migration compatibility only.
+    function _canonicalReadFailed(kind, error) {
+      if (!_isMigrated()) return;
+      try {
+        _emit('storage:read-error', {
+          kind, backend: 'indexedDB', canonical: true, error: _errorInfo(error),
+        });
+      } catch { /* observer failures must not mask the storage exception */ }
+      throw error;
+    }
+
     function _isMigrated() {
       return localStorage.getItem(KEY_MIGRATED) === 'true';
     }
@@ -555,7 +568,7 @@
           const fallback = _read(KEY_PROGRESS, {});
           if (fallback[topicId]) return fallback[topicId];
           return null;
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getProgress', error); }
       }
       const map = _read(KEY_PROGRESS, {});
       return map[topicId] ?? null;
@@ -576,7 +589,7 @@
             if (topicId && record?.topicId && !seen.has(topicId)) records.push(record);
           }
           return records;
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getAllProgress', error); }
       }
       const map = _read(KEY_PROGRESS, {});
       return Object.values(map);
@@ -648,7 +661,7 @@
             if (record?.id && !seen.has(record.id)) records.push(record);
           }
           return records;
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
       }
       return _read(KEY_TIMESTAMPS, []);
     }
@@ -697,7 +710,7 @@
       if (idb) {
         const migrated = await _migrateOnce();
         if (migrated || _isMigrated()) {
-          try { return (await idb.getAll('notes')) ?? []; } catch {}
+          try { return (await idb.getAll('notes')) ?? []; } catch (error) { _canonicalReadFailed('getAllNotes', error); }
         }
       }
       try { return JSON.parse(localStorage.getItem('ocd_notes')) ?? []; } catch { return []; }
@@ -761,7 +774,7 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('folders')) ?? []; } catch {}
+        try { return (await idb.getAll('folders')) ?? []; } catch (error) { _canonicalReadFailed('getAllFolders', error); }
       }
       return _read('ocd_folders', []);
     }
@@ -834,7 +847,7 @@
             const legacy = await idb.get('settings', legacyKey);
             if (legacy) return legacy.value;
           }
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getSetting', error); }
       }
       const direct = _read(key, null);
       if (direct != null) return direct;
@@ -863,7 +876,7 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('annotations')) ?? []; } catch {}
+        try { return (await idb.getAll('annotations')) ?? []; } catch (error) { _canonicalReadFailed('getAllAnnotations', error); }
       }
       const dict = _read('plasma-pdf-annotations', {});
       if (Array.isArray(dict)) return dict;
@@ -878,7 +891,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('annotations', 'docId', docId) ?? [];
           const all = await idb.getAll('annotations') ?? [];
           return all.filter(a => a.docId === docId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getAnnotations', error); }
       }
       return (await getAllAnnotations()).filter(a => a.docId === docId);
     }
@@ -1165,7 +1178,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('watchedSegments', 'topicId', topicId) ?? [];
           const all = await idb.getAll('watchedSegments') ?? [];
           return all.filter(s => s.topicId === topicId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getWatchedSegments', error); }
       }
       return [];
     }
@@ -1216,7 +1229,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('pdfBookmarks', 'docId', docId) ?? [];
           const all = await idb.getAll('pdfBookmarks') ?? [];
           return all.filter(b => b.docId === docId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getPdfBookmarks', error); }
       }
       return [];
     }

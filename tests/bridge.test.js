@@ -22,6 +22,39 @@ describe('bridge DB safety helpers', () => {
     else delete window.BroadcastChannel;
   });
 
+  it.each([
+    ['getProgress', ['topic-stale']],
+    ['getAllProgress', []],
+    ['getAllTimestamps', []],
+    ['getAllNotes', []],
+    ['getAllFolders', []],
+    ['getSetting', ['ocd_user_library']],
+    ['getAllAnnotations', []],
+    ['getAnnotations', ['pdf-a']],
+    ['getWatchedSegments', ['topic-stale']],
+    ['getPdfBookmarks', ['pdf-a']],
+  ])('rejects %s after migrated IndexedDB read failure instead of returning a stale snapshot', async (method, args) => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('ocd_user_library', JSON.stringify({
+      version: 1, courses: { stale: { title: 'Must not overwrite canonical library' } },
+    }));
+    localStorage.setItem('ocd_notes', JSON.stringify([{ id: 'old-note' }]));
+    localStorage.setItem('plasma_progress_v1', JSON.stringify({ 'topic-stale': { topicId: 'topic-stale' } }));
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get() { throw new Error('canonical storage read failed'); }
+      async getAll() { throw new Error('canonical storage read failed'); }
+      async getAllByIndex() { throw new Error('canonical storage read failed'); }
+    };
+
+    await expect(window.DB[method](...args)).rejects.toThrow('canonical storage read failed');
+    expect(emit).toHaveBeenCalledWith('storage:read-error', expect.objectContaining({
+      kind: method, backend: 'indexedDB', canonical: true,
+      error: expect.objectContaining({ message: 'canonical storage read failed' }),
+    }));
+  });
+
   it('merges localStorage and IndexedDB notes during compatibility migration', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },
