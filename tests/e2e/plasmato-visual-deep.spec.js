@@ -132,6 +132,21 @@ test('mobile navigation and global chrome reveal real live controls',async({page
   await boot(page);
   await page.locator('#mobile-menu-btn').click();
   await expect(page.locator('#mobile-menu-btn')).toHaveAttribute('aria-expanded','true');
+  await expect(page.locator('#sidebar')).toHaveClass(/sidebar-mobile-open/);
+  // aria-expanded changes immediately, but the drawer transitions from
+  // offscreen. Do not screenshot a uniformly darkened backdrop mid-animation.
+  await expect.poll(() => page.locator('#sidebar').evaluate(el => {
+    const box = el.getBoundingClientRect();
+    return Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0));
+  })).toBeGreaterThan(220);
+  await expect.poll(() => page.evaluate(() => {
+    const link = document.querySelector('#sidebar a[href="#/notes"]');
+    if (!link) return false;
+    const rect = link.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+    const node = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return Boolean(node && (node === link || link.contains(node)));
+  })).toBe(true);
   await screenshot(page,'deep-actions','01-mobile-navigation-open');
   await page.locator('#sidebar a[href="#/notes"]').first().click();
   await expect(page).toHaveURL(/#\/notes/);
