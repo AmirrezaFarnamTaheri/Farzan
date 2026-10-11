@@ -4,7 +4,8 @@
 
 Executed real Chrome Playwright against release-built Farzan and standalone Plasmato. Eighteen independent browser scenarios passed and produced 107 actual screenshots: all 15 app routes in dark desktop/tablet/mobile (45), all 15 in light desktop/mobile (30), 26 genuine interaction states, and six standalone-player screenshots.
 
-Visual evidence: https://github.com/AmirrezaFarnamTaheri/Farzan/tree/evidence/plasmato-visual-38177326118/visual-evidence
+Repository screenshots: [all 107 real browser captures and seven contact sheets](../../screenshots/current/README.md) (see [checksummed manifest](../../screenshots/current/manifest.json)).
+Archived original visual evidence: https://github.com/AmirrezaFarnamTaheri/Farzan/tree/evidence/plasmato-visual-38177326118/visual-evidence
 Passing QA run: https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38177326118
 
 ## Confirmed defects resolved
