@@ -583,6 +583,12 @@ const ProgressStats = (() => {
 
   async function importJSONFile(file) {
     if (!file) return;
+    // Retain the verified pre-import snapshot across unexpected read/merge
+    // failures. Without this scope, a throw after an earlier successful write
+    // exits through the outer catch and strands an incomplete import.
+    let rollbackSnapshot = null;
+    let activeResult = null;
+    let rollbackTargets = {};
     try {
         const text    = await file.text();
         const payload = JSON.parse(text);
@@ -645,6 +651,7 @@ const ProgressStats = (() => {
           errors: [],
           preview,
         };
+        activeResult = result;
 
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportPreview = preview;
@@ -657,7 +664,11 @@ const ProgressStats = (() => {
         });
         if (!confirmed) return;
 
-        const rollbackSnapshot = await _createImportSnapshot();
+        rollbackSnapshot = await _createImportSnapshot();
+        rollbackTargets = {
+          annotationDocIds: new Set(annotationRecords.map(row => String(row.docId ?? 'global'))),
+          timestampIds: new Set(timestampRecords.map(row => row.id)),
+        };
 
         await _forEachChunk(progressRecords, async (p) => {
           const existing = await DB.getProgress(p.topicId);
@@ -835,11 +846,11 @@ const ProgressStats = (() => {
           });
         }
         if (result.errors.length) {
-          await _rollbackImport(rollbackSnapshot, result, {
-            annotationDocIds: new Set(annotationRecords.map(row => String(row.docId ?? 'global'))),
-            timestampIds: new Set(timestampRecords.map(row => row.id)),
-          });
+          await _rollbackImport(rollbackSnapshot, result, rollbackTargets);
         }
+        // The known-error path has completed its recovery attempt. Do not
+        // retry rollback if a subsequent toast or observer fails.
+        rollbackSnapshot = null;
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportResult = result;
         if (result.rolledBack) {
@@ -851,6 +862,18 @@ const ProgressStats = (() => {
         }
     } catch (err) {
       console.error('[Progress] import error', err);
+      if (rollbackSnapshot && activeResult) {
+        _recordImportError(activeResult, 'import', null, err);
+        await _rollbackImport(rollbackSnapshot, activeResult, rollbackTargets);
+        window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+        window.OpenCourseDeck.lastImportResult = activeResult;
+        if (activeResult.rolledBack) {
+          pdToast('Import stopped after an unexpected error. Previously saved data was restored.', 'error');
+        } else {
+          pdToast('Import failed and recovery was incomplete. Keep your original backup and review import errors before retrying.', 'error');
+        }
+        return;
+      }
       pdToast('Import error: ' + err.message, 'error');
     }
   }
