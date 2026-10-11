@@ -992,7 +992,7 @@ import { Pointer } from './src/lib/pointer.js';
       OpenCourseDeck.bus.emit('search:query', eventPayload);
       const lexical = data
         .filter((item) => {
-          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
+          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''} ${item.searchText || ''}`.toLowerCase();
           return haystack.includes(q);
         })
         .slice(0, 12);
@@ -1062,6 +1062,9 @@ import { Pointer } from './src/lib/pointer.js';
         results.push({
           icon: 'library',
           label: String(course.title || course.name || course.id),
+          // Course display names can be Persian while URLs/IDs are English.
+          // Index the readable slug so both language paths are discoverable.
+          searchText: String(course.id || '').replace(/[-_]+/g, ' '),
           description: Array.isArray(course.topics) && course.topics.length
             ? `${course.topics.length} topic${course.topics.length === 1 ? '' : 's'}`
             : '',
@@ -1077,6 +1080,7 @@ import { Pointer } from './src/lib/pointer.js';
           icon: topic.pdfs?.length ? 'file-pdf' : topic.videos?.length ? 'play' : 'search',
           label: title,
           description: source,
+          searchText: `${String(topic.courseId || '').replace(/[-_]+/g, ' ')} ${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
           href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {

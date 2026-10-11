@@ -1,9 +1,36 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const { makePdf } = require('../../scripts/dist-browser-smoke.cjs');
+function makeVisualPdf() {
+  // A contentful portrait PDF, not the blank 200 x 200 parser test fixture.
+  const drawing = [
+    '0.94 0.97 0.99 rg 45 555 522 190 re f',
+    '0.10 0.31 0.48 rg 45 660 522 85 re f',
+    '1 1 1 rg BT /F1 22 Tf 64 700 Td (Plasmato Visual Acceptance) Tj ET',
+    '0.14 0.21 0.31 rg BT /F1 16 Tf 64 626 Td (Rendered in the actual PDF viewer.) Tj ET',
+    'BT /F1 14 Tf 64 599 Td (A source page with visible, searchable text.) Tj ET',
+    '0.12 0.53 0.74 rg 65 567 400 8 re f',
+  ].join('\n') + '\n';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(drawing,'latin1') + ' >>\nstream\n' + drawing + 'endstream',
+  ];
+  let pdf='%PDF-1.4\n';
+  const offsets=[0];
+  for (let i=0;i<objects.length;i++) {
+    offsets.push(Buffer.byteLength(pdf,'latin1'));
+    pdf += (i+1)+' 0 obj\n'+objects[i]+'\nendobj\n';
+  }
+  const xref=Buffer.byteLength(pdf,'latin1');
+  pdf+='xref\n0 '+(objects.length+1)+'\n0000000000 65535 f \n';
+  for (const n of offsets.slice(1)) pdf+=String(n).padStart(10,'0')+' 00000 n \n';
+  pdf+='trailer\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n';
+  return Buffer.from(pdf,'latin1');
+}
+
 const root = path.resolve('artifacts/visual-audit');
 const routes = ['home','courses','my-courses','materials','notes','pdf','progress','playlists','bookmarks','tags','flashcards','studio','achievements','settings','help'];
 test.use({channel:'chrome'});
@@ -33,6 +60,7 @@ async function health(page){return page.evaluate(()=>{
     overflow:Math.max(body.scrollWidth,root.scrollWidth)-innerWidth,
     viewErrors:document.querySelectorAll('.view-error,.route-error').length,
     brokenImages:[...document.images].filter(i=>i.complete&&i.naturalWidth===0&&i.src).length,
+    brokenImageSources:[...document.images].filter(i=>i.complete&&i.naturalWidth===0&&i.src).map(i=>i.src).slice(0,8),
     buttons:[...main.querySelectorAll('button,a[href],input,textarea,select')].filter(e=>e.getBoundingClientRect().width>0).length};
 });}
 for(const [device,width,height] of [['desktop',1440,900],['tablet',900,1080],['mobile',390,844]]){
@@ -76,6 +104,8 @@ test('a written rich-text note autosaves and reopens',async({page})=>{
   await expect(editor).toHaveAttribute('contenteditable','true');
   await editor.fill('I reviewed a Plasmato course lecture. This note was written and saved by a real browser.');
   await expect.poll(()=>page.evaluate(async()=>{const notes=await window.DB.getAllNotes();return notes.some(n=>n.title==='Visual QA saved Plasmato note'&&String(n.content).includes('course lecture'));}),{timeout:15000}).toBe(true);
+  const editorTitleFont = await page.locator('[data-note-title-input]').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+  expect(editorTitleFont, 'Long note title should not obscure editor or saved indicator').toBeLessThanOrEqual(30);
   await shot(page,'functional','04-written-note-persisted');
   await visit(page,'home');await visit(page,'notes');
   await expect(page.locator('[data-notes-list]')).toContainText('Visual QA saved Plasmato note');
@@ -108,8 +138,18 @@ test('flashcard is created, flipped, and reviewed',async({page})=>{
 });
 test('PDF genuinely loads and a page note persists',async({page})=>{
   await boot(page,'pdf');
-  await page.locator('[data-pdf-open]').setInputFiles({name:'visual-acceptance.pdf',mimeType:'application/pdf',buffer:makePdf()});
+  await page.locator('[data-pdf-open]').setInputFiles({name:'visual-acceptance.pdf',mimeType:'application/pdf',buffer:makeVisualPdf()});
   await expect.poll(()=>page.locator('[data-pdf-total-pages]').textContent(),{timeout:20000}).toBe('1');
+  await expect(page.locator('[data-pdf-viewer] canvas').first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const c=document.querySelector('[data-pdf-viewer] canvas');
+    if (!c || !c.width || !c.height) return false;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    const pixels=ctx.getImageData(0,0,c.width,c.height).data;
+    let nonWhite=0;
+    for(let i=0;i<pixels.length;i+=4*40){if(pixels[i]<220||pixels[i+1]<220||pixels[i+2]<220)nonWhite++;}
+    return nonWhite>50;
+  })).toBe(true);
   await shot(page,'functional','10-pdf-rendered');
   await page.locator('[data-pdf-page-note-input]').fill('PDF visual QA linked page annotation');
   await page.locator('[data-pdf-save-page-note]').click();
@@ -187,7 +227,7 @@ test('a real browser-recorded WebM plays in the native course player',async({pag
   await page.evaluate(async()=>{
     const lib=window.OpenCourseDeck.UserLibrary;
     await lib.upsertCourse({id:'qa-playback',title:'Visual QA Playback'});
-    await lib.addRemoteLink({courseId:'qa-playback',title:'Controlled MP4 playback',kind:'video',url:'https://visual-acceptance.invalid/clip.webm'});
+    await lib.addRemoteLink({courseId:'qa-playback',title:'Controlled WebM playback',kind:'video',url:'https://visual-acceptance.invalid/clip.webm'});
   });
   await visit(page,'my-courses');await visit(page,'courses');
   await page.locator('.course-item[data-course-id="qa-playback"]').click();

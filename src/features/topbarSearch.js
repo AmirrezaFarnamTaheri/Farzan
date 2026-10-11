@@ -119,6 +119,7 @@ export const TopbarSearch = {
         icon: '??',
         label: String(course.title || course.id),
         description: 'Course',
+        searchText: String(course.id || '').replace(/[-_]+/g, ' '),
         tags: course.tags || [],
         href: `#/courses?id=${encodeURIComponent(course.id)}`,
       });
@@ -130,7 +131,7 @@ export const TopbarSearch = {
         label: String(topic.title || topic.topicId),
         description: String(topic.sourceLabel || 'Topic'),
         tags: topic.tags || [],
-        searchText: `${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
+        searchText: `${String(topic.courseId || '').replace(/[-_]+/g, ' ')} ${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
         href: `#/courses?topic=${encodeURIComponent(topic.topicId)}`,
       });
     });
