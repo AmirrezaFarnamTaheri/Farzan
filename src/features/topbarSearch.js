@@ -101,8 +101,14 @@ export const TopbarSearch = {
   },
 
   async _loadUniversalData() {
-    if (this._universalData) return this._universalData;    const catalog = await window.DataStore?.init() || { courses: [], topics: [] };
-    const notes = await window.DB?.getNotes() || [];
+    if (this._universalData) return this._universalData;
+    await window.DataStore?.init?.();
+    const catalog = {
+      courses: window.DataStore?.allCourses?.() ?? [],
+      topics: window.DataStore?.allTopics?.() ?? [],
+    };
+    const savedNotes = await window.DB?.getAllNotes?.() ?? [];
+    const notes = Array.isArray(savedNotes) ? savedNotes : [];
     // const timestamps = ...
     // const annotations = ...
 
@@ -114,7 +120,7 @@ export const TopbarSearch = {
         label: String(course.title || course.id),
         description: 'Course',
         tags: course.tags || [],
-        href: `#/courses?id=${course.id}`,
+        href: `#/courses?id=${encodeURIComponent(course.id)}`,
       });
     });
 
@@ -125,7 +131,7 @@ export const TopbarSearch = {
         description: String(topic.sourceLabel || 'Topic'),
         tags: topic.tags || [],
         searchText: `${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
-        href: `#/courses?topic=${topic.topicId}`,
+        href: `#/courses?topic=${encodeURIComponent(topic.topicId)}`,
       });
     });
 
@@ -135,7 +141,7 @@ export const TopbarSearch = {
         label: String(note.title || 'Untitled note'),
         description: note.topicId ? `Linked to ${note.topicId}` : 'Note',
         searchText: this._plainText(note.content || ''),
-        href: `#/notes?id=${note.id}`,
+        href: `#/notes?id=${encodeURIComponent(note.id)}`,
       });
     });
 

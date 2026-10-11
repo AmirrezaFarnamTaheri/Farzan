@@ -105,6 +105,17 @@ function stageStaticAssets(sourceRoot = root, outputDir = outdir) {
   copyDirectory(path.join(sourceRoot, 'src', 'styles'), path.join(outputDir, 'src', 'styles'));
   copyDirectory(path.join(sourceRoot, 'src', 'workers'), path.join(outputDir, 'src', 'workers'));
 
+  // Ship the standalone edition beside the canonical study app. Keep
+  // repository verification/recovery scripts out of the public runtime.
+  const edition = path.join('editions', 'plasmato-emergency');
+  for (const file of ['index.html', 'styles.css', 'app.js', 'catalog_data.js', 'edition.json']) {
+    const from = path.join(sourceRoot, edition, file);
+    if (!fs.existsSync(from)) continue;
+    const to = path.join(outputDir, edition, file);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(from, to);
+  }
+
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js']) {
     const from = path.join(sourceRoot, file);
     const to = path.join(outputDir, file);
