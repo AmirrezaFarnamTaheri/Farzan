@@ -52,7 +52,9 @@ function capture(sourceFile, relative, expected) {
   const height = bytes.readUInt32BE(20);
   if (expected?.width) assert.equal(width, expected.width, 'Wrong screenshot width: ' + sourceFile);
   if (expected?.height) assert.equal(height, expected.height, 'Wrong screenshot height: ' + sourceFile);
-  assert(width >= 320 && height >= 600, 'Screenshot dimensions too small: ' + sourceFile);
+  // Contact sheets are composites; their height depends on the number of tiles.
+  const minHeight = relative.startsWith('contact-sheets/') ? 400 : 600;
+  assert(width >= 320 && height >= minHeight, 'Screenshot dimensions too small: ' + sourceFile);
   const destination = path.join(output, relative);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.writeFileSync(destination, bytes);
