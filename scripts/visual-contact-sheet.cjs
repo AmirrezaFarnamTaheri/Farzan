@@ -33,7 +33,10 @@ async function make(group) {
 }
 
 (async () => {
-  if (!fs.existsSync(screenshots)) throw new Error('No visual screenshot directory');
+  if (!fs.existsSync(screenshots)) {
+    console.warn('[visual-audit] No screenshots were captured before the failed build');
+    return;
+  }
   const groups = fs.readdirSync(screenshots, { withFileTypes: true })
     .filter(e => e.isDirectory()).map(e => e.name).sort();
   if (!groups.length) throw new Error('No screenshot groups');

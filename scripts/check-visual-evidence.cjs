@@ -75,7 +75,7 @@ const observations = observationBytes.toString('utf8').trim().split('\n')
   .map((line, index) => {
     try { return JSON.parse(line); } catch (error) {
       throw new Error('Visual evidence observation line ' + (index + 1) +
-        ' is invalid JSON: ' + error.message);
+        ' is invalid JSON: ' + error.message, { cause: error });
     }
   });
 const captures = observations.filter(item => typeof item.file === 'string');
