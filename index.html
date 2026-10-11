@@ -75,7 +75,8 @@
       --skeleton-base: #101820;
       --skeleton-shine: #1d2b39;
     }
-    [data-theme="light"] {
+    [data-theme="light"],
+    [data-theme="paper"] {
       --skeleton-base: #f4f6f6;
       --skeleton-shine: #ffffff;
     }
@@ -108,8 +109,8 @@
       box-shadow: none;
     }
     .splash-label {
-      font-size: 1.5rem; font-weight: 800;
-      background: #2563a8;
+      font-size: 1.5rem; font-weight: 750;
+      background: transparent;
       color: #f3f5f7;
       letter-spacing: -0.02em;
     }
@@ -129,8 +130,10 @@
       color: rgba(243,245,247,0.78);
       letter-spacing: 0.05em;
     }
-    [data-theme="light"] .splash-status { color: rgba(28,48,61,0.75); }
-    [data-theme="light"] .splash-label { color: #1c303d; }
+    [data-theme="light"] .splash-status,
+    [data-theme="paper"] .splash-status { color: rgba(28,48,61,0.75); }
+    [data-theme="light"] .splash-label,
+    [data-theme="paper"] .splash-label { color: #1c303d; }
     @media (prefers-reduced-motion: reduce) {
       .splash-bar { animation: none; width: 100%; }
       #app-loading { transition: none; }
