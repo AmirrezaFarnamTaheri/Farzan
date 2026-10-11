@@ -1,58 +1,57 @@
 /* ── DARK (default) ── */
   [data-theme="dark"] {
-    --bg:             #0f0f1a;
-    --bg-secondary:   #13131f;
-    --surface:        #1a1a2e;
-    --surface-2:      #1e1e35;
-    --surface-3:      #252540;
-    --surface-hover:  #2a2a48;
-    --surface-active: #30305a;
-    --border:         rgba(255,255,255,0.07);
-    --border-strong:  rgba(255,255,255,0.14);
-    --text-primary:   #f0f0ff;
-    --text-secondary: rgba(240,240,255,0.65);
-    --text-tertiary:  rgba(240,240,255,0.38);
-    --text-disabled:  rgba(240,240,255,0.22);
-    --text-inverse:   #0f0f1a;
+    --bg:             #101820;
+    --bg-secondary:   #14202b;
+    --surface:        #182633;
+    --surface-2:      #1d2b39;
+    --surface-3:      #263747;
+    --surface-4:      #2d4050;
+    --surface-hover:  #304354;
+    --surface-active: #344d60;
+    --border:         rgba(230,240,248,0.10);
+    --border-strong:  rgba(230,240,248,0.19);
+    --text-primary:   #f3f5f7;
+    --text-secondary: rgba(243,245,247,0.75);
+    --text-tertiary:  rgba(243,245,247,0.63);
+    --text-disabled:  rgba(243,245,247,0.38);
+    --text-inverse:   #101820;
     /* Shadows tinted toward the surface hue rather than pure black, so
        they read as ambient depth instead of harsh drop shadows. */
-    --shadow-xs:      0 1px 2px rgba(8,4,26,0.42);
-    --shadow-sm:      0 2px 8px rgba(8,4,26,0.47);
-    --shadow-md:      0 4px 20px rgba(8,4,26,0.52);
-    --shadow-lg:      0 8px 40px rgba(8,4,26,0.60);
-    --shadow-xl:      0 16px 64px rgba(8,4,26,0.70);
-    --shadow-card:    0 2px 12px rgba(8,4,26,0.52), 0 0 0 1px var(--border);
+    --shadow-xs:      0 1px 2px rgba(3,10,18,0.22);
+    --shadow-sm:      0 2px 8px rgba(3,10,18,0.26);
+    --shadow-md:      0 4px 20px rgba(3,10,18,0.30);
+    --shadow-lg:      0 8px 40px rgba(3,10,18,0.36);
+    --shadow-xl:      0 16px 64px rgba(3,10,18,0.42);
+    --shadow-card:    0 2px 12px rgba(3,10,18,0.25), 0 0 0 1px var(--border);
     color-scheme: dark;
   }
 
   /* ── LIGHT ── */
     [data-theme="light"] {
-    /* Rebuilt from tinted neutrals: the old light theme was flat
-    #fff/#f5f5fa with no hue, measuring 3-5% saturation vs 37-41% in
-    dark. Every neutral now carries a cool violet undertone matching
-    the accent family, so light has the same depth as dark. */
-    --bg:             #f4f3fb;
-    --bg-secondary:   #eceaf7;
-    --surface:        #fdfcff;
-    --surface-2:      #f7f5fd;
-    --surface-3:      #eeeaf8;
-    --surface-hover:  #e7e2f5;
-    --surface-active: #ddd6f0;
-    --border:         rgba(46,32,110,0.10);
-    --border-strong:  rgba(46,32,110,0.18);
-    --text-primary:   #1b1733;
-    --text-secondary: rgba(27,23,51,0.66);
-    --text-tertiary:  rgba(27,23,51,0.42);
-    --text-disabled:  rgba(27,23,51,0.26);
-    --text-inverse:   #fdfcff;
+    /* Neutral, readable surfaces for long study sessions. */
+    --bg:             #f4f6f6;
+    --bg-secondary:   #edf1f2;
+    --surface:        #ffffff;
+    --surface-2:      #fbfcfc;
+    --surface-3:      #eaf0f2;
+    --surface-4:      #e1e9ed;
+    --surface-hover:  #e4edf0;
+    --surface-active: #dce9ef;
+    --border:         rgba(30,58,75,0.11);
+    --border-strong:  rgba(30,58,75,0.20);
+    --text-primary:   #1c303d;
+    --text-secondary: rgba(28,48,61,0.75);
+    --text-tertiary:  rgba(28,48,61,0.64);
+    --text-disabled:  rgba(28,48,61,0.42);
+    --text-inverse:   #ffffff;
     /* Shadows tinted to the surface hue instead of pure black:
     pure-black shadows read harsh on tinted light surfaces. */
-    --shadow-xs:      0 1px 2px rgba(40,28,90,0.08);
-    --shadow-sm:      0 2px 8px rgba(40,28,90,0.10);
-    --shadow-md:      0 4px 20px rgba(40,28,90,0.13);
-    --shadow-lg:      0 8px 40px rgba(40,28,90,0.16);
-    --shadow-xl:      0 16px 64px rgba(40,28,90,0.20);
-    --shadow-card:    0 2px 12px rgba(40,28,90,0.11), 0 0 0 1px var(--border);
+    --shadow-xs:      0 1px 2px rgba(22,42,59,0.05);
+    --shadow-sm:      0 2px 8px rgba(22,42,59,0.07);
+    --shadow-md:      0 4px 20px rgba(22,42,59,0.09);
+    --shadow-lg:      0 8px 40px rgba(22,42,59,0.12);
+    --shadow-xl:      0 16px 64px rgba(22,42,59,0.16);
+    --shadow-card:    0 2px 12px rgba(22,42,59,0.08), 0 0 0 1px var(--border);
     color-scheme: light;
     }
 

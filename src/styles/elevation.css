@@ -1,64 +1,16 @@
-.bg-orbs, .ambient-desk-surface {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-    overflow: hidden;
-    background: var(--bg);
-    background-image:
-      radial-gradient(1100px 700px at 12% -10%, rgba(var(--accent-rgb), 0.16), transparent 62%),
-      radial-gradient(900px 600px at 100% 20%, color-mix(in srgb, var(--accent-cyan, #06b6d4) 10%, transparent), transparent 60%),
-      linear-gradient(to right, var(--border) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
-    background-position: center top, center top, 0 0, 0 0;
-    background-attachment: scroll;
-    contain: strict;
-  }
-  .orb {
-    display: none;
-  }
-
-  .ocd-app {
-    background: transparent !important;
-  }
-  
-  .sidebar, .topbar {
-    background: var(--glass-bg-strong) !important;
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-right: 1px solid var(--glass-border);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  }
-  
-  .topbar {
-    border-bottom: 1px solid var(--glass-border);
-    border-right: none;
-  }
-
-  /* Cards sit on a static canvas, so a backdrop blur costs a full extra
-     compositing pass per card and changes nothing visible. Blur is reserved
-     for surfaces that actually float over moving content (sidebar, topbar,
-     modals, popovers). */
-  .card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
-    background: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border) !important;
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transition: transform var(--duration-base) var(--ease-studio), box-shadow var(--duration-base) var(--ease-studio), border-color var(--duration-base) var(--ease-studio);
-  }
-
-  .card.card-interactive:hover,
-  a.card:hover,
-  button.card:hover,
-  .card[role="button"]:hover,
-  .course-card:hover,
-  .course-item:hover,
-  .playlist-card:hover,
-  .tag-card:hover,
-  .flashcard-card:hover,
-  .home-pulse-item:hover,
-  .settings-control-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) !important;
-    border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border)) !important;
-  }
+/* Static application background.
+ * The UI does not require decorative grids, large blur layers or forced
+ * overrides; cards, sidebars and toolbars are styled in their own layers.
+ */
+.bg-orbs,
+.ambient-desk-surface {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--bg);
+  contain: strict;
+}
+.orb {
+  display: none;
+}

@@ -70,14 +70,43 @@ describe('SpatialKnowledgeGraph', () => {
 
     const canvas = container.querySelector('canvas.spatial-graph-canvas');
     expect(canvas).not.toBeNull();
-    expect(canvas.getAttribute('role')).toBe('img');
-    expect(canvas.getAttribute('aria-label')).toBe('3D Spatial Knowledge Graph');
+    expect(canvas.getAttribute('role')).toBe('application');
+    expect(canvas.tabIndex).toBe(0);
+    expect(canvas.getAttribute('aria-label')).toContain('arrow keys');
     expect(canvas.style.touchAction).toBe('none');
     expect(graph.nodes.length).toBeGreaterThanOrEqual(12);
     expect(graph.edges.length).toBeGreaterThan(0);
     expect(graph.coordinateRings.length).toBe(3);
 
     graph.dispose();
+  });
+
+  it('cycles through graph concepts with the keyboard and exposes each target to screen readers', () => {
+    const graph = new SpatialKnowledgeGraph();
+    graph.mount(container, [
+      { id: 'algebra', title: 'Algebra', type: 'course' },
+      { id: 'geometry', title: 'Geometry', type: 'note' },
+    ]);
+    const select = vi.fn();
+    graph.on('node:select', select);
+    const key = (value) => graph.canvas.dispatchEvent(new KeyboardEvent('keydown', {
+      key: value, bubbles: true, cancelable: true,
+    }));
+
+    expect(graph.canvas.getAttribute('aria-label')).toContain('Algebra');
+    key('ArrowRight');
+    expect(graph.canvas.getAttribute('aria-label')).toContain('Geometry');
+    expect(container.querySelector('[aria-live="polite"]')?.textContent).toContain('Geometry');
+    key('Enter');
+    expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 'geometry' }));
+    key('ArrowLeft');
+    key(' ');
+    expect(select).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'algebra' }));
+    key('ArrowLeft');
+    expect(graph.keyboardNodeIndex).toBe(graph.nodes.length - 1);
+
+    graph.dispose();
+    expect(container.querySelector('[aria-live="polite"]')).toBeNull();
   });
 
   it('disposes cleanly removing event listeners, canvas, and animation loop', () => {

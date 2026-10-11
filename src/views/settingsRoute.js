@@ -1,3 +1,5 @@
+import { isLoopbackHostname } from '../core/networkSafety.js';
+
 export function mountSettingsView(deps = {}) {
   const {
     setView,
@@ -18,14 +20,13 @@ export function mountSettingsView(deps = {}) {
     <section class="view view-settings">
       <div class="page-header settings-page-header">
         <div>
-          <span class="eyebrow">Control center</span>
           <h1 class="page-title">Settings</h1>
-          <p class="page-subtitle">Personalize the workspace, manage local data, and configure optional AI features with explicit privacy boundaries.</p>
+          <p class="page-subtitle">Change appearance, manage saved data, and configure optional AI connections.</p>
         </div>
         <div class="settings-header-actions">
           <button class="btn btn-primary" id="btn-export-json-2" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-            Export backup
+            Export app-data JSON
           </button>
           <button class="btn btn-ghost" id="btn-import-json-2" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
@@ -48,7 +49,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
                 <div>
-                  <span class="eyebrow">Workspace comfort</span>
+                  <span class="eyebrow">Appearance</span>
                   <h2 id="settings-appearance-title">Appearance</h2>
                   <p>Adjust readability and information density without changing your learning data.</p>
                 </div>
@@ -114,7 +115,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading settings-section-heading-status">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
                 <div>
-                  <span class="eyebrow">Optional and private by default</span>
+                  <span class="eyebrow">AI connection</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
                   <p>Local mode is an on-device extractive summary unless you register a runtime. Gemma package names are catalog labels only. API keys remain in this browser session only.</p>
                 </div>
@@ -228,7 +229,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading settings-section-heading-status">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-drive"/></svg></div>
                 <div>
-                  <span class="eyebrow">Local-first health</span>
+                  <span class="eyebrow">Storage</span>
                   <h2 id="settings-storage-title">Storage</h2>
                   <p>Review browser quota, local fallback usage, and recent persistence warnings.</p>
                 </div>
@@ -255,7 +256,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading">
                 <div class="settings-section-icon settings-section-icon-danger"><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg></div>
                 <div>
-                  <span class="eyebrow">Selective cleanup</span>
+                  <span class="eyebrow">Data removal</span>
                   <h2 id="settings-data-title">Data controls</h2>
                   <p>Export a backup first, then remove only the local category you no longer need.</p>
                 </div>
@@ -266,7 +267,7 @@ export function mountSettingsView(deps = {}) {
                   <select class="select" id="select-clear-scope" aria-label="Data to wipe">
                     <option value="progress">Progress only</option>
                     <option value="notes">Notes and folders</option>
-                    <option value="media">Timestamps and PDF annotations</option>
+                    <option value="media">Bookmarks, annotations, and watch history</option>
                     <option value="playlists">Saved playlists</option>
                     <option value="studio">Studio boards</option>
                     <option value="preferences">Preferences only</option>
@@ -333,11 +334,11 @@ export function mountSettingsView(deps = {}) {
     });
   }
 
-  on(document.getElementById('btn-export-json-2'), 'click', () => {
-    try { window.ProgressStats?.exportJSON?.(); } catch { Toast?.error?.('Export failed'); }
+  on(document.getElementById('btn-export-json-2'), 'click', async () => {
+    try { await window.ProgressStats?.exportJSON?.(); } catch { Toast?.error?.('Export failed'); }
   });
-  on(document.getElementById('btn-import-json-2'), 'click', () => {
-    try { window.ProgressStats?.importJSON?.(); } catch { Toast?.error?.('Import failed'); }
+  on(document.getElementById('btn-import-json-2'), 'click', async () => {
+    try { await window.ProgressStats?.importJSON?.(); } catch { Toast?.error?.('Import failed'); }
   });
 
   const storageController = renderStorageHealth();
@@ -348,7 +349,7 @@ export function mountSettingsView(deps = {}) {
   const scopeLabels = {
     progress: 'progress records',
     notes: 'notes, folders, and note settings',
-    media: 'timestamps and PDF annotations',
+    media: 'bookmarks, annotations, and watch history',
     playlists: 'saved playlists',
     studio: 'Studio boards',
     preferences: 'preferences',
@@ -359,9 +360,24 @@ export function mountSettingsView(deps = {}) {
     const label = scopeLabels[scope] || scopeLabels.all;
     const confirmed = await window.OpenCourseDeck?.UI?.confirm?.(`This will permanently delete ${label} from this browser. Continue?`);
     if (!confirmed) return;
+    const db = window.DB;
+    const clearMain = typeof db?.clearUserData === 'function'
+      ? () => db.clearUserData(scope)
+      : (scope === 'all' && typeof db?.clearAll === 'function' ? () => db.clearAll() : null);
+    const clearFiles = scope === 'all' ? window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles : null;
+    if (!clearMain || (scope === 'all' && typeof clearFiles !== 'function')) {
+      Toast?.error?.('Cannot verify that all requested storage is available. Nothing was cleared.');
+      return;
+    }
+    let mainCleared = false;
     try {
-      if (window.DB?.clearUserData) await window.DB.clearUserData(scope);
-      else if (scope === 'all') await window.DB?.clearAll?.();
+      const committed = await clearMain();
+      if (committed === false) throw new Error('Primary storage did not confirm the deletion');
+      mainCleared = true;
+      if (scope === 'all') {
+        const filesCleared = await clearFiles();
+        if (filesCleared !== true) throw new Error('Imported media deletion was not confirmed');
+      }
       if (scope === 'all' || scope === 'media') {
         sessionStorage.removeItem('ocd_pending_topic');
         sessionStorage.removeItem('ocd_pending_position');
@@ -369,8 +385,11 @@ export function mountSettingsView(deps = {}) {
       }
       Toast?.success?.(`Cleared ${label}`);
       storageController?.update?.();
-    } catch {
-      Toast?.error?.('Clear failed');
+    } catch (error) {
+      console.warn('[Settings] Storage clear failed:', error);
+      Toast?.error?.(scope === 'all' && mainCleared
+        ? 'Some study records were deleted, but imported media could not be cleared. Check storage and your backup before retrying.'
+        : 'Deletion could not be confirmed. Check storage before retrying.');
     }
   });
 
@@ -442,10 +461,6 @@ export function mountSettingsView(deps = {}) {
     let activeDownloadController = null;
 
     const selectedModelOption = () => gemmaOptions.find(option => option.id === localPackage.value) || gemmaOptions[0];
-    const isLoopback = (hostname) => {
-      const value = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-      return value === 'localhost' || value === '::1' || value === '127.0.0.1' || value.startsWith('127.');
-    };
     const parseEndpoint = (value) => {
       const source = String(value || '').trim();
       if (!source) return { valid: false, reason: 'Enter an endpoint URL.' };
@@ -453,7 +468,7 @@ export function mountSettingsView(deps = {}) {
       try {
         const parsed = new URL(source);
         if (parsed.username || parsed.password) return { valid: false, reason: 'Remove embedded credentials from the URL.' };
-        if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) {
+        if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
           return { valid: false, reason: 'Remote endpoints must use HTTPS. HTTP is allowed only for localhost.' };
         }
         return { valid: true, origin: parsed.origin, href: parsed.href };
@@ -629,7 +644,7 @@ export function mountSettingsView(deps = {}) {
       const source = localSource.value.trim() || selectedModelOption()?.url;
       try {
         const parsed = new URL(source);
-        if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback(parsed.hostname))) throw new Error();
+        if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopbackHostname(parsed.hostname))) throw new Error();
         window.open(parsed.href, '_blank', 'noopener,noreferrer');
       } catch {
         Toast?.error?.('Model source must be a secure HTTP(S) URL.');

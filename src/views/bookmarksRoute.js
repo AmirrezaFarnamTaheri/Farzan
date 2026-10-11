@@ -17,12 +17,10 @@ export function mountBookmarksView(deps = {}) {
     <section class="view view-bookmarks">
       <div class="page-header bookmarks-header">
         <div>
-          <span class="eyebrow">Saved References</span>
           <div class="page-title-row">
             <h1 class="page-title">Bookmarks</h1>
-            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
           </div>
-          <p class="page-subtitle">Quick access to saved study timestamps, note bookmarks, and PDF annotations.</p>
+          <p class="page-subtitle">Return to saved video times, notes, and PDF pages.</p>
         </div>
       </div>
       <div class="stat-grid" data-bookmark-metrics></div>
@@ -41,6 +39,7 @@ export function mountBookmarksView(deps = {}) {
       </div>
     </section>
   `);
+  let visibleLimit = 24;
   renderBookmarks();
 
   function formatDuration(seconds) {
@@ -60,23 +59,41 @@ export function mountBookmarksView(deps = {}) {
     if (!metricsRoot || !listRoot) return;
     const activeFilter = filtersRoot?.dataset.activeFilter || 'all';
 
+    let readError = null;
+    const readCollection = async (method, label) => {
+      try {
+        if (typeof method !== 'function') throw new Error(`${label} reader is unavailable`);
+        const value = await method();
+        if (!Array.isArray(value)) throw new TypeError(`${label} returned invalid records`);
+        return value;
+      } catch (error) {
+        readError ||= new Error(`${label} could not be loaded`, { cause: error });
+        return [];
+      }
+    };
     const [timestamps, notes, annotations] = await Promise.all([
-      (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllAnnotations?.() ?? []; } catch { return []; } })(),
+      readCollection(window.DB?.getAllTimestamps, 'Timestamps'),
+      readCollection(window.DB?.getAllNotes, 'Notes'),
+      readCollection(window.DB?.getAllAnnotations, 'PDF annotations'),
     ]);
     if (!document.body.contains(listRoot)) return;
+    if (readError) {
+      // Never present partial or fabricated zero totals after any canonical
+      // read fails; the remaining records may be entirely correct.
+      metricsRoot.replaceChildren();
+      listRoot.replaceChildren();
+      const error = document.createElement('p');
+      error.className = 'bookmarks-load-error';
+      error.setAttribute('role', 'alert');
+      error.textContent = 'Bookmarks could not be loaded. Your stored data was not changed.';
+      listRoot.appendChild(error);
+      return;
+    }
     const notesById = new Map(notes.map(note => [note.id, note]));
     const previewText = (value, limit = 140) => {
-      // Inert parse: a live-document element would start loading any
-      // <img>/<video> URL in the note body just to build a text preview.
-      let text;
-      try {
-        text = new DOMParser().parseFromString(sanitizeHtml(value || ''), 'text/html').body?.textContent || '';
-      } catch {
-        text = String(value || '').replace(/<[^>]*>/g, ' ');
-      }
-      text = text.replace(/\s+/g, ' ').trim();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = sanitizeHtml(value || '');
+      const text = String(tmp.textContent || '').replace(/\s+/g, ' ').trim();
       return text.length > limit ? `${text.slice(0, limit - 1)}...` : text;
     };
 
@@ -155,7 +172,7 @@ export function mountBookmarksView(deps = {}) {
       listRoot.appendChild(empty);
     }
 
-    visibleItems.slice(0, 24).forEach(item => {
+    visibleItems.slice(0, visibleLimit).forEach(item => {
       const card = document.createElement('article');
       card.className = 'card';
       card.dataset.bookmarkType = item.type.toLowerCase();
@@ -224,12 +241,14 @@ export function mountBookmarksView(deps = {}) {
           titleInput.name = 'title';
           titleInput.value = item.title;
           titleInput.placeholder = 'Timestamp title';
+          titleInput.setAttribute('aria-label', 'Timestamp title');
           const noteInput = document.createElement('textarea');
           noteInput.className = 'input';
           noteInput.name = 'note';
           noteInput.rows = 3;
           noteInput.value = item.source?.note || '';
           noteInput.placeholder = 'Timestamp note';
+          noteInput.setAttribute('aria-label', 'Timestamp note');
           const save = document.createElement('button');
           save.type = 'submit';
           save.className = 'btn btn-primary btn-sm';
@@ -272,11 +291,24 @@ export function mountBookmarksView(deps = {}) {
       listRoot.appendChild(card);
     });
 
+    if (visibleLimit < visibleItems.length) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'btn btn-ghost bookmarks-load-more';
+      more.textContent = `Show ${Math.min(24, visibleItems.length - visibleLimit)} more`;
+      more.addEventListener('click', () => {
+        visibleLimit += 24;
+        renderBookmarks();
+      });
+      listRoot.appendChild(more);
+    }
+
     if (filtersRoot && !filtersRoot.dataset.bound) {
       filtersRoot.dataset.bound = 'true';
       filtersRoot.addEventListener('click', (event) => {
         const button = event.target?.closest?.('[data-bookmark-filter]');
         if (!button) return;
+        visibleLimit = 24;
         filtersRoot.dataset.activeFilter = button.dataset.bookmarkFilter || 'all';
         filtersRoot.querySelectorAll('[data-bookmark-filter]').forEach((btn) => {
           const active = btn === button;
@@ -292,6 +324,9 @@ export function mountBookmarksView(deps = {}) {
       if (editButton) {
         listRoot.dataset.editingTimestamp = editButton.dataset.editTimestamp;
         renderBookmarks();
+        requestAnimationFrame(() => {
+          listRoot.querySelector(`[data-timestamp-edit-form="${editButton.dataset.editTimestamp}"] input`)?.focus();
+        });
         return;
       }
       const cancelButton = event.target?.closest?.('[data-cancel-timestamp-edit]');
@@ -305,7 +340,8 @@ export function mountBookmarksView(deps = {}) {
         const ok = await window.OpenCourseDeck?.UI?.confirm?.('Delete this timestamp bookmark?');
         if (!ok) return;
         try {
-          await window.DB?.deleteTimestamp?.(deleteButton.dataset.deleteTimestamp);
+          const deleted = await window.DB?.deleteTimestamp?.(deleteButton.dataset.deleteTimestamp);
+          if (deleted !== true) throw new Error('Timestamp deletion was not acknowledged');
           delete listRoot.dataset.editingTimestamp;
           Toast.success('Timestamp deleted');
           renderBookmarks();

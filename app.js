@@ -749,6 +749,13 @@ import { Pointer } from './src/lib/pointer.js';
       this.topbar      = $('.topbar');
       if (!this.el) return;
 
+      // Match the displayed search shortcut to the host keyboard.
+      const searchHint = this.el.querySelector('.sidebar-search-kbd');
+      if (searchHint) {
+        const platform = navigator.userAgentData?.platform || navigator.platform || '';
+        searchHint.textContent = /Mac|iPad|iPhone/i.test(platform) ? '⌘K' : 'Ctrl+K';
+      }
+
       // Restore collapsed state
       const collapsed = localStorage.getItem(this.STORAGE_KEY) === 'true';
       if (collapsed) this._setCollapsed(true);
@@ -3556,7 +3563,13 @@ import { Pointer } from './src/lib/pointer.js';
 
     // Command palette (extracted to an ES module under src/)
     const cpOpen = () => window.OpenCourseDeck?.CommandPalette?.open?.();
-    KeyboardShortcuts.register('ctrl+k', () => cpOpen(), 'Open command palette');
+    // The shortcut must match the platform-specific hint shown in the sidebar.
+    const shortcutPlatform = navigator.userAgentData?.platform || navigator.platform || '';
+    KeyboardShortcuts.register(
+      /Mac|iPad|iPhone/i.test(shortcutPlatform) ? 'meta+k' : 'ctrl+k',
+      cpOpen,
+      'Open command palette',
+    );
     const btn = document.getElementById('command-palette-btn');
     if (btn && !btn.dataset.pdBound) {
       btn.dataset.pdBound = 'true';
@@ -3627,7 +3640,17 @@ import { Pointer } from './src/lib/pointer.js';
       if (!label) return;
       const finish = (text, pct) => {
         label.textContent = text;
-        if (bar && typeof pct === 'number') bar.style.width = pct + '%';
+        const meter = bar?.closest('[role="progressbar"]');
+        if (bar) bar.style.width = typeof pct === 'number' ? pct + '%' : '0%';
+        if (meter) {
+          if (typeof pct === 'number') {
+            meter.setAttribute('aria-valuenow', String(pct));
+            meter.removeAttribute('aria-valuetext');
+          } else {
+            meter.removeAttribute('aria-valuenow');
+            meter.setAttribute('aria-valuetext', 'Storage usage unavailable');
+          }
+        }
       };
       try {
         const est = await Promise.race([
@@ -3641,10 +3664,10 @@ import { Pointer } from './src/lib/pointer.js';
           const pct = Math.min(100, Math.round((usage / quota) * 100));
           finish('Storage: ' + pct + '% used', pct);
         } else {
-          finish('Local storage ready', 0);
+          finish('Storage usage unavailable', null);
         }
       } catch {
-        finish('Local storage ready', 0);
+        finish('Storage usage unavailable', null);
       }
     })();    TopbarSearch.init();
 

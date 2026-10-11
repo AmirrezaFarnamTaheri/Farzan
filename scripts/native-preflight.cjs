@@ -130,8 +130,8 @@ if (packageJson) {
 }
 
 if (cargoToml) {
-  add(cargoToml.includes('tauri = { version = "=2.11.5"') ? 'ok' : 'fail', 'Tauri runtime version is pinned');
-  add(cargoToml.includes('tauri-build = { version = "=2.6.3"') ? 'ok' : 'fail', 'Tauri build helper version is pinned');
+  add(cargoToml.includes('tauri = { version = "=2.11.6"') ? 'ok' : 'fail', 'Tauri runtime version is pinned');
+  add(cargoToml.includes('tauri-build = { version = "=2.7.1"') ? 'ok' : 'fail', 'Tauri build helper version is pinned');
   add(cargoToml.includes('custom-protocol = ["tauri/custom-protocol"]') ? 'ok' : 'fail', 'release build enables the custom protocol');
   add(!/\bpath\s*=/.test(cargoToml) ? 'ok' : 'fail', 'Tauri dependencies use registry releases instead of missing local paths');
   add(cargoToml.includes('publish = false') ? 'ok' : 'fail', 'Native package is not publishable independently');

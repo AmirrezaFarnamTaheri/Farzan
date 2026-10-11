@@ -4,17 +4,10 @@
  */
 
 import { translationCache } from './translationCache.js';
+import { isLoopbackHostname } from '../core/networkSafety.js';
 
 const TRANSLATION_POLICY_VERSION = 'remote-translation-v2';
 const DEFAULT_TIMEOUT_MS = 30_000;
-
-function isLoopbackHostname(hostname) {
-  const normalized = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-  return normalized === 'localhost'
-    || normalized === '::1'
-    || normalized === '127.0.0.1'
-    || normalized.startsWith('127.');
-}
 
 export function validateTranslatorEndpoint(value, label = 'Translator endpoint') {
   const source = String(value || '').trim();
@@ -215,6 +208,8 @@ export class GoogleTranslator extends BaseTranslator {
       credentials: 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      // Do not forward learning material or API credentials to redirected hosts.
+      redirect: 'error',
       signal,
     });
     if (!response.ok) throw new Error(`Google translation failed with HTTP ${response.status}`);
@@ -263,6 +258,8 @@ export class OpenAITranslator extends BaseTranslator {
       credentials: 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      // Do not forward learning material or API credentials to redirected hosts.
+      redirect: 'error',
       signal,
       body: JSON.stringify({
         model: this._model,
@@ -318,6 +315,8 @@ export class CustomAPITranslator extends BaseTranslator {
       credentials: 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      // Do not forward learning material or API credentials to redirected hosts.
+      redirect: 'error',
       signal,
       body: JSON.stringify({ text, from, to, model: this._model }),
     });

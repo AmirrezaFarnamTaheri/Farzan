@@ -1,10 +1,10 @@
 [data-accent="lapis"] {
-    --accent:       #2563eb;
-    --accent-light: #3b82f6;
-    --accent-dark:  #1d4ed8;
-    --accent-muted: rgba(37,99,235,0.15);
-    --accent-glow:  rgba(37,99,235,0.35);
-    --accent-rgb:   37, 99, 235;
+    --accent:       #2563a8;
+    --accent-light: #3b82c4;
+    --accent-dark:  #1d4f88;
+    --accent-muted: rgba(37,99,168,0.15);
+    --accent-glow:  rgba(37,99,168,0.24);
+    --accent-rgb:   37, 99, 168;
     --accent-contrast: #ffffff;
   }
   [data-accent="violet"] {

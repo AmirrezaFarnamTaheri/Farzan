@@ -1,9 +1,6 @@
-const INSTALLED = Symbol.for('opencoursedeck.endpointApprovalGuard');
+import { isLoopbackHostname } from './networkSafety.js';
 
-function isLoopback(hostname) {
-  const value = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-  return value === 'localhost' || value === '::1' || value === '127.0.0.1' || value.startsWith('127.');
-}
+const INSTALLED = Symbol.for('opencoursedeck.endpointApprovalGuard');
 
 function isValidEndpoint(value) {
   const source = String(value || '').trim();
@@ -11,7 +8,7 @@ function isValidEndpoint(value) {
   try {
     const parsed = new URL(source);
     if (parsed.username || parsed.password) return false;
-    return parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLoopback(parsed.hostname));
+    return parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLoopbackHostname(parsed.hostname));
   } catch {
     return false;
   }

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
 
-function mountDashboard({ progress = [], notes = [], timestamps = [] } = {}) {
+function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes = false } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
   window.DataStore = {
     init: vi.fn(async () => true),
@@ -13,7 +13,10 @@ function mountDashboard({ progress = [], notes = [], timestamps = [] } = {}) {
   };
   window.DB = {
     getAllProgress: vi.fn(async () => progress),
-    getAllNotes: vi.fn(async () => notes),
+    getAllNotes: vi.fn(async () => {
+      if (failNotes) throw new Error('IndexedDB read failed');
+      return notes;
+    }),
     getAllTimestamps: vi.fn(async () => timestamps),
   };
 
@@ -74,6 +77,15 @@ describe('home dashboard', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('shows an error instead of fabricated zeros when saved activity cannot be read', async () => {
+    mountDashboard({ failNotes: true });
+    await vi.waitFor(() => expect(document.querySelector('.home-data-error')).not.toBeNull());
+    expect(document.querySelector('[data-home-widgets]').getAttribute('aria-busy')).toBe('false');
+    expect(document.querySelector('[data-home-active-count]').textContent).toBe('—');
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('—');
+    expect(document.querySelector('.home-empty-state').textContent).toContain('temporarily unavailable');
+  });
+
   it('shows a useful empty state for a new learner', async () => {
     mountDashboard();
 
@@ -81,8 +93,8 @@ describe('home dashboard', () => {
       expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false');
     });
 
-    expect(document.getElementById('home-focus-title')?.textContent).toBe('Explore your course library');
-    expect(document.body.textContent).toContain('Your learning trail starts here');
-    expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Start learning');
+    expect(document.getElementById('home-focus-title')?.textContent).toBe('Choose a course');
+    expect(document.body.textContent).toContain('No recent activity');
+    expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Browse courses');
   });
 });

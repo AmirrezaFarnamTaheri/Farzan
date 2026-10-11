@@ -267,6 +267,9 @@
 
     let _idb = null;
     let _idbCtor = null;
+    // Serialize read-modify-write updates of the same topic in this runtime.
+    // A lost race could overwrite a resume position with a bookmark update.
+    const _pendingProgressWrites = new Map();
     let _sync = null;
     const _sourceId = `pd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -313,6 +316,19 @@
         error: _errorInfo(error),
         ...extra,
       });
+    }
+
+    // A migrated IndexedDB store is authoritative. Returning a stale local
+    // mirror (or an empty collection) on read failure can erase newer data on
+    // the next read-modify-write. Preserve pre-migration compatibility only.
+    function _canonicalReadFailed(kind, error) {
+      if (!_isMigrated()) return;
+      try {
+        _emit('storage:read-error', {
+          kind, backend: 'indexedDB', canonical: true, error: _errorInfo(error),
+        });
+      } catch { /* observer failures must not mask the storage exception */ }
+      throw error;
     }
 
     function _isMigrated() {
@@ -552,7 +568,7 @@
           const fallback = _read(KEY_PROGRESS, {});
           if (fallback[topicId]) return fallback[topicId];
           return null;
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getProgress', error); }
       }
       const map = _read(KEY_PROGRESS, {});
       return map[topicId] ?? null;
@@ -573,13 +589,13 @@
             if (topicId && record?.topicId && !seen.has(topicId)) records.push(record);
           }
           return records;
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getAllProgress', error); }
       }
       const map = _read(KEY_PROGRESS, {});
       return Object.values(map);
     }
 
-    async function saveProgress(topicId, courseId, patch = {}) {
+    async function _saveProgressNow(topicId, courseId, patch = {}) {
       const prev = (await getProgress(topicId)) ?? { topicId, courseId };
       const next = {
         ...prev,
@@ -598,9 +614,9 @@
           _broadcast('progress', 'save', next);
           return next;
         } catch (e) {
-          _signalSaveError('progress', 'indexedDB', e);
-          if (_errorInfo(e).quota) throw e;
-          console.warn('[DB] saveProgress IDB failed, falling back to localStorage:', e);
+          _signalSaveError('progress', 'indexedDB', e, { canonical: _isMigrated() });
+          if (_isMigrated() || _errorInfo(e).quota) throw e;
+          console.warn('[DB] saveProgress IDB failed before migration, using localStorage:', e);
           _emit('storage:fallback', { kind: 'progress', fallbackBackend: 'localStorage' });
         }
       }
@@ -615,11 +631,37 @@
       return next;
     }
 
+    function saveProgress(topicId, courseId, patch = {}) {
+      const previous = _pendingProgressWrites.get(topicId) || Promise.resolve();
+      const operation = previous.catch(() => {}).then(() => {
+        // Web Locks serialize cooperating tabs where supported (including
+        // Chromium/WebView2); the promise chain covers browsers without them.
+        const locks = window.navigator?.locks;
+        if (typeof locks?.request === 'function') {
+          return locks.request(`opencoursedeck:progress:${topicId}`, { mode: 'exclusive' },
+            () => _saveProgressNow(topicId, courseId, patch));
+        }
+        return _saveProgressNow(topicId, courseId, patch);
+      });
+      _pendingProgressWrites.set(topicId, operation);
+      operation.finally(() => {
+        if (_pendingProgressWrites.get(topicId) === operation) _pendingProgressWrites.delete(topicId);
+      }).catch(() => {});
+      return operation;
+    }
+
     async function getAllTimestamps() {
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('timestamps')) ?? []; } catch {}
+        try {
+          const records = (await idb.getAll('timestamps')) ?? [];
+          const seen = new Set(records.map(record => record?.id));
+          for (const record of _read(KEY_TIMESTAMPS, [])) {
+            if (record?.id && !seen.has(record.id)) records.push(record);
+          }
+          return records;
+        } catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
       }
       return _read(KEY_TIMESTAMPS, []);
     }
@@ -631,9 +673,9 @@
       if (idb) {
         await _migrateOnce();
         try { await idb.put('timestamps', next); _broadcast('timestamp', 'save', next); return true; } catch (e) {
-          _signalSaveError('timestamp', 'indexedDB', e);
-          if (_errorInfo(e).quota) throw e;
-          console.warn('[DB] saveTimestamp IDB failed, falling back to localStorage:', e);
+          _signalSaveError('timestamp', 'indexedDB', e, { canonical: _isMigrated() });
+          if (_isMigrated() || _errorInfo(e).quota) throw e;
+          console.warn('[DB] saveTimestamp IDB failed before migration, using localStorage:', e);
         }
       }
 
@@ -651,7 +693,11 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('timestamps', id); } catch {}
+        try { await idb.delete('timestamps', id); }
+        catch (error) {
+          _signalSaveError('timestamp-delete', 'indexedDB', error);
+          throw error;
+        }
       }
       const list = _read(KEY_TIMESTAMPS, []);
       _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
@@ -664,7 +710,7 @@
       if (idb) {
         const migrated = await _migrateOnce();
         if (migrated || _isMigrated()) {
-          try { return (await idb.getAll('notes')) ?? []; } catch {}
+          try { return (await idb.getAll('notes')) ?? []; } catch (error) { _canonicalReadFailed('getAllNotes', error); }
         }
       }
       try { return JSON.parse(localStorage.getItem('ocd_notes')) ?? []; } catch { return []; }
@@ -704,7 +750,11 @@
       let idbDeleted = false;
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('notes', id); idbDeleted = true; } catch {}
+        try { await idb.delete('notes', id); idbDeleted = true; }
+        catch (error) {
+          _signalSaveError('note-delete', 'indexedDB', error, { canonical: _isMigrated() });
+          throw error;
+        }
       }
       if (idbDeleted && _isMigrated()) {
         // Post-migration the localStorage mirror is stale; clear it only when
@@ -724,7 +774,7 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('folders')) ?? []; } catch {}
+        try { return (await idb.getAll('folders')) ?? []; } catch (error) { _canonicalReadFailed('getAllFolders', error); }
       }
       return _read('ocd_folders', []);
     }
@@ -758,7 +808,11 @@
         // Pre-migration, deleting from IDB alone is a no-op and a later
         // migration would resurrect the folder from localStorage.
         await _migrateOnce();
-        try { await idb.delete('folders', id); idbDeleted = true; } catch {}
+        try { await idb.delete('folders', id); idbDeleted = true; }
+        catch (error) {
+          _signalSaveError('folder-delete', 'indexedDB', error, { canonical: _isMigrated() });
+          throw error;
+        }
       }
       if (idbDeleted && _isMigrated()) {
         localStorage.removeItem('ocd_folders');
@@ -793,7 +847,7 @@
             const legacy = await idb.get('settings', legacyKey);
             if (legacy) return legacy.value;
           }
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getSetting', error); }
       }
       const direct = _read(key, null);
       if (direct != null) return direct;
@@ -822,7 +876,7 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('annotations')) ?? []; } catch {}
+        try { return (await idb.getAll('annotations')) ?? []; } catch (error) { _canonicalReadFailed('getAllAnnotations', error); }
       }
       const dict = _read('plasma-pdf-annotations', {});
       if (Array.isArray(dict)) return dict;
@@ -837,7 +891,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('annotations', 'docId', docId) ?? [];
           const all = await idb.getAll('annotations') ?? [];
           return all.filter(a => a.docId === docId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getAnnotations', error); }
       }
       return (await getAllAnnotations()).filter(a => a.docId === docId);
     }
@@ -1098,6 +1152,23 @@
     }
 
     // Issue 8: throw on save failure, return null when IDB unavailable
+    async function getAllWatchedSegments() {
+      const idb = _getIdb();
+      if (!idb) {
+        if (_isMigrated()) throw new Error('Canonical watched-segment storage is unavailable; backup cannot be complete');
+        return []; // Pre-migration local-only mode never persisted watched segments.
+      }
+      await _migrateOnce();
+      try {
+        const records = await idb.getAll('watchedSegments');
+        if (!Array.isArray(records)) throw new Error('Invalid watched-segment records');
+        return records;
+      } catch (error) {
+        _canonicalReadFailed('getAllWatchedSegments', error);
+        throw error;
+      }
+    }
+
     async function addWatchedSegment(segment) {
       const id = segment?.id ?? `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(segment ?? {}), id, updatedAt: segment?.updatedAt ?? Date.now() };
@@ -1124,7 +1195,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('watchedSegments', 'topicId', topicId) ?? [];
           const all = await idb.getAll('watchedSegments') ?? [];
           return all.filter(s => s.topicId === topicId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getWatchedSegments', error); }
       }
       return [];
     }
@@ -1147,6 +1218,23 @@
       return Math.min(100, Math.round((totalWatched / duration) * 100));
     }
 
+    async function getAllPdfBookmarks() {
+      const idb = _getIdb();
+      if (!idb) {
+        if (_isMigrated()) throw new Error('Canonical PDF bookmark storage is unavailable; backup cannot be complete');
+        return []; // Pre-migration local-only mode never persisted PDF bookmarks.
+      }
+      await _migrateOnce();
+      try {
+        const records = await idb.getAll('pdfBookmarks');
+        if (!Array.isArray(records)) throw new Error('Invalid PDF bookmark records');
+        return records;
+      } catch (error) {
+        _canonicalReadFailed('getAllPdfBookmarks', error);
+        throw error;
+      }
+    }
+
     async function addPdfBookmark(bookmark) {
       const id = bookmark?.id ?? `bm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(bookmark ?? {}), id, updatedAt: bookmark?.updatedAt ?? Date.now() };
@@ -1162,7 +1250,9 @@
           throw e;
         }
       }
-      return next;
+      const error = new Error('Cannot save PDF bookmark: IndexedDB unavailable');
+      _signalSaveError('pdfBookmark', 'indexedDB', error);
+      throw error;
     }
 
     async function getPdfBookmarks(docId) {
@@ -1173,7 +1263,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('pdfBookmarks', 'docId', docId) ?? [];
           const all = await idb.getAll('pdfBookmarks') ?? [];
           return all.filter(b => b.docId === docId);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getPdfBookmarks', error); }
       }
       return [];
     }
@@ -1192,8 +1282,8 @@
           return false;
         }
       }
-      _broadcast('pdfBookmark', 'delete', { id });
-      return true;
+      _signalSaveError('pdfBookmark-delete', 'indexedDB', new Error('IndexedDB unavailable'));
+      return false;
     }
 
     // Issue 1: include watchedSegments and pdfBookmarks
@@ -1217,7 +1307,7 @@
         const idb = _getIdb();
         if (idb) {
           await _migrateOnce();
-          try { data.watchedSegments = await idb.getAll('watchedSegments') ?? []; } catch { data.watchedSegments = []; }
+          data.watchedSegments = await getAllWatchedSegments();
         } else {
           data.watchedSegments = [];
         }
@@ -1226,7 +1316,7 @@
         const idb = _getIdb();
         if (idb) {
           await _migrateOnce();
-          try { data.pdfBookmarks = await idb.getAll('pdfBookmarks') ?? []; } catch { data.pdfBookmarks = []; }
+          data.pdfBookmarks = await getAllPdfBookmarks();
         } else {
           data.pdfBookmarks = [];
         }
@@ -1302,9 +1392,11 @@
       queryByRange,
       countByIndex,
       addWatchedSegment,
+      getAllWatchedSegments,
       getWatchedSegments,
       getWatchedPercent,
       addPdfBookmark,
+      getAllPdfBookmarks,
       getPdfBookmarks,
       deletePdfBookmark,
       exportBackup,

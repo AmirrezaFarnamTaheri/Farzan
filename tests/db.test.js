@@ -16,6 +16,34 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     await expect(db.bulkAdd('items', [{ id: 'a' }, { id: 'a' }])).rejects.toBeTruthy();
   });
 
+  it.each(['bulkAdd', 'bulkPut'])('%s aborts earlier queued writes if a later key is invalid', async (method) => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('plasma-test-db', 1, [
+      { name: 'items', key: 'id', autoIncrement: false },
+    ]);
+    await expect(db[method]('items', [
+      { id: 'would-be-partial', value: 'do not commit' },
+      { value: 'missing primary key' },
+    ])).rejects.toBeTruthy();
+    // Inspect canonical persisted state after the failed mutation.
+    expect(await db.getAll('items')).toEqual([]);
+    db.db?.close();
+  });
+
+  it('bulkPutWithCheckpoint aborts data writes if the checkpoint key is invalid', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('plasma-test-db', 1, [
+      { name: 'items', key: 'id', autoIncrement: false },
+      { name: 'settings', key: 'key', autoIncrement: false },
+    ]);
+    await expect(db.bulkPutWithCheckpoint('items', [
+      { id: 'would-be-partial', value: 1 },
+    ], { value: 'missing setting key' })).rejects.toBeTruthy();
+    expect(await db.getAll('items')).toEqual([]);
+    expect(await db.getAll('settings')).toEqual([]);
+    db.db?.close();
+  });
+
   it('can read records by an IndexedDB index', async () => {
     const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
@@ -125,6 +153,46 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
 
     const decrypted = await db.decryptPayload(envelope);
     expect(decrypted).toEqual({ legacy: true });
+  });
+
+  it('refuses encrypted reads with missing or incorrect passphrases', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-missing-key', 1, [
+      { name: 'notes', key: 'id', autoIncrement: false },
+    ]);
+    db.setPassphrase('correct-passphrase');
+    await db.put('notes', { id: 'secret', text: 'Research notes' });
+    db.setPassphrase(null);
+    await expect(db.get('notes', 'secret')).rejects.toThrow(/passphrase/i);
+    db.setPassphrase('wrong-passphrase');
+    await expect(db.getAll('notes')).rejects.toThrow();
+    db.db?.close();
+  });
+
+  it('never silently stores plaintext when Web Crypto is unavailable', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-no-crypto', 1, [
+      { name: 'notes', key: 'id', autoIncrement: false },
+    ]);
+    db.setPassphrase('private');
+    db._getCrypto = () => null;
+    await expect(db.put('notes', { id: 'unprotected', text: 'secret' }))
+      .rejects.toThrow(/Web Crypto/);
+    expect(await db.get('notes', 'unprotected')).toBeUndefined();
+    db.db?.close();
+  });
+
+  it('bounds KDF work on malicious or corrupt imported envelopes', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-kdf-validation');
+    db.setPassphrase('private');
+    await expect(db.decryptPayload({
+      __encrypted: true, v: 2, iv: Array(12).fill(1), salt: Array(16).fill(1),
+      iterations: 999999999, ciphertext: [1],
+    })).rejects.toThrow(/parameters/);
+    await expect(db.decryptPayload({
+      __encrypted: true, v: 99, iv: Array(12).fill(1), ciphertext: [1],
+    })).rejects.toThrow(/version/);
   });
 
   it('encrypts put/get write paths while keeping IndexedDB indexes queryable', async () => {

@@ -13,12 +13,12 @@ export function mountHelpView(deps = {}) {
       <div class="page-header">
         <div>
           <h1 class="page-title">Help</h1>
-          <p class="page-subtitle">Start quickly, find your data, and keep your library portable.</p>
+          <p class="page-subtitle">Find shortcuts, backup instructions, and help with common problems.</p>
         </div>
         <div class="page-actions">
           <button class="btn btn-primary" id="help-backup-btn">
             <svg class="icon" aria-hidden="true"><use href="#i-file-export"/></svg>
-            Export backup
+            Export app-data JSON
           </button>
           <button class="btn btn-ghost" id="help-shortcuts-btn">
             <svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg>
@@ -55,21 +55,21 @@ export function mountHelpView(deps = {}) {
 
         <section class="card card-filled help-card">
           <div class="card-body">
-            <h2 class="help-card-title">Quick links</h2>
+            <h2 class="help-card-title">Guides</h2>
             <div class="help-links" aria-label="Help links">
               <a href="docs/getting-started.md">Getting started</a>
               <a href="docs/content-and-catalog.md">Content and catalog</a>
               <a href="docs/architecture.md">Architecture and storage</a>
               <a href="docs/backup-restore.md">Backup and restore</a>
               <a href="docs/troubleshooting.md">Troubleshooting</a>
-              <a href="docs/roadmap.md">Roadmap</a>
+              <a href="docs/release-and-rollback.md">Release guide</a>
             </div>
           </div>
         </section>
 
         <section class="card card-filled help-card">
           <div class="card-body">
-            <h2 class="help-card-title">Catalog health</h2>
+            <h2 class="help-card-title">Catalog status</h2>
             <dl class="help-facts" data-catalog-health>
               <div><dt>Status</dt><dd>Loading...</dd></div>
             </dl>
@@ -78,7 +78,7 @@ export function mountHelpView(deps = {}) {
 
         <section class="card card-filled help-card">
           <div class="card-body">
-            <h2 class="help-card-title">Common recovery moves</h2>
+            <h2 class="help-card-title">Troubleshooting</h2>
             <div class="help-recovery-list">
               <div>
                 <strong>Blank or stuck loading?</strong>
@@ -98,7 +98,7 @@ export function mountHelpView(deps = {}) {
 
         <section class="card card-filled help-card">
           <div class="card-body">
-            <h2 class="help-card-title">Keyboard essentials</h2>
+            <h2 class="help-card-title">Keyboard shortcuts</h2>
             <table class="shortcuts-table help-shortcuts">
               <tbody>
                 <tr><td><kbd>Ctrl+K</kbd></td><td>Command palette</td></tr>

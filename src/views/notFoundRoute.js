@@ -2,9 +2,9 @@ export function mountNotFoundView({ setView, hash } = {}) {
   setView(`
     <section class="view view-notfound">
       <div class="page-header notfound-header">
-        <span class="eyebrow">404</span>
         <h1 class="page-title">Page not found</h1>
-        <p class="page-subtitle">No view for <code>${String(hash ?? '')}</code></p>
+        <p class="page-subtitle">This page doesn't exist. Check the address or return home.</p>
+        <p class="notfound-requested">Requested address: <code data-missing-route></code></p>
       </div>
       <div class="card card-filled notfound-card">
         <div class="card-body notfound-body">
@@ -18,5 +18,8 @@ export function mountNotFoundView({ setView, hash } = {}) {
       </div>
     </section>
   `);
+  // Render untrusted URL text as text, not template HTML.
+  const target = document.querySelector('[data-missing-route]');
+  if (target) target.textContent = String(hash ?? '');
 }
 

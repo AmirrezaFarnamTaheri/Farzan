@@ -70,8 +70,8 @@ describe('desktop shell wiring', () => {
     expect(stageNative).toContain("'open-course-deck.exe'");
     expect(stageNative).toContain('OpenCourseDeck-Native');
 
-    expect(tauriCargo).toContain('tauri = { version = "=2.11.5"');
-    expect(tauriCargo).toContain('tauri-build = { version = "=2.6.3"');
+    expect(tauriCargo).toContain('tauri = { version = "=2.11.6"');
+    expect(tauriCargo).toContain('tauri-build = { version = "=2.7.1"');
     expect(tauriCargo).toContain('custom-protocol = ["tauri/custom-protocol"]');
     expect(tauriCargo).toContain('publish = false');
     expect(tauriCargo).toContain('license-file = "../../LICENSE"');

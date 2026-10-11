@@ -32,27 +32,32 @@ async function digestText(text, cryptoRoot) {
 
 export async function buildLegacyRecords(kind, records, version, cryptoRoot = globalThis.crypto) {
   const output = [];
-  const identities = new Map();
+  const seenIds = new Map();
+  const collisionError = (kind, id) => {
+    const error = new Error(`Migration identity collision for ${kind}:${id}`);
+    error.code = 'MIGRATION_IDENTITY_COLLISION';
+    return error;
+  };
   for (const record of records.filter(Boolean)) {
     let id = record.id;
-    let canonical = null;
     if (!id) {
       const identity = { ...record };
       delete identity.id;
-      canonical = stableStringify(identity);
+      const canonical = stableStringify(identity);
       const digest = await digestText(
         `opencoursedeck:migration:v${version}:${kind}\0${canonical}`,
         cryptoRoot,
       );
       id = `${kind}-migrated-v${version}-${digest.slice(0, 24)}`;
+      const prior = seenIds.get(id);
+      if (prior && (prior.explicit || prior.canonical !== canonical)) {
+        throw collisionError(kind, id);
+      }
+      seenIds.set(id, { explicit: false, canonical });
+    } else {
+      if (seenIds.has(id)) throw collisionError(kind, id);
+      seenIds.set(id, { explicit: true, canonical: null });
     }
-    const prior = identities.get(id);
-    if (prior && canonical && prior !== canonical) {
-      const error = new Error(`Migration identity collision for ${kind}:${id}`);
-      error.code = 'MIGRATION_IDENTITY_COLLISION';
-      throw error;
-    }
-    if (canonical) identities.set(id, canonical);
     output.push([record, id]);
   }
   return output;

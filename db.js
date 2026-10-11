@@ -68,7 +68,9 @@ async _deriveKey(passphrase, salt = LEGACY_KDF.salt, iterations = LEGACY_KDF.ite
 async encryptPayload(data) {
   if (!this.encryptionPassphrase) return data;
   const cryptoObj = this._getCrypto();
-  if (!cryptoObj || !cryptoObj.subtle) return data;
+  if (!cryptoObj || !cryptoObj.subtle) {
+    throw new Error('Web Crypto is required to encrypt protected records');
+  }
   // v2 envelope: random per-database salt + hardened PBKDF2 iteration count.
   const salt = cryptoObj.getRandomValues(new Uint8Array(16));
   const key = await this._deriveKey(this.encryptionPassphrase, salt, KDF_ITERATIONS);
@@ -87,9 +89,26 @@ async encryptPayload(data) {
 }
 
 async decryptPayload(data) {
-  if (!data || !data.__encrypted || !this.encryptionPassphrase) return data;
+  if (!data || !data.__encrypted) return data;
+  if (!this.encryptionPassphrase) {
+    throw new Error('A passphrase is required to read this encrypted record');
+  }
   const cryptoObj = this._getCrypto();
-  if (!cryptoObj || !cryptoObj.subtle) return data;
+  if (!cryptoObj || !cryptoObj.subtle) {
+    throw new Error('Web Crypto is required to decrypt protected records');
+  }
+  if (!Array.isArray(data.iv) || data.iv.length !== 12 || !Array.isArray(data.ciphertext) || !data.ciphertext.length) {
+    throw new Error('Invalid encrypted record envelope');
+  }
+  if (data.v === 2 && (
+    !Array.isArray(data.salt) || data.salt.length !== 16 ||
+    !Number.isInteger(data.iterations) || data.iterations < 10000 || data.iterations > 1000000
+  )) {
+    throw new Error('Invalid encrypted record parameters');
+  }
+  if (data.v != null && data.v !== 2) {
+    throw new Error('Unsupported encrypted record version');
+  }
   // Legacy envelopes (no v field) used the static app-wide salt and the
   // original 10,000-iteration KDF; keep decrypting them transparently.
   const isLegacy = data.v !== 2;
@@ -194,17 +213,14 @@ return out;
 async _seal(store, data) {
 if (!this.encryptionPassphrase || !data || typeof data !== 'object' || data.__encrypted) return data;
 const sealed = await this.encryptPayload(data);
-if (!sealed || !sealed.__encrypted) return data;
+if (!sealed || !sealed.__encrypted) throw new Error('Unable to encrypt the protected record');
 return { ...sealed, ...this._plaintextIndexFields(store, data) };
 }
 
 async _open(data) {
 if (!data || !data.__encrypted) return data;
-try {
-return await this.decryptPayload(data);
-} catch {
-return data;
-}
+// Never pass an encrypted envelope to callers as though it were a usable record.
+return this.decryptPayload(data);
 }
 
 async _openAll(list) {
@@ -324,12 +340,20 @@ return withMutationRetry(async () => {
 const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
-const s = tx.objectStore(store);
-sealed.forEach(item => s.add(item));
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  // Register completion before queuing requests. A synchronous DataError or
+  // DataCloneError does not automatically abort the transaction: without
+  // explicit abort, earlier queued writes could still commit after rejection.
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.add(item);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }
@@ -339,12 +363,17 @@ return withMutationRetry(async () => {
 const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
-const s = tx.objectStore(store);
-sealed.forEach(item=>s.put(item));
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.put(item);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }
@@ -356,13 +385,18 @@ const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) :
 const db = await this.open();
 const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
 const tx = db.transaction(stores,"readwrite");
-const target = tx.objectStore(store);
-sealed.forEach(item=>target.put(item));
-if(sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.put(item);
+    if (sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }

@@ -62,11 +62,14 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.dragStartY = 0;
     this.hoveredNode = null;
     this.selectedNode = null;
+    this.keyboardNodeIndex = 0;
+    this.keyboardStatus = null;
 
     this.onResize = this.handleResize.bind(this);
     this.onPointerDown = this.handlePointerDown.bind(this);
     this.onPointerMove = this.handlePointerMove.bind(this);
     this.onPointerUp = this.handlePointerUp.bind(this);
+    this.onKeyDown = this.handleKeyDown.bind(this);
   }
 
   /**
@@ -85,8 +88,9 @@ export class SpatialKnowledgeGraph extends EventEmitter {
 
     const canvas = document.createElement('canvas');
     canvas.className = 'spatial-graph-canvas';
-    canvas.setAttribute('aria-label', '3D Spatial Knowledge Graph');
-    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', '3D Knowledge graph. Use Left and Right to choose a concept, Up and Down to rotate, and Enter to select.');
+    canvas.setAttribute('role', 'application');
+    canvas.tabIndex = 0;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     canvas.style.cursor = 'grab';
@@ -105,8 +109,16 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.dpr = dpr;
 
     this.container.appendChild(canvas);
+    const keyboardStatus = document.createElement('p');
+    keyboardStatus.className = 'sr-only';
+    keyboardStatus.setAttribute('aria-live', 'polite');
+    keyboardStatus.setAttribute('aria-atomic', 'true');
+    this.container.appendChild(keyboardStatus);
+    this.keyboardStatus = keyboardStatus;
 
     this.initData(items);
+    this.keyboardNodeIndex = 0;
+    this.updateKeyboardTarget();
     this.bindEvents();
     this.startLoop();
   }
@@ -205,6 +217,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     if (!this.canvas) return;
 
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.canvas.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
   }
@@ -270,8 +283,41 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     }
     if (this.hoveredNode && !this.isDragging) {
       this.selectedNode = this.hoveredNode;
+      this.keyboardNodeIndex = this.nodes.indexOf(this.hoveredNode);
+      this.updateKeyboardTarget();
       this.emit('node:select', this.selectedNode.raw);
     }
+  }
+
+  updateKeyboardTarget() {
+    const node = this.nodes[this.keyboardNodeIndex];
+    const selection = node
+      ? `Concept ${this.keyboardNodeIndex + 1} of ${this.nodes.length}: ${node.title}.`
+      : 'No concepts available.';
+    if (this.canvas) {
+      this.canvas.setAttribute('aria-label',
+        `3D Knowledge graph. ${selection} Left and Right arrow keys change the concept; Up and Down rotate; Enter or Space selects.`);
+    }
+    if (this.keyboardStatus) this.keyboardStatus.textContent = selection;
+  }
+
+  handleKeyDown(event) {
+    const step = 0.12;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (!this.nodes.length) return;
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      this.keyboardNodeIndex = (this.keyboardNodeIndex + delta + this.nodes.length) % this.nodes.length;
+      this.updateKeyboardTarget();
+    } else if (event.key === 'ArrowUp') this.camera.targetRotX -= step;
+    else if (event.key === 'ArrowDown') this.camera.targetRotX += step;
+    else if (event.key === 'Enter' || event.key === ' ') {
+      const node = this.nodes[this.keyboardNodeIndex];
+      if (node) {
+        this.selectedNode = node;
+        this.emit('node:select', node.raw);
+      }
+    } else return;
+    event.preventDefault();
   }
 
   startLoop() {
@@ -449,7 +495,9 @@ export class SpatialKnowledgeGraph extends EventEmitter {
 
     for (const node of sortedNodes) {
       const r = Math.max(3, node.baseRadius * node.screenScale);
-      const isHovered = this.hoveredNode === node;
+      const isKeyboardTarget = this.canvas === document.activeElement
+        && this.nodes[this.keyboardNodeIndex] === node;
+      const isHovered = this.hoveredNode === node || isKeyboardTarget;
       const isSelected = this.selectedNode === node;
 
       // Halo / Specular Glow for hovered or selected nodes
@@ -514,11 +562,15 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas?.removeEventListener?.('keydown', this.onKeyDown);
 
     if (this.canvas?.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas);
     }
     this.canvas = null;
+    this.keyboardStatus?.remove();
+    this.keyboardStatus = null;
+    this.keyboardNodeIndex = 0;
     this.ctx = null;
     this.nodes = [];
     this.edges = [];

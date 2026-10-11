@@ -352,7 +352,7 @@ describe('app shell resilience helpers', () => {
     for (const viewName of ['tags', 'playlists', 'bookmarks', 'achievements']) {
       await window.OpenCourseDeck.Views[viewName]();
       const view = document.querySelector(`#view-container .view-${viewName}`);
-      expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+      expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
       expect(view.textContent).not.toContain('planned and not yet interactive');
     }
   });
@@ -379,7 +379,7 @@ describe('app shell resilience helpers', () => {
     const view = document.querySelector('#view-container .view-tags');
     const ecg = view.querySelector('[data-tag-name="ecg"]');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Unique tags');
     expect(view.textContent).toContain('Tagged records');
@@ -446,10 +446,15 @@ describe('app shell resilience helpers', () => {
 
   it('saves and deletes custom courses from My Courses storage', async () => {
     await loadApp();
-    const saveSetting = vi.fn(async () => true);
+    let savedState = [];
+    const saveSetting = vi.fn(async (_key, value) => { savedState = value; return true; });
     window.DB = {
-      getSetting: vi.fn(async () => []),
+      getSetting: vi.fn(async () => savedState),
       saveSetting,
+    };
+    window.OpenCourseDeck.UserLibrary = {
+      upsertCourse: vi.fn(async () => ({ id: 'course-in-catalog' })),
+      removeCourse: vi.fn(async () => true),
     };
 
     await window.OpenCourseDeck.Views.myCourses();
@@ -468,12 +473,66 @@ describe('app shell resilience helpers', () => {
       description: 'Focused rhythm practice',
     }));
 
-    window.DB.getSetting.mockResolvedValueOnce(savedCourses);
     await window.OpenCourseDeck.Views.myCourses();
     await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]').textContent).toContain('Cardiology review'));
     document.querySelector('[data-my-course-id] button').click();
 
     await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_my_courses', []));
+  });
+
+  it('does not replace an unreadable My Courses list with a fresh empty list', async () => {
+    await loadApp();
+    const saveSetting = vi.fn();
+    window.DB = {
+      getSetting: vi.fn(async () => { throw new Error('canonical read failed'); }),
+      saveSetting,
+    };
+    await window.OpenCourseDeck.Views.myCourses();
+    await vi.waitFor(() => expect(document.querySelector('.view-my-courses').textContent)
+      .toContain('Unable to load saved courses'));
+    document.querySelector('[data-my-course-title]').value = 'Do not overwrite existing courses';
+    document.querySelector('[data-my-course-save]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-save]').disabled).toBe(false));
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(document.querySelector('.view-my-courses').textContent).not.toContain('No custom courses yet');
+  });
+
+  it('reports a partially saved course if its catalog update fails', async () => {
+    await loadApp();
+    const saveSetting = vi.fn(async () => true);
+    window.DB = { getSetting: vi.fn(async () => []), saveSetting };
+    window.OpenCourseDeck.UserLibrary = {
+      upsertCourse: vi.fn(async () => { throw new Error('catalog write failed'); }),
+    };
+    const error = vi.spyOn(window.OpenCourseDeck.Toast, 'error');
+    await window.OpenCourseDeck.Views.myCourses();
+    const input = document.querySelector('[data-my-course-title]');
+    input.value = 'Partially saved course';
+    document.querySelector('[data-my-course-save]').click();
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('catalog update failed')));
+    expect(saveSetting).toHaveBeenCalledWith('ocd_my_courses', expect.arrayContaining([
+      expect.objectContaining({ title: 'Partially saved course' }),
+    ]));
+    expect(input.value).toBe('Partially saved course');
+  });
+
+  it('restores the My Courses listing after a failed catalog deletion', async () => {
+    await loadApp();
+    const saved = [{ id: 'course-one', title: 'Keep this course', createdAt: 1 }];
+    let state = saved;
+    const saveSetting = vi.fn(async (_key, courses) => { state = courses; });
+    window.DB = { getSetting: vi.fn(async () => state), saveSetting };
+    window.OpenCourseDeck.UserLibrary = {
+      removeCourse: vi.fn(async () => { throw new Error('catalog delete failed'); }),
+    };
+    const error = vi.spyOn(window.OpenCourseDeck.Toast, 'error');
+    await window.OpenCourseDeck.Views.myCourses();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]')));
+    document.querySelector('[data-my-course-id] button').click();
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('deletion did not complete')));
+    expect(state).toEqual(saved);
+    expect(saveSetting).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('.view-my-courses').textContent).toContain('Keep this course');
   });
 
   it('renders playlists from active queue, timestamps, and catalog video sources', async () => {
@@ -508,7 +567,7 @@ describe('app shell resilience helpers', () => {
     const resume = view.querySelector('[data-playlist-id="timestamp-queue"]');
     const catalog = view.querySelector('[data-playlist-id^="source-"]');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).toContain('Active tracks');
     expect(view.textContent).toContain('Video topics');
     expect(live.textContent).toContain('Loaded lecture');
@@ -1388,7 +1447,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('[data-bookmark-type]')).toHaveLength(3));
     const view = document.querySelector('#view-container .view-bookmarks');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Video timestamps');
     expect(view.textContent).toContain('Total bookmarks');
@@ -1626,7 +1685,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('[data-achievement-id]')).toHaveLength(6));
     const view = document.querySelector('#view-container .view-achievements');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Touched topics');
     expect(view.textContent).toContain('Completed courses');
@@ -2500,11 +2559,16 @@ describe('app shell resilience helpers', () => {
     );
 
     const view = document.getElementById('view-container');
-    const img = view.querySelector('img');
-    const link = view.querySelector('a');
+    // Untrusted hash text is rendered as textContent, not sanitized into
+    // executable DOM nodes. Keep that stronger invariant covered.
+    const routeLabel = view.querySelector('[data-missing-route]');
+    expect(routeLabel).toBeTruthy();
+    expect(routeLabel.textContent).toContain('<img src=x onerror=');
+    expect(routeLabel.textContent).toContain('javascript:alert(1)');
+    expect(routeLabel.textContent).toContain('<script>');
+    expect(view.querySelector('img')).toBeNull();
     expect(view.querySelector('script')).toBeNull();
-    expect(img?.getAttribute('onerror')).toBeNull();
-    expect(link?.getAttribute('href')).toBeNull();
+    expect(view.querySelector('a[href^="javascript:"]')).toBeNull();
     expect(window.__fallbackXss).toBeUndefined();
     expect(window.__scriptXss).toBeUndefined();
   });

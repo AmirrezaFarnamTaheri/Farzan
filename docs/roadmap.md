@@ -1,6 +1,6 @@
-## Roadmap And Backlog
+# Current work list
 
-This backlog keeps the high-RoI upgrade plan tied to concrete files, definitions of done, and test expectations.
+Tasks with code locations and acceptance checks. Priority labels describe the original plan and may need review against the latest commit.
 
 > **Status (2026-09-18):** rows are relabeled as work lands. Three items previously listed as pending have shipped — overlay focus trap + `setAppInert` (live in `app.js`, `src/ui/overlays.js`, `src/features/commandPalette.js`), the styled async `confirm()` returning a Promise (`ui.js`), and route-level lazy loading via 13 dynamic imports in `src/index.js`. The remaining P0/P1 items (PDF search cache and cancellation, notes scalable rendering) are still open.
 
@@ -21,9 +21,9 @@ This backlog keeps the high-RoI upgrade plan tied to concrete files, definitions
 | Done | Windows-safe npm scripts | High | Low | `package.json`, `vitest.config.js`, `scripts/smoke-test.cjs`, `scripts/dev-server.cjs`, `docs/getting-started.md` | Build, lint, test, smoke, and service-worker scripts use local entry points, avoid fragile child-process paths where practical, and do not require `.bin` shims. | `npm test`, `npm run build`, `npm run smoke`. |
 | P3 | Brand refresh | Medium | Medium | `assets/favicon.svg`, `assets/icon-192.svg`, `assets/og-cover.svg`, `index.html`, `manifest.json` | One consistent SVG mark replaces emoji-only branding across app icon, favicon, shell, and OG cover. | Visual check and manifest validation. |
 
-### Expansion Picks
+### Possible follow-ups
 
-Start with these because they improve first-run confidence and daily use without a framework rewrite:
+Confirm whether these are still missing before creating new work:
 
 1. Guided import/export with validation feedback.
 2. Search facets for tags, courses, and materials.

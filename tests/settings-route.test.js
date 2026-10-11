@@ -122,6 +122,47 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('refuses a full reset before deleting anything when media storage cannot be reached', async () => {
+    const { controller, Toast } = mountSettings();
+    document.getElementById('select-clear-scope').value = 'all';
+    document.getElementById('btn-clear-scope').click();
+
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Nothing was cleared'),
+    ));
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(Toast.success).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('reports a partial reset when the auxiliary file database fails after main deletion', async () => {
+    const { controller, Toast } = mountSettings();
+    window.OpenCourseDeck.UserLibrary = {
+      clearLibraryFiles: vi.fn(async () => { throw new Error('Library storage quota error'); }),
+    };
+    document.getElementById('select-clear-scope').value = 'all';
+    document.getElementById('btn-clear-scope').click();
+
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Some study records were deleted'),
+    ));
+    expect(window.DB.clearUserData).toHaveBeenCalledWith('all');
+    expect(window.OpenCourseDeck.UserLibrary.clearLibraryFiles).toHaveBeenCalledOnce();
+    expect(Toast.success).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('confirms a full reset only when both storage layers report completion', async () => {
+    const { controller, Toast } = mountSettings();
+    window.OpenCourseDeck.UserLibrary = { clearLibraryFiles: vi.fn(async () => true) };
+    document.getElementById('select-clear-scope').value = 'all';
+    document.getElementById('btn-clear-scope').click();
+    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Cleared all local OpenCourseDeck data'));
+    expect(window.DB.clearUserData).toHaveBeenCalledWith('all');
+    expect(window.OpenCourseDeck.UserLibrary.clearLibraryFiles).toHaveBeenCalledOnce();
+    controller.unmount();
+  });
+
   it('blocks insecure remote endpoints before saving credentials', async () => {
     const { controller, saveSetting, Toast } = mountSettings({ mode: 'custom-api' });
     await vi.waitFor(() => expect(window.DB.getSetting).toHaveBeenCalled());

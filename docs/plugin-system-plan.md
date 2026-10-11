@@ -7,7 +7,7 @@
 
 OpenCourseDeck should support user-installed extensions without weakening the local-first privacy model, CSP posture, route lifecycle discipline, or backup/export guarantees already established in the unified audit. The plugin system must begin as a conservative capability platform, not as arbitrary code execution inside the main app.
 
-The first production target is a **local plugin registry** that can install, enable, disable, inspect, export, and remove plugins. Plugins should be able to add focused behavior such as dashboard widgets, note actions, command-palette commands, import/export adapters, Studio tools, and AI provider connectors.
+The proposed first step is a **local plugin registry** for installing, enabling, disabling, inspecting, exporting, and removing plugins. Possible extension points include note actions, command-palette commands, data import/export adapters, Studio tools, and provider connections. None is a shipped plugin capability yet.
 
 ## Non-Goals
 

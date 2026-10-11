@@ -65,6 +65,22 @@ function safeJoin(base, requestedPath) {
   return pResolved;
 }
 
+/** Check the actual filesystem target, not just the URL's lexical path. */
+function isServableRealPath(serverRoot, filePath, debugLogPath) {
+  try {
+    const rootReal = fs.realpathSync.native(serverRoot);
+    const fileReal = fs.realpathSync.native(filePath);
+    const relative = path.relative(rootReal, fileReal);
+    if (!relative || path.isAbsolute(relative)
+      || relative === '..' || relative.startsWith(`..${path.sep}`)
+      || isHiddenPath(relative)) return false;
+    if (fs.existsSync(debugLogPath) && fileReal === fs.realpathSync.native(debugLogPath)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 /**
@@ -380,7 +396,15 @@ function createServer(options = {}) {
       return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
     }
 
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    if (!fs.existsSync(filePath)) {
+      finish(404);
+      return send(res, 404, { 'Content-Type': 'text/plain' }, 'Not found');
+    }
+    if (!isServableRealPath(serverRoot, filePath, debugLogPath)) {
+      finish(403);
+      return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
+    }
+    if (fs.statSync(filePath).isDirectory()) {
       finish(404);
       return send(res, 404, { 'Content-Type': 'text/plain' }, 'Not found');
     }

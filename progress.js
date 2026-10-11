@@ -396,6 +396,9 @@ const ProgressStats = (() => {
     const allTimestamps= await DB.getAllTimestamps();
     const allFolders   = await DB.getAllFolders?.() ?? [];
     const allAnnotations = await DB.getAllAnnotations?.() ?? [];
+    // A portable app-data backup must not silently omit auxiliary stores.
+    const allWatchedSegments = await DB.getAllWatchedSegments();
+    const allPdfBookmarks = await DB.getAllPdfBookmarks();
     const notesSettings= await DB.getSetting?.('ocd_notes_settings') ?? null;
     const playlistsSettings= await DB.getSetting?.('ocd_playlists') ?? null;
     const studioSettings= await DB.getSetting?.('ocd_studio_board') ?? null;
@@ -407,7 +410,7 @@ const ProgressStats = (() => {
 
     const payload = {
       exportedAt  : new Date().toISOString(),
-      version     : '1.4',
+      version     : '1.5',
       meta        : {
         storage: await _storageEstimate(),
       },
@@ -423,6 +426,8 @@ const ProgressStats = (() => {
       },
       annotations : allAnnotations,
       timestamps  : allTimestamps,
+      watchedSegments: allWatchedSegments,
+      pdfBookmarks: allPdfBookmarks,
     };
     let json = JSON.stringify(payload, null, 2);
     payload.meta.sizeBytes = new Blob([json]).size;
@@ -583,6 +588,12 @@ const ProgressStats = (() => {
 
   async function importJSONFile(file) {
     if (!file) return;
+    // Retain the verified pre-import snapshot across unexpected read/merge
+    // failures. Without this scope, a throw after an earlier successful write
+    // exits through the outer catch and strands an incomplete import.
+    let rollbackSnapshot = null;
+    let activeResult = null;
+    let rollbackTargets = {};
     try {
         const text    = await file.text();
         const payload = JSON.parse(text);
@@ -599,14 +610,20 @@ const ProgressStats = (() => {
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
         const timestampRecords = _asArray(payload.timestamps).filter((timestamp) => _isObjectRecord(timestamp) && timestamp.id != null);
-        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4'].includes(String(payload.version));
+        const rawWatchedSegments = _asArray(payload.watchedSegments);
+        const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
+        const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
+        const pdfBookmarkRecords = rawPdfBookmarks.filter(_isPdfBookmarkRecord);
+        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5'].includes(String(payload.version));
         if (!versionSupported) throw new Error(`Unsupported backup version: ${payload.version}`);
         const invalidCount =
           rawProgress.length - progressRecords.length +
           _asArray(payload.notes).length - noteRecords.length +
           _asArray(payload.folders).length - folderRecords.length +
           _asArray(payload.annotations).length - annotationRecords.length +
-          _asArray(payload.timestamps).length - timestampRecords.length;
+          _asArray(payload.timestamps).length - timestampRecords.length +
+          rawWatchedSegments.length - watchedSegmentRecords.length +
+          rawPdfBookmarks.length - pdfBookmarkRecords.length;
         const settingsCount =
           (payload.settings?.notes ? 1 : 0) +
           (Array.isArray(payload.settings?.playlists) ? 1 : 0) +
@@ -624,6 +641,8 @@ const ProgressStats = (() => {
           settings: settingsCount,
           annotations: annotationRecords.length,
           timestamps: timestampRecords.length,
+          watchedSegments: watchedSegmentRecords.length,
+          pdfBookmarks: pdfBookmarkRecords.length,
           invalid: invalidCount,
           totalValid:
             progressRecords.length +
@@ -631,7 +650,9 @@ const ProgressStats = (() => {
             folderRecords.length +
             settingsCount +
             annotationRecords.length +
-            timestampRecords.length,
+            timestampRecords.length +
+            watchedSegmentRecords.length +
+            pdfBookmarkRecords.length,
         };
         const result = {
           progress: 0,
@@ -640,11 +661,14 @@ const ProgressStats = (() => {
           settings: 0,
           annotations: 0,
           timestamps: 0,
+          watchedSegments: 0,
+          pdfBookmarks: 0,
           skipped: 0,
           invalid: invalidCount,
           errors: [],
           preview,
         };
+        activeResult = result;
 
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportPreview = preview;
@@ -657,7 +681,19 @@ const ProgressStats = (() => {
         });
         if (!confirmed) return;
 
-        const rollbackSnapshot = await _createImportSnapshot();
+        rollbackSnapshot = await _createImportSnapshot();
+        // The legacy multi-step restore does not atomically restore auxiliary
+        // media stores. Reject the import BEFORE writing anything unless a v3
+        // atomic rollback snapshot is available.
+        const hasExtendedMedia = watchedSegmentRecords.length > 0 || pdfBookmarkRecords.length > 0;
+        if (hasExtendedMedia && !rollbackSnapshot.primary) {
+          rollbackSnapshot = null;
+          throw new Error('This backup contains watch history or PDF bookmarks, but atomic media recovery is unavailable');
+        }
+        rollbackTargets = {
+          annotationDocIds: new Set(annotationRecords.map(row => String(row.docId ?? 'global'))),
+          timestampIds: new Set(timestampRecords.map(row => row.id)),
+        };
 
         await _forEachChunk(progressRecords, async (p) => {
           const existing = await DB.getProgress(p.topicId);
@@ -708,9 +744,8 @@ const ProgressStats = (() => {
               }
             });
 
-          // Nudge Notes UI to refresh if open
+          // Refresh open Notes UI; report one final import result after all writes.
           try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
-          try { window.OpenCourseDeck?.Toast?.success?.(`Imported ${imported.length} notes.`); } catch { /* ignore */ }
         }
         if (folderRecords.length && DB.saveFolder) {
           await _forEachChunk(folderRecords, async (folder) => {
@@ -834,18 +869,72 @@ const ProgressStats = (() => {
             }
           });
         }
-        if (result.errors.length) {
-          await _rollbackImport(rollbackSnapshot, result);
+        if (hasExtendedMedia) {
+          const existingWatched = watchedSegmentRecords.length ? await DB.getAllWatchedSegments() : [];
+          const existingBookmarks = pdfBookmarkRecords.length ? await DB.getAllPdfBookmarks() : [];
+          const watchedById = new Map(existingWatched.map(item => [String(item.id), item]));
+          const bookmarksById = new Map(existingBookmarks.map(item => [String(item.id), item]));
+
+          await _forEachChunk(watchedSegmentRecords, async (record) => {
+            if (!_shouldImportRecord(watchedById.get(String(record.id)), record)) {
+              result.skipped += 1;
+              return;
+            }
+            try {
+              if (typeof DB.addWatchedSegment !== 'function') throw new Error('Watched segment storage is unavailable');
+              const saved = await DB.addWatchedSegment(record);
+              if (saved === false || saved == null) throw new Error('Watched segment write was not acknowledged');
+              watchedById.set(String(record.id), record);
+              result.watchedSegments += 1;
+            } catch (error) {
+              _recordImportError(result, 'watchedSegments', record.id, error);
+            }
+          });
+          await _forEachChunk(pdfBookmarkRecords, async (record) => {
+            if (!_shouldImportRecord(bookmarksById.get(String(record.id)), record)) {
+              result.skipped += 1;
+              return;
+            }
+            try {
+              if (typeof DB.addPdfBookmark !== 'function') throw new Error('PDF bookmark storage is unavailable');
+              const saved = await DB.addPdfBookmark(record);
+              if (saved === false || saved == null) throw new Error('PDF bookmark write was not acknowledged');
+              bookmarksById.set(String(record.id), record);
+              result.pdfBookmarks += 1;
+            } catch (error) {
+              _recordImportError(result, 'pdfBookmarks', record.id, error);
+            }
+          });
         }
+        if (result.errors.length) {
+          await _rollbackImport(rollbackSnapshot, result, rollbackTargets);
+        }
+        // The known-error path has completed its recovery attempt. Do not
+        // retry rollback if a subsequent toast or observer fails.
+        rollbackSnapshot = null;
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportResult = result;
         if (result.rolledBack) {
           pdToast(`Import rolled back after ${result.errors.length} error(s). No partial backup changes were kept.`, 'error');
+        } else if (result.errors.length) {
+          pdToast('Import failed and recovery was incomplete. Some imported data may remain. Preserve your original backup and review the import errors before retrying.', 'error');
         } else {
-          pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.invalid} invalid skipped.`, 'success');
+          pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.watchedSegments} watched segments, ${result.pdfBookmarks} PDF bookmarks, ${result.invalid} invalid skipped.`, 'success');
         }
     } catch (err) {
       console.error('[Progress] import error', err);
+      if (rollbackSnapshot && activeResult) {
+        _recordImportError(activeResult, 'import', null, err);
+        await _rollbackImport(rollbackSnapshot, activeResult, rollbackTargets);
+        window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+        window.OpenCourseDeck.lastImportResult = activeResult;
+        if (activeResult.rolledBack) {
+          pdToast('Import stopped after an unexpected error. Previously saved data was restored.', 'error');
+        } else {
+          pdToast('Import failed and recovery was incomplete. Keep your original backup and review import errors before retrying.', 'error');
+        }
+        return;
+      }
       pdToast('Import error: ' + err.message, 'error');
     }
   }
@@ -872,14 +961,36 @@ const ProgressStats = (() => {
     on('#btn-reset-all',    'click', async () => {
       const ok = await pdConfirm({
         title: 'Reset All Data',
-        message: 'All progress, notes, and timestamps will be permanently deleted. This cannot be undone.',
+        message: 'All local app data and imported media files will be permanently deleted. This cannot be undone.',
         confirmLabel: 'Reset All',
         cancelLabel: 'Cancel',
       });
       if (!ok) return;
-      await DB.clearAll();
-      pdToast('All data has been cleared.', 'info');
-      renderStatsPage();
+      // Verify both backends before deleting anything. The auxiliary
+      // imported-file database is managed by UserLibrary separately.
+      const clearMedia = window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles;
+      if (typeof clearMedia !== 'function') {
+        pdToast('Reset not started: imported media storage cannot be cleared.', 'error');
+        return;
+      }
+      let appRecordsCleared = false;
+      try {
+        await DB.clearAll();
+        appRecordsCleared = true;
+        await clearMedia();
+        pdToast('All data has been cleared.', 'info');
+      } catch (error) {
+        pdToast(
+          (appRecordsCleared
+            ? 'App records were cleared, but imported media files may remain. '
+            : 'Reset did not complete; some app records may already have been removed. ')
+          + (error?.message ?? String(error)),
+          'error',
+        );
+      } finally {
+        try { await renderStatsPage(); }
+        catch (error) { pdToast('Unable to refresh progress after reset: ' + (error?.message ?? error), 'error'); }
+      }
     });
     return true;
   }
@@ -986,6 +1097,17 @@ const ProgressStats = (() => {
     return _isObjectRecord(value) && value.page != null && Number.isFinite(Number(value.page));
   }
 
+  function _isWatchedSegmentRecord(value) {
+    return _isObjectRecord(value) && value.id != null && value.topicId != null
+      && Number.isFinite(Number(value.start)) && Number.isFinite(Number(value.end))
+      && Number(value.start) >= 0 && Number(value.end) > Number(value.start);
+  }
+
+  function _isPdfBookmarkRecord(value) {
+    return _isObjectRecord(value) && value.id != null && value.docId != null
+      && Number.isInteger(Number(value.page)) && Number(value.page) > 0;
+  }
+
   function _recordTime(value) {
     const raw = value?.updatedAt ?? value?.createdAt ?? 0;
     const numeric = Number(raw);
@@ -1007,51 +1129,107 @@ const ProgressStats = (() => {
     });
   }
 
+  // Backups imported through the progress UI are written in several steps.
+  // NEVER substitute an empty collection when reading the rollback snapshot:
+  // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
     const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library'];
-    const annotations = await Promise.resolve(DB.getAllAnnotations?.()).catch(() => []);
+    const readList = async (name) => {
+      if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
+      const records = await DB[name]();
+      if (!Array.isArray(records)) throw new Error(`Cannot protect existing data: ${name} returned invalid records`);
+      return records;
+    };
+    if (typeof DB.getSetting !== 'function') throw new Error('Cannot protect settings before import');
+    const primary = typeof DB.exportBackup === 'function' && typeof DB.importBackup === 'function'
+      ? await DB.exportBackup()
+      : null;
+    const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
+      && primary._meta.version === 3;
+    const mirrorKeys = [
+      'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
+      'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
+      'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
+      'ocd_user_library', 'plasma-pdf-annotations',
+    ];
+    const storage = window.localStorage;
+    if (!storage || typeof storage.getItem !== 'function') {
+      throw new Error('Cannot protect local backup mirrors: localStorage is unavailable');
+    }
+    const mirrors = Object.fromEntries(mirrorKeys.map(key => [key, storage.getItem(key)]));
     return {
-      progress: await Promise.resolve(DB.getAllProgress?.()).catch(() => []),
-      notes: await Promise.resolve(DB.getAllNotes?.()).catch(() => []),
-      folders: await Promise.resolve(DB.getAllFolders?.()).catch(() => []),
+      primary: canAtomicRestore ? primary : null,
+      mirrors,
+      progress: await readList('getAllProgress'),
+      notes: await readList('getAllNotes'),
+      folders: await readList('getAllFolders'),
       settings: Object.fromEntries(await Promise.all(settingsKeys.map(async (key) => [
         key,
-        await Promise.resolve(DB.getSetting?.(key)).catch(() => undefined),
+        await DB.getSetting(key),
       ]))),
-      annotations: Array.isArray(annotations) ? annotations : [],
-      timestamps: await Promise.resolve(DB.getAllTimestamps?.()).catch(() => []),
+      annotations: await readList('getAllAnnotations'),
+      timestamps: await readList('getAllTimestamps'),
     };
   }
 
-  async function _rollbackImport(snapshot, result) {
-    result.rolledBack = true;
+  async function _rollbackImport(snapshot, result, { annotationDocIds = new Set(), timestampIds = new Set() } = {}) {
+    result.rolledBack = false;
     result.rollbackErrors = [];
     try {
-      if (DB.clearUserData) {
+      if (snapshot.primary && typeof DB.importBackup === 'function') {
+        // The v3 backup engine overwrites all primary object stores in ONE IDB
+        // transaction, preserving untouched watchedSegments/pdfBookmarks.
+        const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
+        if (receipt?.committed !== true || receipt.degraded === true) {
+          throw new Error('Atomic rollback was incomplete; check storage and AI session status');
+        }
+      } else {
+        // Legacy compatibility path: never clear the broad "media" scope.
+        // That scope also contains watched segments and PDF bookmarks, which
+        // the legacy import snapshot does not include.
+        if (typeof DB.clearUserData !== 'function') throw new Error('Safe rollback requires storage deletion support');
         await DB.clearUserData('progress');
         await DB.clearUserData('notes');
-        await DB.clearUserData('media');
         await DB.clearUserData('playlists');
         await DB.clearUserData('studio');
+        await _forEachChunk(snapshot.progress, (record) => DB.saveProgress(record.topicId, record.courseId, record));
+        await _forEachChunk(snapshot.notes, (record) => DB.saveNote(record));
+        await _forEachChunk(snapshot.folders, (record) => DB.saveFolder(record));
+        for (const [key, value] of Object.entries(snapshot.settings)) {
+          if (value !== undefined) await DB.saveSetting(key, value);
+        }
+        const allDocs = new Set([...annotationDocIds, ...snapshot.annotations.map(a => String(a.docId ?? 'global'))]);
+        for (const docId of allDocs) {
+          const pages = {};
+          for (const ann of snapshot.annotations.filter(a => String(a.docId ?? 'global') === docId)) {
+            const page = String(ann.page ?? 1);
+            (pages[page] ??= []).push(ann);
+          }
+          if (typeof DB.saveAnnotations !== 'function') throw new Error('Cannot restore annotations');
+          await DB.saveAnnotations(docId, pages);
+        }
+        const existingTimestamps = new Map(snapshot.timestamps.map(item => [item.id, item]));
+        for (const id of timestampIds) {
+          if (!existingTimestamps.has(id)) {
+            if (typeof DB.deleteTimestamp !== 'function') throw new Error('Cannot undo newly imported timestamp');
+            await DB.deleteTimestamp(id);
+          }
+        }
+        for (const item of snapshot.timestamps) {
+          if (typeof DB.saveTimestamp !== 'function') throw new Error('Cannot restore original timestamps');
+          await DB.saveTimestamp(item);
+        }
       }
-      await _forEachChunk(snapshot.progress ?? [], (record) => DB.saveProgress?.(record.topicId, record.courseId, record));
-      await _forEachChunk(snapshot.notes ?? [], (record) => DB.saveNote?.(record));
-      await _forEachChunk(snapshot.folders ?? [], (record) => DB.saveFolder?.(record));
-      for (const [key, value] of Object.entries(snapshot.settings ?? {})) {
-        if (value !== undefined) await DB.saveSetting?.(key, value);
+      // Restore local mirrors after primary storage so fallback reads never
+      // resurrect a partially imported version.
+      for (const [key, value] of Object.entries(snapshot.mirrors)) {
+        if (value === null) window.localStorage.removeItem(key);
+        else window.localStorage.setItem(key, value);
       }
-      const annotationsByDoc = (snapshot.annotations ?? []).reduce((acc, annotation) => {
-        const docId = String(annotation.docId ?? 'global');
-        const page = String(annotation.page ?? 1);
-        acc[docId] = acc[docId] ?? {};
-        acc[docId][page] = acc[docId][page] ?? [];
-        acc[docId][page].push(annotation);
-        return acc;
-      }, {});
-      for (const [docId, pages] of Object.entries(annotationsByDoc)) {
-        await DB.saveAnnotations?.(docId, pages);
-      }
-      await _forEachChunk(snapshot.timestamps ?? [], (record) => DB.saveTimestamp?.(record));
+      result.rolledBack = true;
+      try { window.OpenCourseDeck?.Flashcards?.invalidateCache?.(); } catch {}
+      try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+      try { await window.OpenCourseDeck?.Canvas?.restoreBoard?.(); } catch {}
     } catch (err) {
       result.rollbackErrors.push(err?.message ?? String(err));
     }
@@ -1079,6 +1257,8 @@ const ProgressStats = (() => {
       `Settings groups: ${preview.settings}`,
       `PDF annotations: ${preview.annotations}`,
       `Timestamps: ${preview.timestamps}`,
+      `Watched segments: ${preview.watchedSegments}`,
+      `PDF bookmarks: ${preview.pdfBookmarks}`,
       `Invalid records that will be skipped: ${preview.invalid}`,
       '',
       'Existing records are updated only when the imported record is newer or has no comparable timestamp.',
@@ -1315,6 +1495,7 @@ window.OpenCourseDeck.ProgressStatsInit = async () => {
     await ProgressStats.renderStatsPage();
   } catch (e) {
     console.error('[ProgressStatsInit] failed', e);
+    throw e;
   }
 };
 

@@ -7,27 +7,27 @@ This guide gets a new user from first launch to a useful study session.
 From the repository root:
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run first-run
 npm start
 ```
 
 Open `http://localhost:5173/`. Keep the terminal running while you use the app.
 
-Windows users can also use `Run-OpenCourseDeck.vbs` or `Run-OpenCourseDeck.cmd`.
+Windows users can also use `Run-OpenCourseDeck.cmd`.
 
 ### First Tour
 
-1. Start on Home and use the launch cards to open Courses, Notes, Help, PDF, Studio, or Settings.
+1. Start on Home, choose a course, or open Notes or PDF from the sidebar.
 2. Press `Tab` once from the top of the page to reveal the skip link.
-3. Press `Ctrl+K` to open the command palette and jump to any section.
+3. Press `Ctrl+K` to search for a page or command.
 4. Search the command palette for `backup`, `shortcuts`, or `guide` when you need recovery actions.
 5. Open Settings to confirm the storage summary and backup actions.
 
 ### Add Or Open Content
 
 - Courses come from the active catalog selected in `data/catalog.json`.
-- Use Materials for your local content library workflow.
+- Use Materials to find the videos and PDFs available in your catalog.
 - Use Notes for free-form study notes, tags, folders, import, and export.
 - Use PDF when studying documents.
 - Use Studio for canvas work.
@@ -38,7 +38,7 @@ Data is stored in your browser profile for the local origin, usually `http://loc
 
 - Progress and timestamps use IndexedDB when available.
 - Preferences use `localStorage`.
-- Backup/export creates a JSON file you control.
+- Export creates a portable JSON file of supported app data. The current Progress/Settings export is format 1.5 and includes saved watch segments and PDF page bookmarks. Imported video and PDF file blobs are stored separately and are **not** included: retain the original files for migration.
 
 Changing browser profile, hostname, or port can make the app look like it has no data because browser storage is origin-scoped.
 
@@ -52,29 +52,18 @@ Changing browser profile, hostname, or port can make the app look like it has no
 
 Dialogs, drawers, and the command palette trap focus while open and return focus to the opener when closed.
 
-### Development Checks
+For development and tests, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-The npm scripts call local package entry points directly so they keep working even if `node_modules/.bin` shims are missing on Windows. Tests use Vitest's `vmThreads` pool to avoid fork-based worker failures in restricted shells.
-
-```bash
-npm run validate
-npm test
-npm run build
-npm run smoke
-```
-
-Use `npm run ci` for the combined audit plus HTTP smoke check.
-
-### Newcomer FAQ
+### Common questions
 
 **Can I open `index.html` directly?**  
 No. Use `npm start` or the Windows launcher. Browser security rules block core features on `file://`.
 
 **Does OpenCourseDeck upload my notes or progress?**  
-No. The app is local-first and does not upload by default.
+Not by default. Configured AI endpoints receive the content you send to them, and linked external videos or PDFs are requested from their hosts.
 
 **Why did my data disappear after changing ports?**  
 Browser storage is scoped to the origin. `localhost:5173` and `localhost:5174` have separate storage.
 
 **What should I back up?**  
-Use the in-app export actions for progress and notes. Also keep any custom catalog JSON files you edited outside the app.
+Use the JSON export in Settings or Progress, keep a copy outside the app, and retain imported media files and any catalog JSON you edited yourself. See [Backup and restore](backup-restore.md).

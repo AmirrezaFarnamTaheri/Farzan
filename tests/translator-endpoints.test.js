@@ -25,8 +25,27 @@ describe('translator endpoint security', () => {
     expect(validateTranslatorEndpoint('')).toBe('');
   });
 
+  it('treats 127-prefixed internet hostnames as remote', () => {
+    for (const endpoint of ['http://127.attacker.example/v1', 'http://127.0.0.1.evil.example/x']) {
+      expect(() => validateTranslatorEndpoint(endpoint)).toThrow(/HTTPS/);
+      expect(() => new CustomAPITranslator({ endpoint })).toThrow(/HTTPS/);
+    }
+  });
+
   it('rejects cleartext remote endpoints', () => {
     expect(() => validateTranslatorEndpoint('http://api.example.com/v1')).toThrow(/HTTPS/);
+  });
+
+  it('does not allow remote translations to follow redirects with source text or credentials', async () => {
+    const response = { ok: true, json: async () => ({ translation: 'ok' }) };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+    try {
+      const translator = new CustomAPITranslator({ endpoint: 'https://api.example.test/translate', apiKey: 'private-key' });
+      await expect(translator.doTranslate('Private study text', 'en', 'fa')).resolves.toBe('ok');
+      expect(fetchMock).toHaveBeenCalledWith('https://api.example.test/translate', expect.objectContaining({ redirect: 'error' }));
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it('rejects embedded credentials and non-HTTP protocols', () => {

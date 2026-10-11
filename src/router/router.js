@@ -125,7 +125,10 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
         if (typeof $$ === 'function') {
           $$('.nav-item').forEach((item) => {
             const href = item.getAttribute('href') || '';
-            item.classList.toggle('active', href === path || href === hash);
+            const active = href === path || href === hash;
+            item.classList.toggle('active', active);
+            if (active) item.setAttribute('aria-current', 'page');
+            else item.removeAttribute('aria-current');
           });
         }
 

@@ -14,6 +14,22 @@ const blobUrls = new Map();
 let overlayBound = false;
 let fileDb = null;
 let fileDbPromise = null;
+let libraryMutationQueue = Promise.resolve();
+
+// Serialize the entire read-modify-write cycle. Individual IndexedDB settings
+// puts are atomic, but two independent library readers can otherwise each
+// overwrite the other one's course/topic additions.
+function mutateLibrary(operation) {
+  const run = libraryMutationQueue.catch(() => {}).then(() => {
+    const perform = async () => operation(await loadLibrary());
+    const locks = window.navigator?.locks;
+    return typeof locks?.request === 'function'
+      ? locks.request('opencoursedeck:user-library', { mode: 'exclusive' }, perform)
+      : perform();
+  });
+  libraryMutationQueue = run.catch(() => {});
+  return run;
+}
 
 function emptyLibrary() {
   return { version: 1, courses: {} };
@@ -62,9 +78,9 @@ function makeId(prefix) {
 }
 
 function openFileDb() {
+  if (typeof indexedDB === 'undefined' || indexedDB == null) return Promise.resolve(null);
   if (fileDb) return Promise.resolve(fileDb);
   if (fileDbPromise) return fileDbPromise;
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   fileDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(FILE_DB_NAME, 1);
     request.onupgradeneeded = () => {
@@ -91,9 +107,12 @@ function openFileDb() {
   return fileDbPromise;
 }
 
-async function withFileStore(mode, fn) {
+async function withFileStore(mode, fn, { required = false } = {}) {
   const db = await openFileDb();
-  if (!db) return null;
+  if (!db) {
+    if (required) throw new Error('Library file storage is unavailable; file data cannot be cleared.');
+    return null;
+  }
   return new Promise((resolve, reject) => {
     let tx;
     try {
@@ -104,16 +123,20 @@ async function withFileStore(mode, fn) {
       reject(error);
       return;
     }
-    const store = tx.objectStore(FILE_STORE);
-    const request = fn(store);
     let result;
-    if (request) {
-      request.onsuccess = () => { result = request.result; };
-      request.onerror = () => reject(request.error);
-    }
     tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error || new Error('Library file transaction failed'));
     tx.onabort = () => reject(tx.error || new Error('Library file transaction aborted'));
+    try {
+      const request = fn(tx.objectStore(FILE_STORE));
+      if (request) {
+        request.onsuccess = () => { result = request.result; };
+        request.onerror = () => reject(request.error || new Error('Library file request failed'));
+      }
+    } catch (error) {
+      try { tx.abort(); } catch { /* transaction already finished */ }
+      reject(error);
+    }
   });
 }
 
@@ -135,6 +158,9 @@ function closeFileDb() {
 }
 
 export async function loadLibrary() {
+  if (typeof window.DB?.getSetting !== 'function') {
+    throw new Error('Unable to read the user library: persistent storage is unavailable');
+  }
   let saved;
   try {
     saved = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
@@ -148,14 +174,39 @@ export async function loadLibrary() {
 }
 
 async function persistLibrary(library, extra = {}) {
+  if (typeof window.DB?.saveSetting !== 'function') {
+    throw new Error('Unable to save the user library: persistent storage is unavailable');
+  }
   const next = cloneLibrary(library);
-  await window.DB?.saveSetting?.(LIBRARY_SETTING_KEY, next);
-  overlayLibrary(next);
-  window.OpenCourseDeck?.bus?.emit?.('library:changed', {
-    courses: Object.keys(next.courses).length,
-    ...extra,
-  });
+  await window.DB.saveSetting(LIBRARY_SETTING_KEY, next);
+  // The canonical mutation is durable now. View refresh failures must not
+  // make the caller delete blobs which this committed metadata references.
+  try {
+    overlayLibrary(next);
+  } catch (error) {
+    console.warn('[UserLibrary] Refresh after committed save failed:', error);
+  }
+  try {
+    window.OpenCourseDeck?.bus?.emit?.('library:changed', {
+      courses: Object.keys(next.courses).length,
+      ...extra,
+    });
+  } catch (error) {
+    console.warn('[UserLibrary] Change notification failed after committed save:', error);
+  }
   return next;
+}
+
+/**
+ * Reset the auxiliary file database as part of an explicitly confirmed "all
+ * local app data" reset. Do not claim success if the file store was unavailable.
+ */
+export async function clearLibraryFiles() {
+  const result = await withFileStore('readwrite', (store) => store.clear(), { required: true });
+  if (result === false) throw new Error('Library file deletion was not acknowledged');
+  revokeAllCachedUrls();
+  closeFileDb();
+  return true;
 }
 
 export function overlayLibrary(library) {
@@ -284,6 +335,11 @@ export async function putLibraryFile(file, { kind = 'file' } = {}) {
     record.bytes = Array.from(new Uint8Array(buffer));
   }
   try {
+    if (typeof indexedDB === 'undefined') {
+      throw new Error('Local file storage is unavailable. Enable browser storage before importing files.');
+    }
+    const db = await openFileDb();
+    if (!db) throw new Error('Local file storage is unavailable. The file was not imported.');
     await withFileStore('readwrite', (store) => store.put(record));
   } catch (error) {
     if (error?.name === 'QuotaExceededError') {
@@ -327,33 +383,35 @@ export async function resolveMediaUrl(value) {
 
 export async function upsertCourse({ id, title, description = '' } = {}) {
   if (!String(title || '').trim() && !id) throw new TypeError('Course title is required');
-  const library = await loadLibrary();
-  const courseId = id || makeId('course');
-  ensureCourse(library, {
-    id: courseId,
-    title: String(title || '').trim() || undefined,
-    description: String(description || '').trim(),
-    overwriteTitle: Boolean(String(title || '').trim()),
+  return mutateLibrary(async (library) => {
+    const courseId = id || makeId('course');
+    ensureCourse(library, {
+      id: courseId,
+      title: String(title || '').trim() || undefined,
+      description: String(description || '').trim(),
+      overwriteTitle: Boolean(String(title || '').trim()),
+    });
+    await persistLibrary(library, { courseId });
+    return { id: courseId, title: library.courses[courseId].title };
   });
-  await persistLibrary(library, { courseId });
-  return { id: courseId, title: library.courses[courseId].title };
 }
 
 export async function removeCourse(courseId) {
-  const library = await loadLibrary();
-  const course = library.courses[courseId];
-  const doomed = collectLibraryFileIds(course);
-  const stillUsed = new Set();
-  for (const [id, remaining] of Object.entries(library.courses || {})) {
-    if (id === courseId) continue;
-    collectLibraryFileIds(remaining, stillUsed);
-  }
-  delete library.courses[courseId];
-  await persistLibrary(library, { courseId });
-  for (const id of doomed) {
-    if (!stillUsed.has(id)) await deleteLibraryFile(id);
-  }
-  return true;
+  return mutateLibrary(async (library) => {
+    const course = library.courses[courseId];
+    const doomed = collectLibraryFileIds(course);
+    const stillUsed = new Set();
+    for (const [id, remaining] of Object.entries(library.courses || {})) {
+      if (id === courseId) continue;
+      collectLibraryFileIds(remaining, stillUsed);
+    }
+    delete library.courses[courseId];
+    await persistLibrary(library, { courseId });
+    for (const id of doomed) {
+      if (!stillUsed.has(id)) await deleteLibraryFile(id);
+    }
+    return true;
+  });
 }
 
 export async function addTopic({
@@ -366,48 +424,58 @@ export async function addTopic({
 } = {}) {
   const topicTitle = String(title || '').trim();
   if (!topicTitle) throw new TypeError('Topic title is required');
-  const library = await loadLibrary();
-  const { id, course } = resolveOrCreateCourse(library, { courseId, courseTitle });
-  const topics = courseTopics(course);
-  const topicId = makeId('topic');
-  topics.push({
-    title: topicTitle,
-    url: topicId,
-    videos: Array.isArray(videos) ? videos : [],
-    pdfs: Array.isArray(pdfs) ? pdfs : [],
-    iframes: Array.isArray(iframes) ? iframes : [],
+  return mutateLibrary(async (library) => {
+    const { id, course } = resolveOrCreateCourse(library, { courseId, courseTitle });
+    const topics = courseTopics(course);
+    const topicId = makeId('topic');
+    topics.push({
+      title: topicTitle,
+      url: topicId,
+      videos: Array.isArray(videos) ? videos : [],
+      pdfs: Array.isArray(pdfs) ? pdfs : [],
+      iframes: Array.isArray(iframes) ? iframes : [],
+    });
+    await persistLibrary(library, { courseId: id });
+    return { courseId: id, topicId, title: topicTitle };
   });
-  await persistLibrary(library, { courseId: id });
-  return { courseId: id, topicId, title: topicTitle };
 }
 
 export async function addMediaFiles(files, { kind = 'video', courseId, courseTitle, title } = {}) {
   const list = [...(files || [])].filter(Boolean);
   if (!list.length) return [];
   const type = kind === 'pdf' ? 'pdf' : 'video';
-  const library = await loadLibrary();
-  const resolved = resolveOrCreateCourse(library, { courseId, courseTitle });
-  const topics = courseTopics(resolved.course);
-  const sharedTitle = list.length === 1 ? String(title || '').trim() : '';
-  const results = [];
-  for (const file of list) {
-    const stored = await putLibraryFile(file, { kind: type });
-    const topicTitle = sharedTitle
-      || String(file.name || stored.name).replace(/\.[^.]+$/, '')
-      || (type === 'pdf' ? 'PDF' : 'Video');
-    const topicId = makeId('topic');
-    const media = [{ url: stored.ref, label: stored.name }];
-    topics.push({
-      title: topicTitle,
-      url: topicId,
-      videos: type === 'video' ? media : [],
-      pdfs: type === 'pdf' ? media : [],
-      iframes: [],
+  const staged = [];
+  try {
+    // File I/O happens before holding the shared library-metadata lock.
+    for (const file of list) staged.push({ file, stored: await putLibraryFile(file, { kind: type }) });
+    return await mutateLibrary(async (library) => {
+      const resolved = resolveOrCreateCourse(library, { courseId, courseTitle });
+      const topics = courseTopics(resolved.course);
+      const sharedTitle = list.length === 1 ? String(title || '').trim() : '';
+      const results = [];
+      for (const { file, stored } of staged) {
+        const topicTitle = sharedTitle
+          || String(file.name || stored.name).replace(/\.[^.]+$/, '')
+          || (type === 'pdf' ? 'PDF' : 'Video');
+        const topicId = makeId('topic');
+        const media = [{ url: stored.ref, label: stored.name }];
+        topics.push({
+          title: topicTitle,
+          url: topicId,
+          videos: type === 'video' ? media : [],
+          pdfs: type === 'pdf' ? media : [],
+          iframes: [],
+        });
+        results.push({ courseId: resolved.id, topicId, title: topicTitle });
+      }
+      await persistLibrary(library, { courseId: resolved.id });
+      return results;
     });
-    results.push({ courseId: resolved.id, topicId, title: topicTitle });
+  } catch (error) {
+    // Never leave orphaned blobs when the metadata commit fails.
+    await Promise.allSettled(staged.map(({ stored }) => deleteLibraryFile(stored.id)));
+    throw error;
   }
-  await persistLibrary(library, { courseId: resolved.id });
-  return results;
 }
 
 export async function addVideoFile(file, options = {}) {
@@ -457,6 +525,7 @@ export function initUserLibrary(root = window) {
     addMediaFiles,
     addRemoteLink,
     putLibraryFile,
+    clearLibraryFiles,
     revokeCachedUrl,
   };
 

@@ -40,9 +40,14 @@ function stripSourceMapReferences(filePath) {
   return true;
 }
 
-function finalizeServiceWorkerArtifacts() {
+function stripServiceWorkerInputSourceMaps() {
   const javascriptFiles = walkFiles(dist).filter(file => file.endsWith('.js'));
   for (const file of javascriptFiles) stripSourceMapReferences(file);
+  return javascriptFiles;
+}
+
+function finalizeServiceWorkerArtifacts() {
+  const javascriptFiles = stripServiceWorkerInputSourceMaps();
   removeProductionSourceMaps();
 
   const remainingMaps = walkFiles(dist).filter(file => file.endsWith('.map'));
@@ -69,6 +74,9 @@ async function generateReleaseServiceWorker(config = workboxConfig) {
 async function main() {
   assertFile(indexPath, 'Cannot generate release service worker: dist/index.html is missing');
 
+  // Workbox revisions must be calculated from the same JavaScript bytes that
+  // remain after release source-map cleanup.
+  stripServiceWorkerInputSourceMaps();
   const result = await generateReleaseServiceWorker();
   finalizeServiceWorkerArtifacts();
   assertFile(swPath, 'Release service worker was not generated at dist/sw.js');

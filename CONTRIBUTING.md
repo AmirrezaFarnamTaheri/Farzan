@@ -1,9 +1,9 @@
-﻿## Contributing
+## Contributing
 
 ### Setup
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run vendor
 ```
 
@@ -20,8 +20,8 @@ npm run vendor
 ### Where To Change What
 
 - App shell and landmarks: `index.html`.
-- Global design system and responsive rules: `style.css`.
-- App behavior, routes, overlays, settings, and view builders: `app.js`.
+- Styles: edit `src/styles/index.css` and its imported CSS files, especially `tokens.css`, `themes.css`, and `workspace.css`; `style.css` is a compatibility entry.
+- App shell and common controls: `app.js`; route markup and handlers: `src/views/*Route.js`.
 - Shared DOM helpers: `src/lib/dom.js`.
 - Command palette: `src/features/commandPalette.js`.
 - Reusable UI helpers: `ui.js`.
@@ -37,7 +37,9 @@ npm run vendor
 - Keep the app self-contained. Do not add CDN dependencies.
 - Keep CSP healthy in `index.html`; do not add `unsafe-eval` or broad script sources.
 - Prefer shared utilities in `src/lib/dom.js` over duplicating focus, selector, debounce, throttle, or ID helpers.
-- Preserve keyboard behavior when changing overlays.
+- Preserve keyboard behavior, focus restoration, readable contrast, reduced motion and responsive layouts when changing overlays or shared CSS.
+- Keep storage errors visible. Do not replace a failed authoritative IndexedDB read with an empty array or a success toast.
+- Avoid silently merging backup formats or changing persistent keys without migration tests.
 - Treat service worker cache as a production concern; local dev should remain easy to refresh.
 
 ### Test Strategy
@@ -47,6 +49,10 @@ npm run vendor
 - Add regression tests for fragile UX primitives: router focus, overlay focus trap, inert state, and async confirm.
 - Run `npm run build` after module import changes.
 - Run `npm test` for every behavior change.
+
+### UI and writing changes
+
+Use the component and writing guidance in [DESIGN.md](DESIGN.md). Verify empty, loading, failure, and populated states. Preserve keyboard focus, translated layouts, and saved data. Do not add decorative "Ready" badges or imply a feature works when it does not.
 
 ### Common Pitfalls
 

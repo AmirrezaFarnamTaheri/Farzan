@@ -22,6 +22,50 @@ describe('bridge DB safety helpers', () => {
     else delete window.BroadcastChannel;
   });
 
+  it.each([
+    ['getProgress', ['topic-stale']],
+    ['getAllProgress', []],
+    ['getAllTimestamps', []],
+    ['getAllNotes', []],
+    ['getAllFolders', []],
+    ['getSetting', ['ocd_user_library']],
+    ['getAllAnnotations', []],
+    ['getAnnotations', ['pdf-a']],
+    ['getWatchedSegments', ['topic-stale']],
+    ['getAllWatchedSegments', []],
+    ['getPdfBookmarks', ['pdf-a']],
+    ['getAllPdfBookmarks', []],
+  ])('rejects %s after migrated IndexedDB read failure instead of returning a stale snapshot', async (method, args) => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('ocd_user_library', JSON.stringify({
+      version: 1, courses: { stale: { title: 'Must not overwrite canonical library' } },
+    }));
+    localStorage.setItem('ocd_notes', JSON.stringify([{ id: 'old-note' }]));
+    localStorage.setItem('plasma_progress_v1', JSON.stringify({ 'topic-stale': { topicId: 'topic-stale' } }));
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get() { throw new Error('canonical storage read failed'); }
+      async getAll() { throw new Error('canonical storage read failed'); }
+      async getAllByIndex() { throw new Error('canonical storage read failed'); }
+    };
+
+    await expect(window.DB[method](...args)).rejects.toThrow('canonical storage read failed');
+    expect(emit).toHaveBeenCalledWith('storage:read-error', expect.objectContaining({
+      kind: method, backend: 'indexedDB', canonical: true,
+      error: expect.objectContaining({ message: 'canonical storage read failed' }),
+    }));
+  });
+
+  it('treats auxiliary stores as empty only in the pre-migration localStorage-only mode', async () => {
+    delete window.OpenCourseDeck.DB.PlasmaDB;
+    await expect(window.DB.getAllWatchedSegments()).resolves.toEqual([]);
+    await expect(window.DB.getAllPdfBookmarks()).resolves.toEqual([]);
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    await expect(window.DB.getAllWatchedSegments()).rejects.toThrow(/Canonical watched-segment/);
+    await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow(/Canonical PDF bookmark/);
+  });
+
   it('merges localStorage and IndexedDB notes during compatibility migration', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },
@@ -239,63 +283,68 @@ describe('bridge DB safety helpers', () => {
     expect(emit).not.toHaveBeenCalledWith('storage:fallback', expect.anything());
   });
 
-  it('signals transient progress write failures before using localStorage fallback', async () => {
+  it('rejects failed writes to canonical progress storage without a false fallback success', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = class {
-      async get() { return null; }
-      async put() { throw new Error('Temporary IDB failure'); }
+      async get() { return { topicId: 'topic-canonical', courseId: 'course-a', watched: 100 }; }
+      async put() { throw new Error('IDB transaction aborted'); }
     };
 
-    const progress = await window.DB.saveProgress('topic-fallback', 'course-a', { status: 'done' });
-    const saved = JSON.parse(localStorage.getItem('plasma_progress_v1'));
-
-    expect(progress.status).toBe('done');
-    expect(saved['topic-fallback']).toEqual(expect.objectContaining({ status: 'done' }));
+    await expect(window.DB.saveProgress('topic-canonical', 'course-a', { bookmarked: true }))
+      .rejects.toThrow('IDB transaction aborted');
+    expect(localStorage.getItem('plasma_progress_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
-      kind: 'progress',
-      backend: 'indexedDB',
-      error: expect.objectContaining({ quota: false }),
+      kind: 'progress', canonical: true, backend: 'indexedDB',
     }));
-    expect(emit).toHaveBeenCalledWith('storage:fallback', expect.objectContaining({
-      kind: 'progress',
-      fallbackBackend: 'localStorage',
-    }));
+    expect(emit).not.toHaveBeenCalledWith('progress:save', expect.anything());
   });
 
-  it('keeps an acknowledged localStorage-fallback progress write readable once IndexedDB recovers', async () => {
+  it('rejects failed canonical timestamp writes and does not broadcast success', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     window.OpenCourseDeck.bus = { emit: vi.fn() };
-
-    // IDB writes fail transiently while reads already work: saveProgress falls
-    // back to localStorage and reports success.
-    const idbRecords = new Map();
     window.OpenCourseDeck.DB.PlasmaDB = class {
-      async get(_store, key) { return idbRecords.get(key) ?? null; }
-      async getAll() { return [...idbRecords.values()]; }
-      async put() { throw new Error('Temporary IDB failure'); }
+      async put() { throw new Error('timestamp transaction aborted'); }
     };
 
-    const saved = await window.DB.saveProgress('topic-fallback', 'course-a', { status: 'done' });
-    expect(saved.status).toBe('done');
+    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a' }))
+      .rejects.toThrow('timestamp transaction aborted');
+    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
+  });
 
-    // The acknowledged write must stay readable even though IDB never got it.
-    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
-      expect.objectContaining({ topicId: 'topic-fallback', status: 'done' }),
-    );
-    await expect(window.DB.getAllProgress()).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ topicId: 'topic-fallback', status: 'done' })]),
-    );
+  it('retains readability for legacy timestamp fallbacks without overriding canonical records', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { id: 'legacy-only', topicId: 'a' },
+      { id: 'both', topicId: 'stale' },
+    ]));
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async getAll() { return [{ id: 'both', topicId: 'canonical' }]; }
+    };
+    const timestamps = await window.DB.getAllTimestamps();
+    expect(timestamps).toEqual(expect.arrayContaining([
+      { id: 'legacy-only', topicId: 'a' },
+      { id: 'both', topicId: 'canonical' },
+    ]));
+    expect(timestamps).toHaveLength(2);
+  });
 
-    // A record IDB later holds wins over the stale fallback.
-    idbRecords.set('topic-fallback', { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' });
-    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
-      { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' },
-    );
-    await expect(window.DB.getAllProgress()).resolves.toEqual(
-      [{ topicId: 'topic-fallback', status: 'reviewed', source: 'idb' }],
-    );
+  it('reads historical localStorage-fallback progress records but prefers IndexedDB', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma_progress_v1', JSON.stringify({
+      fallback: { topicId: 'fallback', status: 'done' },
+      both: { topicId: 'both', status: 'stale' },
+    }));
+    const rows = new Map([['both', { topicId: 'both', status: 'canonical' }]]);
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get(_store, key) { return rows.get(key) ?? null; }
+      async getAll() { return [...rows.values()]; }
+    };
+    await expect(window.DB.getProgress('fallback')).resolves.toMatchObject({ status: 'done' });
+    await expect(window.DB.getProgress('both')).resolves.toMatchObject({ status: 'canonical' });
+    expect((await window.DB.getAllProgress())).toHaveLength(2);
   });
 
   it('does not mark migration complete when a compatibility section fails', async () => {
@@ -585,6 +634,66 @@ describe('bridge DB safety helpers', () => {
     ]));
     expect(localStorage.getItem('ocd_notes')).toBeNull();
     expect(localStorage.getItem('ocd_folders')).toBeNull();
+  });
+
+  it.each([
+    ['note', 'notes', 'deleteNote', 'note-delete'],
+    ['folder', 'folders', 'deleteFolder', 'folder-delete'],
+    ['timestamp', 'timestamps', 'deleteTimestamp', 'timestamp-delete'],
+  ])('rejects an uncommitted %s deletion instead of broadcasting success', async (_kind, store, method, errorKind) => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    const persisted = new Map([['keep-me', { id: 'keep-me', title: 'Still stored' }]]);
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async delete(_store, id) {
+        expect(_store).toBe(store);
+        expect(id).toBe('keep-me');
+        throw new Error('IndexedDB deletion transaction aborted');
+      }
+      async getAll() { return [...persisted.values()]; }
+    };
+
+    await expect(window.DB[method]('keep-me')).rejects.toThrow(/transaction aborted/);
+    expect(persisted.has('keep-me')).toBe(true);
+    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
+      kind: errorKind, backend: 'indexedDB',
+    }));
+    expect(emit).not.toHaveBeenCalledWith('sync:local-change', expect.objectContaining({ action: 'delete' }));
+  });
+
+  it('merges simultaneous progress updates to a topic instead of losing a field', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const persisted = new Map([['topic-concurrent', {
+      topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
+    }]]);
+    let activeReads = 0;
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get(_store, id) {
+        activeReads++;
+        // Let a second independent reader overtake this one if the caller
+        // performs read-modify-write without holding the topic lock.
+        await new Promise(resolve => setTimeout(resolve, 2));
+        const value = persisted.get(id);
+        return value ? { ...value } : null;
+      }
+      async put(_store, value) { persisted.set(value.topicId, { ...value }); }
+    };
+    const [first, second] = await Promise.all([
+      window.DB.saveProgress('topic-concurrent', 'course-a', { watched: 42 }),
+      window.DB.saveProgress('topic-concurrent', 'course-a', { bookmarked: true }),
+    ]);
+    expect(activeReads).toBe(2);
+    expect(first.watched).toBe(42);
+    expect(second).toMatchObject({ watched: 42, bookmarked: true });
+    expect(persisted.get('topic-concurrent')).toMatchObject({ watched: 42, bookmarked: true });
+  });
+
+  it('does not claim PDF bookmarks were persisted when IndexedDB is unavailable', async () => {
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+    await expect(window.DB.addPdfBookmark({ id: 'bm-unsaved', docId: 'doc-x' }))
+      .rejects.toThrow(/IndexedDB unavailable/);
+    await expect(window.DB.deletePdfBookmark('bm-unsaved')).resolves.toBe(false);
   });
 
   it('deletes timestamps from local mirrors and IndexedDB stores', async () => {

@@ -1,21 +1,37 @@
-# OpenCourseDeck Shipping & Production Launch Verification (`SHIPPING_CHECKLIST.md`)
+# Release verification checklist
 
-## 1. Code Quality & Verification Evidence
-- [x] **JS Parsing & Bundle Syntax**: `npm run validate` passed clean with 16 root modules and vendor scripts verified.
-- [x] **Unit & Regression Testing**: Vitest suite passing with 25/25 tests green across 6 test files (`flashcards.test.js`, `laser.test.js`, `launcher.test.js`, `db.test.js`, `ai-client-ext.test.js`, `offline-sync.test.js`).
-- [x] **No Console Artifacts / Leftover TODOs**: Core production engines cleaned of debug logging.
+Complete this checklist for each release candidate. Earlier checkmarks are not proof that a newer commit is ready. Attach the exact Git commit and GitHub Actions run URLs when marking an item complete.
 
-## 2. Design System & Accessibility (WCAG 2.2 AA)
-- [x] **Design Tokens (`DESIGN.md`)**: Full OKLCH palette, font scale, geometry tokens, and dark-mode glassmorphic styling established.
-- [x] **Layered Shadows (`skills-beautiful-shadows`)**: Multi-layered neutral elevation system (`--shadow-sm`, `--shadow-md`, `--shadow-lg`) applied to buttons, popovers, and floating panels.
-- [x] **Focus & Motion Safety**: Visible focus outlines (`outline: 2px solid var(--brand-primary)`), keyboard accessibility, and `@media (prefers-reduced-motion: reduce)` overrides implemented.
+## Automated checks
 
-## 3. Desktop Application & Installer Packaging
-- [x] **Tauri Desktop Configuration**: `src-tauri/tauri.conf.json` configured for NSIS Windows single-file installer target (`OpenCourseDeck_1.1.2_x64-setup.exe`).
-- [x] **Root Launcher (`Run-OpenCourseDeck.cmd`)**: Canonical entry script created to auto-navigate to the repository root and run `npm run build` then `npm start`.
-- [x] **Automated CI/CD Workflow**: `.github/workflows/desktop-release.yml` created for tag-triggered cross-platform compilation and release artifact uploads.
+- [ ] Lockfile-based dependency installation succeeds on supported CI runners.
+- [ ] Source validation, lint, unit/regression tests, and negative-path storage tests pass.
+- [ ] Production build and generated-artifact checks pass without uncommitted drift.
+- [ ] Dependency audit, SBOM/manifest/attestation checks, and browser smoke tests pass.
+- [ ] Native Windows Cargo check, release build, package staging, and artifact hash verification pass.
+- [ ] Release tag, package version, source revision, and uploaded files agree.
 
-## 4. Rollback & Emergency Contingency Plan
-- **Instant Feature Rollback**: Single-button toggle to disable WebGL background laser rendering if legacy low-spec GPUs experience WebGL context loss.
-- **Data Safety**: IndexedDB fallback to `memoryStore` in case of browser quota or storage permission exceptions.
-- **Rollback SLA**: Sub-minute desktop executable revert via GitHub Release tagged commits.
+## Application behavior
+
+- [ ] Create/edit/delete notes and courses; confirm persistence after reload.
+- [ ] Complete a backup/export/import cycle with notes, annotations, bookmarks, and watch history.
+- [ ] Test partial failures, rollback, and a full reset that clears the separate local media store.
+- [ ] Confirm external media works when online and fails clearly when unavailable.
+- [ ] Exercise PDF search, playback, Studio, flashcards, shortcuts, and navigation after refresh.
+
+## Visual and accessibility review
+
+- [ ] Inspect Home, Courses, Notes, PDF, Studio, Progress, Settings, and Help at desktop and phone widths.
+- [ ] Verify default dark/light and alternate themes and accents for contrast and readable status text.
+- [ ] Verify keyboard focus, dialog focus return, zoom to 200%, and reduced-motion behavior.
+- [ ] Test representative screen readers and RTL content on target platforms.
+- [ ] Capture any remaining accessibility limitations. Do not describe automated test success as WCAG certification.
+
+## Distribution and recovery
+
+- [ ] Install, launch, update, uninstall, and reinstall the actual Windows build.
+- [ ] Verify a previous release can be restored without losing study data.
+- [ ] Keep the release files and checksums with the published version.
+- [ ] Document verified compatibility limits and outstanding defects.
+
+See [RELEASING.md](RELEASING.md), [release-and-rollback.md](release-and-rollback.md), and the current GitHub Actions run for the applicable revision.

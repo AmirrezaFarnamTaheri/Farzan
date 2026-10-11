@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-accent="violet" dir="ltr">
+<html lang="en" data-theme="dark" data-accent="lapis" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="OpenCourseDeck — Your personal interactive learning studio" />
-  <meta name="theme-color" content="#7c3aed" id="meta-theme-color" />
+  <meta name="description" content="OpenCourseDeck — Courses, PDFs, notes, and progress in a local study app" />
+  <meta name="theme-color" content="#2563a8" id="meta-theme-color" />
   <meta name="color-scheme" content="dark light" />
   <!-- media-src/connect-src/frame-src/img-src intentionally allow http: —
        this offline-first app loads user-supplied course catalogs that may
@@ -37,15 +37,15 @@
 
   <!-- Open Graph / Share -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="OpenCourseDeck Learning Studio" />
-  <meta property="og:description" content="Your personal interactive learning studio with video, PDF, notes, canvas and progress tracking." />
+  <meta property="og:title" content="OpenCourseDeck" />
+  <meta property="og:description" content="Courses, video, PDFs, notes, and saved progress in a local app." />
   <meta property="og:image" content="./assets/og-cover.svg" />
   <meta property="og:url" content="" id="og-url" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="OpenCourseDeck Learning Studio" />
-  <meta name="twitter:description" content="Your personal interactive learning studio." />
+  <meta name="twitter:title" content="OpenCourseDeck" />
+  <meta name="twitter:description" content="A local app for courses, PDFs, notes, and progress." />
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="./manifest.json" />
@@ -67,17 +67,18 @@
   <link rel="stylesheet" href="./src/styles/index.css" />
   
 
-  <title>OpenCourseDeck — Learning Studio</title>
+  <title>OpenCourseDeck — Courses and notes</title>
 
   <!-- Critical inline styles to prevent FOUC -->
   <style>
     :root {
-      --skeleton-base: #1e1e2e;
-      --skeleton-shine: #2a2a3e;
+      --skeleton-base: #101820;
+      --skeleton-shine: #1d2b39;
     }
-    [data-theme="light"] {
-      --skeleton-base: #e8e8f0;
-      --skeleton-shine: #f0f0f8;
+    [data-theme="light"],
+    [data-theme="paper"] {
+      --skeleton-base: #f4f6f6;
+      --skeleton-shine: #ffffff;
     }
     html, body {
       margin: 0; padding: 0;
@@ -101,19 +102,16 @@
     }
     .splash-logo {
       width: 72px; height: 72px;
-      background: linear-gradient(135deg, #7c3aed, #06b6d4);
+      background: #2563a8;
       border-radius: 20px;
       display: flex; align-items: center; justify-content: center;
       font-size: 2rem; color: white;
-      animation: splash-pulse 1.2s ease-in-out infinite alternate;
-      box-shadow: 0 0 40px rgba(124,58,237,0.4);
+      box-shadow: none;
     }
     .splash-label {
-      font-size: 1.5rem; font-weight: 800;
-      background: linear-gradient(135deg, #7c3aed, #06b6d4);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 1.5rem; font-weight: 750;
+      background: transparent;
+      color: #f3f5f7;
       letter-spacing: -0.02em;
     }
     .splash-bar-wrap {
@@ -123,19 +121,22 @@
     }
     .splash-bar {
       height: 100%;
-      background: linear-gradient(90deg, #7c3aed, #06b6d4);
+      background: #2563a8;
       border-radius: 99px;
       animation: splash-bar 1.8s ease-in-out infinite;
     }
     .splash-status {
       font-size: 0.75rem;
-      color: rgba(255,255,255,0.4);
+      color: rgba(243,245,247,0.78);
       letter-spacing: 0.05em;
     }
-    [data-theme="light"] .splash-status { color: rgba(0,0,0,0.4); }
-    @keyframes splash-pulse {
-      from { transform: scale(1); box-shadow: 0 0 40px rgba(124,58,237,0.4); }
-      to   { transform: scale(1.08); box-shadow: 0 0 60px rgba(6,182,212,0.5); }
+    [data-theme="light"] .splash-status,
+    [data-theme="paper"] .splash-status { color: rgba(28,48,61,0.75); }
+    [data-theme="light"] .splash-label,
+    [data-theme="paper"] .splash-label { color: #1c303d; }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-bar { animation: none; width: 100%; }
+      #app-loading { transition: none; }
     }
     @keyframes splash-bar {
       0%   { width: 0%; margin-left: 0%; }
@@ -162,7 +163,7 @@
 <symbol id="i-notes" viewBox="0 0 24 24"><title>Cornell Notes</title><rect x="3" y="3" width="18" height="18" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><line x1="9" y1="3" x2="9" y2="16" stroke="currentColor" stroke-width="2"/><line x1="3" y1="16" x2="21" y2="16" stroke="currentColor" stroke-width="2"/><line x1="12" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="12" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="18.5" x2="18" y2="18.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
 <symbol id="i-flashcards" viewBox="0 0 24 24"><title>SM-2 Flashcards</title><rect x="2" y="6" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 3h14a2 2 0 0 1 2 2v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="6" y1="11" x2="14" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="15" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
 <symbol id="i-canvas" viewBox="0 0 24 24"><title>Concept Canvas</title><circle cx="6" cy="6" r="3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="8" r="3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="18" r="3" stroke="currentColor" stroke-width="2" fill="none"/><line x1="8.5" y1="7.5" x2="15.5" y2="7.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="7.5" y1="8.5" x2="10.5" y2="15.5" stroke="currentColor" stroke-width="1.5"/><line x1="16.5" y1="9.5" x2="13.5" y2="15.5" stroke="currentColor" stroke-width="1.5"/></symbol>
-<symbol id="i-insights" viewBox="0 0 24 24"><title>Insights &amp; Telemetry</title><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 20h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-insights" viewBox="0 0 24 24"><title>Progress chart</title><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 20h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
 <symbol id="i-settings" viewBox="0 0 24 24"><title>Settings &amp; Preferences</title><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
 <symbol id="i-help" viewBox="0 0 24 24"><title>Help &amp; Onboarding</title><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M9.3 9a2.8 2.8 0 0 1 5.44.93c0 1.87-2.74 2.32-2.74 3.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><line x1="12" y1="17" x2="12" y2="17.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
 
@@ -171,8 +172,8 @@
 <symbol id="i-retention" viewBox="0 0 24 24"><title>Retention Stability</title><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" fill="none"/></symbol>
 <symbol id="i-spark" viewBox="0 0 24 24"><title>Idea &amp; Synthesis Spark</title><path d="M12 3l1.8 5.4L19 10.2l-5.2 1.8L12 17.4l-1.8-5.4L5 10.2l5.2-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" fill="currentColor"/><path d="M5 2l.5 1.5L7 4l-1.5.5L5 6l-.5-1.5L3 4l1.5-.5L5 2z" fill="currentColor"/></symbol>
 <symbol id="i-trophy" viewBox="0 0 24 24"><title>Achievement Trophy</title><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 6H4a1 1 0 0 0-1 1c0 2.2 1.8 4 4 4M17 6h3a1 1 0 0 1 1 1c0 2.2-1.8 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
-<symbol id="i-sprout" viewBox="0 0 24 24"><title>Growing Mastery</title><path d="M12 21v-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13C12 9 9 7 4 7c0 5 3 7 8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 11c0-4 2.5-6 8-6 0 3.5-2 6-8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 21h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-<symbol id="i-verified" viewBox="0 0 24 24"><title>Mastery Verified</title><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l2.5 2.5L16 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+<symbol id="i-sprout" viewBox="0 0 24 24"><title>Sprout</title><path d="M12 21v-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13C12 9 9 7 4 7c0 5 3 7 8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 11c0-4 2.5-6 8-6 0 3.5-2 6-8 6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 21h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-verified" viewBox="0 0 24 24"><title>Completed</title><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l2.5 2.5L16 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
 <symbol id="i-hourglass" viewBox="0 0 24 24"><title>Focus Session</title><path d="M6 3h12M6 21h12M7 3v3c0 2.5 5 4.5 5 6s-5 3.5-5 6v3M17 3v3c0 2.5-5 4.5-5 6s5 3.5 5 6v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
 
 <!-- ── Actions ── -->
@@ -291,7 +292,7 @@
       position:fixed;inset:0;
       display:flex;flex-direction:column;
       align-items:center;justify-content:center;
-      background:#0f0f1a;color:#fff;
+      background:#101820;color:#f3f5f7;
       font-family:Inter,system-ui,sans-serif;
       text-align:center;gap:1rem;padding:2rem;
       z-index:999999;">
@@ -299,7 +300,7 @@
       <h1 style="font-size:1.5rem;font-weight:800;margin:0;">OpenCourseDeck requires JavaScript</h1>
       <p style="color:rgba(255,255,255,0.6);max-width:400px;line-height:1.6;margin:0;">
         Please enable JavaScript in your browser to use OpenCourseDeck.
-        This application is a client-side learning studio that stores all your data locally.
+        Saved notes and progress stay in your browser profile. Remote media may still need a network connection.
       </p>
       <div style="color:rgba(255,255,255,0.6);max-width:520px;line-height:1.6;">
         To use OpenCourseDeck, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
@@ -313,7 +314,7 @@
 
   <div class="ambient-desk-surface" aria-hidden="true"></div>
 
-  <div id="ocd-app" class="ocd-app" aria-label="OpenCourseDeck Learning Studio">
+  <div id="ocd-app" class="ocd-app" aria-label="OpenCourseDeck">
 
 
     <!-- ── SIDEBAR ─────────────────────────────── -->
@@ -403,8 +404,8 @@
         </div>
 
         <div class="nav-group">
-          <span class="nav-group-label">Insights</span>
-          <a href="#/progress" class="nav-item" data-route="/progress" aria-label="Progress and analytics">
+          <span class="nav-group-label">Activity</span>
+          <a href="#/progress" class="nav-item" data-route="/progress" aria-label="Study progress">
             <svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg>
             <span class="nav-item-text">Progress</span>
           </a>

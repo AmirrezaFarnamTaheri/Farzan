@@ -1,10 +1,10 @@
-﻿## OpenCourseDeck Learning Studio
+# OpenCourseDeck
 
-OpenCourseDeck is the app inside this repository. The parent folder may be named Farzan Lite, but the runnable product is a self-contained, browser-based learning studio for videos, PDFs, notes, canvas work, bookmarks, progress tracking, and local backups.
+A local study app for courses, videos, PDFs, notes, and progress tracking.
 
-It is designed for private study libraries and offline-friendly use. The app runs from a local HTTP server, uses vendored dependencies instead of CDNs, and stores user data in the browser on the current device.
+OpenCourseDeck runs in a browser from a local server or in a Tauri desktop window. Notes and progress are saved in the browser profile used to open it. Course links may still point to media hosted elsewhere. No account is required for the bundled features.
 
-### What You Can Do In 5 Minutes
+### First steps
 
 1. Start the local server and open OpenCourseDeck.
 2. Browse the bundled catalog from `data/catalog.json`.
@@ -17,12 +17,12 @@ It is designed for private study libraries and offline-friendly use. The app run
 - Node.js and npm.
 - A modern browser with IndexedDB support.
 - An HTTP(S) origin. Do not open `index.html` with `file://`; service workers, module loading, and `fetch()` need a server.
-- **Native App**: A browserless Tauri app build is available for desktop use. See [desktop/NATIVE_STRATEGY.md](desktop/NATIVE_STRATEGY.md) for details.
+- **Desktop build:** Tauri packaging is supported for Windows. See [desktop/README.md](desktop/README.md) for prerequisites and limitations.
 
 ### First Run
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run first-run
 npm start
 ```
@@ -31,9 +31,9 @@ Open `http://localhost:5173/`.
 
 On Windows, the launcher is often easier:
 
-- `Run-OpenCourseDeck.cmd`: builds the bundle, then starts the local server with console logs visible. Stop it with `Ctrl+C` in that console. (A native app is built separately with Tauri — see [desktop/NATIVE_STRATEGY.md](desktop/NATIVE_STRATEGY.md); the `npm run desktop` Electron path needs `npm install --save-dev electron`, which is not part of the default install.)
+- `Run-OpenCourseDeck.cmd` builds the app and starts the local server with console logs visible. Stop it with `Ctrl+C`. The Tauri desktop app is built separately.
 
-### Regular Run
+### Start again
 
 ```bash
 npm start
@@ -45,7 +45,7 @@ If port `5173` is busy, start with another port:
 $env:PORT=5174; npm start
 ```
 
-### Build And Validate
+### Build and test
 
 ```bash
 npm run build
@@ -58,18 +58,18 @@ npm run audit
 - `npm run build:sw` regenerates `sw.js` with Workbox.
 - `npm run vendor` refreshes local vendor assets and fonts.
 
-### Data And Privacy
+### Data and backups
 
 OpenCourseDeck stores data locally in the browser profile for the origin you open, usually `http://localhost:5173`.
 
 - IndexedDB stores progress, timestamps, and database-backed records.
 - Some preferences and notes compatibility data may be mirrored in `localStorage`.
 - Nothing is uploaded by the app by default.
-- Backups are JSON files you export manually.
+- Progress and Settings export a JSON file (current portable format: **1.5**) containing supported saved records, including watch history and PDF page bookmarks. It does **not** contain video/PDF file blobs from the separate library-files database. Keep your original media files before changing devices or browser profiles.
 
 For details, see [backup-restore.md](docs/backup-restore.md).
 
-### User Guides
+### Guides
 
 - [Getting started](docs/getting-started.md)
 - [Content and catalog](docs/content-and-catalog.md)
@@ -79,10 +79,10 @@ For details, see [backup-restore.md](docs/backup-restore.md).
 
 The app also includes an in-app Help route at `#/help` with the first-run checklist, storage summary, backup entry, shortcuts entry point, and links to these guides.
 
-### Project Layout
+### Code layout
 
 - `index.html`: static app shell, landmarks, overlay roots, vendor script tags, and boot entry.
-- `style.css`: global design system and component styles.
+- `src/styles/index.css`: stylesheet entry; `src/styles/themes.css` contains the theme palettes, and `src/styles/workspace.css` contains shared refinements. `style.css` is the compatibility entry.
 - `src/index.js`: ES module entry that bundles the current vanilla modules.
 - `app.js`: app shell behavior, routes, views, modal/drawer primitives, settings, and shortcuts.
 - `ui.js`: reusable UI helpers.
@@ -92,7 +92,7 @@ The app also includes an in-app Help route at `#/help` with the first-run checkl
 - `vendor/`: vendored browser libraries, icons, and fonts.
 - `dist/opencoursedeck.js`: generated bundle.
 
-### Debugging Boot
+### Debug startup
 
 Local debug logging is opt-in. Open:
 
@@ -102,7 +102,7 @@ http://localhost:5173/?debug=1
 
 The dev server accepts `/__debug` posts and writes `debug.log`. Boot and app timing marks include import time, bundle-to-ready time, and app init time.
 
-### Troubleshooting Shortcuts
+### Troubleshooting
 
 - Stuck on `Initializing...`: run `npm run build`, hard refresh, and check `debug.log` with `?debug=1`.
 - Missing fonts or icons: run `npm run vendor`.

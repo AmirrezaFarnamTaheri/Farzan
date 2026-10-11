@@ -188,6 +188,46 @@ describe('dev server range handling', () => {
     expect((await request(`${baseUrl}/%2egit/config`)).status).toBe(403);
   });
 
+  it('does not expose files outside the document root through symbolic links', async () => {
+    const privateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-private-'));
+    try {
+      fs.writeFileSync(path.join(privateDir, 'secret.txt'), 'OUTSIDE_ROOT_SECRET');
+      try { fs.symlinkSync(path.join(privateDir, 'secret.txt'), path.join(root, 'alias.txt')); }
+      catch (error) {
+        if (error?.code === 'EPERM' || error?.code === 'EACCES') return; // Windows CI without symlink privileges
+        throw error;
+      }
+      const res = await request(baseUrl + '/alias.txt');
+      expect(res.status).toBe(403);
+      expect(await res.text()).not.toContain('OUTSIDE_ROOT_SECRET');
+    } finally {
+      fs.rmSync(privateDir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses symbolic-link aliases to hidden files', async () => {
+    fs.writeFileSync(path.join(root, '.secret'), 'HIDDEN_CONTENT');
+    try { fs.symlinkSync('.secret', path.join(root, 'visible.txt')); }
+    catch (error) {
+      if (error?.code === 'EPERM' || error?.code === 'EACCES') return;
+      throw error;
+    }
+    const res = await request(baseUrl + '/visible.txt');
+    expect(res.status).toBe(403);
+  });
+
+  it('does not expose application debug logs through static GET', async () => {
+    const wrote = await request(baseUrl + '/__debug?debug=1', {
+      method: 'POST',
+      headers: { Origin: baseUrl, 'Content-Type': 'text/plain' },
+      body: '{"note":"sensitive"}',
+    });
+    expect(wrote.status).toBe(204);
+    const leaked = await request(baseUrl + '/debug.log');
+    expect(leaked.status).toBe(403);
+    expect(await leaked.text()).not.toContain('sensitive');
+  });
+
   it('ignores cross-origin debug log writes', async () => {
     const res = await request(`${baseUrl}/__debug?debug=1`, {
       method: 'POST',
