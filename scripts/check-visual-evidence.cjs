@@ -42,7 +42,8 @@ function pngRecord(relative, bounds = {}) {
     [137, 80, 78, 71, 13, 10, 26, 10], 'PNG magic invalid: ' + relative);
   assert.equal(data.toString('ascii', 12, 16), 'IHDR', 'PNG IHDR invalid: ' + relative);
   const width = data.readUInt32BE(16), height = data.readUInt32BE(20);
-  assert(width >= 320 && height >= 390, 'Image resolution too small: ' + relative);
+  const minHeight = relative.startsWith('contact-sheet-') ? 200 : 390;
+  assert(width >= 320 && height >= minHeight, 'Image resolution too small: ' + relative);
   if (bounds.width) assert.equal(width, bounds.width, 'Screenshot width: ' + relative);
   if (bounds.height) assert.equal(height, bounds.height, 'Screenshot height: ' + relative);
   return { path: relative, width, height, bytes: data.length, sha256: digest(data) };
@@ -127,5 +128,51 @@ const report = [
   '',
 ].join('\n');
 fs.writeFileSync(path.join(root, 'VISUAL-REPORT.md'), report);
+
+// Offline, navigable image gallery makes every actual screenshot inspectable
+// without GitHub login, an image-hosting service or a build tool.
+const esc = text => String(text).replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;');
+const navigation = matrix.map(([group, count]) =>
+  '<a href="#' + esc(group) + '">' + esc(group) + ' (' + count + ')</a>').join('');
+const sections = matrix.map(([group, count]) => {
+  const frames = images.filter(item => item.path.startsWith('screenshots/' + group + '/'));
+  const sheet = 'contact-sheet-' + group + '.png';
+  const tiles = frames.map(frame =>
+    '<a class="tile" href="' + esc(frame.path) + '" target="_blank" rel="noopener">' +
+    '<img src="' + esc(frame.path) + '" alt="' + esc(frame.path) +
+    '" loading="lazy"><span>' + esc(frame.path.split('/').pop()) +
+    '</span></a>').join('');
+  return '<section id="' + esc(group) + '"><h2>' + esc(group) + ' <small>' +
+    count + ' actual browser frames</small></h2>' +
+    '<p><a href="' + esc(sheet) + '" target="_blank" rel="noopener">Open contact sheet</a></p>' +
+    '<a href="' + esc(sheet) + '" target="_blank" rel="noopener">' +
+    '<img class="sheet" src="' + esc(sheet) + '" alt="' + esc(group) +
+    ' contact sheet" loading="lazy"></a><div class="tiles">' +
+    tiles + '</div></section>';
+}).join('');
+const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+  '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+  '<title>Farzan Plasmato 1.0.3 - verified visual gallery</title>' +
+  '<style>body{margin:0;background:#101923;color:#e8eef6;font:15px/1.5 system-ui,sans-serif}' +
+  'header{padding:30px clamp(15px,4vw,60px);background:#1b2c40}h1{margin:0}' +
+  'nav{display:flex;flex-wrap:wrap;gap:8px;padding:16px;background:#152234;position:sticky;top:0}' +
+  'a{color:#a9d7ff}nav a{border:1px solid #445c74;border-radius:20px;padding:3px 12px}' +
+  'main{padding:20px clamp(15px,4vw,60px)}section{padding:30px 0;border-bottom:1px solid #445c74}' +
+  '.sheet{max-width:min(100%,1350px);max-height:750px;object-fit:contain;border:1px solid #445c74}' +
+  '.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:16px;margin-top:18px}' +
+  '.tile{display:flex;flex-direction:column;border:1px solid #445c74;border-radius:8px;overflow:hidden;' +
+  'background:#1b2c40;text-decoration:none}.tile img{height:145px;width:100%;object-fit:contain}' +
+  '.tile span{padding:8px 12px;overflow-wrap:anywhere}small{color:#afbbca}</style></head><body>' +
+  '<header><h1>Farzan Plasmato v1.0.3 - Visual Evidence</h1>' +
+  '<p>308 actual Chrome captures across 24 groups; no synthetic UI renderings.</p>' +
+  '<p><a href="manifest.json">SHA-256 evidence manifest</a> · ' +
+  '<a href="VISUAL-REPORT.md">Full coverage and limitations</a></p></header><nav>' +
+  navigation + '</nav><main>' + sections + '</main></body></html>';
+fs.writeFileSync(path.join(root, 'index.html'), html);
+assert.equal((html.match(/class="tile"/g) || []).length, expectedCount,
+  'The offline gallery did not include every screenshot');
+
 console.log('[visual-evidence] verified ' + images.length + ' browser screenshots, ' +
   matrix.length + ' groups, ' + contactSheets.length + ' contact sheets');

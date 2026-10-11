@@ -326,6 +326,8 @@ test('study activity unlocks visible achievements and populates Progress', async
     return topics.slice(0, 3).map(item => item.topicId);
   });
   expect(saved).toHaveLength(3);
+  // An unchanged hash does not emit hashchange, so force an actual remount.
+  await routeState(page, 'home');
   await routeState(page, 'achievements');
   await expect(page.locator('[data-achievement-state="unlocked"]').first()).toBeVisible();
   await stateShot(page, 'study-states', '02-actual-unlocked-achievements');
