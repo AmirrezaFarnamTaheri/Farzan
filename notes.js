@@ -1582,6 +1582,10 @@
   const NotesSearch = {
     init(inputEl) {
       if (!inputEl) return;
+      // The singleton NotesList persists independently of route DOM. Always
+      // reflect its current query in the new input (and the cleared value on
+      // remount) so a hidden filter cannot make stored notes appear deleted.
+      inputEl.value = NotesList._filter.query || '';
       RouteListeners.on(inputEl, 'input', debounce(e => {
         NotesList.setFilter({ query: e.target.value.trim() });
       }, 300));

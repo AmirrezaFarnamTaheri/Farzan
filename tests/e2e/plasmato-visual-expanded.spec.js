@@ -252,6 +252,9 @@ test('real notes retain long titles, autosave, search and expose export UI', asy
   await expect(page.locator('[data-notes-list]')).toContainText('Pharmacology');
   await stateShot(page, 'notes-states', '04-notes-search-found');
   await page.locator('[data-notes-search]').fill('visual-nonexistent-title-9913');
+  // Debounced search must finish before screenshot evidence claims an empty
+  // result. Capturing immediately after fill previously showed stale notes.
+  await expect(page.locator('[data-notes-list]')).toContainText('No notes found');
   await stateShot(page, 'notes-states', '05-notes-search-empty');
   await routeState(page, 'home');
   await routeState(page, 'notes');
