@@ -3,7 +3,6 @@ export function mountTagsView({ setView } = {}) {
     <section class="view view-tags">
       <div class="page-header tags-header">
         <div>
-          <span class="eyebrow">Taxonomy & Index</span>
           <div class="page-title-row">
             <h1 class="page-title">Tags</h1>
             <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
@@ -14,7 +13,7 @@ export function mountTagsView({ setView } = {}) {
       <div class="stat-grid" data-tag-metrics></div>
       <div class="card card-filled tags-controls-card">
         <div class="card-body">
-          <input class="input" type="search" data-tag-search placeholder="Search tags..." />
+          <input class="input" type="search" data-tag-search placeholder="Search tags..." aria-label="Search tags" />
           <div class="filter-row tags-filter-row" data-tag-filters aria-label="Tag filters">
             <button class="filter-chip active" type="button" data-tag-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-tag-filter="mixed" aria-pressed="false">Mixed</button>

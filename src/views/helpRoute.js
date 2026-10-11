@@ -18,7 +18,7 @@ export function mountHelpView(deps = {}) {
         <div class="page-actions">
           <button class="btn btn-primary" id="help-backup-btn">
             <svg class="icon" aria-hidden="true"><use href="#i-file-export"/></svg>
-            Export backup
+            Export app-data JSON
           </button>
           <button class="btn btn-ghost" id="help-shortcuts-btn">
             <svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg>
@@ -62,7 +62,7 @@ export function mountHelpView(deps = {}) {
               <a href="docs/architecture.md">Architecture and storage</a>
               <a href="docs/backup-restore.md">Backup and restore</a>
               <a href="docs/troubleshooting.md">Troubleshooting</a>
-              <a href="docs/roadmap.md">Roadmap</a>
+              <a href="docs/release-and-rollback.md">Release guide</a>
             </div>
           </div>
         </section>

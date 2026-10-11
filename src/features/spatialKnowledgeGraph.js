@@ -67,6 +67,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.onPointerDown = this.handlePointerDown.bind(this);
     this.onPointerMove = this.handlePointerMove.bind(this);
     this.onPointerUp = this.handlePointerUp.bind(this);
+    this.onKeyDown = this.handleKeyDown.bind(this);
   }
 
   /**
@@ -85,8 +86,9 @@ export class SpatialKnowledgeGraph extends EventEmitter {
 
     const canvas = document.createElement('canvas');
     canvas.className = 'spatial-graph-canvas';
-    canvas.setAttribute('aria-label', '3D Spatial Knowledge Graph');
-    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', '3D Spatial Knowledge Graph. Use arrow keys to rotate and Enter to select a concept.');
+    canvas.setAttribute('role', 'application');
+    canvas.tabIndex = 0;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     canvas.style.cursor = 'grab';
@@ -205,6 +207,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     if (!this.canvas) return;
 
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.canvas.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
   }
@@ -272,6 +275,22 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       this.selectedNode = this.hoveredNode;
       this.emit('node:select', this.selectedNode.raw);
     }
+  }
+
+  handleKeyDown(event) {
+    const step = 0.12;
+    if (event.key === 'ArrowLeft') this.camera.targetRotY -= step;
+    else if (event.key === 'ArrowRight') this.camera.targetRotY += step;
+    else if (event.key === 'ArrowUp') this.camera.targetRotX -= step;
+    else if (event.key === 'ArrowDown') this.camera.targetRotX += step;
+    else if (event.key === 'Enter' || event.key === ' ') {
+      const node = this.hoveredNode || this.nodes[0];
+      if (node) {
+        this.selectedNode = node;
+        this.emit('node:select', node.raw);
+      }
+    } else return;
+    event.preventDefault();
   }
 
   startLoop() {
@@ -514,6 +533,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas?.removeEventListener?.('keydown', this.onKeyDown);
 
     if (this.canvas?.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas);

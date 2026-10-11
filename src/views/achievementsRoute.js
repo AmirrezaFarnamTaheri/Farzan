@@ -11,7 +11,6 @@ export function mountAchievementsView(deps = {}) {
     <section class="view view-achievements">
       <div class="page-header achievements-header">
         <div>
-          <span class="eyebrow">Milestones & Mastery</span>
           <div class="page-title-row">
             <h1 class="page-title">Achievements</h1>
             <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>

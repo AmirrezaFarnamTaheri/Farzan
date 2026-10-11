@@ -13,14 +13,13 @@ export async function mountMaterialsView(deps = {}) {
     <section class="view view-materials">
       <div class="page-header materials-header">
         <div>
-          <span class="eyebrow">Curriculum Index</span>
           <h1 class="page-title">Materials</h1>
           <p class="page-subtitle">All videos and PDFs in your catalog, searchable and filterable by source.</p>
         </div>
       </div>
       <div class="card card-filled materials-controls-card">
         <div class="card-body">
-          <input class="input" id="materials-search" type="search" placeholder="Search topics..." />
+          <input class="input" id="materials-search" type="search" placeholder="Search topics..." aria-label="Search materials" />
           <div class="filter-row materials-filter-row" aria-label="Material filters">
             <button class="filter-chip active" type="button" data-material-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-material-filter="video" aria-pressed="false">Video</button>

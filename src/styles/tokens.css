@@ -1,13 +1,14 @@
 :root {
     /* ── Accent (overridden per data-accent) ── */
-    /* Defaults mirror [data-accent="violet"] so nothing flashes lapis before
-       the accent attribute is applied. */
-    --accent:           #7c3aed;
-    --accent-light:     #9d5ff5;
-    --accent-dark:      #5b21b6;
-    --accent-muted:     rgba(124, 58, 237, 0.15);
-    --accent-glow:      rgba(124, 58, 237, 0.35);
-    --accent-rgb:       124, 58, 237;
+    /* Lapis is the default accent: a restrained archival blue that matches
+       the product's research-desk direction. Violet remains an explicit
+       user-selectable preset in accents.css. */
+    --accent:           #2563a8;
+    --accent-light:     #3b82c4;
+    --accent-dark:      #1d4f88;
+    --accent-muted:     rgba(37, 99, 168, 0.15);
+    --accent-glow:      rgba(37, 99, 168, 0.24);
+    --accent-rgb:       37, 99, 168;
     /* Foreground for text placed directly on --accent; light accents
        (amber, cyan, emerald) override this in accents.css. */
     --accent-contrast:  #ffffff;
@@ -156,8 +157,8 @@
     --ease-studio: cubic-bezier(0.32, 0.72, 0, 1);
     --ease-in:     cubic-bezier(0.4, 0, 1, 1);
     --ease-inout:  cubic-bezier(0.4, 0, 0.2, 1);
-    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
 
     /* ── High-End Double-Bezel & Haptic Tokens ── */
     --radius-bezel-outer: var(--radius-xl);

@@ -3,7 +3,6 @@ export function mountNotesView({ setView } = {}) {
     <section class="view view-notes">
       <div class="page-header notes-page-header">
         <div>
-          <span class="eyebrow">Knowledge workspace</span>
           <h1 class="page-title">Notes</h1>
           <p class="page-subtitle">Capture ideas, connect them to learning materials, and keep every note available offline.</p>
         </div>
