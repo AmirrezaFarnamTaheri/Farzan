@@ -262,8 +262,17 @@ describe('PDF viewer safe messages', () => {
 
     const sidebar = document.querySelector('[data-pdf-thumbnails]');
     expect(sidebar.querySelector('.thumb-loading')).toBeNull();
-    expect(sidebar.querySelectorAll('.thumb-item')).toHaveLength(2);
+    expect(sidebar.querySelectorAll('button.thumb-item[type="button"]')).toHaveLength(2);
     expect(sidebar.querySelector('[data-thumb-page="1"] .thumb-label').textContent).toBe('1');
+    expect(sidebar.querySelector('[data-thumb-page="1"]').getAttribute('aria-label')).toBe('Go to page 1');
+    expect(sidebar.querySelector('[data-thumb-page="1"] canvas').getAttribute('aria-hidden')).toBe('true');
+    const goTo = vi.spyOn(window.PlasmaPDFViewer, 'goTo').mockImplementation(() => {});
+    sidebar.querySelector('[data-thumb-page="2"]').click();
+    expect(goTo).toHaveBeenCalledWith(2);
+    for (const button of sidebar.querySelectorAll('.thumb-item')) button.scrollIntoView = vi.fn();
+    window.PlasmaPDFViewer._highlightThumbnail(2);
+    expect(sidebar.querySelector('[data-thumb-page="2"]').getAttribute('aria-current')).toBe('page');
+    expect(sidebar.querySelector('[data-thumb-page="1"]').hasAttribute('aria-current')).toBe(false);
     expect(sidebar.querySelector('script,img')).toBeNull();
   });
 

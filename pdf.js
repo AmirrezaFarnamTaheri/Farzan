@@ -805,14 +805,18 @@
       const fragment = document.createDocumentFragment();
 
       for (let i = 1; i <= State.totalPages; i++) {
-        const wrapper  = document.createElement('div');
+        const wrapper  = document.createElement('button');
+        wrapper.type = 'button';
         wrapper.className = 'thumb-item';
         wrapper.dataset.thumbPage = i;
+        wrapper.setAttribute('aria-label', `Go to page ${i}`);
 
         const canvas   = document.createElement('canvas');
         canvas.className = 'thumb-canvas';
+        canvas.setAttribute('aria-hidden', 'true');
         const label    = document.createElement('span');
         label.className = 'thumb-label';
+        label.setAttribute('aria-hidden', 'true');
         label.textContent = i;
 
         wrapper.append(canvas, label);
@@ -850,9 +854,12 @@
     _highlightThumbnail(page) {
       const sidebar = DOM.thumbnailSidebar;
       if (!sidebar) return;
-      $$('.thumb-item', sidebar).forEach(el =>
-        el.classList.toggle('active', parseInt(el.dataset.thumbPage, 10) === page)
-      );
+      $$('.thumb-item', sidebar).forEach(el => {
+        const active = parseInt(el.dataset.thumbPage, 10) === page;
+        el.classList.toggle('active', active);
+        if (active) el.setAttribute('aria-current', 'page');
+        else el.removeAttribute('aria-current');
+      });
       const active = $(`.thumb-item[data-thumb-page="${page}"]`, sidebar);
       active?.scrollIntoView({ block: 'nearest' });
     },
