@@ -1,14 +1,13 @@
-> **Status note (2026-08):** This roadmap is a historical planning artifact from the July 2026 build sprint. Phases 0-2 are fully landed; later phases are partially superseded by shipped work documented in CHANGELOG.md and docs/HISTORY.md. Consult it for intent, not current state.
+> **Status note (2026-10):** Historical planning material from July–August 2026. Individual task labels may be outdated. Consult this document for prior intent, not verified current behavior; check each claim against the current code.
 
-# OpenCourseDeck — Complete Roadmap
+# OpenCourseDeck — Historical feature plan
 
-> Every implementation, feature, widget, capability, performance refinement, subsystem, and visual component. Nothing omitted.
+> Original proposals and implementation notes. This is not an exhaustive feature inventory or an up-to-date claim about shipped behavior. Consult the current source, tests, and PRODUCT.md.
 
-> **Status accuracy.** Every `Status:` line below was re-verified against the
-> source tree. A substantial number previously read `COMPLETE`/`DONE` for work
-> that has no corresponding code, and several read "Wired into src/index.js"
-> for modules that nothing imports. Those are now marked `PARTIAL` or
-> `NOT STARTED` with the specific gap named.
+> **Status note.** Earlier status labels were reconciled against the source
+> tree at the time of that audit; they are not automatically updated when the
+> code changes. Verify any `DONE`, `PARTIAL`, or `NOT STARTED` label before
+> depending on it.
 >
 > Three status values are used:
 > - **DONE** — implemented *and* reachable at runtime.
