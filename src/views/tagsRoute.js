@@ -5,9 +5,8 @@ export function mountTagsView({ setView } = {}) {
         <div>
           <div class="page-title-row">
             <h1 class="page-title">Tags</h1>
-            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
           </div>
-          <p class="page-subtitle">Browse note tags and catalog tags across your entire learning workspace.</p>
+          <p class="page-subtitle">Find notes and course materials by tag.</p>
         </div>
       </div>
       <div class="stat-grid" data-tag-metrics></div>

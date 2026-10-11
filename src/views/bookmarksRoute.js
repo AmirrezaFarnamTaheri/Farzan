@@ -19,9 +19,8 @@ export function mountBookmarksView(deps = {}) {
         <div>
           <div class="page-title-row">
             <h1 class="page-title">Bookmarks</h1>
-            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
           </div>
-          <p class="page-subtitle">Quick access to saved study timestamps, note bookmarks, and PDF annotations.</p>
+          <p class="page-subtitle">Return to saved video times, notes, and PDF pages.</p>
         </div>
       </div>
       <div class="stat-grid" data-bookmark-metrics></div>

@@ -5,9 +5,8 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     <section class="view view-my-courses">
       <div class="page-header my-courses-header">
         <div>
-          <span class="eyebrow">Custom Curriculum</span>
           <h1 class="page-title">My Courses</h1>
-          <p class="page-subtitle">Create and organize your own custom course outlines.</p>
+          <p class="page-subtitle">Add courses and organize your own study topics.</p>
         </div>
         <div class="page-header-actions">
           <button class="btn btn-ghost" type="button" data-my-courses-add>

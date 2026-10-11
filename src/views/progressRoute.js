@@ -3,9 +3,8 @@ export function mountProgressView({ setView } = {}) {
     <section class="view view-progress">
       <div class="page-header progress-page-header">
         <div>
-          <span class="eyebrow">Learning analytics</span>
           <h1 class="page-title">Progress</h1>
-          <p class="page-subtitle">Track momentum, review course completion, and keep portable backups of your learning data.</p>
+          <p class="page-subtitle">See completed topics and activity. Export or restore saved study data.</p>
         </div>
 
         <div class="progress-toolbar" aria-label="Progress data actions">

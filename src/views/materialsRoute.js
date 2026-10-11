@@ -14,7 +14,7 @@ export async function mountMaterialsView(deps = {}) {
       <div class="page-header materials-header">
         <div>
           <h1 class="page-title">Materials</h1>
-          <p class="page-subtitle">All videos and PDFs in your catalog, searchable and filterable by source.</p>
+          <p class="page-subtitle">Search videos and PDFs from your courses.</p>
         </div>
       </div>
       <div class="card card-filled materials-controls-card">

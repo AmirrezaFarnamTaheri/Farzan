@@ -57,7 +57,7 @@ export function mountPdfView() {
     <section class="view view-pdf">
       <div class="page-header">
         <h1 class="page-title">PDF Annotator</h1>
-        <p class="page-subtitle">Drop a PDF here, annotate key chapters, or load via file picker.</p>
+        <p class="page-subtitle">Open a PDF, search its text, and save page notes or annotations.</p>
       </div>
 
       <div class="pdf-shell">

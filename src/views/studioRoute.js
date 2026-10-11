@@ -22,7 +22,7 @@ printStudioBoardPdf,
       <div class="page-header studio-header">
         <div>
           <h1 class="page-title">Studio</h1>
-          <p class="page-subtitle">Whiteboard canvas with portable board storage, Cornell templates, and 3D concept maps.</p>
+          <p class="page-subtitle">Draw on a canvas, take Cornell notes, or build a concept map.</p>
         </div>
         <div class="studio-status-pill" aria-live="polite">
           <span data-studio-status>Ready</span>

@@ -13,9 +13,8 @@ export function mountAchievementsView(deps = {}) {
         <div>
           <div class="page-title-row">
             <h1 class="page-title">Achievements</h1>
-            <span class="badge badge-success" aria-label="Feature status: ready">Ready</span>
           </div>
-          <p class="page-subtitle">Milestones and spaced retention cues based on your learning history.</p>
+          <p class="page-subtitle">Study goals completed from your recorded activity.</p>
         </div>
       </div>
       <div class="stat-grid" data-achievement-metrics></div>

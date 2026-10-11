@@ -21,8 +21,8 @@ export async function mountCoursesView(deps = {}) {
     <section class="view view-courses">
       <div class="page-header">
         <div>
-          <h1 class="page-title">Course Catalog</h1>
-          <p class="page-subtitle">Explore curriculum tracks, video lectures, and timestamped study notes.</p>
+          <h1 class="page-title">Courses</h1>
+          <p class="page-subtitle">Choose a course, open a lesson, and save notes or timestamps.</p>
         </div>
         <div class="page-header-actions">
           <button class="btn btn-primary" type="button" data-courses-add>

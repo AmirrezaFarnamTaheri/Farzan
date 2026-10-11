@@ -20,9 +20,8 @@ export function mountSettingsView(deps = {}) {
     <section class="view view-settings">
       <div class="page-header settings-page-header">
         <div>
-          <span class="eyebrow">Control center</span>
           <h1 class="page-title">Settings</h1>
-          <p class="page-subtitle">Personalize the workspace, manage local data, and configure optional AI features with explicit privacy boundaries.</p>
+          <p class="page-subtitle">Change appearance, manage saved data, and configure optional AI connections.</p>
         </div>
         <div class="settings-header-actions">
           <button class="btn btn-primary" id="btn-export-json-2" type="button">
@@ -50,7 +49,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
                 <div>
-                  <span class="eyebrow">Workspace comfort</span>
+                  <span class="eyebrow">Appearance</span>
                   <h2 id="settings-appearance-title">Appearance</h2>
                   <p>Adjust readability and information density without changing your learning data.</p>
                 </div>
@@ -116,7 +115,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading settings-section-heading-status">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
                 <div>
-                  <span class="eyebrow">Optional and private by default</span>
+                  <span class="eyebrow">AI connection</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
                   <p>Local mode is an on-device extractive summary unless you register a runtime. Gemma package names are catalog labels only. API keys remain in this browser session only.</p>
                 </div>
@@ -230,7 +229,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading settings-section-heading-status">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-drive"/></svg></div>
                 <div>
-                  <span class="eyebrow">Local-first health</span>
+                  <span class="eyebrow">Storage</span>
                   <h2 id="settings-storage-title">Storage</h2>
                   <p>Review browser quota, local fallback usage, and recent persistence warnings.</p>
                 </div>
@@ -257,7 +256,7 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading">
                 <div class="settings-section-icon settings-section-icon-danger"><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg></div>
                 <div>
-                  <span class="eyebrow">Selective cleanup</span>
+                  <span class="eyebrow">Data removal</span>
                   <h2 id="settings-data-title">Data controls</h2>
                   <p>Export a backup first, then remove only the local category you no longer need.</p>
                 </div>
