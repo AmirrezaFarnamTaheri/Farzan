@@ -14,7 +14,7 @@ npm start
 
 Open `http://localhost:5173/`. Keep the terminal running while you use the app.
 
-Windows users can also use `Run-OpenCourseDeck.vbs` or `Run-OpenCourseDeck.cmd`.
+Windows users can also use `Run-OpenCourseDeck.cmd`.
 
 ### First Tour
 
@@ -27,7 +27,7 @@ Windows users can also use `Run-OpenCourseDeck.vbs` or `Run-OpenCourseDeck.cmd`.
 ### Add Or Open Content
 
 - Courses come from the active catalog selected in `data/catalog.json`.
-- Use Materials for your local content library workflow.
+- Use Materials to find the videos and PDFs available in your catalog.
 - Use Notes for free-form study notes, tags, folders, import, and export.
 - Use PDF when studying documents.
 - Use Studio for canvas work.
@@ -38,7 +38,7 @@ Data is stored in your browser profile for the local origin, usually `http://loc
 
 - Progress and timestamps use IndexedDB when available.
 - Preferences use `localStorage`.
-- Backup/export creates a JSON file you control.
+- Export creates a JSON file of supported app records. Locally imported video and PDF files are stored separately and are not embedded in the JSON backup.
 
 Changing browser profile, hostname, or port can make the app look like it has no data because browser storage is origin-scoped.
 

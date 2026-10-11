@@ -1,15 +1,15 @@
-# OpenCourseDeck — Best of All Worlds
+# Library comparison notes (historical)
 
-> Definitive technical decisions for every peer implementation. Which pattern wins, what to steal from runners-up, and exactly how to combine them.
+> Earlier exploration of alternative libraries and possible implementation approaches. This is not a list of shipped features, a current dependency policy, or a verified recommendation. Check actual source and tests before using any proposal.
 
 ---
 
 ## 1. Animation & Easing
 
-### Winner: Anime.js v4
+### Compared choice: Anime.js v4
 **Why:** Already vanilla JS. Spring physics (underdamped/critically/overdamped) is unique. Stagger with grid/center/random origins is irreplaceable. Timeline with labels/positioning is the most complete. Cubic bezier solver is production-grade.
 
-### What to steal from runners-up
+### Other approaches worth evaluating
 
 | Feature | From | How to integrate |
 |---------|------|-----------------|
@@ -39,9 +39,9 @@ From Motion Canvas: `createEaseInBack(strength)`, `createEaseOutElastic(amplitud
 
 ## 2. Video Player
 
-### Winner: Vidstack (keyboard, storage, time ranges, request queue)
+### Compared choice: Vidstack (keyboard, storage, time ranges, request queue)
 
-### What to steal from others
+### Other approaches worth evaluating from others
 
 | Feature | From | How to integrate |
 |---------|------|-----------------|
@@ -94,7 +94,7 @@ src/views/settingsRoute.js       ← Splayer ShortcutsDialog (vanilla JS)
 
 ## 3. DOM & Events
 
-### Winner: wolf-table HElement + EventEmitter
+### Compared choice: wolf-table HElement + EventEmitter
 
 ### Comparison
 
@@ -119,7 +119,7 @@ src/lib/eventEmitter.js ← wolf-table event.ts (fixed) + wildcard support
 
 ## 4. Undo/Redo & History
 
-### Winner: x-spreadsheet History
+### Compared choice: x-spreadsheet History
 
 ### Comparison
 
@@ -145,7 +145,7 @@ Used by: canvas.js, notes.js, future inline editors.
 
 ## 5. Context Menu
 
-### Winner: x-spreadsheet
+### Compared choice: x-spreadsheet
 
 ### Comparison
 
@@ -171,7 +171,7 @@ src/ui/contextMenu.js  ← x-spreadsheet contextmenu.js + keyboard nav + submenu
 
 ## 6. Clipboard
 
-### Winner: x-spreadsheet
+### Compared choice: x-spreadsheet
 
 ### Comparison
 
@@ -194,7 +194,7 @@ src/lib/clipboard.js  ← x-spreadsheet core/clipboard.js (35 lines) + cross-sub
 
 ## 7. Toolbar
 
-### Winner: x-spreadsheet (composable items)
+### Compared choice: x-spreadsheet (composable items)
 
 ### Comparison
 
@@ -219,7 +219,7 @@ src/features/canvasTools/ ← Each tool as separate file (pen.js, eraser.js, etc
 
 ## 8. Data Visualization
 
-### Winner: Hybrid (Chart.js helpers + Ripl architecture + D3 modules)
+### Compared choice: Hybrid (Chart.js helpers + Ripl architecture + D3 modules)
 
 ### Comparison
 
@@ -256,7 +256,7 @@ src/lib/textCache.js                     ← Chart.js _measureText LRU cache
 
 ## 9. UI Components
 
-### Winner: Motion Canvas (ColorPicker, Slider, Timeline, Playback, Shortcuts) + Ant Design Pro (Dashboard, Error Boundary)
+### Compared choice: Motion Canvas (ColorPicker, Slider, Timeline, Playback, Shortcuts) + Ant Design Pro (Dashboard, Error Boundary)
 
 ### ColorPicker
 
@@ -355,7 +355,7 @@ src/features/offlineBanner.js   ← Ant Design Pro offline detection
 
 ## 10. Translation & Config
 
-### Winner: PDFMathTranslate (cache + multi-provider + config)
+### Compared choice: PDFMathTranslate (cache + multi-provider + config)
 
 ### Comparison
 
@@ -389,7 +389,7 @@ src/core/locale.js               ← x-spreadsheet locale registration + fallbac
 
 ## 11. Data Structures
 
-### Winner: Ripl Utilities
+### Compared choice: Ripl Utilities
 
 ### What to port
 
@@ -414,7 +414,7 @@ src/lib/collection.js  ← Ripl packages/utilities/src/collection.ts (258 lines)
 
 ## 12. Canvas Input
 
-### Winner: Phaser (Pointer + KeyCombo)
+### Compared choice: Phaser (Pointer + KeyCombo)
 
 ### Comparison
 
@@ -437,7 +437,7 @@ src/lib/keyCombo.js        ← Phaser (sequence matching, maxKeyDelay) — not y
 
 ## 13. Export & File Operations
 
-### Winner: canvas2image (canvas export)
+### Compared choice: canvas2image (canvas export)
 
 ### What to port
 
@@ -459,7 +459,7 @@ src/lib/canvasExport.js  ← canvas2image canvas2image.js (329 lines, vanilla JS
 
 ## 14. Locale & i18n
 
-### Winner: x-spreadsheet locale + Ant Design Pro structure
+### Compared choice: x-spreadsheet locale + Ant Design Pro structure
 
 ### Comparison
 
