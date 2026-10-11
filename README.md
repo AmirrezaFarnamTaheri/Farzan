@@ -22,7 +22,7 @@ OpenCourseDeck runs in a browser from a local server or in a Tauri desktop windo
 ### First Run
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run first-run
 npm start
 ```
@@ -65,7 +65,7 @@ OpenCourseDeck stores data locally in the browser profile for the origin you ope
 - IndexedDB stores progress, timestamps, and database-backed records.
 - Some preferences and notes compatibility data may be mirrored in `localStorage`.
 - Nothing is uploaded by the app by default.
-- Backups are JSON files you export manually. These include supported application database records **but not local video/PDF file blobs** stored in the separate library-files database; keep the original media files for device migration.
+- Progress and Settings export a JSON file (current portable format: **1.5**) containing supported saved records, including watch history and PDF page bookmarks. It does **not** contain video/PDF file blobs from the separate library-files database. Keep your original media files before changing devices or browser profiles.
 
 For details, see [backup-restore.md](docs/backup-restore.md).
 

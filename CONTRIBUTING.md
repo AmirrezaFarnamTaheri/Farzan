@@ -3,7 +3,7 @@
 ### Setup
 
 ```bash
-npm install
+npm ci --ignore-scripts --legacy-peer-deps
 npm run vendor
 ```
 
@@ -21,7 +21,7 @@ npm run vendor
 
 - App shell and landmarks: `index.html`.
 - Styles: edit `src/styles/index.css` and its imported CSS files, especially `tokens.css`, `themes.css`, and `workspace.css`; `style.css` is a compatibility entry.
-- App behavior, routes, overlays, settings, and view builders: `app.js`.
+- App shell and common controls: `app.js`; route markup and handlers: `src/views/*Route.js`.
 - Shared DOM helpers: `src/lib/dom.js`.
 - Command palette: `src/features/commandPalette.js`.
 - Reusable UI helpers: `ui.js`.
@@ -37,7 +37,9 @@ npm run vendor
 - Keep the app self-contained. Do not add CDN dependencies.
 - Keep CSP healthy in `index.html`; do not add `unsafe-eval` or broad script sources.
 - Prefer shared utilities in `src/lib/dom.js` over duplicating focus, selector, debounce, throttle, or ID helpers.
-- Preserve keyboard behavior when changing overlays.
+- Preserve keyboard behavior, focus restoration, readable contrast, reduced motion and responsive layouts when changing overlays or shared CSS.
+- Keep storage errors visible. Do not replace a failed authoritative IndexedDB read with an empty array or a success toast.
+- Avoid silently merging backup formats or changing persistent keys without migration tests.
 - Treat service worker cache as a production concern; local dev should remain easy to refresh.
 
 ### Test Strategy
