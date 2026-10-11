@@ -767,14 +767,25 @@ import { Pointer } from './src/lib/pointer.js';
         if (target.closest('[data-sidebar-toggle]') || target.closest('.sidebar-collapse-btn')) {
           this.toggle();
         }
-        // Mobile: close on overlay click
+        // Keep the mobile drawer state, trigger accessibility attributes and
+        // body scroll lock in sync. Navigating away must dismiss the drawer.
         if (target.classList.contains('sidebar-overlay')) {
           this.closeMobile();
         }
-        // Topbar menu button (mobile)
-        if (target.closest('.topbar-menu-btn')) {
-          this.openMobile();
+        if (target.closest('.sidebar a[href^="#/"]')
+            && this.el.classList.contains('sidebar-mobile-open')) {
+          this.closeMobile();
         }
+        if (target.closest('.topbar-menu-btn')) {
+          if (this.el.classList.contains('sidebar-mobile-open')) this.closeMobile();
+          else this.openMobile();
+        }
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !this.el.classList.contains('sidebar-mobile-open')) return;
+        this.closeMobile();
+        document.getElementById('mobile-menu-btn')?.focus({ preventScroll: true });
       });
 
       // Sub-nav toggle
@@ -824,10 +835,13 @@ import { Pointer } from './src/lib/pointer.js';
 
     openMobile() {
       this.el.classList.add('sidebar-mobile-open');
-      // Overlay
+      const trigger = document.getElementById('mobile-menu-btn');
+      trigger?.setAttribute('aria-expanded', 'true');
+      trigger?.setAttribute('aria-label', 'Close navigation menu');
+      // The overlay is a visual backdrop, not an alternative navigation tree.
       let overlay = $('.sidebar-overlay');
       if (!overlay) {
-        overlay = createElement('div', { class: 'sidebar-overlay' });
+        overlay = createElement('div', { class: 'sidebar-overlay', 'aria-hidden': 'true' });
         document.body.appendChild(overlay);
       }
       overlay.classList.add('active');
@@ -836,6 +850,9 @@ import { Pointer } from './src/lib/pointer.js';
 
     closeMobile() {
       this.el.classList.remove('sidebar-mobile-open');
+      const trigger = document.getElementById('mobile-menu-btn');
+      trigger?.setAttribute('aria-expanded', 'false');
+      trigger?.setAttribute('aria-label', 'Open navigation menu');
       const overlay = $('.sidebar-overlay');
       if (overlay) overlay.classList.remove('active');
       document.body.style.overflow = '';
