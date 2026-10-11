@@ -1,0 +1,815 @@
+{
+  "edition": "Farzan Plasmato",
+  "sourceRun": 38177326118,
+  "sourceWorkflow": "Plasmato Visual and Functional Acceptance",
+  "sourceBranch": "qa/plasmato-visual-acceptance-20261012",
+  "captures": [
+    {
+      "path": "desktop/01-home.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 130743,
+      "sha256": "062f54be355255c681715326cf0e70f3ec4f3f698d21ca1d1f0fcbb539401c5b"
+    },
+    {
+      "path": "desktop/02-courses.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 234143,
+      "sha256": "b1e3f5598f133e33cc44ff68a5606db442a7092d685a3e65ce162256888aee41"
+    },
+    {
+      "path": "desktop/03-my-courses.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 105211,
+      "sha256": "9f4198e8636991412cc3fc8eb70b258e5886fccc2fd2e9f2b753b2abfda363d8"
+    },
+    {
+      "path": "desktop/04-materials.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 156898,
+      "sha256": "58f6fe17ab152b2ccdf30150bdd5ad8426a37a8fcc7551b4458ef059d42a6180"
+    },
+    {
+      "path": "desktop/05-notes.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 139643,
+      "sha256": "daf5385ceabc95bbbc3e0dd9175a2b8f61d7731f6024f18b33accffaa61af673"
+    },
+    {
+      "path": "desktop/06-pdf.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 71548,
+      "sha256": "f39e3785e141c5b3b35527ce59c119bfc831890a68b18bbfabdb95f121b008fe"
+    },
+    {
+      "path": "desktop/07-progress.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 180995,
+      "sha256": "728e3edd79c604a1376414ff04bd72212d9399add48aa05e5eb6d15c3de27429"
+    },
+    {
+      "path": "desktop/08-playlists.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 196801,
+      "sha256": "fbd13b7a44f5e7a0727f7a41432a187ea6223dc611bca53c7ffaefb6a1459116"
+    },
+    {
+      "path": "desktop/09-bookmarks.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 73937,
+      "sha256": "db4718c726b57b4edea21eaa600cdf022e6ae2e3a2e3b4698c18331ddd0afd75"
+    },
+    {
+      "path": "desktop/10-tags.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 73216,
+      "sha256": "f4393497cca394d9e7f5b5ef2f82c7b3a77aed0a10ec970d863f541693a70319"
+    },
+    {
+      "path": "desktop/11-flashcards.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 157511,
+      "sha256": "4ec52dcc8817e863e31dff62cd22e24d090c2369208d77b2b9c7aa1359698946"
+    },
+    {
+      "path": "desktop/12-studio.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 98535,
+      "sha256": "f887cb59b9327ed565b60dcc12f4592648f3658c8f85f2f43a610ba856ee8811"
+    },
+    {
+      "path": "desktop/13-achievements.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 137353,
+      "sha256": "44797fcf420a41da6ad5b36131eb5cc67c3a0731ab212f971dd257ebe9274790"
+    },
+    {
+      "path": "desktop/14-settings.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 137443,
+      "sha256": "6c735ff09477c7559c0112ce7d5535a7838b104dad0f5384d19751ef5717c1e6"
+    },
+    {
+      "path": "desktop/15-help.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 166419,
+      "sha256": "05f975d683472ad99f73328dbd2bbedb1e9a0a7cf6a5c8b9e1e190f9b78e1b09"
+    },
+    {
+      "path": "tablet/01-home.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 85402,
+      "sha256": "be792280384eaeaac8d689c8e3ee29be30cbfa7f057e3987da92de58a3f69a03"
+    },
+    {
+      "path": "tablet/02-courses.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 112588,
+      "sha256": "22b1d5e50797ec36b3f77ddbb029f1007926df9b23692c071629878d4d9b0e47"
+    },
+    {
+      "path": "tablet/03-my-courses.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 67581,
+      "sha256": "d6ae720ee9e2dc8592e3016088ed4e76698bfd0792c7c9c922aca47518f02558"
+    },
+    {
+      "path": "tablet/04-materials.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 107152,
+      "sha256": "af4d5315907360af8512cbe97daa2b91656f0398834c284973d6492ae39e6645"
+    },
+    {
+      "path": "tablet/05-notes.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 98577,
+      "sha256": "158a19c6aa2063dd2acb33e7dac4ea9058dd534e18529e84dfb20bf964c49d16"
+    },
+    {
+      "path": "tablet/06-pdf.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 36657,
+      "sha256": "f47305cdfa32f0fb98a70eba7807924eda08ae9cd191141a7ee6365ae143231b"
+    },
+    {
+      "path": "tablet/07-progress.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 122581,
+      "sha256": "c7e63cacf06a3d341046b33b12e4aeea0f507eeffb38b283ead0a8e822433ce8"
+    },
+    {
+      "path": "tablet/08-playlists.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 139922,
+      "sha256": "2f5225e15a3b2061dadd8c9519c4273ce680b4d6f99055a2c1f802fd38968e5b"
+    },
+    {
+      "path": "tablet/09-bookmarks.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 37408,
+      "sha256": "1e6bf31549b98dd7c4b8c051362d90c8feddb976eedb3e6cd61c52aed8ff3d82"
+    },
+    {
+      "path": "tablet/10-tags.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 36065,
+      "sha256": "d6cc3d6907760ef8b742e0e99e47635892f62a8b77c6f2b5e77fb9e5e2aa48e6"
+    },
+    {
+      "path": "tablet/11-flashcards.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 109492,
+      "sha256": "b15c42d71e4dadcf5737e5b5c966e86c86579eee5da601302d9022233e8148eb"
+    },
+    {
+      "path": "tablet/12-studio.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 43733,
+      "sha256": "28605893671e583518e7b58cf2634f2bb78590c48778b4e12df862ae15007696"
+    },
+    {
+      "path": "tablet/13-achievements.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 94974,
+      "sha256": "b1cdda9fa6b009327270e3c1a294deedca21ed424851eb74a9b91523433f6419"
+    },
+    {
+      "path": "tablet/14-settings.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 107762,
+      "sha256": "95d911981c4e5fd75f64d024c221490dd27dd422ac394f64c0e0e05fdd13e442"
+    },
+    {
+      "path": "tablet/15-help.png",
+      "width": 900,
+      "height": 1080,
+      "bytes": 106766,
+      "sha256": "5332898a13640b88148a3a605ed7c790210ceb1023f898d803a1e5ce88c96547"
+    },
+    {
+      "path": "mobile/01-home.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 51031,
+      "sha256": "e76d79483f0d73987ef133fcd78a397f2e8bab3afec9cb122ea75ff9b3e11972"
+    },
+    {
+      "path": "mobile/02-courses.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 63366,
+      "sha256": "f08a99e92641af49c5ce3409fd306bca189a54ee436d8c473ddbf8c45b463ee0"
+    },
+    {
+      "path": "mobile/03-my-courses.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 55922,
+      "sha256": "91546ec6abe001604cb3a5dabac80d29e248370035f1cf0e5ceb765fa9a43854"
+    },
+    {
+      "path": "mobile/04-materials.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 61200,
+      "sha256": "c7d2b720237287ad923977f380719daf22b883bb5e7a970bab21474ac1bde82f"
+    },
+    {
+      "path": "mobile/05-notes.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 46098,
+      "sha256": "79564235ce60524cd31e0c6bbafbcb23cada0d11a64e12f41e23153791e1badc"
+    },
+    {
+      "path": "mobile/06-pdf.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 34746,
+      "sha256": "9ae435164414b52fdf6442382aaeedf8a002a9d5a420f51c1c7f7db6bb70a7d5"
+    },
+    {
+      "path": "mobile/07-progress.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 61296,
+      "sha256": "f6d463c6cb9605e72d18d7e7135a015f6e4bac08aa4c0d3d29a7055cd5b5ea22"
+    },
+    {
+      "path": "mobile/08-playlists.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 61262,
+      "sha256": "3c37ecf93220e798bb63822eef3fd7a01c78ff2635877045cf6132758d072bb3"
+    },
+    {
+      "path": "mobile/09-bookmarks.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 34282,
+      "sha256": "94f5e4aeec8e2353b2ba6448c014a33a83785c6d082e310e4fe4241abae49ae0"
+    },
+    {
+      "path": "mobile/10-tags.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 32997,
+      "sha256": "5ed544cf830dc6bfd35f08917abb7a7f68030dddc1ef17329d6ea74a63d12f6a"
+    },
+    {
+      "path": "mobile/11-flashcards.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 70995,
+      "sha256": "cb6fc105c4e649177a1bdabddacf06c8c3b534560319ff698155a8ce3f5523ca"
+    },
+    {
+      "path": "mobile/12-studio.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 41082,
+      "sha256": "a2989fc08ad4475b24128775d032b485cca05045ef35632cb9d5710529d134d8"
+    },
+    {
+      "path": "mobile/13-achievements.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 54826,
+      "sha256": "29bfa44007d50c114af68ee2eecdaaf3f71809db48ad3700a9e92e66b0a31125"
+    },
+    {
+      "path": "mobile/14-settings.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 60315,
+      "sha256": "b970de63b59fbcbb2956074dac67b8673d8958a3be1245e091b862d9ffc18426"
+    },
+    {
+      "path": "mobile/15-help.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 68533,
+      "sha256": "64cdc54a9f5dbe81cd8ce3bed2e75ab11dfa6b7aebdb9bf6310e2126d624db07"
+    },
+    {
+      "path": "light-desktop/01-home.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 128896,
+      "sha256": "ad70a1a9eba3bfb9d5a16b67b1e8dff32d945566e845b53a8742777782f3d800"
+    },
+    {
+      "path": "light-desktop/02-courses.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 233213,
+      "sha256": "bbf2aebe8249d7afc1b807612e19b5e77f3cdf8ba71d023158911fc5a6c774fa"
+    },
+    {
+      "path": "light-desktop/03-my-courses.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 103142,
+      "sha256": "e11b743aba34cec0dbc37f5d26c5b5f3ad28a95fd2955838fa9e3df9f1abc2a1"
+    },
+    {
+      "path": "light-desktop/04-materials.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 156696,
+      "sha256": "43e7cfd34ad6967f0560085c4cee63401783388552b5a9b2375d6df32f5c7f9f"
+    },
+    {
+      "path": "light-desktop/05-notes.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 135413,
+      "sha256": "d2816262d31f13f56061a8f4dfb3033f162e59fe11ab34e95da2bef562751b97"
+    },
+    {
+      "path": "light-desktop/06-pdf.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 70080,
+      "sha256": "7f07de4beda5b120807a55d911cbf14ac3b38db1c139a0c5b7d93bfba9c0a471"
+    },
+    {
+      "path": "light-desktop/07-progress.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 187552,
+      "sha256": "e3d58cdc02cc67bb18c6b6d6da0e57e108fba6668a57a2486211b3dd3b60ea28"
+    },
+    {
+      "path": "light-desktop/08-playlists.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 193717,
+      "sha256": "6dd89496967f5aa8ca17d9c6c63312dfb5e8054c8e7394e982ca4bc373893f5e"
+    },
+    {
+      "path": "light-desktop/09-bookmarks.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 73532,
+      "sha256": "b05f1cccfea5ff641e2867ba5932fa9c2b8161c6ea3b6cd1fe0cc2195146aa47"
+    },
+    {
+      "path": "light-desktop/10-tags.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 72366,
+      "sha256": "459e69e81942588cbef3d07e636d1b136f42d0888a98d34effc5fe8a7c75e461"
+    },
+    {
+      "path": "light-desktop/11-flashcards.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 163066,
+      "sha256": "30800ed992e4305339aafc12cf1bc28064243ff40fe53ed5df3535f643ea7030"
+    },
+    {
+      "path": "light-desktop/12-studio.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 95316,
+      "sha256": "cf60c22c07881390bc1096db26a02115822163dc2498f8fcc3651d9213060927"
+    },
+    {
+      "path": "light-desktop/13-achievements.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 134066,
+      "sha256": "0a23e0b03edd66ebf7015ff22f0ca4ab863bb4ac7eeaed2c025c5d4cccf7535d"
+    },
+    {
+      "path": "light-desktop/14-settings.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 134942,
+      "sha256": "f3ec676c0cf5e5f4cdc62490c82cd6457aab7ebd5d9b71df5952f067b833c855"
+    },
+    {
+      "path": "light-desktop/15-help.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 165325,
+      "sha256": "e88775217e30dda3c828061186ccbf5fb7de8089a592cfd059177469ee0ff52d"
+    },
+    {
+      "path": "light-mobile/01-home.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 49775,
+      "sha256": "ccc3371d6d8564605a17e56251668e838221f334bb3b9a10a1acc785cdebd32c"
+    },
+    {
+      "path": "light-mobile/02-courses.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 61130,
+      "sha256": "4291e01897e618337a69a8853005e59facce8c5e23be48cc0b5f6852af38ec4b"
+    },
+    {
+      "path": "light-mobile/03-my-courses.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 54666,
+      "sha256": "71ab9088d8c78981e4e97e822b9b0fd90bd7a217c8cc395b2d2c92328d6202df"
+    },
+    {
+      "path": "light-mobile/04-materials.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 61272,
+      "sha256": "0ede29f62b468806183548013a878385671372c379a55b863205095220dbc97f"
+    },
+    {
+      "path": "light-mobile/05-notes.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 48326,
+      "sha256": "029079ccceac4c7e4622ea7f8bdc68a83c9abcd955885ca0c5d3d673429e9b8c"
+    },
+    {
+      "path": "light-mobile/06-pdf.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 33939,
+      "sha256": "e04e8f5497c533a32e49a2f17b7e67ccb8d13f73f08c62e854ceb8fd5916bd21"
+    },
+    {
+      "path": "light-mobile/07-progress.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 64146,
+      "sha256": "5eed2afd25943bdb7caf3aac0f47a14b8e457d2dd165034fa4625e3cba608513"
+    },
+    {
+      "path": "light-mobile/08-playlists.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 60587,
+      "sha256": "41eaea1a54dfcde4b187bc82abf59490da180bd06b953c65152cb7bdafcb5144"
+    },
+    {
+      "path": "light-mobile/09-bookmarks.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 34136,
+      "sha256": "2d8fd41170645cd9780dae4b99f8aa8032d0a87a51e144d8792f14b20232fb7a"
+    },
+    {
+      "path": "light-mobile/10-tags.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 32618,
+      "sha256": "4f35a619c33b3d8b619bfb1a2223627398680171530957adca105e59456125e4"
+    },
+    {
+      "path": "light-mobile/11-flashcards.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 74612,
+      "sha256": "1b6f04935d3239b6192add93a466e18151026193b9db6af90cb75a68d917a702"
+    },
+    {
+      "path": "light-mobile/12-studio.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 40259,
+      "sha256": "3fe227620d39fed0d52a6b2e7bf602ceb87bde61f9c40354d3417fc7d23e0452"
+    },
+    {
+      "path": "light-mobile/13-achievements.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 53623,
+      "sha256": "bf915ba4907bb7fb98755d558f140103409fe439b5b9424f09d866f97a997f6a"
+    },
+    {
+      "path": "light-mobile/14-settings.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 59618,
+      "sha256": "1955615a74b3f0bd97681f7fc0fefc42d3ba6e25e3685e0c4e38fc86b27a5a30"
+    },
+    {
+      "path": "light-mobile/15-help.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 67300,
+      "sha256": "8b1e2559e4ef317d903c1963c69b0d247629bb1f166df1f74ec14a2ce939b505"
+    },
+    {
+      "path": "functional/01-plasmato-lecture-selected.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 150141,
+      "sha256": "6738a39bd6c54eaa7dab90faeb496c32fc6e338761e63c2f92bb8f6231b4f3f8"
+    },
+    {
+      "path": "functional/02-real-completion-saved.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 154635,
+      "sha256": "0f1ed5064d3406ca58048b1ce5a13307744defd00d8936604c5ad6897910011f"
+    },
+    {
+      "path": "functional/03-filtered-plasmato-materials.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 119800,
+      "sha256": "b254db86d1c9fe4919df7aa02953b2d515346a7877adcfc0440e8bf4958b41d6"
+    },
+    {
+      "path": "functional/04-written-note-persisted.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 135294,
+      "sha256": "8db66ae9e6b1df8f70c8342362431cf93f8655dd01b873afd785599f37f0db8b"
+    },
+    {
+      "path": "functional/05-saved-note-reopened.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 134929,
+      "sha256": "e2f7dd487b204c589ec6fe68ae35cbb0ddfca06376356310cb0b043d3a3ff4fc"
+    },
+    {
+      "path": "functional/06-my-course-created.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 102340,
+      "sha256": "6152e0291255dc41bbd9e2ce116baef5d7666cee2301272cb469f4b31e2733f3"
+    },
+    {
+      "path": "functional/07-flashcard-editor.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 111871,
+      "sha256": "48fb6eb27c9ba2ade32f385a1d0c41b012b4592721e0830e7038c3f0187e7a2c"
+    },
+    {
+      "path": "functional/08-flashcard-flipped.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 130084,
+      "sha256": "7f6b60e07fb1c8942e710bc5dd2b5b78a783b30935a4cfc79531585e24b8889a"
+    },
+    {
+      "path": "functional/09-flashcard-graded.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 108874,
+      "sha256": "9b335a1d634cda73a8a22540ebfde312253df7d0d9a0b6bcadbe7fc1b45416e6"
+    },
+    {
+      "path": "functional/10-pdf-rendered.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 80784,
+      "sha256": "5d2a70c6557f2acd5fb19b8b51080f9390ec5baa7f779acd81ac650c6dcacac5"
+    },
+    {
+      "path": "functional/11-pdf-page-note-saved.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 103153,
+      "sha256": "21e339769896583981e2e6bdee4aacb660338f43946aa30497f4a5f0e50e0c46"
+    },
+    {
+      "path": "functional/12-playlist-created.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 168054,
+      "sha256": "072092d09e661d9eb344245222ebdb1315d69b92bcd3f6d5d106df34a4933862"
+    },
+    {
+      "path": "functional/13-theme-switched.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 106227,
+      "sha256": "b1d14e662962c2cb155bc71c34db0371e7a75321fb4054a8016cca4fd9967089"
+    },
+    {
+      "path": "functional/14-type-scale-increased.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 112367,
+      "sha256": "b00234dd64bb756ed5b35e14f4d9e6212ced87615088935fe5f46c3aa9c71ccd"
+    },
+    {
+      "path": "functional/15-search-query-entered.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 132590,
+      "sha256": "ba9f87fe5c9f842d0ce6e08d7d7ecbf92be024b25ed5dca2b9ed80c0695cbbed"
+    },
+    {
+      "path": "functional/15b-global-search-results.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 132586,
+      "sha256": "599ae1a9824f0c4898863c255398bf2f2b6a4044113dfe5a7e0445d71056ba3e"
+    },
+    {
+      "path": "functional/16-search-result-opened.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 110289,
+      "sha256": "9b8f9d3a483634d3f6923ea9b3a5aedbedc8a18151705ea7e1a804500425c0a7"
+    },
+    {
+      "path": "functional/17-real-local-video-playing.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 144628,
+      "sha256": "96e9ce9a418048cf68fa80731e1e5fb8ed803983b65d5616d2f0c4133c150243"
+    },
+    {
+      "path": "functional/18-video-timestamp-bookmarked.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 146408,
+      "sha256": "bb8a12d0e4ba10ec3339541550b225b93fe010b6e4aa6b9bcc197d338a485bfb"
+    },
+    {
+      "path": "functional/19-bookmark-visible-after-video.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 92923,
+      "sha256": "dcd7090a7f5bf8894ce4d9bfd694f9b43248b2942b42378f8e308008e7fbedf7"
+    },
+    {
+      "path": "functional/20-studio-note-added.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 97162,
+      "sha256": "340e8a0b1455b70d9c20152e950fe449bb3be41d73c339962ca0022de6c72196"
+    },
+    {
+      "path": "functional/21-studio-shapes-added.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 112389,
+      "sha256": "214e08fb64d913b2fb3c49c00f228b0aa054c0fddbd84d61559b09361d98e115"
+    },
+    {
+      "path": "functional/22-studio-reopened.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 108994,
+      "sha256": "b0a7cbae45895e65cdde2dfa78823f9651c01aa4eb75997ad48b3c5fcfbeac77"
+    },
+    {
+      "path": "functional/23-settings-ai-panel.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 105779,
+      "sha256": "e8b4ed9b0551360fe980380590a7762a55e4dfbe8ad907789bf58689b87c9e05"
+    },
+    {
+      "path": "functional/24-settings-storage-panel.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 94613,
+      "sha256": "292fea3e132a509375743fb459b27b1d2bece68f672f5bd4468e30d1522072fa"
+    },
+    {
+      "path": "functional/25-pdf-zoom-in-working.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 82827,
+      "sha256": "39889fd2df146eb601a4cedcaa743962cf75c448ab56414c689f8628db90265f"
+    },
+    {
+      "path": "standalone/01-standalone-course-summary.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 373127,
+      "sha256": "459fea545acf2d9ee85a6789acf05b6c3986c9ae40fa1a2ce400a68608f7e96c"
+    },
+    {
+      "path": "standalone/02-hierarchy-drilldown.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 219780,
+      "sha256": "cfadac2d2a3ebdc7f6553f47b2ba8eb926dd0f3c05646df2196a9ffb1f65e164"
+    },
+    {
+      "path": "standalone/03-pdf-resource-saved.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 370443,
+      "sha256": "b63dec566fe4c8043148d793022355534f30362d732b1bc4cb5bcc2992ca1b5c"
+    },
+    {
+      "path": "standalone/04-saved-only-focus-mode.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 372485,
+      "sha256": "c484cde343e8a5d295e4bc82716d2b2439c9efabe47aceeacf342bf4722b0f65"
+    },
+    {
+      "path": "standalone/05-mobile-standalone.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 251447,
+      "sha256": "66145be5bd08caa4f95444f5843ffb6859e4b524c361ab6becffe2c5f10b7b9e"
+    },
+    {
+      "path": "standalone/06-mobile-search-results.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 106085,
+      "sha256": "6aaae076d5b0fbba188134aabd9d93521be1ee0b7baf4f71193df6925e581508"
+    }
+  ],
+  "contactSheets": [
+    {
+      "path": "contact-sheets/contact-sheet-desktop.png",
+      "width": 1572,
+      "height": 762,
+      "bytes": 331598,
+      "sha256": "50d97b36d30ac0d08efe49d7ce5b7e305f670530d7e7e4514c784a99596faf51"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-tablet.png",
+      "width": 1572,
+      "height": 762,
+      "bytes": 272952,
+      "sha256": "2fcda438fde466ba72368af6fc55b06cca2310b26947f54f8f1017a72025d7a0"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-mobile.png",
+      "width": 1572,
+      "height": 762,
+      "bytes": 253413,
+      "sha256": "2e0c7e2b9ca9cc18574b81f270c7be932c9981919d635e40523315a1d18224ec"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-light-desktop.png",
+      "width": 1572,
+      "height": 762,
+      "bytes": 309340,
+      "sha256": "2a178477d408a287f4ea857b93dae5d32ef367dd70bc6da4a62042a25b2d7df7"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-light-mobile.png",
+      "width": 1572,
+      "height": 762,
+      "bytes": 240433,
+      "sha256": "7b4046245f89be154af9aed0a58913d4973ddc535a607c50a0114218d6deba39"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-functional.png",
+      "width": 1262,
+      "height": 1746,
+      "bytes": 592359,
+      "sha256": "ab205cc47534be0a54e414c66ae22081d0b84bae823aa15a563b29256286e5c2"
+    },
+    {
+      "path": "contact-sheets/contact-sheet-standalone.png",
+      "width": 1572,
+      "height": 516,
+      "bytes": 226373,
+      "sha256": "267edbe3e222befb983d952cc3856fe0b7d5f652907fe1607da935b52e84d62e"
+    }
+  ],
+  "observations": {
+    "path": "observations.jsonl",
+    "bytes": 39504,
+    "sha256": "904efa017874d88246d9bae9deae49443b774be38f2fcbc83afab0a4ddf2ca16"
+  },
+  "totalScreenshots": 107,
+  "totalContactSheets": 7
+}
