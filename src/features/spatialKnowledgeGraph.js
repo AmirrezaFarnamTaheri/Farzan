@@ -296,7 +296,7 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       : 'No concepts available.';
     if (this.canvas) {
       this.canvas.setAttribute('aria-label',
-        `3D Knowledge graph. ${selection} Left and Right change the concept; Up and Down rotate; Enter or Space selects.`);
+        `3D Knowledge graph. ${selection} Left and Right arrow keys change the concept; Up and Down rotate; Enter or Space selects.`);
     }
     if (this.keyboardStatus) this.keyboardStatus.textContent = selection;
   }
