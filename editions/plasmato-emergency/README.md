@@ -1,6 +1,6 @@
 # Farzan — Plasmato Edition 1.0.0
 
-A separate, self-contained **Plasmato course viewer**, preserved from the supplied Farzan Emergency Player archive. This edition does **not** replace OpenCourseDeck's main course catalog or data layer.
+A dedicated **Plasmato edition of Farzan/OpenCourseDeck**, with the supplied archive integrated into the normal Courses, Materials, search, notes and progress flows. The original emergency player is also preserved as a self-contained browser viewer.
 
 The supplied hierarchy is preserved as `course → source → topic → resource`. The bundled snapshot contains **31 courses, 100 sources, 6,418 topics, 5,990 video references, 280 PDF references, and 13 issue topics**. Videos and PDFs remain external links and may be unavailable without an Internet connection or access rights. The player does not request any remote media on initial load; select a resource to play it.
 
@@ -28,4 +28,10 @@ Search and filters operate across the course, source, topic and resource hierarc
 
 ## Scope and branch policy
 
-This edition is intentionally kept under `editions/plasmato-emergency/` on the dedicated `edition/plasmato-emergency-player-20261011` branch. It is **not** an alteration to `main`, not a production release, and not a proposal to merge the Plasmato extraction into the default catalog.
+The dedicated branch `edition/plasmato-emergency-player-20261011` includes **both** a Farzan app with the archive added to the canonical DataStore and this standalone emergency player. The production pointer `data/catalog.json` retains the starter course and adds `data/plasmato-2026-04-11.json.gz` (SHA-256 verified). All 31 Plasmato courses become ordinary Farzan lessons with stable source topic URLs. The combined catalog contains 32 courses and 6,421 topics.
+
+Run the normal app from the repository root (`npm ci --ignore-scripts --legacy-peer-deps && npm run first-run && npm start`); open `#/courses`, `#/materials`, or search for a Plasmato topic. For the emergency player visit `editions/plasmato-emergency/index.html`.
+
+**Publishing:** The branch's workflow runs Farzan verification, builds the app, publishes a downloadable web bundle with SHA256SUMS, and deploys to GitHub Pages when Pages is configured for GitHub Actions. The emergency viewer appears at `/editions/plasmato-emergency/index.html` on the published site. `main` remains unchanged. Media files are external; 13 source pages that returned errors remain as flagged catalog entries.
+
+Progress in the **main Farzan application** uses its existing profile, notes, media and backup data. The **standalone emergency player** continues to use independent `farzanEmergency:*` storage and does not synchronize progress with Farzan; use the main app for unified tracking.

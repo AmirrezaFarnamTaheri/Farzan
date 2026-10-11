@@ -13,6 +13,8 @@ const EXPECTED_ACTION_PINS = new Map([
   ['actions/setup-node', { sha: '820762786026740c76f36085b0efc47a31fe5020', version: 'v7.0.0' }],
   ['actions/upload-artifact', { sha: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a', version: 'v7.0.1' }],
   ['actions/download-artifact', { sha: '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c', version: 'v8.0.1' }],
+  ['actions/upload-pages-artifact', { sha: '7b1f4a764d45c48632c6b24a0339c27f5614fb0b', version: 'v4' }],
+  ['actions/deploy-pages', { sha: 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e', version: 'v4' }],
   ['actions/github-script', { sha: '3a2844b7e9c422d3c10d287c895573f7108da1b3', version: 'v9.0.0' }],
   ['actions/attest', { sha: '1e69f48acb82d1966a394da916b4c1698aa569d6', version: 'v4.2.2' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
@@ -236,6 +238,7 @@ function main() {
     'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
     'release.yml': readWorkflow('release.yml'),
     'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
+    'plasmato-edition.yml': readWorkflow('plasmato-edition.yml'),
   };
   const errors = validateWorkflowSet(files);
   if (errors.length) {

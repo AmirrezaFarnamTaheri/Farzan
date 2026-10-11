@@ -1,12 +1,9 @@
-name: Plasmato Edition Integrity
+name: Plasmato Edition - Verify and Publish
 
 on:
   push:
     branches:
       - edition/plasmato-emergency-player-20261011
-    paths:
-      - 'editions/plasmato-emergency/**'
-      - '.github/workflows/plasmato-edition.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,10 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify-edition:
-    name: Verify Plasmato offline snapshot
+  build-and-verify:
+    name: Verify native catalog and build both web apps
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Check out edition source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,13 +28,98 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
+          cache: npm
 
-      - name: Verify bundled hierarchy and untrusted URL rejection
-        run: node editions/plasmato-emergency/verify.cjs
-
-      - name: Validate standalone JavaScript source
+      - name: Verify supplied archive and native catalog integration
         run: |
+          node editions/plasmato-emergency/verify.cjs
+          node editions/plasmato-emergency/verify-integrated.cjs
           node --check editions/plasmato-emergency/app.js
           node --check editions/plasmato-emergency/catalog_data.js
           node --check editions/plasmato-emergency/extract.cjs
           node --check editions/plasmato-emergency/verify.cjs
+          node --check editions/plasmato-emergency/verify-integrated.cjs
+
+      - name: Install dependencies reproducibly
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Generate vendor libraries
+        run: npm run vendor
+
+      - name: Validate code, workflows, and unit tests
+        run: |
+          npm run check:encoding
+          npm run check:workflows
+          npm run validate
+          npm run lint
+          npm test
+
+      - name: Build production applications
+        run: |
+          npm run build:release
+          npm run check:generated
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          for (const file of [
+            'dist/index.html',
+            'dist/opencoursedeck.js',
+            'dist/data/catalog.json',
+            'dist/data/plasmato-2026-04-11.json.gz',
+            'dist/editions/plasmato-emergency/index.html',
+            'dist/editions/plasmato-emergency/app.js',
+            'dist/editions/plasmato-emergency/catalog_data.js',
+            'dist/sw.js',
+          ]) assert(fs.statSync(file).size > 0, 'Missing production asset: ' + file);
+          const pointer = JSON.parse(fs.readFileSync('dist/data/catalog.json', 'utf8'));
+          assert.equal(pointer.additionalCatalogs?.length, 1);
+          const worker = fs.readFileSync('dist/sw.js', 'utf8');
+          assert(worker.includes('plasmato-2026-04-11.json.gz'), 'Offline SW must precache native catalog');
+          assert(worker.includes('editions/plasmato-emergency/index.html'), 'Offline SW must precache standalone viewer');
+          NODE
+
+      - name: Run release security and runtime checks
+        run: |
+          npm run audit
+          npm audit --omit=dev --audit-level=high
+          npm run smoke
+          npm run smoke:dist-browser
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+
+      - name: Package complete installable static site
+        run: |
+          mkdir -p release-assets
+          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.0-web.zip .)
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.0-web.zip > SHA256SUMS)
+
+      - name: Upload verified downloadable app and checksums
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: farzan-plasmato-edition-v1.0.0-web
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload static site for GitHub Pages
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: dist
+
+  publish-pages:
+    name: Publish Plasmato Edition web application
+    needs: build-and-verify
+    if: github.ref == 'refs/heads/edition/plasmato-emergency-player-20261011'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified Plasmato web app
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
