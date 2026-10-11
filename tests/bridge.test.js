@@ -32,7 +32,9 @@ describe('bridge DB safety helpers', () => {
     ['getAllAnnotations', []],
     ['getAnnotations', ['pdf-a']],
     ['getWatchedSegments', ['topic-stale']],
+    ['getAllWatchedSegments', []],
     ['getPdfBookmarks', ['pdf-a']],
+    ['getAllPdfBookmarks', []],
   ])('rejects %s after migrated IndexedDB read failure instead of returning a stale snapshot', async (method, args) => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     localStorage.setItem('ocd_user_library', JSON.stringify({

@@ -1152,6 +1152,20 @@
     }
 
     // Issue 8: throw on save failure, return null when IDB unavailable
+    async function getAllWatchedSegments() {
+      const idb = _getIdb();
+      if (!idb) throw new Error('Watched-segment storage is unavailable; backup cannot be complete');
+      await _migrateOnce();
+      try {
+        const records = await idb.getAll('watchedSegments');
+        if (!Array.isArray(records)) throw new Error('Invalid watched-segment records');
+        return records;
+      } catch (error) {
+        _canonicalReadFailed('getAllWatchedSegments', error);
+        throw error;
+      }
+    }
+
     async function addWatchedSegment(segment) {
       const id = segment?.id ?? `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(segment ?? {}), id, updatedAt: segment?.updatedAt ?? Date.now() };
@@ -1199,6 +1213,20 @@
       }
       const totalWatched = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
       return Math.min(100, Math.round((totalWatched / duration) * 100));
+    }
+
+    async function getAllPdfBookmarks() {
+      const idb = _getIdb();
+      if (!idb) throw new Error('PDF bookmark storage is unavailable; backup cannot be complete');
+      await _migrateOnce();
+      try {
+        const records = await idb.getAll('pdfBookmarks');
+        if (!Array.isArray(records)) throw new Error('Invalid PDF bookmark records');
+        return records;
+      } catch (error) {
+        _canonicalReadFailed('getAllPdfBookmarks', error);
+        throw error;
+      }
     }
 
     async function addPdfBookmark(bookmark) {
@@ -1273,7 +1301,7 @@
         const idb = _getIdb();
         if (idb) {
           await _migrateOnce();
-          try { data.watchedSegments = await idb.getAll('watchedSegments') ?? []; } catch { data.watchedSegments = []; }
+          data.watchedSegments = await getAllWatchedSegments();
         } else {
           data.watchedSegments = [];
         }
@@ -1282,7 +1310,7 @@
         const idb = _getIdb();
         if (idb) {
           await _migrateOnce();
-          try { data.pdfBookmarks = await idb.getAll('pdfBookmarks') ?? []; } catch { data.pdfBookmarks = []; }
+          data.pdfBookmarks = await getAllPdfBookmarks();
         } else {
           data.pdfBookmarks = [];
         }
@@ -1358,9 +1386,11 @@
       queryByRange,
       countByIndex,
       addWatchedSegment,
+      getAllWatchedSegments,
       getWatchedSegments,
       getWatchedPercent,
       addPdfBookmark,
+      getAllPdfBookmarks,
       getPdfBookmarks,
       deletePdfBookmark,
       exportBackup,
