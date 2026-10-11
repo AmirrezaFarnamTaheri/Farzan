@@ -624,6 +624,11 @@ describe('PDF viewer safe messages', () => {
     window.PlasmaPDFViewer.next = vi.fn();
     window.PlasmaPDFViewer.goTo = vi.fn();
 
+    // Mount with a logically opened PDF; the viewer now resets page input
+    // to an empty state when no document is present.
+    window.PlasmaPDFState.pdfDoc = {};
+    window.PlasmaPDFState.totalPages = 3;
+    window.PlasmaPDFState.currentPage = 3;
     window.PlasmaPDFInit();
 
     document.getElementById('outside-next').click();
@@ -643,6 +648,9 @@ describe('PDF viewer safe messages', () => {
     expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledTimes(1);
     expect(window.PlasmaPDFState.searchDocId).toBe('global');
 
+    window.PlasmaPDFState.pdfDoc = {};
+    window.PlasmaPDFState.totalPages = 3;
+    window.PlasmaPDFState.currentPage = 3;
     window.PlasmaPDFInit();
     document.getElementById('inside-next').click();
     pageInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

@@ -1538,6 +1538,11 @@ describe('app shell resilience helpers', () => {
     };
 
     const controller = await window.OpenCourseDeck.Views.pdf();
+    // The real PDF runtime enables these controls only after load().
+    // This focused route test stubs that runtime; emulate its loaded state,
+    // rather than invoking a disabled Save button against no document.
+    document.querySelector('[data-pdf-page-note-input]').disabled = false;
+    document.querySelector('[data-pdf-save-page-note]').disabled = false;
     document.querySelector('[data-pdf-page-note-input]').value = '<b>Important rhythm page</b>';
     document.querySelector('[data-pdf-save-page-note]').click();
 
