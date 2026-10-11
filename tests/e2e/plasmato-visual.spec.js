@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { makePdf } = require('../../scripts/dist-browser-smoke.cjs');
@@ -140,32 +139,60 @@ test('theme and font settings change the actual UI',async({page})=>{
 });
 test('global search displays Plasmato results and navigates',async({page})=>{
   await boot(page);
-  await page.locator('#sidebar-search, .topbar-search input').first().fill('comprehensive internal medicine');
+  await page.waitForFunction(()=>Boolean(window.OpenCourseDeck?.TopbarSearch?.input && window.OpenCourseDeck?.TopbarSearch?.resultsBox),null,{timeout:15000});
+  await page.locator('#sidebar-search').fill('comprehensive internal medicine');
+  await page.waitForTimeout(1100);
+  const searchState=await page.evaluate(()=>{
+    const search=window.OpenCourseDeck.TopbarSearch;
+    return {field:search.input?.value,visible:search.resultsBox?.className,
+      count:search.resultsBox?.querySelectorAll('.search-result-item').length||0,
+      indexed:search._universalData?.length||0,
+      searchMessage:search.resultsBox?.innerText?.slice(0,350)};
+  });
+  log({group:'functional',behavior:'search query diagnostic',searchState});
+  await shot(page,'functional','15-search-query-entered');
   await expect(page.locator('.search-result-item').first()).toBeVisible({timeout:15000});
-  await shot(page,'functional','15-global-search-results');
+  await shot(page,'functional','15b-global-search-results');
   await page.locator('.search-result-item').first().click();
   await expect(page).toHaveURL(/#\/courses/);
   await shot(page,'functional','16-search-result-opened');
 });
-test('a real locally generated MP4 plays in the native course player',async({page})=>{
-  const fixture=path.join(root,'fixtures','clip.mp4');
-  fs.mkdirSync(path.dirname(fixture),{recursive:true});
-  const ff=spawnSync('ffmpeg',['-hide_banner','-loglevel','error','-y',
-    '-f','lavfi','-i','testsrc2=size=320x180:rate=15','-t','5','-c:v','libx264',
-    '-pix_fmt','yuv420p','-movflags','+faststart',fixture],{encoding:'utf8',timeout:25000});
-  expect(ff.status,'ffmpeg fixture: '+ff.stderr).toBe(0);
-  const bytes=fs.readFileSync(fixture);
-  await page.route('https://visual-acceptance.invalid/clip.mp4',r=>r.fulfill({status:200,contentType:'video/mp4',body:bytes,headers:{'access-control-allow-origin':'*'}}));
+test('a real browser-recorded WebM plays in the native course player',async({page})=>{
+  await boot(page,'courses');
+  const recorded=await page.evaluate(async()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=320;canvas.height=180;
+    const ctx=canvas.getContext('2d');
+    let frame=0;
+    const draw=()=>{ctx.fillStyle='#173857';ctx.fillRect(0,0,320,180);
+      ctx.fillStyle='#f59e0b';ctx.fillRect((frame++*4)%290,60,30,50);
+      ctx.fillStyle='white';ctx.font='bold 21px sans-serif';ctx.fillText('VISUAL QA PLAYING',20,33);};
+    draw();
+    const stream=canvas.captureStream(20);
+    const mime='video/webm;codecs=vp8';
+    if(!MediaRecorder.isTypeSupported(mime))throw new Error('Chromium WebM video recording unavailable');
+    const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:250000});
+    const parts=[];rec.ondataavailable=e=>{if(e.data?.size)parts.push(e.data);};
+    const stopped=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=reject;});
+    const timer=setInterval(draw,45);rec.start(300);
+    await new Promise(resolve=>setTimeout(resolve,3200));
+    rec.stop();await stopped;clearInterval(timer);stream.getTracks().forEach(t=>t.stop());
+    const bytes=new Uint8Array(await new Blob(parts,{type:'video/webm'}).arrayBuffer());
+    return Array.from(bytes);
+  });
+  const bytes=Buffer.from(recorded);
+  expect(bytes.length).toBeGreaterThan(3000);
+  await page.route('https://visual-acceptance.invalid/clip.webm',r=>r.fulfill({status:200,contentType:'video/webm',body:bytes,headers:{'access-control-allow-origin':'*'}}));
   await boot(page,'courses');
   await page.evaluate(async()=>{
     const lib=window.OpenCourseDeck.UserLibrary;
     await lib.upsertCourse({id:'qa-playback',title:'Visual QA Playback'});
-    await lib.addRemoteLink({courseId:'qa-playback',title:'Controlled MP4 playback',kind:'video',url:'https://visual-acceptance.invalid/clip.mp4'});
+    await lib.addRemoteLink({courseId:'qa-playback',title:'Controlled MP4 playback',kind:'video',url:'https://visual-acceptance.invalid/clip.webm'});
   });
   await visit(page,'my-courses');await visit(page,'courses');
   await page.locator('.course-item[data-course-id="qa-playback"]').click();
   await page.locator('#course-detail [data-action="play-video"]').first().click();
   await expect.poll(()=>page.evaluate(()=>[...document.querySelectorAll('video')].some(v=>v.readyState>=2&&v.currentTime>0.5&&!v.paused)),{timeout:20000}).toBe(true);
   await shot(page,'functional','17-real-local-video-playing');
-  log({group:'functional',behavior:'actual MP4 playing via native player',fixture:'local deterministic',bytes:bytes.length});
+  log({group:'functional',behavior:'actual WebM playing via native player',fixture:'recorded in Chrome',bytes:bytes.length});
 });
