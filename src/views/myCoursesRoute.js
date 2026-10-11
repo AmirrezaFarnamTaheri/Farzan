@@ -220,7 +220,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           // A failed catalog deletion must not invisibly remove this course.
           try { await saveCourses(existing); }
           catch (rollbackError) {
-            throw new AggregateError([error, rollbackError], 'Course list and catalog may be out of sync', { cause: error });
+            throw new AggregateError([error, rollbackError], 'Course list and catalog may be out of sync', { cause: rollbackError });
           }
           throw error;
         }
