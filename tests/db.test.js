@@ -127,6 +127,46 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     expect(decrypted).toEqual({ legacy: true });
   });
 
+  it('refuses encrypted reads with missing or incorrect passphrases', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-missing-key', 1, [
+      { name: 'notes', key: 'id', autoIncrement: false },
+    ]);
+    db.setPassphrase('correct-passphrase');
+    await db.put('notes', { id: 'secret', text: 'Research notes' });
+    db.setPassphrase(null);
+    await expect(db.get('notes', 'secret')).rejects.toThrow(/passphrase/i);
+    db.setPassphrase('wrong-passphrase');
+    await expect(db.getAll('notes')).rejects.toThrow();
+    db.db?.close();
+  });
+
+  it('never silently stores plaintext when Web Crypto is unavailable', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-no-crypto', 1, [
+      { name: 'notes', key: 'id', autoIncrement: false },
+    ]);
+    db.setPassphrase('private');
+    db._getCrypto = () => null;
+    await expect(db.put('notes', { id: 'unprotected', text: 'secret' }))
+      .rejects.toThrow(/Web Crypto/);
+    expect(await db.get('notes', 'unprotected')).toBeUndefined();
+    db.db?.close();
+  });
+
+  it('bounds KDF work on malicious or corrupt imported envelopes', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-db-kdf-validation');
+    db.setPassphrase('private');
+    await expect(db.decryptPayload({
+      __encrypted: true, v: 2, iv: Array(12).fill(1), salt: Array(16).fill(1),
+      iterations: 999999999, ciphertext: [1],
+    })).rejects.toThrow(/parameters/);
+    await expect(db.decryptPayload({
+      __encrypted: true, v: 99, iv: Array(12).fill(1), ciphertext: [1],
+    })).rejects.toThrow(/version/);
+  });
+
   it('encrypts put/get write paths while keeping IndexedDB indexes queryable', async () => {
     await indexedDB.deleteDatabase('ocd-test-db-write-crypto');
     const { OpenCourseDB } = DBExports;

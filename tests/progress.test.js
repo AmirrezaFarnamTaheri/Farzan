@@ -489,6 +489,56 @@ describe('progress backup exports', () => {
     delete window.OpenCourseDeck.Canvas;
   });
 
+  it('aborts an import before its first write when an original collection cannot be snapshotted', async () => {
+    const payload = { version: '1.4', progress: [{ topicId: 'new', courseId: 'a' }] };
+    const file = new File([JSON.stringify(payload)], 'unsafe-import.json', { type: 'application/json' });
+    window.DB.getAllNotes.mockRejectedValueOnce(new Error('Existing notes read failed'));
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Existing notes read failed'));
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
+  });
+
+  it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
+    const payload = { version: '1.4', notes: [{ id: 'bad', title: 'Bad' }] };
+    const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
+    window.DB.clearUserData = vi.fn(async () => { throw new Error('Rollback deletion failed'); });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: false });
+    expect(window.OpenCourseDeck.lastImportResult.rollbackErrors).toEqual([expect.stringContaining('Rollback deletion failed')]);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
+  });
+
+  it('prefers atomic full-primary-store rollback when the v3 backup engine is available', async () => {
+    const payload = { version: '1.4', notes: [{ id: 'bad', title: 'Bad' }] };
+    const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
+    const original = {
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      watchedSegments: [{ id: 'segment-that-must-survive' }],
+      pdfBookmarks: [{ id: 'bookmark-that-must-survive' }],
+      notes: [{ id: 'old-note' }],
+    };
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => original);
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.saveNote.mockRejectedValueOnce(new Error('Bad note'));
+    window.DB.clearUserData = vi.fn(async () => true);
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.importBackup).toHaveBeenCalledWith(original, { mode: 'overwrite' });
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
+  });
+
   it('rolls back backup import writes when any store write fails', async () => {
     const payload = {
       version: '1.3',
@@ -526,7 +576,6 @@ describe('progress backup exports', () => {
     expect(window.DB.clearUserData.mock.calls.map(([scope]) => scope)).toEqual([
       'progress',
       'notes',
-      'media',
       'playlists',
       'studio',
     ]);
