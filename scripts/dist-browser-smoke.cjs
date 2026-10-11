@@ -226,8 +226,10 @@ async function run() {
       'Plasmato native lesson rows', 25000);
 
     pd.Router.navigate('#/materials');
-    await waitFor(() => document.querySelector('.view-materials #materials-course-filter'),
-      'native Plasmato materials browser', 25000);
+    await waitFor(() => {
+      const select = document.querySelector('.view-materials #materials-course-filter');
+      return select && [...select.options].some(item => item.value === medicine.id) ? select : null;
+    }, 'populated native Plasmato materials browser', 25000);
     const courseSelect = document.querySelector('#materials-course-filter');
     invariant([...courseSelect.options].some(item => item.value === medicine.id),
       'Plasmato courses are missing from Materials filters');
