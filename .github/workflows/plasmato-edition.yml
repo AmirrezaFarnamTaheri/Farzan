@@ -105,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.3-visual-evidence
+          name: farzan-plasmato-edition-v1.0.4-visual-evidence
           path: |
             artifacts/visual-audit/
             test-results/
@@ -115,18 +115,18 @@ jobs:
       - name: Package complete installable static site
         run: |
           mkdir -p release-assets
-          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.3-web.zip .)
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.3-web.zip > SHA256SUMS)
+          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.4-web.zip .)
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.4-web.zip > SHA256SUMS)
           test -f artifacts/visual-audit/manifest.json
           test -f artifacts/visual-audit/VISUAL-REPORT.md
           test -f artifacts/visual-audit/observations.jsonl
-          zip -q -r release-assets/farzan-plasmato-edition-v1.0.3-visual-evidence.zip artifacts/visual-audit
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.3-visual-evidence.zip > SHA256SUMS.visual)
+          zip -q -r release-assets/farzan-plasmato-edition-v1.0.4-visual-evidence.zip artifacts/visual-audit
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.4-visual-evidence.zip > SHA256SUMS.visual)
 
       - name: Upload verified downloadable app and checksums
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.3-web
+          name: farzan-plasmato-edition-v1.0.4-web
           path: release-assets/
           if-no-files-found: error
           retention-days: 90
@@ -186,17 +186,17 @@ jobs:
           if ($found.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($found.Count)" }
           if ($found[0].Length -lt 1000000) { throw "Windows installer is unexpectedly small" }
           New-Item -ItemType Directory -Path 'release-native' -Force | Out-Null
-          $dest = 'release-native/farzan-plasmato-edition-v1.0.3-windows-setup.exe'
+          $dest = 'release-native/farzan-plasmato-edition-v1.0.4-windows-setup.exe'
           Copy-Item -LiteralPath $found[0].FullName -Destination $dest
           $digest = (Get-FileHash -Algorithm SHA256 $dest).Hash.ToLowerInvariant()
-          "$digest  farzan-plasmato-edition-v1.0.3-windows-setup.exe" |
+          "$digest  farzan-plasmato-edition-v1.0.4-windows-setup.exe" |
             Out-File 'release-native/SHA256SUMS.windows' -Encoding ascii
           Get-Content 'release-native/SHA256SUMS.windows'
 
       - name: Upload verified Windows installer and checksum
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.3-windows
+          name: farzan-plasmato-edition-v1.0.4-windows
           path: release-native/
           if-no-files-found: error
           retention-days: 90
@@ -213,13 +213,13 @@ jobs:
       - name: Download verified edition bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.3-web
+          name: farzan-plasmato-edition-v1.0.4-web
           path: release-assets
 
       - name: Download verified Windows installer
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.3-windows
+          name: farzan-plasmato-edition-v1.0.4-windows
           path: release-assets
 
       - name: Verify release bytes and immutable version identity
@@ -231,19 +231,19 @@ jobs:
           (cd release-assets && sha256sum -c SHA256SUMS)
           (cd release-assets && sha256sum -c SHA256SUMS.windows)
           (cd release-assets && sha256sum -c SHA256SUMS.visual)
-          tag=plasmato-edition-v1.0.3
+          tag=plasmato-edition-v1.0.4
           existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha' 2>/dev/null | grep -E '^[a-f0-9]{40}$' || :)
           if [[ -n "$existing" && "$existing" != "$EXPECTED_COMMIT" ]]; then
             echo "::error::Version tag ${tag} is immutable and points to ${existing}; bump the edition version to publish a new build."
             exit 1
           fi
 
-      - name: Publish Plasmato Edition v1.0.3
+      - name: Publish Plasmato Edition v1.0.4
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: plasmato-edition-v1.0.3
+          tag_name: plasmato-edition-v1.0.4
           target_commitish: ${{ github.sha }}
-          name: Farzan Plasmato Edition v1.0.3
+          name: Farzan Plasmato Edition v1.0.4
           body: |
             Branch-specific edition of Farzan/OpenCourseDeck, built from the full Plasmato archive.
             Contains 31 imported Plasmato courses (6,418 topics, 5,990 video and 280 PDF references)
@@ -255,11 +255,11 @@ jobs:
             Extract the ZIP and serve it over HTTP(S). External video and PDF hosts are not mirrored.
             This edition is not merged to main and is distinct from standard Farzan releases.
           files: |
-            release-assets/farzan-plasmato-edition-v1.0.3-web.zip
+            release-assets/farzan-plasmato-edition-v1.0.4-web.zip
             release-assets/SHA256SUMS
-            release-assets/farzan-plasmato-edition-v1.0.3-windows-setup.exe
+            release-assets/farzan-plasmato-edition-v1.0.4-windows-setup.exe
             release-assets/SHA256SUMS.windows
-            release-assets/farzan-plasmato-edition-v1.0.3-visual-evidence.zip
+            release-assets/farzan-plasmato-edition-v1.0.4-visual-evidence.zip
             release-assets/SHA256SUMS.visual
           fail_on_unmatched_files: true
           overwrite_files: false

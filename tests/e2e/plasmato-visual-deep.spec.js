@@ -100,6 +100,7 @@ for (const cfg of modes) {
           await expect(page.locator('[data-pdf-current-page]')).toBeDisabled();
           await expect(page.locator('[data-pdf-current-page]')).toHaveValue('—');
           await expect(page.locator('[data-pdf-save-page-note]')).toBeDisabled();
+          await expect(page.locator('[data-pdf-empty-hint]')).toBeVisible();
         }
         if(cfg.scrollBottom) {
           if(await page.evaluate(allScrollContainers))scrolled++;

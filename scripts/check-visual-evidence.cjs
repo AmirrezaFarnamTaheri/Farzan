@@ -106,7 +106,7 @@ for (const entry of images) {
   assert(seen.has(entry.path), 'Missing browser proof for ' + entry.path);
 }
 const manifest = {
-  edition: 'Farzan Plasmato Edition', editionVersion: '1.0.3',
+  edition: 'Farzan Plasmato Edition', editionVersion: '1.0.4',
   capturedBy: 'real Chrome and Playwright tests',
   commit: process.env.GITHUB_SHA || null,
   totalScreenshots: images.length, totalContactSheets: contactSheets.length,
@@ -123,7 +123,7 @@ const manifest = {
 };
 fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 const report = [
-  '# Plasmato Edition 1.0.3 - visual and functional evidence',
+  '# Plasmato Edition 1.0.4 - visual and functional evidence',
   '',
   '**' + images.length + ' accepted browser screenshots and ' +
     contactSheets.length + ' contact sheets** from the production site.',
@@ -167,7 +167,7 @@ const sections = matrix.map(([group, count]) => {
 }).join('');
 const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
   '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-  '<title>Farzan Plasmato 1.0.3 - verified visual gallery</title>' +
+  '<title>Farzan Plasmato 1.0.4 - verified visual gallery</title>' +
   '<style>body{margin:0;background:#101923;color:#e8eef6;font:15px/1.5 system-ui,sans-serif}' +
   'header{padding:30px clamp(15px,4vw,60px);background:#1b2c40}h1{margin:0}' +
   'nav{display:flex;flex-wrap:wrap;gap:8px;padding:16px;background:#152234;position:sticky;top:0}' +
@@ -178,7 +178,7 @@ const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
   '.tile{display:flex;flex-direction:column;border:1px solid #445c74;border-radius:8px;overflow:hidden;' +
   'background:#1b2c40;text-decoration:none}.tile img{height:145px;width:100%;object-fit:contain}' +
   '.tile span{padding:8px 12px;overflow-wrap:anywhere}small{color:#afbbca}</style></head><body>' +
-  '<header><h1>Farzan Plasmato v1.0.3 - Visual Evidence</h1>' +
+  '<header><h1>Farzan Plasmato v1.0.4 - Visual Evidence</h1>' +
   '<p>476 actual Chrome captures across 35 groups; no synthetic UI renderings.</p>' +
   '<p><a href="manifest.json">SHA-256 evidence manifest</a> · ' +
   '<a href="VISUAL-REPORT.md">Full coverage and limitations</a></p></header><nav>' +
