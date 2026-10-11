@@ -1,9 +1,12 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const esbuild = require('esbuild');
+const { generateSW } = require('workbox-build');
 const { createBuildOptions, renderReleaseStyles, rewriteReleaseStaticFile } = require('./build.cjs');
 const { stripSourceMapText } = require('./build-sw-dist.cjs');
+const workboxConfig = require('./workbox-dist.config.cjs');
 
 const root = path.join(__dirname, '..');
 const outdir = path.join(root, 'dist');
@@ -22,6 +25,14 @@ function isGeneratedBundleFile(file) {
   return file === 'opencoursedeck.js' || file.startsWith('chunks/');
 }
 
+function isWorkboxArtifact(file) {
+  return file === 'sw.js' || /^workbox-[a-z0-9]+\.js$/i.test(file);
+}
+
+function isAllowedGeneratedOutput(file) {
+  return isGeneratedBundleFile(file) || isWorkboxArtifact(file);
+}
+
 function normalizeGeneratedText(text) {
   return String(text).replace(/-[a-z0-9]{8}(?=\.js\b)/gi, '-HASH');
 }
@@ -33,6 +44,11 @@ function hashText(text) {
 function inventoryDirectory(dir, { filter = isGeneratedBundleFile } = {}) {
   const files = walkFiles(dir).filter(file => typeof filter !== 'function' || filter(file));
   return new Map(files.map((file) => [file, hashText(fs.readFileSync(path.join(dir, file), 'utf8'))]));
+}
+
+function inventoryRawDirectory(dir, { filter = isWorkboxArtifact } = {}) {
+  const files = walkFiles(dir).filter(file => typeof filter !== 'function' || filter(file));
+  return new Map(files.map((file) => [file, hashBuffer(fs.readFileSync(path.join(dir, file)))]));
 }
 
 function inventoryOutputFiles(outputFiles) {
@@ -85,6 +101,13 @@ function contentMatch(expectedRecords, actualRecords) {
   return { missing, extra };
 }
 
+function compareWorkboxDirectories(expectedDir, actualDir) {
+  return compareInventories(
+    inventoryRawDirectory(expectedDir),
+    inventoryRawDirectory(actualDir),
+  );
+}
+
 function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.js') } = {}) {
   const expectedFiles = walkFiles(expectedDir).filter(filter);
   const actualFiles = walkFiles(actualDir).filter(filter);
@@ -128,7 +151,7 @@ function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.
 }
 
 const STATIC_ROOT_FILES = ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'];
-const STATIC_DIRS = ['assets', 'data', 'docs', 'vendor'];
+const STATIC_DIRS = ['assets', 'data', 'docs', 'vendor', 'src/workers'];
 
 function hashBuffer(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -137,10 +160,13 @@ function hashBuffer(buffer) {
 function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
   const missing = [];
   const changed = [];
+  const extra = [];
+  const expectedStatic = new Set();
 
   for (const file of STATIC_ROOT_FILES) {
     const from = path.join(rootDir, file);
     if (!fs.existsSync(from)) continue;
+    expectedStatic.add(file);
     const to = path.join(actualOutdir, file);
     if (!fs.existsSync(to)) {
       missing.push(file);
@@ -153,11 +179,15 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
 
   // src/styles is flattened into a single bundled index.css at release time
   // (see build.cjs bundleReleaseStyles); it is verified separately by
-  // checkReleaseStyles() rather than byte-compared here.
+  // checkReleaseStyles() rather than byte-compared here. The worker directory
+  // is copied verbatim and therefore belongs in the static inventory.
+  const styleSource = path.join(rootDir, 'src', 'styles', 'index.css');
+  if (fs.existsSync(styleSource)) expectedStatic.add('src/styles/index.css');
   const dirPairs = STATIC_DIRS.map((dir) => [path.join(rootDir, dir), path.join(actualOutdir, dir), dir]);
   for (const [from, to, label] of dirPairs) {
     for (const rel of walkFiles(from)) {
       const relLabel = `${label}/${rel}`;
+      expectedStatic.add(relLabel);
       const target = path.join(to, ...rel.split('/'));
       if (!fs.existsSync(target)) {
         missing.push(relLabel);
@@ -175,10 +205,17 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
     }
   }
 
+  // Generated bundles and Workbox output are verified by their own checks;
+  // every other staged file must have a source counterpart.
+  for (const file of walkFiles(actualOutdir)) {
+    if (!expectedStatic.has(file) && !isAllowedGeneratedOutput(file)) extra.push(file);
+  }
+
   return {
-    clean: missing.length === 0 && changed.length === 0,
+    clean: missing.length === 0 && changed.length === 0 && extra.length === 0,
     missing: missing.sort(),
     changed: changed.sort(),
+    extra: extra.sort(),
   };
 }
 
@@ -202,6 +239,24 @@ async function checkGenerated({ actualOutdir = outdir } = {}) {
   return compareInventories(inventoryOutputFiles(result.outputFiles), inventoryDirectory(actualOutdir));
 }
 
+async function checkWorkboxArtifacts({
+  actualOutdir = outdir,
+  generateServiceWorker = generateSW,
+  config = workboxConfig,
+} = {}) {
+  const temporaryOutdir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencoursedeck-workbox-check-'));
+  try {
+    await generateServiceWorker({
+      ...config,
+      globDirectory: actualOutdir,
+      swDest: path.join(temporaryOutdir, 'sw.js'),
+    });
+    return compareWorkboxDirectories(temporaryOutdir, actualOutdir);
+  } finally {
+    fs.rmSync(temporaryOutdir, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!fs.existsSync(outdir)) {
     console.error('[check-generated] dist/ is missing. Run npm run build.');
@@ -215,12 +270,13 @@ async function main() {
   }
 
   const result = await checkGenerated();
+  const workboxResult = await checkWorkboxArtifacts();
   const staticResult = checkStaticArtifacts();
   const stylesResult = await checkReleaseStyles();
   staticResult.missing.push(...stylesResult.missing);
   staticResult.changed.push(...stylesResult.changed);
   staticResult.clean = staticResult.clean && stylesResult.clean;
-  if (result.clean && staticResult.clean) {
+  if (result.clean && staticResult.clean && workboxResult.clean) {
     console.log('[check-generated] dist/ matches a fresh production build.');
     return;
   }
@@ -230,7 +286,11 @@ async function main() {
   if (result.extra.length) console.error(`  Extra: ${result.extra.join(', ')}`);
   if (result.changed.length) console.error(`  Changed: ${result.changed.join(', ')}`);
   if (staticResult.missing.length) console.error(`  Missing static: ${staticResult.missing.join(', ')}`);
+  if (staticResult.extra.length) console.error(`  Extra static: ${staticResult.extra.join(', ')}`);
   if (staticResult.changed.length) console.error(`  Stale static: ${staticResult.changed.join(', ')}`);
+  if (workboxResult.missing.length) console.error(`  Missing service worker: ${workboxResult.missing.join(', ')}`);
+  if (workboxResult.extra.length) console.error(`  Extra service worker: ${workboxResult.extra.join(', ')}`);
+  if (workboxResult.changed.length) console.error(`  Stale service worker: ${workboxResult.changed.join(', ')}`);
   process.exit(1);
 }
 
@@ -245,10 +305,15 @@ module.exports = {
   checkGenerated,
   checkReleaseStyles,
   checkStaticArtifacts,
+  checkWorkboxArtifacts,
   compareDirs,
   compareInventories,
+  compareWorkboxDirectories,
   inventoryDirectory,
+  inventoryRawDirectory,
   inventoryOutputFiles,
+  isAllowedGeneratedOutput,
   isGeneratedBundleFile,
+  isWorkboxArtifact,
   normalizeGeneratedText,
 };
