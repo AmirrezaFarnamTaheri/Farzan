@@ -72,12 +72,12 @@
   <!-- Critical inline styles to prevent FOUC -->
   <style>
     :root {
-      --skeleton-base: #1e1e2e;
-      --skeleton-shine: #2a2a3e;
+      --skeleton-base: #101820;
+      --skeleton-shine: #1d2b39;
     }
     [data-theme="light"] {
-      --skeleton-base: #e8e8f0;
-      --skeleton-shine: #f0f0f8;
+      --skeleton-base: #f4f6f6;
+      --skeleton-shine: #ffffff;
     }
     html, body {
       margin: 0; padding: 0;
@@ -101,19 +101,16 @@
     }
     .splash-logo {
       width: 72px; height: 72px;
-      background: linear-gradient(135deg, #7c3aed, #06b6d4);
+      background: #2563a8;
       border-radius: 20px;
       display: flex; align-items: center; justify-content: center;
       font-size: 2rem; color: white;
-      animation: splash-pulse 1.2s ease-in-out infinite alternate;
-      box-shadow: 0 0 40px rgba(124,58,237,0.4);
+      box-shadow: none;
     }
     .splash-label {
       font-size: 1.5rem; font-weight: 800;
-      background: linear-gradient(135deg, #7c3aed, #06b6d4);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      background: #2563a8;
+      color: #f3f5f7;
       letter-spacing: -0.02em;
     }
     .splash-bar-wrap {
@@ -123,19 +120,20 @@
     }
     .splash-bar {
       height: 100%;
-      background: linear-gradient(90deg, #7c3aed, #06b6d4);
+      background: #2563a8;
       border-radius: 99px;
       animation: splash-bar 1.8s ease-in-out infinite;
     }
     .splash-status {
       font-size: 0.75rem;
-      color: rgba(255,255,255,0.4);
+      color: rgba(243,245,247,0.78);
       letter-spacing: 0.05em;
     }
-    [data-theme="light"] .splash-status { color: rgba(0,0,0,0.4); }
-    @keyframes splash-pulse {
-      from { transform: scale(1); box-shadow: 0 0 40px rgba(124,58,237,0.4); }
-      to   { transform: scale(1.08); box-shadow: 0 0 60px rgba(6,182,212,0.5); }
+    [data-theme="light"] .splash-status { color: rgba(28,48,61,0.75); }
+    [data-theme="light"] .splash-label { color: #1c303d; }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-bar { animation: none; width: 100%; }
+      #app-loading { transition: none; }
     }
     @keyframes splash-bar {
       0%   { width: 0%; margin-left: 0%; }
@@ -291,7 +289,7 @@
       position:fixed;inset:0;
       display:flex;flex-direction:column;
       align-items:center;justify-content:center;
-      background:#0f0f1a;color:#fff;
+      background:#101820;color:#f3f5f7;
       font-family:Inter,system-ui,sans-serif;
       text-align:center;gap:1rem;padding:2rem;
       z-index:999999;">

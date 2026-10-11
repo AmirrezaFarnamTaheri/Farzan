@@ -5,6 +5,7 @@
     --surface:        #182633;
     --surface-2:      #1d2b39;
     --surface-3:      #263747;
+    --surface-4:      #2d4050;
     --surface-hover:  #304354;
     --surface-active: #344d60;
     --border:         rgba(230,240,248,0.10);
@@ -33,6 +34,7 @@
     --surface:        #ffffff;
     --surface-2:      #fbfcfc;
     --surface-3:      #eaf0f2;
+    --surface-4:      #e1e9ed;
     --surface-hover:  #e4edf0;
     --surface-active: #dce9ef;
     --border:         rgba(30,58,75,0.11);

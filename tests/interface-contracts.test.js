@@ -50,6 +50,22 @@ describe('interface contracts', () => {
     expect(entry).toContain('prefers-reduced-motion: reduce');
   });
 
+  it('does not force obsolete glass, background-grid or card-hover overrides', () => {
+    const background = source('src/styles/elevation.css');
+    expect(background).not.toContain('!important');
+    expect(background).not.toContain('linear-gradient');
+    expect(background).not.toContain('radial-gradient');
+    expect(background).not.toContain('backdrop-filter');
+    expect(background).not.toMatch(/translateY\s*\(/);
+  });
+
+  it('keeps the startup splash consistent with the Lapis palette', () => {
+    const html = source('index.html');
+    expect(html).not.toContain('#7c3aed');
+    expect(html).toContain('--skeleton-base: #101820');
+    expect(html).toContain('prefers-reduced-motion: reduce');
+  });
+
   it('does not restore decorative badges or promotional route slogans', () => {
     for (const file of routeFiles) {
       const content = source(file);

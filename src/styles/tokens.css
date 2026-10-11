@@ -1,8 +1,6 @@
 :root {
     /* ── Accent (overridden per data-accent) ── */
-    /* Lapis is the default accent: a restrained archival blue that matches
-       the product's research-desk direction. Violet remains an explicit
-       user-selectable preset in accents.css. */
+    /* Match the default Lapis accent until a saved preference is applied. */
     --accent:           #2563a8;
     --accent-light:     #3b82c4;
     --accent-dark:      #1d4f88;
@@ -20,16 +18,16 @@
     --accent-on-tint:   color-mix(in srgb, var(--accent-light) 70%, white);
 
     /* ── Surface Colors (overridden per data-theme) ── */
-    --bg:               #0f0f1a;
-    --bg-secondary:     #13131f;
-    --surface:          #1a1a2e;
-    --surface-2:        #1e1e35;
-    --surface-3:        #252540;
-    --surface-4:        #2b2b4d;
-    --surface-hover:    #2a2a48;
-    --surface-active:   #30305a;
-    --border:           rgba(255, 255, 255, 0.07);
-    --border-strong:    rgba(255, 255, 255, 0.14);
+    --bg:               #101820;
+    --bg-secondary:     #14202b;
+    --surface:          #182633;
+    --surface-2:        #1d2b39;
+    --surface-3:        #263747;
+    --surface-4:        #2d4050;
+    --surface-hover:    #304354;
+    --surface-active:   #344d60;
+    --border:           rgba(230, 240, 248, 0.10);
+    --border-strong:    rgba(230, 240, 248, 0.19);
     /* Alias for dividers / connectors (some sections use --border-color / --text-muted) */
     --border-color:     var(--border-strong);
     --border-focus:     var(--accent);
@@ -43,12 +41,12 @@
     --surface-raised:   var(--surface-3);
 
     /* ── Text Colors ── */
-    --text-primary:     #f0f0ff;
-    --text-secondary:   rgba(240, 240, 255, 0.65);
-    --text-tertiary:    rgba(240, 240, 255, 0.38);
+    --text-primary:     #f3f5f7;
+    --text-secondary:   rgba(243, 245, 247, 0.75);
+    --text-tertiary:    rgba(243, 245, 247, 0.63);
     --text-muted:       var(--text-tertiary);
-    --text-disabled:    rgba(240, 240, 255, 0.22);
-    --text-inverse:     #0f0f1a;
+    --text-disabled:    rgba(243, 245, 247, 0.38);
+    --text-inverse:     #101820;
     --text-on-accent:   var(--accent-contrast);
 
     /* ── Semantic Colors ── */
