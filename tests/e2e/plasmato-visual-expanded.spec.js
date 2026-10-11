@@ -161,3 +161,197 @@ for (const config of configurations) {
     }
   });
 }
+
+
+async function ready(page, route = 'home') {
+  await page.goto('/#/' + route, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(
+    window.OpenCourseDeck?.Router && window.DataStore?.getState,
+  ), null, { timeout: 20000 });
+  await routeState(page, route);
+}
+
+async function stateShot(page, group, name) {
+  await expect(page.locator('#view-container')).toBeVisible();
+  await page.waitForTimeout(180);
+  await capture(page, group, name);
+}
+
+// Distinct, interaction-proven states supplement empty/new-route captures.
+// Tests do not falsely claim an external Plasmato video host was contacted.
+test('course search, no results, media facets and source scopes change the real view', async ({ page }) => {
+  await ready(page, 'courses');
+  await expect(page.locator('.course-item[data-course-id]')).not.toHaveCount(0);
+  await stateShot(page, 'course-states', '01-catalog-loaded');
+  await page.locator('#courses-search').fill('not-an-existing-course-visual-suite');
+  await expect(page.locator('#courses-list')).toContainText('No courses match');
+  await stateShot(page, 'course-states', '02-search-empty-result');
+  await page.locator('#courses-search').fill('');
+  await page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]').click();
+  await expect(page.locator('#course-detail')).toContainText('385 topics');
+  await stateShot(page, 'course-states', '03-real-plasmato-detail');
+  for (const [index, media] of ['video', 'pdf', 'mixed', 'none'].entries()) {
+    const chip = page.locator('[data-course-filter="' + media + '"]');
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await stateShot(page, 'course-states', String(index + 4).padStart(2, '0') + '-' + media + '-facet');
+  }
+  await page.locator('[data-course-filter="all"]').click();
+  await page.locator('#courses-source-scope').selectOption('multi');
+  await expect(page.locator('#courses-source-scope')).toHaveValue('multi');
+  await stateShot(page, 'course-states', '08-multiple-source-courses');
+});
+
+test('Materials changes filters, source, course and empty-result presentation', async ({ page }) => {
+  await ready(page, 'materials');
+  await expect(page.locator('#materials-course-filter option[value="comprehensive-internal-medicine-course"]')).toHaveCount(1);
+  await stateShot(page, 'materials-states', '01-all-materials');
+  for (const [index, media] of ['video', 'pdf', 'none'].entries()) {
+    const chip = page.locator('[data-material-filter="' + media + '"]');
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await stateShot(page, 'materials-states', String(index + 2).padStart(2, '0') + '-' + media + '-filtered');
+  }
+  await page.locator('[data-material-filter="all"]').click();
+  await page.locator('#materials-course-filter').selectOption('comprehensive-internal-medicine-course');
+  await expect(page.locator('#materials-course-filter')).toHaveValue('comprehensive-internal-medicine-course');
+  await stateShot(page, 'materials-states', '05-real-course-materials');
+  const firstSource = await page.locator('#materials-source-filter option').evaluateAll(
+    options => options.find(option => option.value !== 'all')?.value ?? '',
+  );
+  expect(firstSource).not.toBe('');
+  await page.locator('#materials-source-filter').selectOption(firstSource);
+  await stateShot(page, 'materials-states', '06-source-filter-selected');
+  await page.locator('#materials-search').fill('visual-no-material-match-73917');
+  await expect(page.locator('#materials-search')).toHaveValue('visual-no-material-match-73917');
+  await stateShot(page, 'materials-states', '07-no-material-results');
+  await page.locator('#materials-search').fill('');
+  await page.locator('#materials-source-filter').selectOption('all');
+  await stateShot(page, 'materials-states', '08-course-materials-restored');
+});
+
+test('real notes retain long titles, autosave, search and expose export UI', async ({ page }) => {
+  await ready(page, 'notes');
+  await stateShot(page, 'notes-states', '01-notes-initial');
+  await page.locator('[data-action="new-note"]').first().click();
+  const title = 'Extensive Visual QA: Pharmacology and Clinical Study Notes with a Long but Valid Document Name';
+  await page.locator('[data-note-title-input]').fill(title);
+  await page.locator('[data-notes-editor]').fill(
+    'First point: assess the patient.\nSecond point: document findings.\nThird point: verify source credibility.',
+  );
+  await expect.poll(() => page.evaluate(async name =>
+    (await window.DB.getAllNotes()).some(note => note.title === name &&
+      String(note.content).includes('assess the patient')), title,
+  ), { timeout: 15000 }).toBe(true);
+  await stateShot(page, 'notes-states', '02-real-note-autosaved');
+  await page.locator('.notes-export-menu summary').click();
+  await expect(page.locator('.notes-export-menu')).toHaveAttribute('open', '');
+  await stateShot(page, 'notes-states', '03-export-options-expanded');
+  await page.locator('.notes-export-menu summary').click();
+  await page.locator('[data-notes-search]').fill('Pharmacology');
+  await expect(page.locator('[data-notes-list]')).toContainText('Pharmacology');
+  await stateShot(page, 'notes-states', '04-notes-search-found');
+  await page.locator('[data-notes-search]').fill('visual-nonexistent-title-9913');
+  await stateShot(page, 'notes-states', '05-notes-search-empty');
+  await routeState(page, 'home');
+  await routeState(page, 'notes');
+  await expect(page.locator('[data-notes-list]')).toContainText(title);
+  await stateShot(page, 'notes-states', '06-note-reopens-after-navigation');
+});
+
+test('settings density, font, theme and AI permission states are visible', async ({ page }) => {
+  await ready(page, 'settings');
+  await stateShot(page, 'settings-states', '01-appearance-default');
+  for (const [index, density] of ['compact', 'spacious'].entries()) {
+    await page.locator('#select-density').selectOption(density);
+    await expect(page.locator('#select-density')).toHaveValue(density);
+    await stateShot(page, 'settings-states', String(index + 2).padStart(2, '0') + '-' + density + '-density');
+  }
+  await page.locator('#btn-font-inc').click();
+  await page.locator('#btn-font-inc').click();
+  await expect(page.locator('#font-scale-label')).not.toHaveText('100%');
+  await stateShot(page, 'settings-states', '04-enlarged-font');
+  await page.locator('#btn-theme-toggle').click();
+  await stateShot(page, 'settings-states', '05-toggled-theme');
+  await page.locator('[data-ai-mode]').selectOption('custom-api');
+  await expect(page.locator('[data-ai-custom-fields]')).toBeVisible();
+  await stateShot(page, 'settings-states', '06-custom-api-permission');
+  await page.locator('[data-ai-endpoint]').fill('http://not-local.example/v1/chat');
+  await expect(page.locator('[data-ai-endpoint-warning]')).toContainText('HTTPS');
+  await stateShot(page, 'settings-states', '07-unsafe-endpoint-rejected');
+  await page.locator('[data-ai-mode]').selectOption('local-gemma');
+  await expect(page.locator('[data-ai-local-fields]')).toBeVisible();
+  await stateShot(page, 'settings-states', '08-on-device-model-panel');
+  await page.locator('#select-clear-scope').selectOption('notes');
+  await expect(page.locator('#select-clear-scope')).toHaveValue('notes');
+  await page.locator('#select-clear-scope').scrollIntoViewIfNeeded();
+  await stateShot(page, 'settings-states', '09-scope-specific-clear-review');
+  // Never click the destructive data-clear action.
+});
+
+test('Studio shape, note, layer and template actions update its real canvas', async ({ page }) => {
+  await ready(page, 'studio');
+  await stateShot(page, 'studio-states', '01-blank-board');
+  await page.locator('[data-studio-text]').fill('Visual acceptance lesson map');
+  await page.locator('[data-studio-add-text]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Note added');
+  await stateShot(page, 'studio-states', '02-real-board-note');
+  await page.locator('[data-studio-add-rect]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Rectangle added');
+  await stateShot(page, 'studio-states', '03-board-rectangle');
+  await page.locator('[data-studio-add-circle]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Circle added');
+  await stateShot(page, 'studio-states', '04-board-circle');
+  await page.locator('[data-studio-add-arrow]').click();
+  await stateShot(page, 'studio-states', '05-board-arrow');
+  await page.locator('[data-studio-layer-name]').fill('Reviewed subjects');
+  await page.locator('[data-studio-add-layer]').click();
+  await expect(page.locator('[data-studio-layers]')).toContainText('Reviewed subjects');
+  await stateShot(page, 'studio-states', '06-real-layer-created');
+  await page.locator('[data-studio-save]').click();
+  await stateShot(page, 'studio-states', '07-persisted-studio-board');
+});
+
+test('study activity unlocks visible achievements and populates Progress', async ({ page }) => {
+  await ready(page, 'achievements');
+  await stateShot(page, 'study-states', '01-achievements-before-activity');
+  const saved = await page.evaluate(async () => {
+    await window.DataStore.init();
+    const topics = window.DataStore.allTopics().filter(item => item.courseId !== 'getting-started');
+    for (const item of topics.slice(0, 3)) {
+      await window.DB.saveProgress(item.topicId, item.courseId, {
+        status: 'done', percent: 100, position: 120,
+      });
+    }
+    return topics.slice(0, 3).map(item => item.topicId);
+  });
+  expect(saved).toHaveLength(3);
+  await routeState(page, 'achievements');
+  await expect(page.locator('[data-achievement-state="unlocked"]').first()).toBeVisible();
+  await stateShot(page, 'study-states', '02-actual-unlocked-achievements');
+  await routeState(page, 'progress');
+  await expect.poll(() => page.locator('#stat-done-topics').textContent()).toContain('3');
+  await stateShot(page, 'study-states', '03-populated-progress-metrics');
+  await page.locator('summary').first().click();
+  await stateShot(page, 'study-states', '04-expanded-progress-options');
+});
+
+for (const [label, width, height] of [
+  ['narrow', 320, 740], ['landscape', 844, 390], ['wide', 1920, 1080],
+]) {
+  test('standalone player controls remain usable at ' + label + ' width', async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/editions/plasmato-emergency/index.html', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#statCourses')).toHaveText('31', { timeout: 15000 });
+    await capture(page, 'standalone-responsive', label + '-01-31-courses');
+    await page.locator('#searchInput').fill('anemia');
+    await expect(page.locator('#resourceList button').first()).toBeVisible({ timeout: 15000 });
+    await capture(page, 'standalone-responsive', label + '-02-real-search-results');
+    await page.locator('#focusToggle').click();
+    await expect(page.locator('#focusToggle')).toHaveAttribute('aria-pressed', 'true');
+    await capture(page, 'standalone-responsive', label + '-03-focus-mode');
+    const overflow = await page.evaluate(() =>
+      Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth);
+    expect(overflow, 'Standalone responsive clipping at ' + label).toBeLessThanOrEqual(28);
+  });
+}
