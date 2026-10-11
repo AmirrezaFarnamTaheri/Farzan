@@ -340,12 +340,20 @@ return withMutationRetry(async () => {
 const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
-const s = tx.objectStore(store);
-sealed.forEach(item => s.add(item));
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  // Register completion before queuing requests. A synchronous DataError or
+  // DataCloneError does not automatically abort the transaction: without
+  // explicit abort, earlier queued writes could still commit after rejection.
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.add(item);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }
@@ -355,12 +363,17 @@ return withMutationRetry(async () => {
 const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
 const db = await this.open();
 const tx = db.transaction(store,"readwrite");
-const s = tx.objectStore(store);
-sealed.forEach(item=>s.put(item));
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.put(item);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }
@@ -372,13 +385,18 @@ const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) :
 const db = await this.open();
 const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
 const tx = db.transaction(stores,"readwrite");
-const target = tx.objectStore(store);
-sealed.forEach(item=>target.put(item));
-if(sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
-return new Promise((res,rej)=>{
-tx.oncomplete=()=>res(true);
-tx.onerror=()=>rej(tx.error || new Error('Transaction failed'));
-tx.onabort=()=>rej(tx.error || new Error('Transaction aborted'));
+return new Promise((res, rej) => {
+  tx.oncomplete = () => res(true);
+  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
+  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
+  try {
+    const target = tx.objectStore(store);
+    for (const item of sealed) target.put(item);
+    if (sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    rej(error);
+  }
 });
 });
 }
