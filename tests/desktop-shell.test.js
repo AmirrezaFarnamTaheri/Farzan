@@ -82,9 +82,11 @@ describe('desktop shell wiring', () => {
     expect(tauriLib).toContain('tauri::Builder::default()');
     expect(tauriLib).toContain('tauri::generate_context!()');
 
-    expect(tauriConfig.productName).toBe('OpenCourseDeck');
+    const isPlasmatoEdition = Boolean(readOptional('editions/plasmato-emergency/edition.json'));
+    expect(tauriConfig.productName).toBe(isPlasmatoEdition ? 'Farzan Plasmato Edition' : 'OpenCourseDeck');
     expect(tauriConfig.version).toBe(packageJson.version);
-    expect(tauriConfig.identifier).toBe('app.opencoursedeck.desktop');
+    expect(tauriConfig.identifier).toBe(isPlasmatoEdition ? 'app.opencoursedeck.plasmato' : 'app.opencoursedeck.desktop');
+    if (isPlasmatoEdition) expect(tauriConfig.app.windows[0].title).toBe('Farzan Plasmato Edition');
     expect(tauriConfig.build.frontendDist).toBe('../dist');
     expect(tauriConfig.build.beforeBuildCommand).toBe('npm run build:release');
     expect(tauriConfig.build.removeUnusedCommands).toBe(true);

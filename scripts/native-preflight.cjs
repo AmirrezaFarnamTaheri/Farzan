@@ -6,6 +6,9 @@ const { spawnSync } = require('node:child_process');
 
 const root = process.cwd();
 const strict = new Set(process.argv.slice(2)).has('--strict');
+const isPlasmatoEdition = fs.existsSync(path.join(root, 'editions', 'plasmato-emergency', 'edition.json'));
+const expectedProductName = isPlasmatoEdition ? 'Farzan Plasmato Edition' : 'OpenCourseDeck';
+const expectedBundleId = isPlasmatoEdition ? 'app.opencoursedeck.plasmato' : 'app.opencoursedeck.desktop';
 const checks = [];
 
 function rel(...parts) {
@@ -139,9 +142,9 @@ if (cargoToml) {
 }
 
 if (tauriConfig) {
-  add(tauriConfig.productName === 'OpenCourseDeck' ? 'ok' : 'fail', 'Tauri product name is OpenCourseDeck');
+  add(tauriConfig.productName === expectedProductName ? 'ok' : 'fail', 'Tauri product name matches its edition');
   add(tauriConfig.version === packageJson?.version ? 'ok' : 'fail', 'Tauri and package versions match');
-  add(tauriConfig.identifier === 'app.opencoursedeck.desktop' ? 'ok' : 'fail', 'Tauri bundle identifier is stable');
+  add(tauriConfig.identifier === expectedBundleId ? 'ok' : 'fail', 'Tauri bundle identifier is edition-isolated');
   add(tauriConfig.build?.frontendDist === '../dist' ? 'ok' : 'fail', 'Tauri embeds the production dist frontend');
   add(tauriConfig.build?.beforeBuildCommand === 'npm run build:release' ? 'ok' : 'fail', 'Tauri rebuilds the production frontend before bundling');
   add(tauriConfig.build?.removeUnusedCommands === true ? 'ok' : 'warn', 'Tauri removes unused commands');
