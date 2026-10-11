@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 function parseColor(input) {
-  const values = String(input).match(/[\\d.]+/g)?.map(Number) ?? [];
+  const values = String(input).match(/[0-9.]+/g)?.map(Number) ?? [];
   if (values.length < 3) throw new Error(`Cannot parse computed color: ${input}`);
   return { rgb: values.slice(0, 3), alpha: values[3] ?? 1 };
 }
