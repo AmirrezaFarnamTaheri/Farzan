@@ -1,0 +1,21 @@
+{
+  "edition": "plasmato-emergency",
+  "editionVersion": "1.0.0",
+  "baseApplication": "OpenCourseDeck 1.1.2",
+  "snapshot": "plasmato_full_2026-04-11.json",
+  "sha256": "5ba184603b4d8cc1f77cf8740f813e720c41fdce8526a0cff2e8f1ff9bc69f98",
+  "originalBytes": 3462737,
+  "gzipBytes": 291610,
+  "gzipBase64Length": 388816,
+  "counts": {
+    "courses": 31,
+    "sources": 100,
+    "topics": 6418,
+    "videos": 5990,
+    "pdfs": 280,
+    "iframes": 0,
+    "issues": 13
+  },
+  "sourceDate": "2026-04-11",
+  "notes": "Bundled archive is source-provided; links are references, not guaranteed live or licensed for redistribution."
+}
