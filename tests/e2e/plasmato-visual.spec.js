@@ -234,5 +234,100 @@ test('a real browser-recorded WebM plays in the native course player',async({pag
   await page.locator('#course-detail [data-action="play-video"]').first().click();
   await expect.poll(()=>page.evaluate(()=>[...document.querySelectorAll('video')].some(v=>v.readyState>=2&&v.currentTime>0.5&&!v.paused)),{timeout:20000}).toBe(true);
   await shot(page,'functional','17-real-local-video-playing');
-  log({group:'functional',behavior:'actual WebM playing via native player',fixture:'recorded in Chrome',bytes:bytes.length});
+  await page.locator('[data-save-timestamp]').click();
+  await expect.poll(()=>page.evaluate(async()=>(await window.DB.getAllTimestamps()).some(item=>item.courseId==='qa-playback'))).toBe(true);
+  await shot(page,'functional','18-video-timestamp-bookmarked');
+  await visit(page,'bookmarks');
+  await expect(page.locator('[data-bookmark-list]')).toContainText('Controlled WebM playback');
+  await shot(page,'functional','19-bookmark-visible-after-video');
+  log({group:'functional',behavior:'actual WebM playing via native player + timestamp bookmark saved',fixture:'recorded in Chrome',bytes:bytes.length});
+});
+
+for (const [device,width,height] of [['desktop',1440,900],['mobile',390,844]]) {
+  test('all 15 routes in light theme at '+device, async ({page}) => {
+    await page.setViewportSize({width,height});
+    await boot(page,'settings');
+    await page.locator('#btn-theme-toggle').click();
+    await expect.poll(()=>page.locator('html').getAttribute('data-theme')).not.toBe('dark');
+    const bad=[];
+    for (let i=0;i<routes.length;i++) {
+      const route=routes[i],name=String(i+1).padStart(2,'0')+'-'+route;
+      try {
+        await visit(page,route);
+        const state=await health(page);
+        await shot(page,'light-'+device,name);
+        log({group:'light-'+device,route,health:state});
+        if(!state.visible||state.textLength<10||state.viewErrors||state.overflow>24||state.brokenImages)bad.push({route,state});
+      } catch(e) {bad.push({route,error:e.message});try{await shot(page,'light-'+device,name+'-failed');}catch{}}
+    }
+    expect(bad,'Light UI regression or broken assets').toEqual([]);
+  });
+}
+test('standalone Plasmato emergency player navigates, saves resource, filters and enters focus mode',async({page})=>{
+  await page.goto('/editions/plasmato-emergency/index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#statCourses')).toHaveText('31',{timeout:15000});
+  await expect(page.locator('#statTopics')).toContainText('6,418');
+  await shot(page,'standalone','01-standalone-course-summary');
+  await page.locator('#courseList button').first().click();
+  await expect(page.locator('#sourceList button').first()).toBeVisible();
+  await page.locator('#sourceList button').first().click();
+  await expect(page.locator('#topicList button').first()).toBeVisible();
+  await page.locator('#topicList button').first().click();
+  await shot(page,'standalone','02-hierarchy-drilldown');
+  await page.locator('#scopeSelect').selectOption('all');
+  await page.locator('#mediaSelect').selectOption('pdf');
+  await expect(page.locator('#resourceList button').first()).toBeVisible();
+  await page.locator('#resourceList button').first().click();
+  await expect(page.locator('#favoriteButton')).toBeEnabled();
+  await page.locator('#favoriteButton').click();
+  await expect(page.locator('#favoriteButton')).toHaveAttribute('aria-pressed','true');
+  await shot(page,'standalone','03-pdf-resource-saved');
+  await page.locator('#favoritesOnlyButton').click();
+  await expect(page.locator('#favoritesOnlyButton')).toHaveAttribute('aria-pressed','true');
+  await page.locator('#focusToggle').click();
+  await expect(page.locator('#focusToggle')).toHaveAttribute('aria-pressed','true');
+  await shot(page,'standalone','04-saved-only-focus-mode');
+});
+test('standalone emergency viewer remains usable on mobile',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/editions/plasmato-emergency/index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#statCourses')).toHaveText('31',{timeout:15000});
+  await shot(page,'standalone','05-mobile-standalone');
+  await page.locator('#searchInput').fill('anemia');
+  await expect(page.locator('#resourceList button').first()).toBeVisible({timeout:15000});
+  await shot(page,'standalone','06-mobile-search-results');
+  const overflow=await page.evaluate(()=>Math.max(document.body.scrollWidth,document.documentElement.scrollWidth)-innerWidth);
+  expect(overflow).toBeLessThanOrEqual(24);
+});
+test('Studio adds real text and shapes and persists the resulting board',async({page})=>{
+  await boot(page,'studio');
+  await page.locator('[data-studio-text]').fill('Clinical decision diagram for visual QA');
+  await page.locator('[data-studio-add-text]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Note added');
+  await shot(page,'functional','20-studio-note-added');
+  await page.locator('[data-studio-add-rect]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Rectangle added');
+  await page.locator('[data-studio-add-circle]').click();
+  await expect(page.locator('[data-studio-status]')).toContainText('Circle added');
+  await shot(page,'functional','21-studio-shapes-added');
+  const board=await page.evaluate(()=>window.DB.getSetting('ocd_studio_board'));
+  expect(JSON.stringify(board)).toContain('Clinical decision diagram');
+  await visit(page,'home');await visit(page,'studio');
+  await expect(page.locator('[data-studio-elements]')).toContainText('Clinical decision diagram');
+  await shot(page,'functional','22-studio-reopened');
+});
+test('Settings secondary configuration panels and PDF controls have screenshot evidence',async({page})=>{
+  await boot(page,'settings');
+  await page.locator('[data-ai-mode]').scrollIntoViewIfNeeded();
+  await shot(page,'functional','23-settings-ai-panel');
+  await page.locator('#select-clear-scope').scrollIntoViewIfNeeded();
+  await shot(page,'functional','24-settings-storage-panel');
+  await visit(page,'pdf');
+  const input=page.locator('[data-pdf-open]');
+  await input.setInputFiles({name:'visual-controls.pdf',mimeType:'application/pdf',buffer:makeVisualPdf()});
+  await expect(page.locator('[data-pdf-total-pages]')).toHaveText('1');
+  const before=await page.locator('[data-pdf-zoom]').textContent();
+  await page.locator('[data-pdf-action="zoom-in"]').click();
+  await expect(page.locator('[data-pdf-zoom]')).not.toHaveText(before);
+  await shot(page,'functional','25-pdf-zoom-in-working');
 });

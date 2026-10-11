@@ -220,7 +220,7 @@
         <!-- Track info -->
         <div class="pd-info">
           <div class="pd-artwork">
-            <img class="pd-art-img" src="" alt="" aria-hidden="true">
+            <img class="pd-art-img" alt="" aria-hidden="true">
             <div class="pd-art-placeholder" aria-hidden="true">${this._opts.type === 'video' ? 'Video' : 'Audio'}</div>
           </div>
           <div class="pd-meta">
@@ -1108,7 +1108,7 @@
         this._dom.artImg.style.display = '';
         this._dom.artPlaceholder.style.display = 'none';
       } else {
-        this._dom.artImg.src = '';
+        this._dom.artImg.removeAttribute('src');
         this._dom.artImg.style.display = 'none';
         this._dom.artPlaceholder.style.display = '';
       }
