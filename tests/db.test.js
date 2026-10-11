@@ -16,6 +16,34 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     await expect(db.bulkAdd('items', [{ id: 'a' }, { id: 'a' }])).rejects.toBeTruthy();
   });
 
+  it.each(['bulkAdd', 'bulkPut'])('%s aborts earlier queued writes if a later key is invalid', async (method) => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('plasma-test-db', 1, [
+      { name: 'items', key: 'id', autoIncrement: false },
+    ]);
+    await expect(db[method]('items', [
+      { id: 'would-be-partial', value: 'do not commit' },
+      { value: 'missing primary key' },
+    ])).rejects.toBeTruthy();
+    // Inspect canonical persisted state after the failed mutation.
+    expect(await db.getAll('items')).toEqual([]);
+    db.db?.close();
+  });
+
+  it('bulkPutWithCheckpoint aborts data writes if the checkpoint key is invalid', async () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('plasma-test-db', 1, [
+      { name: 'items', key: 'id', autoIncrement: false },
+      { name: 'settings', key: 'key', autoIncrement: false },
+    ]);
+    await expect(db.bulkPutWithCheckpoint('items', [
+      { id: 'would-be-partial', value: 1 },
+    ], { value: 'missing setting key' })).rejects.toBeTruthy();
+    expect(await db.getAll('items')).toEqual([]);
+    expect(await db.getAll('settings')).toEqual([]);
+    db.db?.close();
+  });
+
   it('can read records by an IndexedDB index', async () => {
     const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
