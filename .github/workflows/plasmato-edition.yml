@@ -46,13 +46,12 @@ jobs:
       - name: Generate vendor libraries
         run: npm run vendor
 
-      - name: Validate code, workflows, and unit tests
+      - name: Validate source and workflow contracts
         run: |
           npm run check:encoding
           npm run check:workflows
           npm run validate
           npm run lint
-          npm test
 
       - name: Build production applications
         run: |
@@ -77,6 +76,9 @@ jobs:
           assert(worker.includes('plasmato-2026-04-11.json.gz'), 'Offline SW must precache native catalog');
           assert(worker.includes('editions/plasmato-emergency/index.html'), 'Offline SW must precache standalone viewer');
           NODE
+
+      - name: Run all repository unit and integration tests
+        run: npm test
 
       - name: Run release security and runtime checks
         run: |
