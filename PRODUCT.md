@@ -25,7 +25,7 @@ Private learners and study groups who collect video/PDF course materials from an
 - **Materials** — file-based assets (images, downloads)
 
 ### Intelligence
-- **AI client** — local Gemma integration + custom API endpoint for note summarization (semantic search and quiz generation are planned, not implemented)
+- **AI assistance** — local extractive summaries without generative inference by default; an explicitly configured API or registered local runtime is required for model-generated responses. Downloaded model files alone do not provide executable Gemma inference. Semantic search and quiz generation remain planned.
 - **Fuzzy search** (Fuse.js) across courses, topics, notes, timestamps, annotations
 - **Command palette** (Ctrl+K) — keyboard-driven navigation and actions
 
@@ -36,10 +36,11 @@ Private learners and study groups who collect video/PDF course materials from an
 - **Study queue** *(planned)* — daily plan generation, focus sprints. Today Playlists provides manual study queues.
 
 ### System
-- **Plugin host** *(planned)* — `src/features/pluginHost.js` validates plugin manifests, but it is not loaded into the runtime and Settings exposes no plugin UI.
+- **Plugin host** *(not shipped)* — `src/features/pluginHost.js` validates manifests but is not wired into the application.
+- **Manual sync-package helpers** *(not shipped)* — `src/features/offlineSync.js` can merge locally exchanged cards and notes, but packages are plaintext JSON, not encrypted or automatically synchronized. Requests for encryption are rejected.
 - **Theme system** — 8 themes (dark, light, midnight, forest, ocean, sunset, rose, paper), 6 accents, 3 density modes, font scaling
 - **Keyboard shortcuts** — full keyboard navigation, shortcuts cheatsheet
-- **Backup/restore** — JSON export/import of all user data
+- **Backup/restore** — JSON snapshots of supported main IndexedDB stores; local library media blobs live in a separate database and are **not** embedded in these exports. See `docs/backup-restore.md` before migrating devices.
 - **Help route** — first-run checklist, storage diagnostics, runtime parity panel
 - **PWA** — installable, service worker for offline caching
 - **Desktop app** — Tauri native shell (primary), Electron fallback
@@ -47,7 +48,7 @@ Private learners and study groups who collect video/PDF course materials from an
 ## Design principles
 
 1. **Self-contained** — no CDN, no external fetches at runtime (vendored libs)
-2. **Strict CSP** — no `unsafe-eval`, no `unsafe-inline`, no remote scripts
+2. **Restricted CSP** — no `unsafe-eval` or remote scripts; the development server permits inline styles, so do not describe its CSP as banning all `unsafe-inline`.
 3. **Offline-first** — works without network after initial load
 4. **Local-only data** — IndexedDB primary, localStorage for preferences, JSON backups
 5. **Accessible** — native landmarks, skip links, focus traps, ARIA live regions, screen reader announcements
@@ -70,7 +71,7 @@ Private learners and study groups who collect video/PDF course materials from an
 | Search | Fuse.js |
 | Sanitization | DOMPurify |
 | Charts | Chart.js |
-| Icons | FontAwesome (vendored) |
+| Icons | Local SVG sprite, with legacy vendored icons where needed |
 | Fonts | Inter, JetBrains Mono, Playfair Display (vendored) |
 | Desktop | Tauri (Rust), Electron (fallback) |
 | Package | npm, Node.js |

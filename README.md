@@ -65,7 +65,7 @@ OpenCourseDeck stores data locally in the browser profile for the origin you ope
 - IndexedDB stores progress, timestamps, and database-backed records.
 - Some preferences and notes compatibility data may be mirrored in `localStorage`.
 - Nothing is uploaded by the app by default.
-- Backups are JSON files you export manually.
+- Backups are JSON files you export manually. These include supported application database records **but not local video/PDF file blobs** stored in the separate library-files database; keep the original media files for device migration.
 
 For details, see [backup-restore.md](docs/backup-restore.md).
 
