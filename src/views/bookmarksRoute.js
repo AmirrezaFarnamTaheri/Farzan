@@ -62,8 +62,10 @@ export function mountBookmarksView(deps = {}) {
     let readError = null;
     const readCollection = async (method, label) => {
       try {
-        const value = await method?.();
-        return Array.isArray(value) ? value : [];
+        if (typeof method !== 'function') throw new Error(`${label} reader is unavailable`);
+        const value = await method();
+        if (!Array.isArray(value)) throw new TypeError(`${label} returned invalid records`);
+        return value;
       } catch (error) {
         readError ||= new Error(`${label} could not be loaded`, { cause: error });
         return [];
@@ -75,6 +77,18 @@ export function mountBookmarksView(deps = {}) {
       readCollection(window.DB?.getAllAnnotations, 'PDF annotations'),
     ]);
     if (!document.body.contains(listRoot)) return;
+    if (readError) {
+      // Never present partial or fabricated zero totals after any canonical
+      // read fails; the remaining records may be entirely correct.
+      metricsRoot.replaceChildren();
+      listRoot.replaceChildren();
+      const error = document.createElement('p');
+      error.className = 'bookmarks-load-error';
+      error.setAttribute('role', 'alert');
+      error.textContent = 'Bookmarks could not be loaded. Your stored data was not changed.';
+      listRoot.appendChild(error);
+      return;
+    }
     const notesById = new Map(notes.map(note => [note.id, note]));
     const previewText = (value, limit = 140) => {
       const tmp = document.createElement('div');
@@ -144,14 +158,6 @@ export function mountBookmarksView(deps = {}) {
     });
 
     listRoot.replaceChildren();
-    if (readError) {
-      const error = document.createElement('p');
-      error.className = 'bookmarks-load-error';
-      error.setAttribute('role', 'alert');
-      error.textContent = 'Bookmarks could not be loaded. Your stored data was not changed.';
-      listRoot.appendChild(error);
-      return;
-    }
     if (!bookmarkItems.length) {
       const empty = document.createElement('p');
       empty.className = 'text-muted';
