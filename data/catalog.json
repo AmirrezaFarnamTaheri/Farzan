@@ -1,6 +1,14 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-10T00:00:00.000Z",
+  "generatedAt": "2026-10-11T00:00:00.000Z",
   "currentCatalog": "data/opencoursedeck-starter.json",
-  "fallbackCatalogs": []
+  "fallbackCatalogs": [],
+  "additionalCatalogs": [
+    {
+      "id": "plasmato-2026-04-11",
+      "path": "data/plasmato-2026-04-11.json.gz",
+      "compression": "gzip",
+      "sha256": "5ba184603b4d8cc1f77cf8740f813e720c41fdce8526a0cff2e8f1ff9bc69f98"
+    }
+  ]
 }
