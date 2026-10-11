@@ -3563,7 +3563,13 @@ import { Pointer } from './src/lib/pointer.js';
 
     // Command palette (extracted to an ES module under src/)
     const cpOpen = () => window.OpenCourseDeck?.CommandPalette?.open?.();
-    KeyboardShortcuts.register('ctrl+k', () => cpOpen(), 'Open command palette');
+    // The shortcut must match the platform-specific hint shown in the sidebar.
+    const shortcutPlatform = navigator.userAgentData?.platform || navigator.platform || '';
+    KeyboardShortcuts.register(
+      /Mac|iPad|iPhone/i.test(shortcutPlatform) ? 'meta+k' : 'ctrl+k',
+      cpOpen,
+      'Open command palette',
+    );
     const btn = document.getElementById('command-palette-btn');
     if (btn && !btn.dataset.pdBound) {
       btn.dataset.pdBound = 'true';

@@ -13,6 +13,7 @@ function assertRecords(value, label) {
   for (const [index, record] of value.entries()) {
     if (!record || typeof record !== 'object' || Array.isArray(record)
       || (typeof record.id !== 'string' && typeof record.id !== 'number')
+      || (typeof record.id === 'number' && !Number.isFinite(record.id))
       || String(record.id).length === 0
       || (record.updatedAt != null && (!Number.isFinite(record.updatedAt) || record.updatedAt < 0))) {
       throw new TypeError(`${label}[${index}] has an invalid id or timestamp`);

@@ -28,6 +28,13 @@ describe('offlineSync PWA sync pipeline', () => {
     expect(cards).toEqual([{ id: 'a', updatedAt: 10 }]);
   });
 
+  it('rejects non-finite numeric record IDs rather than serializing them to null', () => {
+    for (const id of [NaN, Infinity, -Infinity]) {
+      expect(() => createSyncPackage([{ id, updatedAt: 1 }], [])).toThrow(/invalid id/);
+      expect(() => mergeSyncPackage([{ id }], [], createSyncPackage([], []))).toThrow(/invalid id/);
+    }
+  });
+
   it('uses a stable local tie-break for equal timestamps', () => {
     const pkg = createSyncPackage([{ id: 'a', front: 'Incoming', updatedAt: 10 }], []);
     const result = mergeSyncPackage([{ id: 'a', front: 'Local', updatedAt: 10 }], [], pkg);

@@ -1,10 +1,30 @@
 import { test, expect } from '@playwright/test';
 
 function parseColor(input) {
-  const values = String(input).match(/[0-9.]+/g)?.map(Number) ?? [];
-  if (values.length < 3) throw new Error(`Cannot parse computed color: ${input}`);
-  return { rgb: values.slice(0, 3), alpha: values[3] ?? 1 };
+  const css = String(input).trim().toLowerCase();
+  const srgb = /^color\(\s*srgb\s+(.+)\)$/.exec(css);
+  // Other color spaces must be converted explicitly. Treating Display-P3
+  // unit channels as 8-bit sRGB could falsely pass a contrast check.
+  if (css.startsWith('color(') && !srgb) throw new Error(`Unsupported computed color space: ${input}`);
+  const channelText = srgb ? srgb[1] : css;
+  const values = [...channelText.matchAll(/-?(?:\d*\.\d+|\d+\.?\d*)(?:e[+-]?\d+)?%?/g)].map(match => {
+    const value = Number(match[0].replace('%', ''));
+    return match[0].endsWith('%') ? value / 100 : value;
+  });
+  if (values.length < 3 || values.some(value => !Number.isFinite(value))) {
+    throw new Error(`Cannot parse computed color: ${input}`);
+  }
+  return {
+    rgb: srgb ? values.slice(0, 3).map(value => Math.max(0, Math.min(1, value)) * 255) : values.slice(0, 3),
+    alpha: values[3] ?? 1,
+  };
 }
+
+test('understands normalized sRGB color channels and rejects other color spaces', () => {
+  expect(parseColor('color(srgb 1 0 0 / 0.5)')).toEqual({ rgb: [255, 0, 0], alpha: 0.5 });
+  expect(contrast(parseColor('color(srgb 0 0 0)').rgb, parseColor('color(srgb 1 1 1)').rgb)).toBeCloseTo(21);
+  expect(() => parseColor('color(display-p3 1 1 1)')).toThrow(/Unsupported computed color space/);
+});
 
 function over(foreground, background) {
   return foreground.rgb.map((channel, index) =>

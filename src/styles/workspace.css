@@ -16,8 +16,8 @@
 }
 .sidebar {
   background: var(--surface);
-  border-inline-end: 1px solid var(--workspace-rule);
   border-right: 0;
+  border-inline-end: 1px solid var(--workspace-rule);
   box-shadow: none;
 }
 .sidebar-nav {
