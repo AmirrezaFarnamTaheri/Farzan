@@ -27,6 +27,7 @@ const workflows = {
   'ci.yml': readWorkflow('ci.yml'),
   'verify.yml': readWorkflow('verify.yml'),
   'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
+  'native-windows.yml': readWorkflow('native-windows.yml'),
   'release.yml': readWorkflow('release.yml'),
   'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
 };

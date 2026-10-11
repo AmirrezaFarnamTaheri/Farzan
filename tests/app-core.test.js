@@ -352,7 +352,7 @@ describe('app shell resilience helpers', () => {
     for (const viewName of ['tags', 'playlists', 'bookmarks', 'achievements']) {
       await window.OpenCourseDeck.Views[viewName]();
       const view = document.querySelector(`#view-container .view-${viewName}`);
-      expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+      expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
       expect(view.textContent).not.toContain('planned and not yet interactive');
     }
   });
@@ -379,7 +379,7 @@ describe('app shell resilience helpers', () => {
     const view = document.querySelector('#view-container .view-tags');
     const ecg = view.querySelector('[data-tag-name="ecg"]');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Unique tags');
     expect(view.textContent).toContain('Tagged records');
@@ -567,7 +567,7 @@ describe('app shell resilience helpers', () => {
     const resume = view.querySelector('[data-playlist-id="timestamp-queue"]');
     const catalog = view.querySelector('[data-playlist-id^="source-"]');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).toContain('Active tracks');
     expect(view.textContent).toContain('Video topics');
     expect(live.textContent).toContain('Loaded lecture');
@@ -1447,7 +1447,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('[data-bookmark-type]')).toHaveLength(3));
     const view = document.querySelector('#view-container .view-bookmarks');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Video timestamps');
     expect(view.textContent).toContain('Total bookmarks');
@@ -1685,7 +1685,7 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('[data-achievement-id]')).toHaveLength(6));
     const view = document.querySelector('#view-container .view-achievements');
 
-    expect(view.querySelector('[aria-label="Feature status: ready"]').textContent).toBe('Ready');
+    expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Touched topics');
     expect(view.textContent).toContain('Completed courses');
@@ -2559,11 +2559,16 @@ describe('app shell resilience helpers', () => {
     );
 
     const view = document.getElementById('view-container');
-    const img = view.querySelector('img');
-    const link = view.querySelector('a');
+    // Untrusted hash text is rendered as textContent, not sanitized into
+    // executable DOM nodes. Keep that stronger invariant covered.
+    const routeLabel = view.querySelector('[data-missing-route]');
+    expect(routeLabel).toBeTruthy();
+    expect(routeLabel.textContent).toContain('<img src=x onerror=');
+    expect(routeLabel.textContent).toContain('javascript:alert(1)');
+    expect(routeLabel.textContent).toContain('<script>');
+    expect(view.querySelector('img')).toBeNull();
     expect(view.querySelector('script')).toBeNull();
-    expect(img?.getAttribute('onerror')).toBeNull();
-    expect(link?.getAttribute('href')).toBeNull();
+    expect(view.querySelector('a[href^="javascript:"]')).toBeNull();
     expect(window.__fallbackXss).toBeUndefined();
     expect(window.__scriptXss).toBeUndefined();
   });

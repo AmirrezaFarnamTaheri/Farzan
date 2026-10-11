@@ -196,7 +196,7 @@ async function main() {
   };
 
   await navigate('#/home', null, '.home-title');
-  await navigate('#/courses', 'Course Catalog');
+  await navigate('#/courses', 'Courses');
   await navigate('#/notes', 'Notes');
   await navigate('#/pdf', 'PDF Annotator');
   await navigate('#/studio', 'Studio');
