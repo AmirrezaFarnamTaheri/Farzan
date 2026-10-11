@@ -539,6 +539,43 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
   });
 
+  it('rolls back earlier progress writes when a later read fails unexpectedly', async () => {
+    const saved = new Map([['original', { topicId: 'original', courseId: 'course-old', updatedAt: 20 }]]);
+    window.DB.getAllProgress = vi.fn(async () => [...saved.values()]);
+    window.DB.getProgress = vi.fn(async (topicId) => {
+      if (topicId === 'read-fails') throw new Error('Reading progress failed');
+      return saved.get(topicId) ?? null;
+    });
+    window.DB.saveProgress = vi.fn(async (topicId, _courseId, data) => {
+      saved.set(topicId, data);
+      return data;
+    });
+    window.DB.clearUserData = vi.fn(async (scope) => {
+      if (scope === 'progress') saved.clear();
+    });
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const payload = {
+      version: '1.4',
+      progress: [
+        { topicId: 'imported', courseId: 'course-new', updatedAt: 100 },
+        { topicId: 'read-fails', courseId: 'course-new', updatedAt: 100 },
+      ],
+    };
+    const file = new File([JSON.stringify(payload)], 'read-failure.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveProgress).toHaveBeenCalledWith('imported', 'course-new', expect.any(Object));
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true });
+    expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
+      expect.objectContaining({ store: 'import', message: 'Reading progress failed' }),
+    ]);
+    expect([...saved.values()]).toEqual([{ topicId: 'original', courseId: 'course-old', updatedAt: 20 }]);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Previously saved data was restored'),
+    );
+  });
+
   it('rolls back backup import writes when any store write fails', async () => {
     const payload = {
       version: '1.3',
