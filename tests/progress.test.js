@@ -286,7 +286,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-json').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.4');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.5');
 
     downloadedBlob = null;
     document.getElementById('btn-export-csv').click();
