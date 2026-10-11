@@ -170,8 +170,31 @@ export function installBackupEngine(root = window) {
         throw error;
       }
       await completion;
+      // Delete compatibility mirrors only AFTER the authoritative transaction
+      // commits. Empty overwrite collections also invalidate stale mirrors.
+      const mirrorFailures = [];
+      if (mode === 'overwrite') {
+        for (const [store, key] of [
+          ['progress', 'plasma_progress_v1'],
+          ['timestamps', 'plasma_timestamps_v1'],
+        ]) {
+          if (!Object.prototype.hasOwnProperty.call(portable, store)) continue;
+          try {
+            if (typeof root.localStorage?.removeItem !== 'function'
+              || typeof root.localStorage?.getItem !== 'function') {
+              throw new Error('localStorage mirror cleanup is unavailable');
+            }
+            root.localStorage.removeItem(key);
+            if (root.localStorage.getItem(key) != null) {
+              throw new Error(`Compatibility mirror ${key} remained after deletion`);
+            }
+          } catch (error) {
+            mirrorFailures.push({ key, message: error?.message || String(error) });
+          }
+        }
+      }
       const authorityFailures = clearSessionAuthority(root);
-      const degraded = authorityFailures.length > 0;
+      const degraded = authorityFailures.length > 0 || mirrorFailures.length > 0;
 
       const receipt = {
         committed: true,
@@ -183,14 +206,22 @@ export function installBackupEngine(root = window) {
         importedAt: new Date().toISOString(),
         stores: counts,
         totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
-        aiAuthorityInvalidated: !degraded,
-        warnings: degraded ? [{
-          code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
-          message: 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
-          failures: authorityFailures,
-        }] : [],
+        aiAuthorityInvalidated: authorityFailures.length === 0,
+        warnings: [
+          ...(mirrorFailures.length ? [{
+            code: 'MIRROR_CLEANUP_INCOMPLETE',
+            message: 'Backup committed, but old browser-storage mirrors remain. Do not switch to legacy storage until they are cleared.',
+            failures: mirrorFailures,
+          }] : []),
+          ...(authorityFailures.length ? [{
+            code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
+            message: 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
+            failures: authorityFailures,
+          }] : []),
+        ],
       };
       root.OpenCourseDeck?.bus?.emit?.('storage:import-complete', receipt);
+      if (mirrorFailures.length) root.OpenCourseDeck?.bus?.emit?.('storage:mirror-cleanup-incomplete', receipt);
       if (degraded) {
         root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidation-incomplete', {
           reason: 'backup-import',

@@ -57,6 +57,15 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
+  it('treats auxiliary stores as empty only in the pre-migration localStorage-only mode', async () => {
+    delete window.OpenCourseDeck.DB.PlasmaDB;
+    await expect(window.DB.getAllWatchedSegments()).resolves.toEqual([]);
+    await expect(window.DB.getAllPdfBookmarks()).resolves.toEqual([]);
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    await expect(window.DB.getAllWatchedSegments()).rejects.toThrow(/Canonical watched-segment/);
+    await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow(/Canonical PDF bookmark/);
+  });
+
   it('merges localStorage and IndexedDB notes during compatibility migration', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },

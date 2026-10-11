@@ -1154,7 +1154,10 @@
     // Issue 8: throw on save failure, return null when IDB unavailable
     async function getAllWatchedSegments() {
       const idb = _getIdb();
-      if (!idb) throw new Error('Watched-segment storage is unavailable; backup cannot be complete');
+      if (!idb) {
+        if (_isMigrated()) throw new Error('Canonical watched-segment storage is unavailable; backup cannot be complete');
+        return []; // Pre-migration local-only mode never persisted watched segments.
+      }
       await _migrateOnce();
       try {
         const records = await idb.getAll('watchedSegments');
@@ -1217,7 +1220,10 @@
 
     async function getAllPdfBookmarks() {
       const idb = _getIdb();
-      if (!idb) throw new Error('PDF bookmark storage is unavailable; backup cannot be complete');
+      if (!idb) {
+        if (_isMigrated()) throw new Error('Canonical PDF bookmark storage is unavailable; backup cannot be complete');
+        return []; // Pre-migration local-only mode never persisted PDF bookmarks.
+      }
       await _migrateOnce();
       try {
         const records = await idb.getAll('pdfBookmarks');

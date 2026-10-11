@@ -45,6 +45,7 @@ function rootWithFacade(sessionEntries) {
     DB: {},
     OpenCourseDeck: { bus: { emit() {} } },
     sessionStorage: createStorage(sessionEntries),
+    localStorage: createStorage(),
   };
 }
 
@@ -237,6 +238,41 @@ describe('atomic backup engine', () => {
     expect(receipt.committed).toBe(true);
     expect(receipt.stores.notes).toBe(0);
     expect(snapshot.notes).toEqual([]);
+  });
+
+  it('removes stale progress and timestamps mirrors only after an overwrite commits', async () => {
+    const root = rootWithFacade();
+    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
+    root.localStorage.setItem('plasma_timestamps_v1', '[{"id":"old"}]');
+    installBackupEngine(root);
+    const receipt = await root.DB.importBackup({
+      progress: [], timestamps: [],
+    }, { mode: 'overwrite' });
+    expect(receipt).toMatchObject({ committed: true, degraded: false });
+    expect(root.localStorage.getItem('plasma_progress_v1')).toBeNull();
+    expect(root.localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+  });
+
+  it('does not clear compatibility mirrors if the overwrite transaction aborts', async () => {
+    const root = rootWithFacade();
+    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
+    installBackupEngine(root);
+    await expect(root.DB.importBackup({
+      progress: [{ missingTopicId: true }],
+    }, { mode: 'overwrite' })).rejects.toThrow();
+    expect(root.localStorage.getItem('plasma_progress_v1')).toBe('{"old":true}');
+  });
+
+  it('reports a degraded commit instead of hiding failed mirror removal', async () => {
+    const root = rootWithFacade();
+    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
+    root.localStorage.removeItem = () => { throw new Error('storage blocked'); };
+    installBackupEngine(root);
+    const receipt = await root.DB.importBackup({ progress: [] }, { mode: 'overwrite' });
+    expect(receipt).toMatchObject({ committed: true, degraded: true, aiAuthorityInvalidated: true });
+    expect(receipt.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'MIRROR_CLEANUP_INCOMPLETE' }),
+    ]));
   });
 
   it('rejects unknown stores before mutating live data', async () => {
