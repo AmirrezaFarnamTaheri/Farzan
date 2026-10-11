@@ -60,9 +60,14 @@ jobs:
           if test -f artifacts/visual-audit/observations.jsonl; then
             cp artifacts/visual-audit/observations.jsonl "$work/visual-evidence/"
           fi
-          if test -d artifacts/visual-audit/screenshots/functional; then
-            cp artifacts/visual-audit/screenshots/functional/*.png "$work/visual-evidence/" || :
-          fi
+          for section in functional standalone; do
+            if test -d "artifacts/visual-audit/screenshots/$section"; then
+              for asset in artifacts/visual-audit/screenshots/"$section"/*.png; do
+                test -f "$asset" || continue
+                cp "$asset" "$work/visual-evidence/$section-$(basename "$asset")"
+              done
+            fi
+          done
           git -C "$work" config user.name 'github-actions[bot]'
           git -C "$work" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git -C "$work" add visual-evidence

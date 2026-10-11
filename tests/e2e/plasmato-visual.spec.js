@@ -40,7 +40,13 @@ async function shot(page,group,name){
   const folder=path.join(root,'screenshots',group);fs.mkdirSync(folder,{recursive:true});
   const file=path.join(folder,name.replace(/[^a-z0-9-]/gi,'-')+'.png');
   await page.screenshot({path:file,animations:'disabled',caret:'hide',timeout:20000});
-  log({group,name,file:path.relative(root,file),viewport:page.viewportSize(),at:new Date().toISOString()});
+  // A successful page.screenshot() can still be an entirely blank GPU frame.
+  // Reject those so the screenshot evidence actually shows rendered UI.
+  const sharp=(await import('sharp')).default;
+  const pixel=await sharp(file).stats();
+  const brightness=pixel.channels.slice(0,3).reduce((sum,c)=>sum+c.mean,0)/3;
+  if(brightness<8)throw new Error('Captured a blank/black screen: '+group+'/'+name);
+  log({group,name,file:path.relative(root,file),viewport:page.viewportSize(),brightness,at:new Date().toISOString()});
 }
 async function boot(page,route='home'){
   await page.goto('/#/'+route,{waitUntil:'domcontentloaded'});
@@ -281,6 +287,8 @@ test('standalone Plasmato emergency player navigates, saves resource, filters an
   await expect(page.locator('#favoriteButton')).toBeEnabled();
   await page.locator('#favoriteButton').click();
   await expect(page.locator('#favoriteButton')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('h1')).toContainText('Plasmato Edition');
+  await page.waitForTimeout(250);
   await shot(page,'standalone','03-pdf-resource-saved');
   await page.locator('#favoritesOnlyButton').click();
   await expect(page.locator('#favoritesOnlyButton')).toHaveAttribute('aria-pressed','true');
@@ -292,6 +300,7 @@ test('standalone emergency viewer remains usable on mobile',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('/editions/plasmato-emergency/index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#statCourses')).toHaveText('31',{timeout:15000});
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeLessThanOrEqual(20);
   await shot(page,'standalone','05-mobile-standalone');
   await page.locator('#searchInput').fill('anemia');
   await expect(page.locator('#resourceList button').first()).toBeVisible({timeout:15000});
