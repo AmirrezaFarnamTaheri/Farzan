@@ -1,3 +1,5 @@
+import { isLoopbackHostname } from '../core/networkSafety.js';
+
 const AI_SETTINGS_KEY = 'ocd_ai_settings';
 const AI_SESSION_KEY = 'ocd_ai_api_key_session';
 const AI_MODEL_DB = 'opencoursedeck-ai-models';
@@ -200,14 +202,6 @@ function cosine(a = [], b = []) {
   let score = 0;
   for (let i = 0; i < Math.min(a.length, b.length); i += 1) score += Number(a[i] || 0) * Number(b[i] || 0);
   return score;
-}
-
-function isLoopbackHostname(hostname) {
-  const normalized = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-  return normalized === 'localhost'
-    || normalized === '::1'
-    || normalized === '127.0.0.1'
-    || normalized.startsWith('127.');
 }
 
 function parseSecureHttpUrl(value, root, label = 'URL') {
@@ -413,6 +407,8 @@ export function createAIClient(root = window) {
         credentials: 'omit',
         cache: 'no-store',
         referrerPolicy: 'no-referrer',
+        // A redirect must not send private study text to an unapproved origin.
+        redirect: 'error',
         signal: timed.signal,
         body: JSON.stringify({
           model: current.settings.model,

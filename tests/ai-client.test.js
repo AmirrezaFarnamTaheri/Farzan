@@ -356,6 +356,43 @@ describe('AI client', () => {
     expect(root.fetch).not.toHaveBeenCalled();
   });
 
+  it('rejects cleartext public hostnames that start with 127.', async () => {
+    sessionStorage.setItem('ocd_ai_api_key_session', 'private-session-key');
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({
+        mode: 'custom-api',
+        endpoint: 'http://127.attacker.example/v1/chat/completions',
+        approvedEndpointOrigin: 'http://127.attacker.example',
+        hasKey: true,
+      })) },
+      fetch: vi.fn(),
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+    await expect(client.status()).resolves.toMatchObject({ available: false, reason: 'invalid-endpoint' });
+    await expect(client.complete({ prompt: 'Private study material' })).resolves.toMatchObject({ ok: false, reason: 'invalid-endpoint' });
+    await expect(client.downloadLocalModel('http://127.attacker.example/model.bin')).rejects.toThrow('HTTPS');
+    expect(root.fetch).not.toHaveBeenCalled();
+  });
+
+  it('prevents redirected AI requests from forwarding approved private material', async () => {
+    sessionStorage.setItem('ocd_ai_api_key_session', 'private-session-key');
+    const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) }));
+    const root = {
+      DB: { getSetting: vi.fn(async () => ({
+        mode: 'custom-api',
+        endpoint: 'https://api.example.test/v1/chat',
+        approvedEndpointOrigin: 'https://api.example.test',
+        hasKey: true,
+      })) },
+      fetch,
+      sessionStorage,
+    };
+    const client = createAIClient(root);
+    await expect(client.complete({ prompt: 'Private material' })).resolves.toMatchObject({ ok: true });
+    expect(fetch).toHaveBeenCalledWith('https://api.example.test/v1/chat', expect.objectContaining({ redirect: 'error' }));
+  });
+
   it('installs the client on OpenCourseDeck once', () => {
     const root = { OpenCourseDeck: {}, DB: {}, sessionStorage };
     const first = initAIClient(root);

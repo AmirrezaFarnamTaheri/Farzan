@@ -1,3 +1,5 @@
+import { isLoopbackHostname } from '../core/networkSafety.js';
+
 export function mountSettingsView(deps = {}) {
   const {
     setView,
@@ -442,10 +444,6 @@ export function mountSettingsView(deps = {}) {
     let activeDownloadController = null;
 
     const selectedModelOption = () => gemmaOptions.find(option => option.id === localPackage.value) || gemmaOptions[0];
-    const isLoopback = (hostname) => {
-      const value = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-      return value === 'localhost' || value === '::1' || value === '127.0.0.1' || value.startsWith('127.');
-    };
     const parseEndpoint = (value) => {
       const source = String(value || '').trim();
       if (!source) return { valid: false, reason: 'Enter an endpoint URL.' };
@@ -453,7 +451,7 @@ export function mountSettingsView(deps = {}) {
       try {
         const parsed = new URL(source);
         if (parsed.username || parsed.password) return { valid: false, reason: 'Remove embedded credentials from the URL.' };
-        if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) {
+        if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
           return { valid: false, reason: 'Remote endpoints must use HTTPS. HTTP is allowed only for localhost.' };
         }
         return { valid: true, origin: parsed.origin, href: parsed.href };
@@ -629,7 +627,7 @@ export function mountSettingsView(deps = {}) {
       const source = localSource.value.trim() || selectedModelOption()?.url;
       try {
         const parsed = new URL(source);
-        if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback(parsed.hostname))) throw new Error();
+        if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopbackHostname(parsed.hostname))) throw new Error();
         window.open(parsed.href, '_blank', 'noopener,noreferrer');
       } catch {
         Toast?.error?.('Model source must be a secure HTTP(S) URL.');

@@ -1,21 +1,17 @@
 import { committedReceipt, failedReceipt } from './mutationReceipt.js';
+import { isLoopbackHostname } from './networkSafety.js';
 
 export const AI_SETTINGS_KEY = 'ocd_ai_settings';
 export const AI_SESSION_KEY = 'ocd_ai_api_key_session';
 export const AI_BINDING_KEY = 'ocd_ai_authority_session';
 const BINDING_VERSION = 1;
 
-function isLoopback(hostname) {
-  const value = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-  return value === 'localhost' || value === '::1' || value === '127.0.0.1' || value.startsWith('127.');
-}
-
 function validateEndpoint(value) {
   const source = String(value || '').trim();
   if (!/^https?:\/\//i.test(source)) throw new TypeError('AI endpoint must be an absolute HTTP or HTTPS URL');
   const parsed = new URL(source);
   if (parsed.username || parsed.password) throw new TypeError('AI endpoint must not contain embedded credentials');
-  if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) throw new TypeError('Remote AI endpoints must use HTTPS');
+  if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) throw new TypeError('Remote AI endpoints must use HTTPS');
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new TypeError('AI endpoint must use HTTP or HTTPS');
   return { href: parsed.href, origin: parsed.origin };
 }
