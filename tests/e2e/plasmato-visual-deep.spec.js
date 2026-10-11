@@ -96,6 +96,11 @@ for (const cfg of modes) {
       try{
         await visit(page,route);
         if(cfg.rtl)await page.evaluate(()=>{document.documentElement.dir='rtl';});
+        if (route === 'pdf' && !cfg.scrollBottom) {
+          await expect(page.locator('[data-pdf-current-page]')).toBeDisabled();
+          await expect(page.locator('[data-pdf-current-page]')).toHaveValue('—');
+          await expect(page.locator('[data-pdf-save-page-note]')).toBeDisabled();
+        }
         if(cfg.scrollBottom) {
           if(await page.evaluate(allScrollContainers))scrolled++;
         }

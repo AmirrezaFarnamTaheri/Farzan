@@ -1092,15 +1092,29 @@
     // ──────────────────────────────────────────────────────
 
     _updatePageUI() {
-      if (DOM.currentPageInput) DOM.currentPageInput.value = State.currentPage;
-      if (DOM.totalPagesLabel)  DOM.totalPagesLabel.textContent = State.totalPages;
+      const hasDocument = Boolean(State.pdfDoc && State.totalPages > 0);
+      if (DOM.currentPageInput) {
+        DOM.currentPageInput.value = hasDocument ? String(State.currentPage) : '—';
+        DOM.currentPageInput.disabled = !hasDocument;
+      }
+      if (DOM.totalPagesLabel) DOM.totalPagesLabel.textContent = String(State.totalPages);
       if (DOM.zoomLevelDisplay) DOM.zoomLevelDisplay.textContent = `${Math.round(State.scale * 100)}%`;
+      const emptyHint = $('[data-pdf-empty-hint]');
+      if (emptyHint) emptyHint.hidden = hasDocument;
+      const noteInput = $('[data-pdf-page-note-input]');
+      if (noteInput) {
+        noteInput.disabled = !hasDocument;
+        noteInput.placeholder = hasDocument
+          ? 'Note for this PDF page...'
+          : 'Open a PDF to add a page note...';
+      }
+      const saveNote = $('[data-pdf-save-page-note]');
+      if (saveNote) saveNote.disabled = !hasDocument;
 
-      // Disable prev/next buttons at boundaries
       const prevBtn = $('[data-pdf-prev]');
       const nextBtn = $('[data-pdf-next]');
-      if (prevBtn) prevBtn.disabled = State.currentPage <= 1;
-      if (nextBtn) nextBtn.disabled = State.currentPage >= State.totalPages;
+      if (prevBtn) prevBtn.disabled = !hasDocument || State.currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = !hasDocument || State.currentPage >= State.totalPages;
     },
 
     _showLoading(show) {
@@ -1520,6 +1534,7 @@
     PDFToolbar.init();
     AnnotationManager.init();
     PDFInput.init();
+    PDFViewer._updatePageUI();
 
     // Auto-load if data-pdf-src is set
     const viewer = $('[data-pdf-viewer]');

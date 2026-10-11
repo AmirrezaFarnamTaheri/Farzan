@@ -71,7 +71,7 @@ export function mountPdfView() {
               </div>
               <div class="button-row gap-1">
                 <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page" aria-label="Previous page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
-                <input class="input input-sm w-32 text-center" data-pdf-current-page value="1" aria-label="Current page" />
+                <input class="input input-sm w-32 text-center" data-pdf-current-page value="—" aria-label="Current page" disabled />
                 <span class="text-xs text-secondary">/ <span data-pdf-total-pages>0</span></span>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page" aria-label="Next page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
                 <span class="pdf-zoom badge" data-pdf-zoom>100%</span>
@@ -92,9 +92,9 @@ export function mountPdfView() {
               </div>
             </div>
             <div class="pdf-page-note mt-2 border-t pt-2" data-pdf-page-note>
-              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page..." aria-label="PDF page note"></textarea>
+              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Open a PDF to add a page note..." aria-label="PDF page note" disabled></textarea>
               <div class="button-row mt-2">
-                <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note>Save page note</button>
+                <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note disabled>Save page note</button>
                 <span class="text-sm" data-pdf-page-note-status aria-live="polite"></span>
               </div>
             </div>
@@ -102,6 +102,9 @@ export function mountPdfView() {
 
           <div class="pdf-viewer-wrap">
             <div class="pdf-viewer" data-pdf-viewer tabindex="0"></div>
+            <p class="pdf-empty-hint text-sm text-secondary" data-pdf-empty-hint role="status">
+              No PDF open. Choose Open to read a document, then add page notes or annotations.
+            </p>
             <div class="pdf-loading" data-pdf-loading hidden>
               <div class="pdf-progress"><div data-pdf-progress class="pdf-progress-bar"></div></div>
             </div>
@@ -125,13 +128,17 @@ export function mountPdfView() {
     if (noteStatus) noteStatus.textContent = message;
   };
   const onSavePageNote = async () => {
+    const snapshot = window.PlasmaPDFViewer?.getSnapshot?.() ?? window.PlasmaPDFState ?? {};
+    if (!(Number(snapshot.totalPages) > 0) || !snapshot.docId || snapshot.docId === 'global') {
+      setNoteStatus('Open a PDF before saving a page note');
+      return;
+    }
     const text = String(noteInput?.value || '').trim();
     if (!text) {
       setNoteStatus('Add a note first');
       return;
     }
-    const snapshot = window.PlasmaPDFViewer?.getSnapshot?.() ?? window.PlasmaPDFState ?? {};
-    const docId = snapshot.docId || snapshot.annotationDocId || 'global';
+    const docId = snapshot.docId;
     const page = Math.max(1, Number(snapshot.page || snapshot.currentPage || 1));
     const now = Date.now();
     try {
