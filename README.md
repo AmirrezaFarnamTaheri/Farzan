@@ -71,8 +71,7 @@ For details, see [backup-restore.md](docs/backup-restore.md).
 
 ### Plasmato edition screenshots and visual QA
 
-The dedicated Plasmato edition includes [107 current application screenshots](screenshots/current/README.md),
-seven contact sheets and a [SHA-256 evidence manifest](screenshots/current/manifest.json).
+The branch retains a [107-image historical application gallery](screenshots/current/README.md) and its [SHA-256 manifest](screenshots/current/manifest.json). Plasmato Edition v1.0.3 additionally gates publication on **308 newly captured browser screenshots across 24 groups**, with a full visual-evidence ZIP and checksum manifest attached to its GitHub Release.
 These capture all 15 main app routes at desktop, tablet and mobile sizes, light-theme states,
 and functional examples such as saved notes, video playback, searchable PDF, flashcards and Studio boards.
 The capture fixtures are controlled test data, not a claim that every external media host is accessible.

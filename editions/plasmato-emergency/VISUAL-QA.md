@@ -25,3 +25,9 @@ Plasmato course selection/completion; Materials filter; written note autosave an
 ## Acceptance constraints and limits
 
 Enforced 107 nonblank screenshots, 18 passing scenarios, zero broken images, no uncaught route errors, no detected horizontal overflow in sampled states, standard 907+ unit tests, web smoke and locked Windows installer build before publishing. Manual native installation/update/uninstallation, screen readers, every device density and third-party media hosting are not established by synthetic fixture success. Original Farzan main remains unchanged.
+
+## Expanded Plasmato 1.0.3 visual acceptance gate
+
+The next release is gated on 308 **newly captured within the same CI run** actual Chrome screenshots: 107 baseline captures plus 150 additional fifteen-route responsive/accessibility states and 51 additional working UI states. The enlarged matrix includes 320-pixel phones, wide desktops, light tablet, RTL directional stress, large type, compact density, reduced motion, keyboard focus, full-page captures, course/media facet changes, saved notes, settings, Studio, progress and achievements, and responsive standalone player states. All 24 groups receive dedicated labeled contact sheets; generated `manifest.json` checks every PNG size and SHA-256 plus its browser observation. Incomplete captures block publication. The earlier 107-image repository gallery remains historical; the complete 308-image set is packaged with the edition release's visual-evidence ZIP.
+
+**Limits:** RTL direction tests do not imply Persian translation. Browser-generated WebM confirms actual local playback but not remote Plasmato media reachability. No claim of screen-reader certification or hardware-specific Windows installer acceptance follows from browser screenshots.
