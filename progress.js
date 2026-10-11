@@ -966,13 +966,31 @@ const ProgressStats = (() => {
         cancelLabel: 'Cancel',
       });
       if (!ok) return;
-      await DB.clearAll();
-      // Imported media is stored in a separate IndexedDB database.
+      // Verify both backends before deleting anything. The auxiliary
+      // imported-file database is managed by UserLibrary separately.
       const clearMedia = window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles;
-      if (typeof clearMedia !== 'function') throw new Error('Cannot confirm auxiliary media deletion');
-      await clearMedia();
-      pdToast('All data has been cleared.', 'info');
-      renderStatsPage();
+      if (typeof clearMedia !== 'function') {
+        pdToast('Reset not started: imported media storage cannot be cleared.', 'error');
+        return;
+      }
+      let appRecordsCleared = false;
+      try {
+        await DB.clearAll();
+        appRecordsCleared = true;
+        await clearMedia();
+        pdToast('All data has been cleared.', 'info');
+      } catch (error) {
+        pdToast(
+          (appRecordsCleared
+            ? 'App records were cleared, but imported media files may remain. '
+            : 'Reset did not complete; some app records may already have been removed. ')
+          + (error?.message ?? String(error)),
+          'error',
+        );
+      } finally {
+        try { await renderStatsPage(); }
+        catch (error) { pdToast('Unable to refresh progress after reset: ' + (error?.message ?? error), 'error'); }
+      }
     });
     return true;
   }

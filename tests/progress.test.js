@@ -62,6 +62,35 @@ describe('progress backup exports', () => {
     vi.restoreAllMocks();
   });
 
+  it('never starts full reset when auxiliary media deletion is unavailable', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.clearAll = vi.fn(async () => ({ committed: true }));
+    document.body.innerHTML = '<section class="view-progress"><button id="btn-reset-all">Reset</button></section>';
+
+    window.ProgressStats.bindButtons();
+    document.getElementById('btn-reset-all').click();
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalled());
+    expect(window.DB.clearAll).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Reset not started'));
+  });
+
+  it('reports partial media-reset failures after application records were cleared', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.clearAll = vi.fn(async () => ({ committed: true }));
+    const clearLibraryFiles = vi.fn(async () => { throw new Error('Media deletion denied'); });
+    window.OpenCourseDeck.UserLibrary = { clearLibraryFiles };
+    document.body.innerHTML = '<section class="view-progress"><button id="btn-reset-all">Reset</button></section>';
+
+    window.ProgressStats.bindButtons();
+    document.getElementById('btn-reset-all').click();
+    await vi.waitFor(() => expect(clearLibraryFiles).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringContaining('Media deletion denied')));
+    expect(window.DB.clearAll).toHaveBeenCalledTimes(1);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('imported media files may remain'));
+    expect(window.OpenCourseDeck.Toast.info).not.toHaveBeenCalledWith('All data has been cleared.');
+  });
+
   it('exports JSON backups with all canonical user-data collections', async () => {
     await window.ProgressStats.exportJSON();
 
