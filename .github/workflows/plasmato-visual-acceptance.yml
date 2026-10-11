@@ -28,7 +28,7 @@ jobs:
           npm run build:release
           npm run check:generated
       - name: Run real Chrome Playwright acceptance scenarios
-        run: npm run test:e2e -- --grep "all 15 application panels|Plasmato courses|written rich-text note|user course is created|flashcard is|PDF genuinely|playlist gets|theme and font|global search|real locally generated MP4"
+        run: npm run test:e2e -- --grep "all 15 application panels|Plasmato courses|written rich-text note|user course is created|flashcard is|PDF genuinely|playlist gets|theme and font|global search|real browser-recorded WebM"
         env:
           CHROME_BIN: /usr/bin/google-chrome
       - name: Generate contact sheets even on test failure
