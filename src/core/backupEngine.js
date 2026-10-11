@@ -198,7 +198,12 @@ export function installBackupEngine(root = window) {
           counts[storeName] = portable[storeName].length;
         }
       } catch (error) {
+        // The transaction's completion promise rejects asynchronously after
+        // abort(). Observe that rejection before propagating the original
+        // synchronous DataError / DataCloneError; otherwise callers see an
+        // unrelated unhandled rejection even when importBackup was caught.
         try { transaction.abort(); } catch {}
+        await completion.catch(() => {});
         throw error;
       }
       await completion;
