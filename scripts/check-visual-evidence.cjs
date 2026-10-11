@@ -39,7 +39,7 @@ const matrix = [
   ['light-rtl-phone', 15, 390, 844],
   ['high-contrast', 15, 1280, 800],
   ['forced-colors', 15, 1280, 800],
-  ['zoom-200', 15, 1280, 900],
+  ['zoom-200', 15, 640, 450],
   ['scroll-bottom', 15, 1440, 900],
   ['deep-actions', 18, null, null],
 ];

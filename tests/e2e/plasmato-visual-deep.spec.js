@@ -20,7 +20,10 @@ const modes = [
   { group:'light-rtl-phone',width:390,height:844,light:true,rtl:true },
   { group:'high-contrast',width:1280,height:800,contrast:true },
   { group:'forced-colors',width:1280,height:800,forcedColors:true },
-  { group:'zoom-200',width:1280,height:900,zoom:true },
+  // At 200% browser page zoom, an unzoomed 1280x900 screen exposes only
+  // 640x450 CSS layout pixels. CSS style.zoom=2 is NOT equivalent: it
+  // leaves media queries at 1280px and manufactures invalid desktop grids.
+  { group:'zoom-200',width:640,height:450,effectiveZoom:2 },
   { group:'scroll-bottom',width:1440,height:900,scrollBottom:true },
 ];
 function record(payload) {
@@ -81,9 +84,10 @@ for (const cfg of modes) {
       await page.locator('#btn-theme-toggle').click();
       await expect.poll(()=>page.locator('html').getAttribute('data-theme')).not.toBe('dark');
     }
-    if(cfg.zoom) {
-      await page.evaluate(()=>{document.documentElement.style.zoom='2';});
-      expect(await page.evaluate(()=>getComputedStyle(document.documentElement).zoom)).toBe('2');
+    if(cfg.effectiveZoom) {
+      // Exercise the effective layout viewport after browser 200% zoom,
+      // rather than injecting CSS zoom and bypassing media-query reflow.
+      expect(page.viewportSize()).toEqual({ width: 640, height: 450 });
     }
     let scrolled=0;
     const errors=[];
@@ -125,6 +129,8 @@ test('mobile navigation and global chrome reveal real live controls',async({page
   await screenshot(page,'deep-actions','01-mobile-navigation-open');
   await page.locator('#sidebar a[href="#/notes"]').first().click();
   await expect(page).toHaveURL(/#\/notes/);
+  await expect(page.locator('#mobile-menu-btn')).toHaveAttribute('aria-expanded','false');
+  await expect(page.locator('#sidebar')).not.toHaveClass(/sidebar-mobile-open/);
   await screenshot(page,'deep-actions','02-mobile-navigation-complete');
   await page.setViewportSize({width:1280,height:800});
   await visit(page,'home');
