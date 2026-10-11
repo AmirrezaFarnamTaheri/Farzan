@@ -74,6 +74,22 @@ describe('home dashboard', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('shows an error instead of fabricated zeros when saved activity cannot be read', async () => {
+    mountDashboard();
+    window.DB.getAllNotes.mockRejectedValueOnce(new Error('IndexedDB read failed'));
+    await import('../src/views/homeRoute.js').then(({ mountHomeView }) => mountHomeView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+      Router: { navigate: vi.fn() },
+      setPendingCourseMedia: vi.fn(),
+    }));
+
+    await vi.waitFor(() => expect(document.querySelector('.home-data-error')).not.toBeNull());
+    expect(document.querySelector('[data-home-widgets]').getAttribute('aria-busy')).toBe('false');
+    expect(document.querySelector('[data-home-active-count]').textContent).toBe('—');
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('—');
+    expect(document.querySelector('.home-empty-state').textContent).toContain('temporarily unavailable');
+  });
+
   it('shows a useful empty state for a new learner', async () => {
     mountDashboard();
 
@@ -81,8 +97,8 @@ describe('home dashboard', () => {
       expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false');
     });
 
-    expect(document.getElementById('home-focus-title')?.textContent).toBe('Explore your course library');
-    expect(document.body.textContent).toContain('Your learning trail starts here');
-    expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Start learning');
+    expect(document.getElementById('home-focus-title')?.textContent).toBe('Choose a course');
+    expect(document.body.textContent).toContain('No recent activity');
+    expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Browse courses');
   });
 });

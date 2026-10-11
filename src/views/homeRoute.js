@@ -29,9 +29,8 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <span class="eyebrow">Your learning workspace</span>
-          <h1 class="home-title">Make space for focused study.</h1>
-          <p class="home-subtitle">Organize courses, annotate PDFs, write notes, and track your progress. Your materials stay on this device.</p>
+          <h1 class="home-title">Back to your studies.</h1>
+          <p class="home-subtitle">Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
@@ -51,9 +50,9 @@ export function mountHomeView(deps = {}) {
             </a>
           </div>
           <div class="home-command-strip" aria-label="Learning overview" data-home-command-strip>
-            <span><strong data-home-active-count>0</strong> active</span>
-            <span><strong data-home-note-count>0</strong> notes</span>
-            <span><strong data-home-review-count>0</strong> due for review</span>
+            <span><strong data-home-active-count>—</strong> active</span>
+            <span><strong data-home-note-count>—</strong> notes</span>
+            <span><strong data-home-review-count>—</strong> due for review</span>
           </div>
         </div>
 
@@ -62,14 +61,14 @@ export function mountHomeView(deps = {}) {
             <div>
               <h2 id="home-focus-title">Pick up where you left off</h2>
             </div>
-            <span class="home-focus-status" data-home-focus-status>Ready</span>
+            <span class="home-focus-status" data-home-focus-status>Start</span>
           </div>
-          <p data-home-focus-detail>Open a course to begin building your learning history.</p>
+          <p data-home-focus-detail>Open a course to see your recent work here.</p>
           <div class="home-focus-progress" aria-hidden="true">
             <span data-home-focus-progress></span>
           </div>
           <div class="home-focus-meta">
-            <span data-home-focus-percent>0% complete</span>
+            <span data-home-focus-percent>—</span>
             <span data-home-focus-time>No saved position</span>
           </div>
           <button class="home-focus-action" type="button" data-home-focus-action>
@@ -84,29 +83,29 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <h2 class="home-card-title">Your library at a glance</h2>
+                <h2 class="home-card-title">Progress</h2>
               </div>
-              <a class="btn btn-ghost btn-sm" href="#/progress">Open analytics</a>
+              <a class="btn btn-ghost btn-sm" href="#/progress">View progress</a>
             </div>
             <div class="home-pulse-grid" data-home-pulse aria-live="polite">
               <div class="home-pulse-item">
                 <span class="home-pulse-icon"><svg class="icon icon--spin" aria-hidden="true"><use href="#i-spinner"/></svg></span>
-                <strong data-pulse-active>0</strong>
+                <strong data-pulse-active>—</strong>
                 <span>In progress</span>
               </div>
               <div class="home-pulse-item">
                 <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"/></svg></span>
-                <strong data-pulse-complete>0</strong>
+                <strong data-pulse-complete>—</strong>
                 <span>Completed</span>
               </div>
               <div class="home-pulse-item">
                 <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></span>
-                <strong data-pulse-week>0</strong>
+                <strong data-pulse-week>—</strong>
                 <span>Activities this week</span>
               </div>
               <div class="home-pulse-item">
                 <span class="home-pulse-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart-columns"/></svg></span>
-                <strong data-pulse-average>0%</strong>
+                <strong data-pulse-average>—</strong>
                 <span>Average progress</span>
               </div>
             </div>
@@ -115,7 +114,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Library snapshot</h3>
+            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Catalog</h3>
             <div class="home-stat"><strong id="home-course-count">—</strong><span>Courses</span></div>
             <div class="home-stat"><strong id="home-topic-count">—</strong><span>Topics</span></div>
             <p class="home-card-note">Your catalog stays available offline after the first successful load.</p>
@@ -124,7 +123,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
-            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Quick tools</h3>
+            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Tools</h3>
             <div class="home-tool-list">
               <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
               <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
@@ -137,9 +136,9 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <h2 class="home-card-title">Continue, review, and capture</h2>
+                <h2 class="home-card-title">Next steps</h2>
               </div>
-              <kbd>Ctrl+K</kbd>
+              <span class="home-card-hint">Search: Ctrl+K</span>
             </div>
             <div class="home-widget-list" data-home-widgets aria-live="polite" aria-busy="true">
               <div class="home-widget-skeleton" aria-hidden="true"></div>
@@ -153,11 +152,11 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
-                <h2 class="home-card-title">Your latest learning trail</h2>
+                <h2 class="home-card-title">Recent activity</h2>
               </div>
             </div>
             <div class="home-activity-list" data-home-activity aria-live="polite">
-              <p class="home-empty-state">Your recent notes, timestamps, and progress updates will appear here.</p>
+              <p class="home-empty-state">Recent notes, bookmarks, and progress will appear here.</p>
             </div>
           </div>
         </section>
@@ -256,19 +255,53 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const activityRoot = document.querySelector('[data-home-activity]');
   if (!widgetsRoot || !activityRoot) return;
 
-  const [progress, notes, timestamps, topics] = await Promise.all([
-    (async () => { try { return await window.DB?.getAllProgress?.() ?? []; } catch { return []; } })(),
-    (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
-    (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-    (async () => {
-      try {
-        await window.DataStore?.init?.();
-        return window.DataStore?.allTopics?.() ?? [];
-      } catch {
-        return [];
-      }
-    })(),
-  ]);
+  const readSaved = async (method) => {
+    const reader = window.DB?.[method];
+    if (typeof reader !== 'function') throw new Error(`Saved study data is unavailable: ${method}`);
+    const records = await reader.call(window.DB);
+    if (!Array.isArray(records)) throw new TypeError(`Invalid saved study data: ${method}`);
+    return records;
+  };
+  let collections;
+  try {
+    collections = await Promise.all([
+      readSaved('getAllProgress'),
+      readSaved('getAllNotes'),
+      readSaved('getAllTimestamps'),
+      (async () => {
+        try {
+          await window.DataStore?.init?.();
+          return window.DataStore?.allTopics?.() ?? [];
+        } catch {
+          return [];
+        }
+      })(),
+    ]);
+  } catch (error) {
+    console.warn('[Home] Could not load saved activity:', error);
+    if (!document.body.contains(widgetsRoot)) return;
+    widgetsRoot.replaceChildren();
+    widgetsRoot.setAttribute('aria-busy', 'false');
+    const message = document.createElement('p');
+    message.className = 'home-data-error';
+    message.setAttribute('role', 'alert');
+    message.textContent = 'Saved activity could not be loaded. Nothing was changed. Reload to try again.';
+    widgetsRoot.append(message);
+    activityRoot.replaceChildren();
+    const activityMessage = document.createElement('p');
+    activityMessage.className = 'home-empty-state';
+    activityMessage.textContent = 'Recent activity is temporarily unavailable.';
+    activityRoot.append(activityMessage);
+    setText('#home-focus-title', 'Saved activity unavailable');
+    setText('[data-home-focus-status]', 'Unavailable');
+    setText('[data-home-focus-detail]', 'Your saved activity could not be read.');
+    setText('[data-home-focus-percent]', '—');
+    setText('[data-home-focus-time]', '');
+    document.querySelector('[data-home-focus-action]')?.addEventListener('click', () => Router.navigate('#/courses'));
+    document.querySelector('[data-home-resume]')?.addEventListener('click', () => Router.navigate('#/courses'));
+    return;
+  }
+  const [progress, notes, timestamps, topics] = collections;
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
@@ -306,10 +339,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const focusTopicId = focusRecord?.topicId;
   const focusTopic = topicMap.get(focusTopicId);
   const focusPercent = Math.max(0, Math.min(100, Number(latestProgress?.percent) || 0));
-  const focusTitle = focusTopic?.title || latestProgress?.topicTitle || latestTimestamp?.title || 'Explore your course library';
+  const focusTitle = focusTopic?.title || latestProgress?.topicTitle || latestTimestamp?.title || 'Choose a course';
   const focusDetail = focusRecord
-    ? 'Your latest learning session is ready to resume.'
-    : 'Choose a course and OpenCourseDeck will keep your next step ready here.';
+    ? 'Continue from your last saved activity.'
+    : 'Open a course to start tracking progress.';
 
   setText('#home-focus-title', focusTitle);
   setText('[data-home-focus-detail]', focusDetail);
@@ -335,7 +368,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     focusAction.addEventListener('click', openFocus);
   }
   if (resumeAction) {
-    resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Start learning';
+    resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Browse courses';
     resumeAction.addEventListener('click', openFocus);
   }
 
@@ -354,16 +387,16 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     {
       id: 'review',
       icon: 'i-redo',
-      label: 'Due review',
+      label: 'Review',
       title: topicMap.get(dueReview?.record?.topicId)?.title || dueReview?.record?.topicTitle || 'Nothing due',
-      detail: dueReview ? 'Revisit a completed topic to reinforce retention.' : 'Completed topics are still fresh.',
+      detail: dueReview ? 'Review a completed topic.' : 'Nothing scheduled for review.',
       action: dueReview ? 'review' : 'achievements',
       topicId: dueReview?.record?.topicId,
     },
     {
       id: 'recent',
       icon: 'i-lightbulb',
-      label: 'Recent insight',
+      label: 'Latest note',
       title: latestNote?.title || latestTimestamp?.title || 'No notes yet',
       detail: latestNote?.sourceType === 'pdf'
         ? `PDF page ${latestNote.pdfPage || latestNote.page || 1}`
@@ -453,7 +486,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     empty.className = 'home-empty-state';
     const icon = svgIcon('i-sprout');
     const title = document.createElement('strong');
-    title.textContent = 'Your learning trail starts here';
+    title.textContent = 'No recent activity';
     const detail = document.createElement('span');
     detail.textContent = 'Open a course, save a timestamp, or create a note.';
     empty.append(icon, title, detail);
