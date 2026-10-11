@@ -4,6 +4,10 @@
   --workspace-rule: color-mix(in srgb, var(--text-primary) 14%, transparent);
   --workspace-rule-strong: color-mix(in srgb, var(--text-primary) 24%, transparent);
   --workspace-focus: var(--accent-light);
+  /* Accent-tinted surfaces need readable text in light and dark themes.
+     Mixing accent-light toward white makes small labels fail contrast on
+     light panels (approximately 2:1 for the default Lapis selection). */
+  --accent-on-tint: var(--text-primary);
 }
 
 /* An even canvas and visible navigation; avoid layered blur over text. */
