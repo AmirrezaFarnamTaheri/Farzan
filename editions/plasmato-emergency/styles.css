@@ -701,7 +701,19 @@ input::placeholder { color: var(--faint); }
     padding-top: 14px;
   }
 
-  .stats-grid,
+  /* Keep all six catalog figures accessible without forcing mobile users
+     through a full screen of stacked metrics before course navigation. */
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+  .stat-card span {
+    font-size: clamp(1.12rem, 5vw, 1.5rem);
+  }
   .hierarchy-grid,
   .filter-grid {
     grid-template-columns: 1fr;

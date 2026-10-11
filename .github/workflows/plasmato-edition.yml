@@ -90,7 +90,7 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
 
       - name: Exercise visual and functional app acceptance in Chrome
-        run: npm run test:e2e -- tests/e2e/plasmato-visual.spec.js tests/e2e/plasmato-visual-expanded.spec.js
+        run: npm run test:e2e -- tests/e2e/plasmato-visual.spec.js tests/e2e/plasmato-visual-expanded.spec.js tests/e2e/plasmato-visual-deep.spec.js
         env:
           CHROME_BIN: /usr/bin/google-chrome
 
@@ -98,7 +98,7 @@ jobs:
         if: always()
         run: node scripts/visual-contact-sheet.cjs
 
-      - name: Verify all 308 screenshots, observations and SHA-256 manifest
+      - name: Verify all 476 screenshots, observations and SHA-256 manifest
         run: node scripts/check-visual-evidence.cjs
 
       - name: Upload screenshot matrix, interaction captures, and browser traces
@@ -138,6 +138,7 @@ jobs:
 
   build-windows:
     name: Build independent Plasmato Windows NSIS installer
+    if: false # Evidence review staging: keep release unmodified until visual sign-off
     needs: build-and-verify
     runs-on: windows-latest
     timeout-minutes: 90

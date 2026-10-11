@@ -29,9 +29,22 @@ const matrix = [
   ['studio-states', 7, 1280, 720],
   ['study-states', 4, 1280, 720],
   ['standalone-responsive', 9, null, null],
+  // Second full browser pass: reflow, landscape, forced colors, RTL and
+  // actual application scroll positions, plus interaction-first evidence.
+  ['medium-phone', 15, 480, 880],
+  ['phone-landscape', 15, 844, 390],
+  ['tablet-portrait', 15, 768, 1024],
+  ['tablet-landscape', 15, 1180, 820],
+  ['light-rtl-desktop', 15, 1440, 900],
+  ['light-rtl-phone', 15, 390, 844],
+  ['high-contrast', 15, 1280, 800],
+  ['forced-colors', 15, 1280, 800],
+  ['zoom-200', 15, 1280, 900],
+  ['scroll-bottom', 15, 1440, 900],
+  ['deep-actions', 18, null, null],
 ];
 const expectedCount = matrix.reduce((sum, item) => sum + item[1], 0);
-assert.equal(expectedCount, 308, 'Expected the reviewed 308-capture evidence matrix');
+assert.equal(expectedCount, 476, 'Expected the expanded 476-capture evidence matrix');
 const read = file => fs.readFileSync(path.join(root, file));
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -68,8 +81,8 @@ for (const [group, expected, width, height] of matrix) {
   }
   contactSheets.push(pngRecord('contact-sheet-' + group + '.png'));
 }
-assert.equal(images.length, 308);
-assert.equal(contactSheets.length, 24);
+assert.equal(images.length, 476);
+assert.equal(contactSheets.length, 35);
 
 const observationBytes = read('observations.jsonl');
 const observations = observationBytes.toString('utf8').trim().split('\n')
@@ -166,7 +179,7 @@ const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
   'background:#1b2c40;text-decoration:none}.tile img{height:145px;width:100%;object-fit:contain}' +
   '.tile span{padding:8px 12px;overflow-wrap:anywhere}small{color:#afbbca}</style></head><body>' +
   '<header><h1>Farzan Plasmato v1.0.3 - Visual Evidence</h1>' +
-  '<p>308 actual Chrome captures across 24 groups; no synthetic UI renderings.</p>' +
+  '<p>476 actual Chrome captures across 35 groups; no synthetic UI renderings.</p>' +
   '<p><a href="manifest.json">SHA-256 evidence manifest</a> · ' +
   '<a href="VISUAL-REPORT.md">Full coverage and limitations</a></p></header><nav>' +
   navigation + '</nav><main>' + sections + '</main></body></html>';
