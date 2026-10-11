@@ -131,7 +131,50 @@ jobs:
         run: |
           (cd release-assets && sha256sum -c SHA256SUMS)
           tag=plasmato-edition-v1.0.0
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha' 2>/dev/null || :)
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha' 2>/dev/null | grep -E '^[a-f0-9]{40}
+          if [[ -n "$existing" && "$existing" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Version tag ${tag} is immutable and points to ${existing}; bump the edition version to publish a new build."
+            exit 1
+          fi
+
+      - name: Publish Plasmato Edition v1.0.0
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: plasmato-edition-v1.0.0
+          target_commitish: ${{ github.sha }}
+          name: Farzan Plasmato Edition v1.0.0
+          body: |
+            Branch-specific edition of Farzan/OpenCourseDeck, built from the full Plasmato archive.
+            Contains 31 imported Plasmato courses (6,418 topics, 5,990 video and 280 PDF references)
+            alongside Farzan's existing starter course, plus the standalone emergency player.
+            Includes the production static website, offline service worker and checksum manifest.
+            Extract the ZIP and serve it over HTTP(S). External video and PDF hosts are not mirrored.
+            This edition is not merged to main and is distinct from standard Farzan releases.
+          files: |
+            release-assets/farzan-plasmato-edition-v1.0.0-web.zip
+            release-assets/SHA256SUMS
+          fail_on_unmatched_files: true
+          overwrite_files: false
+          make_latest: false
+
+  publish-pages:
+    name: Publish Plasmato Edition web application
+    needs: build-and-verify
+    if: github.ref == 'refs/heads/edition/plasmato-emergency-player-20261011' && vars.ENABLE_PLASMATO_PAGES == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified Plasmato web app
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+ || :)
           if [[ -n "$existing" && "$existing" != "$EXPECTED_COMMIT" ]]; then
             echo "::error::Version tag ${tag} is immutable and points to ${existing}; bump the edition version to publish a new build."
             exit 1
