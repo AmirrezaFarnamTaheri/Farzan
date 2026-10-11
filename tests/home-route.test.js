@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
 
-function mountDashboard({ progress = [], notes = [], timestamps = [] } = {}) {
+function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes = false } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
   window.DataStore = {
     init: vi.fn(async () => true),
@@ -13,7 +13,10 @@ function mountDashboard({ progress = [], notes = [], timestamps = [] } = {}) {
   };
   window.DB = {
     getAllProgress: vi.fn(async () => progress),
-    getAllNotes: vi.fn(async () => notes),
+    getAllNotes: vi.fn(async () => {
+      if (failNotes) throw new Error('IndexedDB read failed');
+      return notes;
+    }),
     getAllTimestamps: vi.fn(async () => timestamps),
   };
 
@@ -75,14 +78,7 @@ describe('home dashboard', () => {
   });
 
   it('shows an error instead of fabricated zeros when saved activity cannot be read', async () => {
-    mountDashboard();
-    window.DB.getAllNotes.mockRejectedValueOnce(new Error('IndexedDB read failed'));
-    await import('../src/views/homeRoute.js').then(({ mountHomeView }) => mountHomeView({
-      setView: html => { document.getElementById('main-content').innerHTML = html; },
-      Router: { navigate: vi.fn() },
-      setPendingCourseMedia: vi.fn(),
-    }));
-
+    mountDashboard({ failNotes: true });
     await vi.waitFor(() => expect(document.querySelector('.home-data-error')).not.toBeNull());
     expect(document.querySelector('[data-home-widgets]').getAttribute('aria-busy')).toBe('false');
     expect(document.querySelector('[data-home-active-count]').textContent).toBe('—');
