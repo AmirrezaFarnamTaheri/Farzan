@@ -140,6 +140,28 @@ describe('user library overlay', () => {
     await expect(putLibraryFile(file, { kind: 'video' })).rejects.toThrow(/too large/i);
   });
 
+  it('rejects file uploads when IndexedDB is unavailable without adding phantom topics', async () => {
+    const original = globalThis.indexedDB;
+    vi.stubGlobal('indexedDB', undefined);
+    try {
+      const file = new File(['file'], 'never-persisted.pdf', { type: 'application/pdf' });
+      await expect(putLibraryFile(file, { kind: 'pdf' })).rejects.toThrow(/storage is unavailable/);
+      await expect(addPdfFile(file)).rejects.toThrow(/storage is unavailable/);
+      expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('indexedDB', original);
+    }
+  });
+
+  it('keeps committed imported file blobs when a noncritical overlay callback throws', async () => {
+    window.DataStore.mergeRaw = vi.fn(() => { throw new Error('view unavailable'); });
+    const pdf = new File(['%PDF-1.4'], 'lecture.pdf', { type: 'application/pdf' });
+    const topic = await addPdfFile(pdf);
+    expect(topic.title).toBe('lecture');
+    const stored = (await loadLibrary()).courses[topic.courseId].sources[0].topics[0].pdfs[0];
+    expect(await resolveMediaUrl(stored)).toMatch(/^blob:/);
+  });
+
   it('registers the UserLibrary namespace', () => {
     const api = initUserLibrary(window);
     expect(window.OpenCourseDeck.UserLibrary).toBe(api);

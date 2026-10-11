@@ -172,11 +172,21 @@ async function persistLibrary(library, extra = {}) {
   }
   const next = cloneLibrary(library);
   await window.DB.saveSetting(LIBRARY_SETTING_KEY, next);
-  overlayLibrary(next);
-  window.OpenCourseDeck?.bus?.emit?.('library:changed', {
-    courses: Object.keys(next.courses).length,
-    ...extra,
-  });
+  // The canonical mutation is durable now. View refresh failures must not
+  // make the caller delete blobs which this committed metadata references.
+  try {
+    overlayLibrary(next);
+  } catch (error) {
+    console.warn('[UserLibrary] Refresh after committed save failed:', error);
+  }
+  try {
+    window.OpenCourseDeck?.bus?.emit?.('library:changed', {
+      courses: Object.keys(next.courses).length,
+      ...extra,
+    });
+  } catch (error) {
+    console.warn('[UserLibrary] Change notification failed after committed save:', error);
+  }
   return next;
 }
 
@@ -306,6 +316,11 @@ export async function putLibraryFile(file, { kind = 'file' } = {}) {
     record.bytes = Array.from(new Uint8Array(buffer));
   }
   try {
+    if (typeof indexedDB === 'undefined') {
+      throw new Error('Local file storage is unavailable. Enable browser storage before importing files.');
+    }
+    const db = await openFileDb();
+    if (!db) throw new Error('Local file storage is unavailable. The file was not imported.');
     await withFileStore('readwrite', (store) => store.put(record));
   } catch (error) {
     if (error?.name === 'QuotaExceededError') {

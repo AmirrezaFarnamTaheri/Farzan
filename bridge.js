@@ -601,9 +601,9 @@
           _broadcast('progress', 'save', next);
           return next;
         } catch (e) {
-          _signalSaveError('progress', 'indexedDB', e);
-          if (_errorInfo(e).quota) throw e;
-          console.warn('[DB] saveProgress IDB failed, falling back to localStorage:', e);
+          _signalSaveError('progress', 'indexedDB', e, { canonical: _isMigrated() });
+          if (_isMigrated() || _errorInfo(e).quota) throw e;
+          console.warn('[DB] saveProgress IDB failed before migration, using localStorage:', e);
           _emit('storage:fallback', { kind: 'progress', fallbackBackend: 'localStorage' });
         }
       }
@@ -641,7 +641,14 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { return (await idb.getAll('timestamps')) ?? []; } catch {}
+        try {
+          const records = (await idb.getAll('timestamps')) ?? [];
+          const seen = new Set(records.map(record => record?.id));
+          for (const record of _read(KEY_TIMESTAMPS, [])) {
+            if (record?.id && !seen.has(record.id)) records.push(record);
+          }
+          return records;
+        } catch {}
       }
       return _read(KEY_TIMESTAMPS, []);
     }
@@ -653,9 +660,9 @@
       if (idb) {
         await _migrateOnce();
         try { await idb.put('timestamps', next); _broadcast('timestamp', 'save', next); return true; } catch (e) {
-          _signalSaveError('timestamp', 'indexedDB', e);
-          if (_errorInfo(e).quota) throw e;
-          console.warn('[DB] saveTimestamp IDB failed, falling back to localStorage:', e);
+          _signalSaveError('timestamp', 'indexedDB', e, { canonical: _isMigrated() });
+          if (_isMigrated() || _errorInfo(e).quota) throw e;
+          console.warn('[DB] saveTimestamp IDB failed before migration, using localStorage:', e);
         }
       }
 

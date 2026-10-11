@@ -239,63 +239,68 @@ describe('bridge DB safety helpers', () => {
     expect(emit).not.toHaveBeenCalledWith('storage:fallback', expect.anything());
   });
 
-  it('signals transient progress write failures before using localStorage fallback', async () => {
+  it('rejects failed writes to canonical progress storage without a false fallback success', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = class {
-      async get() { return null; }
-      async put() { throw new Error('Temporary IDB failure'); }
+      async get() { return { topicId: 'topic-canonical', courseId: 'course-a', watched: 100 }; }
+      async put() { throw new Error('IDB transaction aborted'); }
     };
 
-    const progress = await window.DB.saveProgress('topic-fallback', 'course-a', { status: 'done' });
-    const saved = JSON.parse(localStorage.getItem('plasma_progress_v1'));
-
-    expect(progress.status).toBe('done');
-    expect(saved['topic-fallback']).toEqual(expect.objectContaining({ status: 'done' }));
+    await expect(window.DB.saveProgress('topic-canonical', 'course-a', { bookmarked: true }))
+      .rejects.toThrow('IDB transaction aborted');
+    expect(localStorage.getItem('plasma_progress_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
-      kind: 'progress',
-      backend: 'indexedDB',
-      error: expect.objectContaining({ quota: false }),
+      kind: 'progress', canonical: true, backend: 'indexedDB',
     }));
-    expect(emit).toHaveBeenCalledWith('storage:fallback', expect.objectContaining({
-      kind: 'progress',
-      fallbackBackend: 'localStorage',
-    }));
+    expect(emit).not.toHaveBeenCalledWith('progress:save', expect.anything());
   });
 
-  it('keeps an acknowledged localStorage-fallback progress write readable once IndexedDB recovers', async () => {
+  it('rejects failed canonical timestamp writes and does not broadcast success', async () => {
     localStorage.setItem('plasma_migrated_v2', 'true');
     window.OpenCourseDeck.bus = { emit: vi.fn() };
-
-    // IDB writes fail transiently while reads already work: saveProgress falls
-    // back to localStorage and reports success.
-    const idbRecords = new Map();
     window.OpenCourseDeck.DB.PlasmaDB = class {
-      async get(_store, key) { return idbRecords.get(key) ?? null; }
-      async getAll() { return [...idbRecords.values()]; }
-      async put() { throw new Error('Temporary IDB failure'); }
+      async put() { throw new Error('timestamp transaction aborted'); }
     };
 
-    const saved = await window.DB.saveProgress('topic-fallback', 'course-a', { status: 'done' });
-    expect(saved.status).toBe('done');
+    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a' }))
+      .rejects.toThrow('timestamp transaction aborted');
+    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
+  });
 
-    // The acknowledged write must stay readable even though IDB never got it.
-    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
-      expect.objectContaining({ topicId: 'topic-fallback', status: 'done' }),
-    );
-    await expect(window.DB.getAllProgress()).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ topicId: 'topic-fallback', status: 'done' })]),
-    );
+  it('retains readability for legacy timestamp fallbacks without overriding canonical records', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+      { id: 'legacy-only', topicId: 'a' },
+      { id: 'both', topicId: 'stale' },
+    ]));
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async getAll() { return [{ id: 'both', topicId: 'canonical' }]; }
+    };
+    const timestamps = await window.DB.getAllTimestamps();
+    expect(timestamps).toEqual(expect.arrayContaining([
+      { id: 'legacy-only', topicId: 'a' },
+      { id: 'both', topicId: 'canonical' },
+    ]));
+    expect(timestamps).toHaveLength(2);
+  });
 
-    // A record IDB later holds wins over the stale fallback.
-    idbRecords.set('topic-fallback', { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' });
-    await expect(window.DB.getProgress('topic-fallback')).resolves.toEqual(
-      { topicId: 'topic-fallback', status: 'reviewed', source: 'idb' },
-    );
-    await expect(window.DB.getAllProgress()).resolves.toEqual(
-      [{ topicId: 'topic-fallback', status: 'reviewed', source: 'idb' }],
-    );
+  it('reads historical localStorage-fallback progress records but prefers IndexedDB', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma_progress_v1', JSON.stringify({
+      fallback: { topicId: 'fallback', status: 'done' },
+      both: { topicId: 'both', status: 'stale' },
+    }));
+    const rows = new Map([['both', { topicId: 'both', status: 'canonical' }]]);
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get(_store, key) { return rows.get(key) ?? null; }
+      async getAll() { return [...rows.values()]; }
+    };
+    await expect(window.DB.getProgress('fallback')).resolves.toMatchObject({ status: 'done' });
+    await expect(window.DB.getProgress('both')).resolves.toMatchObject({ status: 'canonical' });
+    expect((await window.DB.getAllProgress())).toHaveLength(2);
   });
 
   it('does not mark migration complete when a compatibility section fails', async () => {
