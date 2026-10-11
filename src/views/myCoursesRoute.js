@@ -55,32 +55,59 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     window.OpenCourseDeck?.AddContent?.openMenu?.();
   });
 
+  let savingCourse = false;
   document.querySelector('[data-my-course-save]')?.addEventListener('click', async (event) => {
     event.preventDefault();
+    if (savingCourse) return;
+    const button = event.currentTarget;
     const titleInput = document.querySelector('[data-my-course-title]');
     const descriptionInput = document.querySelector('[data-my-course-description]');
     const title = titleInput?.value.trim() || '';
-    if (!title) return;
-    const courses = await loadCourses();
-    const record = {
-      id: `course-${Date.now().toString(36)}`,
-      title,
-      description: descriptionInput?.value.trim() || '',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    await saveCourses([record, ...courses]);
+    if (!title) {
+      titleInput?.focus?.();
+      Toast?.error?.('Enter a course title');
+      return;
+    }
+    savingCourse = true;
+    button.disabled = true;
     try {
-      await window.OpenCourseDeck?.UserLibrary?.upsertCourse?.({
-        id: record.id,
-        title: record.title,
-        description: record.description,
-      });
-    } catch {}
-    titleInput.value = '';
-    if (descriptionInput) descriptionInput.value = '';
-    Toast?.success?.('Course saved');
-    await renderCourses();
+      // Do not replace a live library based on a failed authoritative read.
+      const courses = await loadCourses();
+      const record = {
+        id: `course-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        title,
+        description: descriptionInput?.value.trim() || '',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await saveCourses([record, ...courses]);
+      const upsert = window.OpenCourseDeck?.UserLibrary?.upsertCourse;
+      if (typeof upsert === 'function') {
+        try {
+          await upsert({ id: record.id, title: record.title, description: record.description });
+        } catch (error) {
+          // The outline committed; do not misreport a partial catalog update.
+          console.warn('[My Courses] catalog update after saved outline failed:', error);
+          Toast?.error?.('Course outline saved, but catalog update failed. Retry from My Courses.');
+          await renderCourses();
+          return;
+        }
+      } else {
+        Toast?.error?.('Course outline saved, but catalog integration is unavailable.');
+        await renderCourses();
+        return;
+      }
+      titleInput.value = '';
+      if (descriptionInput) descriptionInput.value = '';
+      Toast?.success?.('Course saved');
+      await renderCourses();
+    } catch (error) {
+      console.warn('[My Courses] failed to save course:', error);
+      Toast?.error?.('Unable to save the course. Check local storage and try again.');
+    } finally {
+      savingCourse = false;
+      button.disabled = false;
+    }
   });
 
   let pendingLibraryCourse = '';
@@ -94,7 +121,20 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     const list = document.querySelector('[data-my-course-list]');
     const metrics = document.querySelector('[data-my-course-metrics]');
     if (!list || !metrics) return;
-    const courses = await loadCourses();
+    let courses;
+    try {
+      courses = await loadCourses();
+    } catch (error) {
+      console.warn('[My Courses] failed to read saved courses:', error);
+      metrics.replaceChildren();
+      list.replaceChildren();
+      const notice = document.createElement('p');
+      notice.className = 'text-muted';
+      notice.setAttribute('role', 'alert');
+      notice.textContent = 'Unable to load saved courses. Your data has not been reset. Check storage and reload this view.';
+      list.append(notice);
+      return;
+    }
     metrics.replaceChildren(metric('Courses', courses.length), metric('With descriptions', courses.filter(course => course.description).length));
     list.replaceChildren();
     if (!courses.length) {
@@ -166,11 +206,33 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     remove.type = 'button';
     remove.textContent = 'Delete';
     remove.addEventListener('click', async () => {
-      const next = (await loadCourses()).filter(item => item.id !== course.id);
-      await saveCourses(next);
-      try { await window.OpenCourseDeck?.UserLibrary?.removeCourse?.(course.id); } catch {}
-      Toast?.info?.('Course deleted');
-      await renderCourses();
+      if (remove.disabled) return;
+      remove.disabled = true;
+      try {
+        const existing = await loadCourses();
+        const next = existing.filter(item => item.id !== course.id);
+        await saveCourses(next);
+        try {
+          const removeFromCatalog = window.OpenCourseDeck?.UserLibrary?.removeCourse;
+          if (typeof removeFromCatalog !== 'function') throw new Error('Catalog integration is unavailable');
+          await removeFromCatalog(course.id);
+        } catch (error) {
+          // A failed catalog deletion must not invisibly remove this course.
+          try { await saveCourses(existing); }
+          catch (rollbackError) {
+            throw new AggregateError([error, rollbackError], 'Course list and catalog may be out of sync', { cause: rollbackError });
+          }
+          throw error;
+        }
+        Toast?.info?.('Course deleted');
+        await renderCourses();
+      } catch (error) {
+        console.warn('[My Courses] could not fully delete course:', error);
+        Toast?.error?.('Course deletion did not complete. Check My Courses and the catalog before retrying.');
+        await renderCourses();
+      } finally {
+        remove.disabled = false;
+      }
     });
     actions.append(open, remove);
     body.append(title, description, meta, actions);
@@ -191,10 +253,18 @@ function metric(label, value) {
 }
 
 async function loadCourses() {
-  const courses = await Promise.resolve(window.DB?.getSetting?.(STORAGE_KEY)).catch(() => []);
-  return Array.isArray(courses) ? courses : [];
+  if (typeof window.DB?.getSetting !== 'function') {
+    throw new Error('Course storage is unavailable');
+  }
+  const courses = await window.DB.getSetting(STORAGE_KEY);
+  if (courses == null) return [];
+  if (!Array.isArray(courses)) throw new TypeError('Saved courses have an unexpected format');
+  return courses;
 }
 
 async function saveCourses(courses) {
-  await Promise.resolve(window.DB?.saveSetting?.(STORAGE_KEY, courses));
+  if (typeof window.DB?.saveSetting !== 'function') {
+    throw new Error('Course storage is unavailable');
+  }
+  return window.DB.saveSetting(STORAGE_KEY, courses);
 }
