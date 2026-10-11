@@ -88,7 +88,7 @@ async function load({ failure = null } = {}) {
   for (const failure of ['missing', 'corrupt']) {
     const { dataStore: fallback, bus: events } = await load({ failure });
     assert.equal(fallback.getState().status, 'degraded');
-    assert.deepEqual(fallback.allCourses().map(course => course.id), ['getting-started']);
+    assert.deepEqual(Array.from(fallback.allCourses(), course => String(course.id)), ['getting-started']);
     assert.equal(fallback.allTopics().length, 3);
     assert(events.some(event => event.type === 'data:degraded'));
   }
