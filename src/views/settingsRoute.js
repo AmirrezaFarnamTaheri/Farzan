@@ -360,11 +360,23 @@ export function mountSettingsView(deps = {}) {
     const label = scopeLabels[scope] || scopeLabels.all;
     const confirmed = await window.OpenCourseDeck?.UI?.confirm?.(`This will permanently delete ${label} from this browser. Continue?`);
     if (!confirmed) return;
+    const db = window.DB;
+    const clearMain = typeof db?.clearUserData === 'function'
+      ? () => db.clearUserData(scope)
+      : (scope === 'all' && typeof db?.clearAll === 'function' ? () => db.clearAll() : null);
+    const clearFiles = scope === 'all' ? window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles : null;
+    if (!clearMain || (scope === 'all' && typeof clearFiles !== 'function')) {
+      Toast?.error?.('Cannot verify that all requested storage is available. Nothing was cleared.');
+      return;
+    }
+    let mainCleared = false;
     try {
-      if (window.DB?.clearUserData) await window.DB.clearUserData(scope);
-      else if (scope === 'all') await window.DB?.clearAll?.();
+      const committed = await clearMain();
+      if (committed === false) throw new Error('Primary storage did not confirm the deletion');
+      mainCleared = true;
       if (scope === 'all') {
-        await window.OpenCourseDeck?.UserLibrary?.clearLibraryFiles?.();
+        const filesCleared = await clearFiles();
+        if (filesCleared !== true) throw new Error('Imported media deletion was not confirmed');
       }
       if (scope === 'all' || scope === 'media') {
         sessionStorage.removeItem('ocd_pending_topic');
@@ -373,8 +385,11 @@ export function mountSettingsView(deps = {}) {
       }
       Toast?.success?.(`Cleared ${label}`);
       storageController?.update?.();
-    } catch {
-      Toast?.error?.('Clear failed');
+    } catch (error) {
+      console.warn('[Settings] Storage clear failed:', error);
+      Toast?.error?.(scope === 'all' && mainCleared
+        ? 'Some study records were deleted, but imported media could not be cleared. Check storage and your backup before retrying.'
+        : 'Deletion could not be confirmed. Check storage before retrying.');
     }
   });
 
