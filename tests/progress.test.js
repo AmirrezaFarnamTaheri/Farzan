@@ -17,6 +17,8 @@ describe('progress backup exports', () => {
       getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1' }]),
       getAllFolders: vi.fn(async () => [{ id: 'folder-1', name: 'Folder' }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-1', page: 2 }]),
+      getAllWatchedSegments: vi.fn(async () => []),
+      getAllPdfBookmarks: vi.fn(async () => []),
       getSetting: vi.fn(async (key) => {
         if (key === 'ocd_playlists') return [{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }];
         if (key === 'ocd_studio_board') return { version: 1, layers: [{ id: 'layer-1', elements: [] }] };
@@ -32,6 +34,8 @@ describe('progress backup exports', () => {
       getAnnotations: vi.fn(async () => []),
       saveAnnotations: vi.fn(async () => true),
       saveTimestamp: vi.fn(async () => true),
+      addWatchedSegment: vi.fn(async record => record),
+      addPdfBookmark: vi.fn(async record => record),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -63,12 +67,14 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.4');
+    expect(payload.version).toBe('1.5');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
     expect(payload.annotations).toHaveLength(1);
     expect(payload.timestamps).toHaveLength(1);
+    expect(payload.watchedSegments).toEqual([]);
+    expect(payload.pdfBookmarks).toEqual([]);
     expect(payload.settings.notes).toEqual({ view: 'list' });
     expect(payload.settings.playlists).toEqual([{ id: 'playlist-1', title: 'Saved queue', topicIds: ['topic-1'] }]);
     expect(payload.settings.studio).toEqual({ version: 1, layers: [{ id: 'layer-1', elements: [] }] });
@@ -76,6 +82,63 @@ describe('progress backup exports', () => {
     expect(payload.settings.library).toEqual({ version: 1, courses: { 'user-library': { title: 'My Library', sources: [] } } });
     expect(payload.meta.storage.available).toBe(900);
     expect(payload.meta.sizeBytes).toBeGreaterThan(0);
+  });
+
+  it('includes watched segments and PDF bookmarks in version 1.5 JSON exports', async () => {
+    window.DB.getAllWatchedSegments.mockResolvedValueOnce([
+      { id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 },
+    ]);
+    window.DB.getAllPdfBookmarks.mockResolvedValueOnce([
+      { id: 'page-bookmark', docId: 'document.pdf', page: 4 },
+    ]);
+    await window.ProgressStats.exportJSON();
+    const payload = JSON.parse(await downloadedBlob.text());
+    expect(payload).toMatchObject({
+      version: '1.5',
+      watchedSegments: [{ id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 }],
+      pdfBookmarks: [{ id: 'page-bookmark', docId: 'document.pdf', page: 4 }],
+    });
+  });
+
+  it('never exports an incomplete backup when an auxiliary store read fails', async () => {
+    window.DB.getAllPdfBookmarks.mockRejectedValueOnce(new Error('bookmark storage failed'));
+    await expect(window.ProgressStats.exportJSON()).rejects.toThrow('bookmark storage failed');
+    expect(downloadedBlob).toBeNull();
+  });
+
+  it('rejects an extended media import before any write without an atomic rollback snapshot', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.5',
+      watchedSegments: [{ id: 'segment', topicId: 'topic-1', start: 0, end: 10 }],
+    })], 'media.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('atomic media recovery is unavailable'),
+    );
+    expect(window.DB.addWatchedSegment).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+  });
+
+  it('restores version 1.5 media records when a v3 rollback snapshot is available', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      progress: [], notes: [], folders: [], settings: [], annotations: [],
+      timestamps: [], watchedSegments: [], pdfBookmarks: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    const file = new File([JSON.stringify({
+      version: '1.5',
+      watchedSegments: [{ id: 'segment-2', topicId: 'topic-1', start: 3, end: 14 }],
+      pdfBookmarks: [{ id: 'pdf-2', docId: 'research.pdf', page: 6 }],
+    })], 'portable-media.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.addWatchedSegment).toHaveBeenCalledWith(expect.objectContaining({ id: 'segment-2' }));
+    expect(window.DB.addPdfBookmark).toHaveBeenCalledWith(expect.objectContaining({ id: 'pdf-2' }));
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      watchedSegments: 1, pdfBookmarks: 1, errors: [],
+    });
   });
 
   it('exports Markdown notes from current content before legacy fields', async () => {
