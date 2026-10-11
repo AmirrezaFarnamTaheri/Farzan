@@ -626,7 +626,9 @@ describe('progress backup exports', () => {
 
     await window.ProgressStats.importJSONFile(file);
 
-    expect(window.DB.importBackup).toHaveBeenCalledWith(original, { mode: 'overwrite' });
+    expect(window.DB.importBackup).toHaveBeenCalledWith(original, {
+      mode: 'overwrite', restoreLocalAuthority: true,
+    });
     expect(window.DB.clearUserData).not.toHaveBeenCalled();
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
   });

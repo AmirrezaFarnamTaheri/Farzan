@@ -275,6 +275,59 @@ describe('atomic backup engine', () => {
     ]));
   });
 
+  it('recovers the original same-session AI approval after an atomic rollback without exporting it', async () => {
+    const original = {
+      mode: 'custom-api', model: 'saved-model',
+      endpoint: 'https://api.example.test/v1/chat',
+      approvedEndpointOrigin: 'https://api.example.test',
+      authorityRevision: 7, authorityTransactionId: 'prior-session',
+      hasKey: true,
+    };
+    await putSetting(original);
+    const root = rootWithFacade({
+      [AI_SESSION_KEY]: 'original-key',
+      [AI_BINDING_KEY]: '{"version":1,"prior":true}',
+    });
+    installBackupEngine(root);
+    const snapshot = await root.DB.exportBackup();
+    expect(JSON.stringify(snapshot)).not.toContain('original-key');
+    expect(JSON.stringify(snapshot)).not.toContain('prior-session');
+    expect(snapshot.settings[0].value.approvedEndpointOrigin).toBe('');
+
+    await root.DB.importBackup({ notes: [{ id: 'temp', title: 'temporary' }] }, { mode: 'merge' });
+    expect(root.sessionStorage.getItem(AI_SESSION_KEY)).toBeNull();
+    const receipt = await root.DB.importBackup(snapshot, {
+      mode: 'overwrite', restoreLocalAuthority: true,
+    });
+    expect(receipt).toMatchObject({
+      committed: true, degraded: false, aiAuthorityInvalidated: false, aiAuthorityRestored: true,
+    });
+    expect(root.sessionStorage.getItem(AI_SESSION_KEY)).toBe('original-key');
+    expect(root.sessionStorage.getItem(AI_BINDING_KEY)).toContain('prior');
+
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('opencoursedeck', 3);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const originalSaved = await new Promise((resolve, reject) => {
+      const tx = db.transaction('settings', 'readonly');
+      const req = tx.objectStore('settings').get(AI_SETTINGS_KEY);
+      req.onsuccess = () => resolve(req.result.value);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    expect(originalSaved).toEqual(original);
+  });
+
+  it('refuses a trusted-rollback opt-in for untrusted portable JSON', async () => {
+    const root = rootWithFacade();
+    installBackupEngine(root);
+    await expect(root.DB.importBackup({ notes: [] }, {
+      mode: 'overwrite', restoreLocalAuthority: true,
+    })).rejects.toThrow(/same-session snapshot/);
+  });
+
   it('rejects unknown stores before mutating live data', async () => {
     const root = rootWithFacade();
     installBackupEngine(root);

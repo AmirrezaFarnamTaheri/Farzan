@@ -117,6 +117,11 @@ export function installBackupEngine(root = window) {
   const facade = root.DB;
   if (!facade || facade.__backupEngineInstalled) return facade;
 
+  // A portable snapshot must never expose API keys or endpoint approval.
+  // Keep the exact, same-session rollback state in a WeakMap keyed by the
+  // in-memory snapshot object; JSON serialization cannot disclose it.
+  const localRollbackAuthority = new WeakMap();
+
   facade.exportBackup = async () => {
     const db = await openDatabase(root);
     try {
@@ -126,8 +131,12 @@ export function installBackupEngine(root = window) {
       // after await Promise.all(reads) can miss an already-completed transaction.
       const completion = transactionDone(transaction);
       const result = {};
+      let originalAISetting = null;
       const reads = available.map(async (store) => {
         const records = await requestResult(transaction.objectStore(store).getAll());
+        if (store === 'settings') {
+          originalAISetting = records.find(record => record?.key === AI_SETTINGS_KEY) ?? null;
+        }
         result[store] = store === 'settings' ? sanitizeSettingsRecords(records) : records;
       });
       await Promise.all(reads);
@@ -140,14 +149,31 @@ export function installBackupEngine(root = window) {
         portableAuthority: false,
         stores: countRecords(result, available),
       };
+      // Store raw authorization only in non-serializable closure state.
+      // Missing/denied session storage makes trusted rollback unavailable,
+      // but ordinary portable exports remain possible.
+      try {
+        localRollbackAuthority.set(result, {
+          originalAISetting,
+          session: Object.fromEntries([AI_SESSION_KEY, AI_BINDING_KEY]
+            .map(key => [key, root.sessionStorage?.getItem?.(key) ?? null])),
+        });
+      } catch { /* session authority cannot be captured for rollback */ }
       return result;
     } finally {
       db.close();
     }
   };
 
-  facade.importBackup = async (input, { mode = 'merge' } = {}) => {
+  facade.importBackup = async (input, { mode = 'merge', restoreLocalAuthority = false } = {}) => {
     if (!['merge', 'overwrite'].includes(mode)) throw new TypeError(`Unsupported import mode: ${mode}`);
+    // This opt-in is exclusively for a snapshot produced by this engine in
+    // this same runtime. Imported JSON can never opt itself into restoring
+    // credential or endpoint approval state.
+    const trusted = restoreLocalAuthority ? localRollbackAuthority.get(input) : null;
+    if (restoreLocalAuthority && (mode !== 'overwrite' || !trusted)) {
+      throw new Error('Trusted local rollback requires a same-session snapshot and overwrite mode');
+    }
     const portable = sanitizePortableBackup(input);
     const included = validateBackup(portable);
     const db = await openDatabase(root);
@@ -162,7 +188,13 @@ export function installBackupEngine(root = window) {
         for (const storeName of included) {
           const store = transaction.objectStore(storeName);
           if (mode === 'overwrite') store.clear();
-          for (const record of portable[storeName]) store.put(record);
+          for (const record of portable[storeName]) {
+            const restoredRecord = trusted && storeName === 'settings'
+              && record.key === AI_SETTINGS_KEY && trusted.originalAISetting
+              ? trusted.originalAISetting
+              : record;
+            store.put(restoredRecord);
+          }
           counts[storeName] = portable[storeName].length;
         }
       } catch (error) {
@@ -193,7 +225,30 @@ export function installBackupEngine(root = window) {
           }
         }
       }
-      const authorityFailures = clearSessionAuthority(root);
+      // Normal imports always invalidate AI authority. Only a rollback using
+      // the precise in-memory export object may rebind its previous session.
+      const authorityFailures = [];
+      if (trusted) {
+        for (const [key, previous] of Object.entries(trusted.session)) {
+          try {
+            const existing = root.sessionStorage?.getItem?.(key) ?? null;
+            // A newly approved authority from a concurrent action must never
+            // be overwritten by an older rollback credential.
+            if (existing !== null && existing !== previous) {
+              throw new Error('Session authority changed after rollback snapshot');
+            }
+            if (previous === null) root.sessionStorage?.removeItem?.(key);
+            else root.sessionStorage?.setItem?.(key, previous);
+            if ((root.sessionStorage?.getItem?.(key) ?? null) !== previous) {
+              throw new Error('Restored session authority did not persist');
+            }
+          } catch (error) {
+            authorityFailures.push({ key, message: error?.message || String(error) });
+          }
+        }
+      } else {
+        authorityFailures.push(...clearSessionAuthority(root));
+      }
       const degraded = authorityFailures.length > 0 || mirrorFailures.length > 0;
 
       const receipt = {
@@ -206,7 +261,8 @@ export function installBackupEngine(root = window) {
         importedAt: new Date().toISOString(),
         stores: counts,
         totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
-        aiAuthorityInvalidated: authorityFailures.length === 0,
+        aiAuthorityInvalidated: !trusted && authorityFailures.length === 0,
+        aiAuthorityRestored: Boolean(trusted && authorityFailures.length === 0),
         warnings: [
           ...(mirrorFailures.length ? [{
             code: 'MIRROR_CLEANUP_INCOMPLETE',
@@ -214,21 +270,23 @@ export function installBackupEngine(root = window) {
             failures: mirrorFailures,
           }] : []),
           ...(authorityFailures.length ? [{
-            code: 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
-            message: 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
+            code: trusted ? 'AI_AUTHORITY_ROLLBACK_INCOMPLETE' : 'AI_AUTHORITY_INVALIDATION_INCOMPLETE',
+            message: trusted
+              ? 'Backup was restored, but the previous AI session approval could not be recovered. Reauthorize your AI endpoint.'
+              : 'Backup data committed, but session AI authority could not be fully invalidated. Close this tab before retrying or using AI features.',
             failures: authorityFailures,
           }] : []),
         ],
       };
       root.OpenCourseDeck?.bus?.emit?.('storage:import-complete', receipt);
       if (mirrorFailures.length) root.OpenCourseDeck?.bus?.emit?.('storage:mirror-cleanup-incomplete', receipt);
-      if (degraded) {
-        root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidation-incomplete', {
-          reason: 'backup-import',
-          committed: true,
-          retrySafe: false,
-          failures: authorityFailures,
-        });
+      if (authorityFailures.length) {
+        root.OpenCourseDeck?.bus?.emit?.(
+          trusted ? 'ai:authority-rollback-incomplete' : 'ai:authority-invalidation-incomplete',
+          { reason: 'backup-import', committed: true, retrySafe: false, failures: authorityFailures },
+        );
+      } else if (trusted) {
+        root.OpenCourseDeck?.bus?.emit?.('ai:authority-restored', { reason: 'local-rollback' });
       } else {
         root.OpenCourseDeck?.bus?.emit?.('ai:authority-invalidated', { reason: 'backup-import' });
       }

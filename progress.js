@@ -1179,8 +1179,10 @@ const ProgressStats = (() => {
       if (snapshot.primary && typeof DB.importBackup === 'function') {
         // The v3 backup engine overwrites all primary object stores in ONE IDB
         // transaction, preserving untouched watchedSegments/pdfBookmarks.
-        const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite' });
-        if (receipt?.committed !== true) throw new Error('Atomic rollback did not commit');
+        const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
+        if (receipt?.committed !== true || receipt.degraded === true) {
+          throw new Error('Atomic rollback was incomplete; check storage and AI session status');
+        }
       } else {
         // Legacy compatibility path: never clear the broad "media" scope.
         // That scope also contains watched segments and PDF bookmarks, which
