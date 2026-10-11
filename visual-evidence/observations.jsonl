@@ -1,0 +1,107 @@
+{"group":"desktop","name":"01-home","file":"screenshots/desktop/01-home.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:25.363Z"}
+{"group":"desktop","route":"home","health":{"hash":"#/home","title":"OpenCourseDeck — Courses and notes","textLength":932,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"desktop","name":"02-courses","file":"screenshots/desktop/02-courses.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:26.035Z"}
+{"group":"desktop","route":"courses","health":{"hash":"#/courses","title":"OpenCourseDeck — Courses and notes","textLength":2748,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":1,"buttons":78}}
+{"group":"desktop","name":"03-my-courses","file":"screenshots/desktop/03-my-courses.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:26.676Z"}
+{"group":"desktop","route":"my-courses","health":{"hash":"#/my-courses","title":"OpenCourseDeck — Courses and notes","textLength":372,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":6}}
+{"group":"desktop","name":"04-materials","file":"screenshots/desktop/04-materials.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:27.443Z"}
+{"group":"desktop","route":"materials","health":{"hash":"#/materials","title":"OpenCourseDeck — Courses and notes","textLength":5631,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":57}}
+{"group":"desktop","name":"05-notes","file":"screenshots/desktop/05-notes.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:28.079Z"}
+{"group":"desktop","route":"notes","health":{"hash":"#/notes","title":"OpenCourseDeck — Courses and notes","textLength":410,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":29}}
+{"group":"desktop","name":"06-pdf","file":"screenshots/desktop/06-pdf.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:28.649Z"}
+{"group":"desktop","route":"pdf","health":{"hash":"#/pdf","title":"OpenCourseDeck — Courses and notes","textLength":162,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":16}}
+{"group":"desktop","name":"07-progress","file":"screenshots/desktop/07-progress.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:29.299Z"}
+{"group":"desktop","route":"progress","health":{"hash":"#/progress","title":"OpenCourseDeck — Courses and notes","textLength":2093,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":9}}
+{"group":"desktop","name":"08-playlists","file":"screenshots/desktop/08-playlists.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:29.894Z"}
+{"group":"desktop","route":"playlists","health":{"hash":"#/playlists","title":"OpenCourseDeck — Courses and notes","textLength":2542,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"desktop","name":"09-bookmarks","file":"screenshots/desktop/09-bookmarks.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:30.409Z"}
+{"group":"desktop","route":"bookmarks","health":{"hash":"#/bookmarks","title":"OpenCourseDeck — Courses and notes","textLength":187,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"desktop","name":"10-tags","file":"screenshots/desktop/10-tags.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:30.968Z"}
+{"group":"desktop","route":"tags","health":{"hash":"#/tags","title":"OpenCourseDeck — Courses and notes","textLength":206,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"desktop","name":"11-flashcards","file":"screenshots/desktop/11-flashcards.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:31.525Z"}
+{"group":"desktop","route":"flashcards","health":{"hash":"#/flashcards","title":"OpenCourseDeck — Courses and notes","textLength":249,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":1}}
+{"group":"desktop","name":"12-studio","file":"screenshots/desktop/12-studio.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:32.093Z"}
+{"group":"desktop","route":"studio","health":{"hash":"#/studio","title":"OpenCourseDeck — Courses and notes","textLength":306,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":25}}
+{"group":"desktop","name":"13-achievements","file":"screenshots/desktop/13-achievements.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:32.705Z"}
+{"group":"desktop","route":"achievements","health":{"hash":"#/achievements","title":"OpenCourseDeck — Courses and notes","textLength":493,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":0}}
+{"group":"desktop","name":"14-settings","file":"screenshots/desktop/14-settings.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:33.331Z"}
+{"group":"desktop","route":"settings","health":{"hash":"#/settings","title":"OpenCourseDeck — Courses and notes","textLength":1852,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":18}}
+{"group":"desktop","name":"15-help","file":"screenshots/desktop/15-help.png","viewport":{"width":1440,"height":900},"at":"2026-10-11T21:24:33.890Z"}
+{"group":"desktop","route":"help","health":{"hash":"#/help","title":"OpenCourseDeck — Courses and notes","textLength":1423,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":8}}
+{"group":"desktop","failures":[],"exceptions":[]}
+{"group":"tablet","name":"01-home","file":"screenshots/tablet/01-home.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:35.196Z"}
+{"group":"tablet","route":"home","health":{"hash":"#/home","title":"OpenCourseDeck — Courses and notes","textLength":932,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"tablet","name":"02-courses","file":"screenshots/tablet/02-courses.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:35.766Z"}
+{"group":"tablet","route":"courses","health":{"hash":"#/courses","title":"OpenCourseDeck — Courses and notes","textLength":2748,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":1,"buttons":78}}
+{"group":"tablet","name":"03-my-courses","file":"screenshots/tablet/03-my-courses.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:36.319Z"}
+{"group":"tablet","route":"my-courses","health":{"hash":"#/my-courses","title":"OpenCourseDeck — Courses and notes","textLength":372,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":6}}
+{"group":"tablet","name":"04-materials","file":"screenshots/tablet/04-materials.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:36.907Z"}
+{"group":"tablet","route":"materials","health":{"hash":"#/materials","title":"OpenCourseDeck — Courses and notes","textLength":5631,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":57}}
+{"group":"tablet","name":"05-notes","file":"screenshots/tablet/05-notes.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:37.486Z"}
+{"group":"tablet","route":"notes","health":{"hash":"#/notes","title":"OpenCourseDeck — Courses and notes","textLength":410,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":29}}
+{"group":"tablet","name":"06-pdf","file":"screenshots/tablet/06-pdf.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:38.030Z"}
+{"group":"tablet","route":"pdf","health":{"hash":"#/pdf","title":"OpenCourseDeck — Courses and notes","textLength":162,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":16}}
+{"group":"tablet","name":"07-progress","file":"screenshots/tablet/07-progress.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:38.714Z"}
+{"group":"tablet","route":"progress","health":{"hash":"#/progress","title":"OpenCourseDeck — Courses and notes","textLength":2093,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":9}}
+{"group":"tablet","name":"08-playlists","file":"screenshots/tablet/08-playlists.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:39.335Z"}
+{"group":"tablet","route":"playlists","health":{"hash":"#/playlists","title":"OpenCourseDeck — Courses and notes","textLength":2542,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"tablet","name":"09-bookmarks","file":"screenshots/tablet/09-bookmarks.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:39.881Z"}
+{"group":"tablet","route":"bookmarks","health":{"hash":"#/bookmarks","title":"OpenCourseDeck — Courses and notes","textLength":187,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"tablet","name":"10-tags","file":"screenshots/tablet/10-tags.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:40.426Z"}
+{"group":"tablet","route":"tags","health":{"hash":"#/tags","title":"OpenCourseDeck — Courses and notes","textLength":206,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"tablet","name":"11-flashcards","file":"screenshots/tablet/11-flashcards.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:41.007Z"}
+{"group":"tablet","route":"flashcards","health":{"hash":"#/flashcards","title":"OpenCourseDeck — Courses and notes","textLength":249,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":1}}
+{"group":"tablet","name":"12-studio","file":"screenshots/tablet/12-studio.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:41.576Z"}
+{"group":"tablet","route":"studio","health":{"hash":"#/studio","title":"OpenCourseDeck — Courses and notes","textLength":306,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":25}}
+{"group":"tablet","name":"13-achievements","file":"screenshots/tablet/13-achievements.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:42.137Z"}
+{"group":"tablet","route":"achievements","health":{"hash":"#/achievements","title":"OpenCourseDeck — Courses and notes","textLength":493,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":0}}
+{"group":"tablet","name":"14-settings","file":"screenshots/tablet/14-settings.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:42.716Z"}
+{"group":"tablet","route":"settings","health":{"hash":"#/settings","title":"OpenCourseDeck — Courses and notes","textLength":1852,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":18}}
+{"group":"tablet","name":"15-help","file":"screenshots/tablet/15-help.png","viewport":{"width":900,"height":1080},"at":"2026-10-11T21:24:43.274Z"}
+{"group":"tablet","route":"help","health":{"hash":"#/help","title":"OpenCourseDeck — Courses and notes","textLength":1423,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":8}}
+{"group":"tablet","failures":[],"exceptions":[]}
+{"group":"mobile","name":"01-home","file":"screenshots/mobile/01-home.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:44.424Z"}
+{"group":"mobile","route":"home","health":{"hash":"#/home","title":"OpenCourseDeck — Courses and notes","textLength":932,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"mobile","name":"02-courses","file":"screenshots/mobile/02-courses.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:44.966Z"}
+{"group":"mobile","route":"courses","health":{"hash":"#/courses","title":"OpenCourseDeck — Courses and notes","textLength":2748,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":1,"buttons":78}}
+{"group":"mobile","name":"03-my-courses","file":"screenshots/mobile/03-my-courses.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:45.496Z"}
+{"group":"mobile","route":"my-courses","health":{"hash":"#/my-courses","title":"OpenCourseDeck — Courses and notes","textLength":372,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":6}}
+{"group":"mobile","name":"04-materials","file":"screenshots/mobile/04-materials.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:46.059Z"}
+{"group":"mobile","route":"materials","health":{"hash":"#/materials","title":"OpenCourseDeck — Courses and notes","textLength":5631,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":57}}
+{"group":"mobile","name":"05-notes","file":"screenshots/mobile/05-notes.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:46.622Z"}
+{"group":"mobile","route":"notes","health":{"hash":"#/notes","title":"OpenCourseDeck — Courses and notes","textLength":410,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":29}}
+{"group":"mobile","name":"06-pdf","file":"screenshots/mobile/06-pdf.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:47.149Z"}
+{"group":"mobile","route":"pdf","health":{"hash":"#/pdf","title":"OpenCourseDeck — Courses and notes","textLength":162,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":16}}
+{"group":"mobile","name":"07-progress","file":"screenshots/mobile/07-progress.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:47.751Z"}
+{"group":"mobile","route":"progress","health":{"hash":"#/progress","title":"OpenCourseDeck — Courses and notes","textLength":2093,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":9}}
+{"group":"mobile","name":"08-playlists","file":"screenshots/mobile/08-playlists.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:48.306Z"}
+{"group":"mobile","route":"playlists","health":{"hash":"#/playlists","title":"OpenCourseDeck — Courses and notes","textLength":2542,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":12}}
+{"group":"mobile","name":"09-bookmarks","file":"screenshots/mobile/09-bookmarks.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:48.818Z"}
+{"group":"mobile","route":"bookmarks","health":{"hash":"#/bookmarks","title":"OpenCourseDeck — Courses and notes","textLength":187,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"mobile","name":"10-tags","file":"screenshots/mobile/10-tags.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:49.330Z"}
+{"group":"mobile","route":"tags","health":{"hash":"#/tags","title":"OpenCourseDeck — Courses and notes","textLength":206,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":5}}
+{"group":"mobile","name":"11-flashcards","file":"screenshots/mobile/11-flashcards.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:49.848Z"}
+{"group":"mobile","route":"flashcards","health":{"hash":"#/flashcards","title":"OpenCourseDeck — Courses and notes","textLength":249,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":1}}
+{"group":"mobile","name":"12-studio","file":"screenshots/mobile/12-studio.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:50.365Z"}
+{"group":"mobile","route":"studio","health":{"hash":"#/studio","title":"OpenCourseDeck — Courses and notes","textLength":306,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":25}}
+{"group":"mobile","name":"13-achievements","file":"screenshots/mobile/13-achievements.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:50.920Z"}
+{"group":"mobile","route":"achievements","health":{"hash":"#/achievements","title":"OpenCourseDeck — Courses and notes","textLength":493,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":0}}
+{"group":"mobile","name":"14-settings","file":"screenshots/mobile/14-settings.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:51.465Z"}
+{"group":"mobile","route":"settings","health":{"hash":"#/settings","title":"OpenCourseDeck — Courses and notes","textLength":1852,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":18}}
+{"group":"mobile","name":"15-help","file":"screenshots/mobile/15-help.png","viewport":{"width":390,"height":844},"at":"2026-10-11T21:24:52.003Z"}
+{"group":"mobile","route":"help","health":{"hash":"#/help","title":"OpenCourseDeck — Courses and notes","textLength":1423,"visible":true,"overflow":0,"viewErrors":0,"brokenImages":0,"buttons":8}}
+{"group":"mobile","failures":[],"exceptions":[]}
+{"group":"functional","name":"01-plasmato-lecture-selected","file":"screenshots/functional/01-plasmato-lecture-selected.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:53.686Z"}
+{"group":"functional","name":"02-real-completion-saved","file":"screenshots/functional/02-real-completion-saved.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:54.243Z"}
+{"group":"functional","name":"03-filtered-plasmato-materials","file":"screenshots/functional/03-filtered-plasmato-materials.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:54.908Z"}
+{"group":"functional","name":"04-written-note-persisted","file":"screenshots/functional/04-written-note-persisted.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:57.274Z"}
+{"group":"functional","name":"05-saved-note-reopened","file":"screenshots/functional/05-saved-note-reopened.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:58.328Z"}
+{"group":"functional","name":"06-my-course-created","file":"screenshots/functional/06-my-course-created.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:24:59.725Z"}
+{"group":"functional","name":"07-flashcard-editor","file":"screenshots/functional/07-flashcard-editor.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:00.777Z"}
+{"group":"functional","name":"08-flashcard-flipped","file":"screenshots/functional/08-flashcard-flipped.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:01.585Z"}
+{"group":"functional","name":"09-flashcard-graded","file":"screenshots/functional/09-flashcard-graded.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:01.827Z"}
+{"group":"functional","name":"10-pdf-rendered","file":"screenshots/functional/10-pdf-rendered.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:03.048Z"}
+{"group":"functional","name":"11-pdf-page-note-saved","file":"screenshots/functional/11-pdf-page-note-saved.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:03.312Z"}
+{"group":"functional","name":"12-playlist-created","file":"screenshots/functional/12-playlist-created.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:04.627Z"}
+{"group":"functional","name":"13-theme-switched","file":"screenshots/functional/13-theme-switched.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:05.940Z"}
+{"group":"functional","name":"14-type-scale-increased","file":"screenshots/functional/14-type-scale-increased.png","viewport":{"width":1280,"height":720},"at":"2026-10-11T21:25:06.250Z"}
