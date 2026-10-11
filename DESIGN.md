@@ -197,3 +197,15 @@ Every interactive control satisfies all 8 states:
   - Built 20-icon standalone vector suite in `assets/icons/`, compiled `icon-sprite.svg`, and deployed `icons-preview.html`.
   - Updated brand identity assets (`og-cover.svg`, `favicon.svg`, `icon-192.svg`) with layered gradients and crisp vector geometry.
   - Documented complete OKLCH/sRGB token architecture, 8-state interactive component matrix, and WCAG AA accessibility compliance in `DESIGN.md`.
+
+## Study-first refinement (October 2026)
+
+The deployed home screen is a workspace, not a marketing landing page. `src/styles/study-polish.css` is the narrow finishing layer for actual UI surfaces; it uses existing theme and accent variables, preserves the 15-route information architecture and avoids replacing the vanilla JavaScript component system.
+
+- Solid navigation surfaces reduce blur and improve contrast/scroll performance on low-end devices.
+- A shorter, sans-serif home heading yields more room for course and note actions at compact laptop widths.
+- Supporting captions use stronger theme-derived contrast rather than near-invisible 35–42% opacity.
+- Non-interactive statistics no longer imitate click targets through hover lift. Interactive navigation exposes `aria-current=page`.
+- Primary home actions form a compact two-column grid on narrow phones, with single-column fallback below 360px; the focus card stacks below the hero when space is constrained.
+
+This is a code-level visual refinement, not a claim of pixel-verified browser screenshots, full WCAG certification or completed Persian localization. Validate all supported themes, keyboard-only flows, 200% zoom and real-device layout before approving a final redesign.

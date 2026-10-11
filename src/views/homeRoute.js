@@ -29,9 +29,9 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <span class="eyebrow">Local-first learning studio</span>
-          <h1 class="home-title">Your study command deck is ready.</h1>
-          <p class="home-subtitle">Continue where you left off, capture ideas, and keep every learning artifact on your device.</p>
+          <span class="eyebrow">Your learning workspace</span>
+          <h1 class="home-title">Make space for focused study.</h1>
+          <p class="home-subtitle">Organize courses, annotate PDFs, write notes, and track your progress. Your materials stay on this device.</p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
