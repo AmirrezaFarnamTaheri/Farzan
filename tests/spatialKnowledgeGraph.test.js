@@ -81,6 +81,34 @@ describe('SpatialKnowledgeGraph', () => {
     graph.dispose();
   });
 
+  it('cycles through graph concepts with the keyboard and exposes each target to screen readers', () => {
+    const graph = new SpatialKnowledgeGraph();
+    graph.mount(container, [
+      { id: 'algebra', title: 'Algebra', type: 'course' },
+      { id: 'geometry', title: 'Geometry', type: 'note' },
+    ]);
+    const select = vi.fn();
+    graph.on('node:select', select);
+    const key = (value) => graph.canvas.dispatchEvent(new KeyboardEvent('keydown', {
+      key: value, bubbles: true, cancelable: true,
+    }));
+
+    expect(graph.canvas.getAttribute('aria-label')).toContain('Algebra');
+    key('ArrowRight');
+    expect(graph.canvas.getAttribute('aria-label')).toContain('Geometry');
+    expect(container.querySelector('[aria-live="polite"]')?.textContent).toContain('Geometry');
+    key('Enter');
+    expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 'geometry' }));
+    key('ArrowLeft');
+    key(' ');
+    expect(select).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'algebra' }));
+    key('ArrowLeft');
+    expect(graph.keyboardNodeIndex).toBe(graph.nodes.length - 1);
+
+    graph.dispose();
+    expect(container.querySelector('[aria-live="polite"]')).toBeNull();
+  });
+
   it('disposes cleanly removing event listeners, canvas, and animation loop', () => {
     const graph = new SpatialKnowledgeGraph();
     graph.mount(container, []);
