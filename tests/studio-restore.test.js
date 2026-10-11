@@ -72,6 +72,56 @@ describe('Canvas board restore races', () => {
     window.OpenCourseDeck.Canvas.serialize().layers
       .flatMap((layer) => layer.elements.map((element) => element.id));
 
+  it('restores a retired canvas key and persists it as the canonical Studio board', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    const legacy = boardWith(['legacy-research-diagram']);
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? legacy : null),
+      saveSetting: vi.fn(async () => true),
+    };
+
+    expect(await canvas.restoreBoard()).toBe(true);
+    expect(elementIds()).toEqual(['legacy-research-diagram']);
+    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_studio_board');
+    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_canvas_board');
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', expect.objectContaining({
+      layers: expect.arrayContaining([expect.objectContaining({
+        elements: expect.arrayContaining([expect.objectContaining({ id: 'legacy-research-diagram' })]),
+      })]),
+    }));
+  });
+
+  it('does not claim legacy Studio adoption succeeded when the canonical write failed', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    const legacy = boardWith(['legacy-still-recoverable']);
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? legacy : null),
+      saveSetting: vi.fn(async () => { throw new Error('Storage quota exceeded'); }),
+    };
+
+    expect(await canvas.restoreBoard()).toBe(false);
+    expect(elementIds()).toEqual(['legacy-still-recoverable']);
+    expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not load a stale legacy board after edits arrive during a pending read', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    let finishLegacyRead;
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_studio_board' ? null : new Promise(resolve => { finishLegacyRead = resolve; })),
+      saveSetting: vi.fn(async () => true),
+    };
+    const restore = canvas.restoreBoard();
+    await vi.waitFor(() => expect(finishLegacyRead).toBeTypeOf('function'));
+    canvas.addElement({ id: 'new-local-edit', type: 'rect' });
+    finishLegacyRead(boardWith(['stale-legacy']));
+
+    expect(await restore).toBe(false);
+    expect(elementIds()).toContain('new-local-edit');
+    expect(elementIds()).not.toContain('stale-legacy');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
   it('discards a stale board restore when a newer load landed first', async () => {
     const canvas = window.OpenCourseDeck.Canvas;
     let resolveRead;
