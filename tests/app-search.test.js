@@ -124,9 +124,11 @@ describe('app topbar search rendering', () => {
       id: 'note-memory',
       text: expect.stringContaining('Long term memory'),
     }));
-    const result = document.querySelector('.search-result-item');
-    expect(result.textContent).toContain('Retrieval practice');
-    expect(result.textContent).toContain('Semantic note');
+    const results = [...document.querySelectorAll('.search-result-item')];
+    expect(results.some(result => result.textContent.includes('Retrieval practice'))).toBe(true);
+    // The lexical note remains visible; a separate semantic hit must also
+    // be present rather than assuming search ranking always puts it first.
+    expect(results.some(result => result.textContent.includes('Semantic note'))).toBe(true);
   });
 
   it('escapes catalog course and topic titles in the courses view', async () => {
