@@ -1,0 +1,446 @@
+/* Working surfaces across routes. Theme and accent remain user-selectable. */
+:root,
+[data-theme] {
+  --workspace-rule: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  --workspace-rule-strong: color-mix(in srgb, var(--text-primary) 24%, transparent);
+  --workspace-focus: var(--accent-light);
+}
+
+/* An even canvas and visible navigation; avoid layered blur over text. */
+.main-content {
+  background: var(--bg);
+}
+.sidebar {
+  background: var(--surface);
+  border-inline-end: 1px solid var(--workspace-rule);
+  border-right: 0;
+  box-shadow: none;
+}
+.sidebar-nav {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+.sidebar-logo {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.nav-group-label {
+  letter-spacing: 0.085em;
+  color: var(--text-tertiary);
+  font-weight: 650;
+}
+.nav-item {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast), color var(--duration-fast);
+}
+.nav-item:hover:not(.active) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.nav-item.active,
+.nav-item[aria-current="page"] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text-primary);
+  border-color: var(--workspace-rule);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+[dir="rtl"] .nav-item.active,
+[dir="rtl"] .nav-item[aria-current="page"] {
+  box-shadow: inset -3px 0 0 var(--accent);
+}
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--workspace-rule);
+  box-shadow: none;
+}
+
+/* Typography belongs to content, not to decorative effects. */
+.page-header {
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: var(--space-5);
+}
+.view .page-title,
+.view-courses .page-title {
+  font-family: var(--font-sans);
+  font-weight: 750;
+  font-style: normal;
+  font-size: clamp(1.7rem, 1.2rem + 1.25vw, 2.25rem);
+  letter-spacing: -0.035em;
+  line-height: 1.17;
+}
+.page-subtitle {
+  max-width: 70ch;
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.view-home,
+.view-help,
+.view-settings,
+.view-progress,
+.view-achievements,
+.view-tags,
+.view-bookmarks,
+.view-materials,
+.view-playlists,
+.view-my-courses {
+  width: 100%;
+  max-width: 1480px;
+  margin-inline: auto;
+}
+
+/* Flat, deliberate panels that preserve contrast in every theme. */
+.card,
+.card.card-filled,
+[data-theme="light"] .card,
+[data-theme="paper"] .card {
+  background: var(--surface-2);
+  border: 1px solid var(--workspace-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.card::before,
+.card.card-glow::before {
+  content: none;
+}
+.card:hover,
+.card.card-interactive:hover {
+  box-shadow: none;
+  transform: none;
+}
+.card .card-body {
+  min-width: 0;
+}
+.btn,
+.btn.btn-primary,
+.btn.btn-secondary,
+.btn.btn-ghost {
+  border-radius: var(--radius-md);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-shadow: none;
+  box-shadow: none;
+  transform: none;
+}
+.btn.btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.btn.btn-primary:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  box-shadow: none;
+  transform: none;
+}
+.btn.btn-primary:active,
+.btn.btn-secondary:hover,
+.btn.btn-ghost:hover {
+  box-shadow: none;
+  transform: none;
+}
+.btn:disabled,
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.input,
+.select,
+textarea.input,
+input.input,
+.search-input {
+  border: 1px solid var(--workspace-rule-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+.input::placeholder,
+textarea::placeholder,
+input::placeholder {
+  color: var(--text-tertiary);
+}
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 3px;
+}
+:where(.card, .btn, .nav-item, .filter-chip, .home-widget):focus-within {
+  scroll-margin-block: var(--space-4);
+}
+
+/* The first screen is a workbench: current task first, data next. */
+.home-hero {
+  gap: clamp(var(--space-4), 2.2vw, var(--space-7));
+  align-items: stretch;
+  padding: clamp(var(--space-5), 2.7vw, var(--space-8));
+  background: var(--surface-2);
+  border: 1px solid var(--workspace-rule);
+  border-radius: var(--radius-xl);
+  box-shadow: none;
+}
+.home-hero::before {
+  content: none;
+}
+.home-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 67ch;
+}
+.home-title {
+  max-width: 21ch;
+  margin-block: 0 var(--space-3);
+  font-family: var(--font-serif);
+  font-size: clamp(2.25rem, 2.2rem + 1.55vw, 3.7rem);
+  font-weight: 650;
+  line-height: 1.11;
+  letter-spacing: -0.052em;
+  text-wrap: balance;
+}
+.home-subtitle {
+  max-width: 54ch;
+  line-height: 1.6;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+.home-actions .btn {
+  min-height: 44px;
+}
+.home-actions .btn:first-child {
+  order: 0;
+}
+.home-command-strip {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--workspace-rule);
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.home-command-strip strong {
+  color: var(--text-primary);
+}
+.home-focus-panel {
+  padding: clamp(var(--space-4), 2vw, var(--space-6));
+  border: 1px solid var(--workspace-rule-strong);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: none;
+}
+.home-focus-head {
+  align-items: flex-start;
+}
+.home-focus-head h2 {
+  max-width: 26ch;
+  line-height: 1.23;
+}
+.home-focus-status {
+  border: 1px solid var(--workspace-rule);
+  border-radius: var(--radius-sm);
+  color: var(--accent-on-tint);
+  background: var(--accent-muted);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+.home-focus-panel > p {
+  margin-top: var(--space-3);
+  line-height: 1.55;
+}
+.home-focus-meta {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.home-focus-action {
+  min-height: 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--workspace-rule-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+.home-focus-action:hover {
+  background: var(--surface-hover);
+  border-color: var(--workspace-rule-strong);
+  transform: none;
+}
+.home-grid {
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.home-card .card-body {
+  padding: clamp(var(--space-4), 1.6vw, var(--space-6));
+}
+.home-card-head {
+  align-items: center;
+  gap: var(--space-3);
+}
+.home-card-title {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.home-pulse-grid {
+  gap: var(--space-3);
+}
+.home-pulse-item {
+  padding: var(--space-4);
+  border: 1px solid var(--workspace-rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.home-pulse-item:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--workspace-rule);
+}
+.home-pulse-icon {
+  display: none;
+}
+.home-pulse-item strong,
+.home-stat strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+.home-pulse-item > span:last-child {
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.home-widget,
+.home-tool-list a,
+.home-activity-item {
+  background: transparent;
+  border-radius: var(--radius-md);
+}
+.home-widget:hover,
+.home-widget:focus-visible,
+.home-tool-list a:hover,
+.home-activity-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--workspace-rule);
+  box-shadow: none;
+  transform: none;
+}
+.home-widget-icon,
+.home-activity-icon {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+}
+.home-empty-state {
+  color: var(--text-secondary);
+}
+
+/* Filtering and reading should use the same quiet surface vocabulary. */
+.view-courses .courses-sidebar,
+.view-materials .card,
+.view-notes .card,
+.view-studio .card,
+.view-pdf .card,
+.view-settings .card {
+  border-color: var(--workspace-rule);
+  background: var(--surface-2);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.view-courses .filter-chip {
+  background: var(--surface);
+  border-color: var(--workspace-rule-strong);
+  color: var(--text-secondary);
+  font-weight: 650;
+  transform: none;
+}
+.view-courses .filter-chip:hover {
+  background: var(--surface-hover);
+  transform: none;
+}
+.view-courses :is(.filter-chip[aria-pressed="true"], .filter-chip.active) {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.view-pdf .pdf-toolbar,
+.view-studio .studio-toolbar {
+  background: var(--surface-2);
+  border: 1px solid var(--workspace-rule);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+.view-pdf .pdf-main {
+  min-width: 0;
+}
+.view-notes .notes-editor,
+.view-notes [data-notes-editor] {
+  line-height: 1.7;
+}
+.view-settings .settings-header-actions,
+.view .page-actions {
+  align-self: center;
+}
+
+@media (max-width: 900px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-title {
+    max-width: 26ch;
+  }
+}
+@media (max-width: 640px) {
+  .page-header {
+    align-items: flex-start;
+  }
+  .view .page-title {
+    font-size: clamp(1.65rem, 7vw, 2.1rem);
+  }
+  .home-hero {
+    padding: var(--space-4);
+  }
+  .home-title {
+    font-size: clamp(2rem, 8vw, 2.8rem);
+  }
+  .home-actions {
+    display: flex;
+  }
+  .home-actions .btn {
+    flex: 1 1 calc(50% - var(--space-2));
+    white-space: normal;
+    min-height: 44px;
+  }
+  .home-focus-panel {
+    padding: var(--space-4);
+  }
+}
+@media (max-width: 380px) {
+  .home-actions .btn {
+    flex-basis: 100%;
+  }
+}
+@media (prefers-contrast: more) {
+  .card,
+  .nav-item.active,
+  .home-focus-panel,
+  .home-pulse-item {
+    border-color: var(--text-primary);
+  }
+}
+@media (forced-colors: active) {
+  .btn.btn-primary,
+  .home-focus-panel,
+  .nav-item.active {
+    border: 1px solid CanvasText;
+  }
+}
