@@ -1098,6 +1098,11 @@
     destroy() {
       this._clearRenderQueue();
       this._container = null;
+      // The search input is recreated empty on each route mount. Reset its
+      // singleton filters as well, otherwise a previous zero-result query
+      // remains invisibly active and makes already-saved notes appear lost.
+      this._filter.query = '';
+      this._semanticIds = null;
     },
 
     _clearRenderQueue() {

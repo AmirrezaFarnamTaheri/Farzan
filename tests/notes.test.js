@@ -153,6 +153,27 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-folder-id="__pinned__"]').classList.contains('active')).toBe(true);
   });
 
+  it('removes hidden search filters when leaving and reopening Notes', async () => {
+    const input = document.querySelector('[data-notes-search]');
+    input.value = 'this phrase matches no saved note';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(window.PlasmaNotesList._filter.query).toBe(input.value);
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+
+    window.PlasmaNotesList._semanticIds = ['nonexistent-embedding-result'];
+    window.PlasmaNotesApp.destroy();
+
+    expect(window.PlasmaNotesList._filter.query).toBe('');
+    expect(window.PlasmaNotesList._semanticIds).toBeNull();
+
+    window.PlasmaNotesApp.init();
+    const restored = document.querySelector('[data-notes-search]');
+    expect(restored.value).toBe('');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
+  });
+
   it('filters notes by search query and clears the query with Escape', async () => {
     const input = document.querySelector('[data-notes-search]');
 
