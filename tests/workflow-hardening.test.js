@@ -63,6 +63,15 @@ describe('module and command contract', () => {
 });
 
 describe('GitHub Actions hardening', () => {
+  it('does not queue obsolete browser and native assurance builds for each PR edit', () => {
+    for (const name of ['native-windows.yml', 'browser-assurance.yml']) {
+      const workflow = workflows[name];
+      expect(workflow).toContain('concurrency:');
+      expect(workflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
+      expect(workflow).toContain('github.event.pull_request.number || github.ref');
+    }
+  });
+
   it('accepts the committed workflow set', () => {
     expect(validateWorkflowSet(workflows)).toEqual([]);
   });
