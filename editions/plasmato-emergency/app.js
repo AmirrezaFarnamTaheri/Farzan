@@ -1821,7 +1821,14 @@
   function scrollActiveIntoView(container) {
     requestAnimationFrame(() => {
       const active = container.querySelector('.active');
-      if (active) active.scrollIntoView({ block: 'nearest' });
+      // Browser-wide scrollIntoView also scrolls <body> when the hierarchy
+      // fits in its column. On mobile that moved the page away from the
+      // catalog title and controls immediately after loading.
+      if (!active || container.scrollHeight <= container.clientHeight + 1) return;
+      const bounds = container.getBoundingClientRect();
+      const row = active.getBoundingClientRect();
+      if (row.top < bounds.top) container.scrollTop += row.top - bounds.top;
+      else if (row.bottom > bounds.bottom) container.scrollTop += row.bottom - bounds.bottom;
     });
   }
 
