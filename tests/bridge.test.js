@@ -587,6 +587,66 @@ describe('bridge DB safety helpers', () => {
     expect(localStorage.getItem('ocd_folders')).toBeNull();
   });
 
+  it.each([
+    ['note', 'notes', 'deleteNote', 'note-delete'],
+    ['folder', 'folders', 'deleteFolder', 'folder-delete'],
+    ['timestamp', 'timestamps', 'deleteTimestamp', 'timestamp-delete'],
+  ])('rejects an uncommitted %s deletion instead of broadcasting success', async (_kind, store, method, errorKind) => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    const persisted = new Map([['keep-me', { id: 'keep-me', title: 'Still stored' }]]);
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async delete(_store, id) {
+        expect(_store).toBe(store);
+        expect(id).toBe('keep-me');
+        throw new Error('IndexedDB deletion transaction aborted');
+      }
+      async getAll() { return [...persisted.values()]; }
+    };
+
+    await expect(window.DB[method]('keep-me')).rejects.toThrow(/transaction aborted/);
+    expect(persisted.has('keep-me')).toBe(true);
+    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
+      kind: errorKind, backend: 'indexedDB',
+    }));
+    expect(emit).not.toHaveBeenCalledWith('sync:local-change', expect.objectContaining({ action: 'delete' }));
+  });
+
+  it('merges simultaneous progress updates to a topic instead of losing a field', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const persisted = new Map([['topic-concurrent', {
+      topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
+    }]]);
+    let activeReads = 0;
+    window.OpenCourseDeck.DB.PlasmaDB = class {
+      async get(_store, id) {
+        activeReads++;
+        // Let a second independent reader overtake this one if the caller
+        // performs read-modify-write without holding the topic lock.
+        await new Promise(resolve => setTimeout(resolve, 2));
+        const value = persisted.get(id);
+        return value ? { ...value } : null;
+      }
+      async put(_store, value) { persisted.set(value.topicId, { ...value }); }
+    };
+    const [first, second] = await Promise.all([
+      window.DB.saveProgress('topic-concurrent', 'course-a', { watched: 42 }),
+      window.DB.saveProgress('topic-concurrent', 'course-a', { bookmarked: true }),
+    ]);
+    expect(activeReads).toBe(2);
+    expect(first.watched).toBe(42);
+    expect(second).toMatchObject({ watched: 42, bookmarked: true });
+    expect(persisted.get('topic-concurrent')).toMatchObject({ watched: 42, bookmarked: true });
+  });
+
+  it('does not claim PDF bookmarks were persisted when IndexedDB is unavailable', async () => {
+    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+    await expect(window.DB.addPdfBookmark({ id: 'bm-unsaved', docId: 'doc-x' }))
+      .rejects.toThrow(/IndexedDB unavailable/);
+    await expect(window.DB.deletePdfBookmark('bm-unsaved')).resolves.toBe(false);
+  });
+
   it('deletes timestamps from local mirrors and IndexedDB stores', async () => {
     await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', position: 42 });
 

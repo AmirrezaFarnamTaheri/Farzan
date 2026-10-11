@@ -151,6 +151,57 @@ describe('user library overlay', () => {
     );
   });
 
+  it('rejects library creation when the persistent storage adapter is missing', async () => {
+    const originalDB = window.DB;
+    window.DB = undefined;
+    try {
+      await expect(upsertCourse({ title: 'Must not claim saved' })).rejects.toThrow(/storage is unavailable/);
+      await expect(addTopic({ title: 'No storage' })).rejects.toThrow(/storage is unavailable/);
+      expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
+    } finally {
+      window.DB = originalDB;
+    }
+  });
+
+  it('rejects library mutations without a storage writer and keeps the overlay unchanged', async () => {
+    window.DB.saveSetting = undefined;
+    await expect(upsertCourse({ title: 'Not saved' })).rejects.toThrow(/Unable to save/);
+    expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent user-library edits without dropping a course or topic', async () => {
+    // Interleave reads via an asynchronous adapter; without the lock both
+    // operations see the same empty snapshot and the last writer wins.
+    const originalGet = window.DB.getSetting;
+    window.DB.getSetting = vi.fn(async (key) => {
+      const result = await originalGet(key);
+      await new Promise(resolve => setTimeout(resolve, 2));
+      return result;
+    });
+    const [a, b] = await Promise.all([
+      upsertCourse({ title: 'Course A' }),
+      upsertCourse({ title: 'Course B' }),
+    ]);
+    expect(Object.keys((await loadLibrary()).courses).sort()).toEqual([a.id, b.id].sort());
+
+    await Promise.all([
+      addTopic({ courseId: a.id, title: 'Topic 1' }),
+      addTopic({ courseId: a.id, title: 'Topic 2' }),
+    ]);
+    const topics = (await loadLibrary()).courses[a.id].sources[0].topics;
+    expect(topics.map(item => item.title).sort()).toEqual(['Topic 1', 'Topic 2']);
+  });
+
+  it('does not leave newly imported blobs when user-library metadata cannot be saved', async () => {
+    const file = new File(['data'], 'rejected.mp4', { type: 'video/mp4' });
+    window.DB.saveSetting = vi.fn(async () => { throw new Error('metadata quota exhausted'); });
+    const storage = await import('../src/features/userLibrary.js');
+    await expect(addVideoFile(file)).rejects.toThrow(/metadata quota exhausted/);
+    // The file record is not linked or visible as a phantom course.
+    expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
+    expect(storage).toBeDefined();
+  });
+
   it('does not overwrite the library when a transient read failure occurs', async () => {
     const created = await upsertCourse({ title: 'Anatomy review' });
     expect(Object.keys((await loadLibrary()).courses)).toEqual([created.id]);

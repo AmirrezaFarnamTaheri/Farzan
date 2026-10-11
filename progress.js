@@ -835,12 +835,17 @@ const ProgressStats = (() => {
           });
         }
         if (result.errors.length) {
-          await _rollbackImport(rollbackSnapshot, result);
+          await _rollbackImport(rollbackSnapshot, result, {
+            annotationDocIds: new Set(annotationRecords.map(row => String(row.docId ?? 'global'))),
+            timestampIds: new Set(timestampRecords.map(row => row.id)),
+          });
         }
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportResult = result;
         if (result.rolledBack) {
           pdToast(`Import rolled back after ${result.errors.length} error(s). No partial backup changes were kept.`, 'error');
+        } else if (result.errors.length) {
+          pdToast('Import failed and recovery was incomplete. Some imported data may remain. Preserve your original backup and review the import errors before retrying.', 'error');
         } else {
           pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.invalid} invalid skipped.`, 'success');
         }
@@ -1007,51 +1012,105 @@ const ProgressStats = (() => {
     });
   }
 
+  // Backups imported through the progress UI are written in several steps.
+  // NEVER substitute an empty collection when reading the rollback snapshot:
+  // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
     const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library'];
-    const annotations = await Promise.resolve(DB.getAllAnnotations?.()).catch(() => []);
+    const readList = async (name) => {
+      if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
+      const records = await DB[name]();
+      if (!Array.isArray(records)) throw new Error(`Cannot protect existing data: ${name} returned invalid records`);
+      return records;
+    };
+    if (typeof DB.getSetting !== 'function') throw new Error('Cannot protect settings before import');
+    const primary = typeof DB.exportBackup === 'function' && typeof DB.importBackup === 'function'
+      ? await DB.exportBackup()
+      : null;
+    const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
+      && primary._meta.version === 3;
+    const mirrorKeys = [
+      'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
+      'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
+      'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
+      'ocd_user_library', 'plasma-pdf-annotations',
+    ];
+    const storage = window.localStorage;
+    if (!storage || typeof storage.getItem !== 'function') {
+      throw new Error('Cannot protect local backup mirrors: localStorage is unavailable');
+    }
+    const mirrors = Object.fromEntries(mirrorKeys.map(key => [key, storage.getItem(key)]));
     return {
-      progress: await Promise.resolve(DB.getAllProgress?.()).catch(() => []),
-      notes: await Promise.resolve(DB.getAllNotes?.()).catch(() => []),
-      folders: await Promise.resolve(DB.getAllFolders?.()).catch(() => []),
+      primary: canAtomicRestore ? primary : null,
+      mirrors,
+      progress: await readList('getAllProgress'),
+      notes: await readList('getAllNotes'),
+      folders: await readList('getAllFolders'),
       settings: Object.fromEntries(await Promise.all(settingsKeys.map(async (key) => [
         key,
-        await Promise.resolve(DB.getSetting?.(key)).catch(() => undefined),
+        await DB.getSetting(key),
       ]))),
-      annotations: Array.isArray(annotations) ? annotations : [],
-      timestamps: await Promise.resolve(DB.getAllTimestamps?.()).catch(() => []),
+      annotations: await readList('getAllAnnotations'),
+      timestamps: await readList('getAllTimestamps'),
     };
   }
 
-  async function _rollbackImport(snapshot, result) {
-    result.rolledBack = true;
+  async function _rollbackImport(snapshot, result, { annotationDocIds = new Set(), timestampIds = new Set() } = {}) {
+    result.rolledBack = false;
     result.rollbackErrors = [];
     try {
-      if (DB.clearUserData) {
+      if (snapshot.primary && typeof DB.importBackup === 'function') {
+        // The v3 backup engine overwrites all primary object stores in ONE IDB
+        // transaction, preserving untouched watchedSegments/pdfBookmarks.
+        const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite' });
+        if (receipt?.committed !== true) throw new Error('Atomic rollback did not commit');
+      } else {
+        // Legacy compatibility path: never clear the broad "media" scope.
+        // That scope also contains watched segments and PDF bookmarks, which
+        // the legacy import snapshot does not include.
+        if (typeof DB.clearUserData !== 'function') throw new Error('Safe rollback requires storage deletion support');
         await DB.clearUserData('progress');
         await DB.clearUserData('notes');
-        await DB.clearUserData('media');
         await DB.clearUserData('playlists');
         await DB.clearUserData('studio');
+        await _forEachChunk(snapshot.progress, (record) => DB.saveProgress(record.topicId, record.courseId, record));
+        await _forEachChunk(snapshot.notes, (record) => DB.saveNote(record));
+        await _forEachChunk(snapshot.folders, (record) => DB.saveFolder(record));
+        for (const [key, value] of Object.entries(snapshot.settings)) {
+          if (value !== undefined) await DB.saveSetting(key, value);
+        }
+        const allDocs = new Set([...annotationDocIds, ...snapshot.annotations.map(a => String(a.docId ?? 'global'))]);
+        for (const docId of allDocs) {
+          const pages = {};
+          for (const ann of snapshot.annotations.filter(a => String(a.docId ?? 'global') === docId)) {
+            const page = String(ann.page ?? 1);
+            (pages[page] ??= []).push(ann);
+          }
+          if (typeof DB.saveAnnotations !== 'function') throw new Error('Cannot restore annotations');
+          await DB.saveAnnotations(docId, pages);
+        }
+        const existingTimestamps = new Map(snapshot.timestamps.map(item => [item.id, item]));
+        for (const id of timestampIds) {
+          if (!existingTimestamps.has(id)) {
+            if (typeof DB.deleteTimestamp !== 'function') throw new Error('Cannot undo newly imported timestamp');
+            await DB.deleteTimestamp(id);
+          }
+        }
+        for (const item of snapshot.timestamps) {
+          if (typeof DB.saveTimestamp !== 'function') throw new Error('Cannot restore original timestamps');
+          await DB.saveTimestamp(item);
+        }
       }
-      await _forEachChunk(snapshot.progress ?? [], (record) => DB.saveProgress?.(record.topicId, record.courseId, record));
-      await _forEachChunk(snapshot.notes ?? [], (record) => DB.saveNote?.(record));
-      await _forEachChunk(snapshot.folders ?? [], (record) => DB.saveFolder?.(record));
-      for (const [key, value] of Object.entries(snapshot.settings ?? {})) {
-        if (value !== undefined) await DB.saveSetting?.(key, value);
+      // Restore local mirrors after primary storage so fallback reads never
+      // resurrect a partially imported version.
+      for (const [key, value] of Object.entries(snapshot.mirrors)) {
+        if (value === null) window.localStorage.removeItem(key);
+        else window.localStorage.setItem(key, value);
       }
-      const annotationsByDoc = (snapshot.annotations ?? []).reduce((acc, annotation) => {
-        const docId = String(annotation.docId ?? 'global');
-        const page = String(annotation.page ?? 1);
-        acc[docId] = acc[docId] ?? {};
-        acc[docId][page] = acc[docId][page] ?? [];
-        acc[docId][page].push(annotation);
-        return acc;
-      }, {});
-      for (const [docId, pages] of Object.entries(annotationsByDoc)) {
-        await DB.saveAnnotations?.(docId, pages);
-      }
-      await _forEachChunk(snapshot.timestamps ?? [], (record) => DB.saveTimestamp?.(record));
+      result.rolledBack = true;
+      try { window.OpenCourseDeck?.Flashcards?.invalidateCache?.(); } catch {}
+      try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
+      try { await window.OpenCourseDeck?.Canvas?.restoreBoard?.(); } catch {}
     } catch (err) {
       result.rollbackErrors.push(err?.message ?? String(err));
     }

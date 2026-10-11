@@ -267,6 +267,9 @@
 
     let _idb = null;
     let _idbCtor = null;
+    // Serialize read-modify-write updates of the same topic in this runtime.
+    // A lost race could overwrite a resume position with a bookmark update.
+    const _pendingProgressWrites = new Map();
     let _sync = null;
     const _sourceId = `pd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -579,7 +582,7 @@
       return Object.values(map);
     }
 
-    async function saveProgress(topicId, courseId, patch = {}) {
+    async function _saveProgressNow(topicId, courseId, patch = {}) {
       const prev = (await getProgress(topicId)) ?? { topicId, courseId };
       const next = {
         ...prev,
@@ -613,6 +616,25 @@
       // sync across tabs too.
       _broadcast('progress', 'save', next);
       return next;
+    }
+
+    function saveProgress(topicId, courseId, patch = {}) {
+      const previous = _pendingProgressWrites.get(topicId) || Promise.resolve();
+      const operation = previous.catch(() => {}).then(() => {
+        // Web Locks serialize cooperating tabs where supported (including
+        // Chromium/WebView2); the promise chain covers browsers without them.
+        const locks = window.navigator?.locks;
+        if (typeof locks?.request === 'function') {
+          return locks.request(`opencoursedeck:progress:${topicId}`, { mode: 'exclusive' },
+            () => _saveProgressNow(topicId, courseId, patch));
+        }
+        return _saveProgressNow(topicId, courseId, patch);
+      });
+      _pendingProgressWrites.set(topicId, operation);
+      operation.finally(() => {
+        if (_pendingProgressWrites.get(topicId) === operation) _pendingProgressWrites.delete(topicId);
+      }).catch(() => {});
+      return operation;
     }
 
     async function getAllTimestamps() {
@@ -651,7 +673,11 @@
       const idb = _getIdb();
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('timestamps', id); } catch {}
+        try { await idb.delete('timestamps', id); }
+        catch (error) {
+          _signalSaveError('timestamp-delete', 'indexedDB', error);
+          throw error;
+        }
       }
       const list = _read(KEY_TIMESTAMPS, []);
       _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
@@ -704,7 +730,11 @@
       let idbDeleted = false;
       if (idb) {
         await _migrateOnce();
-        try { await idb.delete('notes', id); idbDeleted = true; } catch {}
+        try { await idb.delete('notes', id); idbDeleted = true; }
+        catch (error) {
+          _signalSaveError('note-delete', 'indexedDB', error, { canonical: _isMigrated() });
+          throw error;
+        }
       }
       if (idbDeleted && _isMigrated()) {
         // Post-migration the localStorage mirror is stale; clear it only when
@@ -758,7 +788,11 @@
         // Pre-migration, deleting from IDB alone is a no-op and a later
         // migration would resurrect the folder from localStorage.
         await _migrateOnce();
-        try { await idb.delete('folders', id); idbDeleted = true; } catch {}
+        try { await idb.delete('folders', id); idbDeleted = true; }
+        catch (error) {
+          _signalSaveError('folder-delete', 'indexedDB', error, { canonical: _isMigrated() });
+          throw error;
+        }
       }
       if (idbDeleted && _isMigrated()) {
         localStorage.removeItem('ocd_folders');
@@ -1162,7 +1196,9 @@
           throw e;
         }
       }
-      return next;
+      const error = new Error('Cannot save PDF bookmark: IndexedDB unavailable');
+      _signalSaveError('pdfBookmark', 'indexedDB', error);
+      throw error;
     }
 
     async function getPdfBookmarks(docId) {
@@ -1192,8 +1228,8 @@
           return false;
         }
       }
-      _broadcast('pdfBookmark', 'delete', { id });
-      return true;
+      _signalSaveError('pdfBookmark-delete', 'indexedDB', new Error('IndexedDB unavailable'));
+      return false;
     }
 
     // Issue 1: include watchedSegments and pdfBookmarks

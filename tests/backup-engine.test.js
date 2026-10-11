@@ -70,6 +70,44 @@ describe('atomic backup engine', () => {
     db.close();
   });
 
+  it('observes completion even when a transaction finishes immediately after its last read', async () => {
+    const tx = { oncomplete: null, onerror: null, onabort: null };
+    const db = {
+      version: 3,
+      objectStoreNames: { contains: () => true },
+      close() {},
+      transaction: () => tx,
+    };
+    let completedReads = 0;
+    tx.objectStore = () => ({
+      getAll: () => {
+        const request = { result: [] };
+        queueMicrotask(() => {
+          request.onsuccess?.();
+          completedReads++;
+          if (completedReads === schema.length) tx.oncomplete?.();
+        });
+        return request;
+      },
+    });
+    const root = rootWithFacade();
+    root.indexedDB = {
+      open() {
+        const request = { result: db };
+        queueMicrotask(() => request.onsuccess?.());
+        return request;
+      },
+    };
+    installBackupEngine(root);
+
+    const result = await Promise.race([
+      root.DB.exportBackup(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Missed transaction completion')), 200)),
+    ]);
+    expect(result._meta.stores.notes).toBe(0);
+    expect(completedReads).toBe(schema.length);
+  });
+
   it('exports all primary stores from one portable snapshot', async () => {
     const root = rootWithFacade();
     installBackupEngine(root);

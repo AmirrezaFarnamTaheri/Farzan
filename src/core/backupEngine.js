@@ -122,13 +122,16 @@ export function installBackupEngine(root = window) {
     try {
       const available = MAIN_STORES.filter(store => db.objectStoreNames.contains(store));
       const transaction = db.transaction(available, 'readonly');
+      // Attach completion handlers before any request can finish. Registering
+      // after await Promise.all(reads) can miss an already-completed transaction.
+      const completion = transactionDone(transaction);
       const result = {};
       const reads = available.map(async (store) => {
         const records = await requestResult(transaction.objectStore(store).getAll());
         result[store] = store === 'settings' ? sanitizeSettingsRecords(records) : records;
       });
       await Promise.all(reads);
-      await transactionDone(transaction);
+      await completion;
       result._meta = {
         format: 'opencoursedeck-snapshot',
         version: 3,
