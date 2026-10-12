@@ -56,7 +56,17 @@ async function boot(page,route='home'){
 async function visit(page,route){
   await page.evaluate(r=>{window.location.hash='#/'+r;},route);
   await expect.poll(()=>page.evaluate(()=>window.location.hash)).toBe('#/'+route);
-  await page.waitForTimeout(400);
+  const target = page.locator('#view-container .view-' + route);
+  await expect(target).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => target.evaluate(element => {
+    if (!element.isConnected || element.getBoundingClientRect().height <= 0) return false;
+    const style = getComputedStyle(element);
+    return Number(style.opacity) >= 0.995 && !element.getAnimations({ subtree: false })
+      .some(animation => animation.playState === 'running' &&
+        Number(animation.effect?.getComputedTiming()?.endTime) > 0);
+  }), { timeout: 10000 }).toBe(true);
+  await page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 async function health(page){return page.evaluate(()=>{
   const body=document.body,root=document.documentElement,main=document.querySelector('#view-container');
@@ -142,6 +152,15 @@ test('flashcard is created, flipped, and reviewed',async({page})=>{
   await expect(page.locator('#fc-card-back')).toContainText('Hemoglobin');
   await shot(page,'functional','08-flashcard-flipped');
   await page.locator('#fc-grade-btns [data-grade="4"]').click();
+  // Grading replaces the route DOM. Screenshot only after the full success
+  // state has rendered and its new view entrance has settled.
+  await expect(page.locator('.fc-empty-title')).toHaveText('All due cards reviewed');
+  await expect(page.locator('.fc-empty-title')).toBeVisible();
+  await expect.poll(() => page.locator('#view-container .view-flashcards')
+    .evaluate(el => Number(getComputedStyle(el).opacity) >= 0.995 &&
+      !el.getAnimations({ subtree: false }).some(animation => animation.playState === 'running' &&
+        Number(animation.effect?.getComputedTiming()?.endTime) > 0)),
+  { timeout: 10000 }).toBe(true);
   await shot(page,'functional','09-flashcard-graded');
 });
 test('PDF genuinely loads and a page note persists',async({page})=>{
