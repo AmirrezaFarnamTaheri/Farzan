@@ -246,10 +246,13 @@
 .notes-title {
   min-width: 0;
   flex: 1 1 auto;
-  padding: 0;
+  /* Text must not touch or clip against the focus bounds in RTL or LTR.
+     Keep inline padding on both sides even while the field is elided. */
+  padding: 0 var(--space-2);
   border: 0;
   background: transparent;
   color: var(--text-primary);
+  text-align: start;
   font-family: var(--font-serif);
   /* An editable title must stay readable without covering the Save status. */
   font-size: clamp(1.25rem, 1.8vw, 1.65rem);
@@ -261,6 +264,12 @@
 
 .notes-title:focus {
   box-shadow: none;
+}
+
+.notes-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .notes-save {

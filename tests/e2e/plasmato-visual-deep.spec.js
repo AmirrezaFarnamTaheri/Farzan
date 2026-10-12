@@ -107,6 +107,27 @@ for (const cfg of modes) {
               a.playState === 'running' && Number(a.effect?.getComputedTiming()?.endTime) > 0);
             return Number.isFinite(opacity) && opacity >= 0.995 && !animating;
           }), { timeout: 7000, message: 'Route must finish entrance before screenshot' }).toBe(true);
+        if (cfg.rtl && route === 'home') {
+          // The shell can be RTL, but English sentence punctuation must stay
+          // with the English text instead of appearing at the leading edge.
+          const sentence = page.locator('.home-title bdi');
+          await expect(sentence).toHaveText('Back to your studies.');
+          expect(await sentence.evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
+        }
+        if (cfg.rtl && route === 'notes') {
+          const titleState = await page.locator('[data-note-title-input]').evaluate(el => {
+            const computed = getComputedStyle(el);
+            return {
+              directionMode: el.getAttribute('dir'),
+              inlinePadding: parseFloat(computed.paddingInlineStart),
+              alignment: computed.textAlign,
+            };
+          });
+          expect(titleState.directionMode).toBe('auto');
+          expect(titleState.inlinePadding).toBeGreaterThanOrEqual(6);
+          expect(titleState.alignment).toBe('start');
+          await expect(page.locator('[data-notes-editor]')).toHaveAttribute('dir', 'auto');
+        }
         if (route === 'notes' && (cfg.group === 'phone-landscape' || cfg.group === 'zoom-200')) {
           // Restoring a saved note must not scroll the short viewport past
           // the document heading before the user can see its controls.

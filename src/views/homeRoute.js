@@ -29,8 +29,8 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <h1 class="home-title">Back to your studies.</h1>
-          <p class="home-subtitle">Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</p>
+          <h1 class="home-title"><bdi>Back to your studies.</bdi></h1>
+          <p class="home-subtitle"><bdi>Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</bdi></p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>

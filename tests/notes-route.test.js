@@ -42,6 +42,8 @@ describe('notes route workspace', () => {
     requiredSelectors.forEach(selector => expect(document.querySelector(selector), selector).not.toBeNull());
     expect(document.querySelectorAll('[data-cmd]').length).toBeGreaterThanOrEqual(14);
     expect(document.querySelector('[data-notes-editor]')?.getAttribute('role')).toBe('textbox');
+    expect(document.querySelector('[data-note-title-input]')?.getAttribute('dir')).toBe('auto');
+    expect(document.querySelector('[data-notes-editor]')?.getAttribute('dir')).toBe('auto');
     expect(window.PlasmaNotesApp.init).toHaveBeenCalledOnce();
 
     controller.beforeLeave();

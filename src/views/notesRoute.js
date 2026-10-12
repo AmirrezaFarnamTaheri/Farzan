@@ -72,7 +72,7 @@ export function mountNotesView({ setView } = {}) {
           <div class="notes-document-header">
             <div class="notes-top">
               <label class="sr-only" for="note-title-input">Note title</label>
-              <input class="input notes-title" id="note-title-input" data-note-title-input placeholder="Untitled note" />
+              <input class="input notes-title" id="note-title-input" data-note-title-input dir="auto" placeholder="Untitled note" />
               <span class="notes-save" data-save-status aria-live="polite"></span>
             </div>
 
@@ -151,7 +151,7 @@ export function mountNotesView({ setView } = {}) {
           </div>
 
           <div class="notes-editor-wrap">
-            <div class="notes-editor" data-notes-editor role="textbox" aria-multiline="true" aria-label="Note editor"></div>
+            <div class="notes-editor" data-notes-editor dir="auto" role="textbox" aria-multiline="true" aria-label="Note editor"></div>
           </div>
 
           <footer class="notes-footer">
