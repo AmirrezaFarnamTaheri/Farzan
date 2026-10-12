@@ -121,7 +121,7 @@ for (const cfg of modes) {
           await expect(page.locator('#courses-search')).toHaveAttribute('dir', 'auto');
           const courseMeta = page.locator('.course-item-meta bdi').first();
           await expect(courseMeta).toHaveAttribute('dir', 'ltr');
-          await expect(courseMeta).toContainText(/\\d+ topics - \\d+ source\\(s\\)/);
+          await expect(courseMeta).toContainText(/\d+ topics - \d+ source\(s\)/);
         }
         if (cfg.rtl && route === 'materials') {
           await expect(page.locator('#materials-search')).toHaveAttribute('dir', 'auto');
