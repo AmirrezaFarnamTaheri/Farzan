@@ -3,7 +3,7 @@ name: Archive Latest Plasmato Visual Evidence
 on:
   push:
     branches:
-      - edition/plasmato-emergency-player-20261011
+      - qa/plasmato-visual-postfix-38235088842
     paths:
       - .github/workflows/plasmato-evidence-archive.yml
   workflow_dispatch:
@@ -28,7 +28,7 @@ jobs:
       - name: Download verified source visual run
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          run-id: 38230964039
+          run-id: 38235088842
           repository: AmirrezaFarnamTaheri/Farzan
           github-token: ${{ github.token }}
           name: farzan-plasmato-edition-v1.0.4-visual-evidence
@@ -54,7 +54,7 @@ jobs:
           }
           const sheets = manifest.contactSheets;
           if (!Array.isArray(sheets) || sheets.length !== 35) throw new Error('Expected exactly 35 visual contact sheets');
-          const archive = path.join('screenshots', 'v104-reviewed-38230964039');
+          const archive = path.join('screenshots', 'v104-reviewed-38235088842');
           fs.mkdirSync(archive, { recursive: true });
           for (const entry of screenshots) {
             const name = entry.path || entry.file;
@@ -87,7 +87,7 @@ jobs:
             if (fs.existsSync(from)) fs.copyFileSync(from, path.join(archive, name));
           }
           fs.writeFileSync(path.join(archive, 'README.md'),
-            '# Plasmato v1.0.4 browser evidence\n\nOriginal verified run: https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38230964039\n\nAll 476 Chrome PNG screenshots, contact sheets and exact SHA-256 manifest. The evidence branch is separate from both main and the app edition; screenshots are historical until regenerated on a new commit.\n');
+            '# Plasmato v1.0.4 browser evidence\n\nOriginal verified run: https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38235088842\n\nAll 476 Chrome PNG screenshots, contact sheets and exact SHA-256 manifest. The evidence branch is separate from both main and the app edition; screenshots are historical until regenerated on a new commit.\n');
           console.log('Verified', screenshots.length, 'PNG captures and', sheets.length, 'contact sheets');
           NODE
 
@@ -96,7 +96,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -c evidence/plasmato-v104-38230964039
-          git add screenshots/v104-reviewed-38230964039
+          git switch -c evidence/plasmato-v104-38235088842
+          git add screenshots/v104-reviewed-38235088842
           git commit -m "docs(visual): preserve 476 checksummed Plasmato Chrome captures from verified CI"
-          git push origin HEAD:refs/heads/evidence/plasmato-v104-38230964039
+          git push origin HEAD:refs/heads/evidence/plasmato-v104-38235088842
