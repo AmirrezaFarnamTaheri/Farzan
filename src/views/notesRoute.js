@@ -4,7 +4,7 @@ export function mountNotesView({ setView } = {}) {
       <div class="page-header notes-page-header">
         <div>
           <h1 class="page-title">Notes</h1>
-          <p class="page-subtitle">Write notes, organize them in folders, and link them to courses.</p>
+          <p class="page-subtitle"><bdi>Write notes, organize them in folders, and link them to courses.</bdi></p>
         </div>
         <div class="notes-header-actions">
           <button class="btn btn-primary" type="button" data-action="new-note">
@@ -40,7 +40,7 @@ export function mountNotesView({ setView } = {}) {
             <label class="notes-search-field">
               <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
               <span class="sr-only">Search notes</span>
-              <input class="input" type="search" placeholder="Search notes…" data-notes-search autocomplete="off" />
+              <input class="input" type="search" dir="auto" placeholder="Search notes…" data-notes-search autocomplete="off" />
             </label>
             <div class="notes-semantic-actions">
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden>

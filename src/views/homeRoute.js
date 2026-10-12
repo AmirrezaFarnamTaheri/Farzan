@@ -59,11 +59,11 @@ export function mountHomeView(deps = {}) {
         <section class="home-focus-panel" aria-labelledby="home-focus-title" aria-live="polite">
           <div class="home-focus-head">
             <div>
-              <h2 id="home-focus-title">Pick up where you left off</h2>
+              <h2 id="home-focus-title" dir="auto">Pick up where you left off</h2>
             </div>
             <span class="home-focus-status" data-home-focus-status>Start</span>
           </div>
-          <p data-home-focus-detail>Open a course to see your recent work here.</p>
+          <p data-home-focus-detail dir="auto">Open a course to see your recent work here.</p>
           <div class="home-focus-progress" aria-hidden="true">
             <span data-home-focus-progress></span>
           </div>

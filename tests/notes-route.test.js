@@ -44,6 +44,8 @@ describe('notes route workspace', () => {
     expect(document.querySelector('[data-notes-editor]')?.getAttribute('role')).toBe('textbox');
     expect(document.querySelector('[data-note-title-input]')?.getAttribute('dir')).toBe('auto');
     expect(document.querySelector('[data-notes-editor]')?.getAttribute('dir')).toBe('auto');
+    expect(document.querySelector('[data-notes-search]')?.getAttribute('dir')).toBe('auto');
+    expect(document.querySelector('.notes-page-header .page-subtitle bdi')?.textContent).toMatch(/courses\.$/);
     expect(window.PlasmaNotesApp.init).toHaveBeenCalledOnce();
 
     controller.beforeLeave();

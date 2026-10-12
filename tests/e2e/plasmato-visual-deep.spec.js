@@ -113,6 +113,9 @@ for (const cfg of modes) {
           const sentence = page.locator('.home-title bdi');
           await expect(sentence).toHaveText('Back to your studies.');
           expect(await sentence.evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
+          await expect(page.locator('[data-home-focus-detail]')).toHaveAttribute('dir', 'auto');
+          expect(await page.locator('[data-home-focus-detail]').evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
+          await expect(page.locator('#home-focus-title')).toHaveAttribute('dir', 'auto');
         }
         if (cfg.rtl && route === 'notes') {
           const titleState = await page.locator('[data-note-title-input]').evaluate(el => {
@@ -127,6 +130,10 @@ for (const cfg of modes) {
           expect(titleState.inlinePadding).toBeGreaterThanOrEqual(6);
           expect(titleState.alignment).toBe('start');
           await expect(page.locator('[data-notes-editor]')).toHaveAttribute('dir', 'auto');
+          await expect(page.locator('[data-notes-search]')).toHaveAttribute('dir', 'auto');
+          const subtitle = page.locator('.notes-page-header .page-subtitle bdi');
+          await expect(subtitle).toContainText('link them to courses.');
+          expect(await subtitle.evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
         }
         if (route === 'notes' && (cfg.group === 'phone-landscape' || cfg.group === 'zoom-200')) {
           // Restoring a saved note must not scroll the short viewport past
