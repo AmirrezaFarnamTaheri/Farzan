@@ -281,6 +281,10 @@ test('settings density, font, theme and AI permission states are visible', async
   await stateShot(page, 'settings-states', '06-custom-api-permission');
   await page.locator('[data-ai-endpoint]').fill('http://not-local.example/v1/chat');
   await expect(page.locator('[data-ai-endpoint-warning]')).toContainText('HTTPS');
+  const brandClipping = await page.locator('.sidebar-logo-text').evaluate(el =>
+    el.scrollWidth - el.clientWidth);
+  expect(brandClipping, 'App identity must not elide after accessibility font scaling')
+    .toBeLessThanOrEqual(1);
   // After font enlargement the selected mode and disabled session lifetime
   // must remain legible, not be cut to "Approved API er"/"This browser se".
   const aiWidths = await page.locator('.settings-ai-mode-grid .settings-field .select')

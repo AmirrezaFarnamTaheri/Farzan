@@ -179,6 +179,9 @@
 
 .sidebar-logo-text {
   min-width: 0;
+  /* UI font scaling must not truncate the application identity beside
+     the fixed-width sidebar collapse control. */
+  font-size: min(0.95rem, 15px);
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 800;
