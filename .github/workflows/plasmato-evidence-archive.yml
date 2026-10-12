@@ -48,18 +48,18 @@ jobs:
           const root = roots.find(root => fs.existsSync(path.join(root, 'manifest.json')));
           if (!root) throw new Error('Verified visual manifest not found in Actions artifact');
           const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
-          const screenshots = Array.isArray(manifest.captures) ? manifest.captures : manifest.screenshots;
+          const screenshots = manifest.images;
           if (!Array.isArray(screenshots) || screenshots.length !== 476) {
             throw new Error('Expected exactly 476 captures, got ' + screenshots?.length);
           }
-          const sheets = fs.readdirSync(path.join(root, 'contact-sheets')).filter(x => x.endsWith('.png'));
-          if (sheets.length < 35) throw new Error('Expected 35+ visual contact sheets, found ' + sheets.length);
+          const sheets = manifest.contactSheets;
+          if (!Array.isArray(sheets) || sheets.length !== 35) throw new Error('Expected exactly 35 visual contact sheets');
           const archive = path.join('screenshots', 'v104-reviewed-38230964039');
           fs.mkdirSync(archive, { recursive: true });
           for (const entry of screenshots) {
             const name = entry.path || entry.file;
             if (!name || path.isAbsolute(name) || name.includes('..')) throw new Error('Unsafe screenshot path');
-            const candidates = [path.join(root, 'screenshots', name), path.join(root, name)];
+            const candidates = [path.join(root, name), path.join(root, 'screenshots', name)];
             const match = candidates.find(candidate => fs.existsSync(candidate));
             if (!match) throw new Error('Missing capture: ' + name);
             const bytes = fs.readFileSync(match);
@@ -69,13 +69,18 @@ jobs:
             if (entry.sha256 && crypto.createHash('sha256').update(bytes).digest('hex') !== entry.sha256) {
               throw new Error('SHA-256 mismatch: ' + name);
             }
-            const dst = path.join(archive, 'screenshots', name);
+            const dst = path.join(archive, name);
             fs.mkdirSync(path.dirname(dst), { recursive: true });
             fs.copyFileSync(match, dst);
           }
-          for (const filename of sheets) {
-            fs.copyFileSync(path.join(root, 'contact-sheets', filename),
-              path.join(archive, filename));
+          for (const record of sheets) {
+            const name = record.path;
+            if (!/^contact-sheet-[A-Za-z0-9-]+\.png$/.test(name)) throw new Error('Unexpected contact-sheet name: ' + name);
+            const bytes = fs.readFileSync(path.join(root, name));
+            if (crypto.createHash('sha256').update(bytes).digest('hex') !== record.sha256) throw new Error('Contact-sheet checksum mismatch: '+name);
+            const dest = path.join(archive, 'contact-sheets', name);
+            fs.mkdirSync(path.dirname(dest), {recursive:true});
+            fs.writeFileSync(dest, bytes);
           }
           for (const name of ['manifest.json','observations.jsonl','VISUAL-REPORT.md']) {
             const from = path.join(root, name);
