@@ -508,6 +508,18 @@
 }
 
 @media (max-width: 560px) {
+  /* Keep the document editor discoverable above the fold on small phones,
+     without making folders or the saved-note list inaccessible. */
+  .notes-sidebar {
+    max-height: min(290px, 38dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .notes-list {
+    max-height: 140px;
+  }
+
   .notes-header-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;

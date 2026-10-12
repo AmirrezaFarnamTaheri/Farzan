@@ -51,3 +51,19 @@ The next release is gated on 308 **newly captured within the same CI run** actua
 
 7. **Misleading Notes folder counters:** A full-resolution saved-note screenshot showed two live entries while the All Notes badge still displayed `0`. Creating and duplicating a note refreshed the list but did not refresh the folder panel. Both paths now synchronize counters immediately; unit tests and real-browser written-note capture verify the badge equals the backing notes count.
 
+
+## Visual review of all 35 current v1.0.4 contact sheets (2026-10-12)
+
+**Evidence:** [476 SHA-256 verified, actual Chrome screenshots and 35 contact sheets](https://github.com/AmirrezaFarnamTaheri/Farzan/tree/evidence/plasmato-v104-38230964039/screenshots/v104-reviewed-38230964039), independently archived by [successful workflow 38233969209](https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38233969209). Inspected each of the 35 group contact sheets using native vision, then opened the original full-resolution PNGs for suspicious note, desktop settings, mobile drawer and standalone playback states. This is an exhaustive *contact-sheet* review, **not** a claim that every one of the 476 PNGs was separately opened at native resolution.
+
+**New screenshot-grounded corrections:**
+
+- `settings-states/07-unsafe-endpoint-rejected.png`: the three equal columns inside the AI card squeezed the selected mode and session lifetime values into clipped phrases at enlarged font size. The grid now adapts to its **own available panel width**, with at least 235px allocated per field when possible. Playwright checks measured control widths before accepting that screenshot.
+- `deep-actions/01-mobile-navigation-open.png`: the 390px drawer showed a nonactionable `Ctrl+K` badge consuming search-field space; its query placeholder was visibly truncated. The keyboard badge now disappears in responsive drawers; the field and nav links stay functional.
+- `small-mobile/05-notes.png`: on a 320px phone the vertically stacked notes library occupied almost all the first screen before the document editor. The library is now a bounded **scrollable panel** rather than an unscrollable 390px block, preserving folders and saved notes while moving the note title into the first viewport. Playwright explicitly requires the title to be visible before page scroll.
+- `notes-states/02-real-note-autosaved.png`: the All Notes count now correctly matches saved note records; this was fixed before this review, and **was not re-implemented**. The long editable document title uses standard single-line elision with a focusable input, not a lost document.
+- `standalone-responsive/wide-03-focus-mode.png`: a deliberately blank player until explicit remote playback is **expected**, not a broken media load. Source URL availability is still outside CI scope.
+
+**Other inspected groups:** all 15 routes across dark/light desktop, mobile, tablet; 320px/390px/480px phones, landscape, wide desktop, RTL, forced color, high contrast, large text, keyboard focus, density, reduced motion, scroll bottom, 640px effective reflow width (not browser zoom), functional note/video/PDF/flashcard/studio/media actions, source filters and settings, and nine standalone responsive scenes. The overall layout is coherent in sampled full captures; no evidence of other pervasive hard clipping. Manual native installation, device screen readers, and external third-party media availability remain unverified.
+
+**Verification condition:** The CSS changes above are *candidate remediations until a new successful 476-image Chrome run*. The code and the test gates must pass, and freshly generated frames must be reviewed before visual acceptance.

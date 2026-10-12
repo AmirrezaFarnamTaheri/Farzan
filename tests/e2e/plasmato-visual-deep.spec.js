@@ -124,6 +124,19 @@ for (const cfg of modes) {
         record({group:cfg.group,route,health});
         if(!health.visible||health.textLength<10||health.overflow>28||
           health.brokenImages||health.routeErrors)errors.push({route,health});
+        if(cfg.group === 'small-mobile' && route === 'notes') {
+          const title = page.locator('[data-note-title-input]');
+          await expect(title).toBeVisible();
+          const box = await title.boundingBox();
+          expect(box.y, 'Phone note editor title must be visible before scrolling')
+            .toBeLessThan(cfg.height - 95);
+          const state = await page.locator('.notes-sidebar').evaluate(el => ({
+            overflow: getComputedStyle(el).overflowY,
+            height: el.clientHeight,
+          }));
+          expect(state.overflow).toBe('auto');
+          expect(state.height).toBeLessThanOrEqual(295);
+        }
         await screenshot(page,cfg.group,name);
       }catch(e){errors.push({route,error:e.message});record({group:cfg.group,route,error:e.message});}
     }
@@ -157,6 +170,9 @@ test('mobile navigation and global chrome reveal real live controls',async({page
     const node = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     return Boolean(node && (node === link || link.contains(node)));
   })).toBe(true);
+  // On mobile the drawer cannot trade useful search text for a keyboard-only
+  // Ctrl+K badge. Keep the field readable and all navigation links operable.
+  await expect(page.locator('#sidebar .sidebar-search-kbd')).toBeHidden();
   await screenshot(page,'deep-actions','01-mobile-navigation-open');
   await page.locator('#sidebar a[href="#/notes"]').first().click();
   await expect(page).toHaveURL(/#\/notes/);

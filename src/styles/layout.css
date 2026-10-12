@@ -435,6 +435,13 @@
     display: initial;
   }
 
+  /* The touch-sized drawer has a dedicated search trigger; the Ctrl+K
+     desktop accelerator obscures the query placeholder on narrow phones. */
+  .sidebar .sidebar-search-kbd,
+  .sidebar.sidebar-collapsed .sidebar-search-kbd {
+    display: none;
+  }
+
   .sidebar-collapse-btn {
     display: none;
   }

@@ -281,6 +281,12 @@ test('settings density, font, theme and AI permission states are visible', async
   await stateShot(page, 'settings-states', '06-custom-api-permission');
   await page.locator('[data-ai-endpoint]').fill('http://not-local.example/v1/chat');
   await expect(page.locator('[data-ai-endpoint-warning]')).toContainText('HTTPS');
+  // After font enlargement the selected mode and disabled session lifetime
+  // must remain legible, not be cut to "Approved API er"/"This browser se".
+  const aiWidths = await page.locator('.settings-ai-mode-grid .settings-field .select')
+    .evaluateAll(controls => controls.map(control => control.getBoundingClientRect().width));
+  expect(aiWidths.length).toBeGreaterThanOrEqual(2);
+  expect(Math.min(...aiWidths)).toBeGreaterThanOrEqual(225);
   await stateShot(page, 'settings-states', '07-unsafe-endpoint-rejected');
   await page.locator('[data-ai-mode]').selectOption('local-gemma');
   await expect(page.locator('[data-ai-local-fields]')).toBeVisible();

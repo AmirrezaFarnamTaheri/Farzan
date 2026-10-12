@@ -194,15 +194,19 @@
   cursor: pointer;
 }
 
-.settings-ai-mode-grid,
-.settings-ai-two-column {
+/* AI permission controls must retain their full values even when the
+   application sidebar and Settings navigation consume much of the viewport.
+   Fit against the actual card width, not the global window breakpoint. */
+.settings-ai-mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr));
   gap: var(--space-3);
 }
 
 .settings-ai-two-column {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
 .settings-field {
