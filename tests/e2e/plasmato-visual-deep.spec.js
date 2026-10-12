@@ -133,6 +133,11 @@ test('mobile navigation and global chrome reveal real live controls',async({page
   await page.locator('#mobile-menu-btn').click();
   await expect(page.locator('#mobile-menu-btn')).toHaveAttribute('aria-expanded','true');
   await expect(page.locator('#sidebar')).toHaveClass(/sidebar-mobile-open/);
+  await expect.poll(() => page.evaluate(() => {
+    const drawer = document.getElementById('sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+    return Boolean(drawer && overlay && overlay.parentElement === drawer.parentElement);
+  })).toBe(true);
   // aria-expanded changes immediately, but the drawer transitions from
   // offscreen. Do not screenshot a uniformly darkened backdrop mid-animation.
   await expect.poll(() => page.locator('#sidebar').evaluate(el => {

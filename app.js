@@ -838,12 +838,17 @@ import { Pointer } from './src/lib/pointer.js';
       const trigger = document.getElementById('mobile-menu-btn');
       trigger?.setAttribute('aria-expanded', 'true');
       trigger?.setAttribute('aria-label', 'Close navigation menu');
-      // The overlay is a visual backdrop, not an alternative navigation tree.
+      // Keep the backdrop in the same stacking context as the sidebar. The
+      // application root is isolated from the document root by shell styles:
+      // attaching a z-index:60 overlay to <body> placed it *above* the entire
+      // sidebar (z-index:70 within its ancestor context), blurring the drawer
+      // and intercepting links. The overlay and drawer must be siblings.
+      const shell = this.el.parentElement;
       let overlay = $('.sidebar-overlay');
       if (!overlay) {
         overlay = createElement('div', { class: 'sidebar-overlay', 'aria-hidden': 'true' });
-        document.body.appendChild(overlay);
       }
+      if (overlay.parentElement !== shell) shell.appendChild(overlay);
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
     },
