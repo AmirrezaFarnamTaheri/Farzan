@@ -117,6 +117,16 @@ for (const cfg of modes) {
           expect(await page.locator('[data-home-focus-detail]').evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
           await expect(page.locator('#home-focus-title')).toHaveAttribute('dir', 'auto');
         }
+        if (cfg.rtl && route === 'courses') {
+          await expect(page.locator('#courses-search')).toHaveAttribute('dir', 'auto');
+          const courseMeta = page.locator('.course-item-meta bdi').first();
+          await expect(courseMeta).toHaveAttribute('dir', 'ltr');
+          await expect(courseMeta).toContainText(/\\d+ topics - \\d+ source\\(s\\)/);
+        }
+        if (cfg.rtl && route === 'materials') {
+          await expect(page.locator('#materials-search')).toHaveAttribute('dir', 'auto');
+          await expect(page.locator('#materials-pager .text-sm').first()).toHaveAttribute('dir', 'ltr');
+        }
         if (cfg.rtl && route === 'notes') {
           const titleState = await page.locator('[data-note-title-input]').evaluate(el => {
             const computed = getComputedStyle(el);

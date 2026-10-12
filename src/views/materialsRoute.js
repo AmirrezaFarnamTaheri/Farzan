@@ -19,7 +19,7 @@ export async function mountMaterialsView(deps = {}) {
       </div>
       <div class="card card-filled materials-controls-card">
         <div class="card-body">
-          <input class="input" id="materials-search" type="search" placeholder="Search topics..." aria-label="Search materials" />
+          <input class="input" id="materials-search" type="search" dir="auto" placeholder="Search topics..." aria-label="Search materials" />
           <div class="filter-row materials-filter-row" aria-label="Material filters">
             <button class="filter-chip active" type="button" data-material-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-material-filter="video" aria-pressed="false">Video</button>

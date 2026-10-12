@@ -37,7 +37,7 @@ export async function mountCoursesView(deps = {}) {
           <label class="courses-search-field">
             <span class="sr-only">Search courses</span>
             <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-            <input class="input" id="courses-search" type="search" placeholder="Search courses..." />
+            <input class="input" id="courses-search" type="search" dir="auto" placeholder="Search courses..." />
           </label>
           <div class="filter-row" aria-label="Course filters">
             <button class="filter-chip active" type="button" data-course-filter="all" aria-pressed="true">All</button>
@@ -728,7 +728,8 @@ export async function mountCoursesView(deps = {}) {
     mediaMeta.append(badgeNode(mediaLabel, meta.mediaClass === 'none' ? '' : 'badge-primary'));
     btn.append(
       createElement('div', { class: 'course-item-title' }, course.title),
-      createElement('div', { class: 'course-item-meta' }, `${meta.topicCount} topics - ${meta.sourceCount || 0} source(s)`),
+      createElement('div', { class: 'course-item-meta' },
+        createElement('bdi', { dir: 'ltr' }, `${meta.topicCount} topics - ${meta.sourceCount || 0} source(s)`)),
       mediaMeta
     );
     return btn;
@@ -855,7 +856,8 @@ export async function mountCoursesView(deps = {}) {
       summaryBody.appendChild(createElement('a', { href: productUrl, target: '_blank', rel: 'noopener' }, 'Product page'));
     }
     const sourceCount = Object.keys(topics.reduce((acc, t) => { acc[sourceKey(t)] = true; return acc; }, {})).length;
-    summaryBody.appendChild(createElement('div', { class: 'course-detail-meta' }, `${topics.length} topics across ${sourceCount} source(s)`));
+    summaryBody.appendChild(createElement('div', { class: 'course-detail-meta' },
+      createElement('bdi', { dir: 'ltr' }, `${topics.length} topics across ${sourceCount} source(s)`)));
     aiReady().then((ready) => {
       if (!ready || renderToken !== detailRenderToken || !summaryBody.isConnected) return;
       summaryBody.appendChild(createElement('div', { class: 'button-row', style: 'margin-top:10px' }, [

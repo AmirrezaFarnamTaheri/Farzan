@@ -2365,6 +2365,9 @@ import { Pointer } from './src/lib/pointer.js';
 
       const summary = document.createElement('div');
       summary.className = 'text-sm';
+      // Prevent 'Page 1/129' and count units from reordering in an RTL shell.
+      // This widget's labels are English; its flex position remains logical.
+      summary.dir = 'ltr';
       summary.style.opacity = '.8';
       summary.append(`${total.toLocaleString()} items • Page `);
       const currentPage = document.createElement('strong');

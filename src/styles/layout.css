@@ -370,6 +370,14 @@
   margin-top: var(--space-1);
 }
 
+/* RTL shells may contain English or Persian descriptions. Derive each
+   paragraph's visual direction from its text, but keep the shell's right
+   alignment. Without this, periods move ahead of English final words. */
+:dir(rtl) .page-subtitle {
+  unicode-bidi: plaintext;
+  text-align: right;
+}
+
 .page-actions {
   display: flex;
   align-items: center;
