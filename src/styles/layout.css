@@ -510,6 +510,17 @@
     display: none;
   }
 
+  /* The menu already exposes Home on narrow phones. Repeating it in the
+     breadcrumb steals the width needed for names like Materials, Settings
+     and Achievements. Keep the current page as the accessible breadcrumb. */
+  .breadcrumb-list > .breadcrumb-item:first-child:not(:last-child),
+  .breadcrumb-list > .breadcrumb-sep {
+    display: none;
+  }
+  .breadcrumb {
+    max-width: min(54vw, 220px);
+  }
+
   .view-container,
   .page-content {
     padding-inline: var(--space-3);

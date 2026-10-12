@@ -166,6 +166,37 @@ for (const config of configurations) {
           });
           expect(target, 'Visible focus target absent from ' + route).toBe(true);
         }
+        // Visual regression caught by native review of the real 320px
+        // Materials frame: "Home > Materi..." hid an ordinary route title.
+        // Check the actual painted breadcrumb boxes on ALL 15 routes.
+        if (config.group === 'small-mobile') {
+          const breadcrumb = page.locator('#breadcrumb .breadcrumb-current');
+          await expect(breadcrumb).toBeVisible();
+          const geometry = await breadcrumb.evaluate(node => {
+            const nav = node.closest('.breadcrumb');
+            const item = node.closest('.breadcrumb-item');
+            const titleRect = node.getBoundingClientRect();
+            const navRect = nav.getBoundingClientRect();
+            return {
+              title: node.textContent.trim(),
+              titleOverrun: node.scrollWidth - node.clientWidth,
+              itemOverrun: item.scrollWidth - item.clientWidth,
+              navOverrun: nav.scrollWidth - nav.clientWidth,
+              outside: titleRect.left < navRect.left - 1 || titleRect.right > navRect.right + 1,
+              homeVisible: [...nav.querySelectorAll('.breadcrumb-link')].some(
+                link => getComputedStyle(link.closest('.breadcrumb-item')).display !== 'none',
+              ),
+            };
+          });
+          expect(geometry.title.length, 'Missing breadcrumb title on ' + route).toBeGreaterThan(1);
+          expect(geometry.titleOverrun, 'Clipped route label on ' + route).toBeLessThanOrEqual(1);
+          expect(geometry.itemOverrun, 'Clipped breadcrumb item on ' + route).toBeLessThanOrEqual(1);
+          expect(geometry.navOverrun, 'Clipped breadcrumb navigation on ' + route).toBeLessThanOrEqual(1);
+          expect(geometry.outside, 'Breadcrumb outside its container on ' + route).toBe(false);
+          if (route !== 'home') {
+            expect(geometry.homeVisible, 'Redundant Home crumb consumes mobile width').toBe(false);
+          }
+        }
         const state = await stateHealth(page);
         if (!state.visible || state.textLength < 10 || state.errors ||
             state.overflow > 28 || state.brokenImages.length) {
