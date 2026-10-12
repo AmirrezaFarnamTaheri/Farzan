@@ -58,7 +58,27 @@ async function visit(page,route){
   await expect.poll(()=>page.evaluate(()=>location.hash)).toBe('#/'+route);
   await expect.poll(()=>page.locator('#view-container').evaluate(
     el=>el.innerText?.trim().length||0),{timeout:15000}).toBeGreaterThan(10);
-  await page.waitForTimeout(220);
+  // A previous route can still have >10 chars while the new async view is
+  // being mounted, causing a photograph of an empty canvas. Require the
+  // *target* route's rendered element and finished entrance animation.
+  const view = page.locator('#view-container .view-' + route);
+  await expect(view).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => view.evaluate(element => {
+    if (!element.isConnected || element.getBoundingClientRect().height <= 0) return false;
+    let current = element;
+    while (current && current.id !== 'view-container') {
+      const style = getComputedStyle(current);
+      if (style.visibility === 'hidden' || Number(style.opacity) < 0.995) return false;
+      if (current.getAnimations({ subtree: false }).some(animation =>
+        animation.playState === 'running' &&
+        Number(animation.effect?.getComputedTiming()?.endTime) > 0)) return false;
+      current = current.parentElement;
+    }
+    return true;
+  }), { timeout: 10000, message: 'Correct route must finish animation before screenshot' }).toBe(true);
+  await page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
 }
 function allScrollContainers(){
   const root=document.querySelector('#view-container');
@@ -96,17 +116,16 @@ for (const cfg of modes) {
       try{
         await visit(page,route);
         if(cfg.rtl)await page.evaluate(()=>{document.documentElement.dir='rtl';});
-        // The route's finite 420ms entrance and a live RTL direction switch
-        // can overlap. DOM text exists even when the view is visually still
-        // opacity:0; waiting only for innerText allowed a blank screenshot to
-        // pass. Require completed paint before recording a visual frame.
-        await expect.poll(() => page.locator('#view-container .view').first()
-          .evaluate(el => {
-            const opacity = Number(getComputedStyle(el).opacity);
-            const animating = el.getAnimations({ subtree: false }).some(a =>
-              a.playState === 'running' && Number(a.effect?.getComputedTiming()?.endTime) > 0);
-            return Number.isFinite(opacity) && opacity >= 0.995 && !animating;
-          }), { timeout: 7000, message: 'Route must finish entrance before screenshot' }).toBe(true);
+        // For dynamically switched RTL, reconfirm visibility *after* changing
+        // direction. The route was awaited in visit(); wait one final paint.
+        await page.evaluate(() => new Promise(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        if (route === 'home') {
+          const hero = page.locator('#view-container .home-hero');
+          await expect(hero).toBeVisible();
+          await expect(hero).toBeInViewport({ ratio: 0.5 });
+          await expect(page.locator('.home-title')).toContainText('Back to your studies');
+        }
         if (cfg.rtl && route === 'home') {
           // The shell can be RTL, but English sentence punctuation must stay
           // with the English text instead of appearing at the leading edge.

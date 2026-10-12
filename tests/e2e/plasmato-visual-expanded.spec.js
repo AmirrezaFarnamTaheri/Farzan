@@ -68,7 +68,27 @@ async function routeState(page, route) {
     const main = document.querySelector('#view-container');
     return main && main.innerText && main.innerText.trim().length >= 10;
   }), { timeout: 15000 }).toBeTruthy();
-  await page.waitForTimeout(220);
+  // A previous route can still have >10 chars while the new async view is
+  // being mounted, causing a photograph of an empty canvas. Require the
+  // *target* route's rendered element and finished entrance animation.
+  const view = page.locator('#view-container .view-' + route);
+  await expect(view).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => view.evaluate(element => {
+    if (!element.isConnected || element.getBoundingClientRect().height <= 0) return false;
+    let current = element;
+    while (current && current.id !== 'view-container') {
+      const style = getComputedStyle(current);
+      if (style.visibility === 'hidden' || Number(style.opacity) < 0.995) return false;
+      if (current.getAnimations({ subtree: false }).some(animation =>
+        animation.playState === 'running' &&
+        Number(animation.effect?.getComputedTiming()?.endTime) > 0)) return false;
+      current = current.parentElement;
+    }
+    return true;
+  }), { timeout: 10000, message: 'Correct route must finish animation before screenshot' }).toBe(true);
+  await page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
 }
 
 async function stateHealth(page) {
@@ -128,6 +148,10 @@ for (const config of configurations) {
           // The Persian locale option is correctly disabled until translated.
           // This is a directional layout stress test, NOT a translation claim.
           await page.evaluate(() => { document.documentElement.dir = 'rtl'; });
+        }
+        if (route === 'home') {
+          await expect(page.locator('#view-container .home-hero')).toBeInViewport({ ratio: 0.5 });
+          await expect(page.locator('#view-container .home-title')).toContainText('Back to your studies');
         }
         if (config.focus) {
           const target = await page.evaluate(() => {
