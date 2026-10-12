@@ -705,14 +705,14 @@
     },
 
     // ── Load note into editor ─────────────────────────────
-    load(note) {
+    load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
       this._history    = [];
       this._historyIdx = -1;
       this._snapshot();
-      this._el.focus();
+      this._el.focus({ preventScroll });
 
       // Update title field
       const titleEl = $('[data-note-title-input]');
@@ -1882,17 +1882,17 @@
       // empty, and creating here would persist a spurious "Untitled Note"
       // on every page load.
       const notes = Store.getNotes();
-      if (notes.length) this.openNote(notes[0].id);
+      if (notes.length) this.openNote(notes[0].id, { preventScroll: true });
 
       this._bindSyncRefresh();
       Store.hydrateFromDB().then((changed) => {
         if (!this._inited) return;
         if (changed) this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
         const hydrated = Store.getNotes();
-        if (!hydrated.length) this.newNote();
-        else if (!notes.length) this.openNote(hydrated[0].id);
+        if (!hydrated.length) this.newNote(undefined, { preventScroll: true });
+        else if (!notes.length) this.openNote(hydrated[0].id, { preventScroll: true });
       }).catch(() => {
-        if (this._inited && !Store.getNotes().length) this.newNote();
+        if (this._inited && !Store.getNotes().length) this.newNote(undefined, { preventScroll: true });
       });
     },
 
@@ -1925,14 +1925,14 @@
 
       const current = currentId && Store.getNote(currentId);
       if (current) {
-        if (!pendingLocalEdit) Editor.load(current);
+        if (!pendingLocalEdit) Editor.load(current, { preventScroll: true });
         NotesList.setActive(current.id);
         return { currentId: current.id, editorReloaded: !pendingLocalEdit };
       }
 
       const notes = Store.getNotes();
       if (notes.length) {
-        if (!pendingLocalEdit) this.openNote(notes[0].id);
+        if (!pendingLocalEdit) this.openNote(notes[0].id, { preventScroll: true });
         return { currentId: notes[0].id, editorReloaded: !pendingLocalEdit };
       }
 
@@ -1956,21 +1956,21 @@
       return result;
     },
 
-    newNote(folderId = NotesList._filter.folderId ?? 'default') {
+    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
       const note = Store.createNote({ folderId });
       NotesList.render();
       // Folder counts are a separate view; refresh them after creating notes.
       // Otherwise the list can show two notes while All Notes still says 0.
       FoldersPanel.render();
-      this.openNote(note.id);
+      this.openNote(note.id, { preventScroll });
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
     },
 
-    openNote(id) {
+    openNote(id, { preventScroll = false } = {}) {
       Editor.save(true); // Save current
       const note = Store.getNote(id);
       if (!note) return;
-      Editor.load(note);
+      Editor.load(note, { preventScroll });
       NotesList.setActive(id);
 
       const pane = $('[data-notes-main-pane]');

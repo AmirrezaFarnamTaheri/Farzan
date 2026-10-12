@@ -96,6 +96,11 @@ for (const cfg of modes) {
       try{
         await visit(page,route);
         if(cfg.rtl)await page.evaluate(()=>{document.documentElement.dir='rtl';});
+        if (route === 'notes' && (cfg.group === 'phone-landscape' || cfg.group === 'zoom-200')) {
+          // Restoring a saved note must not scroll the short viewport past
+          // the document heading before the user can see its controls.
+          await expect(page.locator('.notes-page-header .page-title')).toBeInViewport({ ratio: 0.8 });
+        }
         if (route === 'pdf' && !cfg.scrollBottom) {
           await expect(page.locator('[data-pdf-current-page]')).toBeDisabled();
           await expect(page.locator('[data-pdf-current-page]')).toHaveValue('—');
