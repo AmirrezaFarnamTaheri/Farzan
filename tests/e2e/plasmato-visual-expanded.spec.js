@@ -166,6 +166,12 @@ for (const config of configurations) {
           });
           expect(target, 'Visible focus target absent from ' + route).toBe(true);
         }
+        if (config.group === 'small-mobile' && route === 'home') {
+          await expect.poll(() => page.locator('[data-home-widgets]').getAttribute('aria-busy')).toBe('false');
+          await expect(page.locator('.home-actions [data-home-resume]')).toContainText('Browse courses');
+          await expect(page.locator('.home-actions [data-home-browse-secondary]')).toHaveCount(0);
+          await expect(page.locator('.home-actions [data-home-resume] use')).toHaveAttribute('href', '#i-curriculum');
+        }
         // Visual regression caught by native review of the real 320px
         // Materials frame: "Home > Materi..." hid an ordinary route title.
         // Check the actual painted breadcrumb boxes on ALL 15 routes.

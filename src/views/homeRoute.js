@@ -36,7 +36,7 @@ export function mountHomeView(deps = {}) {
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
               <span>Continue studying</span>
             </button>
-            <a class="btn btn-ghost" href="#/courses">
+            <a class="btn btn-ghost" href="#/courses" data-home-browse-secondary>
               <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
               Browse courses
             </a>
@@ -369,8 +369,14 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   }
   if (resumeAction) {
     resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Browse courses';
+    resumeAction.querySelector('use')?.setAttribute('href', focusRecord ? '#i-play' : '#i-curriculum');
     resumeAction.addEventListener('click', openFocus);
   }
+  // On a new profile the primary action already opens Courses, so a second
+  // identical hero button adds visual noise and needless keyboard stops.
+  // Once there is saved progress the two actions have distinct purposes:
+  // resume the topic, or browse the full catalog.
+  if (!focusRecord) document.querySelector('[data-home-browse-secondary]')?.remove();
 
   const dueReview = dueReviews[0];
   const widgetData = [

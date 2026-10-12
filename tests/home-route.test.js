@@ -72,6 +72,8 @@ describe('home dashboard', () => {
       expect(document.querySelector('[data-home-focus-action] span')?.textContent).toBe('Resume this topic');
     });
 
+    expect(document.querySelector('[data-home-browse-secondary]')?.getAttribute('href')).toBe('#/courses');
+    expect(document.querySelector('[data-home-resume] use')?.getAttribute('href')).toBe('#i-play');
     document.querySelector('[data-home-resume]')?.click();
     expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 180);
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
@@ -96,5 +98,8 @@ describe('home dashboard', () => {
     expect(document.getElementById('home-focus-title')?.textContent).toBe('Choose a course');
     expect(document.body.textContent).toContain('No recent activity');
     expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Browse courses');
+    expect(document.querySelector('[data-home-resume] use')?.getAttribute('href')).toBe('#i-curriculum');
+    expect(document.querySelector('[data-home-browse-secondary]')).toBeNull();
+    expect(document.querySelectorAll('.home-actions > button, .home-actions > a')).toHaveLength(3);
   });
 });
