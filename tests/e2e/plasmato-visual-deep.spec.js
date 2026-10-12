@@ -96,6 +96,17 @@ for (const cfg of modes) {
       try{
         await visit(page,route);
         if(cfg.rtl)await page.evaluate(()=>{document.documentElement.dir='rtl';});
+        // The route's finite 420ms entrance and a live RTL direction switch
+        // can overlap. DOM text exists even when the view is visually still
+        // opacity:0; waiting only for innerText allowed a blank screenshot to
+        // pass. Require completed paint before recording a visual frame.
+        await expect.poll(() => page.locator('#view-container .view').first()
+          .evaluate(el => {
+            const opacity = Number(getComputedStyle(el).opacity);
+            const animating = el.getAnimations({ subtree: false }).some(a =>
+              a.playState === 'running' && Number(a.effect?.getComputedTiming()?.endTime) > 0);
+            return Number.isFinite(opacity) && opacity >= 0.995 && !animating;
+          }), { timeout: 7000, message: 'Route must finish entrance before screenshot' }).toBe(true);
         if (route === 'notes' && (cfg.group === 'phone-landscape' || cfg.group === 'zoom-200')) {
           // Restoring a saved note must not scroll the short viewport past
           // the document heading before the user can see its controls.
@@ -112,8 +123,11 @@ for (const cfg of modes) {
         }
         const health=await page.evaluate(()=>{
           const main=document.querySelector('#view-container');
+          const visibleView = main?.querySelector('.view');
+          const viewOpacity = Number(visibleView ? getComputedStyle(visibleView).opacity : 0);
           const rect=main?.getBoundingClientRect();
           return {visible:!!rect&&rect.width>0&&rect.height>0,
+            viewOpacity,
             textLength:main?.innerText?.trim().length||0,
             overflow:Math.max(document.body.scrollWidth,
               document.documentElement.scrollWidth)-innerWidth,
@@ -122,7 +136,8 @@ for (const cfg of modes) {
             routeErrors:main?.querySelectorAll('.route-error,.view-error,[data-route-error]').length||0};
         });
         record({group:cfg.group,route,health});
-        if(!health.visible||health.textLength<10||health.overflow>28||
+        if(!health.visible||health.viewOpacity<0.995||
+          health.textLength<10||health.overflow>28||
           health.brokenImages||health.routeErrors)errors.push({route,health});
         if(cfg.group === 'small-mobile' && route === 'notes') {
           const title = page.locator('[data-note-title-input]');

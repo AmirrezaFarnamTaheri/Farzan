@@ -69,3 +69,7 @@ The next release is gated on 308 **newly captured within the same CI run** actua
 **Verification condition:** The CSS changes above are *candidate remediations until a new successful 476-image Chrome run*. The code and the test gates must pass, and freshly generated frames must be reviewed before visual acceptance.
 
 - `settings-states/07-unsafe-endpoint-rejected.png`: the enlarged-font desktop sidebar also elided `OpenCourseDeck` next to the collapse control. Capped only the brand wordmark size, without scaling down page content, and added an actual Chrome width assertion to catch future clipping.
+
+### Additional native-vision finding: RTL Home transition frame (2026-10-12)
+
+The first full-resolution `light-rtl-desktop/01-home.png` on both the original and first post-fix runs showed the entire Home content blank while the sidebar and topbar were visible. The screenshot's recorded `textLength:932` misleadingly marked the route healthy. The browser suite navigated from Settings and immediately switched the document direction while the **420ms entry animation** was still running. The suite now waits for the actual view's computed opacity to reach 1 and its route-entry animation to finish before each screenshot. It also records and rejects unexpectedly transparent views in the health checks. This corrects a screenshot timing/race blind spot; it is not evidence of a permanently missing Home implementation. The next full Chrome run must demonstrate Home content in that RTL frame before accepting the matrix.
