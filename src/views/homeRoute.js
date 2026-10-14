@@ -251,11 +251,7 @@ function createActivityItem({ icon, title, detail, time, href }) {
   return item;
 }
 
-async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
-  const widgetsRoot = document.querySelector('[data-home-widgets]');
-  const activityRoot = document.querySelector('[data-home-activity]');
-  if (!widgetsRoot || !activityRoot) return;
-
+async function fetchDashboardData() {
   const [progress, notes, timestamps, topics] = await Promise.all([
     (async () => { try { return await window.DB?.getAllProgress?.() ?? []; } catch { return []; } })(),
     (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
@@ -269,17 +265,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       }
     })(),
   ]);
-  if (!document.body.contains(widgetsRoot)) return;
+  return { progress, notes, timestamps, topics };
+}
 
-  const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
-  const latestProgress = [...progress]
-    .filter(record => record?.topicId && (Number(record.percent) > 0 || Number(record.position) > 0 || record.status))
-    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
-  const latestTimestamp = [...timestamps]
-    .filter(item => item?.topicId)
-    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
-  const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
-
+function computeDashboardStats(progress, notes, timestamps) {
   const completed = progress.filter(record => record?.status === 'done' || Number(record?.percent) >= 100);
   const active = progress.filter(record => record?.topicId && Number(record?.percent) > 0 && Number(record?.percent) < 100);
   const reviewCutoff = 30 * 24 * 60 * 60 * 1000;
@@ -294,13 +283,23 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     ? Math.round(measuredProgress.reduce((sum, value) => sum + value, 0) / measuredProgress.length)
     : 0;
 
-  setText('[data-home-active-count]', active.length);
-  setText('[data-home-note-count]', notes.length);
-  setText('[data-home-review-count]', dueReviews.length);
-  setText('[data-pulse-active]', active.length);
-  setText('[data-pulse-complete]', completed.length);
-  setText('[data-pulse-week]', weeklyActivity);
-  setText('[data-pulse-average]', `${averageProgress}%`);
+  return {
+    activeCount: active.length,
+    completedCount: completed.length,
+    notesCount: notes.length,
+    dueReviews,
+    weeklyActivity,
+    averageProgress,
+  };
+}
+
+function resolveFocusSession(progress, timestamps, topicMap) {
+  const latestProgress = [...progress]
+    .filter(record => record?.topicId && (Number(record.percent) > 0 || Number(record.position) > 0 || record.status))
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+  const latestTimestamp = [...timestamps]
+    .filter(item => item?.topicId)
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
 
   const focusRecord = latestProgress || latestTimestamp;
   const focusTopicId = focusRecord?.topicId;
@@ -311,11 +310,26 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     ? 'Your latest learning session is ready to resume.'
     : 'Choose a course and OpenCourseDeck will keep your next step ready here.';
 
+  return {
+    focusRecord,
+    focusTopicId,
+    focusPercent,
+    focusTitle,
+    focusDetail,
+    latestProgress,
+    latestTimestamp,
+  };
+}
+
+function updateFocusPanelDOM(focusData, { Router, setPendingCourseMedia }) {
+  const { focusRecord, focusTopicId, focusPercent, focusTitle, focusDetail, latestTimestamp } = focusData;
+
   setText('#home-focus-title', focusTitle);
   setText('[data-home-focus-detail]', focusDetail);
   setText('[data-home-focus-status]', focusRecord ? 'Resume' : 'Start');
   setText('[data-home-focus-percent]', `${Math.round(focusPercent)}% complete`);
   setText('[data-home-focus-time]', latestTimestamp?.position ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'No saved position');
+  
   const focusProgress = document.querySelector('[data-home-focus-progress]');
   if (focusProgress) focusProgress.style.width = `${focusPercent}%`;
 
@@ -338,15 +352,24 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Start learning';
     resumeAction.addEventListener('click', openFocus);
   }
+}
 
+function buildWidgetData(focusData, dueReviews, notes, topicMap) {
+  const { focusTitle, focusTopicId, focusPercent, latestProgress, latestTimestamp } = focusData;
   const dueReview = dueReviews[0];
-  const widgetData = [
+  const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+
+  return [
     {
       id: 'continue',
       icon: 'i-play',
       label: 'Continue studying',
       title: focusTitle,
-      detail: latestProgress ? `${Math.round(focusPercent)}% complete` : latestTimestamp ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'Start with the course catalog.',
+      detail: latestProgress
+        ? `${Math.round(focusPercent)}% complete`
+        : latestTimestamp
+          ? `Saved at ${formatDuration(latestTimestamp.position)}`
+          : 'Start with the course catalog.',
       action: 'courses',
       topicId: focusTopicId,
       position: latestTimestamp?.position,
@@ -377,7 +400,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       position: latestTimestamp?.position,
     },
   ];
+}
 
+function renderWidgets(widgetsRoot, widgetData, { Router, setPendingCourseMedia }) {
   widgetsRoot.replaceChildren();
   widgetsRoot.setAttribute('aria-busy', 'false');
   widgetData.forEach(widget => {
@@ -411,9 +436,6 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
         Router.navigate('#/courses');
         return;
       }
-      // A fresh user with no progress/timestamps gets action:'courses' with
-      // no topicId (widget copy says "Start with the course catalog") --
-      // without this branch they fell through to '#/notes' instead.
       if (widget.action === 'courses') {
         Router.navigate('#/courses');
         return;
@@ -422,8 +444,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     });
     widgetsRoot.appendChild(card);
   });
+}
 
-  const activity = [
+function buildActivityTrail(notes, timestamps, progress, topicMap) {
+  return [
     ...notes.map(note => ({
       icon: 'i-note',
       title: note.title || 'Untitled note',
@@ -446,7 +470,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       href: '#/progress',
     })),
   ].sort((a, b) => b.time - a.time).slice(0, 5);
+}
 
+function renderActivityTrail(activityRoot, activity) {
   activityRoot.replaceChildren();
   if (!activity.length) {
     const empty = document.createElement('div');
@@ -461,4 +487,37 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     return;
   }
   activity.forEach(item => activityRoot.appendChild(createActivityItem(item)));
+}
+
+async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
+  const widgetsRoot = document.querySelector('[data-home-widgets]');
+  const activityRoot = document.querySelector('[data-home-activity]');
+  if (!widgetsRoot || !activityRoot) return;
+
+  const { progress, notes, timestamps, topics } = await fetchDashboardData();
+  if (!document.body.contains(widgetsRoot)) return;
+
+  const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
+  const stats = computeDashboardStats(progress, notes, timestamps);
+
+  // Update telemetry and pulse metrics
+  setText('[data-home-active-count]', stats.activeCount);
+  setText('[data-home-note-count]', stats.notesCount);
+  setText('[data-home-review-count]', stats.dueReviews.length);
+  setText('[data-pulse-active]', stats.activeCount);
+  setText('[data-pulse-complete]', stats.completedCount);
+  setText('[data-pulse-week]', stats.weeklyActivity);
+  setText('[data-pulse-average]', `${stats.averageProgress}%`);
+
+  // Focus session resolution and DOM updates
+  const focusData = resolveFocusSession(progress, timestamps, topicMap);
+  updateFocusPanelDOM(focusData, { Router, setPendingCourseMedia });
+
+  // Dashboard action widgets
+  const widgetData = buildWidgetData(focusData, stats.dueReviews, notes, topicMap);
+  renderWidgets(widgetsRoot, widgetData, { Router, setPendingCourseMedia });
+
+  // Activity trail
+  const activity = buildActivityTrail(notes, timestamps, progress, topicMap);
+  renderActivityTrail(activityRoot, activity);
 }

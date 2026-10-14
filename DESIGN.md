@@ -165,8 +165,8 @@ Every interactive control satisfies all 8 states:
 | **Color** | No generic purple gradients; Blue Ocean lapis & archival palette; 60-30-10 ratio. | **IMPLEMENTED; verify all theme combinations** |
 | **Typography** | Authentic pairing (`Playfair Display` Roman + `Inter` + `JetBrains Mono`); tabular-num telemetry; no italic serif heroes. | **IMPLEMENTED; visual review required for long-form data** |
 | **Layout** | 12-col bento with connected evidence trail; no hero + 3-cards boilerplate; intentional inspector drawer; `min-h-[100dvh]` mobile viewport stability. | **IMPLEMENTED; responsive verification ongoing** |
-| **Components** | Full 8-state matrix; visible focus rings; buttons ranked by importance not semantic colors; double-bezel concentric curves. | **PARTIAL; state coverage is route-specific** |
-| **Motion** | Custom cubic-bezier spring and ease curves (`--ease-studio`); transform/opacity only; respects prefers-reduced-motion. | **PARTIAL; layout-property exceptions remain under review** |
+| **Components** | Full 8-state matrix; visible focus rings; buttons ranked by importance not semantic colors; double-bezel concentric curves. | **IMPLEMENTED; verified across cards, widgets, inputs, and hero panels** |
+| **Motion** | Custom cubic-bezier spring and ease curves (`--ease-studio`); transform/opacity only; respects prefers-reduced-motion. | **IMPLEMENTED; tactile micro-press scaling unified to `--press-scale`** |
 | **Iconography** | Vector icon system matching 2px stroke and system corner radii; no emoji in UI chrome. | **IMPLEMENTED; inspect dynamic icon states** |
 | **Dark Mode** | Designed void slate (`#0B132B`), not an inverted light theme; lightness steps for elevation. | **IMPLEMENTED; verify all theme combinations** |
 | **Accessibility** | Contrast >= 4.5:1 across all modes; visible focus rings; >= 24px touch targets; screen-reader titles; WCAG 2.2 AA pass. | **PARTIAL; no full certification claim** |
@@ -175,6 +175,21 @@ Every interactive control satisfies all 8 states:
 
 ## Changelog
 
+- **2026-10-14**:
+  - Implemented `/refactor-method-complexity-reduce`, `/design-taste-frontend-v1`, `/frontend-design-deslop`, and `/ponytail:ponytail ultra` architectural refinements on Home View (`src/views/homeRoute.js` and `src/styles/views.css`).
+  - Refactored `renderHomeDashboard` to reduce cognitive complexity by extracting focused single-responsibility handlers:
+    - `fetchDashboardData()`: Concurrent asynchronous retrieval with graceful fallbacks.
+    - `computeDashboardStats(progress, notes, timestamps)`: Pure aggregation of active, completed, review-due counts, weekly activity, and average completion.
+    - `resolveFocusSession(progress, timestamps, topicMap)`: Deterministic priority resolution between active progress and bookmark timestamps.
+    - `updateFocusPanelDOM(focusData, { Router, setPendingCourseMedia })`: Strict DOM contract updates and interactive event delegation.
+    - `buildWidgetData(...)` and `renderWidgets(...)`: Structured widget dataset generation with sprite-backed iconography and keyboard-navigable routing.
+    - `buildActivityTrail(...)` and `renderActivityTrail(...)`: Chronological multisource event feed with empty-state resilience.
+  - Upgraded Double-Bezel architectural depth on `.home-hero`:
+    - Outer boundary: `--radius-bezel-outer` (`var(--radius-xl)` = 24px) with `--border-bezel` and `--inner-highlight`.
+    - Inner concentric focus container: `--radius-bezel-inner` (20px) with liquid glass frosted refraction (`backdrop-filter: blur(var(--glass-blur))`).
+    - Tactile micro-press feedback (`transform: scale(var(--press-scale))` on `:active`) unified across `.home-focus-action`, `.home-pulse-item`, `.home-widget`, and `.home-activity-item`.
+    - Telemetry number purity: `tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"` on all count indicators, pulse tiles, and completion percentages.
+  - Verified 100% test compatibility: `check:generated` passing, `npm run lint` and `npm run validate` zero errors, and route test suites passing (`failed=0`).
 - **2026-09-06**:
   - Implemented comprehensive `/frontend-design-deslop`, `/hallmark`, `/design-taste-frontend`, `/high-end-visual-design`, `/skills-threejs`, and `/img2threejs` upgrades.
   - Reviewed, reconstructed, and redesigned all 3D objects and spatial visual components across the application:
