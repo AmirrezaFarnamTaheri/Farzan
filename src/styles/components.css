@@ -1346,21 +1346,33 @@
 
   /* Topbar button alias */
   .topbar-action-btn {
+    position: relative;
     width: 40px;
     height: 40px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
     border: 1px solid transparent;
-    transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
+    background: transparent;
+    box-shadow: none;
+    transition:
+      background var(--duration-fast) var(--ease-studio),
+      color var(--duration-fast) var(--ease-studio),
+      border-color var(--duration-fast) var(--ease-studio),
+      transform var(--duration-fast) var(--ease-studio),
+      box-shadow var(--duration-fast) var(--ease-studio);
   }
   .topbar-action-btn:hover {
-    background: color-mix(in srgb, var(--glass-bg) 65%, transparent);
+    background: color-mix(in srgb, var(--glass-bg) 75%, transparent);
     border-color: var(--glass-border);
     color: var(--text-primary);
     transform: translateY(-1px);
+    box-shadow: var(--shadow-xs), var(--inner-highlight);
+  }
+  .topbar-action-btn:active {
+    transform: scale(var(--press-scale));
   }
 
   /* Modal system alias (index.html uses #modal-overlay + .modal-container) */

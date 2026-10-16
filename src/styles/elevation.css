@@ -1,64 +1,109 @@
 .bg-orbs, .ambient-desk-surface {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-    overflow: hidden;
-    background: var(--bg);
-    background-image:
-      radial-gradient(1100px 700px at 12% -10%, rgba(var(--accent-rgb), 0.16), transparent 62%),
-      radial-gradient(900px 600px at 100% 20%, color-mix(in srgb, var(--accent-cyan, #06b6d4) 10%, transparent), transparent 60%),
-      linear-gradient(to right, var(--border) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
-    background-position: center top, center top, 0 0, 0 0;
-    background-attachment: scroll;
-    contain: strict;
-  }
-  .orb {
-    display: none;
-  }
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg);
+  background-image:
+    radial-gradient(1200px 800px at 15% -8%, rgba(var(--accent-rgb), 0.18), transparent 64%),
+    radial-gradient(1000px 650px at 98% 18%, color-mix(in srgb, var(--accent-cyan, #06b6d4) 12%, transparent), transparent 62%),
+    radial-gradient(1100px 700px at 50% 105%, rgba(0, 0, 0, 0.35), transparent 70%),
+    linear-gradient(to right, color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-position: center top, center top, center bottom, 0 0, 0 0;
+  background-attachment: scroll;
+  contain: strict;
+}
 
-  .ocd-app {
-    background: transparent !important;
-  }
-  
-  .sidebar, .topbar {
-    background: var(--glass-bg-strong) !important;
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-right: 1px solid var(--glass-border);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  }
-  
-  .topbar {
-    border-bottom: 1px solid var(--glass-border);
-    border-right: none;
-  }
+[data-theme="light"] .bg-orbs,
+[data-theme="light"] .ambient-desk-surface {
+  background-image:
+    radial-gradient(1200px 800px at 15% -8%, rgba(var(--accent-rgb), 0.12), transparent 64%),
+    radial-gradient(1000px 650px at 98% 18%, color-mix(in srgb, var(--accent-cyan, #06b6d4) 08%, transparent), transparent 62%),
+    linear-gradient(to right, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
+}
 
-  /* Cards sit on a static canvas, so a backdrop blur costs a full extra
-     compositing pass per card and changes nothing visible. Blur is reserved
-     for surfaces that actually float over moving content (sidebar, topbar,
-     modals, popovers). */
-  .card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
-    background: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border) !important;
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transition: transform var(--duration-base) var(--ease-studio), box-shadow var(--duration-base) var(--ease-studio), border-color var(--duration-base) var(--ease-studio);
-  }
+.orb {
+  display: none;
+}
 
-  .card.card-interactive:hover,
-  a.card:hover,
-  button.card:hover,
-  .card[role="button"]:hover,
-  .course-card:hover,
-  .course-item:hover,
-  .playlist-card:hover,
-  .tag-card:hover,
-  .flashcard-card:hover,
-  .home-pulse-item:hover,
-  .settings-control-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) !important;
-    border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border)) !important;
-  }
+.ocd-app {
+  background: transparent !important;
+}
+
+.sidebar, .topbar {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-right: 1px solid var(--glass-border);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.12), inset -1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+.topbar {
+  border-bottom: 1px solid var(--glass-border);
+  border-right: none;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .sidebar {
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04), inset -1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="light"] .topbar {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Cards sit on a static canvas, so a backdrop blur costs a full extra
+   compositing pass per card and changes nothing visible. Blur is reserved
+   for surfaces that actually float over moving content (sidebar, topbar,
+   modals, popovers). */
+.card, .courses-sidebar, .notes-sidebar, .pdf-sidebar {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-bezel-outer, var(--radius-xl));
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    transform var(--duration-base) var(--ease-studio),
+    box-shadow var(--duration-base) var(--ease-studio),
+    border-color var(--duration-base) var(--ease-studio),
+    background var(--duration-base) var(--ease-studio);
+}
+
+[data-theme="light"] .card,
+[data-theme="light"] .courses-sidebar,
+[data-theme="light"] .notes-sidebar,
+[data-theme="light"] .pdf-sidebar {
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.card.card-interactive:hover,
+a.card:hover,
+button.card:hover,
+.card[role="button"]:hover,
+.course-card:hover,
+.course-item:hover,
+.playlist-card:hover,
+.tag-card:hover,
+.flashcard-card:hover,
+.home-pulse-item:hover,
+.settings-control-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 24px rgba(var(--accent-rgb), 0.16) !important;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border)) !important;
+}
+
+.card.card-interactive:active,
+a.card:active,
+button.card:active,
+.card[role="button"]:active,
+.course-item:active,
+.playlist-card:active,
+.tag-card:active,
+.flashcard-card:active,
+.home-pulse-item:active,
+.settings-control-card:active {
+  transform: scale(var(--press-scale));
+}

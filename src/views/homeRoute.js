@@ -29,7 +29,11 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <span class="eyebrow">Local-first learning studio</span>
+          <div class="home-eyebrow-pill">
+            <span class="status-beacon" aria-hidden="true"></span>
+            <span class="eyebrow">Local-first learning studio</span>
+            <span class="home-version-badge" aria-hidden="true">Offline Core</span>
+          </div>
           <h1 class="home-title">Your study command deck is ready.</h1>
           <p class="home-subtitle">Continue where you left off, capture ideas, and keep every learning artifact on your device.</p>
           <div class="home-actions">
@@ -51,15 +55,16 @@ export function mountHomeView(deps = {}) {
             </a>
           </div>
           <div class="home-command-strip" aria-label="Learning overview" data-home-command-strip>
-            <span><strong data-home-active-count>0</strong> active</span>
-            <span><strong data-home-note-count>0</strong> notes</span>
-            <span><strong data-home-review-count>0</strong> due for review</span>
+            <span class="command-pod"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg><strong data-home-active-count>0</strong> active</span>
+            <span class="command-pod"><svg class="icon" aria-hidden="true"><use href="#i-notes"/></svg><strong data-home-note-count>0</strong> notes</span>
+            <span class="command-pod"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg><strong data-home-review-count>0</strong> due for review</span>
           </div>
         </div>
 
         <section class="home-focus-panel" aria-labelledby="home-focus-title" aria-live="polite">
           <div class="home-focus-head">
             <div>
+              <span class="home-focus-kicker">Active Study Session</span>
               <h2 id="home-focus-title">Pick up where you left off</h2>
             </div>
             <span class="home-focus-status" data-home-focus-status>Ready</span>
@@ -84,6 +89,7 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
+                <span class="eyebrow">Telemetry Matrix</span>
                 <h2 class="home-card-title">Your library at a glance</h2>
               </div>
               <a class="btn btn-ghost btn-sm" href="#/progress">Open analytics</a>
@@ -115,6 +121,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
+            <span class="eyebrow">Catalog Intel</span>
             <h3 class="home-card-title mb-4">Library snapshot</h3>
             <div class="home-stat"><strong id="home-course-count">—</strong><span>Courses</span></div>
             <div class="home-stat"><strong id="home-topic-count">—</strong><span>Topics</span></div>
@@ -124,6 +131,7 @@ export function mountHomeView(deps = {}) {
 
         <section class="card card-filled home-card">
           <div class="card-body">
+            <span class="eyebrow">Studio Workbench</span>
             <h3 class="home-card-title mb-4">Quick tools</h3>
             <div class="home-tool-list">
               <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
@@ -137,9 +145,10 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
+                <span class="eyebrow">Study Triage Deck</span>
                 <h2 class="home-card-title">Continue, review, and capture</h2>
               </div>
-              <kbd>Ctrl+K</kbd>
+              <kbd class="keycap">Ctrl+K</kbd>
             </div>
             <div class="home-widget-list" data-home-widgets aria-live="polite" aria-busy="true">
               <div class="home-widget-skeleton" aria-hidden="true"></div>
@@ -153,6 +162,7 @@ export function mountHomeView(deps = {}) {
           <div class="card-body">
             <div class="home-card-head">
               <div>
+                <span class="eyebrow">Connected Knowledge Trail</span>
                 <h2 class="home-card-title">Your latest learning trail</h2>
               </div>
             </div>

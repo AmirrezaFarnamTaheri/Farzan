@@ -87,16 +87,19 @@
     align-items: center;
     gap: var(--space-3);
     min-height: var(--nav-item-h, 40px);
-    padding: 6px var(--space-3);
-    border-radius: var(--radius-md);
+    padding: 7px var(--space-3_5, 14px);
+    border-radius: var(--radius-lg);
+    border: 1px solid transparent;
     color: var(--text-secondary);
     font-size: var(--text-sm);
     font-weight: 500;
     cursor: pointer;
     transition:
-      background var(--duration-fast),
-      color var(--duration-fast),
-      padding var(--duration-base);
+      background var(--duration-fast) var(--ease-studio),
+      color var(--duration-fast) var(--ease-studio),
+      border-color var(--duration-fast) var(--ease-studio),
+      transform var(--duration-fast) var(--ease-studio),
+      box-shadow var(--duration-fast) var(--ease-studio);
     white-space: nowrap;
     overflow: hidden;
     position: relative;
@@ -104,31 +107,41 @@
     text-decoration: none;
   }
   .nav-item:hover {
-    background: var(--surface-hover);
+    background: color-mix(in srgb, var(--surface-hover) 85%, transparent);
     color: var(--text-primary);
+    border-color: var(--glass-border);
+  }
+  .nav-item:active {
+    transform: scale(var(--press-scale));
   }
   .nav-item.active {
     background:
       linear-gradient(
         135deg,
-        color-mix(in srgb, var(--accent) 16%, var(--surface-3)) 0%,
-        color-mix(in srgb, var(--accent) 10%, var(--surface-2)) 55%,
-        color-mix(in srgb, var(--accent) 6%,  var(--surface-2)) 100%
+        color-mix(in srgb, var(--accent) 18%, var(--surface-3)) 0%,
+        color-mix(in srgb, var(--accent) 10%, var(--surface-2)) 60%,
+        color-mix(in srgb, var(--accent) 5%,  var(--surface-2)) 100%
       );
-    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-strong));
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border));
     color: var(--text-primary);
     font-weight: 600;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.18), 0 0 0 1px rgba(var(--accent-rgb), 0.12) inset;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 18px rgba(var(--accent-rgb), 0.16);
   }
   .nav-item.active::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 20%;
-    height: 60%;
-    width: 4px;
+    top: 22%;
+    height: 56%;
+    width: 3.5px;
     background: linear-gradient(180deg, var(--accent-light), var(--accent));
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  [dir="rtl"] .nav-item.active::before {
+    left: auto;
+    right: 0;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   }
 
   /* Nav Icon */
@@ -137,12 +150,12 @@
     flex-shrink: 0;
     width: 24px;
     text-align: center;
-    transition: transform var(--duration-base);
+    transition: transform var(--duration-base) var(--ease-studio);
   }
-  .nav-item:hover .nav-icon { transform: scale(1.1); }
+  .nav-item:hover .nav-icon { transform: scale(1.08); }
   .nav-item.active .nav-icon {
     color: var(--accent-light);
-    filter: drop-shadow(0 6px 14px rgba(var(--accent-rgb), 0.25));
+    filter: drop-shadow(0 4px 10px rgba(var(--accent-rgb), 0.35));
   }
 
   /* Nav Label */
