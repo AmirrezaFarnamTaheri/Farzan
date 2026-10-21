@@ -91,7 +91,7 @@
   summary,
   [tabindex]:not([tabindex="-1"]):not([disabled])
 ):focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--accent-muted);
   border-radius: var(--radius-sm);

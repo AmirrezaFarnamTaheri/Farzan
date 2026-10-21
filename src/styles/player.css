@@ -152,7 +152,7 @@
 .pd-btn:active { transform: scale(var(--press-scale)); }
 
 .pd-btn:focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 2px;
 }
 
@@ -247,7 +247,7 @@
 }
 
 .pd-progress-track:focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 6px;
 }
 
@@ -341,7 +341,7 @@
 }
 
 .pd-volume-track:focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 6px;
 }
 

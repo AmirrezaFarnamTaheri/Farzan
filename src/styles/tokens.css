@@ -16,6 +16,10 @@
        blending 30% toward white clears WCAG AA at 4.5:1. Use this anywhere
        accent-colored text sits on an accent wash. */
     --accent-on-tint:   color-mix(in srgb, var(--accent-light) 70%, white);
+  /* Focus indicator colour. The light and paper themes override this to
+     --accent-dark, because the pale accent tint falls below the 3:1 that
+     WCAG 2.4.11 asks of a focus indicator on a near-white canvas. */
+  --workspace-focus: var(--accent-light);
 
     /* ── Surface Colors (overridden per data-theme) ── */
     --bg:               #101820;

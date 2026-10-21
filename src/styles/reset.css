@@ -80,7 +80,7 @@ hr {
 [hidden] { display: none !important; }
 
 :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--accent-muted);
 }
@@ -115,7 +115,7 @@ hr {
   opacity: 1;
   pointer-events: auto;
   text-decoration: none;
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--accent-muted), var(--shadow-lg);
 }

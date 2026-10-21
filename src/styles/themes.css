@@ -62,6 +62,7 @@
     --surface:        #0a0a18;
     --surface-2:      #0e0e20;
     --surface-3:      #141428;
+    --surface-4:      #181831;
     --surface-hover:  #1a1a32;
     --surface-active: #20203c;
     --border:         rgba(100,100,255,0.08);
@@ -87,6 +88,7 @@
     --surface:        #141e14;
     --surface-2:      #182418;
     --surface-3:      #1e2c1e;
+    --surface-4:      #222f22;
     --surface-hover:  #243424;
     --surface-active: #2a3c2a;
     --border:         rgba(100,200,100,0.08);
@@ -107,6 +109,7 @@
     --surface:        #071828;
     --surface-2:      #0a1e30;
     --surface-3:      #0e2638;
+    --surface-4:      #102a3d;
     --surface-hover:  #122e44;
     --surface-active: #163650;
     --border:         rgba(0,180,255,0.08);
@@ -127,6 +130,7 @@
     --surface:        #2a1200;
     --surface-2:      #321600;
     --surface-3:      #3c1c00;
+    --surface-4:      #421e00;
     --surface-hover:  #482200;
     --surface-active: #542800;
     --border:         rgba(255,140,0,0.08);
@@ -147,6 +151,7 @@
     --surface:        #2a0020;
     --surface-2:      #320028;
     --surface-3:      #3c0030;
+    --surface-4:      #420034;
     --surface-hover:  #480038;
     --surface-active: #540040;
     --border:         rgba(255,100,180,0.08);
@@ -167,6 +172,7 @@
     --surface:        #fffef8;
     --surface-2:      #faf8f0;
     --surface-3:      #f5f2e8;
+    --surface-4:      #f0ece0;
     --surface-hover:  #ede9dc;
     --surface-active: #e5e0d0;
     --border:         rgba(100,80,40,0.10);
