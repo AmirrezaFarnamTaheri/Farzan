@@ -106,6 +106,14 @@ export function mountSettingsView(deps = {}) {
                     <span data-theme-label>Toggle theme</span>
                   </button>
                 </article>
+
+                <article class="settings-control-card settings-accent-card">
+                  <div>
+                    <strong>Accent color</strong>
+                    <span>Used for selection, primary actions and links.</span>
+                  </div>
+                  <div class="settings-accent-row" role="radiogroup" aria-label="Accent color" data-accent-options></div>
+                </article>
               </div>
             </div>
           </section>
@@ -334,6 +342,80 @@ export function mountSettingsView(deps = {}) {
     });
   }
 
+  // ── Accent color picker ───────────────────────────────────────────
+  // Prefs owns the write and the bus event; the picker only renders the
+  // available accents and mirrors the applied value. Swatches opt in with
+  // data-accent-option, so the delegated handler in Prefs.init() can never
+  // resolve to the root <html data-accent> attribute.
+  const accentRow = document.querySelector('[data-accent-options]');
+  const accentEntries = Array.isArray(Prefs?.ACCENTS) ? Prefs.ACCENTS : [];
+  let syncAccentState = null;
+  if (accentRow && accentEntries.length) {
+    accentRow.replaceChildren(...accentEntries.map((accent) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'accent-dot';
+      button.dataset.accentOption = accent.id;
+      button.title = accent.label;
+      button.setAttribute('role', 'radio');
+      button.setAttribute('aria-checked', 'false');
+      button.setAttribute('aria-label', accent.label);
+      button.style.setProperty('--dot-color', accent.color || 'var(--accent)');
+      return button;
+    }));
+
+    const accentButtons = () => Array.from(accentRow.querySelectorAll('[data-accent-option]'));
+    // Prefs.resolveAccent() is the production path; the fallbacks keep the
+    // picker from throwing if a host injects a partial Prefs implementation.
+    const resolveActiveAccent = (value) => (
+      typeof Prefs.resolveAccent === 'function'
+        ? Prefs.resolveAccent(value)
+        : (accentEntries.some((entry) => entry.id === value) ? value : accentEntries[0]?.id)
+    );
+    syncAccentState = () => {
+      const active = resolveActiveAccent(
+        document.documentElement.getAttribute('data-accent')
+        || Prefs.get?.(Prefs.KEYS?.accent, Prefs.DEFAULT_ACCENT)
+      );
+      const list = accentButtons();
+      list.forEach((button) => {
+        const selected = button.dataset.accentOption === active;
+        button.setAttribute('aria-checked', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+      });
+      if (list.length && !list.some((button) => button.tabIndex === 0)) list[0].tabIndex = 0;
+    };
+    syncAccentState();
+
+    on(accentRow, 'click', (event) => {
+      const button = event.target?.closest?.('[data-accent-option]');
+      if (!button) return;
+      if (Prefs.setAccent?.(button.dataset.accentOption, window.OpenCourseDeck?.bus)) {
+        syncAccentState();
+      }
+    });
+
+    // Roving tabindex: a radiogroup exposes one tab stop, arrows move
+    // between swatches and immediately apply the focused accent.
+    on(accentRow, 'keydown', (event) => {
+      if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      const list = accentButtons();
+      if (!list.length) return;
+      const current = list.indexOf(event.target?.closest?.('[data-accent-option]'));
+      if (current === -1) return;
+      event.preventDefault();
+      let next;
+      if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = list.length - 1;
+      else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % list.length;
+      else next = (current - 1 + list.length) % list.length;
+      list[next].focus();
+      list[next].click();
+    });
+
+    window.OpenCourseDeck?.bus?.on?.('accent:change', syncAccentState);
+  }
+
   on(document.getElementById('btn-export-json-2'), 'click', async () => {
     try { await window.ProgressStats?.exportJSON?.(); } catch { Toast?.error?.('Export failed'); }
   });
@@ -401,6 +483,7 @@ export function mountSettingsView(deps = {}) {
       aiController?.cancelDownload?.();
       if (storageController?.timer) clearInterval(storageController.timer);
       window.OpenCourseDeck?.bus?.off?.('fontScale:change', updateFontLabel);
+      if (syncAccentState) window.OpenCourseDeck?.bus?.off?.('accent:change', syncAccentState);
     },
   };
 

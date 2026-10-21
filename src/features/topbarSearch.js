@@ -1,231 +1,92 @@
-import Fuse from 'fuse.js';
-import { $, createElement, debounce } from '../lib/dom.js';
+/**
+ * Topbar search — module entry point.
+ *
+ * The live implementation lives in the app shell (app.js), where it is
+ * created as an app-lifetime singleton and published as
+ * window.OpenCourseDeck.TopbarSearch. The browser smoke/e2e scripts
+ * assert against that instance (tests/e2e/plasmato-visual.spec.js reads
+ * `.search-result-item` children plus `input`, `resultsBox` and
+ * `_universalData` off it), so app.js is the single source of truth and
+ * the e2e contract is pinned to it.
+ *
+ * This file previously held a SECOND, divergent copy of the search
+ * implementation. Nothing imported it, so it never shipped, but it was
+ * still a trap for the next reader:
+ *
+ *   - It built its own Fuse index with keys (`label`, `description`,
+ *     `searchText`, `tags`) that do not match the live result shape, so
+ *     "fixing" it would have fixed nothing.
+ *   - Its result icons were literal '??' placeholders instead of the
+ *     sprite icons the live renderer emits.
+ *   - It called `window.OpenCourseDeck?.WorkerPool?.runInWorker` with a
+ *     message shape the search worker does not accept, so the fuzzy path
+ *     could only ever have failed over to the main thread.
+ *   - Its `_plainText()` used `innerHTML`, the exact XSS sink that
+ *     docs/forensic-audit-2026-07.md records as finding S-2 and that was
+ *     fixed in app.js. The dead copy still carried the vulnerable form.
+ *
+ * Rather than keep a parallel implementation that can silently drift from
+ * the one the e2e suite exercises, this module now only forwards to the
+ * canonical singleton. The worker-backed fuzzy index stays out of the live
+ * path on purpose: the search worker is shipped and precached, but the live
+ * searcher's substring matching is the behaviour the e2e suite asserts, so
+ * changing it is a product decision rather than a cleanup.
+ */
 
+/**
+ * @returns {object|null} the canonical topbar search instance, or null when
+ *   the app shell has not booted yet.
+ */
+export function getTopbarSearch() {
+  return window.OpenCourseDeck?.TopbarSearch ?? null;
+}
+
+/**
+ * Facade over the canonical app-shell singleton.
+ *
+ * Property reads are forwarded live, so `TopbarSearch.input` and
+ * `TopbarSearch.resultsBox` reflect the mounted widget rather than a
+ * snapshot. Methods are forwarded with the singleton as the receiver so
+ * they keep their `this` binding.
+ */
 export const TopbarSearch = {
-  input: null,
-  resultsBox: null,
-  _fuse: null,
-  _indexedData: null,
-
+  get instance() {
+    return getTopbarSearch();
+  },
+  get input() {
+    return getTopbarSearch()?.input ?? null;
+  },
+  get resultsBox() {
+    return getTopbarSearch()?.resultsBox ?? null;
+  },
+  get _universalData() {
+    return getTopbarSearch()?._universalData ?? null;
+  },
   init() {
-    this.input = $('.topbar-search input');
-    if (!this.input) return;
-
-    this.resultsBox = createElement('div', { class: 'search-results-box' });
-    this.input.parentElement.appendChild(this.resultsBox);
-
-    this.input.addEventListener('input', debounce(e => this._onInput(e.target.value), 300));
-    this.input.addEventListener('focus', () => this._onInput(this.input.value));
-    
-    document.addEventListener('click', e => {
-      if (!this.input.contains(e.target) && !this.resultsBox.contains(e.target)) {
-        this.resultsBox.classList.remove('active');
-      }
-    });
-
-    window.addEventListener('keydown', e => {
-      if (e.key === 'Escape') this.resultsBox.classList.remove('active');
-    });
-    // Cached search data goes stale on any notes/folders mutation.
-    const bus = window.OpenCourseDeck?.bus;
-    for (const evt of ['note:save', 'note:delete', 'folder:save', 'folder:delete']) {
-      bus?.on?.(evt, () => {
-        this._universalData = null;
-        this._workerIndexedData = null;
-      });
-    }  },
-
-  async _onInput(query) {
-    if (!query || query.length < 2) {
-      this.resultsBox.classList.remove('active');
-      return;
-    }
-
-    const results = await this._search(query);
-    this._render(results, query);
-    this.resultsBox.classList.add('active');
+    return getTopbarSearch()?.init?.();
   },
-
-  async _search(query) {
-    const data = await this._loadUniversalData();
-    const viaWorker = await this._searchViaWorker(query, data);
-    if (viaWorker) return viaWorker;
-    const q = query.toLowerCase();
-
-    if (Fuse) {
-      if (this._indexedData !== data) {
-        this._indexedData = data;
-        this._fuse = new Fuse(data, {
-          includeMatches: true,
-          threshold: 0.35,
-          ignoreLocation: true,
-          keys: [
-            { name: 'label', weight: 0.55 },
-            { name: 'description', weight: 0.2 },
-            { name: 'searchText', weight: 0.2 },
-            { name: 'tags', weight: 0.05 },
-          ],
-        });
-      }
-      return this._fuse.search(query, { limit: 10 }).map(result => ({
-        ...result.item,
-        matches: result.matches || [],
-      }));
-    }
-
-    return data.filter(item => 
-      String(item.label || '').toLowerCase().includes(q) ||
-      String(item.description || '').toLowerCase().includes(q) ||
-      String(item.searchText || '').toLowerCase().includes(q)
-    ).slice(0, 10);
+  setData(data) {
+    return getTopbarSearch()?.setData?.(data);
   },
-
-  // Heavy fuzzy search runs in the vendored search worker; the main-thread
-  // Fuse below is the fallback when workers are unavailable or broken.
-  async _searchViaWorker(query, data) {
-    if (this._workerBroken) return null;
-    const runInWorker = window.OpenCourseDeck?.WorkerPool?.runInWorker;
-    if (typeof runInWorker !== 'function') return null;
-    try {
-      if (this._workerIndexedData !== data) {
-        this._workerIndexedData = data;
-        await runInWorker('search', { type: 'init', data: { items: data, options: { keys: [ { name: 'label', weight: 0.55 }, { name: 'description', weight: 0.2 }, { name: 'searchText', weight: 0.2 }, { name: 'tags', weight: 0.05 } ], threshold: 0.35, ignoreLocation: true, includeMatches: true } } }, { timeout: 15000 });
-      }
-      const res = await runInWorker('search', { type: 'search', data: { query, options: { limit: 10 } } }, { timeout: 5000 });
-      return (res?.results || []).map((item, i) => ({ ...item, matches: res.matches?.[i]?.matches || [] }));
-    } catch (error) {
-      if (error?.code === 'WORKER_BUSY') return null; // transient: main thread covers this keystroke
-      this._workerBroken = true; // unavailable/broken: stay on the main thread
-      return null;
-    }
+  _onInput(value) {
+    return getTopbarSearch()?._onInput?.(value);
   },
-
-  async _loadUniversalData() {
-    if (this._universalData) return this._universalData;
-    await window.DataStore?.init?.();
-    const catalog = {
-      courses: window.DataStore?.allCourses?.() ?? [],
-      topics: window.DataStore?.allTopics?.() ?? [],
-    };
-    const savedNotes = await window.DB?.getAllNotes?.() ?? [];
-    const notes = Array.isArray(savedNotes) ? savedNotes : [];
-    // const timestamps = ...
-    // const annotations = ...
-
-    const results = [];
-
-    (catalog.courses || []).forEach(course => {
-      results.push({
-        icon: '??',
-        label: String(course.title || course.id),
-        description: 'Course',
-        searchText: String(course.id || '').replace(/[-_]+/g, ' '),
-        tags: course.tags || [],
-        href: `#/courses?id=${encodeURIComponent(course.id)}`,
-      });
-    });
-
-    (catalog.topics || []).forEach(topic => {
-      results.push({
-        icon: topic.videos?.length ? '??' : '??',
-        label: String(topic.title || topic.topicId),
-        description: String(topic.sourceLabel || 'Topic'),
-        tags: topic.tags || [],
-        searchText: `${String(topic.courseId || '').replace(/[-_]+/g, ' ')} ${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
-        href: `#/courses?topic=${encodeURIComponent(topic.topicId)}`,
-      });
-    });
-
-    notes.forEach(note => {
-      results.push({
-        icon: '??',
-        label: String(note.title || 'Untitled note'),
-        description: note.topicId ? `Linked to ${note.topicId}` : 'Note',
-        searchText: this._plainText(note.content || ''),
-        href: `#/notes?id=${encodeURIComponent(note.id)}`,
-      });
-    });
-
-    // ... add more if needed
-    this._universalData = results;
-    return results;
+  _queryUniversal(value) {
+    return getTopbarSearch()?._queryUniversal?.(value);
   },
-
+  _loadUniversalData() {
+    return getTopbarSearch()?._loadUniversalData?.();
+  },
   _plainText(value) {
-    if (value == null) return '';
-    if (value instanceof Node) return (value.textContent || '').replace(/\s+/g, ' ').trim();
-    const s = String(value);
-    if (!s.includes('<') && !s.includes('&')) return s.replace(/\s+/g, ' ').trim();
-    try {
-      const doc = new DOMParser().parseFromString(s, 'text/html');
-      return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
-    } catch {
-      return s.replace(/\s+/g, ' ').trim();
-    }
+    return getTopbarSearch()?._plainText?.(value) ?? '';
   },
-
   _render(results, query) {
-    this.resultsBox.replaceChildren();
-    if (!results.length) {
-      this.resultsBox.appendChild(createElement('div', { class: 'search-no-results' }, `No results for "${query}"`));
-      return;
-    }
-
-    results.forEach(item => {
-      const el = createElement('a', { class: 'search-result', href: item.href });
-      const icon = createElement('span', { class: 'search-result-icon' }, item.icon || '??');
-      const text = createElement('div', { class: 'search-result-text' });
-      
-      const label = createElement('span', { class: 'search-result-label' });
-      this._appendHighlighted(label, item.label, query, item.matches);
-      
-      text.appendChild(label);
-      if (item.description) {
-        text.appendChild(createElement('span', { class: 'search-result-desc' }, item.description));
-      }
-      
-      el.append(icon, text);
-      el.addEventListener('click', (e) => {
-        if (!item.href.startsWith('#')) {
-           e.preventDefault();
-           if (typeof item.action === 'function') item.action();
-        }
-        this.resultsBox.classList.remove('active');
-      });
-      this.resultsBox.appendChild(el);
-    });
+    return getTopbarSearch()?._render?.(results, query);
   },
-
-  _appendHighlighted(parent, text, query, matches = []) {
-    const source = (text instanceof Node ? text.textContent : String(text || ''));
-    const labelMatch = matches.find(match => match.key === 'label' && Array.isArray(match.indices));
-    if (labelMatch) {
-      let cursor = 0;
-      labelMatch.indices.forEach(([start, end]) => {
-        if (start > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, start)));
-        parent.appendChild(createElement('mark', { class: 'search-highlight' }, source.slice(start, end + 1)));
-        cursor = end + 1;
-      });
-      if (cursor < source.length) parent.appendChild(document.createTextNode(source.slice(cursor)));
-      return;
-    }
-    const q = String(query || '').trim().toLowerCase();
-    if (!q || !source.toLowerCase().includes(q)) {
-      parent.appendChild(document.createTextNode(source));
-      return;
-    }
-
-    let cursor = 0;
-    const lower = source.toLowerCase();
-    while (cursor < source.length) {
-      const idx = lower.indexOf(q, cursor);
-      if (idx === -1) {
-        parent.appendChild(document.createTextNode(source.slice(cursor)));
-        break;
-      }
-      if (idx > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, idx)));
-      parent.appendChild(createElement('mark', { class: 'search-highlight' }, source.slice(idx, idx + q.length)));
-      cursor = idx + q.length;
-    }
+  _appendHighlighted(parent, text, query, matches) {
+    return getTopbarSearch()?._appendHighlighted?.(parent, text, query, matches);
+  },
+  _close() {
+    return getTopbarSearch()?._close?.();
   },
 };
