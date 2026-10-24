@@ -80,6 +80,7 @@ export function mountPdfView() {
               <div class="button-row gap-1">
                 <input type="file" data-pdf-open hidden />
                 <button class="btn btn-primary btn-sm" data-pdf-action="open"><svg class="icon" aria-hidden="true"><use href="#i-folder-open"/></svg> <span>Open</span></button>
+                <button class="btn btn-ghost btn-sm" type="button" data-pdf-retry-pending hidden>Retry PDF</button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><svg class="icon" aria-hidden="true"><use href="#i-zoom-out"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><svg class="icon" aria-hidden="true"><use href="#i-zoom-in"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="fit-width" title="Fit Width">Fit width</button>
@@ -122,16 +123,23 @@ export function mountPdfView() {
   // Consume only after mounting the destination view. Rejecting a load keeps
   // feedback visible instead of silently dropping a first-open request.
   let pdfRouteActive = true;
+  const retryButton = document.querySelector('[data-pdf-retry-pending]');
   const consumePendingPdf = async () => {
+    if (retryButton) retryButton.disabled = true;
     try {
-      await consumePdfSource(window);
+      const loaded = await consumePdfSource(window);
+      if (pdfRouteActive && loaded && retryButton) retryButton.hidden = true;
     } catch (error) {
       if (pdfRouteActive) {
         console.warn('[PDF view] unable to open requested source:', error);
-        Toast.error?.('Could not open that PDF. Choose Open to retry.');
+        if (retryButton) retryButton.hidden = !OpenCourseDeck.pendingPdfOpen;
+        Toast.error?.('Could not open that PDF. Use Retry PDF to try the same source again.');
       }
+    } finally {
+      if (pdfRouteActive && retryButton) retryButton.disabled = false;
     }
   };
+  retryButton?.addEventListener('click', consumePendingPdf);
   OpenCourseDeck.consumePdfOpen = consumePendingPdf;
   void consumePendingPdf();
   const saveButton = document.querySelector('[data-pdf-save-page-note]');
@@ -301,6 +309,7 @@ export function mountPdfView() {
     unmount() {
       pdfRouteActive = false;
       if (OpenCourseDeck.consumePdfOpen === consumePendingPdf) delete OpenCourseDeck.consumePdfOpen;
+      retryButton?.removeEventListener('click', consumePendingPdf);
       saveButton?.removeEventListener('click', onSavePageNote);
       selectionButton?.removeEventListener('click', onSaveSelection);
       aiSummaryButton?.removeEventListener('click', onAISummary);
