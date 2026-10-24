@@ -446,49 +446,73 @@ describe('app shell resilience helpers', () => {
     expect(window.location.hash).toBe('#/flashcards');
   });
 
-  it('saves and deletes custom courses from My Courses storage', async () => {
-    await loadApp();
-    let savedState = [];
-    const saveSetting = vi.fn(async (_key, value) => { savedState = value; return true; });
+  // My Courses now uses the canonical user library, not a second writable
+  // ocd_my_courses list. Keep these shell-level tests aligned with that public
+  // contract; source-level migration and topic moves are covered separately.
+  function setupCanonicalCourseFixture(initial = { version: 1, courses: {} }) {
+    let state = structuredClone(initial);
+    const saveSetting = vi.fn(async (key, value) => {
+      if (key === 'ocd_user_library') state = structuredClone(value);
+      return value;
+    });
     window.DB = {
-      getSetting: vi.fn(async () => savedState),
+      getSetting: vi.fn(async key => key === 'ocd_user_library' ? structuredClone(state) : null),
       saveSetting,
     };
-    window.OpenCourseDeck.UserLibrary = {
-      upsertCourse: vi.fn(async () => ({ id: 'course-in-catalog' })),
-      removeCourse: vi.fn(async () => true),
+    window.OpenCourseDeck.UI = {
+      ...window.OpenCourseDeck.UI,
+      confirm: vi.fn(async () => true),
     };
+    const api = {
+      load: vi.fn(async () => structuredClone(state)),
+      upsertCourse: vi.fn(async ({ title, description }) => {
+        const next = structuredClone(state);
+        next.courses['course-in-catalog'] = { title, description, sources: [{ label: 'My Library', topics: [] }] };
+        await window.DB.saveSetting('ocd_user_library', next);
+        return { id: 'course-in-catalog', title };
+      }),
+      removeCourse: vi.fn(async id => {
+        const next = structuredClone(state);
+        delete next.courses[id];
+        await window.DB.saveSetting('ocd_user_library', next);
+      }),
+    };
+    window.OpenCourseDeck.UserLibrary = api;
+    return { saveSetting, api, getState: () => structuredClone(state) };
+  }
+
+  it('saves and deletes custom courses through canonical library storage', async () => {
+    await loadApp();
+    const { saveSetting, getState } = setupCanonicalCourseFixture();
 
     await window.OpenCourseDeck.Views.myCourses();
     const view = document.querySelector('#view-container .view-my-courses');
     await vi.waitFor(() => expect(view.textContent).toContain('No custom courses yet'));
-    expect(view.textContent).not.toContain('coming next');
 
     view.querySelector('[data-my-course-title]').value = 'Cardiology review';
     view.querySelector('[data-my-course-description]').value = 'Focused rhythm practice';
     view.querySelector('[data-my-course-save]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_my_courses', expect.any(Array)));
-    const savedCourses = saveSetting.mock.calls[0][1];
-    expect(savedCourses[0]).toEqual(expect.objectContaining({
-      title: 'Cardiology review',
-      description: 'Focused rhythm practice',
+    await vi.waitFor(() => expect(getState().courses['course-in-catalog']).toMatchObject({
+      title: 'Cardiology review', description: 'Focused rhythm practice',
     }));
-
+    expect(saveSetting).toHaveBeenCalledWith('ocd_user_library', expect.any(Object));
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_my_courses', expect.anything());
     await window.OpenCourseDeck.Views.myCourses();
     await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]').textContent).toContain('Cardiology review'));
-    document.querySelector('[data-my-course-id] button').click();
-
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_my_courses', []));
+    document.querySelector('[data-my-course-id] [data-my-course-delete]').click();
+    await vi.waitFor(() => expect(Object.keys(getState().courses)).toHaveLength(0));
   });
 
-  it('does not replace an unreadable My Courses list with a fresh empty list', async () => {
+  it('does not replace an unreadable canonical library with a fresh empty list', async () => {
     await loadApp();
     const saveSetting = vi.fn();
     window.DB = {
       getSetting: vi.fn(async () => { throw new Error('canonical read failed'); }),
       saveSetting,
     };
+    const library = await import('../src/features/userLibrary.js');
+    library.initUserLibrary(window);
     await window.OpenCourseDeck.Views.myCourses();
     await vi.waitFor(() => expect(document.querySelector('.view-my-courses').textContent)
       .toContain('Unable to load saved courses'));
@@ -499,41 +523,34 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('.view-my-courses').textContent).not.toContain('No custom courses yet');
   });
 
-  it('reports a partially saved course if its catalog update fails', async () => {
+  it('does not claim a partial outline save when the canonical catalog rejects the write', async () => {
     await loadApp();
-    const saveSetting = vi.fn(async () => true);
-    window.DB = { getSetting: vi.fn(async () => []), saveSetting };
-    window.OpenCourseDeck.UserLibrary = {
-      upsertCourse: vi.fn(async () => { throw new Error('catalog write failed'); }),
-    };
+    const { saveSetting, api } = setupCanonicalCourseFixture();
+    api.upsertCourse.mockRejectedValueOnce(new Error('catalog write failed'));
     const error = vi.spyOn(window.OpenCourseDeck.Toast, 'error');
     await window.OpenCourseDeck.Views.myCourses();
     const input = document.querySelector('[data-my-course-title]');
-    input.value = 'Partially saved course';
+    input.value = 'Unsaved course';
     document.querySelector('[data-my-course-save]').click();
-    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('catalog update failed')));
-    expect(saveSetting).toHaveBeenCalledWith('ocd_my_courses', expect.arrayContaining([
-      expect.objectContaining({ title: 'Partially saved course' }),
-    ]));
-    expect(input.value).toBe('Partially saved course');
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('Unable to save')));
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(input.value).toBe('Unsaved course');
   });
 
-  it('restores the My Courses listing after a failed catalog deletion', async () => {
+  it('preserves the canonical course listing after a rejected deletion', async () => {
     await loadApp();
-    const saved = [{ id: 'course-one', title: 'Keep this course', createdAt: 1 }];
-    let state = saved;
-    const saveSetting = vi.fn(async (_key, courses) => { state = courses; });
-    window.DB = { getSetting: vi.fn(async () => state), saveSetting };
-    window.OpenCourseDeck.UserLibrary = {
-      removeCourse: vi.fn(async () => { throw new Error('catalog delete failed'); }),
-    };
+    const saved = { version: 1, courses: {
+      'course-one': { title: 'Keep this course', sources: [{ label: 'My Library', topics: [] }] },
+    } };
+    const { saveSetting, api, getState } = setupCanonicalCourseFixture(saved);
+    api.removeCourse.mockRejectedValueOnce(new Error('catalog delete failed'));
     const error = vi.spyOn(window.OpenCourseDeck.Toast, 'error');
     await window.OpenCourseDeck.Views.myCourses();
-    await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]')));
-    document.querySelector('[data-my-course-id] button').click();
-    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('deletion did not complete')));
-    expect(state).toEqual(saved);
-    expect(saveSetting).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-id]')).not.toBeNull());
+    document.querySelector('[data-my-course-id] [data-my-course-delete]').click();
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith(expect.stringContaining('deletion failed')));
+    expect(getState()).toEqual(saved);
+    expect(saveSetting).not.toHaveBeenCalled();
     expect(document.querySelector('.view-my-courses').textContent).toContain('Keep this course');
   });
 

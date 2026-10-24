@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'ocd_my_courses';
+const LEGACY_COURSES_KEY = 'ocd_my_courses';
+const CANONICAL_LIBRARY_KEY = 'ocd_user_library';
 
 export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toast } = {}) {
   setView(`
@@ -47,6 +48,17 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
+      <section class="card card-filled" aria-labelledby="media-folder-heading">
+        <div class="card-body">
+          <h2 class="text-lg font-semibold" id="media-folder-heading">Keep a copy of your imported files</h2>
+          <p class="text-sm text-muted">The JSON backup includes notes, courses and saved study state, but not your PDF/video bytes. Export these files to a folder alongside your JSON backup. Restore the JSON first, then restore this media folder on the new device. Available in supported browsers with folder access.</p>
+          <div class="button-row">
+            <button class="btn btn-ghost btn-sm" type="button" data-backup-media-folder>Export media folder</button>
+            <button class="btn btn-ghost btn-sm" type="button" data-restore-media-folder>Restore media folder</button>
+          </div>
+          <p class="text-sm text-muted" data-media-backup-status role="status" aria-live="polite"></p>
+        </div>
+      </section>
       <section class="card card-filled" aria-label="Missing imported files" data-missing-library-section>
         <div class="card-body">
           <h2 class="text-lg font-semibold">Missing local files</h2>
@@ -60,6 +72,46 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
   document.querySelector('[data-my-courses-add]')?.addEventListener('click', () => {
     window.OpenCourseDeck?.AddContent?.openMenu?.();
   });
+
+  const backupStatus = document.querySelector('[data-media-backup-status]');
+  const chooseFolder = async (mode) => {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      throw new Error('Folder backup requires a browser with the File System Access API. Keep the original media and JSON backup in other browsers.');
+    }
+    return window.showDirectoryPicker({ mode });
+  };
+  const bindMediaAction = (selector, action) => {
+    const button = document.querySelector(selector);
+    button?.addEventListener('click', async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      if (backupStatus) backupStatus.textContent = action === 'export' ? 'Preparing media export…' : 'Reading media folder…';
+      try {
+        const directory = await chooseFolder(action === 'export' ? 'readwrite' : 'read');
+        const api = window.OpenCourseDeck?.UserLibrary;
+        if (action === 'export') {
+          if (typeof api?.exportMediaDirectory !== 'function') throw new Error('Media export unavailable');
+          const result = await api.exportMediaDirectory(directory);
+          if (backupStatus) backupStatus.textContent = `Exported ${result.files} local file(s). Keep this folder together with your portable JSON backup.`;
+          Toast?.success?.('Media export completed');
+        } else {
+          if (typeof api?.importMediaDirectory !== 'function') throw new Error('Media restore unavailable');
+          const result = await api.importMediaDirectory(directory);
+          if (backupStatus) backupStatus.textContent = `Restored ${result.restored} local file(s); ${result.skipped} did not need restoration or are not linked here.`;
+          Toast?.success?.('Media restore completed');
+          await renderMissingFiles();
+        }
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          const message = error?.message || 'Could not process media folder';
+          if (backupStatus) backupStatus.textContent = message;
+          Toast?.error?.(message);
+        } else if (backupStatus) backupStatus.textContent = 'Folder selection cancelled.';
+      } finally { button.disabled = false; }
+    });
+  };
+  bindMediaAction('[data-backup-media-folder]', 'export');
+  bindMediaAction('[data-restore-media-folder]', 'import');
 
   let savingCourse = false;
   document.querySelector('[data-my-course-save]')?.addEventListener('click', async (event) => {
@@ -77,32 +129,14 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     savingCourse = true;
     button.disabled = true;
     try {
-      // Do not replace a live library based on a failed authoritative read.
-      const courses = await loadCourses();
-      const record = {
-        id: `course-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      // The canonical UserLibrary setting is the single writable authority.
+      // Legacy outlines are only imported when that setting never existed.
+      const api = window.OpenCourseDeck?.UserLibrary;
+      if (typeof api?.upsertCourse !== 'function') throw new Error('Course storage is unavailable');
+      const record = await api.upsertCourse({
         title,
         description: descriptionInput?.value.trim() || '',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      await saveCourses([record, ...courses]);
-      const upsert = window.OpenCourseDeck?.UserLibrary?.upsertCourse;
-      if (typeof upsert === 'function') {
-        try {
-          await upsert({ id: record.id, title: record.title, description: record.description });
-        } catch (error) {
-          // The outline committed; do not misreport a partial catalog update.
-          console.warn('[My Courses] catalog update after saved outline failed:', error);
-          Toast?.error?.('Course outline saved, but catalog update failed. Retry from My Courses.');
-          await renderCourses();
-          return;
-        }
-      } else {
-        Toast?.error?.('Course outline saved, but catalog integration is unavailable.');
-        await renderCourses();
-        return;
-      }
+      });
       try { sessionStorage.setItem('ocd_active_import_course', record.id); } catch {}
       titleInput.value = '';
       if (descriptionInput) descriptionInput.value = '';
@@ -198,7 +232,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       list.append(notice);
       return;
     }
-    metrics.replaceChildren(metric('Courses', courses.length), metric('With descriptions', courses.filter(course => course.description).length));
+    metrics.replaceChildren(metric('Courses', courses.length), metric('Topics', courses.reduce((count, course) => count + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)), metric('With descriptions', courses.filter(course => course.description).length));
     list.replaceChildren();
     if (!courses.length) {
       const empty = document.createElement('div');
@@ -234,13 +268,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       try { sessionStorage.removeItem('ocd_pending_library_course'); } catch {}
     }
     courses.forEach((course) => {
-      const card = courseCard(course);
+      const card = courseCard(course, courses);
       if (course.id === pendingLibraryCourse) card.classList.add('is-new');
       list.appendChild(card);
     });
   }
 
-  function courseCard(course) {
+  function courseCard(course, allCourses) {
     const card = document.createElement('article');
     card.className = 'card my-course-card';
     card.dataset.myCourseId = course.id;
@@ -265,34 +299,28 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       try { sessionStorage.setItem('ocd_pending_library_course', course.id); } catch {}
     });
     const remove = document.createElement('button');
+    remove.dataset.myCourseDelete = '';
     remove.className = 'btn btn-danger-ghost btn-sm';
     remove.type = 'button';
     remove.textContent = 'Delete';
     remove.addEventListener('click', async () => {
       if (remove.disabled) return;
+      const confirm = window.OpenCourseDeck?.UI?.confirm;
+      const confirmed = typeof confirm === 'function'
+        ? await confirm({ title: 'Delete course', message: 'Delete this personal course and any files not used by other courses? Notes and progress will not be deleted.', confirmLabel: 'Delete course' })
+        : window.confirm('Delete this course and its unused files?');
+      if (!confirmed) return;
       remove.disabled = true;
       try {
-        const existing = await loadCourses();
-        const next = existing.filter(item => item.id !== course.id);
-        await saveCourses(next);
-        try {
-          const removeFromCatalog = window.OpenCourseDeck?.UserLibrary?.removeCourse;
-          if (typeof removeFromCatalog !== 'function') throw new Error('Catalog integration is unavailable');
-          await removeFromCatalog(course.id);
-        } catch (error) {
-          // A failed catalog deletion must not invisibly remove this course.
-          try { await saveCourses(existing); }
-          catch (rollbackError) {
-            throw new AggregateError([error, rollbackError], 'Course list and catalog may be out of sync', { cause: rollbackError });
-          }
-          throw error;
-        }
+        const api = window.OpenCourseDeck?.UserLibrary;
+        if (typeof api?.removeCourse !== 'function') throw new Error('Course storage is unavailable');
+        await api.removeCourse(course.id);
         Toast?.info?.('Course deleted');
         await renderCourses();
+        await renderMissingFiles();
       } catch (error) {
-        console.warn('[My Courses] could not fully delete course:', error);
-        Toast?.error?.('Course deletion did not complete. Check My Courses and the catalog before retrying.');
-        await renderCourses();
+        console.warn('[My Courses] course deletion failed:', error);
+        Toast?.error?.('Course deletion failed. Your library has not been reset.');
       } finally {
         remove.disabled = false;
       }
@@ -307,7 +335,144 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       try { sessionStorage.setItem('ocd_active_import_course', course.id); } catch {}
       window.OpenCourseDeck?.AddContent?.openMenu?.();
     });
-    actions.append(open, remove, addMedia);
+    const edit = document.createElement('button');
+    edit.className = 'btn btn-ghost btn-sm';
+    edit.type = 'button';
+    edit.textContent = 'Edit';
+    edit.dataset.myCourseEdit = '';
+    edit.addEventListener('click', () => {
+      if (card.querySelector('[data-my-course-edit-form]')) return;
+      const form = document.createElement('form');
+      form.dataset.myCourseEditForm = '';
+      form.className = 'my-courses-form';
+      const titleLabel = document.createElement('label');
+      titleLabel.textContent = 'Course title';
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.className = 'input';
+      titleInput.maxLength = 120;
+      titleInput.required = true;
+      titleInput.dataset.myCourseEditTitle = '';
+      titleInput.value = course.title || '';
+      titleLabel.append(titleInput);
+      const descLabel = document.createElement('label');
+      descLabel.textContent = 'Description';
+      const descInput = document.createElement('textarea');
+      descInput.className = 'input';
+      descInput.maxLength = 600;
+      descInput.value = course.description || '';
+      descLabel.append(descInput);
+      const save = document.createElement('button');
+      save.type = 'submit';
+      save.className = 'btn btn-primary btn-sm';
+      save.textContent = 'Save changes';
+      save.dataset.myCourseEditSave = '';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'btn btn-ghost btn-sm';
+      cancel.textContent = 'Cancel';
+      cancel.addEventListener('click', () => form.remove());
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!titleInput.value.trim()) { titleInput.focus(); return; }
+        save.disabled = true;
+        try {
+          const api = window.OpenCourseDeck?.UserLibrary;
+          if (typeof api?.updateCourse !== 'function') throw new Error('Course editing unavailable');
+          await api.updateCourse({ id: course.id, title: titleInput.value, description: descInput.value });
+          Toast?.success?.('Course updated');
+          await renderCourses();
+        } catch (error) {
+          Toast?.error?.(error?.message || 'Course could not be updated');
+          save.disabled = false;
+        }
+      });
+      form.append(titleLabel, descLabel, save, cancel);
+      body.appendChild(form);
+      titleInput.focus();
+    });
+    actions.append(open, edit, addMedia, remove);
+
+    const topics = (course.sources || []).flatMap(src => src.topics || []);
+    if (topics.length) {
+      const topicSection = document.createElement('section');
+      topicSection.className = 'my-course-topics';
+      const heading = document.createElement('h3');
+      heading.className = 'text-sm font-semibold';
+      heading.textContent = `Topics (${topics.length})`;
+      topicSection.appendChild(heading);
+      for (const topic of topics) {
+        const id = String(topic.url || topic.id || '');
+        if (!id) continue;
+        const row = document.createElement('div');
+        row.className = 'my-course-topic button-row';
+        row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px';
+        row.dataset.myTopicId = id;
+        const name = document.createElement('span');
+        name.className = 'text-sm';
+        name.textContent = topic.title || 'Untitled topic';
+        const rename = document.createElement('button');
+        rename.type = 'button';
+        rename.className = 'btn btn-ghost btn-sm';
+        rename.textContent = 'Rename';
+        rename.addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.className = 'input input-sm';
+          input.maxLength = 200;
+          input.value = topic.title || '';
+          input.setAttribute('aria-label', `Rename ${topic.title || 'topic'}`);
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'btn btn-primary btn-sm';
+          save.textContent = 'Save';
+          save.addEventListener('click', async () => {
+            try {
+              await window.OpenCourseDeck?.UserLibrary?.renameTopic?.({ courseId: course.id, topicId: id, title: input.value });
+              Toast?.success?.('Topic renamed');
+              await renderCourses();
+            } catch (error) { Toast?.error?.(error?.message || 'Could not rename topic'); }
+          });
+          row.replaceChildren(input, save);
+          input.focus();
+        });
+        row.append(name, rename);
+        const destinations = allCourses.filter(item => item.id !== course.id);
+        if (destinations.length) {
+          const destination = document.createElement('select');
+          destination.className = 'select input-sm';
+          destination.dataset.myTopicDestination = '';
+          destination.setAttribute('aria-label', `Move ${topic.title || 'topic'} to course`);
+          for (const dest of destinations) {
+            const option = document.createElement('option');
+            option.value = dest.id;
+            option.textContent = dest.title || 'Untitled course';
+            destination.appendChild(option);
+          }
+          const move = document.createElement('button');
+          move.type = 'button';
+          move.className = 'btn btn-ghost btn-sm';
+          move.textContent = 'Move';
+          move.dataset.myTopicMove = '';
+          move.addEventListener('click', async () => {
+            if (move.disabled) return;
+            move.disabled = true;
+            try {
+              await window.OpenCourseDeck?.UserLibrary?.moveTopic?.({
+                topicId: id, fromCourseId: course.id, toCourseId: destination.value,
+              });
+              Toast?.success?.('Topic moved');
+              await renderCourses();
+            } catch (error) {
+              Toast?.error?.(error?.message || 'Could not move topic');
+              move.disabled = false;
+            }
+          });
+          row.append(destination, move);
+        }
+        topicSection.appendChild(row);
+      }
+      body.appendChild(topicSection);
+    }
     body.append(title, description, meta, actions);
     card.appendChild(body);
     return card;
@@ -325,19 +490,32 @@ function metric(label, value) {
   return card;
 }
 
+/**
+ * The user-owned library is authoritative. Only migrate the legacy outline
+ * array when the canonical setting was never created. A canonical `courses: {}`
+ * is an intentional empty state and must never resurrect deleted outlines.
+ */
 async function loadCourses() {
-  if (typeof window.DB?.getSetting !== 'function') {
-    throw new Error('Course storage is unavailable');
+  const api = window.OpenCourseDeck?.UserLibrary;
+  if (typeof api?.load !== 'function') throw new Error('User Library storage is unavailable');
+  if (typeof window.DB?.getSetting !== 'function') throw new Error('Course storage is unavailable');
+  const raw = await window.DB.getSetting(CANONICAL_LIBRARY_KEY);
+  if (raw == null) {
+    const legacy = await window.DB.getSetting(LEGACY_COURSES_KEY);
+    if (Array.isArray(legacy) && legacy.length) {
+      if (typeof api.migrateLegacyCourses !== 'function') throw new Error('Legacy course recovery is unavailable');
+      await api.migrateLegacyCourses(legacy);
+    }
   }
-  const courses = await window.DB.getSetting(STORAGE_KEY);
-  if (courses == null) return [];
-  if (!Array.isArray(courses)) throw new TypeError('Saved courses have an unexpected format');
-  return courses;
-}
-
-async function saveCourses(courses) {
-  if (typeof window.DB?.saveSetting !== 'function') {
-    throw new Error('Course storage is unavailable');
-  }
-  return window.DB.saveSetting(STORAGE_KEY, courses);
+  const library = await api.load();
+  return Object.entries(library.courses || {})
+    .filter(([id]) => id !== 'user-library')
+    .map(([id, record]) => ({
+      id, title: record?.title || 'Untitled course',
+      description: record?.description || '',
+      sources: Array.isArray(record?.sources) ? record.sources : [],
+      createdAt: record?.createdAt,
+      updatedAt: record?.updatedAt,
+    }))
+    .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
 }

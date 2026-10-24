@@ -19,6 +19,14 @@ Version 1.6 imports remain compatible with supported portable versions 1.0–1.5
 
 If storage cannot be read, the export should fail instead of quietly manufacturing an empty backup. Do not treat a missing or unexpectedly small download as proof that your data was exported.
 
+## Optional local-media folder backup (supported browsers)
+
+The portable JSON is deliberately metadata-only and always remains available. For a more complete offline recovery, open **My Courses → Export media folder** in a browser supporting the File System Access API (typically recent desktop Chromium). Pick a new, empty folder and keep it alongside the portable JSON backup. The app writes each locally imported PDF/video as a separate binary file in `media/` without serializing large lectures into JSON; it completes `media-manifest.json` only when every file was saved. A canceled or interrupted export must not be treated as complete.
+
+On another device or browser profile, first import the portable JSON. Then open **My Courses → Restore media folder** and select the exported folder. The app validates the manifest IDs and declared file sizes before attaching missing bytes to *existing* `library-file:` source IDs. It never silently overwrites files already present or attaches unrecognized references. Files omitted from a backup, unsupported external URLs, and files that failed to save remain the user's responsibility. If a restore fails partway, preserve the folder and retry. The manifest checks sizes and safe paths but is not a cryptographic content signature; keep the folder in a trusted location.
+
+This folder workflow is optional and currently unavailable in browsers without directory access. It does not automatically package all app metadata in the media folder: **keep both the JSON backup and media folder**.
+
 ## Import
 
 1. Keep the original backup and media files unchanged.
