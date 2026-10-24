@@ -1168,7 +1168,7 @@ const ProgressStats = (() => {
   // NEVER substitute an empty collection when reading the rollback snapshot:
   // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues'];
     const readList = async (name) => {
       if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
       const records = await DB[name]();
@@ -1185,7 +1185,7 @@ const ProgressStats = (() => {
       'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
       'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
-      'ocd_user_library', 'plasma-pdf-annotations',
+      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'plasma-pdf-annotations',
     ];
     const storage = window.localStorage;
     if (!storage || typeof storage.getItem !== 'function') {
