@@ -30,6 +30,7 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
+          <p class="home-eyebrow">A quieter place to learn</p>
           <h1 class="home-title"><bdi>Back to your studies.</bdi></h1>
           <p class="home-subtitle"><bdi>Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</bdi></p>
           <div class="home-actions">
