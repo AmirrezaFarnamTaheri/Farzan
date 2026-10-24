@@ -1,3 +1,4 @@
+import { consumePdfSource } from '../core/pdfNavigation.js';
 function escapeHtmlText(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -118,6 +119,21 @@ export function mountPdfView() {
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
   const Toast = OpenCourseDeck.Toast ?? { success() {}, error() {} };
   try { window.PlasmaPDFInit?.(); } catch (e) { console.warn('[PDF view] init failed', e); }
+  // Consume only after mounting the destination view. Rejecting a load keeps
+  // feedback visible instead of silently dropping a first-open request.
+  let pdfRouteActive = true;
+  const consumePendingPdf = async () => {
+    try {
+      await consumePdfSource(window);
+    } catch (error) {
+      if (pdfRouteActive) {
+        console.warn('[PDF view] unable to open requested source:', error);
+        Toast.error?.('Could not open that PDF. Choose Open to retry.');
+      }
+    }
+  };
+  OpenCourseDeck.consumePdfOpen = consumePendingPdf;
+  void consumePendingPdf();
   const saveButton = document.querySelector('[data-pdf-save-page-note]');
   const selectionButton = document.querySelector('[data-pdf-save-selection]');
   const aiSummaryButton = document.querySelector('[data-pdf-ai-summary]');
@@ -283,6 +299,8 @@ export function mountPdfView() {
   refreshAIControls();
   return {
     unmount() {
+      pdfRouteActive = false;
+      if (OpenCourseDeck.consumePdfOpen === consumePendingPdf) delete OpenCourseDeck.consumePdfOpen;
       saveButton?.removeEventListener('click', onSavePageNote);
       selectionButton?.removeEventListener('click', onSaveSelection);
       aiSummaryButton?.removeEventListener('click', onAISummary);
