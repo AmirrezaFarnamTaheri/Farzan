@@ -77,7 +77,7 @@ describe('GitHub Actions hardening', () => {
   it('validates every active YAML workflow, including native and optional edition channels', () => {
     const files = readAllWorkflowFiles();
     const diskNames = fs.readdirSync(path.join(repositoryRoot, '.github', 'workflows'))
-      .filter(name => /\\.ya?ml$/.test(name)).sort();
+      .filter(name => /\.ya?ml$/.test(name)).sort();
     expect(Object.keys(files).sort()).toEqual(diskNames);
     expect(validateWorkflowSet(files)).toEqual([]);
     expect(diskNames).not.toContain('desktop-release.yml');
