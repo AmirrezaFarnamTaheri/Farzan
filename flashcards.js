@@ -180,6 +180,25 @@ let studioKeyController = null;
       return updatedCard;
     }
 
+    async updateCard(cardId, { front, back, deck } = {}) {
+      const cards = [...await this.getCards()];
+      const index = cards.findIndex(card => card.id === cardId);
+      if (index < 0) throw new Error('Flashcard not found');
+      const nextFront = String(front || '').trim();
+      const nextBack = String(back || '').trim();
+      if (!nextFront || !nextBack) throw new Error('Front and back text are required');
+      const updated = {
+        ...cards[index],
+        front: nextFront,
+        back: nextBack,
+        deck: String(deck || cards[index].deck || 'General').trim() || 'General',
+        updatedAt: new Date().toISOString(),
+      };
+      cards[index] = updated;
+      await this.saveStorage(cards);
+      return updated;
+    }
+
     async getDueCards(deckName = null) {
       const cards = this.getStorage();
       const todayStr = new Date().toISOString().split('T')[0];
@@ -319,6 +338,19 @@ let studioKeyController = null;
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
+        <details class="card card-filled" id="fc-manage-cards">
+          <summary class="btn btn-ghost">Manage saved cards (${cards.length})</summary>
+          <div class="card-body" style="display:grid;gap:10px;max-height:360px;overflow-y:auto;">
+            ${cards.length ? cards.map(card => `
+              <div class="button-row" style="justify-content:space-between;gap:8px;flex-wrap:wrap" data-fc-manage-row="${esc(card.id)}">
+                <span class="text-sm"><strong>${esc(card.front)}</strong> · ${esc(card.deck)}</span>
+                <span class="button-row">
+                  <button class="btn btn-ghost btn-sm" type="button" data-fc-edit="${esc(card.id)}">Edit</button>
+                  <button class="btn btn-danger-ghost btn-sm" type="button" data-fc-delete="${esc(card.id)}">Delete</button>
+                </span>
+              </div>`).join('') : '<p class="text-muted">No saved cards yet.</p>'}
+          </div>
+        </details>
       </section>
     `;
 
@@ -375,15 +407,55 @@ let studioKeyController = null;
 
     const addBtn = container.querySelector('#fc-add-btn');
     const newForm = container.querySelector('#fc-new-form');
+    let editingCardId = null;
+    container.querySelector('#fc-manage-cards')?.addEventListener('click', async (event) => {
+      const edit = event.target.closest('[data-fc-edit]');
+      const remove = event.target.closest('[data-fc-delete]');
+      if (edit) {
+        const card = cards.find(record => record.id === edit.dataset.fcEdit);
+        if (!card || !newForm) return;
+        editingCardId = card.id;
+        newForm.querySelector('#fc-new-front').value = card.front;
+        newForm.querySelector('#fc-new-back').value = card.back;
+        newForm.querySelector('#fc-new-deck').value = card.deck;
+        newForm.hidden = false;
+        newForm.querySelector('#fc-new-save').textContent = 'Save changes';
+        newForm.querySelector('#fc-new-front').focus();
+      } else if (remove) {
+        const card = cards.find(record => record.id === remove.dataset.fcDelete);
+        if (!card) return;
+        const confirmed = window.OpenCourseDeck?.UI?.confirm
+          ? await window.OpenCourseDeck.UI.confirm({
+            title: 'Delete flashcard',
+            message: `Delete the card "${card.front}"?`,
+            confirmLabel: 'Delete', cancelLabel: 'Cancel',
+          })
+          : window.confirm('Delete this flashcard?');
+        if (!confirmed) return;
+        try {
+          await manager.deleteCard(card.id);
+          announce('Flashcard deleted.');
+          await renderStudio(container);
+        } catch (error) {
+          announce(error?.message || 'Could not delete flashcard');
+        }
+      }
+    });
     if (addBtn && newForm) {
       const frontInput = newForm.querySelector('#fc-new-front');
       const backInput = newForm.querySelector('#fc-new-back');
       const deckInput = newForm.querySelector('#fc-new-deck');
       addBtn.addEventListener('click', () => {
+        editingCardId = null;
+        frontInput.value = '';
+        backInput.value = '';
+        deckInput.value = 'General';
+        newForm.querySelector('#fc-new-save').textContent = 'Save card';
         newForm.hidden = !newForm.hidden;
         if (!newForm.hidden) frontInput.focus();
       });
       newForm.querySelector('#fc-new-cancel').addEventListener('click', () => {
+        editingCardId = null;
         newForm.hidden = true;
         announce('Card creation cancelled.');
         addBtn.focus();
@@ -398,9 +470,19 @@ let studioKeyController = null;
           (!front ? frontInput : backInput).focus();
           return;
         }
-        await manager.addCard({ front, back, deck });
-        announce('Card added to deck ' + deck + '.');
-        renderStudio(container);
+        try {
+          if (editingCardId) {
+            await manager.updateCard(editingCardId, { front, back, deck });
+            announce('Flashcard updated.');
+          } else {
+            await manager.addCard({ front, back, deck });
+            announce('Card added to deck ' + deck + '.');
+          }
+          await renderStudio(container);
+        } catch (error) {
+          // Preserve the editable form and its draft when persistence fails.
+          announce(error?.message || 'Flashcard was not saved.');
+        }
       });
     }
   }
@@ -413,6 +495,7 @@ let studioKeyController = null;
     getCards: () => manager.getCards(),
     addCard: (data) => manager.addCard(data),
     reviewCard: (id, grade) => manager.reviewCard(id, grade),
+    updateCard: (id, fields) => manager.updateCard(id, fields),
     getDueCards: (deck) => manager.getDueCards(deck),
     deleteCard: (id) => manager.deleteCard(id),
     invalidateCache: () => manager.invalidateCache(),
