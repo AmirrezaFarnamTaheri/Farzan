@@ -2085,24 +2085,27 @@
     },
 
     async semanticSearchNotes() {
-      const ai = window.OpenCourseDeck?.AI;
       const query = $('[data-notes-search]')?.value?.trim();
       const status = $('[data-notes-semantic-status]');
       if (!query) {
         if (status) status.textContent = 'Enter a note search first';
         return { ok: false, reason: 'empty-query' };
       }
-      if (!ai?.searchEmbeddings || !ai?.upsertEmbedding) return { ok: false, reason: 'unavailable' };
-      try {
-        const index = await this.rebuildSemanticIndex();
-        const results = await ai.searchEmbeddings(query, { limit: 25 });
-        NotesList.setSemanticResults(results.map(result => result.id));
-        if (status) status.textContent = `Semantic results: ${results.length} from ${index.indexed} indexed notes`;
-        return { ok: true, results: results.length, indexed: index.indexed };
-      } catch {
-        if (status) status.textContent = 'Semantic search failed';
-        return { ok: false, reason: 'search-failed' };
-      }
+      // Exact script-aware keyword overlap is predictable, private and
+      // synchronous. A note query should not reindex an entire library.
+      const terms = new Set(query.toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+      const scores = Store.getNotes().map(note => {
+        const haystack = `${note.title || ''} ${plainTextFromHtml(note.content || '')}`
+          .toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || [];
+        const words = new Set(haystack);
+        return { id: note.id, matches: [...terms].filter(term => words.has(term)).length };
+      });
+      const ids = scores.filter(item => item.matches > 0)
+        .sort((a, b) => b.matches - a.matches)
+        .map(item => item.id);
+      NotesList.setSemanticResults(ids);
+      if (status) status.textContent = `Related notes: ${ids.length} (matching keywords)`;
+      return { ok: true, results: ids.length };
     },
 
     clearSemanticSearch() {
@@ -2128,10 +2131,9 @@
       const searchButton = $('[data-notes-semantic-search]');
       const clearButton = $('[data-notes-semantic-clear]');
       if (!searchButton || !clearButton) return;
-      const available = Boolean(window.OpenCourseDeck?.AI?.searchEmbeddings && window.OpenCourseDeck?.AI?.upsertEmbedding);
-      searchButton.hidden = !available;
-      clearButton.hidden = !available;
-      if (!available) return;
+      // Related-keyword search requires no model, index or API credentials.
+      searchButton.hidden = false;
+      clearButton.hidden = false;
       RouteListeners.on(searchButton, 'click', () => this.semanticSearchNotes());
       RouteListeners.on(clearButton, 'click', () => this.clearSemanticSearch());
     },
