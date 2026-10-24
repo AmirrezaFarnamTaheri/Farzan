@@ -1,3 +1,4 @@
+import { openPdfSource } from '../core/pdfNavigation.js';
 export async function mountCoursesView(deps = {}) {
   const {
     setView,
@@ -1047,11 +1048,7 @@ export async function mountCoursesView(deps = {}) {
       if (action === 'open-pdf') {
         const url = await playableMediaUrl(topic.pdfs?.[0]);
         if (!url) return;
-        Router.navigate('#/pdf');
-        // Wait a tick for the view to mount, then load
-        setTimeout(() => {
-          try { window.PlasmaPDFViewer?.load?.(url); } catch {}
-        }, 50);
+        await openPdfSource(url, { router: Router });
         return;
       }
 
