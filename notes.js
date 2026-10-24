@@ -603,6 +603,38 @@
    * @returns {string} sanitized markup, or escaped text if the markup is not
    *   stable under re-parsing
    */
+  const REMOTE_IMAGE_PERMISSION = 'ocd_note_external_images_session';
+
+  function remoteImagesAllowed() {
+    try { return sessionStorage.getItem(REMOTE_IMAGE_PERMISSION) === 'true'; }
+    catch { return false; }
+  }
+
+  // DOMPurify guards script/markup safety; remote image loading is a separate
+  // privacy concern. Work in an inert template so the transformation itself
+  // cannot request third-party resources.
+  function controlRemoteNoteImages(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html ?? '');
+    const allow = remoteImagesAllowed();
+    for (const image of template.content.querySelectorAll('img')) {
+      const reference = image.getAttribute('data-remote-src') || image.getAttribute('src');
+      if (!reference) continue;
+      let resolved;
+      try { resolved = new URL(reference, document.baseURI); }
+      catch { image.removeAttribute('src'); continue; }
+      if (!['http:', 'https:'].includes(resolved.protocol) || resolved.origin === location.origin) continue;
+      image.setAttribute('data-remote-src', resolved.href);
+      if (allow) {
+        image.setAttribute('src', resolved.href);
+      } else {
+        image.removeAttribute('src');
+        if (!image.getAttribute('alt')) image.setAttribute('alt', 'External image blocked');
+      }
+    }
+    return template.innerHTML;
+  }
+
   function fallbackSanitize(html) {
     // <template> content is inert: parsing it loads no resources and runs no
     // script, unlike the <div> this used to build.
@@ -839,15 +871,15 @@
     _sanitize(html) {
       const purify = window.DOMPurify;
       if (purify?.sanitize) {
-        return purify.sanitize(String(html ?? ''), {
+        return controlRemoteNoteImages(purify.sanitize(String(html ?? ''), {
           FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
-          FORBID_ATTR: ['style'],
+          FORBID_ATTR: ['style', 'srcset', 'sizes'],
           // Block javascript: etc while still allowing normal links/images.
           ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-        });
+        }));
       }
 
-      return fallbackSanitize(html);
+      return controlRemoteNoteImages(fallbackSanitize(html));
     },
 
     // ── Toolbar state sync ────────────────────────────────
@@ -1842,6 +1874,28 @@
       // Init toolbar
       Toolbar.init($('[data-notes-toolbar]'));
       this._initAIControls();
+      const remoteToggle = $('[data-notes-remote-images]');
+      if (remoteToggle) {
+        remoteToggle.setAttribute('aria-pressed', remoteImagesAllowed() ? 'true' : 'false');
+        remoteToggle.textContent = remoteImagesAllowed() ? 'Block external images' : 'Load external images';
+        RouteListeners.on(remoteToggle, 'click', () => {
+          const next = !remoteImagesAllowed();
+          try {
+            if (next) sessionStorage.setItem(REMOTE_IMAGE_PERMISSION, 'true');
+            else sessionStorage.removeItem(REMOTE_IMAGE_PERMISSION);
+          } catch {
+            window.OpenCourseDeck?.Toast?.error?.('Image permission could not be saved for this session');
+            return;
+          }
+          remoteToggle.setAttribute('aria-pressed', next ? 'true' : 'false');
+          remoteToggle.textContent = next ? 'Block external images' : 'Load external images';
+          // Save the current draft before remounting; leave remote loading off
+          // again on restart because this permission is session-only.
+          Editor.save(true);
+          const note = Store.getNote(Editor._currentId);
+          if (note) Editor.load(note, { preventScroll: true });
+        });
+      }
 
       // Title input
       const titleInput = $('[data-note-title-input]');
