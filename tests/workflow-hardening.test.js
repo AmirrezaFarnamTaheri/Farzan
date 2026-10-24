@@ -233,7 +233,7 @@ describe('GitHub Actions hardening', () => {
     const broken = workflows['browser-assurance.yml']
       .replace('persist-credentials: false', 'persist-credentials: true')
       .replace('      - name: Run production browser smoke tests', '      - name: Skip production browser smoke tests')
-      .replace('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
+      .replaceAll('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
       .replace('npm run smoke:dist-browser', 'npm run smoke:browser');
     expect(validateBrowserAssuranceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('disable persisted credentials'),
