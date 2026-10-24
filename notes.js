@@ -2093,10 +2093,10 @@
       }
       // Exact script-aware keyword overlap is predictable, private and
       // synchronous. A note query should not reindex an entire library.
-      const terms = new Set(query.toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+      const terms = new Set(query.toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
       const scores = Store.getNotes().map(note => {
         const haystack = `${note.title || ''} ${plainTextFromHtml(note.content || '')}`
-          .toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || [];
+          .toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || [];
         const words = new Set(haystack);
         return { id: note.id, matches: [...terms].filter(term => words.has(term)).length };
       });
