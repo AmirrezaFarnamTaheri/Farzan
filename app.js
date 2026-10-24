@@ -52,7 +52,7 @@ import { Pointer } from './src/lib/pointer.js';
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
 
   const defaultState = {
-    theme: 'dark',           // 'dark' | 'light' | 'system'
+    theme: 'light',           // 'dark' | 'light' | 'system'
     sidebarCollapsed: false,
     activeToasts: [],
     toastCounter: 0,
