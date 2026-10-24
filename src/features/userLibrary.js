@@ -229,9 +229,19 @@ function normalizeCourseTitle(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function assertSafeCourseId(value) {
+  const id = String(value || '').trim();
+  // Course records are serialized through plain JSON objects. Reject names
+  // supplied by Object.prototype so they cannot be used as inherited records.
+  if (!id || Object.prototype.hasOwnProperty.call(Object.prototype, id)) {
+    throw new TypeError('Invalid reserved course identifier');
+  }
+  return id;
+}
+
 function ensureCourse(library, { id, title, description = '', overwriteTitle = false } = {}) {
-  const courseId = id || DEFAULT_COURSE_ID;
-  const existing = library.courses[courseId];
+  const courseId = assertSafeCourseId(id || DEFAULT_COURSE_ID);
+  const existing = Object.hasOwn(library.courses, courseId) ? library.courses[courseId] : null;
   if (existing && typeof existing === 'object') {
     if (overwriteTitle && title) existing.title = title;
     if (description) existing.description = description;
@@ -262,6 +272,7 @@ function findCourseIdByTitle(library, title) {
 function resolveOrCreateCourse(library, { courseId, courseTitle } = {}) {
   const requestedId = String(courseId || '').trim();
   if (requestedId) {
+    assertSafeCourseId(requestedId);
     // Explicit destination IDs must come from an existing saved course.
     // Silently creating a replacement for a deleted course would attach
     // users' media to a phantom "Untitled course" after a stale menu choice.
@@ -581,7 +592,7 @@ export async function resolveMediaUrl(value) {
 export async function upsertCourse({ id, title, description = '' } = {}) {
   if (!String(title || '').trim() && !id) throw new TypeError('Course title is required');
   return mutateLibrary(async (library) => {
-    const courseId = id || makeId('course');
+    const courseId = assertSafeCourseId(id || makeId('course'));
     ensureCourse(library, {
       id: courseId,
       title: String(title || '').trim() || undefined,
@@ -603,7 +614,11 @@ export async function upsertCourse({ id, title, description = '' } = {}) {
 export async function migrateLegacyCourses(records) {
   if (!Array.isArray(records)) throw new TypeError('Legacy courses must be an array');
   return mutateLibrary(async library => {
-    if (Object.keys(library.courses).length) {
+    // Only the actual absence of the canonical record permits historical
+    // migration. An intentionally empty canonical library means a user has
+    // removed their courses and must not be resurrected.
+    const canonical = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
+    if (canonical != null || Object.keys(library.courses).length) {
       return { migrated: 0, courses: Object.keys(library.courses).length };
     }
     let migrated = 0;
@@ -612,7 +627,8 @@ export async function migrateLegacyCourses(records) {
       const id = String(record.id || '').trim();
       const title = String(record.title || '').trim().slice(0, 120);
       // Avoid reserved prototype properties and malformed course identifiers.
-      if (!/^[a-z0-9_-]{1,160}$/i.test(id) || !title || id === DEFAULT_COURSE_ID) continue;
+      if (!/^[a-z0-9_-]{1,160}$/i.test(id) || !title || id === DEFAULT_COURSE_ID
+        || Object.prototype.hasOwnProperty.call(Object.prototype, id)) continue;
       const course = ensureCourse(library, {
         id, title,
         description: String(record.description || '').trim().slice(0, 600),
