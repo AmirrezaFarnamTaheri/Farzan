@@ -27,7 +27,8 @@ describe('route-owned PDF opening', () => {
     openPdfSource('blob:old', { root, router });
     openPdfSource('blob:new', { root, router });
     await consumePdfSource(root);
-    expect(root.PlasmaPDFViewer.load).toHaveBeenCalledExactlyOnceWith('blob:new');
+    expect(root.PlasmaPDFViewer.load).toHaveBeenCalledTimes(1);
+    expect(root.PlasmaPDFViewer.load).toHaveBeenCalledWith('blob:new');
   });
 
   it('opens a replacement PDF immediately when already on the PDF route', async () => {
