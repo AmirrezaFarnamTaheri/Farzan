@@ -1019,11 +1019,14 @@ import { Pointer } from './src/lib/pointer.js';
         })
         .slice(0, 12);
       const semantic = await this._querySemanticNotes(value, data);
-      const seen = new Set(lexical.map(item => item.id || `${item.category}:${item.label}`));
+      const uniqueKey = item => item.sourceType === 'note' && item.sourceId
+        ? `note:${item.sourceId}`
+        : (item.id || `${item.category}:${item.label}`);
+      const seen = new Set(lexical.map(uniqueKey));
       return [
         ...lexical,
         ...semantic.filter(item => {
-          const key = item.id || `${item.category}:${item.label}`;
+          const key = uniqueKey(item);
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -1032,32 +1035,27 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     async _querySemanticNotes(value, data = []) {
-      const ai = window.OpenCourseDeck?.AI;
-      if (!ai?.upsertEmbedding || !ai?.searchEmbeddings) return [];
-      const notes = data.filter(item => item.sourceType === 'note' && item.sourceId);
-      if (!notes.length) return [];
-      try {
-        await Promise.all(notes.map(item => ai.upsertEmbedding({
-          id: item.sourceId,
-          text: `${item.label || ''}\n${item.searchText || item.description || ''}`,
-          metadata: { type: 'note', title: item.label || '', href: item.href || '#/notes' },
-        })));
-        const hits = await ai.searchEmbeddings(value, { limit: 4 });
-        const byId = new Map(notes.map(item => [item.sourceId, item]));
-        return hits.map(hit => {
-          const item = byId.get(hit.id);
-          if (!item) return null;
-          return {
-            ...item,
-            id: `semantic-note:${item.sourceId}`,
-            icon: 'brain',
-            category: 'Semantic note',
-            description: `Semantic match${hit.score ? ` · ${Math.round(hit.score * 100)}%` : ''}`,
-          };
-        }).filter(Boolean);
-      } catch {
-        return [];
-      }
+      // Related-word suggestions are based only on exact Unicode word overlap.
+      // Avoid rewriting every note into IndexedDB on every search keystroke:
+      // indexing is not a user-query side effect. These are deliberately not
+      // described as neural/semantic results or calibrated percentages.
+      const words = new Set(String(value || '').toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+      if (words.size < 2) return [];
+      const ranked = data.filter(item => item.sourceType === 'note' && item.sourceId)
+        .map(item => {
+          const terms = new Set(`${item.label || ''} ${item.searchText || item.description || ''}`
+            .toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+          const shared = [...words].filter(word => terms.has(word)).length;
+          return { item, shared };
+        }).filter(row => row.shared > 0)
+        .sort((a, b) => b.shared - a.shared);
+      return ranked.slice(0, 4).map(({ item }) => ({
+        ...item,
+        id: `related-note:${item.sourceId}`,
+        icon: 'search',
+        category: 'Related note',
+        description: 'Matching note keywords',
+      }));
     },
 
     async _loadUniversalData() {
