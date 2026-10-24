@@ -1,0 +1,61 @@
+name: Farzan Design Visual QA
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'app.js'
+      - 'canvas.js'
+      - 'progress.js'
+      - 'src/styles/**'
+      - 'src/views/**'
+      - 'tests/e2e/workspace-visual-qa.spec.js'
+      - '.github/workflows/farzan-design-visual.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: farzan-design-visual-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot-review:
+    name: Browser visual evidence across routes and themes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out verified design source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and build reproducibly
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm run vendor
+          npm run build:release
+
+      - name: Capture and validate real rendered application screens
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: npm run test:e2e -- tests/e2e/workspace-visual-qa.spec.js
+
+      - name: Publish screenshot evidence for design review
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: farzan-redesign-screenshots-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/farzan-redesign/
+          if-no-files-found: warn
+          retention-days: 14
