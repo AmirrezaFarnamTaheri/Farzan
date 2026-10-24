@@ -762,8 +762,10 @@ input[type="file"][hidden] {
     transform: translateX(calc(-100% - 20px));
   }
   [dir="rtl"] .sidebar {
-    inset-inline-start: auto;
-    inset-inline-end: 0;
+    /* inline-start is RIGHT when dir=rtl. The previous inline-end:0
+       anchored the hidden drawer on the left, exposing a 70px strip. */
+    inset-inline-start: 0;
+    inset-inline-end: auto;
     transform: translateX(calc(100% + 20px));
   }
   .sidebar.sidebar-mobile-open { transform: translateX(0); }
@@ -786,7 +788,13 @@ input[type="file"][hidden] {
   .home-grid > .home-card { grid-column: 1 / -1; }
   .home-pulse-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .home-widget-list { display: grid; grid-template-columns: 1fr; }
-  .courses-list { grid-template-columns: 1fr; max-height: 260px; }
+  .courses-list { grid-template-columns: 1fr; max-height: 230px; }
+  .view-courses .courses-sidebar #courses-list {
+    min-height: 0;
+    max-height: 230px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
   .view .page-header { align-items: flex-start; }
   .progress-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
   .progress-metric-grid > .progress-metric { grid-column: auto; }

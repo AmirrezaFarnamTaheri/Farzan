@@ -30,7 +30,11 @@ for (const setup of setups) {
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
       if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
-      if (setup.rtl) await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+      if (setup.rtl) {
+        await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+        await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+          el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(setup.width);
+      }
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const dimensions = await page.evaluate(() => ({
         body: document.body.scrollWidth,

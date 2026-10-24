@@ -1697,14 +1697,23 @@
 
     // ── Mini-map ──────────────────────────────────────────
     _drawMinimap(ctx, canvasW, canvasH) {
+      // An empty board has nothing to navigate; at 100% zoom with no pan
+      // the inset is equally redundant. Do not paint a dark block over the
+      // user's fresh whiteboard or narrow mobile writing space.
+      const hasContent = State.layers.some(layer =>
+        layer.visible !== false && Array.isArray(layer.elements) && layer.elements.length > 0);
+      const displaced = Math.abs(State.zoom - 1) > 0.01
+        || Math.abs(State.offsetX) > 4 || Math.abs(State.offsetY) > 4;
+      if (!hasContent || !displaced || canvasW < 350 || canvasH < 240) return;
       const mmW  = 160;
       const mmH  = 100;
       const mmX  = canvasW - mmW - 12;
       const mmY  = canvasH - mmH - 12;
 
       ctx.save();
-      ctx.fillStyle   = 'rgba(15,23,42,0.8)';
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      const lightCanvas = ['light', 'paper'].includes(document.documentElement.dataset.theme);
+      ctx.fillStyle = lightCanvas ? 'rgba(248,250,252,0.95)' : 'rgba(15,23,42,0.8)';
+      ctx.strokeStyle = lightCanvas ? 'rgba(96,119,139,0.4)' : 'rgba(255,255,255,0.15)';
       ctx.lineWidth   = 1;
       // roundRect APPENDS to the current path, it does not start one. Without
       // beginPath() the fill/stroke below also painted every subpath left over

@@ -91,6 +91,30 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
   });
 
+  test('keeps RTL mobile navigation fully off-canvas until opened', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+      el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(390);
+    const layout = await page.evaluate(() => ({
+      app: document.querySelector('#ocd-app').getBoundingClientRect(),
+      topbar: document.querySelector('#topbar').getBoundingClientRect(),
+      hero: document.querySelector('.home-hero').getBoundingClientRect(),
+    }));
+    expect(layout.topbar.right).toBeLessThanOrEqual(391);
+    expect(layout.hero.right).toBeLessThanOrEqual(391);
+  });
+
+  test('keeps the mobile course picker short enough to reveal the lesson outline', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const list = page.locator('#courses-list');
+    await expect(list.locator('.course-item').first()).toBeVisible();
+    const height = await list.evaluate(el => el.getBoundingClientRect().height);
+    expect(height).toBeLessThanOrEqual(245);
+  });
+
   test('keeps a usable mobile shell with no body-level double scrollbars', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
