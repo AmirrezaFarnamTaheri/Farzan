@@ -5,6 +5,17 @@ on:
     branches:
       - main
     paths:
+      # Windows packages embed the same frontend; UI reconstruction is a
+      # native release change even when no Rust file was modified.
+      - 'index.html'
+      - 'manifest.json'
+      - 'app.js'
+      - 'canvas.js'
+      - 'progress.js'
+      - 'src/styles/**'
+      - 'src/views/**'
+      - 'src/core/themeManager.js'
+      - 'data/opencoursedeck-starter.json'
       - 'src-tauri/**'
       - 'assets/icon-192.svg'
       - 'scripts/native-*.cjs'

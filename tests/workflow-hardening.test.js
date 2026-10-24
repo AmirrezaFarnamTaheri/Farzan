@@ -74,6 +74,13 @@ describe('GitHub Actions hardening', () => {
     }
   });
 
+  it('validates native Windows packaging when the study frontend changes', () => {
+    const native = workflows['native-windows.yml'];
+    for (const path of ["'index.html'", "'src/styles/**'", "'src/views/**'", "'app.js'"]) {
+      expect(native).toContain(path);
+    }
+  });
+
   it('validates every active YAML workflow, including native and optional edition channels', () => {
     const files = readAllWorkflowFiles();
     const diskNames = fs.readdirSync(path.join(repositoryRoot, '.github', 'workflows'))
