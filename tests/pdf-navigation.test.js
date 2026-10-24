@@ -43,6 +43,38 @@ describe('route-owned PDF opening', () => {
     expect(load).toHaveBeenCalledWith('blob:replacement');
   });
 
+  it('retains a failed document load for an explicit retry', async () => {
+    const load = vi.fn()
+      .mockRejectedValueOnce(new Error('PDF worker not ready'))
+      .mockResolvedValueOnce(true);
+    const root = { OpenCourseDeck: {}, PlasmaPDFViewer: { load } };
+    openPdfSource('blob:retry', { root, router: { navigate: vi.fn() } });
+    await expect(consumePdfSource(root)).rejects.toThrow('PDF worker not ready');
+    await expect(consumePdfSource(root)).resolves.toBe(true);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenLastCalledWith('blob:retry');
+  });
+
+  it('serializes overlapping opens so an older PDF cannot finish after its replacement', async () => {
+    let finishOld;
+    const load = vi.fn(source => source === 'blob:old'
+      ? new Promise(resolve => { finishOld = resolve; })
+      : Promise.resolve(true));
+    const root = {
+      location: { hash: '#/pdf' },
+      OpenCourseDeck: {},
+      PlasmaPDFViewer: { load },
+    };
+    root.OpenCourseDeck.consumePdfOpen = () => consumePdfSource(root);
+    const oldRequest = openPdfSource('blob:old', { root });
+    const newRequest = openPdfSource('blob:new', { root });
+    expect(load).toHaveBeenCalledTimes(1);
+    finishOld(true);
+    await Promise.all([oldRequest, newRequest]);
+    expect(load.mock.calls.map(args => args[0])).toEqual(['blob:old', 'blob:new']);
+    expect(root.OpenCourseDeck.pendingPdfOpen).toBeNull();
+  });
+
   it('does not lose a pending source when the viewer is unavailable', async () => {
     const root = { OpenCourseDeck: {} };
     const router = { navigate: vi.fn() };
