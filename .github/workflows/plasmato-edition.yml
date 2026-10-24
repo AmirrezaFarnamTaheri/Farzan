@@ -1,9 +1,18 @@
 name: Plasmato Edition - Verify and Publish
 
 on:
+  # Publication is an explicit versioned main-branch change, never an
+  # unreviewed edition-branch push. A new edition.json version is the trigger.
   push:
     branches:
-      - edition/plasmato-emergency-player-20261011
+      - main
+    paths:
+      - editions/plasmato-emergency/edition.json
+  # Exercise build and real NSIS packaging before the release PR merges.
+  pull_request:
+    paths:
+      - .github/workflows/plasmato-edition.yml
+      - editions/plasmato-emergency/edition.json
   workflow_dispatch:
 
 permissions:
@@ -29,6 +38,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      - name: Verify isolated edition release version and catalog
+        run: |
+          node -e "const c=require('./editions/plasmato-emergency/edition.json'); if(c.editionVersion !== '1.0.5') throw new Error('Edition version does not match immutable v1.0.5 release contract')"
 
       - name: Verify supplied archive and native catalog integration
         run: |
@@ -105,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.4-visual-evidence
+          name: farzan-plasmato-edition-v1.0.5-visual-evidence
           path: |
             artifacts/visual-audit/
             test-results/
@@ -115,18 +128,18 @@ jobs:
       - name: Package complete installable static site
         run: |
           mkdir -p release-assets
-          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.4-web.zip .)
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.4-web.zip > SHA256SUMS)
+          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.5-web.zip .)
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.5-web.zip > SHA256SUMS)
           test -f artifacts/visual-audit/manifest.json
           test -f artifacts/visual-audit/VISUAL-REPORT.md
           test -f artifacts/visual-audit/observations.jsonl
-          zip -q -r release-assets/farzan-plasmato-edition-v1.0.4-visual-evidence.zip artifacts/visual-audit
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.4-visual-evidence.zip > SHA256SUMS.visual)
+          zip -q -r release-assets/farzan-plasmato-edition-v1.0.5-visual-evidence.zip artifacts/visual-audit
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.5-visual-evidence.zip > SHA256SUMS.visual)
 
       - name: Upload verified downloadable app and checksums
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.4-web
+          name: farzan-plasmato-edition-v1.0.5-web
           path: release-assets/
           if-no-files-found: error
           retention-days: 90
@@ -185,17 +198,34 @@ jobs:
           if ($found.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($found.Count)" }
           if ($found[0].Length -lt 1000000) { throw "Windows installer is unexpectedly small" }
           New-Item -ItemType Directory -Path 'release-native' -Force | Out-Null
-          $dest = 'release-native/farzan-plasmato-edition-v1.0.4-windows-setup.exe'
+          $dest = 'release-native/farzan-plasmato-edition-v1.0.5-windows-setup.exe'
           Copy-Item -LiteralPath $found[0].FullName -Destination $dest
           $digest = (Get-FileHash -Algorithm SHA256 $dest).Hash.ToLowerInvariant()
-          "$digest  farzan-plasmato-edition-v1.0.4-windows-setup.exe" |
+          "$digest  farzan-plasmato-edition-v1.0.5-windows-setup.exe" |
             Out-File 'release-native/SHA256SUMS.windows' -Encoding ascii
           Get-Content 'release-native/SHA256SUMS.windows'
+
+      - name: Smoke-test silent Windows NSIS installation
+        run: |
+          $setup = (Resolve-Path 'release-native/farzan-plasmato-edition-v1.0.5-windows-setup.exe').Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'FarzanPlasmatoInstallAcceptance'
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          $args = @('/S', "/D=$installDir")
+          $process = Start-Process -FilePath $setup -ArgumentList $args -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Silent NSIS installer failed: $($process.ExitCode)" }
+          if (!(Test-Path $installDir)) { throw "Silent NSIS installer did not create the target directory" }
+          $installed = @(Get-ChildItem $installDir -Recurse -File -Filter 'open-course-deck.exe')
+          if ($installed.Count -ne 1 -or $installed[0].Length -lt 1000000) {
+            throw "Installed native application was not found or is unexpectedly small"
+          }
+          Write-Host "NSIS silent installation passed: $($installed[0].FullName)"
+          # This runner smoke checks installation and bytes, not personal-profile
+          # upgrade, WebView2 UI acceptance, code signing, or licensed content.
 
       - name: Upload verified Windows installer and checksum
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.4-windows
+          name: farzan-plasmato-edition-v1.0.5-windows
           path: release-native/
           if-no-files-found: error
           retention-days: 90
@@ -203,7 +233,7 @@ jobs:
   publish-release:
     name: Publish versioned Plasmato Edition download
     needs: [build-and-verify, build-windows]
-    if: github.ref == 'refs/heads/edition/plasmato-emergency-player-20261011'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -212,13 +242,13 @@ jobs:
       - name: Download verified edition bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.4-web
+          name: farzan-plasmato-edition-v1.0.5-web
           path: release-assets
 
       - name: Download verified Windows installer
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.4-windows
+          name: farzan-plasmato-edition-v1.0.5-windows
           path: release-assets
 
       - name: Verify release bytes and immutable version identity
@@ -230,44 +260,99 @@ jobs:
           (cd release-assets && sha256sum -c SHA256SUMS)
           (cd release-assets && sha256sum -c SHA256SUMS.windows)
           (cd release-assets && sha256sum -c SHA256SUMS.visual)
-          tag=plasmato-edition-v1.0.4
+          tag=plasmato-edition-v1.0.5
           existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha' 2>/dev/null | grep -E '^[a-f0-9]{40}$' || :)
-          if [[ -n "$existing" && "$existing" != "$EXPECTED_COMMIT" ]]; then
-            echo "::error::Version tag ${tag} is immutable and points to ${existing}; bump the edition version to publish a new build."
+          if [[ -n "$existing" ]]; then
+            echo "::error::Version tag ${tag} already exists (${existing}). Never replace published bytes or move its tag; resolve partial publication separately or increment the patch version."
             exit 1
           fi
 
-      - name: Publish Plasmato Edition v1.0.4
+      - name: Publish Plasmato Edition v1.0.5
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: plasmato-edition-v1.0.4
+          tag_name: plasmato-edition-v1.0.5
           target_commitish: ${{ github.sha }}
-          name: Farzan Plasmato Edition v1.0.4
+          name: Farzan Plasmato Edition v1.0.5
           body: |
-            Branch-specific edition of Farzan/OpenCourseDeck, built from the full Plasmato archive.
+            Separately versioned Plasmato edition of Farzan, built from the reviewed main commit and the supplied Plasmato archive.
             Contains 31 imported Plasmato courses (6,418 topics, 5,990 video and 280 PDF references)
             alongside Farzan's existing starter course, plus the standalone emergency player.
             Includes the production website, offline worker and independent NSIS installer, with SHA-256 checksums.
             Visual release acceptance verifies 15 routes across desktop, tablet, mobile and light mode,
             actual saved notes, PDF, flashcards, progress, video/bookmarks, search and Studio persistence.
-            Download the visual evidence ZIP for 308 genuine Chrome screenshots, 24 review contact sheets, browser observations, and image SHA-256 manifest.
+            Download the visual evidence ZIP for 476 genuine Chrome screenshots in 35 review groups, browser observations, and the image SHA-256 manifest.
             Extract the ZIP and serve it over HTTP(S). External video and PDF hosts are not mirrored.
-            This edition is not merged to main and is distinct from standard Farzan releases.
+            This edition is bundled in the main Farzan source but distributed through a distinct edition release channel. Edition version 1.0.5 is independent of the underlying Tauri application version.
           files: |
-            release-assets/farzan-plasmato-edition-v1.0.4-web.zip
+            release-assets/farzan-plasmato-edition-v1.0.5-web.zip
             release-assets/SHA256SUMS
-            release-assets/farzan-plasmato-edition-v1.0.4-windows-setup.exe
+            release-assets/farzan-plasmato-edition-v1.0.5-windows-setup.exe
             release-assets/SHA256SUMS.windows
-            release-assets/farzan-plasmato-edition-v1.0.4-visual-evidence.zip
+            release-assets/farzan-plasmato-edition-v1.0.5-visual-evidence.zip
             release-assets/SHA256SUMS.visual
           fail_on_unmatched_files: true
           overwrite_files: false
           make_latest: false
 
+  verify-published-release:
+    name: Re-download and verify published edition assets
+    needs: publish-release
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Verify tag, expected release asset names and remote SHA-256 bytes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          tag=plasmato-edition-v1.0.5
+          actual=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha')
+          if [[ "$actual" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Published tag ${tag} points to ${actual}, not the verified commit ${EXPECTED_COMMIT}."
+            exit 1
+          fi
+          mkdir -p verified-download
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" --dir verified-download
+          cd verified-download
+          expected=(
+            farzan-plasmato-edition-v1.0.5-web.zip
+            farzan-plasmato-edition-v1.0.5-windows-setup.exe
+            farzan-plasmato-edition-v1.0.5-visual-evidence.zip
+            SHA256SUMS SHA256SUMS.windows SHA256SUMS.visual
+          )
+          for asset in "${expected[@]}"; do
+            if [[ ! -s "$asset" ]]; then
+              echo "::error::Missing expected release asset: $asset"
+              exit 1
+            fi
+          done
+          actual_count=$(find . -maxdepth 1 -type f | wc -l)
+          if [[ "$actual_count" -ne "${#expected[@]}" ]]; then
+            echo "::error::Unexpected release asset set; found ${actual_count} assets, expected ${#expected[@]}."
+            exit 1
+          fi
+          sha256sum -c SHA256SUMS
+          sha256sum -c SHA256SUMS.windows
+          sha256sum -c SHA256SUMS.visual
+          {
+            echo "## Plasmato Edition v1.0.5 publication verified"
+            echo
+            echo "Source commit: \`${EXPECTED_COMMIT}\`"
+            echo
+            echo "All six expected release assets downloaded and verified with SHA-256."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish-pages:
     name: Publish Plasmato Edition web application
-    needs: build-and-verify
-    if: github.ref == 'refs/heads/edition/plasmato-emergency-player-20261011' && vars.ENABLE_PLASMATO_PAGES == 'true'
+    # Do not deploy an edition website before the Windows installer AND
+    # published immutable release assets have passed remote digest checks.
+    needs: verify-published-release
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.ENABLE_PLASMATO_PAGES == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

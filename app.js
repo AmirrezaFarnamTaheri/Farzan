@@ -3561,8 +3561,10 @@ import { Pointer } from './src/lib/pointer.js';
         const normalized = String(hash || '#/home').split('?')[0].replace(/\/$/, '') || '#/home';
         const isHome = normalized === '#/home' || normalized === '#' || normalized === '';
         const title = routeTitle(normalized);
-        if (isHome || title === 'OpenCourseDeck') {
-          // "Home › Home" is noise; on the dashboard just show the current page.
+        if (isHome || title === 'OpenCourseDeck' || window.matchMedia?.('(max-width: 460px)')?.matches) {
+          // At narrow widths the menu already provides Home navigation. A
+          // current-page-only breadcrumb cannot be squeezed by a redundant
+          // Home link and separator, even while the view changes asynchronously.
           breadcrumbList.replaceChildren(
             createElement('li', { class: 'breadcrumb-item' },
               createElement('span', { class: 'breadcrumb-current', 'aria-current': 'page' }, isHome ? 'Home' : title)
