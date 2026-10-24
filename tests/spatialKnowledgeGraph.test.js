@@ -61,7 +61,7 @@ describe('SpatialKnowledgeGraph', () => {
   it('mounts into container and creates canvas with accessibility attributes', () => {
     const graph = new SpatialKnowledgeGraph();
     const items = [
-      { id: '1', title: 'Calculus I', type: 'course' },
+      { id: '1', title: 'Calculus I', type: 'course', relatedIds: ['2'] },
       { id: '2', title: 'Derivatives Note', type: 'note' },
       { id: '3', title: 'Product Rule', type: 'flashcard' },
     ];
@@ -74,7 +74,7 @@ describe('SpatialKnowledgeGraph', () => {
     expect(canvas.tabIndex).toBe(0);
     expect(canvas.getAttribute('aria-label')).toContain('arrow keys');
     expect(canvas.style.touchAction).toBe('none');
-    expect(graph.nodes.length).toBeGreaterThanOrEqual(12);
+    expect(graph.nodes).toHaveLength(3);
     expect(graph.edges.length).toBeGreaterThan(0);
     expect(graph.coordinateRings.length).toBe(3);
 
@@ -107,6 +107,29 @@ describe('SpatialKnowledgeGraph', () => {
 
     graph.dispose();
     expect(container.querySelector('[aria-live="polite"]')).toBeNull();
+  });
+
+  it('does not invent concepts or relationships for an empty workspace', () => {
+    const graph = new SpatialKnowledgeGraph();
+    graph.mount(container, []);
+    expect(graph.nodes).toEqual([]);
+    expect(graph.edges).toEqual([]);
+    expect(container.textContent).toContain('Add notes');
+    graph.dispose();
+  });
+
+  it('only draws links when source records explicitly declare a relationship', () => {
+    const graph = new SpatialKnowledgeGraph();
+    graph.mount(container, [
+      { id: 'note-a', title: 'A', type: 'note' },
+      { id: 'note-b', title: 'B', type: 'note' },
+      { id: 'note-c', title: 'C', type: 'note', relatedIds: ['note-a'] },
+    ]);
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.edges).toHaveLength(1);
+    expect(graph.edges[0].source.id).toBe('note-c');
+    expect(graph.edges[0].target.id).toBe('note-a');
+    graph.dispose();
   });
 
   it('disposes cleanly removing event listeners, canvas, and animation loop', () => {
