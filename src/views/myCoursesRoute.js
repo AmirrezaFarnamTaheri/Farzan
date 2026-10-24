@@ -96,6 +96,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
         await renderCourses();
         return;
       }
+      try { sessionStorage.setItem('ocd_active_import_course', record.id); } catch {}
       titleInput.value = '';
       if (descriptionInput) descriptionInput.value = '';
       Toast?.success?.('Course saved');
@@ -233,7 +234,17 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
         remove.disabled = false;
       }
     });
-    actions.append(open, remove);
+    const addMedia = document.createElement('button');
+    addMedia.className = 'btn btn-ghost btn-sm';
+    addMedia.type = 'button';
+    addMedia.textContent = 'Add media';
+    addMedia.setAttribute('aria-label', `Add media to ${course.title || 'this course'}`);
+    addMedia.addEventListener('click', (event) => {
+      event.stopPropagation();
+      try { sessionStorage.setItem('ocd_active_import_course', course.id); } catch {}
+      window.OpenCourseDeck?.AddContent?.openMenu?.();
+    });
+    actions.append(open, addMedia, remove);
     body.append(title, description, meta, actions);
     card.appendChild(body);
     return card;
