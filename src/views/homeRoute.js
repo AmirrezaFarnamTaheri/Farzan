@@ -166,7 +166,8 @@ export function mountHomeView(deps = {}) {
 
   renderCatalogCounts();
   renderHomeDashboard({ Router, setPendingCourseMedia });
-  document.querySelector('[data-home-add]')?.addEventListener('click', () => {
+  document.querySelector('[data-home-add]')?.addEventListener('click', (event) => {
+    event.stopPropagation();
     if (typeof window.OpenCourseDeck?.AddContent?.openMenu === 'function') {
       window.OpenCourseDeck.AddContent.openMenu();
       return;
@@ -336,6 +337,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-pulse-average]', `${averageProgress}%`);
 
   const focusRecord = latestProgress || latestTimestamp;
+  const focusTimestamp = [...timestamps]
+    .filter(item => item?.topicId === focusRecord?.topicId)
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+  const focusPosition = Number(focusTimestamp?.position ?? focusRecord?.position ?? 0) || 0;
   const focusTopicId = focusRecord?.topicId;
   const focusTopic = topicMap.get(focusTopicId);
   const focusPercent = Math.max(0, Math.min(100, Number(latestProgress?.percent) || 0));
@@ -348,13 +353,13 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-home-focus-detail]', focusDetail);
   setText('[data-home-focus-status]', focusRecord ? 'Resume' : 'Start');
   setText('[data-home-focus-percent]', `${Math.round(focusPercent)}% complete`);
-  setText('[data-home-focus-time]', latestTimestamp?.position ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'No saved position');
+  setText('[data-home-focus-time]', focusPosition ? `Saved at ${formatDuration(focusPosition)}` : 'No saved position');
   const focusProgress = document.querySelector('[data-home-focus-progress]');
   if (focusProgress) focusProgress.style.width = `${focusPercent}%`;
 
   const openFocus = () => {
     if (focusTopicId) {
-      setPendingCourseMedia(focusTopicId, latestTimestamp?.position);
+      setPendingCourseMedia(focusTopicId, focusPosition || undefined);
       Router.navigate('#/courses');
       return;
     }
