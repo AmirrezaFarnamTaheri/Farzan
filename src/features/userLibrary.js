@@ -397,6 +397,15 @@ function assertBackupFolder(handle) {
  */
 export async function exportLibraryMediaDirectory(directory) {
   assertBackupFolder(directory);
+  // Invalidate a previous manifest before doing any work in the same folder:
+  // an interrupted replacement must never leave an apparently complete backup.
+  const manifestHandle = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST, { create: true });
+  const incomplete = await manifestHandle.createWritable();
+  try {
+    await incomplete.write(new Blob([JSON.stringify({
+      format: MEDIA_FOLDER_FORMAT, version: 1, status: 'incomplete',
+    })], { type: 'application/json' }));
+  } finally { await incomplete.close(); }
   const refs = await listLibraryFileReferences();
   const entries = [];
   const checked = [];
@@ -430,8 +439,7 @@ export async function exportLibraryMediaDirectory(directory) {
     exportedAt: new Date().toISOString(),
     files: entries,
   };
-  const file = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST, { create: true });
-  const writer = await file.createWritable();
+  const writer = await manifestHandle.createWritable();
   try {
     await writer.write(new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
   } finally { await writer.close(); }
