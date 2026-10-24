@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ channel: 'chrome' });
+
 test.describe('Farzan desktop workspace redesign', () => {
   test('keeps the app anchored to one viewport without exposing internal file pickers', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
