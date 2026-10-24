@@ -262,7 +262,13 @@ function findCourseIdByTitle(library, title) {
 function resolveOrCreateCourse(library, { courseId, courseTitle } = {}) {
   const requestedId = String(courseId || '').trim();
   if (requestedId) {
-    return { id: requestedId, course: ensureCourse(library, { id: requestedId, title: courseTitle }) };
+    // Explicit destination IDs must come from an existing saved course.
+    // Silently creating a replacement for a deleted course would attach
+    // users' media to a phantom "Untitled course" after a stale menu choice.
+    if (!library.courses[requestedId] && requestedId !== DEFAULT_COURSE_ID) {
+      throw new Error('The selected course no longer exists. Choose another destination before importing.');
+    }
+    return { id: requestedId, course: ensureCourse(library, { id: requestedId }) };
   }
   const title = String(courseTitle || '').trim();
   const isDefaultTitle = !title || normalizeCourseTitle(title) === normalizeCourseTitle(DEFAULT_COURSE_TITLE);
