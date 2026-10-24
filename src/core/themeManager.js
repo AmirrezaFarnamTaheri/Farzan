@@ -102,7 +102,7 @@ export const ThemeManager = {
       try {
         return localStorage.getItem(this.STORAGE_KEY) ?? 'light';
       } catch {
-        return 'dark';
+        return 'light';
       }
     })();
 
