@@ -698,7 +698,8 @@ article:has(#btn-theme-toggle) { min-width: 0; }
   border: 1px solid var(--grade-color, var(--border-strong));
   background: color-mix(in srgb, var(--grade-color, var(--accent)) 10%, transparent);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
-  color: var(--grade-color, var(--text-primary));
+  /* Grade hue remains in border/background; primary ink meets normal-text contrast. */
+  color: var(--text-primary);
   font-weight: 700;
   font-size: var(--text-sm);
   cursor: pointer;
