@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
 
-function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes = false } = {}) {
+function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards = [], failNotes = false } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
   window.DataStore = {
     init: vi.fn(async () => true),
@@ -18,6 +18,7 @@ function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes 
       return notes;
     }),
     getAllTimestamps: vi.fn(async () => timestamps),
+    getSetting: vi.fn(async key => key === 'ocd_flashcards' ? flashcards : null),
   };
 
   const Router = { navigate: vi.fn() };
@@ -44,6 +45,7 @@ describe('home dashboard', () => {
       ],
       notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', updatedAt: now - 1000 }],
       timestamps: [{ topicId: 'topic-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
+      flashcards: [{ id: 'card-due', front: 'Explain spacing', deck: 'Design', nextReviewDate: '2020-01-01' }],
     });
 
     await vi.waitFor(() => {
@@ -60,6 +62,22 @@ describe('home dashboard', () => {
     expect(document.querySelectorAll('.home-widget')).toHaveLength(3);
     expect(document.querySelectorAll('.home-activity-item').length).toBeGreaterThan(0);
     expect(document.body.textContent).toContain('Spacing principles');
+  });
+
+  it('counts only actual scheduled flashcards and opens the Review screen', async () => {
+    const { Router } = mountDashboard({
+      progress: [{ topicId: 'topic-2', percent: 100, status: 'done', updatedAt: Date.now() - 40 * 86400000 }],
+      flashcards: [
+        { id: 'one', front: 'Review this', nextReviewDate: '2020-01-01' },
+        { id: 'two', front: 'Later', nextReviewDate: '2099-01-01' },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.querySelector('[data-home-review-count]').textContent).toBe('1');
+    const review = document.querySelector('[data-home-widget="review"]');
+    expect(review.textContent).toContain('Review this');
+    review.click();
+    expect(Router.navigate).toHaveBeenCalledWith('#/flashcards');
   });
 
   it('resumes the latest topic from its saved position', async () => {
