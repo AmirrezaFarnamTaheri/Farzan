@@ -83,6 +83,20 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('labels the built-in local summary as extractive and hides non-executable model installers', async () => {
+    const { controller } = mountSettings({ mode: 'local-gemma', model: 'gemma-4-local' });
+    await vi.waitFor(() => expect(window.DB.getSetting).toHaveBeenCalled());
+    expect(document.querySelector('[data-ai-mode]').selectedOptions[0].textContent).toMatch(/extractive/i);
+    for (const selector of [
+      '[data-ai-import-local-file]', '[data-ai-download-local-file]',
+      '[data-ai-mark-local-installed]', '[data-ai-open-local-source]',
+    ]) {
+      expect(document.querySelector(selector).hidden).toBe(true);
+    }
+    expect(document.body.textContent).toContain('model files cannot run');
+    controller.unmount();
+  });
+
   it('migrates a persisted key out of storage and approves only the exact endpoint origin', async () => {
     const { controller, saveSetting, Toast } = mountSettings({
       mode: 'custom-api',
