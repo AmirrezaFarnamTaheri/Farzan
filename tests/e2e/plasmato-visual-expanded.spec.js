@@ -354,8 +354,12 @@ test('settings density, font, theme and AI permission states are visible', async
   expect(Math.min(...aiWidths)).toBeGreaterThanOrEqual(225);
   await stateShot(page, 'settings-states', '07-unsafe-endpoint-rejected');
   await page.locator('[data-ai-mode]').selectOption('local-gemma');
-  await expect(page.locator('[data-ai-local-fields]')).toBeVisible();
-  await stateShot(page, 'settings-states', '08-on-device-model-panel');
+  // Local mode is extractive-only. The old model-install controls were
+  // misleading because no shipped runtime consumed those cached model files.
+  // Never weaken the visual gate by pretending that dead controls must exist.
+  await expect(page.locator('[data-ai-local-fields]')).toBeHidden();
+  await expect(page.locator('#settings-ai')).toContainText('do not execute a language model');
+  await stateShot(page, 'settings-states', '08-local-extractive-only');
   await page.locator('#select-clear-scope').selectOption('notes');
   await expect(page.locator('#select-clear-scope')).toHaveValue('notes');
   await page.locator('#select-clear-scope').scrollIntoViewIfNeeded();
