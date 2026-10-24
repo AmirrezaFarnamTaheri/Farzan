@@ -115,6 +115,19 @@ describe('user library overlay', () => {
     expect(Object.keys(library.courses)).toEqual([created.id]);
   });
 
+  it('rejects a removed explicit destination instead of creating an unintended course', async () => {
+    const course = await upsertCourse({ title: 'Transient course' });
+    await removeCourse(course.id);
+    const newPdf = new File(['%PDF-1.4'], 'ghost.pdf', { type: 'application/pdf' });
+    await expect(addPdfFile(newPdf, { courseId: course.id }))
+      .rejects.toThrow(/no longer exists|choose.*destination/i);
+    await expect(addTopic({ title: 'Unplaced topic', courseId: course.id }))
+      .rejects.toThrow(/no longer exists|choose.*destination/i);
+    const library = await loadLibrary();
+    expect(library.courses[course.id]).toBeUndefined();
+    expect(Object.keys(library.courses)).toEqual([]);
+  });
+
   it('persists a batch of media files once', async () => {
     const files = [
       new File(['a'], 'a.mp4', { type: 'video/mp4' }),
