@@ -799,32 +799,27 @@ describe('notes route filters', () => {
     expect(window.OpenCourseDeck.AI.summarizeText).not.toHaveBeenCalled();
   });
 
-  it('indexes notes and renders semantic search results', async () => {
+  it('shows explicitly related keyword results without writing a search index', async () => {
     window.PlasmaNotesApp.destroy();
-    const embeddings = new Map();
     window.OpenCourseDeck.AI = {
-      status: vi.fn(async () => ({ available: true })),
-      upsertEmbedding: vi.fn(async ({ id, text, metadata }) => {
-        embeddings.set(id, { id, text, metadata });
-      }),
-      searchEmbeddings: vi.fn(async () => [{ id: 'regular-note', score: 0.9 }]),
+      upsertEmbedding: vi.fn(),
+      searchEmbeddings: vi.fn(),
     };
-
     window.PlasmaNotesApp.init();
     const input = document.querySelector('[data-notes-search]');
-    input.value = 'memory';
+    input.value = 'regular';
     document.querySelector('[data-notes-semantic-search]').click();
-
-    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.searchEmbeddings).toHaveBeenCalledWith('memory', { limit: 25 }));
-    expect(window.OpenCourseDeck.AI.upsertEmbedding).toHaveBeenCalled();
-    expect(embeddings.get('regular-note').text).toContain('Regular note');
     const list = document.querySelector('[data-notes-list]');
+    await vi.waitFor(() => expect(document.querySelector('[data-notes-semantic-status]').textContent)
+      .toContain('Related notes: 1'));
     expect(list.textContent).toContain('Regular note');
     expect(list.textContent).not.toContain('Pinned note');
-    expect(document.querySelector('[data-notes-semantic-status]').textContent).toContain('Semantic results: 1');
+    expect(window.OpenCourseDeck.AI.upsertEmbedding).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.AI.searchEmbeddings).not.toHaveBeenCalled();
 
     document.querySelector('[data-notes-semantic-clear]').click();
     expect(list.textContent).toContain('Regular note');
     expect(list.textContent).toContain('Pinned note');
   });
+
 });
