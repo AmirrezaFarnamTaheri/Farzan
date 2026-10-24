@@ -1110,7 +1110,7 @@
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS, KEY_MIGRATED, MIGRATED_IDS_KEY];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
       if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_ai_settings');
-      if (includeAnnotations) localKeys.push('plasma-pdf-annotations');
+      if (includeAnnotations) localKeys.push('plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page');
       if (includePrefs) localKeys.push(
         'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
         'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
@@ -1147,7 +1147,7 @@
       if (scope === 'media') {
         return _deletionOutcome('clear-media', scope, [
           await _clearIdbStores(idb, ['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']),
-          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations'], 'localStorage'),
+          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page'], 'localStorage'),
         ]);
       }
       if (scope === 'playlists') {
