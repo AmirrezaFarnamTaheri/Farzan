@@ -342,6 +342,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const focusPosition = Number(focusTimestamp?.position ?? focusRecord?.position ?? 0) || 0;
   const focusTopicId = focusRecord?.topicId;
+  const focusProgress = focusTopicId
+    ? progress.filter(record => record?.topicId === focusTopicId)
+      .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0]
+    : null;
   const focusTopic = topicMap.get(focusTopicId);
   const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
   const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
