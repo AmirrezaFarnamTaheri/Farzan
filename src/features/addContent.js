@@ -13,7 +13,7 @@ function toast(type, message) {
   const T = window.OpenCourseDeck?.Toast;
   if (!T) return;
   const fn = T[type];
-  if (typeof fn === 'function') return fn(message);
+  if (typeof fn === 'function') return fn.call(T, message);
   T.show?.({ message, type });
 }
 
@@ -74,6 +74,7 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
 
   const body = document.createElement('form');
   body.noValidate = true;
+  body.id = `add-content-form-${Math.random().toString(36).slice(2)}`;
   const controls = fields.map((spec) => {
     const created = field(spec);
     body.appendChild(created.wrap);
@@ -88,6 +89,7 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   cancel.textContent = 'Cancel';
   const confirm = document.createElement('button');
   confirm.type = 'submit';
+  confirm.setAttribute('form', body.id);
   confirm.className = 'btn btn-primary';
   confirm.textContent = confirmLabel;
   footer.append(cancel, confirm);
