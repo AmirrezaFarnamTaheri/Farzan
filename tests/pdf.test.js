@@ -18,6 +18,19 @@ describe('PDF viewer safe messages', () => {
     await import('../pdf.js');
   });
 
+  it('returns a failure receipt when PDF.js cannot load a document', async () => {
+    const onError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await window.PlasmaPDFViewer.load('https://example.test/missing.pdf')).toBe(false);
+      globalThis.pdfjsLib = {
+        getDocument: vi.fn(() => ({ promise: Promise.reject(new Error('invalid PDF')) })),
+      };
+      expect(await window.PlasmaPDFViewer.load('https://example.test/invalid.pdf')).toBe(false);
+    } finally {
+      onError.mockRestore();
+    }
+  });
+
   it('renders no-match search text without executing HTML', () => {
     window.PlasmaPDFState.searchQuery = '<img src=x onerror="window.__pdfXss = true">';
     window.PlasmaPDFState.searchResults = [];
