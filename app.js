@@ -1039,12 +1039,12 @@ import { Pointer } from './src/lib/pointer.js';
       // Avoid rewriting every note into IndexedDB on every search keystroke:
       // indexing is not a user-query side effect. These are deliberately not
       // described as neural/semantic results or calibrated percentages.
-      const words = new Set(String(value || '').toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+      const words = new Set(String(value || '').toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
       if (words.size < 2) return [];
       const ranked = data.filter(item => item.sourceType === 'note' && item.sourceId)
         .map(item => {
           const terms = new Set(`${item.label || ''} ${item.searchText || item.description || ''}`
-            .toLocaleLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) || []);
+            .toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
           const shared = [...words].filter(word => terms.has(word)).length;
           return { item, shared };
         }).filter(row => row.shared > 0)
