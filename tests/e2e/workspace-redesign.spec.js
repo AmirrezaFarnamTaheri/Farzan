@@ -40,6 +40,15 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(page.locator('#courses-search')).toBeVisible();
   });
 
+  test('shows meaningful first-run progress guidance instead of empty charts', async ({ page }) => {
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-progress')).toBeVisible();
+    await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.locator('[data-progress-empty]')).toBeVisible();
+    await expect(page.locator('[data-progress-empty]')).toContainText('Start a lesson');
+    await expect(page.locator('#chart-overall')).toBeHidden();
+  });
+
   test('puts advanced Studio commands behind a discoverable disclosure', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
