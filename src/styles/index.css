@@ -19,6 +19,7 @@
 @import './settings-enhancements.css' layer(enhancements);
 @import './study-polish.css' layer(enhancements);
 @import './workspace.css' layer(enhancements);
+@import './farzan-redesign.css' layer(enhancements);
 
 @media (prefers-reduced-motion: reduce) {
   *,
