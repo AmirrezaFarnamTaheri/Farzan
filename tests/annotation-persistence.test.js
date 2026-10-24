@@ -105,3 +105,20 @@ describe('annotation persistence', () => {
     ])).rejects.toThrow(/does not belong to document doc-a/);
   });
 });
+
+describe('annotation transaction failure isolation', () => {
+  it('aborts a partially queued replacement when a later key is invalid', async () => {
+    const idb = new PlasmaDB('annotation-persistence-test', 1, [
+      { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }] },
+    ]);
+    await idb.put('annotations', { id: 'original', docId: 'doc-a', text: 'important' });
+    await expect(replaceDocumentAnnotations(idb, 'doc-a', [
+      { id: 'new-valid', docId: 'doc-a', text: 'new' },
+      { id: undefined, docId: 'doc-a', text: 'invalid key' },
+    ])).rejects.toThrow();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await idb.getAllByIndex('annotations', 'docId', 'doc-a')).toEqual([
+      expect.objectContaining({ id: 'original', text: 'important' }),
+    ]);
+  });
+});
