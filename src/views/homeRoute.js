@@ -343,8 +343,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const focusPosition = Number(focusTimestamp?.position ?? focusRecord?.position ?? 0) || 0;
   const focusTopicId = focusRecord?.topicId;
   const focusTopic = topicMap.get(focusTopicId);
-  const focusPercent = Math.max(0, Math.min(100, Number(latestProgress?.percent) || 0));
-  const focusTitle = focusTopic?.title || latestProgress?.topicTitle || latestTimestamp?.title || 'Choose a course';
+  const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
+  const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
   const focusDetail = focusRecord
     ? 'Continue from your last saved activity.'
     : 'Open a course to start tracking progress.';
@@ -354,8 +354,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-home-focus-status]', focusRecord ? 'Resume' : 'Start');
   setText('[data-home-focus-percent]', `${Math.round(focusPercent)}% complete`);
   setText('[data-home-focus-time]', focusPosition ? `Saved at ${formatDuration(focusPosition)}` : 'No saved position');
-  const focusProgress = document.querySelector('[data-home-focus-progress]');
-  if (focusProgress) focusProgress.style.width = `${focusPercent}%`;
+  const focusProgressBar = document.querySelector('[data-home-focus-progress]');
+  if (focusProgressBar) focusProgressBar.style.width = `${focusPercent}%`;
 
   const openFocus = () => {
     if (focusTopicId) {
