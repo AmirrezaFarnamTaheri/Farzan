@@ -1,3 +1,4 @@
+import { dueReviewCards } from '../core/studyMetrics.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
@@ -270,6 +271,13 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       readSaved('getAllNotes'),
       readSaved('getAllTimestamps'),
       (async () => {
+        if (typeof window.DB?.getSetting !== 'function') return [];
+        const cards = await window.DB.getSetting('ocd_flashcards');
+        if (cards == null) return [];
+        if (!Array.isArray(cards)) throw new TypeError('Saved flashcards are not a valid deck');
+        return cards;
+      })(),
+      (async () => {
         try {
           await window.DataStore?.init?.();
           return window.DataStore?.allTopics?.() ?? [];
@@ -302,7 +310,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     document.querySelector('[data-home-resume]')?.addEventListener('click', () => Router.navigate('#/courses'));
     return;
   }
-  const [progress, notes, timestamps, topics] = collections;
+  const [progress, notes, timestamps, flashcards, topics] = collections;
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
@@ -316,11 +324,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
   const completed = progress.filter(record => record?.status === 'done' || Number(record?.percent) >= 100);
   const active = progress.filter(record => record?.topicId && Number(record?.percent) > 0 && Number(record?.percent) < 100);
-  const reviewCutoff = 30 * 24 * 60 * 60 * 1000;
-  const dueReviews = completed
-    .map(record => ({ record, lastActivity: getRecordTime(record) }))
-    .filter(item => !item.lastActivity || Date.now() - item.lastActivity >= reviewCutoff)
-    .sort((a, b) => a.lastActivity - b.lastActivity);
+  const dueReviews = dueReviewCards(flashcards);
   const weekCutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
   const weeklyActivity = [...progress, ...notes, ...timestamps].filter(item => getRecordTime(item) >= weekCutoff).length;
   const measuredProgress = progress.map(item => Math.max(0, Math.min(100, Number(item?.percent) || 0)));
@@ -403,10 +407,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       id: 'review',
       icon: 'i-redo',
       label: 'Review',
-      title: topicMap.get(dueReview?.record?.topicId)?.title || dueReview?.record?.topicTitle || 'Nothing due',
-      detail: dueReview ? 'Review a completed topic.' : 'Nothing scheduled for review.',
-      action: dueReview ? 'review' : 'achievements',
-      topicId: dueReview?.record?.topicId,
+      title: dueReview?.front || 'Nothing due',
+      detail: dueReview ? `Review ${dueReviews.length} scheduled card${dueReviews.length === 1 ? '' : 's'}.` : 'Nothing scheduled for review.',
+      action: 'flashcards',
     },
     {
       id: 'recent',
@@ -464,6 +467,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       // without this branch they fell through to '#/notes' instead.
       if (widget.action === 'courses') {
         Router.navigate('#/courses');
+        return;
+      }
+      if (widget.action === 'flashcards') {
+        Router.navigate('#/flashcards');
         return;
       }
       Router.navigate(widget.action === 'achievements' ? '#/achievements' : '#/notes');
