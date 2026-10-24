@@ -48,6 +48,17 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
+      <section class="card card-filled" aria-labelledby="media-folder-heading">
+        <div class="card-body">
+          <h2 class="text-lg font-semibold" id="media-folder-heading">Keep a copy of your imported files</h2>
+          <p class="text-sm text-muted">The JSON backup includes notes, courses and saved study state, but not your PDF/video bytes. Export these files to a folder alongside your JSON backup. Restore the JSON first, then restore this media folder on the new device. Available in supported browsers with folder access.</p>
+          <div class="button-row">
+            <button class="btn btn-ghost btn-sm" type="button" data-backup-media-folder>Export media folder</button>
+            <button class="btn btn-ghost btn-sm" type="button" data-restore-media-folder>Restore media folder</button>
+          </div>
+          <p class="text-sm text-muted" data-media-backup-status role="status" aria-live="polite"></p>
+        </div>
+      </section>
       <section class="card card-filled" aria-label="Missing imported files" data-missing-library-section>
         <div class="card-body">
           <h2 class="text-lg font-semibold">Missing local files</h2>
@@ -61,6 +72,46 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
   document.querySelector('[data-my-courses-add]')?.addEventListener('click', () => {
     window.OpenCourseDeck?.AddContent?.openMenu?.();
   });
+
+  const backupStatus = document.querySelector('[data-media-backup-status]');
+  const chooseFolder = async (mode) => {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      throw new Error('Folder backup requires a browser with the File System Access API. Keep the original media and JSON backup in other browsers.');
+    }
+    return window.showDirectoryPicker({ mode });
+  };
+  const bindMediaAction = (selector, action) => {
+    const button = document.querySelector(selector);
+    button?.addEventListener('click', async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      if (backupStatus) backupStatus.textContent = action === 'export' ? 'Preparing media export…' : 'Reading media folder…';
+      try {
+        const directory = await chooseFolder(action === 'export' ? 'readwrite' : 'read');
+        const api = window.OpenCourseDeck?.UserLibrary;
+        if (action === 'export') {
+          if (typeof api?.exportMediaDirectory !== 'function') throw new Error('Media export unavailable');
+          const result = await api.exportMediaDirectory(directory);
+          if (backupStatus) backupStatus.textContent = `Exported ${result.files} local file(s). Keep this folder together with your portable JSON backup.`;
+          Toast?.success?.('Media export completed');
+        } else {
+          if (typeof api?.importMediaDirectory !== 'function') throw new Error('Media restore unavailable');
+          const result = await api.importMediaDirectory(directory);
+          if (backupStatus) backupStatus.textContent = `Restored ${result.restored} local file(s); ${result.skipped} did not need restoration or are not linked here.`;
+          Toast?.success?.('Media restore completed');
+          await renderMissingFiles();
+        }
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          const message = error?.message || 'Could not process media folder';
+          if (backupStatus) backupStatus.textContent = message;
+          Toast?.error?.(message);
+        } else if (backupStatus) backupStatus.textContent = 'Folder selection cancelled.';
+      } finally { button.disabled = false; }
+    });
+  };
+  bindMediaAction('[data-backup-media-folder]', 'export');
+  bindMediaAction('[data-restore-media-folder]', 'import');
 
   let savingCourse = false;
   document.querySelector('[data-my-course-save]')?.addEventListener('click', async (event) => {
