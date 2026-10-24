@@ -410,6 +410,53 @@ describe('flashcard canonical storage invariants', () => {
   });
 });
 
+describe('flashcard canonical read and due query safety', () => {
+  it('does not turn a failed canonical read into apparent empty or old local state', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    localStorage.setItem('ocd_flashcards', JSON.stringify([{
+      id: 'stale', front: 'Stale', back: 'Old', deck: 'Old', nextReviewDate: '2020-01-01',
+    }]));
+    window.DB = {
+      getSetting: vi.fn(async () => { throw new Error('canonical database unreadable'); }),
+      saveSetting: vi.fn(async () => true),
+    };
+    manager.invalidateCache();
+    await expect(manager.getCards()).rejects.toThrow('canonical database unreadable');
+    await expect(manager.addCard({ front: 'Another', back: 'Answer' }))
+      .rejects.toThrow('canonical database unreadable');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('does not accept a false acknowledged canonical card write', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => []),
+      saveSetting: vi.fn(async () => false),
+    };
+    manager.invalidateCache();
+    await expect(manager.addCard({ front: 'Uncommitted', back: 'Nope' }))
+      .rejects.toThrow(/not acknowledged|could not be saved/i);
+    expect(await manager.getCards()).toEqual([]);
+  });
+
+  it('hydrates the authoritative deck before asking for due cards', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => [{
+        id: 'due-from-db', front: 'Review', back: 'Due', deck: 'Science',
+        nextReviewDate: '2020-01-01',
+      }]),
+      saveSetting: vi.fn(async () => true),
+    };
+    manager.invalidateCache();
+    const cards = await manager.getDueCards();
+    expect(cards.map(card => card.id)).toEqual(['due-from-db']);
+  });
+});
+
 describe('flashcard durable-save failures', () => {
   it('rejects a card mutation and preserves memory when both stores cannot save', async () => {
     const manager = window.OpenCourseDeck.Flashcards.manager;
