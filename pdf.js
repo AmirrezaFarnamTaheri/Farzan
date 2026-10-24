@@ -240,7 +240,7 @@
       if (typeof pdfjsLib === 'undefined') {
         console.error('[OpenCourseDeck PDF] PDF.js not loaded. Add pdfjs-dist script.');
         this._showError('PDF.js library not loaded.');
-        return;
+        return false;
       }
 
       this._showLoading(true);
@@ -282,7 +282,7 @@
         // was loading; discard it instead of clobbering the current viewer.
         if (loadToken !== State.loadToken) {
           try { pdfDoc?.destroy?.(); } catch {}
-          return;
+          return false;
         }
         State.pdfDoc    = pdfDoc;
         State.totalPages = State.pdfDoc.numPages;
@@ -309,12 +309,19 @@
           pages: State.totalPages,
           source: typeof source === 'string' ? source : '[file]',
         });
+        return true;
       } catch (err) {
+        // Keep the legacy viewer error overlay, but also return an explicit
+        // failure receipt so route navigation retains the original request.
         console.error('[OpenCourseDeck PDF] Load error:', err);
         this._showError(`Failed to load PDF: ${err.message}`);
+        return false;
       } finally {
-        if (loadToken === State.loadToken) State.loadingTask = null;
-        this._showLoading(false);
+        // A stale request must not hide the loading state of its replacement.
+        if (loadToken === State.loadToken) {
+          State.loadingTask = null;
+          this._showLoading(false);
+        }
       }
     },
 
