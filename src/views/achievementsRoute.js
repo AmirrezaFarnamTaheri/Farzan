@@ -1,3 +1,4 @@
+import { dueReviewCards, watchedCoverageSeconds } from '../core/studyMetrics.js';
 import { ProceduralTrophy } from '../features/proceduralTrophy.js';
 
 export function mountAchievementsView(deps = {}) {
@@ -43,7 +44,7 @@ export function mountAchievementsView(deps = {}) {
     const reviewRoot = document.querySelector('[data-review-list]');
     if (!metricsRoot || !listRoot) return;
 
-    const [progress, notes, timestamps, topics] = await Promise.all([
+    const [progress, notes, timestamps, topics, watchedSegments, cards] = await Promise.all([
       (async () => { try { return await window.DB?.getAllProgress?.() ?? []; } catch { return []; } })(),
       (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
       (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
@@ -55,6 +56,14 @@ export function mountAchievementsView(deps = {}) {
           return [];
         }
       })(),
+      (async () => {
+        try { return await window.DB?.getAllWatchedSegments?.() ?? []; }
+        catch { return []; }
+      })(),
+      (async () => {
+        try { return await window.DB?.getSetting?.('ocd_flashcards') ?? []; }
+        catch { return []; }
+      })(),
     ]);
     if (!document.body.contains(listRoot)) return;
 
@@ -62,33 +71,9 @@ export function mountAchievementsView(deps = {}) {
     const progressByTopic = new Map(progress.map(record => [record.topicId, record]));
     const doneRecords = progress.filter(record => record.status === 'done' || Number(record.percent) >= 100);
     const activeRecords = progress.filter(record => Number(record.percent) > 0 || Number(record.position) > 0 || record.status === 'in-progress');
-    const watchedSeconds = progress.reduce((sum, record) => sum + Math.max(0, Number(record.position) || 0), 0);
+    const watchedSeconds = watchedCoverageSeconds(watchedSegments);
     const courseIds = new Set(topics.map(topic => topic.courseId).filter(Boolean));
-    const now = Date.now();
-    const reviewWindowMs = 30 * 24 * 60 * 60 * 1000;
-    const activityTimesForTopic = (topicId, progressRecord) => [
-      progressRecord?.reviewedAt,
-      progressRecord?.updatedAt,
-      progressRecord?.completedAt,
-      ...timestamps.filter(item => item?.topicId === topicId).map(item => item.updatedAt || item.createdAt),
-      ...notes.filter(item => item?.topicId === topicId).map(item => item.updatedAt || item.createdAt),
-    ].map(value => Number(value) || 0);
-    const reviewItems = doneRecords
-      .map(record => {
-        const topic = topicMap.get(record.topicId);
-        const lastActivity = Math.max(...activityTimesForTopic(record.topicId, record), 0);
-        return {
-          topicId: record.topicId,
-          courseId: record.courseId || topic?.courseId,
-          title: topic?.title || record.topicTitle || record.topicId || 'Completed topic',
-          courseTitle: topic?.courseTitle || record.courseTitle || record.courseId || topic?.courseId || 'Course',
-          lastActivity,
-          daysSince: lastActivity ? Math.floor((now - lastActivity) / (24 * 60 * 60 * 1000)) : null,
-        };
-      })
-      .filter(item => item.topicId && (!item.lastActivity || now - item.lastActivity >= reviewWindowMs))
-      .sort((a, b) => (a.lastActivity || 0) - (b.lastActivity || 0))
-      .slice(0, 6);
+    const reviewItems = dueReviewCards(cards).slice(0, 6);
     let completedCourses = 0;
     courseIds.forEach(courseId => {
       const courseTopics = topics.filter(topic => topic.courseId === courseId);
@@ -104,7 +89,7 @@ export function mountAchievementsView(deps = {}) {
       ['Touched topics', activeRecords.length],
       ['Done topics', doneRecords.length],
       ['Completed courses', completedCourses],
-      ['Watched minutes', Math.round(watchedSeconds / 60)],
+      ['Tracked coverage minutes', Math.round(watchedSeconds / 60)],
       ['Due reviews', reviewItems.length],
     ];
 
@@ -123,7 +108,7 @@ export function mountAchievementsView(deps = {}) {
     const achievementsList = [
       { id: 'first-step', title: 'First Step', detail: 'Start any topic.', unlocked: activeRecords.length >= 1 },
       { id: 'first-finish', title: 'First Finish', detail: 'Complete one topic.', unlocked: doneRecords.length >= 1 },
-      { id: 'deep-focus', title: 'Deep Focus', detail: 'Watch at least 30 minutes.', unlocked: watchedSeconds >= 1800 },
+      { id: 'deep-focus', title: 'Deep Focus', detail: 'Track 30 minutes of watched video coverage.', unlocked: watchedSeconds >= 1800 },
       { id: 'course-complete', title: 'Course Complete', detail: 'Finish every topic in a course.', unlocked: completedCourses >= 1 },
       { id: 'collector', title: 'Collector', detail: 'Make progress on 10 topics.', unlocked: activeRecords.length >= 10 },
       { id: 'catalog-roamer', title: 'Catalog Roamer', detail: 'Touch topics from three courses.', unlocked: new Set(activeRecords.map(record => record.courseId || topicMap.get(record.topicId)?.courseId).filter(Boolean)).size >= 3 },
@@ -171,38 +156,37 @@ export function mountAchievementsView(deps = {}) {
     if (!reviewItems.length) {
       const empty = document.createElement('p');
       empty.className = 'text-muted';
-      empty.textContent = 'No completed topics are due for review yet.';
+      empty.textContent = 'No flashcards are due for review today.';
       reviewRoot.appendChild(empty);
       return;
     }
     reviewItems.forEach(item => {
       const card = document.createElement('article');
       card.className = 'card';
-      card.dataset.reviewTopicId = item.topicId;
+      card.dataset.reviewCardId = item.id;
       const body = document.createElement('div');
       body.className = 'card-body';
       const badge = document.createElement('span');
       badge.className = 'badge badge-warning';
-      badge.textContent = item.daysSince == null ? 'Review' : `${item.daysSince} days`;
+      badge.textContent = item.deck || 'Flashcard';
       const title = document.createElement('h2');
       title.className = 'h4';
-      title.textContent = item.title;
+      title.textContent = item.front || 'Review card';
       const detail = document.createElement('p');
-      detail.textContent = `Revisit notes and media from ${item.courseTitle}.`;
+      detail.textContent = 'Recall the answer in Review.';
       const action = document.createElement('button');
       action.className = 'btn btn-ghost';
       action.type = 'button';
-      action.dataset.reviewTopic = item.topicId;
+      action.dataset.reviewCard = item.id;
       action.textContent = 'Review';
       body.append(badge, title, detail, action);
       card.appendChild(body);
       reviewRoot.appendChild(card);
     });
     reviewRoot.onclick = (event) => {
-      const button = event.target?.closest?.('[data-review-topic]');
+      const button = event.target?.closest?.('[data-review-card]');
       if (!button) return;
-      setPendingCourseMedia(button.dataset.reviewTopic);
-      Router.navigate('#/courses');
+      Router.navigate('#/flashcards');
     };
   }
 }
