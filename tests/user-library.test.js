@@ -10,6 +10,9 @@ import {
   initUserLibrary,
   isSafeRemoteUrl,
   loadLibrary,
+  listLibraryFileReferences,
+  listMissingLibraryFiles,
+  relinkLibraryFile,
   overlayLibrary,
   putLibraryFile,
   removeCourse,
@@ -267,5 +270,33 @@ describe('user library overlay', () => {
     const library = await loadLibrary();
     expect(Object.keys(library.courses)).toEqual([created.id]);
     expect(library.courses[created.id].title).toBe('Anatomy review');
+  });
+});
+
+describe('identity-preserving recovery of missing local assets', () => {
+  it('detects missing imported media and relinks new bytes to the same source reference', async () => {
+    vi.stubGlobal('indexedDB', indexedDB);
+    const values = {};
+    window.DB = {
+      getSetting: vi.fn(async key => values[key] ?? null),
+      saveSetting: vi.fn(async (key, value) => { values[key] = value; return value; }),
+    };
+    window.OpenCourseDeck = { bus: { emit: vi.fn(), on: vi.fn() } };
+    const course = await upsertCourse({ title: 'Recoverable course' });
+    const file = new File(['%PDF-1.4'], 'original.pdf', { type: 'application/pdf' });
+    await addPdfFile(file, { courseId: course.id });
+    const before = await loadLibrary();
+    const ref = before.courses[course.id].sources[0].topics[0].pdfs[0].url;
+
+    expect((await listLibraryFileReferences()).some(item => item.ref === ref)).toBe(true);
+    await clearLibraryFiles();
+    const missing = await listMissingLibraryFiles();
+    expect(missing).toEqual(expect.arrayContaining([expect.objectContaining({ ref, courseId: course.id })]));
+
+    await relinkLibraryFile(ref, new File(['%PDF-1.4 relinked'], 'replacement.pdf', { type: 'application/pdf' }));
+    expect((await listMissingLibraryFiles()).some(item => item.ref === ref)).toBe(false);
+    const after = await loadLibrary();
+    expect(after.courses[course.id].sources[0].topics[0].pdfs[0].url).toBe(ref);
+    expect(await resolveMediaUrl(ref)).toMatch(/^blob:/);
   });
 });
