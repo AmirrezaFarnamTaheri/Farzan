@@ -605,7 +605,7 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
         } catch (rollbackError) {
           throw new AggregateError([error, rollbackError],
             'Topic move failed and could not restore the original course mapping',
-            { cause: error });
+            { cause: rollbackError });
         }
         throw error;
       }
