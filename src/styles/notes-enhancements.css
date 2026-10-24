@@ -520,13 +520,15 @@
   /* Keep the document editor discoverable above the fold on small phones,
      without making folders or the saved-note list inaccessible. */
   .notes-sidebar {
-    max-height: min(290px, 38dvh);
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
     overscroll-behavior: contain;
   }
 
   .notes-list {
-    max-height: 140px;
+    max-height: min(240px, 34dvh);
+    min-height: 112px;
+    overflow-y: auto;
   }
 
   .notes-header-actions {
@@ -542,8 +544,8 @@
   }
 
   .notes-export-popover {
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
     width: min(280px, calc(100vw - 32px));
   }
 
