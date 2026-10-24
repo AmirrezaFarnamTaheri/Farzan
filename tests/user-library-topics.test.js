@@ -30,6 +30,33 @@ describe('canonical course/topic editing', () => {
     });
   });
 
+  it('moves saved progress to the new course while preserving playback position', async () => {
+    const from = await library.upsertCourse({ title: 'Started course' });
+    const to = await library.upsertCourse({ title: 'Destination' });
+    const topic = await library.addTopic({ courseId: from.id, title: 'Started topic' });
+    let progress = { topicId: topic.topicId, courseId: from.id, position: 340, status: 'in-progress' };
+    window.DB.getProgress = vi.fn(async () => progress);
+    window.DB.saveProgress = vi.fn(async (topicId, courseId, fields) => {
+      progress = { ...fields, topicId, courseId };
+      return progress;
+    });
+    await library.moveTopic({ topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id });
+    expect(progress).toMatchObject({ topicId: topic.topicId, courseId: to.id, position: 340, status: 'in-progress' });
+  });
+
+  it('compensates a canonical topic move when the progress migration fails', async () => {
+    const from = await library.upsertCourse({ title: 'Source' });
+    const to = await library.upsertCourse({ title: 'Destination' });
+    const topic = await library.addTopic({ courseId: from.id, title: 'Protected topic' });
+    window.DB.getProgress = vi.fn(async () => ({ topicId: topic.topicId, courseId: from.id, position: 15 }));
+    window.DB.saveProgress = vi.fn(async () => { throw new Error('progress storage is full'); });
+    await expect(library.moveTopic({ topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id }))
+      .rejects.toThrow('progress storage is full');
+    const state = await library.loadLibrary();
+    expect(state.courses[from.id].sources[0].topics.map(item => item.url)).toEqual([topic.topicId]);
+    expect(state.courses[to.id].sources[0].topics).toHaveLength(0);
+  });
+
   it('rejects a missing target without losing the source topic', async () => {
     const first = await library.upsertCourse({ title: 'First' });
     const topic = await library.addTopic({ courseId: first.id, title: 'Keep' });
