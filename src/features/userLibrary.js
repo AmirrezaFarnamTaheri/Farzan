@@ -480,6 +480,108 @@ export async function upsertCourse({ id, title, description = '' } = {}) {
   });
 }
 
+/**
+ * Promote outlines from the old independent My Courses setting, but ONLY when
+ * no canonical user library has ever been stored. The caller must establish
+ * that the canonical setting is absent, not merely empty: an empty canonical
+ * library can mean that the user intentionally deleted their last course.
+ * The entire batch commits in one settings write, avoiding partial migration.
+ */
+export async function migrateLegacyCourses(records) {
+  if (!Array.isArray(records)) throw new TypeError('Legacy courses must be an array');
+  return mutateLibrary(async library => {
+    if (Object.keys(library.courses).length) {
+      return { migrated: 0, courses: Object.keys(library.courses).length };
+    }
+    let migrated = 0;
+    for (const record of records) {
+      if (!record || typeof record !== 'object') continue;
+      const id = String(record.id || '').trim();
+      const title = String(record.title || '').trim().slice(0, 120);
+      // Avoid reserved prototype properties and malformed course identifiers.
+      if (!/^[a-z0-9_-]{1,160}$/i.test(id) || !title || id === DEFAULT_COURSE_ID) continue;
+      const course = ensureCourse(library, {
+        id, title,
+        description: String(record.description || '').trim().slice(0, 600),
+        overwriteTitle: true,
+      });
+      if (Number.isFinite(record.createdAt)) course.createdAt = record.createdAt;
+      if (Number.isFinite(record.updatedAt)) course.updatedAt = record.updatedAt;
+      migrated += 1;
+    }
+    if (migrated) await persistLibrary(library, { migratedLegacyCourses: migrated });
+    return { migrated, courses: Object.keys(library.courses).length };
+  });
+}
+
+export async function updateCourse({ id, title, description } = {}) {
+  const courseId = String(id || '').trim();
+  if (!courseId || courseId === DEFAULT_COURSE_ID) throw new TypeError('A personal course ID is required');
+  const nextTitle = String(title ?? '').trim();
+  if (!nextTitle) throw new TypeError('Course title is required');
+  return mutateLibrary(async library => {
+    const course = library.courses[courseId];
+    if (!course || typeof course !== 'object') throw new Error('Course does not exist');
+    course.title = nextTitle.slice(0, 120);
+    if (description !== undefined) course.description = String(description || '').trim().slice(0, 600);
+    course.updatedAt = Date.now();
+    await persistLibrary(library, { courseId });
+    return { id: courseId, title: course.title, description: course.description };
+  });
+}
+
+/** Change only a topic title; its saved URL/source identity remains unchanged. */
+export async function renameTopic({ courseId, topicId, title } = {}) {
+  const label = String(title || '').trim();
+  if (!label) throw new TypeError('Topic title is required');
+  return mutateLibrary(async library => {
+    const course = library.courses[String(courseId || '')];
+    if (!course) throw new Error('Source course does not exist');
+    const topic = (course.sources || []).flatMap(source => source.topics || [])
+      .find(item => String(item.url || item.id) === String(topicId));
+    if (!topic) throw new Error('Topic was not found in the source course');
+    topic.title = label.slice(0, 200);
+    course.updatedAt = Date.now();
+    await persistLibrary(library, { courseId, topicId });
+    return { courseId, topicId, title: topic.title };
+  });
+}
+
+/**
+ * Move a topic within one canonical library transaction. Keep its topic URL
+ * and all media refs intact; no copied topic or orphaned attachments.
+ */
+export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
+  const fromId = String(fromCourseId || '');
+  const toId = String(toCourseId || '');
+  const id = String(topicId || '');
+  if (!fromId || !toId || !id) throw new TypeError('Both courses and a topic are required');
+  return mutateLibrary(async library => {
+    const from = library.courses[fromId];
+    const to = library.courses[toId];
+    if (!from || typeof from !== 'object') throw new Error('Source course does not exist');
+    if (!to || typeof to !== 'object') throw new Error('Destination course does not exist');
+    let origin = null;
+    let index = -1;
+    for (const section of from.sources || []) {
+      const topics = section?.topics || [];
+      index = topics.findIndex(topic => String(topic.url || topic.id) === id);
+      if (index !== -1) { origin = topics; break; }
+    }
+    if (!origin) throw new Error('Topic was not found in the source course');
+    if (fromId === toId) return { topicId: id, courseId: toId };
+    const duplicate = (to.sources || []).some(section =>
+      (section.topics || []).some(topic => String(topic.url || topic.id) === id));
+    if (duplicate) throw new Error('Destination already contains this topic');
+    const [record] = origin.splice(index, 1);
+    courseTopics(to).push(record);
+    from.updatedAt = Date.now();
+    to.updatedAt = Date.now();
+    await persistLibrary(library, { topicId: id, fromCourseId: fromId, courseId: toId });
+    return { topicId: id, courseId: toId };
+  });
+}
+
 export async function removeCourse(courseId) {
   return mutateLibrary(async (library) => {
     const course = library.courses[courseId];
@@ -602,8 +704,12 @@ export function initUserLibrary(root = window) {
     load: loadLibrary,
     overlay: overlayFromStorage,
     upsertCourse,
+    updateCourse,
+    migrateLegacyCourses,
     removeCourse,
     addTopic,
+    renameTopic,
+    moveTopic,
     addVideoFile,
     addPdfFile,
     addMediaFiles,
