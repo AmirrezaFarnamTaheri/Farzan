@@ -117,7 +117,7 @@ describe('notes route filters', () => {
         <button data-notes-semantic-search hidden>Semantic search</button>
         <button data-notes-semantic-clear hidden>Clear semantic</button>
         <div data-notes-semantic-status></div>
-        <div data-notes-toolbar><button data-ai-summarize hidden>Summarize note</button></div>
+        <div data-notes-toolbar><button data-ai-summarize hidden>Summarize note</button></div><button data-notes-remote-images>Load external images</button>
         <article data-notes-editor></article>
       </div>
     `;
@@ -129,6 +129,7 @@ describe('notes route filters', () => {
     window.PlasmaNotesApp?.destroy?.();
     vi.useRealTimers();
     localStorage.clear();
+    sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
   it('extracts list excerpts without parsing note HTML into the live document', () => {
