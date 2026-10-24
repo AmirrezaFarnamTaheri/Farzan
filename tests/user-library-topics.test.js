@@ -13,6 +13,25 @@ describe('canonical course/topic editing', () => {
     window.OpenCourseDeck = { bus: { emit: vi.fn() } };
   });
 
+  it('rejects inherited prototype names as explicit course identities', async () => {
+    await expect(library.upsertCourse({ id: '__proto__', title: 'Injected' }))
+      .rejects.toThrow(/invalid|reserved|unsafe/i);
+    await expect(library.upsertCourse({ id: 'constructor', title: 'Injected' }))
+      .rejects.toThrow(/invalid|reserved|unsafe/i);
+    await expect(library.addTopic({ courseId: 'toString', title: 'Injected' }))
+      .rejects.toThrow(/invalid|reserved|unsafe|no longer exists/i);
+    const state = await library.loadLibrary();
+    expect(Object.keys(state.courses)).toEqual([]);
+  });
+
+  it('never auto-migrates a legacy outline if a canonical empty library exists', async () => {
+    const created = await library.upsertCourse({ title: 'Removed' });
+    await library.removeCourse(created.id);
+    await library.migrateLegacyCourses([{ id: created.id, title: 'Removed' }]);
+    const data = await library.loadLibrary();
+    expect(Object.keys(data.courses)).toEqual([]);
+  });
+
   it('moves only the selected user topic, preserving its URL and resource references', async () => {
     const first = await library.upsertCourse({ title: 'First' });
     const second = await library.upsertCourse({ title: 'Second' });
