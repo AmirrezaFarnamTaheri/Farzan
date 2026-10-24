@@ -294,6 +294,84 @@ function collectLibraryFileIds(course, into = new Set()) {
   return into;
 }
 
+/**
+ * List imported-asset references without copying large Blob data. The source
+ * identifier belongs to the course/topic and survives metadata-only backups.
+ */
+export async function listLibraryFileReferences(library = null) {
+  const source = library || await loadLibrary();
+  const references = new Map();
+  for (const [courseId, course] of Object.entries(source.courses || {})) {
+    for (const section of course.sources || []) {
+      for (const topic of section.topics || []) {
+        for (const [field, kind] of [['videos', 'video'], ['pdfs', 'pdf'], ['iframes', 'embed']]) {
+          for (const media of topic[field] || []) {
+            const ref = unwrapMediaRef(media);
+            if (!ref.startsWith(FILE_PREFIX)) continue;
+            if (!references.has(ref)) {
+              references.set(ref, {
+                id: ref.slice(FILE_PREFIX.length),
+                ref,
+                kind,
+                courseId,
+                courseTitle: course.title || courseId,
+                topicTitle: topic.title || 'Untitled topic',
+                label: media?.label || topic.title || 'Local file',
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  return [...references.values()];
+}
+
+/** Missing bytes are not treated as a missing course or a new source ID. */
+export async function listMissingLibraryFiles() {
+  const references = await listLibraryFileReferences();
+  if (!references.length) return [];
+  const keys = await withFileStore('readonly', store => store.getAllKeys(), { required: true });
+  const available = new Set(keys || []);
+  return references.filter(item => !available.has(item.id));
+}
+
+/**
+ * Reattach a user-chosen file to an existing source ID without changing notes,
+ * annotations, course membership, progress or bookmark references.
+ */
+export async function relinkLibraryFile(reference, file) {
+  const ref = unwrapMediaRef(reference);
+  const existing = (await listLibraryFileReferences()).find(item => item.ref === ref);
+  if (!existing) throw new Error('This file reference is no longer in your library');
+  if (!file) throw new TypeError('Choose a replacement file');
+  const size = Math.max(0, Number(file.size) || 0);
+  if (size > MAX_LIBRARY_FILE_BYTES) throw new Error('Replacement file exceeds the local library size limit');
+  const name = String(file.name || existing.label).slice(0, 200);
+  const type = String(file.type || (existing.kind === 'pdf' ? 'application/pdf' : 'application/octet-stream'));
+  if (existing.kind === 'pdf' && !/\.pdf$/i.test(name) && type !== 'application/pdf') {
+    throw new TypeError('Choose a PDF to relink this PDF source');
+  }
+  if (existing.kind === 'video' && !/\.(mp4|webm|ogg|ogv|mov|m4v|avi|mkv)$/i.test(name)
+      && !type.startsWith('video/')) {
+    throw new TypeError('Choose a video to relink this video source');
+  }
+  const blob = file instanceof Blob ? file : new Blob([file], { type });
+  const record = {
+    id: existing.id, name, type, size: size || blob.size || 0,
+    kind: existing.kind, createdAt: Date.now(), blob,
+  };
+  if (record.size && record.size <= BYTES_FALLBACK_MAX) {
+    record.bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+  }
+  await withFileStore('readwrite', store => store.put(record), { required: true });
+  // Revoke only after a committed replacement so the old viewer remains usable
+  // on failed writes.
+  revokeCachedUrl(existing.id);
+  window.OpenCourseDeck?.bus?.emit?.('library:file-relinked', { ref, courseId: existing.courseId });
+  return { ref, id: existing.id, courseId: existing.courseId, name };
+}
+
 async function deleteLibraryFile(id) {
   if (!id) return;
   revokeCachedUrl(id);
@@ -525,6 +603,9 @@ export function initUserLibrary(root = window) {
     addMediaFiles,
     addRemoteLink,
     putLibraryFile,
+    listFileReferences: listLibraryFileReferences,
+    listMissingFiles: listMissingLibraryFiles,
+    relinkFile: relinkLibraryFile,
     clearLibraryFiles,
     revokeCachedUrl,
   };
