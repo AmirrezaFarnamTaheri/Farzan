@@ -817,3 +817,33 @@ input[type="file"][hidden] {
   .sidebar, .topbar, .home-hero, .home-focus-panel { forced-color-adjust: auto; border: 1px solid CanvasText; }
   .nav-item.active { outline: 2px solid Highlight; }
 }
+
+/* Real first-run guidance belongs where empty charts used to be. */
+.progress-chart-frame canvas[hidden] { display: none !important; }
+.progress-chart-empty[data-progress-empty] {
+  min-height: 225px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  margin: 0;
+  text-align: center;
+  color: var(--fz-muted);
+  line-height: 1.55;
+  border: 1px dashed var(--fz-line);
+  border-radius: 12px;
+  background: var(--fz-page);
+}
+.progress-chart-empty[data-progress-empty] p { margin: 0; }
+.progress-chart-empty[data-progress-empty] .btn { min-height: 42px; }
+
+/* Make the writing board match the chosen study surface rather than the
+   permanent opaque purple rectangle that was visible in the report. */
+[data-theme="light"], [data-theme="paper"] { --canvas-bg: #f8fafc; }
+[data-theme="dark"], [data-theme="midnight"],
+[data-theme="forest"], [data-theme="ocean"],
+[data-theme="sunset"], [data-theme="rose"] { --canvas-bg: var(--surface); }
+.view-studio .studio-canvas-card { background: var(--canvas-bg, var(--surface)); }
+.view-studio .studio-canvas { background: var(--canvas-bg, var(--surface)); }
