@@ -280,7 +280,7 @@ jobs:
             Includes the production website, offline worker and independent NSIS installer, with SHA-256 checksums.
             Visual release acceptance verifies 15 routes across desktop, tablet, mobile and light mode,
             actual saved notes, PDF, flashcards, progress, video/bookmarks, search and Studio persistence.
-            Download the visual evidence ZIP for 308 genuine Chrome screenshots, 24 review contact sheets, browser observations, and image SHA-256 manifest.
+            Download the visual evidence ZIP for 476 genuine Chrome screenshots in 35 review groups, browser observations, and the image SHA-256 manifest.
             Extract the ZIP and serve it over HTTP(S). External video and PDF hosts are not mirrored.
             This edition is bundled in the main Farzan source but distributed through a distinct edition release channel. Edition version 1.0.5 is independent of the underlying Tauri application version.
           files: |
@@ -349,7 +349,9 @@ jobs:
 
   publish-pages:
     name: Publish Plasmato Edition web application
-    needs: build-and-verify
+    # Do not deploy an edition website before the Windows installer AND
+    # published immutable release assets have passed remote digest checks.
+    needs: verify-published-release
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.ENABLE_PLASMATO_PAGES == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
