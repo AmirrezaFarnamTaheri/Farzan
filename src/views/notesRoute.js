@@ -156,7 +156,10 @@ export function mountNotesView({ setView } = {}) {
 
           <footer class="notes-footer">
             <div class="notes-tags" data-tags-cloud aria-label="Note tags"></div>
-            <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally on this device</span>
+            <div class="button-row" style="gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" type="button" data-notes-remote-images aria-pressed="false" title="May contact third-party servers and share your IP address">Load external images</button>
+              <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally; external images blocked by default</span>
+            </div>
           </footer>
         </main>
       </div>
