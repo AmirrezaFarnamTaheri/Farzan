@@ -421,6 +421,9 @@ describe('app shell resilience helpers', () => {
       getAllTimestamps: vi.fn(async () => [
         { id: 'ts-1', topicId: 'topic-current', title: 'Checkpoint', position: 125, updatedAt: recentActivity },
       ]),
+      getSetting: vi.fn(async key => key === 'ocd_flashcards'
+        ? [{ id: 'card-old', front: 'Old physiology', deck: 'Physiology', nextReviewDate: '2026-05-04' }]
+        : null),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -440,8 +443,7 @@ describe('app shell resilience helpers', () => {
     expect(view.querySelector('[data-home-widget="recent"]').textContent).toContain('Fresh ECG insight');
 
     view.querySelector('[data-home-widget="review"]').click();
-    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-old');
-    expect(window.location.hash).toBe('#/courses');
+    expect(window.location.hash).toBe('#/flashcards');
   });
 
   it('saves and deletes custom courses from My Courses storage', async () => {
@@ -1695,45 +1697,36 @@ describe('app shell resilience helpers', () => {
     expect(view.textContent).toContain('Touched topics');
     expect(view.textContent).toContain('Completed courses');
     expect(view.querySelector('[data-achievement-id="first-finish"]').dataset.achievementState).toBe('unlocked');
-    expect(view.querySelector('[data-achievement-id="deep-focus"]').dataset.achievementState).toBe('unlocked');
+    expect(view.querySelector('[data-achievement-id="deep-focus"]').dataset.achievementState).toBe('locked'); // A seek is not tracked watched time.
     expect(view.querySelector('[data-achievement-id="course-complete"]').dataset.achievementState).toBe('unlocked');
     expect(view.querySelector('[data-achievement-id="collector"]').dataset.achievementState).toBe('locked');
   });
 
-  it('surfaces completed topics that are due for review', async () => {
+  it('surfaces only scheduled flashcards in the review queue', async () => {
     vi.setSystemTime(new Date('2026-05-05T00:00:00Z'));
     await loadApp();
-    const oldActivity = new Date('2026-03-01T00:00:00Z').getTime();
-    const recentActivity = new Date('2026-05-01T00:00:00Z').getTime();
     window.DB = {
-      getAllProgress: vi.fn(async () => [
-        { topicId: 'topic-old', courseId: 'course-1', status: 'done', percent: 100, updatedAt: oldActivity },
-        { topicId: 'topic-recent', courseId: 'course-1', status: 'done', percent: 100, updatedAt: recentActivity },
-      ]),
-      getAllNotes: vi.fn(async () => [
-        { id: 'note-recent', topicId: 'topic-recent', updatedAt: recentActivity },
-      ]),
+      getAllProgress: vi.fn(async () => [{ topicId: 'topic-old', courseId: 'course-1', status: 'done', percent: 100 }]),
+      getAllNotes: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
+      getSetting: vi.fn(async key => key === 'ocd_flashcards'
+        ? [
+          { id: 'card-due', front: 'Old physiology', deck: 'Physiology', nextReviewDate: '2026-03-01' },
+          { id: 'card-later', front: 'Recent physiology', nextReviewDate: '2026-08-01' },
+        ] : null),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
-      allTopics: vi.fn(() => [
-        { topicId: 'topic-old', courseId: 'course-1', title: 'Old physiology', courseTitle: 'Physiology' },
-        { topicId: 'topic-recent', courseId: 'course-1', title: 'Recent physiology', courseTitle: 'Physiology' },
-      ]),
+      allTopics: vi.fn(() => [{ topicId: 'topic-old', courseId: 'course-1', title: 'Old physiology' }]),
     };
-
     await window.OpenCourseDeck.Views.achievements();
-
-    await vi.waitFor(() => expect(document.querySelector('[data-review-topic-id="topic-old"]')).toBeTruthy());
+    await vi.waitFor(() => expect(document.querySelector('[data-review-card-id="card-due"]')).toBeTruthy());
     const view = document.querySelector('#view-container .view-achievements');
     expect(view.textContent).toContain('Due reviews');
-    expect(view.querySelector('[data-review-topic-id="topic-old"]').textContent).toContain('Old physiology');
-    expect(view.querySelector('[data-review-topic-id="topic-recent"]')).toBeNull();
-
-    view.querySelector('[data-review-topic="topic-old"]').click();
-    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-old');
-    expect(window.location.hash).toBe('#/courses');
+    expect(view.querySelector('[data-review-card-id="card-due"]').textContent).toContain('Old physiology');
+    expect(view.querySelector('[data-review-card-id="card-later"]')).toBeNull();
+    view.querySelector('[data-review-card="card-due"]').click();
+    expect(window.location.hash).toBe('#/flashcards');
   });
 
   it('sends falsy API request bodies instead of dropping them', async () => {
