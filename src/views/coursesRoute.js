@@ -59,23 +59,18 @@ export async function mountCoursesView(deps = {}) {
         </aside>
 
         <main class="courses-main">
-          <div id="course-detail" class="course-detail">
-            <div class="card card-filled catalog-placeholder">
-              <div class="card-body catalog-empty">
-                <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
-                <strong>Select a course</strong>
-                <p>Select a course on the left. Add a video or PDF anytime from the plus menu.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="card card-filled mt-3">
+          <section class="course-session" data-course-playback hidden aria-label="Currently playing lesson">
+            <header class="course-session-head">
+              <span class="course-session-label">Now studying</span>
+              <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
+            </header>
+          <div class="card card-filled course-session-player">
             <div class="card-body">
               <div id="course-player" data-player data-player-options='{"type":"video","autoplay":false,"controls":true,"theme":"dark"}'></div>
             </div>
           </div>
 
-          <div class="card card-filled timestamp-note-card mt-3">
+          <div class="card card-filled timestamp-note-card">
             <div class="card-body">
               <div class="timestamp-note-grid">
                 <div class="timestamp-note-copy">
@@ -110,10 +105,23 @@ export async function mountCoursesView(deps = {}) {
                     <div class="learning-marker-list" data-learning-marker-list></div>
                     <div class="timestamp-note-status" data-learning-marker-status aria-live="polite"></div>
                   </div>
+                  </details>
                 </div>
               </div>
             </div>
           </div>
+          </section>
+
+          <div id="course-detail" class="course-detail">
+            <div class="card card-filled catalog-placeholder">
+              <div class="card-body catalog-empty">
+                <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
+                <strong>Select a course</strong>
+                <p data-course-empty-guidance>Select a course to browse lessons and resources. The player opens only when you choose a video.</p>
+              </div>
+            </div>
+          </div>
+
         </main>
       </div>
     </section>
@@ -136,6 +144,16 @@ export async function mountCoursesView(deps = {}) {
   const detailEl = document.getElementById('course-detail');
   let playerEl = document.getElementById('course-player');
   playerEl = window.OpenCourseDeck?.MiniPlayer?.restorePlayer?.(playerEl) || playerEl;
+  const playbackSection = document.querySelector('[data-course-playback]');
+  const openPlayback = ({ scroll = true } = {}) => {
+    if (!playbackSection) return;
+    playbackSection.hidden = false;
+    if (scroll) requestAnimationFrame(() => playbackSection.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  document.querySelector('[data-course-close-playback]')?.addEventListener('click', () => {
+    try { playerEl?._pdPlayer?.pause?.(); } catch {}
+    if (playbackSection) playbackSection.hidden = true;
+  });
   const timestampStatusEl = document.querySelector('[data-timestamp-note-status]');
   const learningMarkerStatusEl = document.querySelector('[data-learning-marker-status]');
   const learningMarkerListEl = document.querySelector('[data-learning-marker-list]');
@@ -198,6 +216,7 @@ export async function mountCoursesView(deps = {}) {
 
   // Ensure player auto-inits for the inserted element
   try { window.OpenCourseDeck?.Player?.init?.(); } catch { /* ignore */ }
+  if (playerEl?._pdPlayer?.snapshot?.()?.track) openPlayback({ scroll: false });
 
   const MEDIA_CUES_KEY = 'ocd_course_media_cues';
   let authoredMediaCues = {};
@@ -1064,6 +1083,7 @@ export async function mountCoursesView(deps = {}) {
       if (action === 'play-video') {
         const url = await playableMediaUrl(topic.videos?.[0]);
         if (!url) return;
+        openPlayback();
         // Ensure player exists and has an instance
         const el = playerEl;
         const inst = el?._pdPlayer;
@@ -1284,6 +1304,7 @@ export async function mountCoursesView(deps = {}) {
     const pendingTrack = pendingSession.track || pendingSession.queue[pendingSession.queueIndex] || pendingSession.queue[0];
     const fallbackCourseId = pendingTrack?.courseId || pendingSession.queue.find(item => item?.courseId)?.courseId;
     if (fallbackCourseId && selectCourse(fallbackCourseId)) {
+      openPlayback({ scroll: false });
       setTimeout(() => {
         const inst = playerEl?._pdPlayer;
         if (!inst) return;
@@ -1320,6 +1341,7 @@ export async function mountCoursesView(deps = {}) {
       setTimeout(async () => {
         const url = await playableMediaUrl(t.videos?.[0]);
         if (!url) return;
+        openPlayback({ scroll: false });
         const el = playerEl;
         const inst = el?._pdPlayer;
         if (inst?.loadPlaylist) {
