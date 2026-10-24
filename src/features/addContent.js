@@ -75,7 +75,6 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   const body = document.createElement('form');
   body.noValidate = true;
   body.id = `add-content-form-${Math.random().toString(36).slice(2)}`;
-  body.id = `add-content-form-${Math.random().toString(36).slice(2)}`;
   const controls = fields.map((spec) => {
     const created = field(spec);
     body.appendChild(created.wrap);
@@ -90,7 +89,6 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   cancel.textContent = 'Cancel';
   const confirm = document.createElement('button');
   confirm.type = 'submit';
-  confirm.setAttribute('form', body.id);
   confirm.setAttribute('form', body.id);
   confirm.className = 'btn btn-primary';
   confirm.textContent = confirmLabel;
@@ -180,7 +178,9 @@ async function populateCourseDestination() {
     option.textContent = title;
     return option;
   }));
-  selector.value = options.some(entry => entry.id === desired) ? desired : '';
+  const destinationExists = options.some(entry => entry.id === desired);
+  selector.value = destinationExists ? desired : '';
+  if (!destinationExists && desired) setImportCourse('');
   positionMenu();
 }
 
