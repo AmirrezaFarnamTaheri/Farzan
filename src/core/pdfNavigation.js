@@ -18,11 +18,40 @@ export function openPdfSource(source, { root = window, router = root.OpenCourseD
 // the request so a subsequent mount or retry can still consume it.
 export async function consumePdfSource(root = window) {
   const pd = root.OpenCourseDeck || {};
-  const request = pd.pendingPdfOpen;
-  if (!request) return false;
-  const loader = root.PlasmaPDFViewer?.load;
+  // Concurrent requests share one drain. Starting a new PDF load before the
+  // previous one settles allows a slow older document to overwrite its
+  // replacement in view implementations without generation checks.
+  if (pd.pdfOpenInFlight) return pd.pdfOpenInFlight;
+  const viewer = root.PlasmaPDFViewer;
+  const loader = viewer?.load;
   if (typeof loader !== 'function') throw new Error('PDF viewer is unavailable');
-  pd.pendingPdfOpen = null;
-  await loader.call(root.PlasmaPDFViewer, request.source);
-  return true;
+
+  const task = (async () => {
+    let loaded = false;
+    while (pd.pendingPdfOpen) {
+      const request = pd.pendingPdfOpen;
+      pd.pendingPdfOpen = null;
+      try {
+        const result = await loader.call(viewer, request.source);
+        // The PDF viewer displays its own diagnostic for unsuccessful loads,
+        // but a false receipt must remain retryable at the route boundary.
+        if (result === false) throw new Error('PDF viewer could not load the document');
+        loaded = true;
+      } catch (error) {
+        // A newer request supersedes an older failed one; do not replace it
+        // with a stale source or send an erroneous duplicate retry.
+        if (pd.pendingPdfOpen) continue;
+        pd.pendingPdfOpen = request;
+        throw error;
+      }
+    }
+    return loaded;
+  })();
+
+  pd.pdfOpenInFlight = task;
+  try {
+    return await task;
+  } finally {
+    if (pd.pdfOpenInFlight === task) pd.pdfOpenInFlight = null;
+  }
 }
