@@ -96,7 +96,7 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.5');
+    expect(payload.version).toBe('1.6');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
@@ -113,7 +113,7 @@ describe('progress backup exports', () => {
     expect(payload.meta.sizeBytes).toBeGreaterThan(0);
   });
 
-  it('includes watched segments and PDF bookmarks in version 1.5 JSON exports', async () => {
+  it('includes watched segments and PDF bookmarks in version 1.6 JSON exports', async () => {
     window.DB.getAllWatchedSegments.mockResolvedValueOnce([
       { id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 },
     ]);
@@ -123,10 +123,46 @@ describe('progress backup exports', () => {
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
     expect(payload).toMatchObject({
-      version: '1.5',
+      version: '1.6',
       watchedSegments: [{ id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 }],
       pdfBookmarks: [{ id: 'page-bookmark', docId: 'document.pdf', page: 4 }],
     });
+  });
+
+
+  it('exports every authored course domain and declares a metadata-only attachment manifest', async () => {
+    const original = window.DB.getSetting;
+    window.DB.getSetting = vi.fn(async key => {
+      if (key === 'ocd_my_courses') return [{ id: 'course-a', title: 'Study course' }];
+      if (key === 'ocd_course_media_cues') return { 'topic-a': [{ at: 12, text: 'Recall' }] };
+      return original(key);
+    });
+    window.OpenCourseDeck.UserLibrary = {
+      listFileReferences: vi.fn(async () => [{ ref: 'library-file:stable-asset', courseId: 'course-a', kind: 'pdf' }]),
+    };
+    await window.ProgressStats.exportJSON();
+    const payload = JSON.parse(await downloadedBlob.text());
+    expect(payload.settings.myCourses).toEqual([{ id: 'course-a', title: 'Study course' }]);
+    expect(payload.settings.mediaCues).toEqual({ 'topic-a': [{ at: 12, text: 'Recall' }] });
+    expect(payload.meta.attachments).toEqual(expect.objectContaining({
+      mode: 'metadata-only',
+      binaryIncluded: false,
+      references: expect.arrayContaining([expect.objectContaining({ ref: 'library-file:stable-asset' })]),
+    }));
+  });
+
+  it('restores course outlines and media cues from version 1.6 portable backups', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const outlines = [{ id: 'course-a', title: 'Saved course' }];
+    const cues = { 'topic-a': [{ at: 18, text: 'Start' }] };
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { myCourses: outlines, mediaCues: cues },
+      progress: [], notes: [], annotations: [], timestamps: [],
+    })], 'all-domains.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_my_courses', outlines);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', cues);
+    expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
   });
 
   it('never exports an incomplete backup when an auxiliary store read fails', async () => {
