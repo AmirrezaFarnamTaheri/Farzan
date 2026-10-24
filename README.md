@@ -65,17 +65,13 @@ OpenCourseDeck stores data locally in the browser profile for the origin you ope
 - IndexedDB stores progress, timestamps, and database-backed records.
 - Some preferences and notes compatibility data may be mirrored in `localStorage`.
 - Nothing is uploaded by the app by default.
-- Progress and Settings export a JSON file (current portable format: **1.5**) containing supported saved records, including watch history and PDF page bookmarks. It does **not** contain video/PDF file blobs from the separate library-files database. Keep your original media files before changing devices or browser profiles.
+- Progress and Settings export portable JSON **1.6**, including notes, progress, PDF annotations/bookmarks, watched segments, flashcards, Studio metadata, custom course outlines, media cues, and local-library references. The export is **metadata-only** for imported PDF/video files: original binary bytes are not included. After importing on another device, open **My Courses → Missing local files → Locate file** to relink original media without changing saved source IDs.
 
 For details, see [backup-restore.md](docs/backup-restore.md).
 
 ### Plasmato edition screenshots and visual QA
 
-The branch retains a [107-image historical application gallery](screenshots/current/README.md) and its [SHA-256 manifest](screenshots/current/manifest.json). Plasmato Edition v1.0.3 additionally gates publication on **308 newly captured browser screenshots across 24 groups**, with a full visual-evidence ZIP and checksum manifest attached to its GitHub Release.
-These capture all 15 main app routes at desktop, tablet and mobile sizes, light-theme states,
-and functional examples such as saved notes, video playback, searchable PDF, flashcards and Studio boards.
-The capture fixtures are controlled test data, not a claim that every external media host is accessible.
-For the findings and scope limits see [the visual QA audit](editions/plasmato-emergency/VISUAL-QA.md).
+The branch retains a [107-image historical application gallery](screenshots/current/README.md) and its [SHA-256 manifest](screenshots/current/manifest.json). The dedicated Plasmato Edition has separate [visual acceptance evidence](editions/plasmato-emergency/VISUAL-QA.md) and its own Windows packaging/release workflow. This is **edition-specific evidence**, not proof that every external Plasmato media host is reachable or that a new standard OpenCourseDeck release has been published.
 
 ### Guides
 
