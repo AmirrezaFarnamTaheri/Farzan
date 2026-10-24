@@ -40,6 +40,35 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(page.locator('#courses-search')).toBeVisible();
   });
 
+  test('renders a high-contrast editorial home hero for a new learner', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-home-title]')).toContainText('What will you learn today');
+    const appearance = await page.locator('.home-hero').evaluate(element => ({
+      background: getComputedStyle(element).backgroundImage,
+      titleInk: getComputedStyle(element.querySelector('.home-title')).color,
+    }));
+    expect(appearance.background).toContain('linear-gradient');
+    expect(appearance.titleInk).toBe('rgb(255, 255, 255)');
+  });
+
+  test('reveals and dismisses lesson video only after choosing Play', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const medicine = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(medicine).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('#courses-list .course-item').first()).not.toContainText('Getting Started');
+    await medicine.click();
+    const play = page.locator('#course-detail button[data-action="play-video"]').first();
+    await expect(play).toBeVisible({ timeout: 20000 });
+    await play.click();
+    const session = page.locator('[data-course-playback]');
+    await expect(session).toBeVisible();
+    await expect(page.locator('#course-player')).toBeVisible();
+    await session.locator('[data-course-close-playback]').click();
+    await expect(session).toBeHidden();
+  });
+
   test('shows meaningful first-run progress guidance instead of empty charts', async ({ page }) => {
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-progress')).toBeVisible();

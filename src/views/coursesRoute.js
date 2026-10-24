@@ -230,7 +230,11 @@ export async function mountCoursesView(deps = {}) {
   let allTopics = [];
   let topicsByCourse = {};
   const rebuildCatalogIndexes = () => {
-    allCourses = window.DataStore?.allCourses?.() ?? [];
+    const sourceCourses = window.DataStore?.allCourses?.() ?? [];
+    // In Plasmato, show the 31 medical courses before the small starter tour.
+    allCourses = sourceCourses.some(course => course.id === 'comprehensive-internal-medicine-course')
+      ? [...sourceCourses].sort((a, b) => Number(a.id === 'getting-started') - Number(b.id === 'getting-started'))
+      : sourceCourses;
     allTopics = window.DataStore?.allTopics?.() ?? [];
     topicsByCourse = allTopics.reduce((acc, t) => {
       (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
@@ -771,11 +775,11 @@ export async function mountCoursesView(deps = {}) {
       createElement('div', { class: 'topic-submeta' }, topic.sourceLabel ?? '')
     );
     const meta = createElement('div', { class: 'topic-meta' });
-    meta.appendChild(statusBadgeNode(status));
-    if (hasVideo) meta.appendChild(badgeNode('video'));
-    if (hasPdf) meta.appendChild(badgeNode('pdf'));
-    if (hasEmbed) meta.appendChild(badgeNode('embed'));
-    if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('no media'));
+    const indicator = statusBadgeNode(status);
+    if (status === 'not-started') indicator.classList.add('sr-only');
+    meta.appendChild(indicator);
+    // Actions already convey video/PDF availability; avoid repeating tags.
+    if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('No attached media'));
 
     const actions = createElement('div', { class: 'topic-actions' });
     if (hasVideo) actions.appendChild(actionButton('play-video', 'Play'));

@@ -1,6 +1,6 @@
 {
-  "name": "OpenCourseDeck",
-  "short_name": "OpenCourseDeck",
+  "name": "Farzan Plasmato Edition",
+  "short_name": "Farzan",
   "id": "./index.html",
   "scope": "./",
   "start_url": "./index.html",
@@ -16,10 +16,26 @@
     }
   ],
   "shortcuts": [
-    { "name": "Notes", "short_name": "Notes", "url": "./index.html#/notes" },
-    { "name": "Studio", "short_name": "Studio", "url": "./index.html#/studio" },
-    { "name": "Progress", "short_name": "Progress", "url": "./index.html#/progress" },
-    { "name": "PDF", "short_name": "PDF", "url": "./index.html#/pdf" }
-  ]
+    {
+      "name": "Notes",
+      "short_name": "Notes",
+      "url": "./index.html#/notes"
+    },
+    {
+      "name": "Studio",
+      "short_name": "Studio",
+      "url": "./index.html#/studio"
+    },
+    {
+      "name": "Progress",
+      "short_name": "Progress",
+      "url": "./index.html#/progress"
+    },
+    {
+      "name": "PDF",
+      "short_name": "PDF",
+      "url": "./index.html#/pdf"
+    }
+  ],
+  "description": "Local-first study workspace for Plasmato courses, notes, PDFs and review."
 }
-
