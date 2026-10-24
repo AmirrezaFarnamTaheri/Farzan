@@ -32,17 +32,29 @@ function parsePageMap(raw) {
   }
 }
 
-function readPageFallback(root) {
+function readPageFallback(root, docId) {
   const storage = root.localStorage;
   const current = storage?.getItem?.(PAGE_ANNOTATION_KEY);
-  if (current) return parsePageMap(current) || {};
+  if (current) return scopedPageMap(parsePageMap(current), docId);
 
   const legacyRaw = storage?.getItem?.(LEGACY_ANNOTATION_KEY);
   const legacyPages = parsePageMap(legacyRaw);
   if (!legacyPages) return {};
   storage.setItem(PAGE_ANNOTATION_KEY, JSON.stringify(legacyPages));
   storage.removeItem(LEGACY_ANNOTATION_KEY);
-  return legacyPages;
+  return scopedPageMap(legacyPages, docId);
+}
+
+function scopedPageMap(pages, docId) {
+  // Historical page-only entries have no identity: only accept explicitly
+  // scoped records, never silently attach another document's annotations.
+  if (!pages || !docId) return {};
+  const scoped = {};
+  for (const [page, records] of Object.entries(pages)) {
+    const owned = records.filter(record => record?.docId === docId);
+    if (owned.length) scoped[page] = owned;
+  }
+  return scoped;
 }
 
 function emitMigrationFailure(root, error, canonicalId, aliases) {
@@ -104,7 +116,7 @@ function installPageFallbackHardening(root, viewer) {
         // Only read failures fall back to the page-local store below.
       }
     }
-    state.annotations = readPageFallback(root);
+    state.annotations = readPageFallback(root, state.annotationDocId);
   };
 
   viewer._saveAnnotations = () => {
