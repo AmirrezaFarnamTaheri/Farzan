@@ -74,14 +74,27 @@ let studioKeyController = null;
       return memoryStore;
     }
 
-    saveStorage(cards) {
-      memoryStore = cards;
+    async saveStorage(cards) {
+      // Commit at least one persistent copy before exposing the mutation.
+      const snapshot = cards.map(card => ({ ...card }));
+      let dbSaved = false;
+      let localSaved = false;
+      let firstError;
+      if (typeof window.DB?.saveSetting === 'function') {
+        try {
+          await window.DB.saveSetting(STORE_NAME, snapshot);
+          dbSaved = true;
+        } catch (error) { firstError = error; }
+      }
       try {
-        if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.setItem === 'function') {
-          window.localStorage.setItem(STORE_NAME, JSON.stringify(cards));
+        if (typeof window.localStorage?.setItem === 'function') {
+          window.localStorage.setItem(STORE_NAME, JSON.stringify(snapshot));
+          localSaved = true;
         }
-      } catch {}
-      try { window.DB?.saveSetting?.(STORE_NAME, cards); } catch {}
+      } catch (error) { firstError ||= error; }
+      if (!dbSaved && !localSaved) throw firstError || new Error('Flashcards could not be saved');
+      memoryStore = snapshot;
+      return snapshot;
     }
 
     async hydrate() {
@@ -130,7 +143,7 @@ let studioKeyController = null;
 
     async addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
       if (!front || !back) throw new Error('Front and back text are required');
-      const cards = this.getStorage();
+      const cards = [...await this.getCards()];
       const newCard = {
         id: 'fc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         deck: deck.trim() || 'Default',
@@ -144,12 +157,12 @@ let studioKeyController = null;
         createdAt: new Date().toISOString(),
       };
       cards.push(newCard);
-      this.saveStorage(cards);
+      await this.saveStorage(cards);
       return newCard;
     }
 
     async reviewCard(cardId, grade) {
-      const cards = this.getStorage();
+      const cards = [...await this.getCards()];
       const index = cards.findIndex(c => c.id === cardId);
       if (index === -1) throw new Error('Flashcard not found');
 
@@ -163,7 +176,7 @@ let studioKeyController = null;
       };
 
       cards[index] = updatedCard;
-      this.saveStorage(cards);
+      await this.saveStorage(cards);
       return updatedCard;
     }
 
@@ -178,9 +191,9 @@ let studioKeyController = null;
     }
 
     async deleteCard(cardId) {
-      let cards = this.getStorage();
+      let cards = [...await this.getCards()];
       cards = cards.filter(c => c.id !== cardId);
-      this.saveStorage(cards);
+      await this.saveStorage(cards);
       return true;
     }
 
