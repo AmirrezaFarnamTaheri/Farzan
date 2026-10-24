@@ -374,6 +374,42 @@ describe('flashcard editing and deletion', () => {
   });
 });
 
+describe('flashcard canonical storage invariants', () => {
+  it('refuses an apparent local success when the canonical DB write failed', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    const original = [{
+      id: 'fc-old', front: 'Original Q', back: 'Original A',
+      deck: 'History', nextReviewDate: '2020-01-01',
+    }];
+    localStorage.setItem('ocd_flashcards', JSON.stringify(original));
+    window.DB = {
+      getSetting: vi.fn(async () => original),
+      saveSetting: vi.fn(async () => { throw new Error('IndexedDB write rejected'); }),
+    };
+    manager.invalidateCache();
+    expect((await manager.getCards()).map(c => c.front)).toEqual(['Original Q']);
+    await expect(manager.addCard({ front: 'New Q', back: 'New A' }))
+      .rejects.toThrow('IndexedDB write rejected');
+    expect((await manager.getCards()).map(c => c.front)).toEqual(['Original Q']);
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards')).map(c => c.front)).toEqual(['Original Q']);
+  });
+
+  it('never resurrects a stale local mirror after the canonical DB deck was cleared', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    localStorage.setItem('ocd_flashcards', JSON.stringify([{
+      id: 'fc-stale', front: 'Stale Q', back: 'Stale A', deck: 'Old',
+      nextReviewDate: '2020-01-01',
+    }]));
+    window.DB = { getSetting: vi.fn(async () => []), saveSetting: vi.fn(async () => true) };
+    manager.invalidateCache();
+    expect(await manager.getCards()).toEqual([]);
+    expect(await manager.getDueCards()).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards'))).toEqual([]);
+  });
+});
+
 describe('flashcard durable-save failures', () => {
   it('rejects a card mutation and preserves memory when both stores cannot save', async () => {
     const manager = window.OpenCourseDeck.Flashcards.manager;
