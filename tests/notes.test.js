@@ -144,6 +144,18 @@ describe('notes route filters', () => {
     expect(leaked).toEqual([]);
   });
 
+  it('does not automatically contact external image hosts from imported notes', () => {
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('img[src^="https://tracker.example"]')).toBeNull();
+    expect(editor.querySelector('img[data-remote-src^="https://tracker.example"]')).not.toBeNull();
+    const control = document.querySelector('[data-notes-remote-images]');
+    expect(control).not.toBeNull();
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    control.click();
+    expect(control.getAttribute('aria-pressed')).toBe('true');
+    expect(editor.querySelector('img[src^="https://tracker.example"]')).not.toBeNull();
+  });
+
   it('shows only pinned notes when the pinned folder is selected', () => {
     document.querySelector('[data-folder-id="__pinned__"]').click();
 
