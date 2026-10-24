@@ -638,7 +638,8 @@ input[type="file"][hidden] {
 .view .page-header.progress-page-header { align-items: center; flex-wrap: wrap; gap: 16px; }
 .progress-toolbar { justify-content: flex-start; gap: 8px; margin-inline-start: auto; }
 .progress-toolbar #btn-reset-all { background: transparent; border-color: var(--fz-line); color: var(--danger); }
-.progress-metric-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.progress-metric-grid { grid-template-columns: repeat(12,minmax(0,1fr)); gap: 12px; }
+.progress-metric-grid > .progress-metric { grid-column: span 3; }
 .progress-metric {
   min-height: 138px;
   gap: 7px;
@@ -657,9 +658,8 @@ input[type="file"][hidden] {
 .progress-metric:nth-child(n+5) {
   min-height: 101px;
   padding: 15px 18px;
-  grid-column: span 1;
+  grid-column: span 4;
 }
-.progress-metric:nth-child(5) { grid-column: 2; }
 .progress-metric:nth-child(n+5) .progress-metric-icon { display: none; }
 .progress-metric:nth-child(n+5) strong { font-size: 23px; }
 .progress-dashboard-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 16px; }
@@ -744,8 +744,9 @@ input[type="file"][hidden] {
   .courses-shell { grid-template-columns: minmax(235px, 290px) minmax(0,1fr); }
   .topic-row { grid-template-columns: minmax(0,1fr); }
   .topic-actions { justify-content: flex-start; }
-  .progress-metric-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
-  .progress-metric:nth-child(5) { grid-column: auto; }
+  .progress-metric-grid { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .progress-metric-grid > .progress-metric { grid-column: span 3; }
+  .progress-metric:nth-child(n+5) { grid-column: span 2; }
 }
 @media (max-width: 1023px) {
   /* Off-canvas navigation is fixed. It never displaces the content width. */
@@ -788,6 +789,7 @@ input[type="file"][hidden] {
   .courses-list { grid-template-columns: 1fr; max-height: 260px; }
   .view .page-header { align-items: flex-start; }
   .progress-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+  .progress-metric-grid > .progress-metric { grid-column: auto; }
   .progress-metric:nth-child(n+5) { grid-column: auto; }
   .progress-dashboard-grid { grid-template-columns: minmax(0,1fr); }
   .progress-table-card { grid-column: 1; }
