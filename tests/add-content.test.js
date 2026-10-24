@@ -137,3 +137,29 @@ describe('complete creation and notification journeys', () => {
     ));
   });
 });
+
+
+describe('explicit import destinations', () => {
+  it('lets users select an existing personal course before importing', async () => {
+    const stored = { version: 1, courses: {
+      'course-anatomy': { title: 'Anatomy', sources: [{ label: 'My Library', topics: [] }] },
+    } };
+    window.DB = {
+      getSetting: vi.fn(async (key) => key === 'ocd_user_library' ? stored : null),
+      saveSetting: vi.fn(async () => true),
+    };
+    sessionStorage.removeItem('ocd_active_import_course');
+    initAddContent(window);
+    document.getElementById('topbar-add-btn').click();
+    const selector = await vi.waitFor(() => {
+      const element = document.querySelector('[data-add-course-destination]');
+      expect(element).not.toBeNull();
+      expect([...element.options].some(option => option.value === 'course-anatomy')).toBe(true);
+      return element;
+    });
+    selector.value = 'course-anatomy';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(sessionStorage.getItem('ocd_active_import_course')).toBe('course-anatomy');
+    sessionStorage.removeItem('ocd_active_import_course');
+  });
+});
