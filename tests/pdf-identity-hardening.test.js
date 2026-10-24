@@ -147,3 +147,18 @@ describe('document-local page fallback', () => {
     expect(state.annotations).toEqual({});
   });
 });
+
+describe('document-local page fallback', () => {
+  it('never assigns a page-only fallback from one document to another', async () => {
+    const storage = createStorage();
+    storage.setItem('plasma-pdf-annotations-by-page', JSON.stringify({
+      1: [{ id: 'note-a', docId: 'doc-a', page: 1, text: 'belongs to A' }],
+    }));
+    const state = { annotationDocId: 'doc-b', annotationAliases: [], annotations: {} };
+    const viewer = { load: vi.fn(), _deriveCanonicalDocId: vi.fn(), _deriveLegacyDocIds: vi.fn() };
+    const root = { PlasmaPDFViewer: viewer, PlasmaPDFState: state, OpenCourseDeck: {}, localStorage: storage };
+    installPdfIdentityHardening(root);
+    await viewer._loadAnnotations();
+    expect(state.annotations).toEqual({});
+  });
+});
