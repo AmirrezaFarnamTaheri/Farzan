@@ -517,8 +517,36 @@
   .breadcrumb-list > .breadcrumb-sep {
     display: none;
   }
+  .topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .topbar-right {
+    flex: 0 0 auto;
+  }
   .breadcrumb {
-    max-width: min(54vw, 220px);
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+  .breadcrumb-list {
+    width: 100%;
+    min-width: 0;
+  }
+  .breadcrumb-list > .breadcrumb-item:last-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+  }
+  .breadcrumb-current {
+    display: block;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
   }
 
   .view-container,
