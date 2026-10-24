@@ -1,6 +1,7 @@
 const path = require('path');
 const { app, BrowserWindow, shell } = require('electron');
 const { createServer } = require('../scripts/dev-server.cjs');
+const { DESKTOP_PORT, DESKTOP_ORIGIN } = require('./storage-origin.cjs');
 
 const root = path.join(__dirname, '..');
 let server;
@@ -9,7 +10,7 @@ let mainWindow;
 function listen(serverInstance) {
   return new Promise((resolve, reject) => {
     serverInstance.once('error', reject);
-    serverInstance.listen(0, '127.0.0.1', () => {
+    serverInstance.listen(DESKTOP_PORT, '127.0.0.1', () => {
       serverInstance.off?.('error', reject);
       resolve(serverInstance.address());
     });
@@ -22,8 +23,8 @@ async function createMainWindow() {
     return mainWindow;
   }
   server = createServer({ root });
-  const address = await listen(server);
-  const url = `http://127.0.0.1:${address.port}/`;
+  await listen(server);
+  const url = DESKTOP_ORIGIN;
   const win = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -69,7 +70,10 @@ else {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
-  app.whenReady().then(createMainWindow);
+  app.whenReady().then(createMainWindow).catch(error => {
+    console.error('[desktop] Cannot start stable local origin; close another launcher if the port is in use:', error?.message || error);
+    app.quit();
+  });
 }
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => {

@@ -59,7 +59,9 @@ describe('MediaPlayer queue rendering', () => {
     const artwork = document.querySelector('#player .pd-art-img');
 
     expect(media.hasAttribute('src')).toBe(false);
-    expect(artwork.getAttribute('src')).toBe('');
+    // Do not assign an empty URL to an image: Chrome treats src="" as a
+    // request for the current document and renders a broken artwork icon.
+    expect(artwork.hasAttribute('src')).toBe(false);
     expect(artwork.style.display).toBe('none');
     expect(window.__mediaXss).toBeUndefined();
     expect(window.__artXss).toBeUndefined();

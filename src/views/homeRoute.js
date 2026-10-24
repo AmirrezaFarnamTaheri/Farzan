@@ -1,3 +1,4 @@
+import { dueReviewCards } from '../core/studyMetrics.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
@@ -29,14 +30,14 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <h1 class="home-title">Back to your studies.</h1>
-          <p class="home-subtitle">Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</p>
+          <h1 class="home-title"><bdi>Back to your studies.</bdi></h1>
+          <p class="home-subtitle"><bdi>Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</bdi></p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
               <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
               <span>Continue studying</span>
             </button>
-            <a class="btn btn-ghost" href="#/courses">
+            <a class="btn btn-ghost" href="#/courses" data-home-browse-secondary>
               <svg class="icon" aria-hidden="true"><use href="#i-curriculum"/></svg>
               Browse courses
             </a>
@@ -59,11 +60,11 @@ export function mountHomeView(deps = {}) {
         <section class="home-focus-panel" aria-labelledby="home-focus-title" aria-live="polite">
           <div class="home-focus-head">
             <div>
-              <h2 id="home-focus-title">Pick up where you left off</h2>
+              <h2 id="home-focus-title" dir="auto">Pick up where you left off</h2>
             </div>
             <span class="home-focus-status" data-home-focus-status>Start</span>
           </div>
-          <p data-home-focus-detail>Open a course to see your recent work here.</p>
+          <p data-home-focus-detail dir="auto">Open a course to see your recent work here.</p>
           <div class="home-focus-progress" aria-hidden="true">
             <span data-home-focus-progress></span>
           </div>
@@ -166,7 +167,8 @@ export function mountHomeView(deps = {}) {
 
   renderCatalogCounts();
   renderHomeDashboard({ Router, setPendingCourseMedia });
-  document.querySelector('[data-home-add]')?.addEventListener('click', () => {
+  document.querySelector('[data-home-add]')?.addEventListener('click', (event) => {
+    event.stopPropagation();
     if (typeof window.OpenCourseDeck?.AddContent?.openMenu === 'function') {
       window.OpenCourseDeck.AddContent.openMenu();
       return;
@@ -269,6 +271,13 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       readSaved('getAllNotes'),
       readSaved('getAllTimestamps'),
       (async () => {
+        if (typeof window.DB?.getSetting !== 'function') return [];
+        const cards = await window.DB.getSetting('ocd_flashcards');
+        if (cards == null) return [];
+        if (!Array.isArray(cards)) throw new TypeError('Saved flashcards are not a valid deck');
+        return cards;
+      })(),
+      (async () => {
         try {
           await window.DataStore?.init?.();
           return window.DataStore?.allTopics?.() ?? [];
@@ -301,7 +310,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     document.querySelector('[data-home-resume]')?.addEventListener('click', () => Router.navigate('#/courses'));
     return;
   }
-  const [progress, notes, timestamps, topics] = collections;
+  const [progress, notes, timestamps, flashcards, topics] = collections;
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
@@ -315,11 +324,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
   const completed = progress.filter(record => record?.status === 'done' || Number(record?.percent) >= 100);
   const active = progress.filter(record => record?.topicId && Number(record?.percent) > 0 && Number(record?.percent) < 100);
-  const reviewCutoff = 30 * 24 * 60 * 60 * 1000;
-  const dueReviews = completed
-    .map(record => ({ record, lastActivity: getRecordTime(record) }))
-    .filter(item => !item.lastActivity || Date.now() - item.lastActivity >= reviewCutoff)
-    .sort((a, b) => a.lastActivity - b.lastActivity);
+  const dueReviews = dueReviewCards(flashcards);
   const weekCutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
   const weeklyActivity = [...progress, ...notes, ...timestamps].filter(item => getRecordTime(item) >= weekCutoff).length;
   const measuredProgress = progress.map(item => Math.max(0, Math.min(100, Number(item?.percent) || 0)));
@@ -336,10 +341,18 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-pulse-average]', `${averageProgress}%`);
 
   const focusRecord = latestProgress || latestTimestamp;
+  const focusTimestamp = [...timestamps]
+    .filter(item => item?.topicId === focusRecord?.topicId)
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+  const focusPosition = Number(focusTimestamp?.position ?? focusRecord?.position ?? 0) || 0;
   const focusTopicId = focusRecord?.topicId;
+  const focusProgress = focusTopicId
+    ? progress.filter(record => record?.topicId === focusTopicId)
+      .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0]
+    : null;
   const focusTopic = topicMap.get(focusTopicId);
-  const focusPercent = Math.max(0, Math.min(100, Number(latestProgress?.percent) || 0));
-  const focusTitle = focusTopic?.title || latestProgress?.topicTitle || latestTimestamp?.title || 'Choose a course';
+  const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
+  const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
   const focusDetail = focusRecord
     ? 'Continue from your last saved activity.'
     : 'Open a course to start tracking progress.';
@@ -348,13 +361,13 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-home-focus-detail]', focusDetail);
   setText('[data-home-focus-status]', focusRecord ? 'Resume' : 'Start');
   setText('[data-home-focus-percent]', `${Math.round(focusPercent)}% complete`);
-  setText('[data-home-focus-time]', latestTimestamp?.position ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'No saved position');
-  const focusProgress = document.querySelector('[data-home-focus-progress]');
-  if (focusProgress) focusProgress.style.width = `${focusPercent}%`;
+  setText('[data-home-focus-time]', focusPosition ? `Saved at ${formatDuration(focusPosition)}` : 'No saved position');
+  const focusProgressBar = document.querySelector('[data-home-focus-progress]');
+  if (focusProgressBar) focusProgressBar.style.width = `${focusPercent}%`;
 
   const openFocus = () => {
     if (focusTopicId) {
-      setPendingCourseMedia(focusTopicId, latestTimestamp?.position);
+      setPendingCourseMedia(focusTopicId, focusPosition || undefined);
       Router.navigate('#/courses');
       return;
     }
@@ -369,8 +382,14 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   }
   if (resumeAction) {
     resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Browse courses';
+    resumeAction.querySelector('use')?.setAttribute('href', focusRecord ? '#i-play' : '#i-curriculum');
     resumeAction.addEventListener('click', openFocus);
   }
+  // On a new profile the primary action already opens Courses, so a second
+  // identical hero button adds visual noise and needless keyboard stops.
+  // Once there is saved progress the two actions have distinct purposes:
+  // resume the topic, or browse the full catalog.
+  if (!focusRecord) document.querySelector('[data-home-browse-secondary]')?.remove();
 
   const dueReview = dueReviews[0];
   const widgetData = [
@@ -388,10 +407,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       id: 'review',
       icon: 'i-redo',
       label: 'Review',
-      title: topicMap.get(dueReview?.record?.topicId)?.title || dueReview?.record?.topicTitle || 'Nothing due',
-      detail: dueReview ? 'Review a completed topic.' : 'Nothing scheduled for review.',
-      action: dueReview ? 'review' : 'achievements',
-      topicId: dueReview?.record?.topicId,
+      title: dueReview?.front || 'Nothing due',
+      detail: dueReview ? `Review ${dueReviews.length} scheduled card${dueReviews.length === 1 ? '' : 's'}.` : 'Nothing scheduled for review.',
+      action: 'flashcards',
     },
     {
       id: 'recent',
@@ -449,6 +467,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       // without this branch they fell through to '#/notes' instead.
       if (widget.action === 'courses') {
         Router.navigate('#/courses');
+        return;
+      }
+      if (widget.action === 'flashcards') {
+        Router.navigate('#/flashcards');
         return;
       }
       Router.navigate(widget.action === 'achievements' ? '#/achievements' : '#/notes');

@@ -139,6 +139,89 @@
       return { courses, topics };
     }
 
+
+    // Optional edition catalogs are loaded through the same canonical DataStore
+    // as ordinary courses. The compressed bytes remain static, offline-cacheable
+    // content; no script evaluation, iframe or third-party network call is needed.
+    async function _loadGzipCatalog(spec) {
+      if (!spec || typeof spec !== 'object'
+        || typeof spec.path !== 'string'
+        || !/^data\/[A-Za-z0-9][A-Za-z0-9._-]*\.json\.gz$/.test(spec.path)
+        || spec.compression !== 'gzip'
+        || (spec.sha256 && !/^[a-f0-9]{64}$/i.test(spec.sha256))) {
+        throw new Error('Invalid additional catalog manifest');
+      }
+      if (typeof DecompressionStream !== 'function') {
+        throw new Error('This browser does not support gzip catalog decoding');
+      }
+      const url = `./${spec.path}`;
+      const response = await fetch(url, { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`Catalog archive HTTP ${response.status}: ${url}`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+        throw new Error('Catalog archive is not gzip data');
+      }
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const original = await new Response(stream).arrayBuffer();
+      if (spec.sha256) {
+        if (!window.crypto?.subtle?.digest) {
+          throw new Error('Verified catalogs require browser SHA-256 support');
+        }
+        const digest = await window.crypto.subtle.digest('SHA-256', original);
+        const actual = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+        if (actual.toLowerCase() !== spec.sha256.toLowerCase()) {
+          throw new Error('Catalog archive integrity check failed');
+        }
+      }
+      const decoded = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(original));
+      if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
+        throw new Error('Catalog archive has an invalid root');
+      }
+      for (const [courseId, course] of Object.entries(decoded)) {
+        if (!courseId || !course || typeof course !== 'object'
+          || !Array.isArray(course.sources)) {
+          throw new Error(`Catalog archive contains invalid course: ${courseId}`);
+        }
+      }
+      return decoded;
+    }
+
+    async function _loadAdditionalCatalogs(pointer, base) {
+      const editions = pointer?.additionalCatalogs;
+      if (editions == null) return base;
+      if (!Array.isArray(editions) || editions.length > 8) {
+        throw new Error('Invalid additional catalog list');
+      }
+      const result = { ...base };
+      const seenTopicIds = new Set();
+      const indexTopics = (catalog) => {
+        for (const course of Object.values(catalog)) {
+          for (const source of course?.sources || []) {
+            for (const topic of source?.topics || []) {
+              if (!topic || typeof topic !== 'object') throw new Error('Invalid catalog topic');
+              const id = String(topic.url || '');
+              if (id) {
+                if (seenTopicIds.has(id)) throw new Error(`Duplicate catalog topic URL: ${id}`);
+                seenTopicIds.add(id);
+              }
+            }
+          }
+        }
+      };
+      indexTopics(result);
+      for (const spec of editions) {
+        const additional = await _loadGzipCatalog(spec);
+        for (const [courseId, course] of Object.entries(additional)) {
+          if (Object.prototype.hasOwnProperty.call(result, courseId)) {
+            throw new Error(`Duplicate course ID across catalogs: ${courseId}`);
+          }
+          result[courseId] = course;
+        }
+        indexTopics(additional);
+      }
+      return result;
+    }
+
     async function init({ path = './data/catalog.json', force = false } = {}) {
       if (STATE.loaded && !force) return true;
       if (STATE.loading) return STATE.loading;
@@ -184,18 +267,33 @@
           const resolvedPath = targetCatalog.startsWith('./') ? targetCatalog : `./${targetCatalog}`;
           updateStatus('Loading catalog content...');
           const raw = await fetchWithRetry(resolvedPath);
-          _catalogRaw = raw;
+          // An edition archive is an addition to the baseline catalog, not a
+          // replacement. Failure must never discard the existing starter course
+          // or claim the partial catalog is authoritative.
+          let combined = raw;
+          let archiveError = null;
+          try {
+            combined = await _loadAdditionalCatalogs(pointer, raw);
+          } catch (error) {
+            archiveError = error;
+            console.warn('[DataStore] Additional catalog unavailable:', error);
+            updateStatus('Additional course archive unavailable. Showing base courses.', true);
+          }
+          _catalogRaw = combined;
           _recompose();
           STATE.loaded = true;
-          STATE.status = 'authoritative';
-          STATE.lastError = null;
-          STATE.lastSuccessfulAt = Date.now();
+          STATE.status = archiveError ? 'degraded' : 'authoritative';
+          STATE.lastError = archiveError
+            ? { name: archiveError?.name || 'Error', message: archiveError?.message || String(archiveError), at: Date.now() }
+            : null;
+          if (!archiveError) STATE.lastSuccessfulAt = Date.now();
           _activeCatalogPath = resolvedPath;
-          window.OpenCourseDeck?.bus?.emit?.('data:loaded', {
+          window.OpenCourseDeck?.bus?.emit?.(archiveError ? 'data:degraded' : 'data:loaded', {
             courses: STATE.courses.length,
             topics: STATE.topics.length,
             status: STATE.status,
             source: _activeCatalogPath,
+            ...(archiveError ? { recovery: 'retry', error: STATE.lastError } : {}),
           });
           return true;
         } catch (err) {
@@ -1012,7 +1110,7 @@
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS, KEY_MIGRATED, MIGRATED_IDS_KEY];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
       if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_ai_settings');
-      if (includeAnnotations) localKeys.push('plasma-pdf-annotations');
+      if (includeAnnotations) localKeys.push('plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page');
       if (includePrefs) localKeys.push(
         'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
         'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
@@ -1049,7 +1147,7 @@
       if (scope === 'media') {
         return _deletionOutcome('clear-media', scope, [
           await _clearIdbStores(idb, ['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']),
-          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations'], 'localStorage'),
+          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page'], 'localStorage'),
         ]);
       }
       if (scope === 'playlists') {

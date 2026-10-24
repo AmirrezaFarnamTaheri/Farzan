@@ -102,3 +102,84 @@ describe('add content chrome', () => {
     await vi.waitFor(() => expect(importer).toHaveBeenCalledWith(file));
   });
 });
+
+describe('complete creation and notification journeys', () => {
+  it('keeps a modal submit button associated with its form when footer is separate', () => {
+    window.OpenCourseDeck.Modal.create = vi.fn(({ body, footer }) => {
+      const modal = document.createElement('section');
+      modal.append(body, footer);
+      document.body.append(modal);
+      return modal;
+    });
+    initAddContent(window);
+    window.OpenCourseDeck.AddContent.createCourse();
+    const form = document.querySelector('form');
+    const submit = document.querySelector('.modal-footer button.btn-primary');
+    expect(submit).not.toBeNull();
+    expect(submit.form).toBe(form);
+  });
+
+  it('calls Toast methods with their owner when a file is skipped', async () => {
+    const show = vi.fn();
+    window.OpenCourseDeck.Toast = {
+      show,
+      info(message) { this.show({ type: 'info', message }); },
+      error: vi.fn(),
+    };
+    initAddContent(window);
+    const input = document.getElementById('file-input-video');
+    Object.defineProperty(input, 'files', {
+      configurable: true, value: [new File(['plain text'], 'readme.txt', { type: 'text/plain' })],
+    });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'info', message: expect.stringContaining('skipped') }),
+    ));
+  });
+});
+
+
+describe('explicit import destinations', () => {
+  it('lets users select an existing personal course before importing', async () => {
+    const stored = { version: 1, courses: {
+      'course-anatomy': { title: 'Anatomy', sources: [{ label: 'My Library', topics: [] }] },
+    } };
+    window.DB = {
+      getSetting: vi.fn(async (key) => key === 'ocd_user_library' ? stored : null),
+      saveSetting: vi.fn(async () => true),
+    };
+    sessionStorage.removeItem('ocd_active_import_course');
+    initAddContent(window);
+    document.getElementById('topbar-add-btn').click();
+    const selector = await vi.waitFor(() => {
+      const element = document.querySelector('[data-add-course-destination]');
+      expect(element).not.toBeNull();
+      expect([...element.options].some(option => option.value === 'course-anatomy')).toBe(true);
+      return element;
+    });
+    selector.value = 'course-anatomy';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(sessionStorage.getItem('ocd_active_import_course')).toBe('course-anatomy');
+    sessionStorage.removeItem('ocd_active_import_course');
+  });
+  it('clears deleted course selection when reopening the destination picker', async () => {
+    sessionStorage.setItem('ocd_active_import_course', 'course-deleted');
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_user_library'
+        ? { version: 1, courses: { 'course-current': { title: 'Current', sources: [] } } }
+        : null),
+      saveSetting: vi.fn(async () => true),
+    };
+    initAddContent(window);
+    document.getElementById('topbar-add-btn').click();
+    const selector = await vi.waitFor(() => {
+      const el = document.querySelector('[data-add-course-destination]');
+      expect(el).not.toBeNull();
+      expect([...el.options].map(option => option.value)).toEqual(['', 'course-current']);
+      expect(el.value).toBe('');
+      return el;
+    });
+    expect(selector.value).toBe('');
+    expect(sessionStorage.getItem('ocd_active_import_course')).toBeNull();
+  });
+});

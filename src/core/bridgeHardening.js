@@ -93,6 +93,7 @@ function moveFallbackDocument(storage, docId, records, legacyBefore) {
 function hardenAnnotations(root, db) {
   if (!db || db.__annotationFallbackHardened) return;
   const originalGetAll = db.getAllAnnotations?.bind(db);
+  const originalGetByDocument = db.getAnnotations?.bind(db);
   const originalSave = db.saveAnnotations?.bind(db);
   if (typeof originalGetAll !== 'function' || typeof originalSave !== 'function') return;
 
@@ -105,10 +106,21 @@ function hardenAnnotations(root, db) {
     const safePrimary = hasAmbiguousPageMap
       ? primary.filter(annotation => annotation?.docId !== 'global')
       : primary;
+    // Once migration commits, IndexedDB is authoritative; a union with old
+    // localStorage data would resurrect deletions and overwritten backups.
+    if (root.localStorage?.getItem?.('plasma_migrated_v2') === 'true') return safePrimary;
     return mergeAnnotations(safePrimary, explicitLegacyAnnotations(root.localStorage), documentFallback(root.localStorage));
   };
 
-  db.getAnnotations = async (docId) => (await db.getAllAnnotations()).filter(annotation => annotation.docId === docId);
+  db.getAnnotations = async (docId) => {
+    // Preserve the indexed document query on canonical profiles. The full
+    // database scan previously ran for every PDF annotation read.
+    if (root.localStorage?.getItem?.('plasma_migrated_v2') === 'true'
+      && typeof originalGetByDocument === 'function') {
+      return originalGetByDocument(docId);
+    }
+    return (await db.getAllAnnotations()).filter(annotation => annotation.docId === docId);
+  };
 
   db.saveAnnotations = async (docId, pages) => {
     const legacyBefore = root.localStorage?.getItem?.(LEGACY_ANNOTATION_KEY) ?? null;

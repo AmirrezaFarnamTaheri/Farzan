@@ -407,12 +407,20 @@ const ProgressStats = (() => {
         ? await window.OpenCourseDeck.Flashcards.getCards()
         : null);
     const librarySettings= await DB.getSetting?.('ocd_user_library') ?? null;
+    const myCoursesSettings = await DB.getSetting?.('ocd_my_courses') ?? null;
+    const mediaCuesSettings = await DB.getSetting?.('ocd_course_media_cues') ?? null;
+    const attachmentRefs = await window.OpenCourseDeck?.UserLibrary?.listFileReferences?.(librarySettings) ?? [];
 
     const payload = {
       exportedAt  : new Date().toISOString(),
-      version     : '1.5',
+      version     : '1.6',
       meta        : {
         storage: await _storageEstimate(),
+        attachments: {
+          mode: 'metadata-only',
+          binaryIncluded: false,
+          references: attachmentRefs,
+        },
       },
       progress    : allProgress,
       notes       : allNotes,
@@ -423,6 +431,8 @@ const ProgressStats = (() => {
         studio: studioSettings,
         flashcards: flashcardsSettings,
         library: librarySettings,
+        myCourses: myCoursesSettings,
+        mediaCues: mediaCuesSettings,
       },
       annotations : allAnnotations,
       timestamps  : allTimestamps,
@@ -614,7 +624,7 @@ const ProgressStats = (() => {
         const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
         const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
         const pdfBookmarkRecords = rawPdfBookmarks.filter(_isPdfBookmarkRecord);
-        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5'].includes(String(payload.version));
+        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6'].includes(String(payload.version));
         if (!versionSupported) throw new Error(`Unsupported backup version: ${payload.version}`);
         const invalidCount =
           rawProgress.length - progressRecords.length +
@@ -629,7 +639,9 @@ const ProgressStats = (() => {
           (Array.isArray(payload.settings?.playlists) ? 1 : 0) +
           (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) ? 1 : 0) +
           (Array.isArray(payload.settings?.flashcards) ? 1 : 0) +
-          (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) ? 1 : 0);
+          (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) ? 1 : 0) +
+          (Array.isArray(payload.settings?.myCourses) ? 1 : 0) +
+          (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object' && !Array.isArray(payload.settings.mediaCues) ? 1 : 0);
         const preview = {
           version: payload.version ?? 'legacy',
           fileName: file.name ?? 'backup.json',
@@ -643,6 +655,8 @@ const ProgressStats = (() => {
           timestamps: timestampRecords.length,
           watchedSegments: watchedSegmentRecords.length,
           pdfBookmarks: pdfBookmarkRecords.length,
+          attachmentsToRelink: Array.isArray(payload.meta?.attachments?.references)
+            ? payload.meta.attachments.references.length : 0,
           invalid: invalidCount,
           totalValid:
             progressRecords.length +
@@ -818,6 +832,27 @@ const ProgressStats = (() => {
               _recordImportError(result, 'settings', 'ocd_user_library', err);
             }
         } else if (payload.settings?.library) {
+          result.skipped += 1;
+        }
+        if (Array.isArray(payload.settings?.myCourses) && DB.saveSetting) {
+          try {
+            await DB.saveSetting('ocd_my_courses', payload.settings.myCourses);
+            result.settings += 1;
+          } catch (err) {
+            _recordImportError(result, 'settings', 'ocd_my_courses', err);
+          }
+        } else if (payload.settings?.myCourses) {
+          result.skipped += 1;
+        }
+        if (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object'
+          && !Array.isArray(payload.settings.mediaCues) && DB.saveSetting) {
+          try {
+            await DB.saveSetting('ocd_course_media_cues', payload.settings.mediaCues);
+            result.settings += 1;
+          } catch (err) {
+            _recordImportError(result, 'settings', 'ocd_course_media_cues', err);
+          }
+        } else if (payload.settings?.mediaCues) {
           result.skipped += 1;
         }
         if (annotationRecords.length && DB.saveAnnotations) {
@@ -1133,7 +1168,7 @@ const ProgressStats = (() => {
   // NEVER substitute an empty collection when reading the rollback snapshot:
   // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues'];
     const readList = async (name) => {
       if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
       const records = await DB[name]();
@@ -1150,7 +1185,7 @@ const ProgressStats = (() => {
       'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
       'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
-      'ocd_user_library', 'plasma-pdf-annotations',
+      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'plasma-pdf-annotations',
     ];
     const storage = window.localStorage;
     if (!storage || typeof storage.getItem !== 'function') {
@@ -1259,6 +1294,7 @@ const ProgressStats = (() => {
       `Timestamps: ${preview.timestamps}`,
       `Watched segments: ${preview.watchedSegments}`,
       `PDF bookmarks: ${preview.pdfBookmarks}`,
+      `Local file references to relink (binary bytes are not included): ${preview.attachmentsToRelink || 0}`,
       `Invalid records that will be skipped: ${preview.invalid}`,
       '',
       'Existing records are updated only when the imported record is newer or has no comparable timestamp.',

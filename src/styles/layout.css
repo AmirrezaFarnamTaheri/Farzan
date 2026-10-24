@@ -179,6 +179,9 @@
 
 .sidebar-logo-text {
   min-width: 0;
+  /* UI font scaling must not truncate the application identity beside
+     the fixed-width sidebar collapse control. */
+  font-size: min(0.95rem, 15px);
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 800;
@@ -266,9 +269,10 @@
   padding: var(--space-2);
   border-radius: var(--radius-xl);
   border: 1px solid var(--glass-border-strong, var(--glass-border));
-  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  /* An opaque menu must hide sidebar links underneath its results. */
+  background: var(--surface-2);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: var(--shadow-lg);
 }
 .search-results-dropdown.open { display: block; }
@@ -366,6 +370,14 @@
   margin-top: var(--space-1);
 }
 
+/* RTL shells may contain English or Persian descriptions. Derive each
+   paragraph's visual direction from its text, but keep the shell's right
+   alignment. Without this, periods move ahead of English final words. */
+:dir(rtl) .page-subtitle {
+  unicode-bidi: plaintext;
+  text-align: right;
+}
+
 .page-actions {
   display: flex;
   align-items: center;
@@ -434,6 +446,13 @@
     display: initial;
   }
 
+  /* The touch-sized drawer has a dedicated search trigger; the Ctrl+K
+     desktop accelerator obscures the query placeholder on narrow phones. */
+  .sidebar .sidebar-search-kbd,
+  .sidebar.sidebar-collapsed .sidebar-search-kbd {
+    display: none;
+  }
+
   .sidebar-collapse-btn {
     display: none;
   }
@@ -489,6 +508,17 @@
 
   #topbar-notifications-btn {
     display: none;
+  }
+
+  /* The menu already exposes Home on narrow phones. Repeating it in the
+     breadcrumb steals the width needed for names like Materials, Settings
+     and Achievements. Keep the current page as the accessible breadcrumb. */
+  .breadcrumb-list > .breadcrumb-item:first-child:not(:last-child),
+  .breadcrumb-list > .breadcrumb-sep {
+    display: none;
+  }
+  .breadcrumb {
+    max-width: min(54vw, 220px);
   }
 
   .view-container,

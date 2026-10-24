@@ -18,6 +18,19 @@ describe('PDF viewer safe messages', () => {
     await import('../pdf.js');
   });
 
+  it('returns a failure receipt when PDF.js cannot load a document', async () => {
+    const onError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await window.PlasmaPDFViewer.load('https://example.test/missing.pdf')).toBe(false);
+      globalThis.pdfjsLib = {
+        getDocument: vi.fn(() => ({ promise: Promise.reject(new Error('invalid PDF')) })),
+      };
+      expect(await window.PlasmaPDFViewer.load('https://example.test/invalid.pdf')).toBe(false);
+    } finally {
+      onError.mockRestore();
+    }
+  });
+
   it('renders no-match search text without executing HTML', () => {
     window.PlasmaPDFState.searchQuery = '<img src=x onerror="window.__pdfXss = true">';
     window.PlasmaPDFState.searchResults = [];
@@ -624,6 +637,11 @@ describe('PDF viewer safe messages', () => {
     window.PlasmaPDFViewer.next = vi.fn();
     window.PlasmaPDFViewer.goTo = vi.fn();
 
+    // Mount with a logically opened PDF; the viewer now resets page input
+    // to an empty state when no document is present.
+    window.PlasmaPDFState.pdfDoc = {};
+    window.PlasmaPDFState.totalPages = 3;
+    window.PlasmaPDFState.currentPage = 3;
     window.PlasmaPDFInit();
 
     document.getElementById('outside-next').click();
@@ -643,6 +661,9 @@ describe('PDF viewer safe messages', () => {
     expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledTimes(1);
     expect(window.PlasmaPDFState.searchDocId).toBe('global');
 
+    window.PlasmaPDFState.pdfDoc = {};
+    window.PlasmaPDFState.totalPages = 3;
+    window.PlasmaPDFState.currentPage = 3;
     window.PlasmaPDFInit();
     document.getElementById('inside-next').click();
     pageInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

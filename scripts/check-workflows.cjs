@@ -13,6 +13,8 @@ const EXPECTED_ACTION_PINS = new Map([
   ['actions/setup-node', { sha: '820762786026740c76f36085b0efc47a31fe5020', version: 'v7.0.0' }],
   ['actions/upload-artifact', { sha: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a', version: 'v7.0.1' }],
   ['actions/download-artifact', { sha: '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c', version: 'v8.0.1' }],
+  ['actions/upload-pages-artifact', { sha: '7b1f4a764d45c48632c6b24a0339c27f5614fb0b', version: 'v4' }],
+  ['actions/deploy-pages', { sha: 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e', version: 'v4' }],
   ['actions/github-script', { sha: '3a2844b7e9c422d3c10d287c895573f7108da1b3', version: 'v9.0.0' }],
   ['actions/attest', { sha: '1e69f48acb82d1966a394da916b4c1698aa569d6', version: 'v4.2.2' }],
   ['softprops/action-gh-release', { sha: '3d0d9888cb7fd7b750713d6e236d1fcb99157228', version: 'v3.0.2' }],
@@ -41,7 +43,7 @@ function extractWorkflowDispatchTagInput(workflow) {
   return workflow.slice(tagStart, tagEnd);
 }
 
-function validateActionPins(filename, workflow) {
+function validateActionPins(filename, workflow, consistency = new Map()) {
   const errors = [];
   const usesPattern = /^[ \t]*(?:-[ \t]+)?uses:[ \t]*([^\s#]+)(?:[ \t]+#[ \t]*(\S+))?[ \t]*$/gm;
   for (const match of workflow.matchAll(usesPattern)) {
@@ -59,13 +61,20 @@ function validateActionPins(filename, workflow) {
       errors.push(`${filename}: ${action} must be pinned to a lowercase 40-character commit SHA`);
       continue;
     }
-    const expected = EXPECTED_ACTION_PINS.get(action);
-    if (!expected) {
+    if (!EXPECTED_ACTION_PINS.has(action)) {
       errors.push(`${filename}: ${action} is not in the audited action allowlist`);
       continue;
     }
-    if (revision !== expected.sha) errors.push(`${filename}: ${action} is pinned to ${revision}; expected ${expected.sha} (${expected.version})`);
-    if (versionComment !== expected.version) errors.push(`${filename}: ${action}@${revision} must carry the version comment # ${expected.version}`);
+    if (!/^v[0-9]+(?:\.[0-9]+)*(?:[-.][A-Za-z0-9]+)*$/.test(versionComment)) {
+      errors.push(`${filename}: ${action}@${revision} needs an explicit version comment (e.g. # v7.0.2)`);
+      continue;
+    }
+    const prior = consistency.get(action);
+    if (prior && (prior.sha !== revision || prior.version !== versionComment)) {
+      errors.push(`${filename}: ${action} uses ${revision} # ${versionComment} but another workflow uses ${prior.sha} # ${prior.version}`);
+    } else {
+      consistency.set(action, { sha: revision, version: versionComment });
+    }
   }
   return errors;
 }
@@ -216,7 +225,10 @@ function validateMaintenanceWorkflow(workflow) {
 
 function validateWorkflowSet(files) {
   const errors = [];
-  for (const [filename, workflow] of Object.entries(files)) errors.push(...validateActionPins(filename, workflow));
+  const consistency = new Map();
+  for (const [filename, workflow] of Object.entries(files)) {
+    errors.push(...validateActionPins(filename, workflow, consistency));
+  }
   errors.push(...validateCiWorkflow(files['ci.yml'] || ''));
   errors.push(...validateVerificationWorkflow(files['verify.yml'] || ''));
   errors.push(...validateBrowserAssuranceWorkflow(files['browser-assurance.yml'] || ''));
@@ -225,31 +237,30 @@ function validateWorkflowSet(files) {
   return errors;
 }
 
-function readWorkflow(filename) {
-  return fs.readFileSync(path.join(REPOSITORY_ROOT, '.github', 'workflows', filename), 'utf8');
+function readAllWorkflowFiles() {
+  const directory = path.join(REPOSITORY_ROOT, '.github', 'workflows');
+  return Object.fromEntries(fs.readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()
+    .map(name => [name, fs.readFileSync(path.join(directory, name), 'utf8')]));
 }
 
 function main() {
-  const files = {
-    'ci.yml': readWorkflow('ci.yml'),
-    'verify.yml': readWorkflow('verify.yml'),
-    'browser-assurance.yml': readWorkflow('browser-assurance.yml'),
-    'release.yml': readWorkflow('release.yml'),
-    'actions-maintenance.yml': readWorkflow('actions-maintenance.yml'),
-  };
+  const files = readAllWorkflowFiles();
   const errors = validateWorkflowSet(files);
   if (errors.length) {
     for (const error of errors) console.error(`[workflow-check] ${error}`);
     console.error(`[workflow-check] Failed with ${errors.length} issue(s).`);
     process.exit(1);
   }
-  console.log('[workflow-check] OK - callers share one pinned, resilient verification pipeline with scoped inputs, immutable release publication, diagnostics, and aggregate gates.');
+  console.log(`[workflow-check] OK - ${Object.keys(files).length} GitHub Actions workflows verified with immutable and consistent action pins, release gates, and diagnostics.`);
 }
 
 if (require.main === module) main();
 
 module.exports = {
   EXPECTED_ACTION_PINS,
+  readAllWorkflowFiles,
   extractNamedStep,
   extractWorkflowDispatchTagInput,
   validateActionPins,

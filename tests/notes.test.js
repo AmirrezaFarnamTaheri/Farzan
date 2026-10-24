@@ -117,7 +117,7 @@ describe('notes route filters', () => {
         <button data-notes-semantic-search hidden>Semantic search</button>
         <button data-notes-semantic-clear hidden>Clear semantic</button>
         <div data-notes-semantic-status></div>
-        <div data-notes-toolbar><button data-ai-summarize hidden>Summarize note</button></div>
+        <div data-notes-toolbar><button data-ai-summarize hidden>Summarize note</button></div><button data-notes-remote-images>Load external images</button>
         <article data-notes-editor></article>
       </div>
     `;
@@ -129,6 +129,7 @@ describe('notes route filters', () => {
     window.PlasmaNotesApp?.destroy?.();
     vi.useRealTimers();
     localStorage.clear();
+    sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
   it('extracts list excerpts without parsing note HTML into the live document', () => {
@@ -144,6 +145,18 @@ describe('notes route filters', () => {
     expect(leaked).toEqual([]);
   });
 
+  it('does not automatically contact external image hosts from imported notes', () => {
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('img[src^="https://tracker.example"]')).toBeNull();
+    expect(editor.querySelector('img[data-remote-src^="https://tracker.example"]')).not.toBeNull();
+    const control = document.querySelector('[data-notes-remote-images]');
+    expect(control).not.toBeNull();
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    control.click();
+    expect(control.getAttribute('aria-pressed')).toBe('true');
+    expect(editor.querySelector('img[src^="https://tracker.example"]')).not.toBeNull();
+  });
+
   it('shows only pinned notes when the pinned folder is selected', () => {
     document.querySelector('[data-folder-id="__pinned__"]').click();
 
@@ -151,6 +164,27 @@ describe('notes route filters', () => {
     expect(list.textContent).toContain('Pinned note');
     expect(list.textContent).not.toContain('Regular note');
     expect(document.querySelector('[data-folder-id="__pinned__"]').classList.contains('active')).toBe(true);
+  });
+
+  it('removes hidden search filters when leaving and reopening Notes', async () => {
+    const input = document.querySelector('[data-notes-search]');
+    input.value = 'this phrase matches no saved note';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(window.PlasmaNotesList._filter.query).toBe(input.value);
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+
+    window.PlasmaNotesList._semanticIds = ['nonexistent-embedding-result'];
+    window.PlasmaNotesApp.destroy();
+
+    expect(window.PlasmaNotesList._filter.query).toBe('');
+    expect(window.PlasmaNotesList._semanticIds).toBeNull();
+
+    window.PlasmaNotesApp.init();
+    const restored = document.querySelector('[data-notes-search]');
+    expect(restored.value).toBe('');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
   });
 
   it('filters notes by search query and clears the query with Escape', async () => {
@@ -182,6 +216,24 @@ describe('notes route filters', () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(document.queryCommandState).not.toHaveBeenCalled();
+  });
+
+  it('keeps All Notes and folder counters in sync after new and duplicated notes', () => {
+    const total = window.PlasmaNotesStore.getNotes().length;
+    const allCounter = () => document.querySelector('[data-folder-id=""] .folder-count')?.textContent;
+    const defaultCounter = () => document.querySelector('[data-folder-id="default"] .folder-count')?.textContent;
+    expect(allCounter()).toBe(String(total));
+
+    window.PlasmaNotesApp.newNote('default');
+    expect(allCounter()).toBe(String(total + 1));
+    const firstNewNote = window.DB.saveNote.mock.calls.at(-1)[0];
+    expect(firstNewNote.folderId).toBe('default');
+
+    window.PlasmaNotesApp.duplicateNote(firstNewNote.id);
+    expect(allCounter()).toBe(String(total + 2));
+    expect(defaultCounter()).toBe(String(
+      window.PlasmaNotesStore.getNotes().filter(note => note.folderId === 'default').length
+    ));
   });
 
   it('routes note create, update, and delete through the DB bridge when available', async () => {
@@ -760,32 +812,27 @@ describe('notes route filters', () => {
     expect(window.OpenCourseDeck.AI.summarizeText).not.toHaveBeenCalled();
   });
 
-  it('indexes notes and renders semantic search results', async () => {
+  it('shows explicitly related keyword results without writing a search index', async () => {
     window.PlasmaNotesApp.destroy();
-    const embeddings = new Map();
     window.OpenCourseDeck.AI = {
-      status: vi.fn(async () => ({ available: true })),
-      upsertEmbedding: vi.fn(async ({ id, text, metadata }) => {
-        embeddings.set(id, { id, text, metadata });
-      }),
-      searchEmbeddings: vi.fn(async () => [{ id: 'regular-note', score: 0.9 }]),
+      upsertEmbedding: vi.fn(),
+      searchEmbeddings: vi.fn(),
     };
-
     window.PlasmaNotesApp.init();
     const input = document.querySelector('[data-notes-search]');
-    input.value = 'memory';
+    input.value = 'regular';
     document.querySelector('[data-notes-semantic-search]').click();
-
-    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.searchEmbeddings).toHaveBeenCalledWith('memory', { limit: 25 }));
-    expect(window.OpenCourseDeck.AI.upsertEmbedding).toHaveBeenCalled();
-    expect(embeddings.get('regular-note').text).toContain('Regular note');
     const list = document.querySelector('[data-notes-list]');
+    await vi.waitFor(() => expect(document.querySelector('[data-notes-semantic-status]').textContent)
+      .toContain('Related notes: 1'));
     expect(list.textContent).toContain('Regular note');
     expect(list.textContent).not.toContain('Pinned note');
-    expect(document.querySelector('[data-notes-semantic-status]').textContent).toContain('Semantic results: 1');
+    expect(window.OpenCourseDeck.AI.upsertEmbedding).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.AI.searchEmbeddings).not.toHaveBeenCalled();
 
     document.querySelector('[data-notes-semantic-clear]').click();
     expect(list.textContent).toContain('Regular note');
     expect(list.textContent).toContain('Pinned note');
   });
+
 });

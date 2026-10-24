@@ -47,6 +47,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
+      <section class="card card-filled" aria-label="Missing imported files" data-missing-library-section>
+        <div class="card-body">
+          <h2 class="text-lg font-semibold">Missing local files</h2>
+          <p class="text-sm text-muted">A metadata-only backup keeps notes and progress linked, but local PDFs and videos must be found again on this device.</p>
+          <div data-missing-library-files role="status">Checking local files…</div>
+        </div>
+      </section>
     </section>
   `);
 
@@ -96,6 +103,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
         await renderCourses();
         return;
       }
+      try { sessionStorage.setItem('ocd_active_import_course', record.id); } catch {}
       titleInput.value = '';
       if (descriptionInput) descriptionInput.value = '';
       Toast?.success?.('Course saved');
@@ -115,6 +123,62 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
   } catch {}
 
   renderCourses();
+  void renderMissingFiles();
+
+  async function renderMissingFiles() {
+    const section = document.querySelector('[data-missing-library-section]');
+    const container = document.querySelector('[data-missing-library-files]');
+    if (!section || !container) return;
+    const library = window.OpenCourseDeck?.UserLibrary;
+    if (typeof library?.listMissingFiles !== 'function' || typeof library?.relinkFile !== 'function') {
+      section.hidden = true;
+      return;
+    }
+    let missing;
+    try {
+      missing = await library.listMissingFiles();
+    } catch (error) {
+      container.textContent = 'Could not check local files. Check storage permissions and reload.';
+      return;
+    }
+    if (!container.isConnected) return;
+    section.hidden = !missing.length;
+    container.replaceChildren();
+    for (const entry of missing) {
+      const row = document.createElement('div');
+      row.className = 'button-row';
+      row.style.cssText = 'align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px';
+      const description = document.createElement('span');
+      description.className = 'text-sm';
+      description.textContent = `${entry.courseTitle} / ${entry.topicTitle} — ${entry.label}`;
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.hidden = true;
+      fileInput.accept = entry.kind === 'pdf' ? '.pdf,application/pdf'
+        : entry.kind === 'video' ? 'video/*,.mp4,.webm,.mkv' : '*/*';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-ghost btn-sm';
+      button.textContent = 'Locate file';
+      button.dataset.relinkFile = '';
+      button.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        button.disabled = true;
+        try {
+          await library.relinkFile(entry.ref, file);
+          Toast?.success?.('Local file relinked. Existing study links were preserved.');
+          await renderMissingFiles();
+        } catch (error) {
+          Toast?.error?.(error?.message || 'Could not relink this file');
+          button.disabled = false;
+        }
+      });
+      row.append(description, fileInput, button);
+      container.appendChild(row);
+    }
+  }
 
   async function renderCourses() {
     const list = document.querySelector('[data-my-course-list]');
@@ -233,7 +297,17 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
         remove.disabled = false;
       }
     });
-    actions.append(open, remove);
+    const addMedia = document.createElement('button');
+    addMedia.className = 'btn btn-ghost btn-sm';
+    addMedia.type = 'button';
+    addMedia.textContent = 'Add media';
+    addMedia.setAttribute('aria-label', `Add media to ${course.title || 'this course'}`);
+    addMedia.addEventListener('click', (event) => {
+      event.stopPropagation();
+      try { sessionStorage.setItem('ocd_active_import_course', course.id); } catch {}
+      window.OpenCourseDeck?.AddContent?.openMenu?.();
+    });
+    actions.append(open, remove, addMedia);
     body.append(title, description, meta, actions);
     card.appendChild(body);
     return card;

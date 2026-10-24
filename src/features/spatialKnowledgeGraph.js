@@ -109,6 +109,13 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.dpr = dpr;
 
     this.container.appendChild(canvas);
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-muted';
+      empty.setAttribute('role', 'status');
+      empty.textContent = 'Add notes to see your saved concepts here.';
+      this.container.appendChild(empty);
+    }
     const keyboardStatus = document.createElement('p');
     keyboardStatus.className = 'sr-only';
     keyboardStatus.setAttribute('aria-live', 'polite');
@@ -127,17 +134,15 @@ export class SpatialKnowledgeGraph extends EventEmitter {
     this.nodes = [];
     this.edges = [];
 
-    const total = Math.max(items.length, 12);
+    // Source records own graph identity. Empty workspaces are empty; never
+    // imply there are notes or conceptual connections that were not saved.
+    const records = Array.isArray(items) ? items : [];
+    const total = records.length;
     const radius = 220;
 
     // Procedural Fibonacci Sphere Node Distribution
     for (let i = 0; i < total; i++) {
-      const item = items[i] || {
-        id: `node_${i}`,
-        title: `Concept ${i + 1}`,
-        type: i % 3 === 0 ? 'course' : i % 3 === 1 ? 'note' : 'flashcard',
-        progress: (i * 17) % 100,
-      };
+      const item = records[i];
 
       const phi = Math.acos(1 - 2 * (i + 0.5) / total);
       const theta = Math.PI * (1 + Math.sqrt(5)) * (i + 0.5);
@@ -162,13 +167,19 @@ export class SpatialKnowledgeGraph extends EventEmitter {
       });
     }
 
-    // Connect nodes with dynamic orbital splines
-    for (let i = 0; i < this.nodes.length; i++) {
-      const targetIdx = (i + 1) % this.nodes.length;
-      const crossIdx = (i + 3) % this.nodes.length;
-      this.edges.push({ source: this.nodes[i], target: this.nodes[targetIdx] });
-      if (i % 2 === 0) {
-        this.edges.push({ source: this.nodes[i], target: this.nodes[crossIdx] });
+    // Only explicit, persisted relationships may produce edges. Sequential
+    // positions and orbital neighbours do not imply a knowledge relationship.
+    const nodeById = new Map(this.nodes.map(node => [String(node.id), node]));
+    const seen = new Set();
+    for (const node of this.nodes) {
+      const related = Array.isArray(node.raw?.relatedIds) ? node.raw.relatedIds : [];
+      for (const targetId of related) {
+        const target = nodeById.get(String(targetId));
+        if (!target || target === node) continue;
+        const key = [String(node.id), String(target.id)].sort().join('::');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        this.edges.push({ source: node, target });
       }
     }
 

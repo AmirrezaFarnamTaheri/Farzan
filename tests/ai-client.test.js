@@ -205,11 +205,22 @@ describe('AI client', () => {
 
     const results = await client.searchEmbeddings('memory retrieval study', { limit: 1 });
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ id: 'note-memory', metadata: { type: 'note' }, provider: 'local-hash-v2' });
+    expect(results[0]).toMatchObject({ id: 'note-memory', metadata: { type: 'note' }, provider: 'local-lexical-v3' });
     expect(results[0].score).toBeGreaterThan(0);
 
     await client.clearEmbeddings();
     await expect(client.searchEmbeddings('memory')).resolves.toEqual([]);
+  });
+
+  it('does not treat unrelated words as identical because of hash collisions', async () => {
+    const root = { DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) }, indexedDB, sessionStorage };
+    const client = createAIClient(root);
+    await client.clearEmbeddings();
+    await client.upsertEmbedding({ id: 'plants', text: 'photosynthesis', metadata: { type: 'note' } });
+    await client.upsertEmbedding({ id: 'space', text: 'galaxy', metadata: { type: 'note' } });
+    const hits = await client.searchEmbeddings('photosynthesis');
+    expect(hits.map(hit => hit.id)).toEqual(['plants']);
+    await client.clearEmbeddings();
   });
 
   it('indexes and searches Persian notes (non-Latin scripts are not discarded)', async () => {

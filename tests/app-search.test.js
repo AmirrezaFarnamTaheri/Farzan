@@ -96,7 +96,7 @@ describe('app topbar search rendering', () => {
     expect(window.__emptySearchXss).toBeUndefined();
   });
 
-  it('merges semantic note matches into universal topbar search', async () => {
+  it('finds related note words without indexing on each query or duplicating lexical hits', async () => {
     window.DB = {
       getAllNotes: vi.fn(async () => [
         { id: 'note-memory', title: 'Retrieval practice', content: '<p>Long term memory and recall.</p>' },
@@ -110,23 +110,22 @@ describe('app topbar search rendering', () => {
       allTopics: vi.fn(() => []),
     };
     window.OpenCourseDeck.AI = {
-      upsertEmbedding: vi.fn(async () => true),
-      searchEmbeddings: vi.fn(async () => [{ id: 'note-memory', score: 0.82 }]),
+      upsertEmbedding: vi.fn(),
+      searchEmbeddings: vi.fn(),
     };
-
     const input = document.querySelector('[data-search-input]');
+    input.value = 'retrieval memory';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(350);
+    await vi.waitFor(() => expect([...document.querySelectorAll('.search-result-item')]
+      .some(result => result.textContent.includes('Related note'))).toBe(true));
+    expect(window.OpenCourseDeck.AI.upsertEmbedding).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.AI.searchEmbeddings).not.toHaveBeenCalled();
+
     input.value = 'recall';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.advanceTimersByTimeAsync(350);
-
-    await vi.waitFor(() => expect(window.OpenCourseDeck.AI.searchEmbeddings).toHaveBeenCalledWith('recall', { limit: 4 }));
-    expect(window.OpenCourseDeck.AI.upsertEmbedding).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'note-memory',
-      text: expect.stringContaining('Long term memory'),
-    }));
-    const result = document.querySelector('.search-result-item');
-    expect(result.textContent).toContain('Retrieval practice');
-    expect(result.textContent).toContain('Semantic note');
+    await vi.waitFor(() => expect([...document.querySelectorAll('.search-result-item')].length).toBe(1));
   });
 
   it('escapes catalog course and topic titles in the courses view', async () => {

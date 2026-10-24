@@ -603,6 +603,38 @@
    * @returns {string} sanitized markup, or escaped text if the markup is not
    *   stable under re-parsing
    */
+  const REMOTE_IMAGE_PERMISSION = 'ocd_note_external_images_session';
+
+  function remoteImagesAllowed() {
+    try { return sessionStorage.getItem(REMOTE_IMAGE_PERMISSION) === 'true'; }
+    catch { return false; }
+  }
+
+  // DOMPurify guards script/markup safety; remote image loading is a separate
+  // privacy concern. Work in an inert template so the transformation itself
+  // cannot request third-party resources.
+  function controlRemoteNoteImages(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html ?? '');
+    const allow = remoteImagesAllowed();
+    for (const image of template.content.querySelectorAll('img')) {
+      const reference = image.getAttribute('data-remote-src') || image.getAttribute('src');
+      if (!reference) continue;
+      let resolved;
+      try { resolved = new URL(reference, document.baseURI); }
+      catch { image.removeAttribute('src'); continue; }
+      if (!['http:', 'https:'].includes(resolved.protocol) || resolved.origin === location.origin) continue;
+      image.setAttribute('data-remote-src', resolved.href);
+      if (allow) {
+        image.setAttribute('src', resolved.href);
+      } else {
+        image.removeAttribute('src');
+        if (!image.getAttribute('alt')) image.setAttribute('alt', 'External image blocked');
+      }
+    }
+    return template.innerHTML;
+  }
+
   function fallbackSanitize(html) {
     // <template> content is inert: parsing it loads no resources and runs no
     // script, unlike the <div> this used to build.
@@ -705,14 +737,14 @@
     },
 
     // ── Load note into editor ─────────────────────────────
-    load(note) {
+    load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
       this._history    = [];
       this._historyIdx = -1;
       this._snapshot();
-      this._el.focus();
+      this._el.focus({ preventScroll });
 
       // Update title field
       const titleEl = $('[data-note-title-input]');
@@ -839,15 +871,15 @@
     _sanitize(html) {
       const purify = window.DOMPurify;
       if (purify?.sanitize) {
-        return purify.sanitize(String(html ?? ''), {
+        return controlRemoteNoteImages(purify.sanitize(String(html ?? ''), {
           FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
-          FORBID_ATTR: ['style'],
+          FORBID_ATTR: ['style', 'srcset', 'sizes'],
           // Block javascript: etc while still allowing normal links/images.
           ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-        });
+        }));
       }
 
-      return fallbackSanitize(html);
+      return controlRemoteNoteImages(fallbackSanitize(html));
     },
 
     // ── Toolbar state sync ────────────────────────────────
@@ -1098,6 +1130,11 @@
     destroy() {
       this._clearRenderQueue();
       this._container = null;
+      // The search input is recreated empty on each route mount. Reset its
+      // singleton filters as well, otherwise a previous zero-result query
+      // remains invisibly active and makes already-saved notes appear lost.
+      this._filter.query = '';
+      this._semanticIds = null;
     },
 
     _clearRenderQueue() {
@@ -1577,6 +1614,10 @@
   const NotesSearch = {
     init(inputEl) {
       if (!inputEl) return;
+      // The singleton NotesList persists independently of route DOM. Always
+      // reflect its current query in the new input (and the cleared value on
+      // remount) so a hidden filter cannot make stored notes appear deleted.
+      inputEl.value = NotesList._filter.query || '';
       RouteListeners.on(inputEl, 'input', debounce(e => {
         NotesList.setFilter({ query: e.target.value.trim() });
       }, 300));
@@ -1833,6 +1874,28 @@
       // Init toolbar
       Toolbar.init($('[data-notes-toolbar]'));
       this._initAIControls();
+      const remoteToggle = $('[data-notes-remote-images]');
+      if (remoteToggle) {
+        remoteToggle.setAttribute('aria-pressed', remoteImagesAllowed() ? 'true' : 'false');
+        remoteToggle.textContent = remoteImagesAllowed() ? 'Block external images' : 'Load external images';
+        RouteListeners.on(remoteToggle, 'click', () => {
+          const next = !remoteImagesAllowed();
+          try {
+            if (next) sessionStorage.setItem(REMOTE_IMAGE_PERMISSION, 'true');
+            else sessionStorage.removeItem(REMOTE_IMAGE_PERMISSION);
+          } catch {
+            window.OpenCourseDeck?.Toast?.error?.('Image permission could not be saved for this session');
+            return;
+          }
+          remoteToggle.setAttribute('aria-pressed', next ? 'true' : 'false');
+          remoteToggle.textContent = next ? 'Block external images' : 'Load external images';
+          // Save the current draft before remounting; leave remote loading off
+          // again on restart because this permission is session-only.
+          Editor.save(true);
+          const note = Store.getNote(Editor._currentId);
+          if (note) Editor.load(note, { preventScroll: true });
+        });
+      }
 
       // Title input
       const titleInput = $('[data-note-title-input]');
@@ -1873,17 +1936,17 @@
       // empty, and creating here would persist a spurious "Untitled Note"
       // on every page load.
       const notes = Store.getNotes();
-      if (notes.length) this.openNote(notes[0].id);
+      if (notes.length) this.openNote(notes[0].id, { preventScroll: true });
 
       this._bindSyncRefresh();
       Store.hydrateFromDB().then((changed) => {
         if (!this._inited) return;
         if (changed) this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
         const hydrated = Store.getNotes();
-        if (!hydrated.length) this.newNote();
-        else if (!notes.length) this.openNote(hydrated[0].id);
+        if (!hydrated.length) this.newNote(undefined, { preventScroll: true });
+        else if (!notes.length) this.openNote(hydrated[0].id, { preventScroll: true });
       }).catch(() => {
-        if (this._inited && !Store.getNotes().length) this.newNote();
+        if (this._inited && !Store.getNotes().length) this.newNote(undefined, { preventScroll: true });
       });
     },
 
@@ -1916,14 +1979,14 @@
 
       const current = currentId && Store.getNote(currentId);
       if (current) {
-        if (!pendingLocalEdit) Editor.load(current);
+        if (!pendingLocalEdit) Editor.load(current, { preventScroll: true });
         NotesList.setActive(current.id);
         return { currentId: current.id, editorReloaded: !pendingLocalEdit };
       }
 
       const notes = Store.getNotes();
       if (notes.length) {
-        if (!pendingLocalEdit) this.openNote(notes[0].id);
+        if (!pendingLocalEdit) this.openNote(notes[0].id, { preventScroll: true });
         return { currentId: notes[0].id, editorReloaded: !pendingLocalEdit };
       }
 
@@ -1947,18 +2010,21 @@
       return result;
     },
 
-    newNote(folderId = NotesList._filter.folderId ?? 'default') {
+    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
       const note = Store.createNote({ folderId });
       NotesList.render();
-      this.openNote(note.id);
+      // Folder counts are a separate view; refresh them after creating notes.
+      // Otherwise the list can show two notes while All Notes still says 0.
+      FoldersPanel.render();
+      this.openNote(note.id, { preventScroll });
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
     },
 
-    openNote(id) {
+    openNote(id, { preventScroll = false } = {}) {
       Editor.save(true); // Save current
       const note = Store.getNote(id);
       if (!note) return;
-      Editor.load(note);
+      Editor.load(note, { preventScroll });
       NotesList.setActive(id);
 
       const pane = $('[data-notes-main-pane]');
@@ -1993,6 +2059,7 @@
         title: `${note.title} (Copy)`,
       });
       NotesList.render();
+      FoldersPanel.render();
       this.openNote(copy.id);
     },
 
@@ -2072,24 +2139,27 @@
     },
 
     async semanticSearchNotes() {
-      const ai = window.OpenCourseDeck?.AI;
       const query = $('[data-notes-search]')?.value?.trim();
       const status = $('[data-notes-semantic-status]');
       if (!query) {
         if (status) status.textContent = 'Enter a note search first';
         return { ok: false, reason: 'empty-query' };
       }
-      if (!ai?.searchEmbeddings || !ai?.upsertEmbedding) return { ok: false, reason: 'unavailable' };
-      try {
-        const index = await this.rebuildSemanticIndex();
-        const results = await ai.searchEmbeddings(query, { limit: 25 });
-        NotesList.setSemanticResults(results.map(result => result.id));
-        if (status) status.textContent = `Semantic results: ${results.length} from ${index.indexed} indexed notes`;
-        return { ok: true, results: results.length, indexed: index.indexed };
-      } catch {
-        if (status) status.textContent = 'Semantic search failed';
-        return { ok: false, reason: 'search-failed' };
-      }
+      // Exact script-aware keyword overlap is predictable, private and
+      // synchronous. A note query should not reindex an entire library.
+      const terms = new Set(query.toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
+      const scores = Store.getNotes().map(note => {
+        const haystack = `${note.title || ''} ${plainTextFromHtml(note.content || '')}`
+          .toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || [];
+        const words = new Set(haystack);
+        return { id: note.id, matches: [...terms].filter(term => words.has(term)).length };
+      });
+      const ids = scores.filter(item => item.matches > 0)
+        .sort((a, b) => b.matches - a.matches)
+        .map(item => item.id);
+      NotesList.setSemanticResults(ids);
+      if (status) status.textContent = `Related notes: ${ids.length} (matching keywords)`;
+      return { ok: true, results: ids.length };
     },
 
     clearSemanticSearch() {
@@ -2115,10 +2185,9 @@
       const searchButton = $('[data-notes-semantic-search]');
       const clearButton = $('[data-notes-semantic-clear]');
       if (!searchButton || !clearButton) return;
-      const available = Boolean(window.OpenCourseDeck?.AI?.searchEmbeddings && window.OpenCourseDeck?.AI?.upsertEmbedding);
-      searchButton.hidden = !available;
-      clearButton.hidden = !available;
-      if (!available) return;
+      // Related-keyword search requires no model, index or API credentials.
+      searchButton.hidden = false;
+      clearButton.hidden = false;
       RouteListeners.on(searchButton, 'click', () => this.semanticSearchNotes());
       RouteListeners.on(clearButton, 'click', () => this.clearSemanticSearch());
     },

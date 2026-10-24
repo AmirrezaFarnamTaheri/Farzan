@@ -246,19 +246,30 @@
 .notes-title {
   min-width: 0;
   flex: 1 1 auto;
-  padding: 0;
+  /* Text must not touch or clip against the focus bounds in RTL or LTR.
+     Keep inline padding on both sides even while the field is elided. */
+  padding: 0 var(--space-2);
   border: 0;
   background: transparent;
   color: var(--text-primary);
+  text-align: start;
   font-family: var(--font-serif);
-  font-size: clamp(1.75rem, 3.2vw, 2.65rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.2;
+  /* An editable title must stay readable without covering the Save status. */
+  font-size: clamp(1.25rem, 1.8vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
 }
 
 .notes-title:focus {
   box-shadow: none;
+}
+
+.notes-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .notes-save {
@@ -436,6 +447,25 @@
   margin-top: 0.8em;
 }
 
+/* The app resets list markers globally for navigation. Authored lesson
+   content must retain its semantic bullets and ordered numbering. */
+.notes-editor ul {
+  list-style-type: disc;
+  margin-block: 0.6em;
+  padding-inline-start: 1.5em;
+}
+
+.notes-editor ol {
+  list-style-type: decimal;
+  margin-block: 0.6em;
+  padding-inline-start: 1.5em;
+}
+
+.notes-editor li {
+  display: list-item;
+  margin-block: 0.25em;
+}
+
 .notes-footer {
   display: flex;
   align-items: center;
@@ -506,6 +536,20 @@
 }
 
 @media (max-width: 560px) {
+  /* Keep the document editor discoverable above the fold on small phones,
+     without making folders or the saved-note list inaccessible. */
+  .notes-sidebar {
+    max-height: none;
+    overflow-y: visible;
+    overscroll-behavior: contain;
+  }
+
+  .notes-list {
+    max-height: min(240px, 34dvh);
+    min-height: 112px;
+    overflow-y: auto;
+  }
+
   .notes-header-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -519,8 +563,8 @@
   }
 
   .notes-export-popover {
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
     width: min(280px, calc(100vw - 32px));
   }
 

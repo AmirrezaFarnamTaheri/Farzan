@@ -767,14 +767,25 @@ import { Pointer } from './src/lib/pointer.js';
         if (target.closest('[data-sidebar-toggle]') || target.closest('.sidebar-collapse-btn')) {
           this.toggle();
         }
-        // Mobile: close on overlay click
+        // Keep the mobile drawer state, trigger accessibility attributes and
+        // body scroll lock in sync. Navigating away must dismiss the drawer.
         if (target.classList.contains('sidebar-overlay')) {
           this.closeMobile();
         }
-        // Topbar menu button (mobile)
-        if (target.closest('.topbar-menu-btn')) {
-          this.openMobile();
+        if (target.closest('.sidebar a[href^="#/"]')
+            && this.el.classList.contains('sidebar-mobile-open')) {
+          this.closeMobile();
         }
+        if (target.closest('.topbar-menu-btn')) {
+          if (this.el.classList.contains('sidebar-mobile-open')) this.closeMobile();
+          else this.openMobile();
+        }
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !this.el.classList.contains('sidebar-mobile-open')) return;
+        this.closeMobile();
+        document.getElementById('mobile-menu-btn')?.focus({ preventScroll: true });
       });
 
       // Sub-nav toggle
@@ -824,18 +835,29 @@ import { Pointer } from './src/lib/pointer.js';
 
     openMobile() {
       this.el.classList.add('sidebar-mobile-open');
-      // Overlay
+      const trigger = document.getElementById('mobile-menu-btn');
+      trigger?.setAttribute('aria-expanded', 'true');
+      trigger?.setAttribute('aria-label', 'Close navigation menu');
+      // Keep the backdrop in the same stacking context as the sidebar. The
+      // application root is isolated from the document root by shell styles:
+      // attaching a z-index:60 overlay to <body> placed it *above* the entire
+      // sidebar (z-index:70 within its ancestor context), blurring the drawer
+      // and intercepting links. The overlay and drawer must be siblings.
+      const shell = this.el.parentElement;
       let overlay = $('.sidebar-overlay');
       if (!overlay) {
-        overlay = createElement('div', { class: 'sidebar-overlay' });
-        document.body.appendChild(overlay);
+        overlay = createElement('div', { class: 'sidebar-overlay', 'aria-hidden': 'true' });
       }
+      if (overlay.parentElement !== shell) shell.appendChild(overlay);
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
     },
 
     closeMobile() {
       this.el.classList.remove('sidebar-mobile-open');
+      const trigger = document.getElementById('mobile-menu-btn');
+      trigger?.setAttribute('aria-expanded', 'false');
+      trigger?.setAttribute('aria-label', 'Open navigation menu');
       const overlay = $('.sidebar-overlay');
       if (overlay) overlay.classList.remove('active');
       document.body.style.overflow = '';
@@ -951,7 +973,8 @@ import { Pointer } from './src/lib/pointer.js';
       for (const event of [
         'note:create', 'note:save', 'note:delete',
         'pdf:annotate', 'sync:message', 'sync:local-change',
-        'storage:import-complete', 'data:loaded',
+        'storage:import-complete', 'data:loaded', 'data:degraded',
+        'library:changed', 'storage:cleared',
       ]) {
         bus?.on?.(event, invalidate);
       }
@@ -991,16 +1014,19 @@ import { Pointer } from './src/lib/pointer.js';
       OpenCourseDeck.bus.emit('search:query', eventPayload);
       const lexical = data
         .filter((item) => {
-          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
+          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''} ${item.searchText || ''}`.toLowerCase();
           return haystack.includes(q);
         })
         .slice(0, 12);
       const semantic = await this._querySemanticNotes(value, data);
-      const seen = new Set(lexical.map(item => item.id || `${item.category}:${item.label}`));
+      const uniqueKey = item => item.sourceType === 'note' && item.sourceId
+        ? `note:${item.sourceId}`
+        : (item.id || `${item.category}:${item.label}`);
+      const seen = new Set(lexical.map(uniqueKey));
       return [
         ...lexical,
         ...semantic.filter(item => {
-          const key = item.id || `${item.category}:${item.label}`;
+          const key = uniqueKey(item);
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -1009,32 +1035,27 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     async _querySemanticNotes(value, data = []) {
-      const ai = window.OpenCourseDeck?.AI;
-      if (!ai?.upsertEmbedding || !ai?.searchEmbeddings) return [];
-      const notes = data.filter(item => item.sourceType === 'note' && item.sourceId);
-      if (!notes.length) return [];
-      try {
-        await Promise.all(notes.map(item => ai.upsertEmbedding({
-          id: item.sourceId,
-          text: `${item.label || ''}\n${item.searchText || item.description || ''}`,
-          metadata: { type: 'note', title: item.label || '', href: item.href || '#/notes' },
-        })));
-        const hits = await ai.searchEmbeddings(value, { limit: 4 });
-        const byId = new Map(notes.map(item => [item.sourceId, item]));
-        return hits.map(hit => {
-          const item = byId.get(hit.id);
-          if (!item) return null;
-          return {
-            ...item,
-            id: `semantic-note:${item.sourceId}`,
-            icon: 'brain',
-            category: 'Semantic note',
-            description: `Semantic match${hit.score ? ` · ${Math.round(hit.score * 100)}%` : ''}`,
-          };
-        }).filter(Boolean);
-      } catch {
-        return [];
-      }
+      // Related-word suggestions are based only on exact Unicode word overlap.
+      // Avoid rewriting every note into IndexedDB on every search keystroke:
+      // indexing is not a user-query side effect. These are deliberately not
+      // described as neural/semantic results or calibrated percentages.
+      const words = new Set(String(value || '').toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
+      if (words.size < 2) return [];
+      const ranked = data.filter(item => item.sourceType === 'note' && item.sourceId)
+        .map(item => {
+          const terms = new Set(`${item.label || ''} ${item.searchText || item.description || ''}`
+            .toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []);
+          const shared = [...words].filter(word => terms.has(word)).length;
+          return { item, shared };
+        }).filter(row => row.shared > 0)
+        .sort((a, b) => b.shared - a.shared);
+      return ranked.slice(0, 4).map(({ item }) => ({
+        ...item,
+        id: `related-note:${item.sourceId}`,
+        icon: 'search',
+        category: 'Related note',
+        description: 'Matching note keywords',
+      }));
     },
 
     async _loadUniversalData() {
@@ -1061,11 +1082,14 @@ import { Pointer } from './src/lib/pointer.js';
         results.push({
           icon: 'library',
           label: String(course.title || course.name || course.id),
+          // Course display names can be Persian while URLs/IDs are English.
+          // Index the readable slug so both language paths are discoverable.
+          searchText: String(course.id || '').replace(/[-_]+/g, ' '),
           description: Array.isArray(course.topics) && course.topics.length
             ? `${course.topics.length} topic${course.topics.length === 1 ? '' : 's'}`
             : '',
           category: 'Course',
-          href: '#/courses',
+          href: `#/courses?id=${encodeURIComponent(String(course.id))}`,
         });
       });
       (catalog.topics || []).forEach((topic) => {
@@ -1076,8 +1100,9 @@ import { Pointer } from './src/lib/pointer.js';
           icon: topic.pdfs?.length ? 'file-pdf' : topic.videos?.length ? 'play' : 'search',
           label: title,
           description: source,
+          searchText: `${String(topic.courseId || '').replace(/[-_]+/g, ' ')} ${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
-          href: '#/courses',
+          href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {
             setPendingCourseMedia(topic.topicId);
           },
@@ -2338,6 +2363,9 @@ import { Pointer } from './src/lib/pointer.js';
 
       const summary = document.createElement('div');
       summary.className = 'text-sm';
+      // Prevent 'Page 1/129' and count units from reordering in an RTL shell.
+      // This widget's labels are English; its flex position remains logical.
+      summary.dir = 'ltr';
       summary.style.opacity = '.8';
       summary.append(`${total.toLocaleString()} items • Page `);
       const currentPage = document.createElement('strong');
@@ -3266,6 +3294,8 @@ import { Pointer } from './src/lib/pointer.js';
         setView: set,
         safeMediaUrl,
         Toast,
+        Router,
+        setPendingCourseSession,
       });
     }
 

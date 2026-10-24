@@ -330,3 +330,149 @@ describe('Flashcards vault persistence', () => {
     expect(window.DB.store.ocd_flashcards.map((c) => c.front)).toEqual(['Restored']);
   });
 });
+
+describe('flashcard editing and deletion', () => {
+  beforeEach(() => {
+    window.OpenCourseDeck.Flashcards.manager.reset();
+    window.DB = {
+      records: [],
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async (key, value) => {
+        window.DB.records = value;
+        return value;
+      }),
+    };
+  });
+
+  it('edits a card in place without losing its review or source history', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    const card = await manager.addCard({ front: 'Old question', back: 'Old answer', deck: 'Biology', sourceNoteId: 'note-1' });
+    const reviewed = await manager.reviewCard(card.id, 5);
+    const updated = await manager.updateCard(card.id, { front: 'Corrected question', back: 'Corrected answer', deck: 'Biology' });
+    expect(updated.id).toBe(card.id);
+    expect(updated.sourceNoteId).toBe('note-1');
+    expect(updated.repetitions).toBe(reviewed.repetitions);
+    expect(window.DB.records[0].front).toBe('Corrected question');
+  });
+
+  it('exposes editing and deleting from a card-management surface', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    const card = await manager.addCard({ front: 'Editable Q', back: 'Editable A', deck: 'General' });
+    document.body.innerHTML = '<div id="aria-announcer"></div><div id="studio-host"></div>';
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+    const edit = container.querySelector(`[data-fc-edit="${card.id}"]`);
+    const remove = container.querySelector(`[data-fc-delete="${card.id}"]`);
+    expect(edit).not.toBeNull();
+    expect(remove).not.toBeNull();
+    edit.click();
+    expect(container.querySelector('#fc-new-front').value).toBe('Editable Q');
+    expect(container.querySelector('#fc-new-form').hidden).toBe(false);
+    container.querySelector('#fc-new-front').value = 'Edited Q';
+    container.querySelector('#fc-new-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(async () => expect((await manager.getCards())[0].front).toBe('Edited Q'));
+  });
+});
+
+describe('flashcard canonical storage invariants', () => {
+  it('refuses an apparent local success when the canonical DB write failed', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    const original = [{
+      id: 'fc-old', front: 'Original Q', back: 'Original A',
+      deck: 'History', nextReviewDate: '2020-01-01',
+    }];
+    localStorage.setItem('ocd_flashcards', JSON.stringify(original));
+    window.DB = {
+      getSetting: vi.fn(async () => original),
+      saveSetting: vi.fn(async () => { throw new Error('IndexedDB write rejected'); }),
+    };
+    manager.invalidateCache();
+    expect((await manager.getCards()).map(c => c.front)).toEqual(['Original Q']);
+    await expect(manager.addCard({ front: 'New Q', back: 'New A' }))
+      .rejects.toThrow('IndexedDB write rejected');
+    expect((await manager.getCards()).map(c => c.front)).toEqual(['Original Q']);
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards')).map(c => c.front)).toEqual(['Original Q']);
+  });
+
+  it('never resurrects a stale local mirror after the canonical DB deck was cleared', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    localStorage.setItem('ocd_flashcards', JSON.stringify([{
+      id: 'fc-stale', front: 'Stale Q', back: 'Stale A', deck: 'Old',
+      nextReviewDate: '2020-01-01',
+    }]));
+    window.DB = { getSetting: vi.fn(async () => []), saveSetting: vi.fn(async () => true) };
+    manager.invalidateCache();
+    expect(await manager.getCards()).toEqual([]);
+    expect(await manager.getDueCards()).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards'))).toEqual([]);
+  });
+});
+
+describe('flashcard canonical read and due query safety', () => {
+  it('does not turn a failed canonical read into apparent empty or old local state', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    localStorage.setItem('ocd_flashcards', JSON.stringify([{
+      id: 'stale', front: 'Stale', back: 'Old', deck: 'Old', nextReviewDate: '2020-01-01',
+    }]));
+    window.DB = {
+      getSetting: vi.fn(async () => { throw new Error('canonical database unreadable'); }),
+      saveSetting: vi.fn(async () => true),
+    };
+    manager.invalidateCache();
+    await expect(manager.getCards()).rejects.toThrow('canonical database unreadable');
+    await expect(manager.addCard({ front: 'Another', back: 'Answer' }))
+      .rejects.toThrow('canonical database unreadable');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('does not accept a false acknowledged canonical card write', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => []),
+      saveSetting: vi.fn(async () => false),
+    };
+    manager.invalidateCache();
+    await expect(manager.addCard({ front: 'Uncommitted', back: 'Nope' }))
+      .rejects.toThrow(/not acknowledged|could not be saved/i);
+    expect(await manager.getCards()).toEqual([]);
+  });
+
+  it('hydrates the authoritative deck before asking for due cards', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => [{
+        id: 'due-from-db', front: 'Review', back: 'Due', deck: 'Science',
+        nextReviewDate: '2020-01-01',
+      }]),
+      saveSetting: vi.fn(async () => true),
+    };
+    manager.invalidateCache();
+    const cards = await manager.getDueCards();
+    expect(cards.map(card => card.id)).toEqual(['due-from-db']);
+  });
+});
+
+describe('flashcard durable-save failures', () => {
+  it('rejects a card mutation and preserves memory when both stores cannot save', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => { throw new Error('IndexedDB quota exceeded'); }),
+    };
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('localStorage quota exceeded');
+    });
+    try {
+      await expect(manager.addCard({ front: 'Question', back: 'Answer' })).rejects.toThrow();
+      expect(await manager.getCards()).toEqual([]);
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+});

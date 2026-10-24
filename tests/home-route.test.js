@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
 
-function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes = false } = {}) {
+function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards = [], failNotes = false } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
   window.DataStore = {
     init: vi.fn(async () => true),
@@ -18,6 +18,7 @@ function mountDashboard({ progress = [], notes = [], timestamps = [], failNotes 
       return notes;
     }),
     getAllTimestamps: vi.fn(async () => timestamps),
+    getSetting: vi.fn(async key => key === 'ocd_flashcards' ? flashcards : null),
   };
 
   const Router = { navigate: vi.fn() };
@@ -44,6 +45,7 @@ describe('home dashboard', () => {
       ],
       notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', updatedAt: now - 1000 }],
       timestamps: [{ topicId: 'topic-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
+      flashcards: [{ id: 'card-due', front: 'Explain spacing', deck: 'Design', nextReviewDate: '2020-01-01' }],
     });
 
     await vi.waitFor(() => {
@@ -62,6 +64,22 @@ describe('home dashboard', () => {
     expect(document.body.textContent).toContain('Spacing principles');
   });
 
+  it('counts only actual scheduled flashcards and opens the Review screen', async () => {
+    const { Router } = mountDashboard({
+      progress: [{ topicId: 'topic-2', percent: 100, status: 'done', updatedAt: Date.now() - 40 * 86400000 }],
+      flashcards: [
+        { id: 'one', front: 'Review this', nextReviewDate: '2020-01-01' },
+        { id: 'two', front: 'Later', nextReviewDate: '2099-01-01' },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.querySelector('[data-home-review-count]').textContent).toBe('1');
+    const review = document.querySelector('[data-home-widget="review"]');
+    expect(review.textContent).toContain('Review this');
+    review.click();
+    expect(Router.navigate).toHaveBeenCalledWith('#/flashcards');
+  });
+
   it('resumes the latest topic from its saved position', async () => {
     const { Router, setPendingCourseMedia } = mountDashboard({
       progress: [{ topicId: 'topic-1', percent: 60, updatedAt: Date.now() }],
@@ -72,6 +90,8 @@ describe('home dashboard', () => {
       expect(document.querySelector('[data-home-focus-action] span')?.textContent).toBe('Resume this topic');
     });
 
+    expect(document.querySelector('[data-home-browse-secondary]')?.getAttribute('href')).toBe('#/courses');
+    expect(document.querySelector('[data-home-resume] use')?.getAttribute('href')).toBe('#i-play');
     document.querySelector('[data-home-resume]')?.click();
     expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 180);
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
@@ -96,5 +116,36 @@ describe('home dashboard', () => {
     expect(document.getElementById('home-focus-title')?.textContent).toBe('Choose a course');
     expect(document.body.textContent).toContain('No recent activity');
     expect(document.querySelector('[data-home-resume] span')?.textContent).toBe('Browse courses');
+    expect(document.querySelector('[data-home-resume] use')?.getAttribute('href')).toBe('#i-curriculum');
+    expect(document.querySelector('[data-home-browse-secondary]')).toBeNull();
+    expect(document.querySelectorAll('.home-actions > button, .home-actions > a')).toHaveLength(3);
+  });
+});
+
+describe('home entry and resume contracts', () => {
+  it('does not bubble the Home Add action to outside-click dismiss handlers', () => {
+    mountDashboard();
+    const openMenu = vi.fn();
+    window.OpenCourseDeck = { AddContent: { openMenu } };
+    const outsideClick = vi.fn();
+    document.addEventListener('click', outsideClick);
+    try {
+      document.querySelector('[data-home-add]').click();
+      expect(openMenu).toHaveBeenCalledOnce();
+      expect(outsideClick).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('click', outsideClick);
+    }
+  });
+
+  it('only resumes a position belonging to the focused topic', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      progress: [{ topicId: 'topic-1', percent: 60, position: 90, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-2', position: 10, updatedAt: now - 60000 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
   });
 });

@@ -198,12 +198,6 @@ function embedText(text) {
   return vector.map(value => Number((value / norm).toFixed(6)));
 }
 
-function cosine(a = [], b = []) {
-  let score = 0;
-  for (let i = 0; i < Math.min(a.length, b.length); i += 1) score += Number(a[i] || 0) * Number(b[i] || 0);
-  return score;
-}
-
 function parseSecureHttpUrl(value, root, label = 'URL') {
   const source = String(value || '').trim();
   if (!/^https?:\/\//i.test(source)) throw new TypeError(`${label} must be an absolute HTTP or HTTPS URL`);
@@ -553,9 +547,10 @@ export function createAIClient(root = window) {
     const record = {
       id: recordId,
       vector: embedText(text),
+      tokens: [...new Set(tokenize(text, 2))],
       textPreview: plainText(text).slice(0, 500),
       metadata,
-      provider: 'local-hash-v2',
+      provider: 'local-lexical-v3',
       updatedAt: Date.now(),
     };
     await modelStore(root, 'readwrite', store => store.put(record), AI_EMBEDDING_STORE);
@@ -563,11 +558,18 @@ export function createAIClient(root = window) {
   }
 
   async function searchEmbeddings(query, { limit = 8 } = {}) {
-    const queryVector = embedText(query);
+    // This offline index is lexical, not a neural embedding. Exact Unicode
+    // tokens prevent unrelated strings from producing 100% similarity through
+    // collisions in the old 64-bin hash scheme. Existing records remain
+    // searchable through their text preview until they are next updated.
+    const queryTerms = new Set(tokenize(query, 2));
+    if (!queryTerms.size) return [];
     const records = await modelStore(root, 'readonly', store => store.getAll(), AI_EMBEDDING_STORE) || [];
-    return records
-      .filter(record => Array.isArray(record.vector))
-      .map(record => ({ ...record, score: Number(cosine(queryVector, record.vector).toFixed(6)) }))
+    return records.map(record => {
+      const terms = new Set(Array.isArray(record.tokens) ? record.tokens : tokenize(record.textPreview || '', 2));
+      const shared = [...queryTerms].filter(term => terms.has(term)).length;
+      return { ...record, score: Number((shared / queryTerms.size).toFixed(6)) };
+    })
       .filter(record => record.score > 0)
       .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)))
       .slice(0, Math.max(1, Number(limit) || 8));

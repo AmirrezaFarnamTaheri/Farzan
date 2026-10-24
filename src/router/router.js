@@ -148,6 +148,19 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
 
         const finish = () => {
           if (!isCurrent()) return;
+          // The app scrolls inside its persistent main shell. Reusing the old
+          // scrollTop on a new route hid PDF/Notes controls in short landscape
+          // viewports and could leave an apparently blank screen. Preserve
+          // scroll position for same-view deep links and explicit refreshes.
+          if (String(from || '').split('?')[0] !== path) {
+            for (const element of [
+              document.getElementById('view-container'),
+              document.getElementById('main-content'),
+              document.scrollingElement,
+            ]) {
+              if (element && element.scrollTop) element.scrollTop = 0;
+            }
+          }
           Progress?.pageBar?.finish?.();
           announce();
           bus?.emit?.('route:change', routeEvent);

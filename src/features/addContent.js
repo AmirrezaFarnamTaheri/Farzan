@@ -13,7 +13,7 @@ function toast(type, message) {
   const T = window.OpenCourseDeck?.Toast;
   if (!T) return;
   const fn = T[type];
-  if (typeof fn === 'function') return fn(message);
+  if (typeof fn === 'function') return fn.call(T, message);
   T.show?.({ message, type });
 }
 
@@ -74,6 +74,7 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
 
   const body = document.createElement('form');
   body.noValidate = true;
+  body.id = `add-content-form-${Math.random().toString(36).slice(2)}`;
   const controls = fields.map((spec) => {
     const created = field(spec);
     body.appendChild(created.wrap);
@@ -88,6 +89,7 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   cancel.textContent = 'Cancel';
   const confirm = document.createElement('button');
   confirm.type = 'submit';
+  confirm.setAttribute('form', body.id);
   confirm.className = 'btn btn-primary';
   confirm.textContent = confirmLabel;
   footer.append(cancel, confirm);
@@ -116,6 +118,70 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
   });
   controls[0]?.input?.focus?.();
   return modal;
+}
+
+const ACTIVE_IMPORT_COURSE_KEY = 'ocd_active_import_course';
+
+function selectedImportCourseId() {
+  // An explicit choice from a course card takes precedence over a picker
+  // created on a previous route. Picker changes also update this key.
+  try {
+    const selected = sessionStorage.getItem(ACTIVE_IMPORT_COURSE_KEY);
+    if (selected) return selected;
+  } catch { /* optional session state */ }
+  return document.querySelector('[data-add-course-destination]')?.value || undefined;
+}
+
+function setImportCourse(courseId) {
+  const id = String(courseId || '');
+  try {
+    if (id) sessionStorage.setItem(ACTIVE_IMPORT_COURSE_KEY, id);
+    else sessionStorage.removeItem(ACTIVE_IMPORT_COURSE_KEY);
+  } catch { /* session preferences are optional */ }
+  const selector = document.querySelector('[data-add-course-destination]');
+  if (selector && [...selector.options].some(option => option.value === id)) selector.value = id;
+}
+
+async function populateCourseDestination() {
+  const menu = document.getElementById('add-content-menu');
+  if (!menu) return;
+  let selector = menu.querySelector('[data-add-course-destination]');
+  if (!selector) {
+    const label = document.createElement('label');
+    label.className = 'form-group';
+    label.style.cssText = 'display:grid;gap:4px;padding:8px 10px;margin:0';
+    const title = document.createElement('span');
+    title.textContent = 'Add to course';
+    title.className = 'text-sm text-muted';
+    selector = document.createElement('select');
+    selector.className = 'select';
+    selector.dataset.addCourseDestination = '';
+    selector.setAttribute('aria-label', 'Destination course for imported materials');
+    selector.addEventListener('change', () => setImportCourse(selector.value));
+    label.append(title, selector);
+    menu.prepend(label);
+  }
+  const options = [{ id: '', title: 'My Library' }];
+  try {
+    const library = await window.OpenCourseDeck?.UserLibrary?.load?.();
+    for (const [id, course] of Object.entries(library?.courses || {})) {
+      if (id !== 'user-library') options.push({ id, title: String(course?.title || id) });
+    }
+  } catch {
+    // Keep a usable default when storage cannot be read; file writes still
+    // surface their own persistence error instead of assuming success.
+  }
+  const desired = selectedImportCourseId();
+  selector.replaceChildren(...options.map(({ id, title }) => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = title;
+    return option;
+  }));
+  const destinationExists = options.some(entry => entry.id === desired);
+  selector.value = destinationExists ? desired : '';
+  if (!destinationExists && desired) setImportCourse('');
+  positionMenu();
 }
 
 function menuItems() {
@@ -153,6 +219,7 @@ function setMenuOpen(open, { restoreFocus = false } = {}) {
   trigger?.setAttribute('aria-expanded', open ? 'true' : 'false');
   trigger?.classList.toggle('is-open', Boolean(open));
   if (open) {
+    void populateCourseDestination();
     positionMenu();
     requestAnimationFrame(() => {
       positionMenu();
@@ -239,7 +306,7 @@ export function createTopic() {
       { label: 'Course title', name: 'courseTitle', placeholder: 'My Library', value: 'My Library' },
     ],
     onSubmit: async ({ title, courseTitle }) => {
-      const result = await addTopic({ title, courseTitle: courseTitle || 'My Library' });
+      const result = await addTopic({ title, courseTitle: courseTitle || 'My Library', courseId: selectedImportCourseId() });
       await afterAdd(result, `Topic “${title}” added`);
     },
   });
@@ -266,6 +333,7 @@ export function createCourse() {
           updatedAt: Date.now(),
         }, ...list.filter((item) => item?.id !== result.id)]);
       } catch { /* my-courses list is a convenience mirror */ }
+      setImportCourse(result.id);
       await afterAdd(result, `Course “${result.title}” created`, { route: '#/my-courses' });
     },
   });
@@ -293,7 +361,7 @@ export function addLink() {
     onSubmit: async ({ url, title, kind }) => {
       if (!isSafeRemoteUrl(url)) throw new Error('Enter an http or https URL');
       const type = ['video', 'pdf', 'embed'].includes(kind) ? kind : 'video';
-      const result = await addRemoteLink({ url, title, kind: type });
+      const result = await addRemoteLink({ url, title, kind: type, courseId: selectedImportCourseId() });
       await afterAdd(result, 'Link added to your library');
     },
   });
@@ -317,7 +385,7 @@ async function addFilesOfKind(files, kind) {
   }
   if (!accepted.length) return { count: 0 };
   const results = typeof addMediaFiles === 'function'
-    ? await addMediaFiles(accepted, { kind })
+    ? await addMediaFiles(accepted, { kind, courseId: selectedImportCourseId() })
     : await Promise.all(accepted.map((file) => (kind === 'pdf' ? addPdfFile(file) : addVideoFile(file))));
   return { count: results.length, courseId: results[results.length - 1]?.courseId };
 }

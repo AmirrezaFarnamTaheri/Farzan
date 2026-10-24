@@ -1,3 +1,4 @@
+import { consumePdfSource } from '../core/pdfNavigation.js';
 function escapeHtmlText(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -71,7 +72,7 @@ export function mountPdfView() {
               </div>
               <div class="button-row gap-1">
                 <button class="btn btn-ghost btn-sm" data-pdf-action="prev" data-pdf-prev title="Previous Page" aria-label="Previous page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
-                <input class="input input-sm w-32 text-center" data-pdf-current-page value="1" aria-label="Current page" />
+                <input class="input input-sm w-32 text-center" data-pdf-current-page value="—" aria-label="Current page" disabled />
                 <span class="text-xs text-secondary">/ <span data-pdf-total-pages>0</span></span>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="next" data-pdf-next title="Next Page" aria-label="Next page"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
                 <span class="pdf-zoom badge" data-pdf-zoom>100%</span>
@@ -79,6 +80,7 @@ export function mountPdfView() {
               <div class="button-row gap-1">
                 <input type="file" data-pdf-open hidden />
                 <button class="btn btn-primary btn-sm" data-pdf-action="open"><svg class="icon" aria-hidden="true"><use href="#i-folder-open"/></svg> <span>Open</span></button>
+                <button class="btn btn-ghost btn-sm" type="button" data-pdf-retry-pending hidden>Retry PDF</button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-out" title="Zoom Out"><svg class="icon" aria-hidden="true"><use href="#i-zoom-out"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="zoom-in" title="Zoom In"><svg class="icon" aria-hidden="true"><use href="#i-zoom-in"/></svg></button>
                 <button class="btn btn-ghost btn-sm" data-pdf-action="fit-width" title="Fit Width">Fit width</button>
@@ -92,9 +94,9 @@ export function mountPdfView() {
               </div>
             </div>
             <div class="pdf-page-note mt-2 border-t pt-2" data-pdf-page-note>
-              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Note for this PDF page..." aria-label="PDF page note"></textarea>
+              <textarea class="input" data-pdf-page-note-input rows="2" placeholder="Open a PDF to add a page note..." aria-label="PDF page note" disabled></textarea>
               <div class="button-row mt-2">
-                <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note>Save page note</button>
+                <button class="btn btn-primary btn-sm" type="button" data-pdf-save-page-note disabled>Save page note</button>
                 <span class="text-sm" data-pdf-page-note-status aria-live="polite"></span>
               </div>
             </div>
@@ -102,6 +104,9 @@ export function mountPdfView() {
 
           <div class="pdf-viewer-wrap">
             <div class="pdf-viewer" data-pdf-viewer tabindex="0"></div>
+            <p class="pdf-empty-hint text-sm text-secondary" data-pdf-empty-hint role="status">
+              No PDF open. Choose Open to read a document, then add page notes or annotations.
+            </p>
             <div class="pdf-loading" data-pdf-loading hidden>
               <div class="pdf-progress"><div data-pdf-progress class="pdf-progress-bar"></div></div>
             </div>
@@ -115,6 +120,28 @@ export function mountPdfView() {
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
   const Toast = OpenCourseDeck.Toast ?? { success() {}, error() {} };
   try { window.PlasmaPDFInit?.(); } catch (e) { console.warn('[PDF view] init failed', e); }
+  // Consume only after mounting the destination view. Rejecting a load keeps
+  // feedback visible instead of silently dropping a first-open request.
+  let pdfRouteActive = true;
+  const retryButton = document.querySelector('[data-pdf-retry-pending]');
+  const consumePendingPdf = async () => {
+    if (retryButton) retryButton.disabled = true;
+    try {
+      const loaded = await consumePdfSource(window);
+      if (pdfRouteActive && loaded && retryButton) retryButton.hidden = true;
+    } catch (error) {
+      if (pdfRouteActive) {
+        console.warn('[PDF view] unable to open requested source:', error);
+        if (retryButton) retryButton.hidden = !OpenCourseDeck.pendingPdfOpen;
+        Toast.error?.('Could not open that PDF. Use Retry PDF to try the same source again.');
+      }
+    } finally {
+      if (pdfRouteActive && retryButton) retryButton.disabled = false;
+    }
+  };
+  retryButton?.addEventListener('click', consumePendingPdf);
+  OpenCourseDeck.consumePdfOpen = consumePendingPdf;
+  void consumePendingPdf();
   const saveButton = document.querySelector('[data-pdf-save-page-note]');
   const selectionButton = document.querySelector('[data-pdf-save-selection]');
   const aiSummaryButton = document.querySelector('[data-pdf-ai-summary]');
@@ -125,13 +152,17 @@ export function mountPdfView() {
     if (noteStatus) noteStatus.textContent = message;
   };
   const onSavePageNote = async () => {
+    const snapshot = window.PlasmaPDFViewer?.getSnapshot?.() ?? window.PlasmaPDFState ?? {};
+    if (!(Number(snapshot.totalPages) > 0) || !snapshot.docId || snapshot.docId === 'global') {
+      setNoteStatus('Open a PDF before saving a page note');
+      return;
+    }
     const text = String(noteInput?.value || '').trim();
     if (!text) {
       setNoteStatus('Add a note first');
       return;
     }
-    const snapshot = window.PlasmaPDFViewer?.getSnapshot?.() ?? window.PlasmaPDFState ?? {};
-    const docId = snapshot.docId || snapshot.annotationDocId || 'global';
+    const docId = snapshot.docId;
     const page = Math.max(1, Number(snapshot.page || snapshot.currentPage || 1));
     const now = Date.now();
     try {
@@ -276,6 +307,9 @@ export function mountPdfView() {
   refreshAIControls();
   return {
     unmount() {
+      pdfRouteActive = false;
+      if (OpenCourseDeck.consumePdfOpen === consumePendingPdf) delete OpenCourseDeck.consumePdfOpen;
+      retryButton?.removeEventListener('click', consumePendingPdf);
       saveButton?.removeEventListener('click', onSavePageNote);
       selectionButton?.removeEventListener('click', onSaveSelection);
       aiSummaryButton?.removeEventListener('click', onAISummary);

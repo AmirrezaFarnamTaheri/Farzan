@@ -42,5 +42,44 @@ describe('createRouter', () => {
 
     await vi.waitFor(() => expect(handler).toHaveBeenCalled());
     expect(busEmit).toHaveBeenCalledWith('route:change', { hash: '#/test-route' });
+    router.destroy();
+  });
+
+  it('resets persistent shell scroll on route changes without resetting same-view query navigation', async () => {
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    const view = document.createElement('div');
+    view.id = 'view-container';
+    main.appendChild(view);
+    document.body.appendChild(main);
+    const bus = { emit: vi.fn() };
+    window.location.hash = '#/home';
+    const router = createRouter({
+      $$: () => [], bus,
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/home', async () => undefined);
+    router.on('#/notes', async () => undefined);
+    try {
+      await router.init();
+      main.scrollTop = 240;
+      view.scrollTop = 180;
+      router.navigate('#/notes');
+      await vi.waitFor(() => expect(bus.emit).toHaveBeenCalledWith('route:change', { hash: '#/notes' }));
+      await router.ready();
+      expect(main.scrollTop).toBe(0);
+      expect(view.scrollTop).toBe(0);
+
+      main.scrollTop = 165;
+      view.scrollTop = 120;
+      router.navigate('#/notes?topic=foo');
+      await vi.waitFor(() => expect(bus.emit).toHaveBeenCalledWith('route:change', { hash: '#/notes?topic=foo' }));
+      await router.ready();
+      expect(main.scrollTop).toBe(165);
+      expect(view.scrollTop).toBe(120);
+    } finally {
+      router.destroy();
+      main.remove();
+    }
   });
 });

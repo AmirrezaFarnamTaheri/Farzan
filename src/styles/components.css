@@ -3058,6 +3058,29 @@
 .pdf-viewer {
   min-height: 420px;
 }
+/* The empty document hint belongs to the visible reader surface, not below
+   its 420px+ placeholder. Loaded PDFs hide it before drawing a canvas. */
+.view-pdf .pdf-viewer-wrap {
+  position: relative;
+}
+.view-pdf .pdf-empty-hint {
+  position: absolute;
+  inset-inline: 1rem;
+  top: clamp(1.5rem, 12vh, 5.5rem);
+  z-index: 1;
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+.view-pdf .pdf-empty-hint[hidden] {
+  display: none;
+}
 @media (max-width: 720px) {
   .pdf-shell {
     grid-template-columns: 1fr;

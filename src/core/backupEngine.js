@@ -214,6 +214,9 @@ export function installBackupEngine(root = window) {
         for (const [store, key] of [
           ['progress', 'plasma_progress_v1'],
           ['timestamps', 'plasma_timestamps_v1'],
+          ['annotations', 'plasma-pdf-annotations'],
+          ['annotations', 'plasma-pdf-annotations-by-document'],
+          ['annotations', 'plasma-pdf-annotations-by-page'],
         ]) {
           if (!Object.prototype.hasOwnProperty.call(portable, store)) continue;
           try {

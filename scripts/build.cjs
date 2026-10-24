@@ -7,6 +7,12 @@ const srcEntry = path.join(root, 'src', 'index.js');
 const outdir = path.join(root, 'dist');
 const isWatch = process.argv.includes('--watch');
 
+// The standalone Plasmato viewer is published as a separate subdirectory.
+// A single manifest drives both staging and immutable generated-file audits.
+const EDITION_RUNTIME_FILES = [
+  'index.html', 'styles.css', 'app.js', 'catalog_data.js', 'edition.json',
+].map(file => path.join('editions', 'plasmato-emergency', file));
+
 function createBuildOptions(outputDir = outdir, watch = false) {
   return {
     entryPoints: [srcEntry],
@@ -105,6 +111,16 @@ function stageStaticAssets(sourceRoot = root, outputDir = outdir) {
   copyDirectory(path.join(sourceRoot, 'src', 'styles'), path.join(outputDir, 'src', 'styles'));
   copyDirectory(path.join(sourceRoot, 'src', 'workers'), path.join(outputDir, 'src', 'workers'));
 
+  // Ship the standalone edition beside the canonical study app. Keep
+  // repository verification/recovery scripts out of the public runtime.
+  for (const file of EDITION_RUNTIME_FILES) {
+    const from = path.join(sourceRoot, file);
+    if (!fs.existsSync(from)) continue;
+    const to = path.join(outputDir, file);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(from, to);
+  }
+
   for (const file of ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js']) {
     const from = path.join(sourceRoot, file);
     const to = path.join(outputDir, file);
@@ -175,6 +191,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  EDITION_RUNTIME_FILES,
   assertReleaseGraph,
   bundleReleaseStyles,
   renderReleaseStyles,

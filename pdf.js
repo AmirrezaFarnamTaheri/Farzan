@@ -240,7 +240,7 @@
       if (typeof pdfjsLib === 'undefined') {
         console.error('[OpenCourseDeck PDF] PDF.js not loaded. Add pdfjs-dist script.');
         this._showError('PDF.js library not loaded.');
-        return;
+        return false;
       }
 
       this._showLoading(true);
@@ -282,7 +282,7 @@
         // was loading; discard it instead of clobbering the current viewer.
         if (loadToken !== State.loadToken) {
           try { pdfDoc?.destroy?.(); } catch {}
-          return;
+          return false;
         }
         State.pdfDoc    = pdfDoc;
         State.totalPages = State.pdfDoc.numPages;
@@ -309,12 +309,19 @@
           pages: State.totalPages,
           source: typeof source === 'string' ? source : '[file]',
         });
+        return true;
       } catch (err) {
+        // Keep the legacy viewer error overlay, but also return an explicit
+        // failure receipt so route navigation retains the original request.
         console.error('[OpenCourseDeck PDF] Load error:', err);
         this._showError(`Failed to load PDF: ${err.message}`);
+        return false;
       } finally {
-        if (loadToken === State.loadToken) State.loadingTask = null;
-        this._showLoading(false);
+        // A stale request must not hide the loading state of its replacement.
+        if (loadToken === State.loadToken) {
+          State.loadingTask = null;
+          this._showLoading(false);
+        }
       }
     },
 
@@ -1092,15 +1099,29 @@
     // ──────────────────────────────────────────────────────
 
     _updatePageUI() {
-      if (DOM.currentPageInput) DOM.currentPageInput.value = State.currentPage;
-      if (DOM.totalPagesLabel)  DOM.totalPagesLabel.textContent = State.totalPages;
+      const hasDocument = Boolean(State.pdfDoc && State.totalPages > 0);
+      if (DOM.currentPageInput) {
+        DOM.currentPageInput.value = hasDocument ? String(State.currentPage) : '—';
+        DOM.currentPageInput.disabled = !hasDocument;
+      }
+      if (DOM.totalPagesLabel) DOM.totalPagesLabel.textContent = String(State.totalPages);
       if (DOM.zoomLevelDisplay) DOM.zoomLevelDisplay.textContent = `${Math.round(State.scale * 100)}%`;
+      const emptyHint = $('[data-pdf-empty-hint]');
+      if (emptyHint) emptyHint.hidden = hasDocument;
+      const noteInput = $('[data-pdf-page-note-input]');
+      if (noteInput) {
+        noteInput.disabled = !hasDocument;
+        noteInput.placeholder = hasDocument
+          ? 'Note for this PDF page...'
+          : 'Open a PDF to add a page note...';
+      }
+      const saveNote = $('[data-pdf-save-page-note]');
+      if (saveNote) saveNote.disabled = !hasDocument;
 
-      // Disable prev/next buttons at boundaries
       const prevBtn = $('[data-pdf-prev]');
       const nextBtn = $('[data-pdf-next]');
-      if (prevBtn) prevBtn.disabled = State.currentPage <= 1;
-      if (nextBtn) nextBtn.disabled = State.currentPage >= State.totalPages;
+      if (prevBtn) prevBtn.disabled = !hasDocument || State.currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = !hasDocument || State.currentPage >= State.totalPages;
     },
 
     _showLoading(show) {
@@ -1520,6 +1541,7 @@
     PDFToolbar.init();
     AnnotationManager.init();
     PDFInput.init();
+    PDFViewer._updatePageUI();
 
     // Auto-load if data-pdf-src is set
     const viewer = $('[data-pdf-viewer]');

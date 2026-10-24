@@ -8,6 +8,9 @@ function recoveryError(summary, cause) {
 export async function replaceDocumentAnnotations(idb, docId, annotations) {
   const records = Array.isArray(annotations) ? annotations : [];
   for (const record of records) {
+    if (record?.id == null || (typeof record.id === 'number' && !Number.isFinite(record.id)) || (typeof record.id !== 'string' && typeof record.id !== 'number')) {
+      throw new TypeError('Every annotation must have a valid string or numeric key');
+    }
     if (record?.docId !== docId) {
       throw new TypeError(`Annotation ${String(record?.id ?? '(missing id)')} does not belong to document ${docId}`);
     }
@@ -27,7 +30,12 @@ export async function replaceDocumentAnnotations(idb, docId, annotations) {
       cursor.continue();
     };
 
-    for (const record of records) store.put(record);
+    try {
+      for (const record of records) store.put(record);
+    } catch (error) {
+      try { transaction.abort(); } catch { /* transaction may already have aborted */ }
+      throw error;
+    }
 
     return new Promise((resolve, reject) => {
       cursorRequest.onerror = () => reject(recoveryError('Annotation replacement cursor failed', cursorRequest.error));

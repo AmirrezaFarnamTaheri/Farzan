@@ -23,12 +23,12 @@
     --accent-muted: rgba(6,182,212,0.15);
     --accent-glow:  rgba(6,182,212,0.35);
     --accent-rgb:   6, 182, 212;
-    --accent-contrast: #032a30;
+    --accent-contrast: #022025;
   }
   [data-accent="amber"] {
     --accent:       #f59e0b;
     --accent-light: #fbbf24;
-    --accent-dark:  #d97706;
+    --accent-dark:  #c86d06;
     --accent-muted: rgba(245,158,11,0.15);
     --accent-glow:  rgba(245,158,11,0.35);
     --accent-rgb:   245, 158, 11;
@@ -37,11 +37,11 @@
   [data-accent="rose"] {
     --accent:       #f43f5e;
     --accent-light: #fb7185;
-    --accent-dark:  #e11d48;
+    --accent-dark:  #e31f4a;
     --accent-muted: rgba(244,63,94,0.15);
     --accent-glow:  rgba(244,63,94,0.35);
     --accent-rgb:   244, 63, 94;
-    --accent-contrast: #ffffff;
+    --accent-contrast: #000000;
   }
   [data-accent="emerald"] {
     --accent:       #10b981;
@@ -50,7 +50,7 @@
     --accent-muted: rgba(16,185,129,0.15);
     --accent-glow:  rgba(16,185,129,0.35);
     --accent-rgb:   16, 185, 129;
-    --accent-contrast: #03271b;
+    --accent-contrast: #032117;
   }
   [data-accent="sakura"] {
     --accent:       #ec4899;
@@ -59,7 +59,7 @@
     --accent-muted: rgba(236,72,153,0.15);
     --accent-glow:  rgba(236,72,153,0.35);
     --accent-rgb:   236, 72, 153;
-    --accent-contrast: #ffffff;
+    --accent-contrast: #070104;
   }
   /* Light accents already have a pale --accent-light; the 30%-toward-white
      blend would wash them out to near-white. Their on-tint text keeps full

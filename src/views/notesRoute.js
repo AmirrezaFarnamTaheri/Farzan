@@ -4,7 +4,7 @@ export function mountNotesView({ setView } = {}) {
       <div class="page-header notes-page-header">
         <div>
           <h1 class="page-title">Notes</h1>
-          <p class="page-subtitle">Write notes, organize them in folders, and link them to courses.</p>
+          <p class="page-subtitle"><bdi>Write notes, organize them in folders, and link them to courses.</bdi></p>
         </div>
         <div class="notes-header-actions">
           <button class="btn btn-primary" type="button" data-action="new-note">
@@ -40,12 +40,12 @@ export function mountNotesView({ setView } = {}) {
             <label class="notes-search-field">
               <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
               <span class="sr-only">Search notes</span>
-              <input class="input" type="search" placeholder="Search notes…" data-notes-search autocomplete="off" />
+              <input class="input" type="search" dir="auto" placeholder="Search notes…" data-notes-search autocomplete="off" />
             </label>
             <div class="notes-semantic-actions">
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden>
                 <svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>
-                Semantic search
+                Related keywords
               </button>
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-clear hidden>Clear</button>
             </div>
@@ -72,7 +72,7 @@ export function mountNotesView({ setView } = {}) {
           <div class="notes-document-header">
             <div class="notes-top">
               <label class="sr-only" for="note-title-input">Note title</label>
-              <input class="input notes-title" id="note-title-input" data-note-title-input placeholder="Untitled note" />
+              <input class="input notes-title" id="note-title-input" data-note-title-input dir="auto" placeholder="Untitled note" />
               <span class="notes-save" data-save-status aria-live="polite"></span>
             </div>
 
@@ -151,12 +151,15 @@ export function mountNotesView({ setView } = {}) {
           </div>
 
           <div class="notes-editor-wrap">
-            <div class="notes-editor" data-notes-editor role="textbox" aria-multiline="true" aria-label="Note editor"></div>
+            <div class="notes-editor" data-notes-editor dir="auto" role="textbox" aria-multiline="true" aria-label="Note editor"></div>
           </div>
 
           <footer class="notes-footer">
             <div class="notes-tags" data-tags-cloud aria-label="Note tags"></div>
-            <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally on this device</span>
+            <div class="button-row" style="gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" type="button" data-notes-remote-images aria-pressed="false" title="May contact third-party servers and share your IP address">Load external images</button>
+              <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally; external images blocked by default</span>
+            </div>
           </footer>
         </main>
       </div>

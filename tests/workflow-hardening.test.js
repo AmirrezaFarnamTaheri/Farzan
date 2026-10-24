@@ -14,6 +14,7 @@ const {
   validateReleaseWorkflow,
   validateVerificationWorkflow,
   validateWorkflowSet,
+  readAllWorkflowFiles,
 } = require('../scripts/check-workflows.cjs');
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,24 @@ describe('GitHub Actions hardening', () => {
       expect(workflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
       expect(workflow).toContain('github.event.pull_request.number || github.ref');
     }
+  });
+
+  it('validates every active YAML workflow, including native and optional edition channels', () => {
+    const files = readAllWorkflowFiles();
+    const diskNames = fs.readdirSync(path.join(repositoryRoot, '.github', 'workflows'))
+      .filter(name => /\.ya?ml$/.test(name)).sort();
+    expect(Object.keys(files).sort()).toEqual(diskNames);
+    expect(validateWorkflowSet(files)).toEqual([]);
+    expect(diskNames).not.toContain('desktop-release.yml');
+  });
+
+  it('permits reviewed immutable pin rotation without locking maintenance to a stale hash', () => {
+    const current = workflows['verify.yml'];
+    const rotated = current.replaceAll(
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+      'actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.2',
+    );
+    expect(validateActionPins('verify.yml', rotated)).toEqual([]);
   });
 
   it('accepts the committed workflow set', () => {

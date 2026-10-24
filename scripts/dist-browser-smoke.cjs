@@ -179,6 +179,72 @@ async function run() {
   invariant(searchEmpty.type === 'search:done' && Array.isArray(searchEmpty.results) && searchEmpty.results.length === 0, 'search worker empty result failed');
   search.terminate();
 
+  // Run this against the *built, served* app, not a VM simulation of bridge.js.
+  // No remote Plasmato media is requested: link availability is not implied
+  // by the presence of a link in the source-provided course archive.
+  const editionPointer = await (await fetch('/data/catalog.json', { cache: 'no-store' })).json();
+  let plasmatoEdition = null;
+  if ((editionPointer.additionalCatalogs || []).some(item => item?.id === 'plasmato-2026-04-11')) {
+    await waitFor(() => window.DataStore?.init && pd.Router?.ready, 'native Farzan DataStore and router', 20000);
+    await timeout(window.DataStore.init(), 'full Plasmato catalog expansion', 30000);
+    const state = window.DataStore.getState();
+    invariant(state.status === 'authoritative', 'Plasmato catalog is not authoritative in Chromium');
+    const courses = window.DataStore.allCourses();
+    const topics = window.DataStore.allTopics();
+    invariant(courses.length === 32, 'Plasmato build lost or duplicated a course');
+    invariant(topics.length === 6421, 'Plasmato build lost or duplicated topics');
+    invariant(new Set(topics.map(item => item.topicId)).size === topics.length, 'Plasmato topic identities collided');
+    invariant(topics.reduce((count, item) => count + (item.videos?.length || 0), 0) === 5990, 'Plasmato video links were lost');
+    invariant(topics.reduce((count, item) => count + (item.pdfs?.length || 0), 0) === 280, 'Plasmato PDF links were lost');
+    invariant(topics.filter(item => item.catalogIssue).length === 13, 'Plasmato source errors were silently removed');
+    const medicine = courses.find(item => item.id === 'comprehensive-internal-medicine-course');
+    const starter = courses.find(item => item.id === 'getting-started');
+    invariant(Boolean(medicine?.sources?.length && starter), 'Plasmato or standard Farzan courses missing');
+    const medicineTopics = topics.filter(item => item.courseId === medicine.id);
+    invariant(medicineTopics.length === 385, 'Internal medicine topic hierarchy is incomplete');
+    const video = medicineTopics.find(item => item.videos?.length);
+    const pdfTopic = topics.find(item => item.pdfs?.length && item.courseId !== medicine.id);
+    invariant(video && pdfTopic, 'Plasmato media references cannot be browsed');
+    invariant(pd.safeMediaUrl(video.videos[0])?.startsWith('https://'), 'Plasmato video URL rejected by media guard');
+    invariant(pd.safeMediaUrl(pdfTopic.pdfs[0])?.startsWith('https://'), 'Plasmato PDF URL rejected by media guard');
+
+    const search = await timeout(pd.TopbarSearch._loadUniversalData(), 'real Plasmato search index', 20000);
+    invariant(search.some(item => item.category === 'Course' && item.href ===
+      '#/courses?id=comprehensive-internal-medicine-course'), 'Course search does not link to native course detail');
+    invariant(search.some(item => item.href === '#/courses?topic=' +
+      encodeURIComponent(video.topicId)), 'Plasmato topic search does not deep link to a stable topic');
+    const searchHits = await timeout(pd.TopbarSearch._queryUniversal(video.title.slice(0, 12)), 'Plasmato topic search', 20000);
+    invariant(searchHits.some(item => item.href === '#/courses?topic=' +
+      encodeURIComponent(video.topicId)), 'Plasmato topics are missing from universal search');
+
+    pd.Router.navigate('#/courses?id=comprehensive-internal-medicine-course');
+    await waitFor(() => document.querySelector('.view-courses [data-course-id="comprehensive-internal-medicine-course"]'),
+      'native Plasmato course list', 25000);
+    await waitFor(() => document.querySelector('#course-detail .course-detail-meta')?.textContent?.includes('385 topics'),
+      'native Plasmato course detail', 25000);
+    await waitFor(() => document.querySelector('#course-detail .topic-row[data-topic-id]'),
+      'Plasmato native lesson rows', 25000);
+
+    pd.Router.navigate('#/materials');
+    await waitFor(() => {
+      const select = document.querySelector('.view-materials #materials-course-filter');
+      return select && [...select.options].some(item => item.value === medicine.id) ? select : null;
+    }, 'populated native Plasmato materials browser', 25000);
+    const courseSelect = document.querySelector('#materials-course-filter');
+    invariant([...courseSelect.options].some(item => item.value === medicine.id),
+      'Plasmato courses are missing from Materials filters');
+    invariant([...courseSelect.options].some(item => item.value === pdfTopic.courseId),
+      'Plasmato PDF source course is missing from Materials');
+
+    await window.DB.saveProgress(video.topicId, video.courseId, { status: 'in-progress', percent: 41, position: 12 });
+    const saved = await window.DB.getProgress(video.topicId);
+    invariant(saved?.topicId === video.topicId && saved?.courseId === video.courseId &&
+      saved?.status === 'in-progress', 'Stable Plasmato topic progress did not persist');
+
+    plasmatoEdition = { courses: courses.length, topics: topics.length, videos: 5990, pdfs: 280,
+      nativeCourses: true, nativeMaterials: true, universalSearch: true, progress: true };
+  }
+
   const primaryName = 'opencoursedeck-dist-smoke-primary';
   const primary = await openDatabase(primaryName);
   await putSmoke(primary.db, { persisted: true });
@@ -226,6 +292,7 @@ async function run() {
     pdf: true,
     media: true,
     fullWipe: true,
+    ...(plasmatoEdition ? { plasmatoEdition } : {}),
   };
   result.dataset.status = 'passed';
   result.textContent = JSON.stringify(detail);

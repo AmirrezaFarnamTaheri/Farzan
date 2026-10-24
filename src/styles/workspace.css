@@ -10,6 +10,16 @@
   --accent-on-tint: var(--text-primary);
 }
 
+/* Light and paper themes paint a near-white canvas, where the pale
+   --accent-light tint drops below the 3:1 that WCAG 2.4.11 asks of a
+   focus indicator (1.54:1 for Amber, 1.67:1 for Cyan). The dark accent
+   step keeps the same hue and stays legible on both light and dark
+   surfaces. */
+[data-theme="light"],
+[data-theme="paper"] {
+  --workspace-focus: var(--accent-dark);
+}
+
 /* An even canvas and visible navigation; avoid layered blur over text. */
 .main-content {
   background: var(--bg);
@@ -445,6 +455,9 @@ input::placeholder {
   .home-focus-panel,
   .home-pulse-item {
     border-color: var(--text-primary);
+  }
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline-color: var(--text-primary);
   }
 }
 @media (forced-colors: active) {

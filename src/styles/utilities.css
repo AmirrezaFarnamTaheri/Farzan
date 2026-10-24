@@ -91,7 +91,7 @@
   summary,
   [tabindex]:not([tabindex="-1"]):not([disabled])
 ):focus-visible {
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--workspace-focus);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--accent-muted);
   border-radius: var(--radius-sm);
@@ -272,9 +272,14 @@ mark.search-highlight {
 }
 
 /* ── Accent color picker dots ──────────────────────────────
-   index.html renders <button class="accent-dot" data-accent="...">; the
-   reset's button{background:none;border:none;padding:0} collapsed these
-   to 0x0 with no CSS of their own. */
+   The Settings route renders <button class="accent-dot"
+   data-accent-option="...">. The swatch must NOT carry a bare
+   data-accent attribute: the shell's delegated click handler resolves
+   swatches with [data-accent-option], but the root <html> element
+   carries data-accent="lapis" itself, so a bare [data-accent] match
+   on any element collides with the document element. The reset's
+   button{background:none;border:none;padding:0} collapsed these to
+   0x0 with no CSS of their own. */
 .accent-dot {
   width: 18px;
   height: 18px;
