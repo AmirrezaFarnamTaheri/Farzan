@@ -44,8 +44,8 @@ test.describe('Farzan desktop workspace redesign', () => {
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-progress')).toBeVisible();
     await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
-    await expect(page.locator('[data-progress-empty]')).toBeVisible();
-    await expect(page.locator('[data-progress-empty]')).toContainText('Start a lesson');
+    await expect(page.locator('[data-progress-empty]').first()).toBeVisible();
+    await expect(page.locator('[data-progress-empty]').first()).toContainText('Start a lesson');
     await expect(page.locator('#chart-overall')).toBeHidden();
   });
 
