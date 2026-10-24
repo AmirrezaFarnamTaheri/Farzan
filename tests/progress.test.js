@@ -669,6 +669,39 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
   });
 
+  it('rolls back authored course outlines and media cues when a later import write fails', async () => {
+    const originalCourses = [{ id: 'course-old', title: 'Original course' }];
+    const originalCues = { 'topic-old': [{ at: 20, text: 'Original cue' }] };
+    const state = new Map([
+      ['ocd_my_courses', originalCourses],
+      ['ocd_course_media_cues', originalCues],
+    ]);
+    window.DB.getSetting = vi.fn(async key => state.get(key) ?? null);
+    window.DB.saveSetting = vi.fn(async (key, value) => {
+      state.set(key, value);
+      return value;
+    });
+    window.DB.clearUserData = vi.fn(async () => true);
+    window.DB.deleteTimestamp = vi.fn(async () => true);
+    window.DB.saveTimestamp.mockRejectedValueOnce(new Error('timestamp write failed'));
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      settings: {
+        myCourses: [{ id: 'course-new', title: 'Imported course' }],
+        mediaCues: { 'topic-new': [{ at: 30, text: 'Imported cue' }] },
+      },
+      timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
+      progress: [], notes: [], annotations: [],
+    })], 'partial-restore.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true });
+    expect(state.get('ocd_my_courses')).toEqual(originalCourses);
+    expect(state.get('ocd_course_media_cues')).toEqual(originalCues);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_my_courses', originalCourses);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', originalCues);
+  });
+
   it('rolls back earlier progress writes when a later read fails unexpectedly', async () => {
     const saved = new Map([['original', { topicId: 'original', courseId: 'course-old', updatedAt: 20 }]]);
     window.DB.getAllProgress = vi.fn(async () => [...saved.values()]);
