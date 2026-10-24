@@ -71,6 +71,24 @@ describe('annotation fallback hardening', () => {
     await expect(db.getAnnotations('doc-a')).resolves.toEqual([authoritative]);
   });
 
+
+  it('does not resurrect deleted or rolled-back annotations from a stale document mirror once migrated', async () => {
+    const localStorage = createStorage();
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    localStorage.setItem('plasma-pdf-annotations-by-document', JSON.stringify({
+      'doc-a': [{ id: 'stale', docId: 'doc-a', page: 1, text: 'rolled back' }],
+    }));
+    const db = {
+      getAllAnnotations: vi.fn(async () => []),
+      getAnnotations: vi.fn(async () => []),
+      saveAnnotations: vi.fn(async () => []),
+    };
+    installBridgeHardening({ localStorage, DB: db, OpenCourseDeck: {}, document });
+    await expect(db.getAllAnnotations()).resolves.toEqual([]);
+    await expect(db.getAnnotations('doc-a')).resolves.toEqual([]);
+    expect(db.getAnnotations).toHaveBeenCalledWith('doc-a');
+  });
+
   it('removes a deleted annotation from the fallback so it cannot reappear', async () => {
     const localStorage = createStorage();
     localStorage.setItem('plasma-pdf-annotations-by-document', JSON.stringify({
