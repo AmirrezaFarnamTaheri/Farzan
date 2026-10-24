@@ -45,7 +45,7 @@ function extractWorkflowDispatchTagInput(workflow) {
 
 function validateActionPins(filename, workflow, consistency = new Map()) {
   const errors = [];
-  const usesPattern = /^[ \\t]*(?:-[ \\t]+)?uses:[ \\t]*([^\\s#]+)(?:[ \\t]+#[ \\t]*(\\S+))?[ \\t]*$/gm;
+  const usesPattern = /^[ \t]*(?:-[ \t]+)?uses:[ \t]*([^\s#]+)(?:[ \t]+#[ \t]*(\S+))?[ \t]*$/gm;
   for (const match of workflow.matchAll(usesPattern)) {
     const reference = match[1];
     const versionComment = match[2] || '';
@@ -65,7 +65,7 @@ function validateActionPins(filename, workflow, consistency = new Map()) {
       errors.push(`${filename}: ${action} is not in the audited action allowlist`);
       continue;
     }
-    if (!/^v[0-9]+(?:\\.[0-9]+)*(?:[-.][A-Za-z0-9]+)*$/.test(versionComment)) {
+    if (!/^v[0-9]+(?:\.[0-9]+)*(?:[-.][A-Za-z0-9]+)*$/.test(versionComment)) {
       errors.push(`${filename}: ${action}@${revision} needs an explicit version comment (e.g. # v7.0.2)`);
       continue;
     }
@@ -240,7 +240,7 @@ function validateWorkflowSet(files) {
 function readAllWorkflowFiles() {
   const directory = path.join(REPOSITORY_ROOT, '.github', 'workflows');
   return Object.fromEntries(fs.readdirSync(directory)
-    .filter(name => /\\.ya?ml$/.test(name))
+    .filter(name => /\.ya?ml$/.test(name))
     .sort()
     .map(name => [name, fs.readFileSync(path.join(directory, name), 'utf8')]));
 }
