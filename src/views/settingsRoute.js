@@ -125,7 +125,7 @@ export function mountSettingsView(deps = {}) {
                 <div>
                   <span class="eyebrow">AI connection</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
-                  <p>Local mode is an on-device extractive summary unless you register a runtime. Gemma package names are catalog labels only. API keys remain in this browser session only.</p>
+                  <p>Local summaries extract sentences from your notes on-device; they do not execute a language model. Model files cannot run in this release. Remote API use requires explicit approval. API keys remain in this browser session only.</p>
                 </div>
                 <span class="badge badge-info" data-ai-status aria-live="polite">Loading</span>
               </div>
@@ -136,7 +136,7 @@ export function mountSettingsView(deps = {}) {
                   <select class="select" data-ai-mode>
                     <option value="hidden">Hidden</option>
                     <option value="disabled">Visible but off</option>
-                    <option value="local-gemma">Local private mode</option>
+                    <option value="local-gemma">Local extractive summary (no model)</option>
                     <option value="custom-api">Approved API endpoint</option>
                   </select>
                 </label>
@@ -585,12 +585,16 @@ export function mountSettingsView(deps = {}) {
 
     const setModeVisibility = () => {
       customFields.hidden = mode.value !== 'custom-api';
-      localFields.hidden = mode.value !== 'local-gemma';
-      document.querySelector('[data-ai-open-local-source]')?.toggleAttribute('hidden', mode.value !== 'local-gemma');
-      document.querySelector('[data-ai-import-local-file]')?.toggleAttribute('hidden', mode.value !== 'local-gemma');
-      document.querySelector('[data-ai-download-local-file]')?.toggleAttribute('hidden', mode.value !== 'local-gemma');
-      document.querySelector('[data-ai-mark-local-installed]')?.toggleAttribute('hidden', mode.value !== 'local-gemma');
-      document.querySelector('[data-ai-clear-local-model]')?.toggleAttribute('hidden', mode.value !== 'local-gemma');
+      // Model bytes can be cached via the advanced API, but there is no
+      // bundled inference runtime to consume them. Do not advertise a model
+      // installer or a false "installed" success to ordinary users.
+      localFields.hidden = true;
+      for (const action of [
+        'open-local-source', 'import-local-file', 'download-local-file',
+        'mark-local-installed', 'clear-local-model',
+      ]) {
+        document.querySelector(`[data-ai-${action}]`)?.setAttribute('hidden', '');
+      }
       document.querySelector('[data-ai-clear-key]')?.toggleAttribute('hidden', mode.value !== 'custom-api');
     };
 
@@ -598,7 +602,7 @@ export function mountSettingsView(deps = {}) {
       const labels = {
         hidden: 'Hidden',
         disabled: 'Off',
-        'local-gemma': 'Local private mode',
+        'local-gemma': 'Local extractive summary',
         'custom-api': 'Approved API',
       };
       const modeLabel = labels[displayMode] || 'Hidden';
