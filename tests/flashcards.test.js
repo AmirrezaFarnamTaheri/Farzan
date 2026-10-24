@@ -330,3 +330,23 @@ describe('Flashcards vault persistence', () => {
     expect(window.DB.store.ocd_flashcards.map((c) => c.front)).toEqual(['Restored']);
   });
 });
+
+describe('flashcard durable-save failures', () => {
+  it('rejects a card mutation and preserves memory when both stores cannot save', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    manager.reset();
+    window.DB = {
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => { throw new Error('IndexedDB quota exceeded'); }),
+    };
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('localStorage quota exceeded');
+    });
+    try {
+      await expect(manager.addCard({ front: 'Question', back: 'Answer' })).rejects.toThrow();
+      expect(await manager.getCards()).toEqual([]);
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+});
