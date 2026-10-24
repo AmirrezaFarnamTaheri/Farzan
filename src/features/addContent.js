@@ -125,10 +125,13 @@ function openForm({ title, fields, confirmLabel = 'Save', onSubmit }) {
 const ACTIVE_IMPORT_COURSE_KEY = 'ocd_active_import_course';
 
 function selectedImportCourseId() {
-  const value = document.querySelector('[data-add-course-destination]')?.value;
-  if (typeof value === 'string') return value || undefined;
-  try { return sessionStorage.getItem(ACTIVE_IMPORT_COURSE_KEY) || undefined; }
-  catch { return undefined; }
+  // An explicit choice from a course card takes precedence over a picker
+  // created on a previous route. Picker changes also update this key.
+  try {
+    const selected = sessionStorage.getItem(ACTIVE_IMPORT_COURSE_KEY);
+    if (selected) return selected;
+  } catch { /* optional session state */ }
+  return document.querySelector('[data-add-course-destination]')?.value || undefined;
 }
 
 function setImportCourse(courseId) {
