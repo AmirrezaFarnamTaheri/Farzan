@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { createServer } = require('../scripts/dev-server.cjs');
+const { DESKTOP_PORT, DESKTOP_ORIGIN, browserProfileDirectory } = require('./storage-origin.cjs');
 
 const root = path.join(__dirname, '..');
 
@@ -26,7 +27,7 @@ function findBrowser() {
 function listen(server) {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(DESKTOP_PORT, '127.0.0.1', () => {
       server.off?.('error', reject);
       resolve(server.address());
     });
@@ -41,9 +42,10 @@ async function main() {
   }
 
   const server = createServer({ root });
-  const address = await listen(server);
-  const url = `http://127.0.0.1:${address.port}/`;
-  const userDataDir = path.join(os.tmpdir(), 'opencoursedeck-app-window');
+  await listen(server);
+  const url = DESKTOP_ORIGIN;
+  const userDataDir = browserProfileDirectory(os.homedir());
+  fs.mkdirSync(userDataDir, { recursive: true });
   const child = spawn(browser, [
     `--app=${url}`,
     `--user-data-dir=${userDataDir}`,
@@ -58,6 +60,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[desktop] App-window launch failed:', err?.message || err);
+  console.error('[desktop] App-window launch failed. Close any other desktop launcher on the stable local port before retrying:', err?.message || err);
   process.exit(1);
 });
