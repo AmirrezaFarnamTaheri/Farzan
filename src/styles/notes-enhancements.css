@@ -447,6 +447,25 @@
   margin-top: 0.8em;
 }
 
+/* The app resets list markers globally for navigation. Authored lesson
+   content must retain its semantic bullets and ordered numbering. */
+.notes-editor ul {
+  list-style-type: disc;
+  margin-block: 0.6em;
+  padding-inline-start: 1.5em;
+}
+
+.notes-editor ol {
+  list-style-type: decimal;
+  margin-block: 0.6em;
+  padding-inline-start: 1.5em;
+}
+
+.notes-editor li {
+  display: list-item;
+  margin-block: 0.25em;
+}
+
 .notes-footer {
   display: flex;
   align-items: center;
