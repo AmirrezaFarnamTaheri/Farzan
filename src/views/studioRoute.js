@@ -40,10 +40,7 @@ printStudioBoardPdf,
               <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>
               <span>Pen</span>
             </button>
-            <button class="btn btn-ghost btn-sm" data-studio-mode="3d" aria-pressed="false" title="3D Spatial Knowledge Graph">
-              <svg class="icon" aria-hidden="true"><use href="#i-canvas"/></svg>
-              <span>3D Graph</span>
-            </button>
+
           </div>
 
           <div class="studio-tool-group" role="group" aria-label="Notes and cards">
@@ -58,6 +55,23 @@ printStudioBoardPdf,
             </button>
           </div>
 
+
+          <div class="studio-tool-group studio-primary-save" role="group" aria-label="Save board">
+            <button class="btn btn-primary btn-sm" data-studio-save title="Save Board">
+              <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
+              <span>Save</span>
+            </button>
+          </div>
+
+          <details class="studio-more-tools" data-studio-more-tools>
+            <summary>More tools &amp; export</summary>
+            <div class="studio-more-tools-content">
+              <div class="studio-tool-group" role="group" aria-label="Knowledge graph">
+            <button class="btn btn-ghost btn-sm" data-studio-mode="3d" aria-pressed="false" title="3D Spatial Knowledge Graph">
+              <svg class="icon" aria-hidden="true"><use href="#i-canvas"/></svg>
+              <span>3D Graph</span>
+            </button>
+              </div>
           <div class="studio-tool-group" role="group" aria-label="Geometric shapes">
             <button class="btn btn-ghost btn-sm" data-studio-add-rect title="Rectangle">
               <svg class="icon" aria-hidden="true"><use href="#i-square"/></svg>
@@ -86,10 +100,7 @@ printStudioBoardPdf,
           </div>
 
           <div class="studio-tool-group" role="group" aria-label="Board management">
-            <button class="btn btn-primary btn-sm" data-studio-save title="Save Board">
-              <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
-              <span>Save</span>
-            </button>
+
             <button class="btn btn-ghost btn-sm" data-studio-load title="Load Saved Board">Load</button>
             <button class="btn btn-ghost btn-sm" data-studio-clear title="Clear Board">Clear</button>
             <button class="btn btn-ghost btn-sm" data-studio-export-pdf title="Export PDF">
@@ -102,6 +113,8 @@ printStudioBoardPdf,
             <button class="btn btn-ghost btn-sm" data-studio-import-json title="Import JSON">Import</button>
             <input type="file" data-studio-import-file accept=".json,application/json" hidden />
           </div>
+            </div>
+          </details>
         </div>
       </div>
 
