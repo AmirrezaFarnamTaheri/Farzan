@@ -83,10 +83,11 @@ describe('annotation fallback hardening', () => {
       getAnnotations: vi.fn(async () => []),
       saveAnnotations: vi.fn(async () => []),
     };
+    const indexedGet = db.getAnnotations;
     installBridgeHardening({ localStorage, DB: db, OpenCourseDeck: {}, document });
     await expect(db.getAllAnnotations()).resolves.toEqual([]);
     await expect(db.getAnnotations('doc-a')).resolves.toEqual([]);
-    expect(db.getAnnotations).toHaveBeenCalledWith('doc-a');
+    expect(indexedGet).toHaveBeenCalledWith('doc-a');
   });
 
   it('removes a deleted annotation from the fallback so it cannot reappear', async () => {
