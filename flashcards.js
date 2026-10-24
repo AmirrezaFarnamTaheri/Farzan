@@ -85,7 +85,10 @@ let studioKeyController = null;
       // A local mirror is not an acceptable fallback when the canonical IDB
       // writer rejects: the next hydration would prefer the old IDB deck and
       // silently overwrite the purportedly saved cards.
-      if (hasCanonicalWriter) await window.DB.saveSetting(STORE_NAME, snapshot);
+      if (hasCanonicalWriter) {
+        const receipt = await window.DB.saveSetting(STORE_NAME, snapshot);
+        if (receipt === false) throw new Error('Flashcard write was not acknowledged by canonical storage');
+      }
       let localSaved = false;
       let localError;
       try {
@@ -104,19 +107,29 @@ let studioKeyController = null;
 
     async hydrate() {
       if (hydratePromise) return hydratePromise;
-      hydratePromise = (async () => {
+      const pending = (async () => {
         if (canonicalDeckKnown || (Array.isArray(memoryStore) && memoryStore.length)) return memoryStore;
-        try {
-          const fromDb = await window.DB?.getSetting?.(STORE_NAME);
+        if (typeof window.DB?.getSetting === 'function') {
+          // A read error is not proof that the canonical deck is absent.
+          // Falling back to a stale mirror would resurrect deleted cards and
+          // allow the next mutation to overwrite newer persisted state.
+          const fromDb = await window.DB.getSetting(STORE_NAME);
           if (Array.isArray(fromDb)) {
             memoryStore = fromDb;
             canonicalDeckKnown = true;
             try { window.localStorage?.setItem?.(STORE_NAME, JSON.stringify(fromDb)); } catch {}
             return memoryStore;
           }
-        } catch {}
+          if (fromDb != null) throw new TypeError('Canonical flashcard deck has an invalid format');
+        }
         return this.getStorage();
       })();
+      // A transient database outage should not permanently poison the deck
+      // with a cached rejected hydration promise.
+      hydratePromise = pending.catch(error => {
+        hydratePromise = null;
+        throw error;
+      });
       return hydratePromise;
     }
 
@@ -208,7 +221,7 @@ let studioKeyController = null;
     }
 
     async getDueCards(deckName = null) {
-      const cards = this.getStorage();
+      const cards = await this.getCards();
       const todayStr = new Date().toISOString().split('T')[0];
       return cards.filter(c => {
         const matchesDeck = !deckName || c.deck === deckName;
