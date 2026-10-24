@@ -573,11 +573,42 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
     const duplicate = (to.sources || []).some(section =>
       (section.topics || []).some(topic => String(topic.url || topic.id) === id));
     if (duplicate) throw new Error('Destination already contains this topic');
+
+    const db = window.DB;
+    const progress = typeof db?.getProgress === 'function'
+      ? await db.getProgress(id) : null;
+    if (progress && progress.courseId && progress.courseId !== fromId && progress.courseId !== toId) {
+      throw new Error('Progress belongs to a different course; review this topic before moving');
+    }
+    if (progress?.courseId === fromId && typeof db?.saveProgress !== 'function') {
+      throw new Error('Progress migration is unavailable; topic was not moved');
+    }
+
+    const before = cloneLibrary(library);
     const [record] = origin.splice(index, 1);
     courseTopics(to).push(record);
     from.updatedAt = Date.now();
     to.updatedAt = Date.now();
     await persistLibrary(library, { topicId: id, fromCourseId: fromId, courseId: toId });
+    if (progress?.courseId === fromId) {
+      try {
+        const receipt = await db.saveProgress(id, toId, {
+          ...progress, courseId: toId, updatedAt: Date.now(),
+        });
+        if (receipt === false) throw new Error('Progress migration was not acknowledged');
+      } catch (error) {
+        // The two stores cannot be committed in a single transaction. Restore
+        // the original course mapping if the linked progress write rejects,
+        // and report incomplete compensation rather than false success.
+        try {
+          await persistLibrary(before, { topicId: id, courseId: fromId, rollback: true });
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError],
+            'Topic move failed and could not restore the original course mapping');
+        }
+        throw error;
+      }
+    }
     return { topicId: id, courseId: toId };
   });
 }
