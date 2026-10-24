@@ -162,4 +162,22 @@ describe('explicit import destinations', () => {
     expect(sessionStorage.getItem('ocd_active_import_course')).toBe('course-anatomy');
     sessionStorage.removeItem('ocd_active_import_course');
   });
+  it('clears deleted course selection when reopening the destination picker', async () => {
+    sessionStorage.setItem('ocd_active_import_course', 'course-deleted');
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_user_library'
+        ? { version: 1, courses: { 'course-current': { title: 'Current', sources: [] } } }
+        : null),
+      saveSetting: vi.fn(async () => true),
+    };
+    initAddContent(window);
+    document.getElementById('topbar-add-btn').click();
+    const selector = await vi.waitFor(() => {
+      const el = document.querySelector('[data-add-course-destination]');
+      expect(el?.options.length).toBe(2);
+      return el;
+    });
+    expect(selector.value).toBe('');
+    expect(sessionStorage.getItem('ocd_active_import_course')).toBeNull();
+  });
 });
