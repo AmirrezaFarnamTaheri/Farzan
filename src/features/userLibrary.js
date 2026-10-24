@@ -378,6 +378,113 @@ export async function relinkLibraryFile(reference, file) {
   return { ref, id: existing.id, courseId: existing.courseId, name };
 }
 
+const MEDIA_FOLDER_FORMAT = 'opencoursedeck-media-folder';
+const MEDIA_FOLDER_MANIFEST = 'media-manifest.json';
+const SAFE_FILE_ID = /^[a-zA-Z0-9_-]{1,180}$/;
+
+function assertBackupFolder(handle) {
+  if (!handle || typeof handle.getFileHandle !== 'function'
+    || typeof handle.getDirectoryHandle !== 'function') {
+    throw new Error('Choose a writable backup folder in a supported browser');
+  }
+}
+
+/**
+ * Stream each owned Blob to the user-picked directory. Never JSON-encode media
+ * bytes or load lecture-sized ArrayBuffers into JavaScript. Export the
+ * media-manifest.json LAST: a partially written folder cannot masquerade as
+ * a completed media backup. Pair this with the standard portable JSON export.
+ */
+export async function exportLibraryMediaDirectory(directory) {
+  assertBackupFolder(directory);
+  const refs = await listLibraryFileReferences();
+  const entries = [];
+  const checked = [];
+  for (const ref of refs) {
+    if (!SAFE_FILE_ID.test(ref.id) || ref.ref !== `${FILE_PREFIX}${ref.id}`) {
+      throw new Error('Invalid local file identity in the library');
+    }
+    const stored = await withFileStore('readonly', store => store.get(ref.id), { required: true });
+    const blob = blobFromRecord(stored);
+    if (!blob) throw new Error(`Cannot export missing local file: ${ref.label || ref.id}`);
+    if (blob.size > MAX_LIBRARY_FILE_BYTES) throw new Error('Local media exceeds the supported size limit');
+    checked.push({ ref, blob, stored });
+  }
+  const mediaDir = await directory.getDirectoryHandle('media', { create: true });
+  for (const { ref, blob, stored } of checked) {
+    const filename = `${ref.id}.bin`;
+    const file = await mediaDir.getFileHandle(filename, { create: true });
+    const writer = await file.createWritable();
+    try { await writer.write(blob); }
+    finally { await writer.close(); }
+    entries.push({
+      id: ref.id, ref: ref.ref, file: `media/${filename}`,
+      name: String(stored.name || ref.label || filename).slice(0, 200),
+      type: String(stored.type || blob.type || 'application/octet-stream'),
+      kind: ref.kind, size: blob.size,
+    });
+  }
+  const manifest = {
+    format: MEDIA_FOLDER_FORMAT,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    files: entries,
+  };
+  const file = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST, { create: true });
+  const writer = await file.createWritable();
+  try {
+    await writer.write(new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
+  } finally { await writer.close(); }
+  return { files: entries.length, bytes: entries.reduce((sum, item) => sum + item.size, 0) };
+}
+
+/**
+ * Restore only references still missing from the current user library.
+ * No media gets linked to an unknown source, and existing blobs are never
+ * overwritten just because a backup folder was selected.
+ */
+export async function importLibraryMediaDirectory(directory) {
+  assertBackupFolder(directory);
+  const manifestFile = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST);
+  const raw = await (await manifestFile.getFile()).text();
+  if (raw.length > 8 * 1024 * 1024) throw new Error('Media manifest is too large');
+  const manifest = JSON.parse(raw);
+  if (manifest?.format !== MEDIA_FOLDER_FORMAT || manifest.version !== 1
+    || !Array.isArray(manifest.files) || manifest.files.length > 20000) {
+    throw new Error('Invalid media folder manifest format');
+  }
+  const seen = new Set();
+  for (const item of manifest.files) {
+    if (!item || !SAFE_FILE_ID.test(item.id)
+      || item.ref !== `${FILE_PREFIX}${item.id}`
+      || item.file !== `media/${item.id}.bin`
+      || !Number.isSafeInteger(item.size) || item.size < 0
+      || item.size > MAX_LIBRARY_FILE_BYTES || seen.has(item.id)) {
+      throw new Error('Invalid or unsafe media folder manifest entry');
+    }
+    seen.add(item.id);
+  }
+  const missing = new Set((await listMissingLibraryFiles()).map(item => item.ref));
+  const mediaDir = await directory.getDirectoryHandle('media');
+  let restored = 0;
+  let skipped = 0;
+  for (const item of manifest.files) {
+    if (!missing.has(item.ref)) { skipped += 1; continue; }
+    try {
+      const file = await (await mediaDir.getFileHandle(`${item.id}.bin`)).getFile();
+      if (file.size !== item.size) throw new Error('Media size differs from backup manifest');
+      const restoredFile = new File([file], String(item.name || item.id), {
+        type: String(item.type || file.type || 'application/octet-stream'),
+      });
+      await relinkLibraryFile(item.ref, restoredFile);
+      restored += 1;
+    } catch (error) {
+      throw new Error(`Media restore stopped after ${restored} file(s): ${item.name || item.id}`, { cause: error });
+    }
+  }
+  return { restored, skipped };
+}
+
 async function deleteLibraryFile(id) {
   if (!id) return;
   revokeCachedUrl(id);
@@ -750,6 +857,8 @@ export function initUserLibrary(root = window) {
     listFileReferences: listLibraryFileReferences,
     listMissingFiles: listMissingLibraryFiles,
     relinkFile: relinkLibraryFile,
+    exportMediaDirectory: exportLibraryMediaDirectory,
+    importMediaDirectory: importLibraryMediaDirectory,
     clearLibraryFiles,
     revokeCachedUrl,
   };
