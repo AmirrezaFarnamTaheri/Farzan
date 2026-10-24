@@ -369,7 +369,7 @@ input[type="file"][hidden] {
 
 /* Home: a real starting point with a focused next action and light hierarchy. */
 .view-home { max-width: 1350px; }
-.home-hero {
+.view-home .home-hero.card.card-filled {
   grid-template-columns: minmax(0, 1.42fr) minmax(280px, .68fr);
   gap: clamp(22px, 3vw, 42px);
   min-height: 330px;
@@ -381,7 +381,7 @@ input[type="file"][hidden] {
   background: linear-gradient(116deg, #132c47 0%, #163f66 58%, #255c87 100%);
   box-shadow: 0 16px 48px rgba(21,44,70,.13);
 }
-.home-hero::before { content: none; }
+.view-home .home-hero.card.card-filled::before { content: none; }
 .home-hero-copy { justify-content: center; max-width: 750px; }
 .home-eyebrow {
   display: inline-flex;
