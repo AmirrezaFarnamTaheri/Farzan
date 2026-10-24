@@ -56,7 +56,7 @@ test.describe('Farzan desktop workspace redesign', () => {
     const advanced = page.locator('[data-studio-more-tools]');
     await expect(advanced.locator('summary')).toBeVisible();
     await expect(advanced.locator('[data-studio-export-json]')).toBeHidden();
-    await expect(page.locator('[data-studio-tool="pen"]')).toBeVisible();
+    await expect(page.locator('button[data-studio-tool="pen"]')).toBeVisible();
     await expect(page.locator('[data-studio-save]')).toBeVisible();
     await advanced.locator('summary').click();
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
