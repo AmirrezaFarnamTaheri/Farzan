@@ -102,3 +102,38 @@ describe('add content chrome', () => {
     await vi.waitFor(() => expect(importer).toHaveBeenCalledWith(file));
   });
 });
+
+describe('complete creation and notification journeys', () => {
+  it('keeps a modal submit button associated with its form when footer is separate', () => {
+    window.OpenCourseDeck.Modal.create = vi.fn(({ body, footer }) => {
+      const modal = document.createElement('section');
+      modal.append(body, footer);
+      document.body.append(modal);
+      return modal;
+    });
+    initAddContent(window);
+    window.OpenCourseDeck.AddContent.createCourse();
+    const form = document.querySelector('form');
+    const submit = document.querySelector('.modal-footer button.btn-primary');
+    expect(submit).not.toBeNull();
+    expect(submit.form).toBe(form);
+  });
+
+  it('calls Toast methods with their owner when a file is skipped', async () => {
+    const show = vi.fn();
+    window.OpenCourseDeck.Toast = {
+      show,
+      info(message) { this.show({ type: 'info', message }); },
+      error: vi.fn(),
+    };
+    initAddContent(window);
+    const input = document.getElementById('file-input-video');
+    Object.defineProperty(input, 'files', {
+      configurable: true, value: [new File(['plain text'], 'readme.txt', { type: 'text/plain' })],
+    });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'info', message: expect.stringContaining('skipped') }),
+    ));
+  });
+});
