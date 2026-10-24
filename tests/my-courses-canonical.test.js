@@ -20,7 +20,7 @@ describe('My Courses canonical ownership and legacy recovery', () => {
       saveSetting: vi.fn(async (key, value) => { settings[key] = value; return value; }),
     };
     toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
-    window.OpenCourseDeck = { Toast: toast, bus: { on: vi.fn(), emit: vi.fn() } };
+    window.OpenCourseDeck = { Toast: toast, UI: { confirm: vi.fn(async () => true) }, bus: { on: vi.fn(), emit: vi.fn() } };
     window.DataStore = { isLoaded: () => false, mergeRaw: vi.fn() };
     initUserLibrary(window);
   });
