@@ -1,6 +1,8 @@
 export function mountPlaylistsView({
   setView,
   safeMediaUrl,
+  Router = window.OpenCourseDeck?.Router,
+  setPendingCourseSession,
   Toast = window.OpenCourseDeck?.Toast
       // Fall back to no-ops: Toast may be unregistered during partial
       // init or in test harnesses, and a bare Toast.success() then threw
@@ -41,7 +43,7 @@ export function mountPlaylistsView({
       </div>
     </section>
   `);
-  renderPlaylists({ safeMediaUrl, Toast });
+  renderPlaylists({ safeMediaUrl, Toast, Router, setPendingCourseSession });
 }
 
 function currentPlayerTracks() {
@@ -70,7 +72,7 @@ function sanitizeSavedPlaylists(value) {
 }
 
 async function renderPlaylists(deps) {
-  const { safeMediaUrl, Toast = window.OpenCourseDeck?.Toast } = deps;
+  const { safeMediaUrl, Router, setPendingCourseSession, Toast = window.OpenCourseDeck?.Toast } = deps;
   const metricsRoot = document.querySelector('[data-playlist-metrics]');
   const listRoot = document.querySelector('[data-playlist-list]');
   if (!metricsRoot || !listRoot) return;
@@ -219,6 +221,12 @@ async function renderPlaylists(deps) {
     link.textContent = playlist.label === 'Resume' ? 'Open bookmarks' : 'Open courses';
     body.append(badge, title, detail, preview, link);
     if (playlist.saved) {
+      const openQueue = document.createElement('button');
+      openQueue.className = 'btn btn-primary btn-sm';
+      openQueue.type = 'button';
+      openQueue.dataset.openPlaylist = playlist.id;
+      openQueue.textContent = 'Open saved queue';
+      body.appendChild(openQueue);
       const remove = document.createElement('button');
       remove.className = 'btn btn-ghost';
       remove.type = 'button';
@@ -253,6 +261,44 @@ async function renderPlaylists(deps) {
   }
 
   listRoot.onclick = async (event) => {
+    const open = event.target?.closest?.('[data-open-playlist]');
+    if (open) {
+      if (typeof setPendingCourseSession !== 'function' || typeof Router?.navigate !== 'function') {
+        Toast.error?.('Player navigation is unavailable');
+        return;
+      }
+      const saved = savedPlaylists.find(item => item.id === open.dataset.openPlaylist);
+      if (!saved) return;
+      const queue = [];
+      for (const topicId of saved.topicIds) {
+        const topic = topicsById.get(topicId);
+        const media = topic?.videos?.[0];
+        if (!media) continue;
+        let src;
+        try {
+          const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
+          src = typeof resolve === 'function' ? await resolve(media, safeMediaUrl) : safeMediaUrl(media);
+        } catch {
+          src = null;
+        }
+        if (!src) continue;
+        queue.push({
+          id: topicId, topicId, courseId: topic.courseId,
+          courseTitle: topic.courseTitle || '', title: playlistTopicTitle(topic),
+          src, type: 'video',
+        });
+      }
+      if (!queue.length) {
+        Toast.error?.('No playable videos are available in this saved queue');
+        return;
+      }
+      setPendingCourseSession({
+        queue, track: queue[0], queueIndex: 0, currentTime: 0,
+        playing: false, repeat: 'none', shuffle: false,
+      });
+      Router.navigate('#/courses');
+      return;
+    }
     const btn = event.target?.closest?.('[data-delete-playlist]');
     if (!btn || !window.DB?.saveSetting) return;
     const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists'));
