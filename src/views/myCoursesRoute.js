@@ -307,7 +307,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       try { sessionStorage.setItem('ocd_active_import_course', course.id); } catch {}
       window.OpenCourseDeck?.AddContent?.openMenu?.();
     });
-    actions.append(open, addMedia, remove);
+    actions.append(open, remove, addMedia);
     body.append(title, description, meta, actions);
     card.appendChild(body);
     return card;
