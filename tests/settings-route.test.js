@@ -93,7 +93,7 @@ describe('settings route', () => {
     ]) {
       expect(document.querySelector(selector).hidden).toBe(true);
     }
-    expect(document.body.textContent).toContain('model files cannot run');
+    expect(document.body.textContent).toMatch(/model files cannot run/i);
     controller.unmount();
   });
 
