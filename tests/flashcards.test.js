@@ -331,6 +331,49 @@ describe('Flashcards vault persistence', () => {
   });
 });
 
+describe('flashcard editing and deletion', () => {
+  beforeEach(() => {
+    window.OpenCourseDeck.Flashcards.manager.reset();
+    window.DB = {
+      records: [],
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async (key, value) => {
+        window.DB.records = value;
+        return value;
+      }),
+    };
+  });
+
+  it('edits a card in place without losing its review or source history', async () => {
+    const manager = window.OpenCourseDeck.Flashcards.manager;
+    const card = await manager.addCard({ front: 'Old question', back: 'Old answer', deck: 'Biology', sourceNoteId: 'note-1' });
+    const reviewed = await manager.reviewCard(card.id, 5);
+    const updated = await manager.updateCard(card.id, { front: 'Corrected question', back: 'Corrected answer', deck: 'Biology' });
+    expect(updated.id).toBe(card.id);
+    expect(updated.sourceNoteId).toBe('note-1');
+    expect(updated.repetitions).toBe(reviewed.repetitions);
+    expect(window.DB.records[0].front).toBe('Corrected question');
+  });
+
+  it('exposes editing and deleting from a card-management surface', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    const card = await manager.addCard({ front: 'Editable Q', back: 'Editable A', deck: 'General' });
+    document.body.innerHTML = '<div id="aria-announcer"></div><div id="studio-host"></div>';
+    const container = document.getElementById('studio-host');
+    await renderStudio(container);
+    const edit = container.querySelector(`[data-fc-edit="${card.id}"]`);
+    const remove = container.querySelector(`[data-fc-delete="${card.id}"]`);
+    expect(edit).not.toBeNull();
+    expect(remove).not.toBeNull();
+    edit.click();
+    expect(container.querySelector('#fc-new-front').value).toBe('Editable Q');
+    expect(container.querySelector('#fc-new-form').hidden).toBe(false);
+    container.querySelector('#fc-new-front').value = 'Edited Q';
+    container.querySelector('#fc-new-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(async () => expect((await manager.getCards())[0].front).toBe('Edited Q'));
+  });
+});
+
 describe('flashcard durable-save failures', () => {
   it('rejects a card mutation and preserves memory when both stores cannot save', async () => {
     const manager = window.OpenCourseDeck.Flashcards.manager;
