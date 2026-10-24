@@ -604,7 +604,8 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
           await persistLibrary(before, { topicId: id, courseId: fromId, rollback: true });
         } catch (rollbackError) {
           throw new AggregateError([error, rollbackError],
-            'Topic move failed and could not restore the original course mapping');
+            'Topic move failed and could not restore the original course mapping',
+            { cause: error });
         }
         throw error;
       }
