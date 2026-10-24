@@ -378,6 +378,121 @@ export async function relinkLibraryFile(reference, file) {
   return { ref, id: existing.id, courseId: existing.courseId, name };
 }
 
+const MEDIA_FOLDER_FORMAT = 'opencoursedeck-media-folder';
+const MEDIA_FOLDER_MANIFEST = 'media-manifest.json';
+const SAFE_FILE_ID = /^[a-zA-Z0-9_-]{1,180}$/;
+
+function assertBackupFolder(handle) {
+  if (!handle || typeof handle.getFileHandle !== 'function'
+    || typeof handle.getDirectoryHandle !== 'function') {
+    throw new Error('Choose a writable backup folder in a supported browser');
+  }
+}
+
+/**
+ * Stream each owned Blob to the user-picked directory. Never JSON-encode media
+ * bytes or load lecture-sized ArrayBuffers into JavaScript. Export the
+ * media-manifest.json LAST: a partially written folder cannot masquerade as
+ * a completed media backup. Pair this with the standard portable JSON export.
+ */
+export async function exportLibraryMediaDirectory(directory) {
+  assertBackupFolder(directory);
+  // Invalidate a previous manifest before doing any work in the same folder:
+  // an interrupted replacement must never leave an apparently complete backup.
+  const manifestHandle = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST, { create: true });
+  const incomplete = await manifestHandle.createWritable();
+  try {
+    await incomplete.write(new Blob([JSON.stringify({
+      format: MEDIA_FOLDER_FORMAT, version: 1, status: 'incomplete',
+    })], { type: 'application/json' }));
+  } finally { await incomplete.close(); }
+  const refs = await listLibraryFileReferences();
+  const entries = [];
+  const checked = [];
+  for (const ref of refs) {
+    if (!SAFE_FILE_ID.test(ref.id) || ref.ref !== `${FILE_PREFIX}${ref.id}`) {
+      throw new Error('Invalid local file identity in the library');
+    }
+    const stored = await withFileStore('readonly', store => store.get(ref.id), { required: true });
+    const blob = blobFromRecord(stored);
+    if (!blob) throw new Error(`Cannot export missing local file: ${ref.label || ref.id}`);
+    if (blob.size > MAX_LIBRARY_FILE_BYTES) throw new Error('Local media exceeds the supported size limit');
+    checked.push({ ref, blob, stored });
+  }
+  const mediaDir = await directory.getDirectoryHandle('media', { create: true });
+  for (const { ref, blob, stored } of checked) {
+    const filename = `${ref.id}.bin`;
+    const file = await mediaDir.getFileHandle(filename, { create: true });
+    const writer = await file.createWritable();
+    try { await writer.write(blob); }
+    finally { await writer.close(); }
+    entries.push({
+      id: ref.id, ref: ref.ref, file: `media/${filename}`,
+      name: String(stored.name || ref.label || filename).slice(0, 200),
+      type: String(stored.type || blob.type || 'application/octet-stream'),
+      kind: ref.kind, size: blob.size,
+    });
+  }
+  const manifest = {
+    format: MEDIA_FOLDER_FORMAT,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    files: entries,
+  };
+  const writer = await manifestHandle.createWritable();
+  try {
+    await writer.write(new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
+  } finally { await writer.close(); }
+  return { files: entries.length, bytes: entries.reduce((sum, item) => sum + item.size, 0) };
+}
+
+/**
+ * Restore only references still missing from the current user library.
+ * No media gets linked to an unknown source, and existing blobs are never
+ * overwritten just because a backup folder was selected.
+ */
+export async function importLibraryMediaDirectory(directory) {
+  assertBackupFolder(directory);
+  const manifestFile = await directory.getFileHandle(MEDIA_FOLDER_MANIFEST);
+  const raw = await (await manifestFile.getFile()).text();
+  if (raw.length > 8 * 1024 * 1024) throw new Error('Media manifest is too large');
+  const manifest = JSON.parse(raw);
+  if (manifest?.format !== MEDIA_FOLDER_FORMAT || manifest.version !== 1
+    || !Array.isArray(manifest.files) || manifest.files.length > 20000) {
+    throw new Error('Invalid media folder manifest format');
+  }
+  const seen = new Set();
+  for (const item of manifest.files) {
+    if (!item || !SAFE_FILE_ID.test(item.id)
+      || item.ref !== `${FILE_PREFIX}${item.id}`
+      || item.file !== `media/${item.id}.bin`
+      || !Number.isSafeInteger(item.size) || item.size < 0
+      || item.size > MAX_LIBRARY_FILE_BYTES || seen.has(item.id)) {
+      throw new Error('Invalid or unsafe media folder manifest entry');
+    }
+    seen.add(item.id);
+  }
+  const missing = new Set((await listMissingLibraryFiles()).map(item => item.ref));
+  const mediaDir = await directory.getDirectoryHandle('media');
+  let restored = 0;
+  let skipped = 0;
+  for (const item of manifest.files) {
+    if (!missing.has(item.ref)) { skipped += 1; continue; }
+    try {
+      const file = await (await mediaDir.getFileHandle(`${item.id}.bin`)).getFile();
+      if (file.size !== item.size) throw new Error('Media size differs from backup manifest');
+      const restoredFile = new File([file], String(item.name || item.id), {
+        type: String(item.type || file.type || 'application/octet-stream'),
+      });
+      await relinkLibraryFile(item.ref, restoredFile);
+      restored += 1;
+    } catch (error) {
+      throw new Error(`Media restore stopped after ${restored} file(s): ${item.name || item.id}`, { cause: error });
+    }
+  }
+  return { restored, skipped };
+}
+
 async function deleteLibraryFile(id) {
   if (!id) return;
   revokeCachedUrl(id);
@@ -477,6 +592,140 @@ export async function upsertCourse({ id, title, description = '' } = {}) {
     });
     await persistLibrary(library, { courseId });
     return { id: courseId, title: library.courses[courseId].title };
+  });
+}
+
+/**
+ * Promote outlines from the old independent My Courses setting, but ONLY when
+ * no canonical user library has ever been stored. The caller must establish
+ * that the canonical setting is absent, not merely empty: an empty canonical
+ * library can mean that the user intentionally deleted their last course.
+ * The entire batch commits in one settings write, avoiding partial migration.
+ */
+export async function migrateLegacyCourses(records) {
+  if (!Array.isArray(records)) throw new TypeError('Legacy courses must be an array');
+  return mutateLibrary(async library => {
+    if (Object.keys(library.courses).length) {
+      return { migrated: 0, courses: Object.keys(library.courses).length };
+    }
+    let migrated = 0;
+    for (const record of records) {
+      if (!record || typeof record !== 'object') continue;
+      const id = String(record.id || '').trim();
+      const title = String(record.title || '').trim().slice(0, 120);
+      // Avoid reserved prototype properties and malformed course identifiers.
+      if (!/^[a-z0-9_-]{1,160}$/i.test(id) || !title || id === DEFAULT_COURSE_ID) continue;
+      const course = ensureCourse(library, {
+        id, title,
+        description: String(record.description || '').trim().slice(0, 600),
+        overwriteTitle: true,
+      });
+      if (Number.isFinite(record.createdAt)) course.createdAt = record.createdAt;
+      if (Number.isFinite(record.updatedAt)) course.updatedAt = record.updatedAt;
+      migrated += 1;
+    }
+    if (migrated) await persistLibrary(library, { migratedLegacyCourses: migrated });
+    return { migrated, courses: Object.keys(library.courses).length };
+  });
+}
+
+export async function updateCourse({ id, title, description } = {}) {
+  const courseId = String(id || '').trim();
+  if (!courseId || courseId === DEFAULT_COURSE_ID) throw new TypeError('A personal course ID is required');
+  const nextTitle = String(title ?? '').trim();
+  if (!nextTitle) throw new TypeError('Course title is required');
+  return mutateLibrary(async library => {
+    const course = library.courses[courseId];
+    if (!course || typeof course !== 'object') throw new Error('Course does not exist');
+    course.title = nextTitle.slice(0, 120);
+    if (description !== undefined) course.description = String(description || '').trim().slice(0, 600);
+    course.updatedAt = Date.now();
+    await persistLibrary(library, { courseId });
+    return { id: courseId, title: course.title, description: course.description };
+  });
+}
+
+/** Change only a topic title; its saved URL/source identity remains unchanged. */
+export async function renameTopic({ courseId, topicId, title } = {}) {
+  const label = String(title || '').trim();
+  if (!label) throw new TypeError('Topic title is required');
+  return mutateLibrary(async library => {
+    const course = library.courses[String(courseId || '')];
+    if (!course) throw new Error('Source course does not exist');
+    const topic = (course.sources || []).flatMap(source => source.topics || [])
+      .find(item => String(item.url || item.id) === String(topicId));
+    if (!topic) throw new Error('Topic was not found in the source course');
+    topic.title = label.slice(0, 200);
+    course.updatedAt = Date.now();
+    await persistLibrary(library, { courseId, topicId });
+    return { courseId, topicId, title: topic.title };
+  });
+}
+
+/**
+ * Move a topic within one canonical library transaction. Keep its topic URL
+ * and all media refs intact; no copied topic or orphaned attachments.
+ */
+export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
+  const fromId = String(fromCourseId || '');
+  const toId = String(toCourseId || '');
+  const id = String(topicId || '');
+  if (!fromId || !toId || !id) throw new TypeError('Both courses and a topic are required');
+  return mutateLibrary(async library => {
+    const from = library.courses[fromId];
+    const to = library.courses[toId];
+    if (!from || typeof from !== 'object') throw new Error('Source course does not exist');
+    if (!to || typeof to !== 'object') throw new Error('Destination course does not exist');
+    let origin = null;
+    let index = -1;
+    for (const section of from.sources || []) {
+      const topics = section?.topics || [];
+      index = topics.findIndex(topic => String(topic.url || topic.id) === id);
+      if (index !== -1) { origin = topics; break; }
+    }
+    if (!origin) throw new Error('Topic was not found in the source course');
+    if (fromId === toId) return { topicId: id, courseId: toId };
+    const duplicate = (to.sources || []).some(section =>
+      (section.topics || []).some(topic => String(topic.url || topic.id) === id));
+    if (duplicate) throw new Error('Destination already contains this topic');
+
+    const db = window.DB;
+    const progress = typeof db?.getProgress === 'function'
+      ? await db.getProgress(id) : null;
+    if (progress && progress.courseId && progress.courseId !== fromId && progress.courseId !== toId) {
+      throw new Error('Progress belongs to a different course; review this topic before moving');
+    }
+    if (progress?.courseId === fromId && typeof db?.saveProgress !== 'function') {
+      throw new Error('Progress migration is unavailable; topic was not moved');
+    }
+
+    const before = cloneLibrary(library);
+    const [record] = origin.splice(index, 1);
+    courseTopics(to).push(record);
+    from.updatedAt = Date.now();
+    to.updatedAt = Date.now();
+    await persistLibrary(library, { topicId: id, fromCourseId: fromId, courseId: toId });
+    if (progress?.courseId === fromId) {
+      try {
+        const receipt = await db.saveProgress(id, toId, {
+          ...progress, courseId: toId, updatedAt: Date.now(),
+        });
+        if (receipt === false) throw new Error('Progress migration was not acknowledged');
+      } catch (error) {
+        // The two stores cannot be committed in a single transaction. Restore
+        // the original course mapping if the linked progress write rejects,
+        // and report incomplete compensation rather than false success.
+        try {
+          await persistLibrary(before, { topicId: id, courseId: fromId, rollback: true });
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError],
+            'Topic move failed and could not restore the original course mapping',
+            { cause: rollbackError });
+        }
+        throw error;
+      }
+    }
+    return { topicId: id, courseId: toId };
   });
 }
 
@@ -602,8 +851,12 @@ export function initUserLibrary(root = window) {
     load: loadLibrary,
     overlay: overlayFromStorage,
     upsertCourse,
+    updateCourse,
+    migrateLegacyCourses,
     removeCourse,
     addTopic,
+    renameTopic,
+    moveTopic,
     addVideoFile,
     addPdfFile,
     addMediaFiles,
@@ -612,6 +865,8 @@ export function initUserLibrary(root = window) {
     listFileReferences: listLibraryFileReferences,
     listMissingFiles: listMissingLibraryFiles,
     relinkFile: relinkLibraryFile,
+    exportMediaDirectory: exportLibraryMediaDirectory,
+    importMediaDirectory: importLibraryMediaDirectory,
     clearLibraryFiles,
     revokeCachedUrl,
   };
