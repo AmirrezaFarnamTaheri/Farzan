@@ -103,3 +103,31 @@ describe('home dashboard', () => {
     expect(document.querySelectorAll('.home-actions > button, .home-actions > a')).toHaveLength(3);
   });
 });
+
+describe('home entry and resume contracts', () => {
+  it('does not bubble the Home Add action to outside-click dismiss handlers', () => {
+    mountDashboard();
+    const openMenu = vi.fn();
+    window.OpenCourseDeck = { AddContent: { openMenu } };
+    const outsideClick = vi.fn();
+    document.addEventListener('click', outsideClick);
+    try {
+      document.querySelector('[data-home-add]').click();
+      expect(openMenu).toHaveBeenCalledOnce();
+      expect(outsideClick).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('click', outsideClick);
+    }
+  });
+
+  it('only resumes a position belonging to the focused topic', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      progress: [{ topicId: 'topic-1', percent: 60, position: 90, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-2', position: 10, updatedAt: now - 60000 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
+  });
+});
