@@ -174,7 +174,9 @@ describe('explicit import destinations', () => {
     document.getElementById('topbar-add-btn').click();
     const selector = await vi.waitFor(() => {
       const el = document.querySelector('[data-add-course-destination]');
-      expect(el?.options.length).toBe(2);
+      expect(el).not.toBeNull();
+      expect([...el.options].map(option => option.value)).toEqual(['', 'course-current']);
+      expect(el.value).toBe('');
       return el;
     });
     expect(selector.value).toBe('');
