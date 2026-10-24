@@ -45,7 +45,7 @@ export function mountNotesView({ setView } = {}) {
             <div class="notes-semantic-actions">
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden>
                 <svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>
-                Semantic search
+                Related keywords
               </button>
               <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-clear hidden>Clear</button>
             </div>
