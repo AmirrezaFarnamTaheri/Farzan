@@ -9,6 +9,7 @@
   const LEGACY_STORE_NAME = 'plasma-flashcards-store';
   let memoryStore = [];
   let hydratePromise = null;
+  let canonicalDeckKnown = false;
 // Keyboard handling re-attaches on every studio render; this controller
 // tears down the previous listener so re-renders never stack handlers.
 let studioKeyController = null;
@@ -57,6 +58,9 @@ let studioKeyController = null;
     }
 
     getStorage() {
+      // An explicitly empty canonical deck is still authoritative. Falling
+      // back to an older localStorage mirror would resurrect deleted cards.
+      if (canonicalDeckKnown) return memoryStore;
       if (Array.isArray(memoryStore) && memoryStore.length) return memoryStore;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
@@ -75,36 +79,38 @@ let studioKeyController = null;
     }
 
     async saveStorage(cards) {
-      // Commit at least one persistent copy before exposing the mutation.
       const snapshot = cards.map(card => ({ ...card }));
-      let dbSaved = false;
+      const hasCanonicalWriter = typeof window.DB?.saveSetting === 'function';
+
+      // A local mirror is not an acceptable fallback when the canonical IDB
+      // writer rejects: the next hydration would prefer the old IDB deck and
+      // silently overwrite the purportedly saved cards.
+      if (hasCanonicalWriter) await window.DB.saveSetting(STORE_NAME, snapshot);
       let localSaved = false;
-      let firstError;
-      if (typeof window.DB?.saveSetting === 'function') {
-        try {
-          await window.DB.saveSetting(STORE_NAME, snapshot);
-          dbSaved = true;
-        } catch (error) { firstError = error; }
-      }
+      let localError;
       try {
         if (typeof window.localStorage?.setItem === 'function') {
           window.localStorage.setItem(STORE_NAME, JSON.stringify(snapshot));
           localSaved = true;
         }
-      } catch (error) { firstError ||= error; }
-      if (!dbSaved && !localSaved) throw firstError || new Error('Flashcards could not be saved');
+      } catch (error) { localError = error; }
+      if (!hasCanonicalWriter && !localSaved) {
+        throw localError || new Error('Flashcards could not be saved');
+      }
       memoryStore = snapshot;
+      canonicalDeckKnown = hasCanonicalWriter;
       return snapshot;
     }
 
     async hydrate() {
       if (hydratePromise) return hydratePromise;
       hydratePromise = (async () => {
-        if (Array.isArray(memoryStore) && memoryStore.length) return memoryStore;
+        if (canonicalDeckKnown || (Array.isArray(memoryStore) && memoryStore.length)) return memoryStore;
         try {
           const fromDb = await window.DB?.getSetting?.(STORE_NAME);
-          if (Array.isArray(fromDb) && fromDb.length) {
+          if (Array.isArray(fromDb)) {
             memoryStore = fromDb;
+            canonicalDeckKnown = true;
             try { window.localStorage?.setItem?.(STORE_NAME, JSON.stringify(fromDb)); } catch {}
             return memoryStore;
           }
@@ -117,6 +123,7 @@ let studioKeyController = null;
     reset() {
       memoryStore = [];
       hydratePromise = null;
+      canonicalDeckKnown = false;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') {
           window.localStorage.removeItem(STORE_NAME);
@@ -134,6 +141,7 @@ let studioKeyController = null;
     invalidateCache() {
       memoryStore = [];
       hydratePromise = null;
+      canonicalDeckKnown = false;
     }
 
     async getCards() {
