@@ -3294,6 +3294,8 @@ import { Pointer } from './src/lib/pointer.js';
         setView: set,
         safeMediaUrl,
         Toast,
+        Router,
+        setPendingCourseSession,
       });
     }
 
