@@ -408,7 +408,9 @@ export async function exportLibraryMediaDirectory(directory) {
   } finally { await incomplete.close(); }
   const refs = await listLibraryFileReferences();
   const entries = [];
-  const checked = [];
+  const mediaDir = await directory.getDirectoryHandle('media', { create: true });
+  // Fetch and write one source at a time; keeping every Blob handle in a
+  // preflight array would pin a large collection of lecture files in memory.
   for (const ref of refs) {
     if (!SAFE_FILE_ID.test(ref.id) || ref.ref !== `${FILE_PREFIX}${ref.id}`) {
       throw new Error('Invalid local file identity in the library');
@@ -417,10 +419,6 @@ export async function exportLibraryMediaDirectory(directory) {
     const blob = blobFromRecord(stored);
     if (!blob) throw new Error(`Cannot export missing local file: ${ref.label || ref.id}`);
     if (blob.size > MAX_LIBRARY_FILE_BYTES) throw new Error('Local media exceeds the supported size limit');
-    checked.push({ ref, blob, stored });
-  }
-  const mediaDir = await directory.getDirectoryHandle('media', { create: true });
-  for (const { ref, blob, stored } of checked) {
     const filename = `${ref.id}.bin`;
     const file = await mediaDir.getFileHandle(filename, { create: true });
     const writer = await file.createWritable();
