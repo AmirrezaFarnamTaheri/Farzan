@@ -1,10 +1,10 @@
 {
   "getting-started": {
-    "title": "Getting Started with OpenCourseDeck",
+    "title": "Getting Started with Farzan",
     "productUrl": "",
     "sources": [
       {
-        "label": "OpenCourseDeck Starter",
+        "label": "Farzan Starter",
         "entryUrl": "#/help",
         "curriculum": "A practical introduction to the local-first learning workflow.",
         "topics": [

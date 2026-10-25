@@ -38,6 +38,13 @@ describe('Canvas renderer scheduling', () => {
     await import('../canvas.js');
   });
 
+  it('does not paint a minimap over a new empty or unzoomed Studio board', () => {
+    const board = window.OpenCourseDeck.Canvas;
+    board._drawMinimap(ctx, 700, 460);
+    expect(ctx.fill).not.toHaveBeenCalled();
+    expect(ctx.strokeRect).not.toHaveBeenCalled();
+  });
+
   it('marks the canvas dirty and resumes without calling a missing render method', () => {
     const canvas = document.createElement('canvas');
     Object.defineProperty(canvas, 'offsetWidth', { value: 320, configurable: true });

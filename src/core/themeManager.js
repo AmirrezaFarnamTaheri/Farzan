@@ -12,7 +12,7 @@ export const ThemeManager = {
     if (theme === 'system') {
       return this.SYSTEM_QUERY.matches ? 'dark' : 'light';
     }
-    return theme || 'dark';
+    return theme || 'light';
   },
 
   /**
@@ -100,9 +100,9 @@ export const ThemeManager = {
     const OpenCourseDeck = window.OpenCourseDeck ?? {};
     const saved = (() => {
       try {
-        return localStorage.getItem(this.STORAGE_KEY) ?? 'dark';
+        return localStorage.getItem(this.STORAGE_KEY) ?? 'light';
       } catch {
-        return 'dark';
+        return 'light';
       }
     })();
 

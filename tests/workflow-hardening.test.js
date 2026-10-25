@@ -74,6 +74,13 @@ describe('GitHub Actions hardening', () => {
     }
   });
 
+  it('validates native Windows packaging when the study frontend changes', () => {
+    const native = workflows['native-windows.yml'];
+    for (const path of ["'index.html'", "'src/styles/**'", "'src/views/**'", "'app.js'"]) {
+      expect(native).toContain(path);
+    }
+  });
+
   it('validates every active YAML workflow, including native and optional edition channels', () => {
     const files = readAllWorkflowFiles();
     const diskNames = fs.readdirSync(path.join(repositoryRoot, '.github', 'workflows'))
@@ -233,7 +240,7 @@ describe('GitHub Actions hardening', () => {
     const broken = workflows['browser-assurance.yml']
       .replace('persist-credentials: false', 'persist-credentials: true')
       .replace('      - name: Run production browser smoke tests', '      - name: Skip production browser smoke tests')
-      .replace('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
+      .replaceAll('CHROME_BIN: /usr/bin/google-chrome', 'CHROME_BIN: auto')
       .replace('npm run smoke:dist-browser', 'npm run smoke:browser');
     expect(validateBrowserAssuranceWorkflow(broken)).toEqual(expect.arrayContaining([
       expect.stringContaining('disable persisted credentials'),

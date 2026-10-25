@@ -30,7 +30,8 @@ export function mountHomeView(deps = {}) {
     <section class="view view-home">
       <div class="home-hero card card-filled">
         <div class="home-hero-copy">
-          <h1 class="home-title"><bdi>Back to your studies.</bdi></h1>
+          <p class="home-eyebrow">A quieter place to learn</p>
+          <h1 class="home-title" data-home-title><bdi>What will you learn today?</bdi></h1>
           <p class="home-subtitle"><bdi>Choose a course, continue reading, or open your notes. Saved notes and progress stay in this browser.</bdi></p>
           <div class="home-actions">
             <button class="btn btn-primary" type="button" data-home-resume>
@@ -311,6 +312,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     return;
   }
   const [progress, notes, timestamps, flashcards, topics] = collections;
+  // Do not greet a fresh learner as if they already have saved history.
+  const homeHeading = document.querySelector('[data-home-title]');
+  if (homeHeading) homeHeading.textContent = progress.length ? 'Welcome back to your studies.' : 'What will you learn today?';
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));

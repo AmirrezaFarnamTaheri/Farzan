@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-accent="lapis" dir="ltr">
+<html lang="en" data-theme="light" data-accent="lapis" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="OpenCourseDeck — Courses, PDFs, notes, and progress in a local study app" />
-  <meta name="theme-color" content="#2563a8" id="meta-theme-color" />
+  <meta name="description" content="Farzan Plasmato — your personal study library, lessons, notes and progress." />
+  <meta name="theme-color" content="#f8f7f3" id="meta-theme-color" />
   <meta name="color-scheme" content="dark light" />
   <!-- media-src/connect-src/frame-src/img-src intentionally allow http: —
        this offline-first app loads user-supplied course catalogs that may
@@ -37,14 +37,14 @@
 
   <!-- Open Graph / Share -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="OpenCourseDeck" />
+  <meta property="og:title" content="Farzan Plasmato Edition" />
   <meta property="og:description" content="Courses, video, PDFs, notes, and saved progress in a local app." />
   <meta property="og:image" content="./assets/og-cover.svg" />
   <meta property="og:url" content="" id="og-url" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="OpenCourseDeck" />
+  <meta name="twitter:title" content="Farzan Plasmato Edition" />
   <meta name="twitter:description" content="A local app for courses, PDFs, notes, and progress." />
 
   <!-- PWA Manifest -->
@@ -67,7 +67,7 @@
   <link rel="stylesheet" href="./src/styles/index.css" />
   
 
-  <title>OpenCourseDeck — Courses and notes</title>
+  <title>Farzan Plasmato — Study workspace</title>
 
   <!-- Critical inline styles to prevent FOUC -->
   <style>
@@ -85,8 +85,8 @@
       background: var(--skeleton-base);
       font-family: Inter, system-ui, sans-serif;
       overflow-x: hidden;
-      overflow-y: auto;
-      min-height: 100%;
+      overflow-y: hidden;
+      height: 100%;
     }
     #app-loading {
       position: fixed; inset: 0;
@@ -275,9 +275,9 @@
   <!-- ═══════════════════════════════════════════
        LOADING SPLASH SCREEN
   ════════════════════════════════════════════ -->
-  <div id="app-loading" role="status" aria-label="Loading OpenCourseDeck">
+  <div id="app-loading" role="status" aria-label="Loading Farzan Plasmato">
     <div class="splash-logo" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
-    <div class="splash-label">OpenCourseDeck</div>
+    <div class="splash-label">Farzan Plasmato</div>
     <div class="splash-bar-wrap">
       <div class="splash-bar"></div>
     </div>
@@ -297,13 +297,13 @@
       text-align:center;gap:1rem;padding:2rem;
       z-index:999999;">
       <div style="font-size:3rem;line-height:1;"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
-      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">OpenCourseDeck requires JavaScript</h1>
+      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">Farzan requires JavaScript</h1>
       <p style="color:rgba(255,255,255,0.6);max-width:400px;line-height:1.6;margin:0;">
-        Please enable JavaScript in your browser to use OpenCourseDeck.
+        Please enable JavaScript in your browser to use Farzan.
         Saved notes and progress stay in your browser profile. Remote media may still need a network connection.
       </p>
       <div style="color:rgba(255,255,255,0.6);max-width:520px;line-height:1.6;">
-        To use OpenCourseDeck, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
+        To use Farzan, open this folder using a local web server (not <code>file://</code>) and enable JavaScript in your browser settings.
       </div>
     </div>
   </noscript>
@@ -314,16 +314,16 @@
 
   <div class="ambient-desk-surface" aria-hidden="true"></div>
 
-  <div id="ocd-app" class="ocd-app" aria-label="OpenCourseDeck">
+  <div id="ocd-app" class="ocd-app" aria-label="Farzan Plasmato study workspace">
 
 
     <!-- ── SIDEBAR ─────────────────────────────── -->
     <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">
 
       <!-- Logo -->
-      <div class="sidebar-logo" aria-label="OpenCourseDeck home">
+      <div class="sidebar-logo" aria-label="Farzan home">
         <div class="sidebar-logo-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
-        <span class="sidebar-logo-text">OpenCourseDeck</span>
+        <span class="sidebar-logo-text">Farzan <small>PLASMATO EDITION</small></span>
         <button class="sidebar-collapse-btn" id="sidebar-collapse-btn"
           aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+B)">
           <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>
@@ -493,6 +493,7 @@
           </nav>
         </div>
         <div class="topbar-right">
+          <span class="topbar-context" aria-hidden="true">YOUR STUDY SPACE</span>
           <!-- Quick actions -->
           <button class="topbar-action-btn" id="topbar-search-btn"
             aria-label="Search" title="Search (Ctrl+K)">
@@ -713,18 +714,18 @@
   <!-- Hidden file inputs for file operations -->
   <input type="file" id="file-input-video"
     accept="video/mp4,video/webm,video/ogg,video/mov,video/avi"
-    multiple aria-hidden="true" tabindex="-1" style="display:none" />
+    multiple aria-hidden="true" tabindex="-1" hidden style="display:none" />
   <input type="file" id="file-input-pdf"
     accept="application/pdf"
-    multiple aria-hidden="true" tabindex="-1" style="display:none" />
+    multiple aria-hidden="true" tabindex="-1" hidden style="display:none" />
   <input type="file" id="file-input-image"
     accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-    aria-hidden="true" tabindex="-1" style="display:none" />
+    aria-hidden="true" tabindex="-1" hidden style="display:none" />
   <input type="file" id="file-input-backup"
     accept="application/json,.ocdbackup,.plasmabackup"
-    aria-hidden="true" tabindex="-1" style="display:none" />
+    aria-hidden="true" tabindex="-1" hidden style="display:none" />
   <input type="file" id="file-input-any"
-    multiple aria-hidden="true" tabindex="-1" style="display:none" />
+    multiple aria-hidden="true" tabindex="-1" hidden style="display:none" />
 
   <!-- HTML Template Library (populated into DOM for cloning) -->
   <template id="tpl-course-card">

@@ -200,14 +200,48 @@ const ProgressStats = (() => {
   }
 
   function _renderCharts(stats) {
-    const showFrameMessage = (sel, text) => {
-      const frame = q(sel)?.closest('.progress-chart-frame');
+    const showFrameMessage = (sel, text, withAction = false) => {
+      const canvas = q(sel);
+      const frame = canvas?.closest('.progress-chart-frame');
       if (!frame) return;
-      const note = document.createElement('p');
+      canvas.hidden = true;
+      frame.querySelector('[data-progress-empty]')?.remove();
+      const note = document.createElement('div');
       note.className = 'progress-chart-empty';
-      note.textContent = text;
-      frame.replaceChildren(note);
+      note.dataset.progressEmpty = '';
+      const message = document.createElement('p');
+      message.textContent = text;
+      note.appendChild(message);
+      if (withAction) {
+        const link = document.createElement('a');
+        link.className = 'btn btn-primary btn-sm';
+        link.href = '#/courses';
+        link.textContent = 'Browse courses';
+        note.appendChild(link);
+      }
+      frame.appendChild(note);
     };
+
+    // Rendering seven all-zero KPIs plus two empty charts on first launch
+    // buries the only meaningful next action. Treat the current dataset as
+    // a proper new learner state, without manufacturing progress activity.
+    if (!stats.doneTopics && !stats.inProgress) {
+      try { window.__ocdCharts?.overall?.destroy?.(); } catch {}
+      try { window.__ocdCharts?.courses?.destroy?.(); } catch {}
+      window.__ocdCharts = null;
+      showFrameMessage('#chart-overall',
+        'Start a lesson to build your learning history.', true);
+      showFrameMessage('#chart-courses',
+        'Course comparisons will appear after you start studying.');
+      return;
+    }
+    for (const sel of ['#chart-overall', '#chart-courses']) {
+      const canvas = q(sel);
+      if (canvas) {
+        canvas.hidden = false;
+        canvas.closest('.progress-chart-frame')?.querySelector('[data-progress-empty]')?.remove();
+      }
+    }
 
     if (!window.Chart) {
       // Chart.js is fetched on demand; if it failed (offline first visit,

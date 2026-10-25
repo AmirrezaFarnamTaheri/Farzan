@@ -1,0 +1,131 @@
+import { test, expect } from '@playwright/test';
+
+test.use({ channel: 'chrome' });
+
+test.describe('Farzan desktop workspace redesign', () => {
+  test('keeps the app anchored to one viewport without exposing internal file pickers', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+    const shell = await page.evaluate(() => {
+      const app = document.getElementById('ocd-app').getBoundingClientRect();
+      const sidebar = document.querySelector('#sidebar').getBoundingClientRect();
+      const topbar = document.querySelector('#topbar').getBoundingClientRect();
+      return {
+        bodyOverflow: getComputedStyle(document.body).overflowY,
+        appTop: app.top, appHeight: app.height, sidebarTop: sidebar.top, headerTop: topbar.top,
+        logo: document.querySelector('.sidebar-logo-text')?.textContent,
+      };
+    });
+    expect(shell.bodyOverflow).toBe('hidden');
+    expect(shell.appTop).toBeGreaterThanOrEqual(-1);
+    expect(shell.appHeight).toBeLessThanOrEqual(901);
+    expect(shell.sidebarTop).toBeGreaterThanOrEqual(-1);
+    expect(shell.headerTop).toBeGreaterThanOrEqual(-1);
+    expect(shell.logo).toContain('Farzan');
+    for (const picker of await page.locator('input[type="file"]').all()) {
+      expect(await picker.getAttribute('hidden')).not.toBeNull();
+      await expect(picker).toBeHidden();
+    }
+  });
+
+  test('presents a useful catalog before playback without a blank media theater', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-courses')).toBeVisible();
+    await expect(page.locator('[data-courses-add]')).toBeVisible();
+    const player = page.locator('[data-course-playback]');
+    await expect(player).toBeHidden();
+    await expect(page.locator('[data-course-empty-guidance]')).toBeVisible();
+    await expect(page.locator('#courses-search')).toBeVisible();
+  });
+
+  test('renders a high-contrast editorial home hero for a new learner', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-home-title]')).toContainText('What will you learn today');
+    const appearance = await page.locator('.home-hero').evaluate(element => ({
+      background: getComputedStyle(element).backgroundImage,
+      titleInk: getComputedStyle(element.querySelector('.home-title')).color,
+    }));
+    expect(appearance.background).toContain('linear-gradient');
+    expect(appearance.titleInk).toBe('rgb(255, 255, 255)');
+  });
+
+  test('reveals and dismisses lesson video only after choosing Play', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const medicine = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(medicine).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('#courses-list .course-item').first()).not.toContainText('Getting Started');
+    await medicine.click();
+    const play = page.locator('#course-detail button[data-action="play-video"]').first();
+    await expect(play).toBeVisible({ timeout: 20000 });
+    await play.click();
+    const session = page.locator('[data-course-playback]');
+    await expect(session).toBeVisible();
+    await expect(page.locator('#course-player')).toBeVisible();
+    await session.locator('[data-course-close-playback]').click();
+    await expect(session).toBeHidden();
+  });
+
+  test('shows meaningful first-run progress guidance instead of empty charts', async ({ page }) => {
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-progress')).toBeVisible();
+    await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.locator('[data-progress-empty]').first()).toBeVisible();
+    await expect(page.locator('[data-progress-empty]').first()).toContainText('Start a lesson');
+    await expect(page.locator('#chart-overall')).toBeHidden();
+  });
+
+  test('puts advanced Studio commands behind a discoverable disclosure', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    const advanced = page.locator('[data-studio-more-tools]');
+    await expect(advanced.locator('summary')).toBeVisible();
+    await expect(advanced.locator('[data-studio-export-json]')).toBeHidden();
+    await expect(page.locator('button[data-studio-tool="pen"]')).toBeVisible();
+    await expect(page.locator('[data-studio-save]')).toBeVisible();
+    await advanced.locator('summary').click();
+    await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
+  });
+
+  test('keeps RTL mobile navigation fully off-canvas until opened', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+      el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(390);
+    const layout = await page.evaluate(() => ({
+      app: document.querySelector('#ocd-app').getBoundingClientRect(),
+      topbar: document.querySelector('#topbar').getBoundingClientRect(),
+      hero: document.querySelector('.home-hero').getBoundingClientRect(),
+    }));
+    expect(layout.topbar.right).toBeLessThanOrEqual(391);
+    expect(layout.hero.right).toBeLessThanOrEqual(391);
+  });
+
+  test('keeps the mobile course picker short enough to reveal the lesson outline', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const list = page.locator('#courses-list');
+    await expect(list.locator('.course-item').first()).toBeVisible();
+    const height = await list.evaluate(el => el.getBoundingClientRect().height);
+    expect(height).toBeLessThanOrEqual(245);
+  });
+
+  test('keeps a usable mobile shell with no body-level double scrollbars', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+    const metrics = await page.evaluate(() => ({
+      bodyOverflow: getComputedStyle(document.body).overflowY,
+      rootOverflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth,
+      header: document.querySelector('#topbar').getBoundingClientRect(),
+    }));
+    expect(metrics.bodyOverflow).toBe('hidden');
+    expect(metrics.rootOverflow).toBeLessThanOrEqual(2);
+    expect(metrics.header.top).toBeGreaterThanOrEqual(-1);
+  });
+});
