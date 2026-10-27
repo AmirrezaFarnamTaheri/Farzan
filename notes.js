@@ -5,6 +5,7 @@
 // ============================================================
 
 import DOMPurify from 'dompurify';
+import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 
 (() => {
   'use strict';
@@ -1560,7 +1561,7 @@ import DOMPurify from 'dompurify';
         this._download('notes.json', JSON.stringify(notes, null, 2), 'application/json');
       } else if (format === 'md') {
         const md = notes.map(n =>
-          `# ${n.title}\n\n${this._htmlToMd(n.content)}\n\n---\n`
+          `# ${n.title}\n\n${noteHtmlToMarkdown(n.content)}\n\n---\n`
         ).join('\n');
         this._download('notes.md', md, 'text/markdown');
       }
@@ -1667,11 +1668,6 @@ import DOMPurify from 'dompurify';
       const current = Number(existing?.updatedAt ?? existing?.createdAt ?? 0);
       const next = Number(incoming?.updatedAt ?? incoming?.createdAt ?? 0);
       return Number.isFinite(next) && next > current;
-    },
-
-    _htmlToMd(html) {
-      const sanitized = Editor._sanitize(html);
-      return inertTextContent(sanitized);
     },
 
     _download(filename, content, mime) {

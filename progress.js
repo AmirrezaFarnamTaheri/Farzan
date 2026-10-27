@@ -2,6 +2,7 @@
 // progress.js  — OpenCourseDeck bulk progress & export
 // ============================================================
 import { createVaultZip } from './src/features/vaultZip.js';
+import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 
 'use strict';
 
@@ -516,7 +517,7 @@ const ProgressStats = (() => {
       const t = topicMap[n.topicId] || {};
       lines.push(`\n## ${n.title || t.title || n.topicId || 'Untitled note'}`);
       lines.push(`> دوره: ${t.courseId || n.courseId || '—'}\n`);
-      lines.push(_htmlToMarkdown(n.content ?? n.html ?? '') || n.text || '');
+      lines.push(noteHtmlToMarkdown(n.content ?? n.html ?? '') || n.text || '');
     });
 
     _downloadText(lines.join('\n'), `opencoursedeck-notes-${_isoDate()}.md`, 'text/markdown');
@@ -1410,7 +1411,7 @@ const ProgressStats = (() => {
   }
 
   function _noteVaultMarkdown(note, topic = {}) {
-    const body = _htmlToMarkdown(note.content ?? note.html ?? '') || note.text || '';
+    const body = noteHtmlToMarkdown(note.content ?? note.html ?? '') || note.text || '';
     const metadata = [
       '---',
       `id: ${_yamlScalar(note.id || '')}`,
@@ -1454,29 +1455,6 @@ const ProgressStats = (() => {
     } catch {
       return null;
     }
-  }
-
-  /* very naive HTML → Markdown — good enough for Quill output */
-  function _htmlToMarkdown(html) {
-    return html
-      .replace(/<h1[^>]*>(.*?)<\/h1>/gi,   '# $1\n')
-      .replace(/<h2[^>]*>(.*?)<\/h2>/gi,   '## $1\n')
-      .replace(/<h3[^>]*>(.*?)<\/h3>/gi,   '### $1\n')
-      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
-      .replace(/<b[^>]*>(.*?)<\/b>/gi,     '**$1**')
-      .replace(/<em[^>]*>(.*?)<\/em>/gi,   '*$1*')
-      .replace(/<i[^>]*>(.*?)<\/i>/gi,     '*$1*')
-      .replace(/<code[^>]*>(.*?)<\/code>/gi,'`$1`')
-      .replace(/<li[^>]*>(.*?)<\/li>/gi,   '- $1\n')
-      .replace(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
-      .replace(/<br\s*\/?>/gi,             '\n')
-      .replace(/<p[^>]*>(.*?)<\/p>/gi,     '$1\n\n')
-      .replace(/<[^>]+>/g,                 '')
-      .replace(/&amp;/g,  '&')
-      .replace(/&lt;/g,   '<')
-      .replace(/&gt;/g,   '>')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
   }
 
   /* ── public API ─────────────────────────────────────────── */

@@ -590,6 +590,29 @@ describe('notes route filters', () => {
     expect(window.__folderIconXss).toBeUndefined();
   });
 
+  it('exports rich notes as portable Markdown through the same safe library converter as Vault', () => {
+    window.PlasmaNotesStore._notes = [{
+      id: 'export-md', title: 'Study export', folderId: 'default',
+      content: '<h2>فیزیولوژی قلب</h2>'
+        + '<p><strong>Bold <em>detail</em></strong> and <a href="https://example.org">source</a></p>'
+        + '<table><thead><tr><th>Subject</th><th>Result</th></tr></thead>'
+        + '<tbody><tr><td>Echo</td><td>Normal</td></tr></tbody></table>'
+        + '<img src="https://tracker.example/pixel.png" onerror="alert(1)">',
+      tags: [], pinned: false, createdAt: now, updatedAt: now,
+    }];
+    const capture = vi.spyOn(window.PlasmaNotesExport, '_download').mockImplementation(() => {});
+    window.PlasmaNotesExport.exportAll('md');
+    expect(capture).toHaveBeenCalledOnce();
+    const [filename, markdown, mime] = capture.mock.calls[0];
+    expect(filename).toBe('notes.md');
+    expect(mime).toBe('text/markdown');
+    expect(markdown).toContain('## فیزیولوژی قلب');
+    expect(markdown).toContain('**Bold *detail***');
+    expect(markdown).toContain('[source](https://example.org)');
+    expect(markdown).toContain('| Echo | Normal |');
+    expect(markdown).not.toContain('tracker.example');
+  });
+
   it('renders the empty notes state with DOM nodes', () => {
     const input = document.querySelector('[data-notes-search]');
 
