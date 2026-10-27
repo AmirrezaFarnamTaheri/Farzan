@@ -43,6 +43,19 @@ describe('Tiptap StarterKit edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('supports native rich text direction and typography commands without discarding HTML', () => {
+    const element = document.createElement('div');
+    const instance = createTiptapNoteEditor({ element, html: '<p>عنوان فارسی</p>' });
+    try {
+      for (const command of ['rtl', 'ltr', 'fontSize', 'fontFamily', 'textColor', 'highlightColor', 'alignRight']) {
+        expect(instance.supports(command)).toBe(true);
+      }
+      expect(instance.run('rtl')).toBe(true);
+      expect(instance.getHTML()).toContain('عنوان فارسی');
+      expect(instance.getHTML()).toMatch(/dir=["']rtl["']/);
+    } finally { instance.destroy(); }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
