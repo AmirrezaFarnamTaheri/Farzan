@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexedDB } from 'fake-indexeddb';
+import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 import {
   addPdfFile, clearLibraryFiles, exportLibraryMediaDirectory,
   importLibraryMediaDirectory, listMissingLibraryFiles, loadLibrary,
@@ -41,6 +41,7 @@ function fakeDirectory() {
 describe('opt-in complete media-folder backup and restore', () => {
   beforeEach(() => {
     vi.stubGlobal('indexedDB', indexedDB);
+    vi.stubGlobal('IDBKeyRange', IDBKeyRange);
     const settings = {};
     window.DB = {
       getSetting: vi.fn(async key => settings[key] ?? null),
