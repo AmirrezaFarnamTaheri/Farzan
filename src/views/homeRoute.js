@@ -81,7 +81,7 @@ export function mountHomeView(deps = {}) {
       </div>
 
       <div class="home-grid">
-        <section class="card card-filled home-card home-card-wide">
+        <section class="card card-filled home-card home-card-wide" data-home-progress-card>
           <div class="card-body">
             <div class="home-card-head">
               <div>
@@ -405,6 +405,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const hasSavedActivity = Boolean(focusRecord || active.length || notes.length || dueReviews.length);
   const hero = document.querySelector('.home-hero');
   if (hero) hero.dataset.homeHasProgress = hasSavedActivity ? 'true' : 'false';
+  const view = document.querySelector('.view-home');
+  if (view) view.dataset.homeHasProgress = hasSavedActivity ? 'true' : 'false';
   const commandStrip = document.querySelector('[data-home-command-strip]');
   if (commandStrip) commandStrip.hidden = !hasSavedActivity;
 
