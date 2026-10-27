@@ -132,6 +132,30 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
+  it('counts Chinese words accurately in saved note metadata using native word segmentation', () => {
+    const editor = document.querySelector('[data-notes-editor]');
+    const priorLanguage = document.documentElement.lang;
+    try {
+      document.documentElement.lang = 'zh-CN';
+      window.PlasmaNotesApp.openNote('pinned-note');
+      editor.innerHTML = '<p>你好世界</p>';
+      Object.defineProperty(editor, 'innerText', {
+        configurable: true,
+        get: () => '你好世界',
+      });
+      window.PlasmaNotesApp.flushPendingSave();
+      const saved = window.PlasmaNotesStore.getNote('pinned-note');
+      expect(saved.wordCount).toBe(2);
+      expect(saved.charCount).toBe(4);
+      expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'pinned-note',
+        wordCount: 2,
+      }));
+    } finally {
+      document.documentElement.lang = priorLanguage;
+    }
+  });
+
   it('extracts list excerpts without parsing note HTML into the live document', () => {
     const list = document.querySelector('[data-notes-list]');
     expect(list.textContent).toContain('Important');

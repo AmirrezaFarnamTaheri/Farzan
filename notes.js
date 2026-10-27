@@ -25,6 +25,31 @@
       : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
+  // Use the browser's maintained Unicode word-break engine rather than
+  // treating whitespace as the only word boundary (which undercounts CJK).
+  // Cached by locale; unchanged saved-note schema and no extra dependency.
+  const wordSegmenters = new Map();
+  function countWords(text) {
+    const source = String(text ?? '').trim();
+    if (!source) return 0;
+    if (typeof Intl.Segmenter !== 'function') {
+      return source.split(/\s+/).filter(Boolean).length;
+    }
+    const locale = document.documentElement.lang || navigator.language || 'en';
+    let segmenter = wordSegmenters.get(locale);
+    if (!segmenter) {
+      try {
+        segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
+        wordSegmenters.set(locale, segmenter);
+      } catch {
+        return source.split(/\s+/).filter(Boolean).length;
+      }
+    }
+    let count = 0;
+    for (const part of segmenter.segment(source)) if (part.isWordLike) count++;
+    return count;
+  }
+
   function debounce(fn, ms = 300) {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -777,7 +802,7 @@
         if (!this._el) return;
         const content  = this.getContent();
         const text     = this._el.innerText ?? '';
-        const words    = text.trim().split(/\s+/).filter(Boolean).length;
+        const words    = countWords(text);
         const chars    = text.length;
         // `?? ` does not catch the empty string, so clearing the title field
         // used to persist '' and render as a blank row in the notes list.
