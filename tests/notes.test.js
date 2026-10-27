@@ -156,6 +156,43 @@ describe('notes route filters', () => {
     }
   });
 
+  it('round-trips legacy rich HTML without losing a table, code, RTL text or blocked external images', () => {
+    const original = [
+      '<h2>فیزیولوژی قلب</h2>',
+      '<p><strong>Cardiology</strong> <em>عنوان فارسی</em> 你好世界</p>',
+      '<blockquote><p>Important lecture excerpt</p></blockquote>',
+      '<pre><code>rate = volume / time</code></pre>',
+      '<table><tbody><tr><th>Term</th><th>Value</th></tr>',
+      '<tr><td>Stroke volume</td><td>70 mL</td></tr></tbody></table>',
+      '<img src="https://tracker.example/remote.png" alt="Saved chart">',
+      '<section data-ai-summary-block="true"><h3>AI summary</h3><p>Prior summary</p></section>',
+    ].join('');
+    const store = window.PlasmaNotesStore;
+    const app = window.PlasmaNotesApp;
+    store.updateNote('regular-note', { content: original });
+    app.openNote('regular-note');
+
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('table td:last-child')?.textContent).toBe('70 mL');
+    expect(editor.querySelector('pre code')?.textContent).toContain('rate = volume / time');
+    expect(editor.textContent).toContain('عنوان فارسی');
+    expect(editor.textContent).toContain('你好世界');
+    expect(editor.querySelector('img[src^="https://tracker.example"]')).toBeNull();
+    expect(editor.querySelector('img[data-remote-src^="https://tracker.example"]')).not.toBeNull();
+
+    app.flushPendingSave();
+    app.openNote('regular-note');
+    const saved = store.getNote('regular-note').content;
+    expect(saved).toContain('<table>');
+    expect(saved).toContain('<blockquote>');
+    expect(saved).toContain('<pre>');
+    expect(saved).toContain('70 mL');
+    expect(saved).toContain('你好世界');
+    expect(saved).toContain('data-ai-summary-block="true"');
+    expect(saved).not.toMatch(/\ssrc="https:\/\/tracker\.example/);
+    expect(saved).toContain('data-remote-src="https://tracker.example/remote.png"');
+  });
+
   it('extracts list excerpts without parsing note HTML into the live document', () => {
     const list = document.querySelector('[data-notes-list]');
     expect(list.textContent).toContain('Important');
