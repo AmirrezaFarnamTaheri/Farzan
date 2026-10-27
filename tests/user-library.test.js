@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexedDB } from 'fake-indexeddb';
+import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 import {
   addMediaFiles,
   clearLibraryFiles,
@@ -24,6 +24,7 @@ import {
 describe('user library overlay', () => {
   beforeEach(() => {
     vi.stubGlobal('indexedDB', indexedDB);
+    vi.stubGlobal('IDBKeyRange', IDBKeyRange);
     window.DB = {
       store: {},
       getSetting: vi.fn(async (key) => window.DB.store[key] ?? null),
