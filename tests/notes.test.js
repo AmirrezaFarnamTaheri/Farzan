@@ -205,6 +205,24 @@ describe('notes route filters', () => {
     expect(editor.textContent).toContain('هوا و ریه');
   });
 
+  it('updates the modern toolbar after an editor selection changes without crashing', async () => {
+    const app = window.PlasmaNotesApp;
+    const toolbar = document.querySelector('[data-notes-toolbar]');
+    const boldButton = document.createElement('button');
+    boldButton.dataset.cmd = 'bold';
+    toolbar.appendChild(boldButton);
+    app.openNote('regular-note');
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: true });
+    const proseMirror = document.querySelector('[data-notes-editor] .ProseMirror');
+    expect(proseMirror).not.toBeNull();
+    proseMirror.focus();
+    expect(document.activeElement).toBe(proseMirror);
+    document.dispatchEvent(new Event('selectionchange'));
+    expect(() => vi.advanceTimersByTime(150)).not.toThrow();
+    expect(boldButton.classList.contains('active')).toBe(false);
+  });
+
   it('round-trips legacy rich HTML without losing a table, code, RTL text or blocked external images', () => {
     const original = [
       '<h2>فیزیولوژی قلب</h2>',
