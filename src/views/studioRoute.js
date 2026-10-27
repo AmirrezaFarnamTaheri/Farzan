@@ -121,7 +121,11 @@ printStudioBoardPdf,
       <div class="studio-workspace-grid">
         <div class="studio-canvas-card">
           <div class="studio-shell">
-            <canvas id="studio-canvas" class="studio-canvas"></canvas>
+            <canvas id="studio-canvas" class="studio-canvas" aria-label="Editable Studio canvas"></canvas>
+            <div class="studio-empty-hint" data-studio-empty-hint aria-live="polite">
+              <strong>Start creating on your board</strong>
+              <span>Choose Pen to draw, type a board note and select Note, or add a card.</span>
+            </div>
           </div>
         </div>
 
@@ -284,6 +288,8 @@ printStudioBoardPdf,
     });
     layersRoot.replaceChildren(...(layerNodes.length ? layerNodes : [document.createTextNode('No layers')]));
     const elements = layers.flatMap((layer) => (Array.isArray(layer.elements) ? layer.elements : []).map((element) => ({ ...element, layerName: layer.name })));
+    const emptyHint = document.querySelector('[data-studio-empty-hint]');
+    if (emptyHint) emptyHint.hidden = elements.length > 0;
     const elementNodes = elements.map((element) => {
       const row = document.createElement('div');
       row.className = 'card card-flat';
@@ -430,6 +436,13 @@ printStudioBoardPdf,
   };
   const canvas = document.getElementById('studio-canvas');
   if (canvas) {
+    // A first stroke should immediately remove the empty-board hint.
+    // The hint never intercepts pointers, and inspector refresh handles
+    // notes, cards, imported and restored board content.
+    on(canvas, 'pointerdown', () => {
+      const hint = document.querySelector('[data-studio-empty-hint]');
+      if (hint) hint.hidden = true;
+    });
     // Give it a size; canvas.js reads offsetWidth/Height
     canvas.style.width = '100%';
     canvas.style.height = '70vh';
