@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from '../lib/eventEmitter.js';
+import { forceManyBody, forceCollide } from 'd3-force';
 import { countWords } from '../core/textMetrics.js';
 
 function extractWikilinks(content) {
@@ -177,90 +178,76 @@ export class KnowledgeGraph extends EventEmitter {
   }
 
   _initSimulation(width, height) {
+    // Replace the previous per-frame O(n^2) handwritten charge and collision
+    // loops with d3-force's Barnes-Hut charge and quadtree collision engines.
+    // Keep our node/edge IDs and Canvas drawing as the public app contract.
+    this._simulation?.stop();
+    this._width = width;
+    this._height = height;
     const cx = width / 2;
     const cy = height / 2;
     for (const node of this._nodes) {
-      node.x = cx + (Math.random() - 0.5) * width * 0.6;
-      node.y = cy + (Math.random() - 0.5) * height * 0.6;
+      if (!Number.isFinite(node.x) || !Number.isFinite(node.y) || (node.x === 0 && node.y === 0)) {
+        node.x = cx + (Math.random() - 0.5) * width * 0.6;
+        node.y = cy + (Math.random() - 0.5) * height * 0.6;
+      }
     }
-    this._width = width;
-    this._height = height;
+    const byId = new Map(this._nodes.map(node => [node.id, node]));
+    const links = this._edges.map(edge => ({
+      source: byId.get(edge.source), target: byId.get(edge.target),
+    })).filter(link => link.source && link.target);
+
+    // Use D3's quadtree/Barnes-Hut charge and collision algorithms. The
+    // small O(edges) spring force retains the original 80px distance without
+    // including another unused D3 module in the strict 1 MiB bundle.
+    const linkForce = alpha => {
+      for (const { source, target } of links) {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        const pull = (distance - 80) * alpha * 0.05 / distance;
+        source.vx += dx * pull;
+        source.vy += dy * pull;
+        target.vx -= dx * pull;
+        target.vy -= dy * pull;
+      }
+    };
+    const forces = new Map([
+      ['charge', forceManyBody().strength(-120)],
+      ['links', linkForce],
+      ['collide', forceCollide(node => node.radius + 2).strength(0.95)],
+    ]);
+    for (const node of this._nodes) {
+      node.vx = Number.isFinite(node.vx) ? node.vx : 0;
+      node.vy = Number.isFinite(node.vy) ? node.vy : 0;
+    }
+    for (const force of forces.values()) force.initialize?.(this._nodes, Math.random);
+    let alpha = 1;
+    const nodes = this._nodes;
+    const graph = this;
+    this._simulation = {
+      force(name) { return forces.get(name); },
+      tick() {
+        alpha += (0 - alpha) * 0.015;
+        for (const force of forces.values()) force(alpha);
+        for (const node of nodes) {
+          // Centering is already in the existing Farzan frame scheduler.
+          node.vx += ((graph._width / 2) - node.x) * 0.015 * alpha;
+          node.vy += ((graph._height / 2) - node.y) * 0.015 * alpha;
+          if (node.fx == null) node.x += (node.vx *= 0.85);
+          else { node.x = node.fx; node.vx = 0; }
+          if (node.fy == null) node.y += (node.vy *= 0.85);
+          else { node.y = node.fy; node.vy = 0; }
+        }
+      },
+      stop() { /* No independent timer to cancel: Farzan owns RAF. */ },
+    };
   }
 
   _tick() {
-    const alpha = 0.3;
-    const chargeStrength = -120;
-    const linkDistance = 80;
-    const centerStrength = 0.05;
-    const collisionPadding = 4;
-
-    const nodeMap = new Map();
-    for (const node of this._nodes) nodeMap.set(node.id, node);
-
+    if (!this._simulation) return;
+    this._simulation.tick(1);
     for (const node of this._nodes) {
-      node.vx += (this._width / 2 - node.x) * centerStrength * alpha;
-      node.vy += (this._height / 2 - node.y) * centerStrength * alpha;
-    }
-
-    for (let i = 0; i < this._nodes.length; i++) {
-      for (let j = i + 1; j < this._nodes.length; j++) {
-        const a = this._nodes[i];
-        const b = this._nodes[j];
-        let dx = b.x - a.x;
-        let dy = b.y - a.y;
-        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = chargeStrength * alpha / (dist * dist);
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        a.vx -= fx;
-        a.vy -= fy;
-        b.vx += fx;
-        b.vy += fy;
-      }
-    }
-
-    for (const edge of this._edges) {
-      const source = nodeMap.get(edge.source);
-      const target = nodeMap.get(edge.target);
-      if (!source || !target) continue;
-      let dx = target.x - source.x;
-      let dy = target.y - source.y;
-      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const force = (dist - linkDistance) * alpha * 0.05;
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      source.vx += fx;
-      source.vy += fy;
-      target.vx -= fx;
-      target.vy -= fy;
-    }
-
-    for (let i = 0; i < this._nodes.length; i++) {
-      for (let j = i + 1; j < this._nodes.length; j++) {
-        const a = this._nodes[i];
-        const b = this._nodes[j];
-        let dx = b.x - a.x;
-        let dy = b.y - a.y;
-        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const minDist = a.radius + b.radius + collisionPadding;
-        if (dist < minDist) {
-          const overlap = (minDist - dist) / 2;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          a.x -= nx * overlap;
-          a.y -= ny * overlap;
-          b.x += nx * overlap;
-          b.y += ny * overlap;
-        }
-      }
-    }
-
-    for (const node of this._nodes) {
-      if (node === this._dragNode) continue;
-      node.vx *= 0.85;
-      node.vy *= 0.85;
-      node.x += node.vx;
-      node.y += node.vy;
       node.x = Math.max(node.radius, Math.min(this._width - node.radius, node.x));
       node.y = Math.max(node.radius, Math.min(this._height - node.radius, node.y));
     }
@@ -369,6 +356,8 @@ export class KnowledgeGraph extends EventEmitter {
       const node = this._findNodeAt(pos.x, pos.y);
       if (node) {
         this._dragNode = node;
+        node.fx = node.x;
+        node.fy = node.y;
         this._dragOffsetX = pos.x - node.x * this._zoom.scale - this._zoom.tx;
         this._dragOffsetY = pos.y - node.y * this._zoom.scale - this._zoom.ty;
         canvas.style.cursor = 'grabbing';
@@ -383,6 +372,8 @@ export class KnowledgeGraph extends EventEmitter {
         const wy = (pos.y - this._dragOffsetY - this._zoom.ty) / this._zoom.scale;
         this._dragNode.x = wx;
         this._dragNode.y = wy;
+        this._dragNode.fx = wx;
+        this._dragNode.fy = wy;
         this._dragNode.vx = 0;
         this._dragNode.vy = 0;
         this._start();
@@ -398,6 +389,8 @@ export class KnowledgeGraph extends EventEmitter {
 
     canvas.addEventListener('pointerup', () => {
       if (this._dragNode) {
+        this._dragNode.fx = null;
+        this._dragNode.fy = null;
         this._dragNode = null;
         canvas.style.cursor = 'grab';
       }
@@ -446,6 +439,8 @@ export class KnowledgeGraph extends EventEmitter {
   destroy() {
     this._running = false;
     if (this._animFrame) cancelAnimationFrame(this._animFrame);
+    this._simulation?.stop();
+    this._simulation = null;
     if (this._canvas) this._canvas.remove();
     this._nodes = [];
     this._edges = [];
