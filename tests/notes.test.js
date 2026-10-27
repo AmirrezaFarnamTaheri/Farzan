@@ -156,6 +156,55 @@ describe('notes route filters', () => {
     }
   });
 
+  it('does not replace unsupported legacy notes when Tiptap preview is requested', async () => {
+    const original = '<h2>Legacy</h2><table><tbody><tr><td>70 mL</td></tr></tbody></table>'
+      + '<img data-remote-src="https://example.test/image.png" alt="Chart">';
+    window.PlasmaNotesStore.updateNote('regular-note', { content: original });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const result = await window.PlasmaNotesApp.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('table td')?.textContent).toBe('70 mL');
+    expect(editor.querySelector('img[data-remote-src]')).not.toBeNull();
+    window.PlasmaNotesApp.flushPendingSave();
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toContain('<table>');
+  });
+
+  it('refuses an unsaved legacy table draft before attempting any ProseMirror conversion', async () => {
+    const store = window.PlasmaNotesStore;
+    const app = window.PlasmaNotesApp;
+    store.updateNote('regular-note', { content: '<p>Original compatible note</p>' });
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    const draft = '<p>Unsaved user text</p><table><tbody><tr><td>Never drop 70 mL</td></tr></tbody></table>';
+    editor.innerHTML = draft;
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
+    expect(editor.querySelector('table td')?.textContent).toBe('Never drop 70 mL');
+    expect(editor.querySelector('.ProseMirror')).toBeNull();
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('Never drop 70 mL');
+    expect(store.getNote('regular-note').content).toContain('<table>');
+  });
+
+  it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
+    const existing = '<p>هوا و ریه 你好世界</p>';
+    window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const savedBefore = window.PlasmaNotesStore.getNote('regular-note').content;
+    const result = await window.PlasmaNotesApp.enableModernEditor();
+    expect(result).toMatchObject({ ok: true });
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('.ProseMirror')?.textContent).toContain('你好世界');
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toBe(savedBefore);
+    expect(window.PlasmaNotesApp.disableModernEditor()).toBe(true);
+    expect(editor.querySelector('.ProseMirror')).toBeNull();
+    expect(editor.textContent).toContain('هوا و ریه');
+  });
+
   it('round-trips legacy rich HTML without losing a table, code, RTL text or blocked external images', () => {
     const original = [
       '<h2>فیزیولوژی قلب</h2>',

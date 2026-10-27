@@ -563,6 +563,85 @@ import { countWords } from './src/core/textMetrics.js';
   // ──────────────────────────────────────────────────────────
 
   const Editor = {
+    _tiptap: null,
+    _tiptapChanged: false,
+    _tiptapOriginal: null,
+
+    async enableModern() {
+      if (this._tiptap) return { ok: true, alreadyEnabled: true };
+      if (!this._el || !this._currentId) return { ok: false, reason: 'no-note' };
+      // Check the *original* HTML before sanitization. A schema-based editor
+      // would otherwise drop unsupported saved metadata and silently replace
+      // it when a title-only save occurs.
+      const originalNote = Store.getNote(this._currentId);
+      const { assessNoteForTiptap } = await import('./src/features/notesEditorCompatibility.js');
+      const preflight = assessNoteForTiptap(originalNote?.content ?? '');
+      if (!preflight.compatible) return { ok: false, reason: 'incompatible', detail: preflight.reason };
+      // A compatible persisted record does not imply the current, unsaved
+      // draft is compatible. Reject tables/images/styles in the live editor
+      // BEFORE flushing a debounced save or replacing the DOM with ProseMirror.
+      const draftCheck = assessNoteForTiptap(this._el.innerHTML);
+      if (!draftCheck.compatible) {
+        return { ok: false, reason: 'incompatible', detail: draftCheck.reason };
+      }
+      if (this._saveTimer) this.save(true);
+      const node = this._el;
+      const noteId = this._currentId;
+      const original = node.innerHTML;
+      const safe = this._sanitize(original);
+      const before = node.innerHTML;
+      let adapterModule;
+      try {
+        adapterModule = await import('./src/features/notesTiptapAdapter.js');
+      } catch (error) {
+        console.warn('[Notes] Tiptap preview unavailable', error);
+        return { ok: false, reason: 'unavailable' };
+      }
+      // Route unmounts, note switches, and intervening keystrokes must never
+      // cause an async editor import to replace a newer user draft.
+      if (node !== this._el || noteId !== this._currentId
+          || node.innerHTML !== before || !node.isConnected) {
+        return { ok: false, reason: 'stale-mount' };
+      }
+      try {
+        node.setAttribute('contenteditable', 'false');
+        node.replaceChildren();
+        const instance = adapterModule.createTiptapNoteEditor({
+          element: node,
+          html: safe,
+          onUpdate: () => {
+            if (this._el !== node || this._currentId !== noteId) return;
+            this._tiptapChanged = true;
+            this._onInput();
+          },
+        });
+        this._tiptap = instance;
+        this._tiptapOriginal = safe;
+        this._tiptapChanged = false;
+        return { ok: true };
+      } catch (error) {
+        node.replaceChildren();
+        node.innerHTML = original;
+        node.setAttribute('contenteditable', 'true');
+        console.warn('[Notes] Tiptap preview rejected this note', error);
+        return { ok: false, reason: 'incompatible' };
+      }
+    },
+
+    disableModern({ preserveContent = true } = {}) {
+      if (!this._tiptap) return false;
+      const preserved = preserveContent ? this.getContent() : '';
+      try { this._tiptap.destroy(); } catch {}
+      this._tiptap = null;
+      this._tiptapOriginal = null;
+      this._tiptapChanged = false;
+      if (this._el) {
+        this._el.replaceChildren();
+        this._el.setAttribute('contenteditable', 'true');
+        if (preserveContent) this._el.innerHTML = preserved;
+      }
+      return true;
+    },
     _el:         null,
     _currentId:  null,
     _saveTimer:  null,
@@ -638,6 +717,7 @@ import { countWords } from './src/core/textMetrics.js';
     // ── Load note into editor ─────────────────────────────
     load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
+      this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
       this._history    = [];
@@ -656,7 +736,10 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Get current HTML ──────────────────────────────────
     getContent() {
-      return this._sanitize(this._el?.innerHTML ?? '');
+      const html = this._tiptap
+        ? (this._tiptapChanged ? this._tiptap.getHTML() : this._tiptapOriginal)
+        : this._el?.innerHTML;
+      return this._sanitize(html ?? '');
     },
 
     // ── Save ──────────────────────────────────────────────
@@ -675,7 +758,7 @@ import { countWords } from './src/core/textMetrics.js';
         // a detached node over a real note.
         if (!this._el) return;
         const content  = this.getContent();
-        const text     = this._el.innerText ?? '';
+        const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
         const chars    = text.length;
         // `?? ` does not catch the empty string, so clearing the title field
@@ -703,6 +786,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Undo / Redo ───────────────────────────────────────
     _snapshot() {
+      if (this._tiptap) return;
       const html = this._el?.innerHTML ?? '';
       // Trim future history if we branched
       this._history = this._history.slice(0, this._historyIdx + 1);
@@ -714,6 +798,7 @@ import { countWords } from './src/core/textMetrics.js';
     _scheduleSnapshot: debounce(function() { Editor._snapshot(); }, 500),
 
     undo() {
+      if (this._tiptap) { this._tiptap.run('undo'); return; }
       if (this._historyIdx <= 0) return;
       this._historyIdx--;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -721,6 +806,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     redo() {
+      if (this._tiptap) { this._tiptap.run('redo'); return; }
       if (this._historyIdx >= this._history.length - 1) return;
       this._historyIdx++;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -729,7 +815,8 @@ import { countWords } from './src/core/textMetrics.js';
 
     _setRichHTML(html) {
       if (!this._el) return;
-      this._el.innerHTML = this._sanitize(html);
+      if (this._tiptap) this._tiptap.setContent(this._sanitize(html));
+      else this._el.innerHTML = this._sanitize(html);
     },
 
     // ── Keyboard shortcuts ────────────────────────────────
@@ -737,6 +824,8 @@ import { countWords } from './src/core/textMetrics.js';
       const ctrl = e.ctrlKey || e.metaKey;
 
       if (ctrl && e.key === 's') { e.preventDefault(); this.save(true); return; }
+      // Tiptap owns editing shortcuts, selection and its native history.
+      if (this._tiptap) return;
       if (ctrl && e.key === 'z') { e.preventDefault(); this.undo(); return; }
       if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); this.redo(); return; }
       if (ctrl && e.key === 'b') { e.preventDefault(); this.COMMANDS.bold(); return; }
@@ -759,6 +848,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Paste handler ─────────────────────────────────────
     _onPaste(e) {
+      if (this._tiptap) return; // ProseMirror owns paste parsing and history.
       e.preventDefault();
       const text = e.clipboardData.getData('text/html')
         || e.clipboardData.getData('text/plain');
@@ -781,6 +871,10 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Toolbar state sync ────────────────────────────────
     _updateToolbar() {
+      if (this._tiptap) {
+        $('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._tiptap.isActive(btn.dataset.cmd)));
+        return;
+      }
       const commands = ['bold', 'italic', 'underline', 'strikeThrough',
                         'justifyLeft', 'justifyCenter', 'justifyRight'];
       commands.forEach(cmd => {
@@ -861,6 +955,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     appendAISummary(summary) {
+      if (this._tiptap) this.disableModern();
       if (!this._el || !this._currentId) return false;
       const lines = String(summary || '')
         .split(/\r?\n/)
@@ -993,6 +1088,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _placeCursorAtEnd() {
+      if (this._tiptap) { this._tiptap.editor.commands.focus('end'); return; }
       const range = document.createRange();
       const sel   = window.getSelection();
       range.selectNodeContents(this._el);
@@ -1667,8 +1763,17 @@ import { countWords } from './src/core/textMetrics.js';
     init(toolbarEl) {
       if (!toolbarEl) return;
       const runCommand = btn => {
-        if (btn.dataset.cmdBlock) Editor.COMMANDS[btn.dataset.cmdBlock]?.();
-        else Editor.COMMANDS[btn.dataset.cmd]?.();
+        const command = btn.dataset.cmdBlock || btn.dataset.cmd;
+        if (Editor._tiptap) {
+          if (Editor._tiptap.supports(command)) {
+            Editor._tiptap.run(command);
+            return;
+          }
+          // Unsupported advanced formatting requires the legacy schema.
+          // Preserve the current HTML rather than silently strip styles.
+          Editor.disableModern();
+        }
+        Editor.COMMANDS[command]?.();
       };
 
       // Pointer activation. mousedown (not click) with preventDefault is
@@ -1703,6 +1808,7 @@ import { countWords } from './src/core/textMetrics.js';
       const sizeSelect = toolbarEl.querySelector('[data-font-size]');
       if (sizeSelect) {
         RouteListeners.on(sizeSelect, 'change', () => {
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontSize', false, sizeSelect.value);
         });
       }
@@ -1711,6 +1817,7 @@ import { countWords } from './src/core/textMetrics.js';
       const fontSelect = toolbarEl.querySelector('[data-font-family]');
       if (fontSelect) {
         RouteListeners.on(fontSelect, 'change', () => {
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontName', false, fontSelect.value);
         });
       }
@@ -1719,6 +1826,7 @@ import { countWords } from './src/core/textMetrics.js';
       const colorInput = toolbarEl.querySelector('[data-text-color]');
       if (colorInput) {
         RouteListeners.on(colorInput, 'input', () => {
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('foreColor', false, colorInput.value);
         });
       }
@@ -1727,6 +1835,7 @@ import { countWords } from './src/core/textMetrics.js';
       const hlInput = toolbarEl.querySelector('[data-highlight-color]');
       if (hlInput) {
         RouteListeners.on(hlInput, 'input', () => {
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('hiliteColor', false, hlInput.value);
         });
       }
@@ -1786,6 +1895,29 @@ import { countWords } from './src/core/textMetrics.js';
           Editor.save(true);
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
+        });
+      }
+
+      // Quality-assurance preview is deliberately opt-in while rich legacy
+      // tables/images/style extensions and the full bundle gate are unfinished.
+      const modernToggle = $('[data-notes-modern-toggle]');
+      if (modernToggle) {
+        modernToggle.hidden = window.OpenCourseDeck?.featureFlags?.notesTiptapPreview !== true;
+        RouteListeners.on(modernToggle, 'click', async () => {
+          if (Editor._tiptap) {
+            Editor.disableModern();
+          } else {
+            const result = await this.enableModernEditor();
+            if (!result.ok) {
+              window.OpenCourseDeck?.Toast?.info?.(
+                result.reason === 'incompatible'
+                  ? 'This note needs the classic editor to preserve its formatting.'
+                  : 'The preview editor is unavailable.',
+              );
+            }
+          }
+          modernToggle.textContent = Editor._tiptap
+            ? 'Use classic editor' : 'Try modern editor (preview)';
         });
       }
 
@@ -1911,6 +2043,9 @@ import { countWords } from './src/core/textMetrics.js';
       this.openNote(note.id, { preventScroll });
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
     },
+
+    enableModernEditor() { return Editor.enableModern(); },
+    disableModernEditor() { return Editor.disableModern(); },
 
     openNote(id, { preventScroll = false } = {}) {
       Editor.save(true); // Save current
@@ -2087,6 +2222,7 @@ import { countWords } from './src/core/textMetrics.js';
     destroy() {
       this._unbindSyncRefresh();
       this.flushPendingSave?.();
+      Editor.disableModern({ preserveContent: false });
       RouteListeners.clear();
       ContextMenu.hide();
       Editor._hideSlashMenu?.();

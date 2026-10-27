@@ -63,7 +63,10 @@
     "fflate": "0.8.3",
     "turndown": "7.2.4",
     "turndown-plugin-gfm": "1.0.2",
-    "d3-force": "3.0.0"
+    "d3-force": "3.0.0",
+    "@tiptap/core": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
