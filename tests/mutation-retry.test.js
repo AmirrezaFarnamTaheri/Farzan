@@ -219,25 +219,23 @@ describe('OpenCourseDB automatic mutation retry integration', () => {
     return db;
   }
 
-  it('put() survives a transient transaction failure and persists the record', async () => {
+  it('put() retries a transient preparation error and durably persists one record', async () => {
     const db = makeDb();
-    const original = db._waitForTransaction.bind(db);
-    let failures = 0;
-    db._waitForTransaction = (tx, request, mapResult) => {
-      if (failures++ === 0) {
-        // Abort the transaction after the request is queued: the write rolls
-        // back and the promise rejects with a retryable AbortError — exactly
-        // what a version-change interruption looks like in production.
-        request.onsuccess = () => tx.abort();
-      }
-      return original(tx, request, mapResult);
+    const originalSeal = db._seal.bind(db);
+    let attempts = 0;
+    // Inject at the public mutation boundary instead of mocking the deleted
+    // native request adapter. A fresh Dexie transaction must be created on
+    // each retry after a retryable failure.
+    db._seal = async (...args) => {
+      if (attempts++ === 0) throw domError('AbortError');
+      return originalSeal(...args);
     };
 
     await expect(db.put('items', { id: 'a', value: 1 })).resolves.toBe('a');
-
-    // The retried attempt must have committed durably, and exactly once.
+    expect(attempts).toBe(2);
     const stored = await db.get('items', 'a');
-    expect(stored).toMatchObject({ id: 'a', value: 1 });
+    expect(stored).toEqual({ id: 'a', value: 1 });
+    expect(await db.count('items')).toBe(1);
   });
 
   it('put() surfaces permanent payload failures immediately without writing', async () => {
