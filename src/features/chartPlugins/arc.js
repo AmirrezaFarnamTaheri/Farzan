@@ -1,132 +1,100 @@
 /**
- * Chart.js Arc Plugin — circular progress rings.
- * Arc from 0% to 100% with center percentage text.
+ * Chart.js completion-ring adapter.
  *
- * Usage:
- *   new Chart(ctx, {
- *     type: 'doughnut',
- *     plugins: [chartArc],
- *     data: { datasets: [{ data: [75, 25] }] },
- *     options: {
- *       plugins: {
- *         arc: {
- *           lineWidth: 12,
- *           color: '#6366f1',
- *           backgroundColor: '#2a2a2e',
- *           animate: true,
- *         }
- *       }
- *     }
- *   });
+ * Chart.js doughnut datasets own the arc geometry, animation and teardown;
+ * Farzan's plugin keeps the existing option names and center percentage label.
+ * No secondary RAF loop or duplicate Canvas2D arc stroke is needed.
  */
+function ringOptions(chart) {
+  return chart.options?.plugins?.arc || {};
+}
 
-import { easeOutCubic } from '../../lib/easing.js';
+function applyRingDatasetDefaults(chart) {
+  const options = ringOptions(chart);
+  for (const dataset of chart.data?.datasets || []) {
+    dataset.backgroundColor ??= [
+      options.color || '#6366f1',
+      options.backgroundColor || 'rgba(255,255,255,0.08)',
+    ];
+    dataset.borderWidth ??= 0;
+    dataset.hoverOffset ??= 0;
+  }
+}
+
+function currentPercent(chart) {
+  const data = chart.data?.datasets?.[0]?.data || [];
+  const total = data.reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0) || 100;
+  const ratio = Math.max(0, Math.min(1, (Number(data[0]) || 0) / total));
+  // Chart.js exposes the animated circumference of its real first ArcElement.
+  // Prefer that when present, falling back to the stored data in test doubles.
+  const arc = chart.getDatasetMeta?.(0)?.data?.[0];
+  // Chart.js stores ArcElement angles in radians, while the chart sweep is in degrees.
+  // A 75% half-circle therefore occupies 0.75*pi radians, not 0.75*2*pi.
+  const sweepDegrees = Number(chart.data?.datasets?.[0]?.circumference
+    ?? chart.options?.circumference ?? 360);
+  const sweepRadians = Math.abs(sweepDegrees) * Math.PI / 180;
+  return Number.isFinite(arc?.circumference) && sweepRadians > 0
+    ? Math.max(0, Math.min(100, Math.abs(arc.circumference) / sweepRadians * 100))
+    : ratio * 100;
+}
 
 export const chartArc = {
   id: 'arc',
 
   beforeInit(chart) {
     const opts = chart.options || {};
-    // Use Object.assign instead of direct property assignment to avoid
-    // Chart.js v4.5.1 Data Proxy recursion (Maximum call stack size exceeded)
-    // when chart.options is a Proxy-wrapped object. Each assign targets a
-    // shallow property so the Proxy's own set() trap is not re-entered.
-    Object.assign(opts, { cutout: opts.cutout ?? '78%', responsive: opts.responsive !== false, maintainAspectRatio: opts.maintainAspectRatio !== false, animation: opts.animation ?? false });
-    Object.assign(opts, { plugins: { ...opts.plugins, legend: { display: false }, tooltip: { enabled: false } } });
+    const options = ringOptions(chart);
+    applyRingDatasetDefaults(chart);
+    // Shallow assignments avoid re-entering Chart.js proxy option setters.
+    Object.assign(opts, {
+      // Legacy lineWidth is an actual pixel thickness. Scriptable cutout is
+      // a native Chart.js option and follows responsive chart size changes.
+      cutout: opts.cutout ?? (options.lineWidth != null
+        && Number.isFinite(Number(options.lineWidth)) && Number(options.lineWidth) >= 0
+        ? (context) => {
+          const active = context?.chart || chart;
+          const width = active.width || (active.chartArea?.right - active.chartArea?.left) || 0;
+          const height = active.height || (active.chartArea?.bottom - active.chartArea?.top) || 0;
+          const radius = Math.min(width, height) / 2;
+          return radius > 0 ? Math.max(0, radius - Number(options.lineWidth)) : '78%';
+        } : '78%'),
+      rotation: opts.rotation ?? -90,
+      responsive: opts.responsive !== false,
+      maintainAspectRatio: opts.maintainAspectRatio !== false,
+      animation: opts.animation ?? (options.animate
+        ? { duration: options.duration || 800 }
+        : false),
+    });
+    Object.assign(opts, {
+      plugins: {
+        ...opts.plugins,
+        legend: { display: false },
+        tooltip: { enabled: false },
+      },
+    });
   },
 
-  afterInit(chart) {
-    const opts = chart.options?.plugins?.arc || {};
-    if (opts.animate) {
-      chart._arcProgress = 0;
-      chart._arcStartTime = null;
-      chart._arcDuration = opts.duration || 800;
-      chart._arcTargetPercent = chart.data?.datasets?.[0]?.data?.[0] || 0;
-      chart._arcDestroyed = false;
-    }
+  beforeUpdate(chart) {
+    applyRingDatasetDefaults(chart);
   },
 
-  beforeDraw(chart) {
-    if (chart._arcDestroyed || chart._arcProgress === undefined || chart._arcProgress >= 1) return;
-
-    if (!chart._arcStartTime) chart._arcStartTime = performance.now();
-    const elapsed = performance.now() - chart._arcStartTime;
-    const t = Math.min(1, elapsed / (chart._arcDuration || 800));
-    chart._arcProgress = easeOutCubic(t);
-
-    if (t < 1 && chart._arcRaf == null) {
-      chart._arcRaf = requestAnimationFrame(() => {
-        chart._arcRaf = null;
-        // Chart.js clears ctx during destroy. The explicit lifecycle bit also
-        // protects test doubles and future Chart.js versions that retain it.
-        if (chart._arcDestroyed || !chart.ctx) return;
-        chart.draw();
-      });
-    }
-  },
-
-  afterDestroy(chart) {
-    chart._arcDestroyed = true;
-    if (chart._arcRaf != null) {
-      cancelAnimationFrame(chart._arcRaf);
-      chart._arcRaf = null;
-    }
-  },
-
-  afterDatasetDraw(chart, _args, options) {
+  afterDatasetDraw(chart, args, options = {}) {
+    if (args?.index !== 0 || options.showText === false) return;
     const { ctx, chartArea } = chart;
     if (!ctx || !chartArea) return;
-
-    const lineWidth = options.lineWidth || 12;
-    const color = options.color || '#6366f1';
-    const bgColor = options.backgroundColor || 'rgba(255,255,255,0.08)';
-    const textColor = options.textColor || null;
-    const fontSize = options.fontSize || null;
-    const showText = options.showText !== false;
-
-    const data = chart.data?.datasets?.[0]?.data || [];
-    const total = data.reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0) || 100;
-    const targetPercent = Math.min(100, Math.max(0, (Number(data[0]) || 0) / total * 100));
-    const progress = chart._arcProgress !== undefined ? chart._arcProgress : 1;
-    const currentPercent = targetPercent * progress;
-
     const cx = (chartArea.left + chartArea.right) / 2;
     const cy = (chartArea.top + chartArea.bottom) / 2;
     const radius = Math.max(0, Math.min(
       chartArea.right - chartArea.left,
       chartArea.bottom - chartArea.top,
-    ) / 2 - lineWidth / 2);
-
+    ) / 2);
     ctx.save();
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = bgColor;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    if (currentPercent > 0) {
-      const startAngle = -Math.PI / 2;
-      const endAngle = startAngle + (currentPercent / 100) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, startAngle, endAngle);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-    }
-
-    if (showText) {
-      const computedFontSize = fontSize || Math.max(12, radius * 0.4);
-      const computedColor = textColor || getComputedStyle(ctx.canvas).getPropertyValue('color').trim() || '#fff';
-      ctx.fillStyle = computedColor;
-      ctx.font = `bold ${computedFontSize}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${Math.round(currentPercent)}%`, cx, cy);
-    }
-
+    ctx.fillStyle = options.textColor
+      || getComputedStyle(ctx.canvas).getPropertyValue('color').trim() || '#fff';
+    ctx.font = 'bold ' + (options.fontSize || Math.max(12, radius * 0.4)) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(Math.round(currentPercent(chart))) + '%', cx, cy);
     ctx.restore();
   },
 };
