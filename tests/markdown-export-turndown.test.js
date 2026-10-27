@@ -36,10 +36,10 @@ describe('portable note HTML -> Markdown with Turndown', () => {
       + '<li><input type="checkbox"> Practice</li></ul>'
       + '<p><del>Outdated</del> Updated</p>';
     const markdown = noteHtmlToMarkdown(html);
-    expect(markdown).toMatch(/\\| Concept\\s+\\| Meaning\\s+\\|/);
+    expect(markdown).toMatch(/\| Concept\s+\| Meaning\s+\|/);
     expect(markdown).toContain('| Cardiac output | Heart flow |');
-    expect(markdown).toMatch(/- \\[x\\] Review/);
-    expect(markdown).toMatch(/- \\[ \\] Practice/);
+    expect(markdown).toMatch(/- \[x\] Review/);
+    expect(markdown).toMatch(/- \[ \] Practice/);
     expect(markdown).toContain('~~Outdated~~');
   });
 
