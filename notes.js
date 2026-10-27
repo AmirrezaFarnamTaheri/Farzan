@@ -33,7 +33,7 @@
     const source = String(text ?? '').trim();
     if (!source) return 0;
     if (typeof Intl.Segmenter !== 'function') {
-      return source.split(/\\s+/).filter(Boolean).length;
+      return source.split(/\s+/).filter(Boolean).length;
     }
     const locale = document.documentElement.lang || navigator.language || 'en';
     let segmenter = wordSegmenters.get(locale);
@@ -42,7 +42,7 @@
         segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
         wordSegmenters.set(locale, segmenter);
       } catch {
-        return source.split(/\\s+/).filter(Boolean).length;
+        return source.split(/\s+/).filter(Boolean).length;
       }
     }
     let count = 0;
