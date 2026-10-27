@@ -29,8 +29,19 @@ export function assessNoteForTiptap(html) {
       return invalid('unsupported-root-' + node.localName);
     }
   }
+  // Comments and non-list children would disappear or be restructured by an editor parse.
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_COMMENT);
+  if (walker.nextNode()) return invalid('unsupported-html-comment');
   for (const element of template.content.querySelectorAll('*')) {
     const tag = element.localName;
+    if (tag === 'ul' || tag === 'ol') {
+      for (const child of element.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE && !child.textContent.trim()) continue;
+        if (child.nodeType !== Node.ELEMENT_NODE || child.localName !== 'li') {
+          return invalid('unsupported-list-child');
+        }
+      }
+    }
     if (!ALLOWED_BLOCKS.has(tag) && !ALLOWED_INLINE.has(tag)) {
       return invalid('unsupported-element-' + tag);
     }

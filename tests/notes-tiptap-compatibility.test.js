@@ -51,4 +51,13 @@ describe('Tiptap migration preflight (HTML remains the source of truth)', () => 
     expect(assessNoteForTiptap(null)).toEqual({ compatible: true, reason: null });
     expect(assessNoteForTiptap('')).toEqual({ compatible: true, reason: null });
   });
+  it.each([
+    ['discarded HTML comment', '<p>Before<!-- preserve me -->After</p>'],
+    ['orphan text inside list', '<ul>orphan<li>Valid</li></ul>'],
+    ['unsupported list child block', '<ul><p>Orphan paragraph</p><li>Valid</li></ul>'],
+    ['orphan text in ordered list', '<ol><li>Valid</li>tail</ol>'],
+  ])('refuses lossy DOM structures: %s', (_label, html) => {
+    expect(assessNoteForTiptap(html).compatible).toBe(false);
+  });
+
 });
