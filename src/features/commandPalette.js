@@ -28,8 +28,17 @@ export function initCommandPalette() {
     fusePending = loadVendorScript('fusejs')
       .then(Constructor => {
         if (typeof Constructor !== 'function') throw new Error('Fuse.js did not expose a constructor');
+        // The learner may have moved selection before the script finished
+        // loading. Capture the command object under the old ranking, then
+        // restore that command under the new ranking rather than index zero.
+        const currentInput = cpInput.value ?? '';
+        const selectedCommand = cpSelectedIdx >= 0
+          ? getFiltered(currentInput).slice(0, 25)[cpSelectedIdx] ?? null
+          : null;
         fuseConstructor = Constructor;
-        if (cpOverlay.classList.contains('open')) renderResults(cpInput.value ?? '');
+        if (cpOverlay.classList.contains('open')) {
+          renderResults(currentInput, { preserveCommand: selectedCommand });
+        }
       })
       .catch(error => {
         console.warn('[Command palette] local fuzzy search unavailable', error);
@@ -134,7 +143,9 @@ export function initCommandPalette() {
     if (!query) return base;
     // Fuse.js is already vendored for the search worker. Reuse it here,
     // rather than building another fuzzy scorer or shipping a second library.
-    if (!fuseConstructor) {
+    if (!fuseConstructor || query.length < 2) {
+      // A single character should retain the same matches before and after
+      // lazy Fuse initialization. Fuzzy matching adds no value here.
       return base.filter(i => (i.label ?? '').toLowerCase().includes(query));
     }
     const ranked = new fuseConstructor(base, {
@@ -181,7 +192,7 @@ export function initCommandPalette() {
     cpClose();
   };
 
-  const renderResults = (q = '') => {
+  const renderResults = (q = '', { preserveCommand } = {}) => {
     const filtered = getFiltered(q).slice(0, 25);
     cpResults.replaceChildren();
     if (!filtered.length) {
@@ -221,7 +232,14 @@ export function initCommandPalette() {
 
       cpResults.appendChild(li);
     }
-    setSelected(filtered.length ? 0 : -1);
+    if (preserveCommand !== undefined) {
+      // If Fuse has filtered out the previous command, leave nothing active:
+      // pressing Enter must never run a different command implicitly.
+      setSelected(preserveCommand ? filtered.indexOf(preserveCommand) : -1);
+    } else {
+      // Explicit search/category changes intentionally select the first hit.
+      setSelected(filtered.length ? 0 : -1);
+    }
   };
 
   // Overlay click to close
