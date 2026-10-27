@@ -39,7 +39,7 @@ test.describe('Farzan desktop workspace redesign', () => {
     // The catalog may legitimately auto-select a course. Verify real content.
     await expect(page.locator('#courses-search')).toBeVisible();
     await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
-    await expect(page.locator('#course-detail')).toBeVisible();
+    await expect(page.locator('#course-detail h2').first()).toBeVisible();
     await expect(player).toBeHidden();
   });
 
