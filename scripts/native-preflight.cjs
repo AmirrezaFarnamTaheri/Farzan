@@ -133,8 +133,14 @@ if (packageJson) {
 }
 
 if (cargoToml) {
-  add(cargoToml.includes('tauri = { version = "=2.11.6"') ? 'ok' : 'fail', 'Tauri runtime version is pinned');
-  add(cargoToml.includes('tauri-build = { version = "=2.7.1"') ? 'ok' : 'fail', 'Tauri build helper version is pinned');
+  // Dependency upgrades must keep exact registry pins AND update Cargo.lock.
+  // Do not make an otherwise-valid future Tauri update fail on stale literals.
+  const cargoLock = cargoLockExists ? fs.readFileSync(rel('src-tauri', 'Cargo.lock'), 'utf8') : '';
+  for (const [crate, label] of [['tauri', 'Tauri runtime'], ['tauri-build', 'Tauri build helper']]) {
+    const pinned = cargoToml.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
+    const locked = pinned && cargoLock.includes(`name = "${crate}"\nversion = "${pinned[1]}"`);
+    add(Boolean(locked) ? 'ok' : 'fail', `${label} version is exactly pinned and matches Cargo.lock`);
+  }
   add(cargoToml.includes('custom-protocol = ["tauri/custom-protocol"]') ? 'ok' : 'fail', 'release build enables the custom protocol');
   add(!/\bpath\s*=/.test(cargoToml) ? 'ok' : 'fail', 'Tauri dependencies use registry releases instead of missing local paths');
   add(cargoToml.includes('publish = false') ? 'ok' : 'fail', 'Native package is not publishable independently');
