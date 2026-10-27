@@ -139,7 +139,7 @@ if (cargoToml) {
   for (const [crate, label] of [['tauri', 'Tauri runtime'], ['tauri-build', 'Tauri build helper']]) {
     const pinned = cargoToml.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
     const locked = pinned && cargoLock.includes(`name = "${crate}"\nversion = "${pinned[1]}"`);
-    add(Boolean(locked) ? 'ok' : 'fail', `${label} version is exactly pinned and matches Cargo.lock`);
+    add(locked ? 'ok' : 'fail', `${label} version is exactly pinned and matches Cargo.lock`);
   }
   add(cargoToml.includes('custom-protocol = ["tauri/custom-protocol"]') ? 'ok' : 'fail', 'release build enables the custom protocol');
   add(!/\bpath\s*=/.test(cargoToml) ? 'ok' : 'fail', 'Tauri dependencies use registry releases instead of missing local paths');
