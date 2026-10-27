@@ -18,24 +18,28 @@ const groups = new Map([
   ['functional', { count: 26, width: 1280, height: 720 }],
   ['standalone', { count: 6, width: null, height: null }],
 ]);
-const sourceRun = 38177326118;
+const sourceRun = 40479110207;
+const releaseVersion = '1.0.6';
+const sourceCommit = '8c7d75517ad95df5b8b48081599065bb35db6d7d';
 const pngMagic = Buffer.from([137,80,78,71,13,10,26,10]);
 const manifest = {
   edition: 'Farzan Plasmato',
   sourceRun,
-  sourceWorkflow: 'Plasmato Visual and Functional Acceptance',
-  sourceBranch: 'qa/plasmato-visual-acceptance-20261012',
+  sourceWorkflow: 'Plasmato Edition - Verify and Publish',
+  sourceBranch: 'main',
+  releaseVersion,
+  sourceCommit,
   captures: [],
   contactSheets: [],
 };
 const gallery = [
   '# Farzan Plasmato - Actual App Screenshots',
   '',
-  'These are unchanged Chrome/Playwright PNG captures from successful [visual acceptance run 38177326118](https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38177326118).',
+  'These are unchanged Chrome/Playwright PNG captures from the published [Farzan Plasmato Edition v1.0.6 acceptance run](https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/40479110207), built from commit `8c7d755`.',
   'They document actual application states, not concepts, generated mockups, or claims of third-party media availability.',
   'The functional video capture plays a browser-recorded WebM fixture through the native player; it does not prove remote media hosts are reachable.',
   '',
-  'There are 107 screenshots across 15 routes and working interaction states, plus seven contact sheets.',
+  'This curated in-repository gallery includes 107 screenshots across 15 routes and working interaction states, plus seven contact sheets. The complete 476-screenshot / 35-group evidence set remains downloadable from the [immutable v1.0.6 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.6).',
   'The complete SHA-256, dimensions, and byte counts are in [manifest.json](manifest.json).',
   '',
   '## Overview contact sheets',
@@ -43,10 +47,18 @@ const gallery = [
 ];
 
 function digest(buffer) { return crypto.createHash('sha256').update(buffer).digest('hex'); }
-function capture(sourceFile, relative, expected) {
+const evidenceManifest = JSON.parse(fs.readFileSync(path.join(source, 'manifest.json'), 'utf8'));
+assert.equal(evidenceManifest.editionVersion, releaseVersion, 'Source evidence version mismatch');
+assert.equal(evidenceManifest.commit, sourceCommit, 'Source evidence commit mismatch');
+assert.equal(evidenceManifest.totalScreenshots, 476, 'Incomplete source screenshot matrix');
+assert.equal(evidenceManifest.totalContactSheets, 35, 'Incomplete source contact-sheet matrix');
+const expectedHashes = new Map([...evidenceManifest.images, ...evidenceManifest.contactSheets]
+  .map(entry => [entry.path, entry.sha256]));
+function capture(sourceFile, relative, expected, sourceEvidencePath) {
   const bytes = fs.readFileSync(sourceFile);
   assert(bytes.length > 12_000, 'Screenshot unexpectedly small: ' + sourceFile);
   assert(bytes.subarray(0, 8).equals(pngMagic), 'Invalid PNG signature: ' + sourceFile);
+  assert.equal(digest(bytes), expectedHashes.get(sourceEvidencePath), 'Source visual SHA-256 mismatch: ' + sourceEvidencePath);
   assert.equal(bytes.toString('ascii', 12, 16), 'IHDR', 'Missing PNG IHDR: ' + sourceFile);
   const width = bytes.readUInt32BE(16);
   const height = bytes.readUInt32BE(20);
@@ -73,7 +85,7 @@ for (const [group, shape] of groups) {
   for (const name of names) {
     assert(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.png$/.test(name), 'Unsafe screenshot name: ' + name);
     const relative = path.posix.join(group, name);
-    const entry = capture(path.join(directory, name), relative, shape);
+    const entry = capture(path.join(directory, name), relative, shape, path.posix.join('screenshots', relative));
     manifest.captures.push(entry);
     gallery.push('- [' + name.replace(/\.png$/, '').replace(/-/g, ' ') + '](' + relative + ')');
   }
@@ -84,7 +96,7 @@ for (const group of groups.keys()) {
   const name = 'contact-sheet-' + group + '.png';
   const from = path.join(source, name);
   assert(fs.existsSync(from), 'Missing visual review contact sheet: ' + name);
-  const entry = capture(from, path.posix.join('contact-sheets', name));
+  const entry = capture(from, path.posix.join('contact-sheets', name), undefined, name);
   manifest.contactSheets.push(entry);
   gallery.splice(gallery.indexOf('## ' + group + ' (' + groups.get(group).count + ')'), 0,
     '### ' + group + ' overview',
@@ -120,4 +132,4 @@ for (const [original, name] of replacements) {
   fs.copyFileSync(from, to);
   assert.equal(digest(fs.readFileSync(to)), digest(fs.readFileSync(from)), 'Screenshot copy mismatch: ' + original);
 }
-console.log('[visual-screenshots] 107 original PNG captures, 7 contact sheets and 8 current app README screenshots verified.');
+console.log('[visual-screenshots] v1.0.6: 107 SHA-matched original PNG captures, 7 contact sheets and 8 current app README screenshots verified.');
