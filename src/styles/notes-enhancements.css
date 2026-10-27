@@ -544,10 +544,19 @@
     overscroll-behavior: contain;
   }
 
+  /* Screenshot QA: a new learner's single-note list stretched the
+     sidebar beyond 500px and pushed the editor below the first phone screen.
+     Keep the folder/search UI but let the list grow only with real notes. */
+  .notes-library-list {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+  }
+
   .notes-list {
-    max-height: min(240px, 34dvh);
-    min-height: 112px;
+    max-height: min(160px, 24dvh);
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .notes-header-actions {
