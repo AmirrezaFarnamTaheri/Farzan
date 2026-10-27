@@ -8,9 +8,9 @@ export function mountProgressView({ setView } = {}) {
         </div>
 
         <div class="progress-toolbar" aria-label="Progress data actions">
-          <button class="btn btn-primary" id="btn-export-json" type="button">
+          <button class="btn btn-primary" id="btn-export-json" type="button" aria-label="Export app-data JSON">
             <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-            Export app-data JSON
+            Export data
           </button>
           <button class="btn btn-ghost" id="btn-import-json" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
