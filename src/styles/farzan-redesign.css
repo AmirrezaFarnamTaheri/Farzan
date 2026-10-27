@@ -845,6 +845,8 @@ input[type="file"][hidden] {
   .view-home .home-hero[data-home-has-progress="false"] .home-focus-panel { display: none; }
   .home-hero .home-focus-panel { padding: 16px; }
   .home-grid { gap: 12px; }
+  /* Hide zero-only mobile progress until there is saved learner activity. */
+  .view-home[data-home-has-progress="false"] [data-home-progress-card] { display: none; }
   .home-card .card-body { padding: 17px; }
   .progress-metric { min-height: 104px; padding: 14px; }
   .progress-metric strong { font-size: 24px; }
