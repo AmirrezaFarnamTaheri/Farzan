@@ -6,16 +6,13 @@
  * work is now managed by the Chart.js library already bundled with Farzan.
  */
 import { chartGauge } from '../chartPlugins/gauge.js';
+import { loadVendorScript } from '../../core/vendorLoader.js';
 
 export class CanvasGauge {
   constructor(canvas, options = {}) {
     if (!canvas) throw new TypeError('CanvasGauge requires a canvas');
-    const Chart = globalThis.Chart;
-    if (typeof Chart !== 'function') {
-      throw new Error('CanvasGauge: Chart.js is unavailable; load the vendored Chart.js library first');
-    }
-
     this._canvas = canvas;
+    this._options = { ...options };
     this._min = Number.isFinite(Number(options.min)) ? Number(options.min) : 0;
     this._max = Number.isFinite(Number(options.max))
       ? Math.max(this._min, Number(options.max)) : 100;
@@ -23,7 +20,23 @@ export class CanvasGauge {
     this._currentDisplay = this._value;
     this._animateDuration = options.duration == null ? 800 : Math.max(0, Number(options.duration) || 0);
     this._destroyed = false;
+    this._chart = null;
+    if (typeof globalThis.Chart === 'function') {
+      this._mount(globalThis.Chart);
+      this.ready = Promise.resolve();
+    } else {
+      this.ready = loadVendorScript('chartjs').then(Chart => {
+        if (!this._destroyed) this._mount(Chart);
+      });
+    }
+  }
 
+  _mount(Chart) {
+    if (this._destroyed) return;
+    if (typeof Chart !== 'function') {
+      throw new Error('CanvasGauge: Chart.js is unavailable after the vendor loader completed');
+    }
+    const options = this._options;
     const gauge = {
       min: this._min,
       max: this._max,
@@ -41,7 +54,7 @@ export class CanvasGauge {
       fontSize: options.fontSize || null,
     };
 
-    this._chart = new Chart(canvas, {
+    this._chart = new Chart(this._canvas, {
       type: 'doughnut',
       // The installed plugin handles the actual gauge; Chart.js provides
       // layout, responsive redraw, animation and resource cleanup.
@@ -77,6 +90,7 @@ export class CanvasGauge {
     if (this._destroyed) return;
     this._value = this._clamp(value);
     this._currentDisplay = this._value;
+    if (!this._chart) return; // Vendor loader has not resolved yet.
     this._chart.options.plugins.gauge.value = this._value;
     this._chart.data.datasets[0].data = [
       Math.max(0, this._value - this._min),
@@ -87,7 +101,7 @@ export class CanvasGauge {
 
   destroy() {
     if (this._destroyed) return;
-    this._chart.destroy();
+    this._chart?.destroy();
     this._chart = null;
     this._destroyed = true;
   }
