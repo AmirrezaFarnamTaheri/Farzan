@@ -77,7 +77,7 @@ describe('desktop shell wiring', () => {
     for (const crate of ['tauri', 'tauri-build']) {
       const pin = tauriCargo.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
       expect(pin, `${crate} must use an exact version pin`).toBeTruthy();
-      expect(tauriLock).toContain(`name = "${crate}"\\nversion = "${pin[1]}"`);
+      expect(tauriLock).toContain(`name = "${crate}"\nversion = "${pin[1]}"`);
     }
     expect(tauriCargo).toContain('custom-protocol = ["tauri/custom-protocol"]');
     expect(tauriCargo).toContain('publish = false');
