@@ -111,4 +111,25 @@ describe('KnowledgeGraph established force layout compatibility', () => {
     dragged.fy = null;
     graph.destroy();
   });
+
+  it('resolves overlaps using D3 collision even when charge and links are disabled', () => {
+    const graph = graphFixture();
+    graph._nodes = [
+      { id: 'a', x: 200, y: 200, vx: 0, vy: 0, radius: 24 },
+      { id: 'b', x: 200, y: 200, vx: 0, vy: 0, radius: 24 },
+    ];
+    graph._edges = [];
+    graph._initSimulation(500, 400);
+    graph._simulation.force('charge').strength(0);
+    // No link force is present and no charge can separate these nodes.
+    for (let i = 0; i < 30; i++) graph._tick();
+    const distance = Math.hypot(
+      graph._nodes[0].x - graph._nodes[1].x,
+      graph._nodes[0].y - graph._nodes[1].y,
+    );
+    expect(graph._nodes.map(node => node.index)).toEqual([0, 1]);
+    expect(distance).toBeGreaterThan(40);
+    graph.destroy();
+  });
+
 });
