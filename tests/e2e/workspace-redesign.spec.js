@@ -91,6 +91,25 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
   });
 
+  test('guides new Studio users without blocking drawing or covering saved content', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    const hint = page.locator('[data-studio-empty-hint]');
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText('Choose Pen');
+    const styles = await hint.evaluate(node => ({
+      events: getComputedStyle(node).pointerEvents,
+      width: node.getBoundingClientRect().width,
+    }));
+    expect(styles.events).toBe('none');
+    expect(styles.width).toBeLessThan(390);
+
+    await page.locator('[data-studio-text]').fill('Plan my next study session');
+    await page.locator('[data-studio-add-text]').click();
+    await expect(page.locator('[data-studio-elements]')).toContainText('Plan my next study session');
+    await expect(hint).toBeHidden();
+  });
+
   test('keeps RTL mobile navigation fully off-canvas until opened', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
