@@ -259,7 +259,40 @@ describe('app.js fallback sanitizer', () => {
 });
 
 // ───────────────────────────────────────────────────────────
-// notes.js -- editor teardown and the fallback sanitizer
+// notes.js -- editor lifecycle and bundled HTML sanitizer
+// ───────────────────────────────────────────────────────────
+
+describe('notes.js editor teardown', () => {
+  it('clears the note binding so a remount cannot write over the last note', () => {
+    const src = read('notes.js');
+    // Several objects in this file define destroy(); anchor on the one that
+    // tears down the route, identified by its unbind of the sync refresh.
+    const at = src.indexOf('this._unbindSyncRefresh();');
+    const destroy = src.slice(at, at + 1400);
+
+    // A surviving _currentId plus a fresh empty editor means the first
+    // keystroke after a remount persists '' over a real note.
+    expect(destroy).toContain('Editor._currentId = null');
+    expect(destroy).toContain('Editor._saveTimer = null');
+    expect(destroy).toContain('_pdTitleT = null');
+  });
+
+  it('nulls the save handle so the dirty check stops reporting stale edits', () => {
+    const src = read('notes.js');
+    const save = src.slice(src.indexOf('const doSave = () => {'), src.indexOf('const doSave = () => {') + 900);
+    expect(save).toContain('this._saveTimer = null');
+    // A save scheduled before teardown must not write through a detached node.
+    expect(save).toContain('if (!this._el) return');
+  });
+
+  it('falls back to Untitled instead of persisting an empty title', () => {
+    const src = read('notes.js');
+    // `?? ` does not catch '', which is what an emptied title field produces.
+    expect(src).not.toMatch(/value\.trim\(\) \?\? 'Untitled'/);
+    expect(src).toMatch(/value\.trim\(\) \|\| 'Untitled'/);
+  });
+});
+
 describe('notes.js established sanitizer integration', () => {
   it('bundles DOMPurify instead of maintaining a second handwritten HTML sanitizer', () => {
     const src = read('notes.js');
