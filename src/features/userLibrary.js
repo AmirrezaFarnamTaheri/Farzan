@@ -1,3 +1,5 @@
+import Dexie from 'dexie';
+
 const LIBRARY_SETTING_KEY = 'ocd_user_library';
 const FILE_DB_NAME = 'opencoursedeck-library-files';
 const FILE_STORE = 'files';
@@ -13,7 +15,6 @@ export const MAX_LIBRARY_FILE_BYTES = 1536 * 1024 * 1024;
 const blobUrls = new Map();
 let overlayBound = false;
 let fileDb = null;
-let fileDbPromise = null;
 let libraryMutationQueue = Promise.resolve();
 
 // Serialize the entire read-modify-write cycle. Individual IndexedDB settings
@@ -77,34 +78,26 @@ function makeId(prefix) {
     : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// The local media database is isolated from the primary study database.
+// Dexie version(0.1) is native IndexedDB version 1: preserve the existing
+// files store, id keyPath and large Blob payloads without copying them.
 function openFileDb() {
-  if (typeof indexedDB === 'undefined' || indexedDB == null) return Promise.resolve(null);
-  if (fileDb) return Promise.resolve(fileDb);
-  if (fileDbPromise) return fileDbPromise;
-  fileDbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(FILE_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(FILE_STORE)) {
-        db.createObjectStore(FILE_STORE, { keyPath: 'id' });
-      }
-    };
-    request.onsuccess = () => {
-      fileDb = request.result;
-      fileDb.onclose = () => { fileDb = null; fileDbPromise = null; };
-      fileDb.onversionchange = () => {
-        try { fileDb.close(); } catch { /* ignore */ }
-        fileDb = null;
-        fileDbPromise = null;
-      };
-      resolve(fileDb);
-    };
-    request.onerror = () => {
-      fileDbPromise = null;
-      reject(request.error || new Error('Unable to open library file storage'));
-    };
-  });
-  return fileDbPromise;
+  const factory = globalThis.indexedDB;
+  if (!factory) return Promise.resolve(null);
+  if (!fileDb) {
+    fileDb = new Dexie(FILE_DB_NAME, {
+      indexedDB: factory,
+      IDBKeyRange: globalThis.IDBKeyRange || Dexie.dependencies.IDBKeyRange,
+    });
+    fileDb.version(0.1).stores({ [FILE_STORE]: 'id' });
+  }
+  return Promise.resolve(fileDb);
+}
+
+function isClosedConnection(error) {
+  return [error?.name, error?.inner?.name].some(
+    name => ['InvalidStateError', 'UnknownError', 'DatabaseClosedError'].includes(name),
+  );
 }
 
 async function withFileStore(mode, fn, { required = false } = {}) {
@@ -113,31 +106,24 @@ async function withFileStore(mode, fn, { required = false } = {}) {
     if (required) throw new Error('Library file storage is unavailable; file data cannot be cleared.');
     return null;
   }
-  return new Promise((resolve, reject) => {
-    let tx;
-    try {
-      tx = db.transaction(FILE_STORE, mode);
-    } catch (error) {
-      fileDb = null;
-      fileDbPromise = null;
-      reject(error);
-      return;
+  const execute = current => {
+    const table = current.table(FILE_STORE);
+    if (mode === 'readwrite') {
+      // Resolve only after the full transaction commits. This is particularly
+      // important when replacing or deleting users' saved lecture Blobs.
+      return current.transaction('rw', table, () => fn(table));
     }
-    let result;
-    tx.oncomplete = () => resolve(result);
-    tx.onerror = () => reject(tx.error || new Error('Library file transaction failed'));
-    tx.onabort = () => reject(tx.error || new Error('Library file transaction aborted'));
-    try {
-      const request = fn(tx.objectStore(FILE_STORE));
-      if (request) {
-        request.onsuccess = () => { result = request.result; };
-        request.onerror = () => reject(request.error || new Error('Library file request failed'));
-      }
-    } catch (error) {
-      try { tx.abort(); } catch { /* transaction already finished */ }
-      reject(error);
-    }
-  });
+    return fn(table);
+  };
+  try {
+    return await execute(db);
+  } catch (error) {
+    if (!isClosedConnection(error)) throw error;
+    closeFileDb();
+    const reopened = await openFileDb();
+    if (!reopened) throw error;
+    return execute(reopened);
+  }
 }
 
 function revokeCachedUrl(id) {
@@ -154,7 +140,6 @@ function revokeAllCachedUrls() {
 function closeFileDb() {
   try { fileDb?.close(); } catch { /* ignore */ }
   fileDb = null;
-  fileDbPromise = null;
 }
 
 export async function loadLibrary() {
@@ -348,7 +333,7 @@ export async function listLibraryFileReferences(library = null) {
 export async function listMissingLibraryFiles() {
   const references = await listLibraryFileReferences();
   if (!references.length) return [];
-  const keys = await withFileStore('readonly', store => store.getAllKeys(), { required: true });
+  const keys = await withFileStore('readonly', store => store.toCollection().primaryKeys(), { required: true });
   const available = new Set(keys || []);
   return references.filter(item => !available.has(item.id));
 }
