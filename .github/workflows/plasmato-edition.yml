@@ -41,7 +41,7 @@ jobs:
 
       - name: Verify isolated edition release version and catalog
         run: |
-          node -e "const c=require('./editions/plasmato-emergency/edition.json'); if(c.editionVersion !== '1.0.5') throw new Error('Edition version does not match immutable v1.0.5 release contract')"
+          node -e "const c=require('./editions/plasmato-emergency/edition.json'); if(c.editionVersion !== '1.0.6') throw new Error('Edition version does not match immutable v1.0.6 release contract')"
 
       - name: Verify supplied archive and native catalog integration
         run: |
@@ -103,7 +103,7 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
 
       - name: Exercise visual and functional app acceptance in Chrome
-        run: npm run test:e2e -- tests/e2e/plasmato-visual.spec.js tests/e2e/plasmato-visual-expanded.spec.js tests/e2e/plasmato-visual-deep.spec.js
+        run: npm run test:e2e -- tests/e2e/plasmato-visual.spec.js tests/e2e/plasmato-visual-expanded.spec.js tests/e2e/plasmato-visual-deep.spec.js tests/e2e/workspace-redesign.spec.js tests/e2e/workspace-visual-qa.spec.js
         env:
           CHROME_BIN: /usr/bin/google-chrome
 
@@ -118,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.5-visual-evidence
+          name: farzan-plasmato-edition-v1.0.6-visual-evidence
           path: |
             artifacts/visual-audit/
             test-results/
@@ -128,18 +128,18 @@ jobs:
       - name: Package complete installable static site
         run: |
           mkdir -p release-assets
-          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.5-web.zip .)
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.5-web.zip > SHA256SUMS)
+          (cd dist && zip -q -r ../release-assets/farzan-plasmato-edition-v1.0.6-web.zip .)
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.6-web.zip > SHA256SUMS)
           test -f artifacts/visual-audit/manifest.json
           test -f artifacts/visual-audit/VISUAL-REPORT.md
           test -f artifacts/visual-audit/observations.jsonl
-          zip -q -r release-assets/farzan-plasmato-edition-v1.0.5-visual-evidence.zip artifacts/visual-audit
-          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.5-visual-evidence.zip > SHA256SUMS.visual)
+          zip -q -r release-assets/farzan-plasmato-edition-v1.0.6-visual-evidence.zip artifacts/visual-audit
+          (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.6-visual-evidence.zip > SHA256SUMS.visual)
 
       - name: Upload verified downloadable app and checksums
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.5-web
+          name: farzan-plasmato-edition-v1.0.6-web
           path: release-assets/
           if-no-files-found: error
           retention-days: 90
@@ -198,16 +198,16 @@ jobs:
           if ($found.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($found.Count)" }
           if ($found[0].Length -lt 1000000) { throw "Windows installer is unexpectedly small" }
           New-Item -ItemType Directory -Path 'release-native' -Force | Out-Null
-          $dest = 'release-native/farzan-plasmato-edition-v1.0.5-windows-setup.exe'
+          $dest = 'release-native/farzan-plasmato-edition-v1.0.6-windows-setup.exe'
           Copy-Item -LiteralPath $found[0].FullName -Destination $dest
           $digest = (Get-FileHash -Algorithm SHA256 $dest).Hash.ToLowerInvariant()
-          "$digest  farzan-plasmato-edition-v1.0.5-windows-setup.exe" |
+          "$digest  farzan-plasmato-edition-v1.0.6-windows-setup.exe" |
             Out-File 'release-native/SHA256SUMS.windows' -Encoding ascii
           Get-Content 'release-native/SHA256SUMS.windows'
 
       - name: Smoke-test silent Windows NSIS installation
         run: |
-          $setup = (Resolve-Path 'release-native/farzan-plasmato-edition-v1.0.5-windows-setup.exe').Path
+          $setup = (Resolve-Path 'release-native/farzan-plasmato-edition-v1.0.6-windows-setup.exe').Path
           $installDir = Join-Path $env:RUNNER_TEMP 'FarzanPlasmatoInstallAcceptance'
           if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
           $args = @('/S', "/D=$installDir")
@@ -225,7 +225,7 @@ jobs:
       - name: Upload verified Windows installer and checksum
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.5-windows
+          name: farzan-plasmato-edition-v1.0.6-windows
           path: release-native/
           if-no-files-found: error
           retention-days: 90
@@ -242,13 +242,13 @@ jobs:
       - name: Download verified edition bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.5-web
+          name: farzan-plasmato-edition-v1.0.6-web
           path: release-assets
 
       - name: Download verified Windows installer
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: farzan-plasmato-edition-v1.0.5-windows
+          name: farzan-plasmato-edition-v1.0.6-windows
           path: release-assets
 
       - name: Verify release bytes and immutable version identity
@@ -260,19 +260,19 @@ jobs:
           (cd release-assets && sha256sum -c SHA256SUMS)
           (cd release-assets && sha256sum -c SHA256SUMS.windows)
           (cd release-assets && sha256sum -c SHA256SUMS.visual)
-          tag=plasmato-edition-v1.0.5
+          tag=plasmato-edition-v1.0.6
           existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha' 2>/dev/null | grep -E '^[a-f0-9]{40}$' || :)
           if [[ -n "$existing" ]]; then
             echo "::error::Version tag ${tag} already exists (${existing}). Never replace published bytes or move its tag; resolve partial publication separately or increment the patch version."
             exit 1
           fi
 
-      - name: Publish Plasmato Edition v1.0.5
+      - name: Publish Plasmato Edition v1.0.6
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: plasmato-edition-v1.0.5
+          tag_name: plasmato-edition-v1.0.6
           target_commitish: ${{ github.sha }}
-          name: Farzan Plasmato Edition v1.0.5
+          name: Farzan Plasmato Edition v1.0.6
           body: |
             Separately versioned Plasmato edition of Farzan, built from the reviewed main commit and the supplied Plasmato archive.
             Contains 31 imported Plasmato courses (6,418 topics, 5,990 video and 280 PDF references)
@@ -282,13 +282,13 @@ jobs:
             actual saved notes, PDF, flashcards, progress, video/bookmarks, search and Studio persistence.
             Download the visual evidence ZIP for 476 genuine Chrome screenshots in 35 review groups, browser observations, and the image SHA-256 manifest.
             Extract the ZIP and serve it over HTTP(S). External video and PDF hosts are not mirrored.
-            This edition is bundled in the main Farzan source but distributed through a distinct edition release channel. Edition version 1.0.5 is independent of the underlying Tauri application version.
+            This edition is bundled in the main Farzan source but distributed through a distinct edition release channel. Edition version 1.0.6 is independent of the underlying Tauri application version.
           files: |
-            release-assets/farzan-plasmato-edition-v1.0.5-web.zip
+            release-assets/farzan-plasmato-edition-v1.0.6-web.zip
             release-assets/SHA256SUMS
-            release-assets/farzan-plasmato-edition-v1.0.5-windows-setup.exe
+            release-assets/farzan-plasmato-edition-v1.0.6-windows-setup.exe
             release-assets/SHA256SUMS.windows
-            release-assets/farzan-plasmato-edition-v1.0.5-visual-evidence.zip
+            release-assets/farzan-plasmato-edition-v1.0.6-visual-evidence.zip
             release-assets/SHA256SUMS.visual
           fail_on_unmatched_files: true
           overwrite_files: false
@@ -310,7 +310,7 @@ jobs:
           EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          tag=plasmato-edition-v1.0.5
+          tag=plasmato-edition-v1.0.6
           actual=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha')
           if [[ "$actual" != "$EXPECTED_COMMIT" ]]; then
             echo "::error::Published tag ${tag} points to ${actual}, not the verified commit ${EXPECTED_COMMIT}."
@@ -320,9 +320,9 @@ jobs:
           gh release download "$tag" -R "$GITHUB_REPOSITORY" --dir verified-download
           cd verified-download
           expected=(
-            farzan-plasmato-edition-v1.0.5-web.zip
-            farzan-plasmato-edition-v1.0.5-windows-setup.exe
-            farzan-plasmato-edition-v1.0.5-visual-evidence.zip
+            farzan-plasmato-edition-v1.0.6-web.zip
+            farzan-plasmato-edition-v1.0.6-windows-setup.exe
+            farzan-plasmato-edition-v1.0.6-visual-evidence.zip
             SHA256SUMS SHA256SUMS.windows SHA256SUMS.visual
           )
           for asset in "${expected[@]}"; do
@@ -340,7 +340,7 @@ jobs:
           sha256sum -c SHA256SUMS.windows
           sha256sum -c SHA256SUMS.visual
           {
-            echo "## Plasmato Edition v1.0.5 publication verified"
+            echo "## Plasmato Edition v1.0.6 publication verified"
             echo
             echo "Source commit: \`${EXPECTED_COMMIT}\`"
             echo

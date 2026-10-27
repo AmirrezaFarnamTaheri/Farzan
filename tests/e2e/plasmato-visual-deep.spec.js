@@ -101,8 +101,10 @@ for (const cfg of modes) {
     const exceptions=[];page.on('pageerror',e=>exceptions.push(e.message));
     await boot(page,'settings');
     if(cfg.light) {
-      await page.locator('#btn-theme-toggle').click();
-      await expect.poll(()=>page.locator('html').getAttribute('data-theme')).not.toBe('dark');
+      // The redesigned edition defaults to light; do not toggle it to dark.
+      if (await page.locator('html').getAttribute('data-theme') !== 'light')
+        await page.locator('#btn-theme-toggle').click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     }
     if(cfg.effectiveZoom) {
       // Exercise the effective layout viewport after browser 200% zoom,
@@ -123,14 +125,21 @@ for (const cfg of modes) {
         if (route === 'home') {
           const hero = page.locator('#view-container .home-hero');
           await expect(hero).toBeVisible();
-          await expect(hero).toBeInViewport({ ratio: 0.5 });
-          await expect(page.locator('.home-title')).toContainText('Back to your studies');
+          // Short landscape/zoom viewports cannot display the entire hero.
+          // Keep the heading fully visible and verify the page reflows safely.
+          await expect(hero).toBeInViewport({ ratio: 0.3 });
+          await expect(page.locator('[data-home-title]')).toBeInViewport({ ratio: 0.8 });
+          await expect(page.locator('[data-home-title]')).toHaveText(
+            /^(What will you learn today\?|Welcome back to your studies\.)$/,
+          );
         }
         if (cfg.rtl && route === 'home') {
           // The shell can be RTL, but English sentence punctuation must stay
           // with the English text instead of appearing at the leading edge.
           const sentence = page.locator('.home-title bdi');
-          await expect(sentence).toHaveText('Back to your studies.');
+          await expect(sentence).toHaveText(
+            /^(What will you learn today\?|Welcome back to your studies\.)$/,
+          );
           expect(await sentence.evaluate(el => getComputedStyle(el).direction)).toBe('ltr');
           await expect(page.locator('[data-home-focus-detail]')).toHaveAttribute('dir', 'auto');
           expect(await page.locator('[data-home-focus-detail]').evaluate(el => getComputedStyle(el).direction)).toBe('ltr');

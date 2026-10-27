@@ -1,4 +1,4 @@
-# Farzan — Plasmato Edition 1.0.5 (release candidate)
+# Farzan — Plasmato Edition 1.0.6 (release candidate)
 
 A dedicated **Plasmato edition of Farzan/OpenCourseDeck**, with the supplied archive integrated into the normal Courses, Materials, search, notes and progress flows. The original emergency player is also preserved as a self-contained browser viewer.
 
@@ -32,7 +32,7 @@ The reviewed Farzan `main` branch now includes **both** a Farzan app with the ar
 
 Run the normal app from the repository root (`npm ci --ignore-scripts --legacy-peer-deps && npm run first-run && npm start`); open `#/courses`, `#/materials`, or search for a Plasmato topic. For the emergency player visit `editions/plasmato-emergency/index.html`.
 
-**Publishing:** The reviewable v1.0.5 release workflow is triggered only by a new edition-version commit on `main`, or by an explicit workflow dispatch on `main`. Pull requests build and verify but never publish. Publication requires the browser visual gate and a locked Windows NSIS installer before creating the immutable [v1.0.5 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.5). A separate post-publish job downloads all six artifacts and verifies their SHA-256 checksums and source commit; the release is **not** accepted until that job passes. For the previous [v1.0.4 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.4), the Windows installer is absent and must not be claimed as published. Hosted Pages remains optional via the repository's `ENABLE_PLASMATO_PAGES=true` variable and a configured GitHub Pages Actions source. The standalone player appears at `/editions/plasmato-emergency/index.html` on the hosted site. External media and 13 issue-marked source pages remain unverified.
+**Publishing:** The reviewable v1.0.6 release workflow is triggered only by a new edition-version commit on `main`, or by an explicit workflow dispatch on `main`. Pull requests build and verify but never publish. Publication requires the browser visual gate and a locked Windows NSIS installer before creating the immutable [v1.0.6 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.6). A separate post-publish job downloads all six artifacts and verifies their SHA-256 checksums and source commit; the release is **not** accepted until that job passes. For the previous [v1.0.4 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.4), the Windows installer is absent and must not be claimed as published. Hosted Pages remains optional via the repository's `ENABLE_PLASMATO_PAGES=true` variable and a configured GitHub Pages Actions source. The standalone player appears at `/editions/plasmato-emergency/index.html` on the hosted site. External media and 13 issue-marked source pages remain unverified.
 
 Progress in the **main Farzan application** uses its existing profile, notes, media and backup data. The **standalone emergency player** continues to use independent `farzanEmergency:*` storage and does not synchronize progress with Farzan; use the main app for unified tracking.
 
@@ -55,6 +55,6 @@ The review corrected the mobile drawer's inaccessible expanded state and stuck-s
 The screenshots contain a real browser-recorded local WebM, a rendered local PDF, saved/reopened notes and timestamp bookmarks, Studio edits and flashcard interactions. External Plasmato hosts are not mirrored or guaranteed to play. Full screen-reader and on-device Windows installer acceptance remain manual tasks; RTL layout screenshots do not certify Farsi translation.
 
 
-## v1.0.5 acceptance limits
+## v1.0.6 acceptance limits
 
 The Windows workflow now performs a silent NSIS installation smoke test on a GitHub-hosted Windows runner. This checks packaged installer behavior and an installed executable; it is **not** a substitute for a physical user's Windows fresh install, existing-profile restart/upgrade, full WebView2 UI acceptance, code signing or publisher/store approval. Original Plasmato media access and rights also remain externally owned and unverified. No previous release tag or asset should be overwritten to close these gaps.

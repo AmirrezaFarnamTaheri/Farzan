@@ -314,7 +314,17 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const [progress, notes, timestamps, flashcards, topics] = collections;
   // Do not greet a fresh learner as if they already have saved history.
   const homeHeading = document.querySelector('[data-home-title]');
-  if (homeHeading) homeHeading.textContent = progress.length ? 'Welcome back to your studies.' : 'What will you learn today?';
+  if (homeHeading) {
+    // Preserve the bidirectional isolate when asynchronous progress arrives.
+    // Replacing the h1 textContent destroyed <bdi> and broke RTL punctuation.
+    const label = progress.length ? 'Welcome back to your studies.' : 'What will you learn today?';
+    let isolate = homeHeading.querySelector('bdi');
+    if (!isolate) {
+      isolate = document.createElement('bdi');
+      homeHeading.replaceChildren(isolate);
+    }
+    isolate.textContent = label;
+  }
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));

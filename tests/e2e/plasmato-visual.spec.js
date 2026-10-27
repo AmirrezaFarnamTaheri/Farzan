@@ -274,8 +274,9 @@ for (const [device,width,height] of [['desktop',1440,900],['mobile',390,844]]) {
   test('all 15 routes in light theme at '+device, async ({page}) => {
     await page.setViewportSize({width,height});
     await boot(page,'settings');
-    await page.locator('#btn-theme-toggle').click();
-    await expect.poll(()=>page.locator('html').getAttribute('data-theme')).not.toBe('dark');
+    if (await page.locator('html').getAttribute('data-theme') !== 'light')
+      await page.locator('#btn-theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     const bad=[];
     for (let i=0;i<routes.length;i++) {
       const route=routes[i],name=String(i+1).padStart(2,'0')+'-'+route;
@@ -335,7 +336,11 @@ test('Studio adds real text and shapes and persists the resulting board',async({
   await page.locator('[data-studio-add-text]').click();
   await expect(page.locator('[data-studio-status]')).toContainText('Note added');
   await shot(page,'functional','20-studio-note-added');
-  await page.locator('[data-studio-add-rect]').click();
+  const advanced = page.locator('[data-studio-more-tools]');
+  await expect(advanced.locator('[data-studio-add-rect]')).toBeHidden();
+  await advanced.locator('summary').click();
+  await expect(advanced.locator('[data-studio-add-rect]')).toBeVisible();
+  await advanced.locator('[data-studio-add-rect]').click();
   await expect(page.locator('[data-studio-status]')).toContainText('Rectangle added');
   await page.locator('[data-studio-add-circle]').click();
   await expect(page.locator('[data-studio-status]')).toContainText('Circle added');
