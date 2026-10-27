@@ -11,6 +11,7 @@
 
 const VENDOR_SCRIPTS = Object.freeze({
   chartjs: Object.freeze({ src: './vendor/chart.umd.js', global: 'Chart', id: 'lib-chartjs' }),
+  fusejs: Object.freeze({ src: './vendor/fuse.min.js', global: 'Fuse', id: 'lib-fusejs' }),
 });
 
 const pending = new Map();
