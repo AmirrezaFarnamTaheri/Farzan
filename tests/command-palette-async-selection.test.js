@@ -81,6 +81,29 @@ describe('command palette async Fuse.js selection consistency', () => {
     expect(window.OpenCourseDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('clears selection if the chosen command disappears on Fuse completion', async () => {
+    let finishLoading;
+    vi.mocked(loadVendorScript).mockReturnValue(new Promise(resolve => { finishLoading = resolve; }));
+    const nav = window.OpenCourseDeck.Router.navigate;
+    initCommandPalette();
+    window.OpenCourseDeck.CommandPalette.open();
+    const field = input('co');
+    const previous = resultLabels().indexOf('My Courses');
+    expect(previous).toBeGreaterThan(0);
+    for (let i = 0; i < previous; i++) key(field, 'ArrowDown');
+    expect(selectedLabel()).toBe('My Courses');
+    const FilteredFuse = class {
+      constructor(items) { this.items = items; }
+      search() { return this.items.filter(item => item.label === 'Courses').map(item => ({ item })); }
+    };
+    finishLoading(FilteredFuse);
+    await flush();
+    expect(resultLabels()).toEqual(['Courses']);
+    expect(selectedLabel()).toBeUndefined();
+    key(field, 'Enter');
+    expect(nav).not.toHaveBeenCalled();
+  });
+
   it('keeps one-letter matches available after local Fuse.js loads', async () => {
     let finishLoading;
     vi.mocked(loadVendorScript).mockReturnValue(new Promise(resolve => { finishLoading = resolve; }));
