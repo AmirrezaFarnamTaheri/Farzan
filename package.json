@@ -61,7 +61,8 @@
     "pdfjs-dist": "6.4.299",
     "dexie": "4.4.7",
     "fflate": "0.8.3",
-    "turndown": "7.2.4"
+    "turndown": "7.2.4",
+    "turndown-plugin-gfm": "1.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
