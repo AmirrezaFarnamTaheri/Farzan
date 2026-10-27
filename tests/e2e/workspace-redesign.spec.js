@@ -101,6 +101,20 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect((await catalog.boundingBox()).y).toBeLessThan(650);
   });
 
+  test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const exportButton = page.locator('#btn-export-json');
+    const importButton = page.locator('#btn-import-json');
+    await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
+    for (const button of [exportButton, importButton]) {
+      await expect(button).toBeVisible();
+      const rect = await button.boundingBox();
+      expect(rect.x).toBeGreaterThanOrEqual(-1);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(391);
+    }
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
