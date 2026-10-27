@@ -3,6 +3,7 @@
 // IndexedDB database engine for OpenCourseDeck
 // ============================================================
 import { withMutationRetry } from './src/core/mutationRetry.js';
+import { withExistingIndexedDBStore } from './src/core/mainDbDexieRead.js';
 
 const DBExports = (() => {
 'use strict';
@@ -284,16 +285,12 @@ return all.filter(filterFn);
 }
 
 async getAllByIndex(store, indexName, value){
-const { objectStore } = await this._transaction(store);
-return new Promise((res,rej)=>{
-try {
-const r = objectStore.index(indexName).getAll(value);
-r.onsuccess=()=>res(this._openAll(r.result));
-r.onerror=()=>rej(r.error);
-} catch (err) {
-rej(err);
-}
-});
+  // Read against the native installed schema; dynamic Dexie mode never
+  // upgrades the primary database or rewrites protected IndexedDB envelopes.
+  const connection = await this.open();
+  const records = await withExistingIndexedDBStore(connection, store, table =>
+    table.where(indexName).equals(value).toArray());
+  return this._openAll(records);
 }
 
 async queryIndex(store, indexName, range, limitOrOptions, legacyOptions = {}){
