@@ -304,6 +304,7 @@ describe('notes.js established sanitizer integration', () => {
 
   it('retains an explicit policy for HTML elements, attributes, and navigation schemes', () => {
     const src = read('notes.js');
+    expect(src).toContain('USE_PROFILES: { html: true }');
     expect(src).toContain('FORBID_TAGS:');
     expect(src).toContain('FORBID_ATTR:');
     expect(src).toContain('ALLOWED_URI_REGEXP:');
