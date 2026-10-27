@@ -1,715 +1,717 @@
 {
   "edition": "Farzan Plasmato",
-  "sourceRun": 38177326118,
-  "sourceWorkflow": "Plasmato Visual and Functional Acceptance",
-  "sourceBranch": "qa/plasmato-visual-acceptance-20261012",
+  "sourceRun": 40479110207,
+  "sourceWorkflow": "Plasmato Edition - Verify and Publish",
+  "sourceBranch": "main",
+  "releaseVersion": "1.0.6",
+  "sourceCommit": "8c7d75517ad95df5b8b48081599065bb35db6d7d",
   "captures": [
     {
       "path": "desktop/01-home.png",
       "width": 1440,
       "height": 900,
-      "bytes": 130743,
-      "sha256": "062f54be355255c681715326cf0e70f3ec4f3f698d21ca1d1f0fcbb539401c5b"
+      "bytes": 296257,
+      "sha256": "ebd2c8bfd88fe593d69659ea91d581ab3cd8ad89dd70927db5228cb1d62834f6"
     },
     {
       "path": "desktop/02-courses.png",
       "width": 1440,
       "height": 900,
-      "bytes": 234143,
-      "sha256": "b1e3f5598f133e33cc44ff68a5606db442a7092d685a3e65ce162256888aee41"
+      "bytes": 156736,
+      "sha256": "2298651dbdeaab9a04909abd006e8c122e4d40e29b4c581745d95acbeb6ded92"
     },
     {
       "path": "desktop/03-my-courses.png",
       "width": 1440,
       "height": 900,
-      "bytes": 105211,
-      "sha256": "9f4198e8636991412cc3fc8eb70b258e5886fccc2fd2e9f2b753b2abfda363d8"
+      "bytes": 93276,
+      "sha256": "5ed1831a814d37d7f3f93761d4334d5ec178cbb621ba48131a1664bcdf0a3dc7"
     },
     {
       "path": "desktop/04-materials.png",
       "width": 1440,
       "height": 900,
-      "bytes": 156898,
-      "sha256": "58f6fe17ab152b2ccdf30150bdd5ad8426a37a8fcc7551b4458ef059d42a6180"
+      "bytes": 106615,
+      "sha256": "470783a4cfe714b358f6ea0bc8d36126e16fec5885079b218c19dfbfc904c27f"
     },
     {
       "path": "desktop/05-notes.png",
       "width": 1440,
       "height": 900,
-      "bytes": 139643,
-      "sha256": "daf5385ceabc95bbbc3e0dd9175a2b8f61d7731f6024f18b33accffaa61af673"
+      "bytes": 134951,
+      "sha256": "e3dd4fef21616ca3a6a506f4049bccabb2fa39f8148516ecc99d2d6e4ff706e5"
     },
     {
       "path": "desktop/06-pdf.png",
       "width": 1440,
       "height": 900,
-      "bytes": 71548,
-      "sha256": "f39e3785e141c5b3b35527ce59c119bfc831890a68b18bbfabdb95f121b008fe"
+      "bytes": 76102,
+      "sha256": "101f03c28be2fc0975e5ee4f929e0393eaf9be9b74ed65469bc85139ccb88146"
     },
     {
       "path": "desktop/07-progress.png",
       "width": 1440,
       "height": 900,
-      "bytes": 180995,
-      "sha256": "728e3edd79c604a1376414ff04bd72212d9399add48aa05e5eb6d15c3de27429"
+      "bytes": 111943,
+      "sha256": "d2e74a9a1912777df89978a5f712bb627107e5e350088fe6693c86ed30ea396a"
     },
     {
       "path": "desktop/08-playlists.png",
       "width": 1440,
       "height": 900,
-      "bytes": 196801,
-      "sha256": "fbd13b7a44f5e7a0727f7a41432a187ea6223dc611bca53c7ffaefb6a1459116"
+      "bytes": 142363,
+      "sha256": "bd0fca7423675af19f66419e1aa22b53404de81d09fa2fff50a10892989a938e"
     },
     {
       "path": "desktop/09-bookmarks.png",
       "width": 1440,
       "height": 900,
-      "bytes": 73937,
-      "sha256": "db4718c726b57b4edea21eaa600cdf022e6ae2e3a2e3b4698c18331ddd0afd75"
+      "bytes": 69742,
+      "sha256": "66cad13706b0cb95ca65eda302cbb3197901744bbf2f51dfb018fe2c1b7c41fb"
     },
     {
       "path": "desktop/10-tags.png",
       "width": 1440,
       "height": 900,
-      "bytes": 73216,
-      "sha256": "f4393497cca394d9e7f5b5ef2f82c7b3a77aed0a10ec970d863f541693a70319"
+      "bytes": 67616,
+      "sha256": "ec245411c13d63036d2e663d45da56ef57808236c40da9898b693667427ed18a"
     },
     {
       "path": "desktop/11-flashcards.png",
       "width": 1440,
       "height": 900,
-      "bytes": 157511,
-      "sha256": "4ec52dcc8817e863e31dff62cd22e24d090c2369208d77b2b9c7aa1359698946"
+      "bytes": 150577,
+      "sha256": "6ca08c566f43977e4aeddbc084858db326e715d2c20fe3cc6d290ccb2a608c56"
     },
     {
       "path": "desktop/12-studio.png",
       "width": 1440,
       "height": 900,
-      "bytes": 98535,
-      "sha256": "f887cb59b9327ed565b60dcc12f4592648f3658c8f85f2f43a610ba856ee8811"
+      "bytes": 79641,
+      "sha256": "35b3d4b0e6969bc6468988674289c39cecdccc5b360ec7f51fc06ffc87329ddd"
     },
     {
       "path": "desktop/13-achievements.png",
       "width": 1440,
       "height": 900,
-      "bytes": 137353,
-      "sha256": "44797fcf420a41da6ad5b36131eb5cc67c3a0731ab212f971dd257ebe9274790"
+      "bytes": 126816,
+      "sha256": "8f1c47a22207ce3c702352d85ae1b151ee338f109bad8467ca76058a54487e06"
     },
     {
       "path": "desktop/14-settings.png",
       "width": 1440,
       "height": 900,
-      "bytes": 137443,
-      "sha256": "6c735ff09477c7559c0112ce7d5535a7838b104dad0f5384d19751ef5717c1e6"
+      "bytes": 131211,
+      "sha256": "33957e6804047ea0b489e5c4a330acbe9b624a1a9d827621e48c6d939f92e385"
     },
     {
       "path": "desktop/15-help.png",
       "width": 1440,
       "height": 900,
-      "bytes": 166419,
-      "sha256": "05f975d683472ad99f73328dbd2bbedb1e9a0a7cf6a5c8b9e1e190f9b78e1b09"
+      "bytes": 140130,
+      "sha256": "67ea33da71281e14b0d1b8679e1b338d03c801577535b1ae289ab5f187b816fe"
     },
     {
       "path": "tablet/01-home.png",
       "width": 900,
       "height": 1080,
-      "bytes": 85402,
-      "sha256": "be792280384eaeaac8d689c8e3ee29be30cbfa7f057e3987da92de58a3f69a03"
+      "bytes": 232987,
+      "sha256": "b963a70039a8619807fa4c599a2034a00d9dc80485c988fd821210b5ba617c73"
     },
     {
       "path": "tablet/02-courses.png",
       "width": 900,
       "height": 1080,
-      "bytes": 112588,
-      "sha256": "22b1d5e50797ec36b3f77ddbb029f1007926df9b23692c071629878d4d9b0e47"
+      "bytes": 116526,
+      "sha256": "0dc90dc3c763196ebd9263909d929259010488ac9d8657998ebeff9a6e565984"
     },
     {
       "path": "tablet/03-my-courses.png",
       "width": 900,
       "height": 1080,
-      "bytes": 67581,
-      "sha256": "d6ae720ee9e2dc8592e3016088ed4e76698bfd0792c7c9c922aca47518f02558"
+      "bytes": 79200,
+      "sha256": "2fbbe1b6303b709f4980e29be8a595365e5d1c7c064ef0024a97a66581920a55"
     },
     {
       "path": "tablet/04-materials.png",
       "width": 900,
       "height": 1080,
-      "bytes": 107152,
-      "sha256": "af4d5315907360af8512cbe97daa2b91656f0398834c284973d6492ae39e6645"
+      "bytes": 73848,
+      "sha256": "76e01e65cf61f756c12416aa95b9d9879b19e162507bbe7ad219c3512ef6be98"
     },
     {
       "path": "tablet/05-notes.png",
       "width": 900,
       "height": 1080,
-      "bytes": 98577,
-      "sha256": "158a19c6aa2063dd2acb33e7dac4ea9058dd534e18529e84dfb20bf964c49d16"
+      "bytes": 98820,
+      "sha256": "ccf73620e26bc75a34a74fda94a3887a307a20866dfa96055ac2399733551ed2"
     },
     {
       "path": "tablet/06-pdf.png",
       "width": 900,
       "height": 1080,
-      "bytes": 36657,
-      "sha256": "f47305cdfa32f0fb98a70eba7807924eda08ae9cd191141a7ee6365ae143231b"
+      "bytes": 44841,
+      "sha256": "ec8d0448d6505e171c9707f497072ea0a5631f01d5da8bb7c0b5a674961258e2"
     },
     {
       "path": "tablet/07-progress.png",
       "width": 900,
       "height": 1080,
-      "bytes": 122581,
-      "sha256": "c7e63cacf06a3d341046b33b12e4aeea0f507eeffb38b283ead0a8e822433ce8"
+      "bytes": 81413,
+      "sha256": "0e82db72880b39ed8cc006162533a00d8f65002794a48abe0a0351caed27ae3c"
     },
     {
       "path": "tablet/08-playlists.png",
       "width": 900,
       "height": 1080,
-      "bytes": 139922,
-      "sha256": "2f5225e15a3b2061dadd8c9519c4273ce680b4d6f99055a2c1f802fd38968e5b"
+      "bytes": 121739,
+      "sha256": "10f74015c4a709aec909281877e43850c5523e0461085dddbb5c6e28d303d98c"
     },
     {
       "path": "tablet/09-bookmarks.png",
       "width": 900,
       "height": 1080,
-      "bytes": 37408,
-      "sha256": "1e6bf31549b98dd7c4b8c051362d90c8feddb976eedb3e6cd61c52aed8ff3d82"
+      "bytes": 37558,
+      "sha256": "26c23a8a9dfad6729813eb543158389da7d051ee0f121d2bd2e0a66b553b3855"
     },
     {
       "path": "tablet/10-tags.png",
       "width": 900,
       "height": 1080,
-      "bytes": 36065,
-      "sha256": "d6cc3d6907760ef8b742e0e99e47635892f62a8b77c6f2b5e77fb9e5e2aa48e6"
+      "bytes": 35854,
+      "sha256": "741bd5a48b003e0dc5ef21a9e0b9682fcb8d17a0c0fb827c25fae41a07b6c671"
     },
     {
       "path": "tablet/11-flashcards.png",
       "width": 900,
       "height": 1080,
-      "bytes": 109492,
-      "sha256": "b15c42d71e4dadcf5737e5b5c966e86c86579eee5da601302d9022233e8148eb"
+      "bytes": 102928,
+      "sha256": "7d516795207259645ce1867c1c09ff4b04ee03d95f032c80ea95a0245ee0060b"
     },
     {
       "path": "tablet/12-studio.png",
       "width": 900,
       "height": 1080,
-      "bytes": 43733,
-      "sha256": "28605893671e583518e7b58cf2634f2bb78590c48778b4e12df862ae15007696"
+      "bytes": 36273,
+      "sha256": "e6c7bb31cee792bdaf53847b77dfb23ab6b5ad8f60dca0181c6b302965cc324c"
     },
     {
       "path": "tablet/13-achievements.png",
       "width": 900,
       "height": 1080,
-      "bytes": 94974,
-      "sha256": "b1cdda9fa6b009327270e3c1a294deedca21ed424851eb74a9b91523433f6419"
+      "bytes": 99763,
+      "sha256": "c917b2a09db95692cf6838c317bcd9c6820f82aaf46b4029f148ff35db06045f"
     },
     {
       "path": "tablet/14-settings.png",
       "width": 900,
       "height": 1080,
-      "bytes": 107762,
-      "sha256": "95d911981c4e5fd75f64d024c221490dd27dd422ac394f64c0e0e05fdd13e442"
+      "bytes": 109331,
+      "sha256": "0335f055f70bc280ec8d15b4358e1c6f7296e553334b2f80c21b3debe3f70f2c"
     },
     {
       "path": "tablet/15-help.png",
       "width": 900,
       "height": 1080,
-      "bytes": 106766,
-      "sha256": "5332898a13640b88148a3a605ed7c790210ceb1023f898d803a1e5ce88c96547"
+      "bytes": 97530,
+      "sha256": "3c724f831fc297ac3105f373c9e2da561684c9d76c2eb2c0edd4cdd75a26297a"
     },
     {
       "path": "mobile/01-home.png",
       "width": 390,
       "height": 844,
-      "bytes": 51031,
-      "sha256": "e76d79483f0d73987ef133fcd78a397f2e8bab3afec9cb122ea75ff9b3e11972"
+      "bytes": 146643,
+      "sha256": "d50c32b0a4ea0529966eb2ecd51a40038e35b117d6dd16017f34ffece63052d1"
     },
     {
       "path": "mobile/02-courses.png",
       "width": 390,
       "height": 844,
-      "bytes": 63366,
-      "sha256": "f08a99e92641af49c5ce3409fd306bca189a54ee436d8c473ddbf8c45b463ee0"
+      "bytes": 57554,
+      "sha256": "6de3030c522eb071e004c583fa430026fa8db56ad185578c62e38196530aafce"
     },
     {
       "path": "mobile/03-my-courses.png",
       "width": 390,
       "height": 844,
-      "bytes": 55922,
-      "sha256": "91546ec6abe001604cb3a5dabac80d29e248370035f1cf0e5ceb765fa9a43854"
+      "bytes": 47167,
+      "sha256": "c910f89eb0a9bc972bc791bd1a6d2ed6b82c0c076dfa19b0173440bb71f61b04"
     },
     {
       "path": "mobile/04-materials.png",
       "width": 390,
       "height": 844,
-      "bytes": 61200,
-      "sha256": "c7d2b720237287ad923977f380719daf22b883bb5e7a970bab21474ac1bde82f"
+      "bytes": 46850,
+      "sha256": "5657c785faeaa7ea948fcc3bb6880249bb458c92481732391a85429d911ef40a"
     },
     {
       "path": "mobile/05-notes.png",
       "width": 390,
       "height": 844,
-      "bytes": 46098,
-      "sha256": "79564235ce60524cd31e0c6bbafbcb23cada0d11a64e12f41e23153791e1badc"
+      "bytes": 50105,
+      "sha256": "7c6e290f684455f994544a419cf778244bdc56990ea32d18c4954ad7895aaccf"
     },
     {
       "path": "mobile/06-pdf.png",
       "width": 390,
       "height": 844,
-      "bytes": 34746,
-      "sha256": "9ae435164414b52fdf6442382aaeedf8a002a9d5a420f51c1c7f7db6bb70a7d5"
+      "bytes": 39037,
+      "sha256": "f74da348b57d38cfaea76353bc80f9bdfb474914616d5217971d54304192881e"
     },
     {
       "path": "mobile/07-progress.png",
       "width": 390,
       "height": 844,
-      "bytes": 61296,
-      "sha256": "f6d463c6cb9605e72d18d7e7135a015f6e4bac08aa4c0d3d29a7055cd5b5ea22"
+      "bytes": 43967,
+      "sha256": "e1678095fad23d6ad742695050d4072b87e301bbe1f3dae0f6e421911d592712"
     },
     {
       "path": "mobile/08-playlists.png",
       "width": 390,
       "height": 844,
-      "bytes": 61262,
-      "sha256": "3c37ecf93220e798bb63822eef3fd7a01c78ff2635877045cf6132758d072bb3"
+      "bytes": 47432,
+      "sha256": "71c6ba170f346d8904229b9feaf1dac4aef336b4a1d8992f891cfc7b306a3861"
     },
     {
       "path": "mobile/09-bookmarks.png",
       "width": 390,
       "height": 844,
-      "bytes": 34282,
-      "sha256": "94f5e4aeec8e2353b2ba6448c014a33a83785c6d082e310e4fe4241abae49ae0"
+      "bytes": 34415,
+      "sha256": "075b5cb9b490f1b2b8d0b30b962c754bff2d893be728ac5e4d6c220848bf7c99"
     },
     {
       "path": "mobile/10-tags.png",
       "width": 390,
       "height": 844,
-      "bytes": 32997,
-      "sha256": "5ed544cf830dc6bfd35f08917abb7a7f68030dddc1ef17329d6ea74a63d12f6a"
+      "bytes": 31003,
+      "sha256": "3b85c5dce0d2e92449d63275df303308d152e01410cab7b0770681854cc6a37e"
     },
     {
       "path": "mobile/11-flashcards.png",
       "width": 390,
       "height": 844,
-      "bytes": 70995,
-      "sha256": "cb6fc105c4e649177a1bdabddacf06c8c3b534560319ff698155a8ce3f5523ca"
+      "bytes": 65280,
+      "sha256": "d3b61ba7758d64b32f93d457e5712a859df098efa01172009fa59df34f412461"
     },
     {
       "path": "mobile/12-studio.png",
       "width": 390,
       "height": 844,
-      "bytes": 41082,
-      "sha256": "a2989fc08ad4475b24128775d032b485cca05045ef35632cb9d5710529d134d8"
+      "bytes": 25592,
+      "sha256": "422d639b42b11b1c5afd456d43f64addcf47946f8d169af29a7c0b948f5e11b5"
     },
     {
       "path": "mobile/13-achievements.png",
       "width": 390,
       "height": 844,
-      "bytes": 54826,
-      "sha256": "29bfa44007d50c114af68ee2eecdaaf3f71809db48ad3700a9e92e66b0a31125"
+      "bytes": 42836,
+      "sha256": "36bafce80fbda29269a7863065bfb8c6684daccfa509060d33ef2fd0cd1632cf"
     },
     {
       "path": "mobile/14-settings.png",
       "width": 390,
       "height": 844,
-      "bytes": 60315,
-      "sha256": "b970de63b59fbcbb2956074dac67b8673d8958a3be1245e091b862d9ffc18426"
+      "bytes": 56758,
+      "sha256": "d696f19aedec5ecfe9727d2fd39c458408f9ea2ef61f8b8f4a99d98eaa925cf9"
     },
     {
       "path": "mobile/15-help.png",
       "width": 390,
       "height": 844,
-      "bytes": 68533,
-      "sha256": "64cdc54a9f5dbe81cd8ce3bed2e75ab11dfa6b7aebdb9bf6310e2126d624db07"
+      "bytes": 54927,
+      "sha256": "f1e7968981c62c50268de9dcf8a82ae58dad20ab7636954441eaaea49bd98907"
     },
     {
       "path": "light-desktop/01-home.png",
       "width": 1440,
       "height": 900,
-      "bytes": 128896,
-      "sha256": "ad70a1a9eba3bfb9d5a16b67b1e8dff32d945566e845b53a8742777782f3d800"
+      "bytes": 296257,
+      "sha256": "ebd2c8bfd88fe593d69659ea91d581ab3cd8ad89dd70927db5228cb1d62834f6"
     },
     {
       "path": "light-desktop/02-courses.png",
       "width": 1440,
       "height": 900,
-      "bytes": 233213,
-      "sha256": "bbf2aebe8249d7afc1b807612e19b5e77f3cdf8ba71d023158911fc5a6c774fa"
+      "bytes": 156724,
+      "sha256": "3af5c2a42e5a17251c2a9da57cbf9699f42055e596426e95242961dcc3d433cf"
     },
     {
       "path": "light-desktop/03-my-courses.png",
       "width": 1440,
       "height": 900,
-      "bytes": 103142,
-      "sha256": "e11b743aba34cec0dbc37f5d26c5b5f3ad28a95fd2955838fa9e3df9f1abc2a1"
+      "bytes": 93276,
+      "sha256": "5ed1831a814d37d7f3f93761d4334d5ec178cbb621ba48131a1664bcdf0a3dc7"
     },
     {
       "path": "light-desktop/04-materials.png",
       "width": 1440,
       "height": 900,
-      "bytes": 156696,
-      "sha256": "43e7cfd34ad6967f0560085c4cee63401783388552b5a9b2375d6df32f5c7f9f"
+      "bytes": 106615,
+      "sha256": "470783a4cfe714b358f6ea0bc8d36126e16fec5885079b218c19dfbfc904c27f"
     },
     {
       "path": "light-desktop/05-notes.png",
       "width": 1440,
       "height": 900,
-      "bytes": 135413,
-      "sha256": "d2816262d31f13f56061a8f4dfb3033f162e59fe11ab34e95da2bef562751b97"
+      "bytes": 134951,
+      "sha256": "e3dd4fef21616ca3a6a506f4049bccabb2fa39f8148516ecc99d2d6e4ff706e5"
     },
     {
       "path": "light-desktop/06-pdf.png",
       "width": 1440,
       "height": 900,
-      "bytes": 70080,
-      "sha256": "7f07de4beda5b120807a55d911cbf14ac3b38db1c139a0c5b7d93bfba9c0a471"
+      "bytes": 76102,
+      "sha256": "101f03c28be2fc0975e5ee4f929e0393eaf9be9b74ed65469bc85139ccb88146"
     },
     {
       "path": "light-desktop/07-progress.png",
       "width": 1440,
       "height": 900,
-      "bytes": 187552,
-      "sha256": "e3d58cdc02cc67bb18c6b6d6da0e57e108fba6668a57a2486211b3dd3b60ea28"
+      "bytes": 111943,
+      "sha256": "d2e74a9a1912777df89978a5f712bb627107e5e350088fe6693c86ed30ea396a"
     },
     {
       "path": "light-desktop/08-playlists.png",
       "width": 1440,
       "height": 900,
-      "bytes": 193717,
-      "sha256": "6dd89496967f5aa8ca17d9c6c63312dfb5e8054c8e7394e982ca4bc373893f5e"
+      "bytes": 142363,
+      "sha256": "bd0fca7423675af19f66419e1aa22b53404de81d09fa2fff50a10892989a938e"
     },
     {
       "path": "light-desktop/09-bookmarks.png",
       "width": 1440,
       "height": 900,
-      "bytes": 73532,
-      "sha256": "b05f1cccfea5ff641e2867ba5932fa9c2b8161c6ea3b6cd1fe0cc2195146aa47"
+      "bytes": 69742,
+      "sha256": "66cad13706b0cb95ca65eda302cbb3197901744bbf2f51dfb018fe2c1b7c41fb"
     },
     {
       "path": "light-desktop/10-tags.png",
       "width": 1440,
       "height": 900,
-      "bytes": 72366,
-      "sha256": "459e69e81942588cbef3d07e636d1b136f42d0888a98d34effc5fe8a7c75e461"
+      "bytes": 67616,
+      "sha256": "ec245411c13d63036d2e663d45da56ef57808236c40da9898b693667427ed18a"
     },
     {
       "path": "light-desktop/11-flashcards.png",
       "width": 1440,
       "height": 900,
-      "bytes": 163066,
-      "sha256": "30800ed992e4305339aafc12cf1bc28064243ff40fe53ed5df3535f643ea7030"
+      "bytes": 150577,
+      "sha256": "6ca08c566f43977e4aeddbc084858db326e715d2c20fe3cc6d290ccb2a608c56"
     },
     {
       "path": "light-desktop/12-studio.png",
       "width": 1440,
       "height": 900,
-      "bytes": 95316,
-      "sha256": "cf60c22c07881390bc1096db26a02115822163dc2498f8fcc3651d9213060927"
+      "bytes": 79641,
+      "sha256": "35b3d4b0e6969bc6468988674289c39cecdccc5b360ec7f51fc06ffc87329ddd"
     },
     {
       "path": "light-desktop/13-achievements.png",
       "width": 1440,
       "height": 900,
-      "bytes": 134066,
-      "sha256": "0a23e0b03edd66ebf7015ff22f0ca4ab863bb4ac7eeaed2c025c5d4cccf7535d"
+      "bytes": 126816,
+      "sha256": "8f1c47a22207ce3c702352d85ae1b151ee338f109bad8467ca76058a54487e06"
     },
     {
       "path": "light-desktop/14-settings.png",
       "width": 1440,
       "height": 900,
-      "bytes": 134942,
-      "sha256": "f3ec676c0cf5e5f4cdc62490c82cd6457aab7ebd5d9b71df5952f067b833c855"
+      "bytes": 131211,
+      "sha256": "33957e6804047ea0b489e5c4a330acbe9b624a1a9d827621e48c6d939f92e385"
     },
     {
       "path": "light-desktop/15-help.png",
       "width": 1440,
       "height": 900,
-      "bytes": 165325,
-      "sha256": "e88775217e30dda3c828061186ccbf5fb7de8089a592cfd059177469ee0ff52d"
+      "bytes": 140130,
+      "sha256": "67ea33da71281e14b0d1b8679e1b338d03c801577535b1ae289ab5f187b816fe"
     },
     {
       "path": "light-mobile/01-home.png",
       "width": 390,
       "height": 844,
-      "bytes": 49775,
-      "sha256": "ccc3371d6d8564605a17e56251668e838221f334bb3b9a10a1acc785cdebd32c"
+      "bytes": 146643,
+      "sha256": "d50c32b0a4ea0529966eb2ecd51a40038e35b117d6dd16017f34ffece63052d1"
     },
     {
       "path": "light-mobile/02-courses.png",
       "width": 390,
       "height": 844,
-      "bytes": 61130,
-      "sha256": "4291e01897e618337a69a8853005e59facce8c5e23be48cc0b5f6852af38ec4b"
+      "bytes": 57554,
+      "sha256": "6de3030c522eb071e004c583fa430026fa8db56ad185578c62e38196530aafce"
     },
     {
       "path": "light-mobile/03-my-courses.png",
       "width": 390,
       "height": 844,
-      "bytes": 54666,
-      "sha256": "71ab9088d8c78981e4e97e822b9b0fd90bd7a217c8cc395b2d2c92328d6202df"
+      "bytes": 47167,
+      "sha256": "c910f89eb0a9bc972bc791bd1a6d2ed6b82c0c076dfa19b0173440bb71f61b04"
     },
     {
       "path": "light-mobile/04-materials.png",
       "width": 390,
       "height": 844,
-      "bytes": 61272,
-      "sha256": "0ede29f62b468806183548013a878385671372c379a55b863205095220dbc97f"
+      "bytes": 46850,
+      "sha256": "5657c785faeaa7ea948fcc3bb6880249bb458c92481732391a85429d911ef40a"
     },
     {
       "path": "light-mobile/05-notes.png",
       "width": 390,
       "height": 844,
-      "bytes": 48326,
-      "sha256": "029079ccceac4c7e4622ea7f8bdc68a83c9abcd955885ca0c5d3d673429e9b8c"
+      "bytes": 50096,
+      "sha256": "f403d59eb0d2f5f2fd05a1313fdaba5c9deb9305ef4d80f4d2bf8515a74b1413"
     },
     {
       "path": "light-mobile/06-pdf.png",
       "width": 390,
       "height": 844,
-      "bytes": 33939,
-      "sha256": "e04e8f5497c533a32e49a2f17b7e67ccb8d13f73f08c62e854ceb8fd5916bd21"
+      "bytes": 39037,
+      "sha256": "f74da348b57d38cfaea76353bc80f9bdfb474914616d5217971d54304192881e"
     },
     {
       "path": "light-mobile/07-progress.png",
       "width": 390,
       "height": 844,
-      "bytes": 64146,
-      "sha256": "5eed2afd25943bdb7caf3aac0f47a14b8e457d2dd165034fa4625e3cba608513"
+      "bytes": 43967,
+      "sha256": "e1678095fad23d6ad742695050d4072b87e301bbe1f3dae0f6e421911d592712"
     },
     {
       "path": "light-mobile/08-playlists.png",
       "width": 390,
       "height": 844,
-      "bytes": 60587,
-      "sha256": "41eaea1a54dfcde4b187bc82abf59490da180bd06b953c65152cb7bdafcb5144"
+      "bytes": 47432,
+      "sha256": "71c6ba170f346d8904229b9feaf1dac4aef336b4a1d8992f891cfc7b306a3861"
     },
     {
       "path": "light-mobile/09-bookmarks.png",
       "width": 390,
       "height": 844,
-      "bytes": 34136,
-      "sha256": "2d8fd41170645cd9780dae4b99f8aa8032d0a87a51e144d8792f14b20232fb7a"
+      "bytes": 34415,
+      "sha256": "075b5cb9b490f1b2b8d0b30b962c754bff2d893be728ac5e4d6c220848bf7c99"
     },
     {
       "path": "light-mobile/10-tags.png",
       "width": 390,
       "height": 844,
-      "bytes": 32618,
-      "sha256": "4f35a619c33b3d8b619bfb1a2223627398680171530957adca105e59456125e4"
+      "bytes": 31003,
+      "sha256": "3b85c5dce0d2e92449d63275df303308d152e01410cab7b0770681854cc6a37e"
     },
     {
       "path": "light-mobile/11-flashcards.png",
       "width": 390,
       "height": 844,
-      "bytes": 74612,
-      "sha256": "1b6f04935d3239b6192add93a466e18151026193b9db6af90cb75a68d917a702"
+      "bytes": 65280,
+      "sha256": "d3b61ba7758d64b32f93d457e5712a859df098efa01172009fa59df34f412461"
     },
     {
       "path": "light-mobile/12-studio.png",
       "width": 390,
       "height": 844,
-      "bytes": 40259,
-      "sha256": "3fe227620d39fed0d52a6b2e7bf602ceb87bde61f9c40354d3417fc7d23e0452"
+      "bytes": 25592,
+      "sha256": "422d639b42b11b1c5afd456d43f64addcf47946f8d169af29a7c0b948f5e11b5"
     },
     {
       "path": "light-mobile/13-achievements.png",
       "width": 390,
       "height": 844,
-      "bytes": 53623,
-      "sha256": "bf915ba4907bb7fb98755d558f140103409fe439b5b9424f09d866f97a997f6a"
+      "bytes": 42836,
+      "sha256": "36bafce80fbda29269a7863065bfb8c6684daccfa509060d33ef2fd0cd1632cf"
     },
     {
       "path": "light-mobile/14-settings.png",
       "width": 390,
       "height": 844,
-      "bytes": 59618,
-      "sha256": "1955615a74b3f0bd97681f7fc0fefc42d3ba6e25e3685e0c4e38fc86b27a5a30"
+      "bytes": 56764,
+      "sha256": "7f624d9044ef05fc7ed738855dc4573664a25c7a2bc3405562f05b714746c419"
     },
     {
       "path": "light-mobile/15-help.png",
       "width": 390,
       "height": 844,
-      "bytes": 67300,
-      "sha256": "8b1e2559e4ef317d903c1963c69b0d247629bb1f166df1f74ec14a2ce939b505"
+      "bytes": 54927,
+      "sha256": "f1e7968981c62c50268de9dcf8a82ae58dad20ab7636954441eaaea49bd98907"
     },
     {
       "path": "functional/01-plasmato-lecture-selected.png",
       "width": 1280,
       "height": 720,
-      "bytes": 150141,
-      "sha256": "6738a39bd6c54eaa7dab90faeb496c32fc6e338761e63c2f92bb8f6231b4f3f8"
+      "bytes": 124063,
+      "sha256": "13e6098153885abb88ee07c4909f9f006f062c3709db4912b4ddeaf841040d23"
     },
     {
       "path": "functional/02-real-completion-saved.png",
       "width": 1280,
       "height": 720,
-      "bytes": 154635,
-      "sha256": "0f1ed5064d3406ca58048b1ce5a13307744defd00d8936604c5ad6897910011f"
+      "bytes": 124520,
+      "sha256": "2ed5e1be96fb3369406b16f274984b5ef275609525ff91fac651658081f1d162"
     },
     {
       "path": "functional/03-filtered-plasmato-materials.png",
       "width": 1280,
       "height": 720,
-      "bytes": 119800,
-      "sha256": "b254db86d1c9fe4919df7aa02953b2d515346a7877adcfc0440e8bf4958b41d6"
+      "bytes": 80341,
+      "sha256": "2ce0a420f7e310e1145070bbc759f27d9de7927285128870610a06994436be3c"
     },
     {
       "path": "functional/04-written-note-persisted.png",
       "width": 1280,
       "height": 720,
-      "bytes": 135294,
-      "sha256": "8db66ae9e6b1df8f70c8342362431cf93f8655dd01b873afd785599f37f0db8b"
+      "bytes": 128168,
+      "sha256": "fa1071d4d42325f36310fe071d35f1a7421844fdfafa107b4ac19e66db8ef38e"
     },
     {
       "path": "functional/05-saved-note-reopened.png",
       "width": 1280,
       "height": 720,
-      "bytes": 134929,
-      "sha256": "e2f7dd487b204c589ec6fe68ae35cbb0ddfca06376356310cb0b043d3a3ff4fc"
+      "bytes": 126373,
+      "sha256": "ac84ba2ff9726cec7ebf058882e4952e7390d02d643d0beca128f577776e3aa7"
     },
     {
       "path": "functional/06-my-course-created.png",
       "width": 1280,
       "height": 720,
-      "bytes": 102340,
-      "sha256": "6152e0291255dc41bbd9e2ce116baef5d7666cee2301272cb469f4b31e2733f3"
+      "bytes": 94848,
+      "sha256": "b5e9af70ecc50c6032fa6ff0ff1b97b5e12d4ce48b21695edacf8e2121add310"
     },
     {
       "path": "functional/07-flashcard-editor.png",
       "width": 1280,
       "height": 720,
-      "bytes": 111871,
-      "sha256": "48fb6eb27c9ba2ade32f385a1d0c41b012b4592721e0830e7038c3f0187e7a2c"
+      "bytes": 108229,
+      "sha256": "101130e4fc7b65d06aa254c0adb67cb3390f090faabf08356f2a6c9c507b97a2"
     },
     {
       "path": "functional/08-flashcard-flipped.png",
       "width": 1280,
       "height": 720,
-      "bytes": 130084,
-      "sha256": "7f6b60e07fb1c8942e710bc5dd2b5b78a783b30935a4cfc79531585e24b8889a"
+      "bytes": 135226,
+      "sha256": "6245f0cf531095f1631a7fbf19b8d78ea56f161126ce12aef49e4b339e5b28ad"
     },
     {
       "path": "functional/09-flashcard-graded.png",
       "width": 1280,
       "height": 720,
-      "bytes": 108874,
-      "sha256": "9b335a1d634cda73a8a22540ebfde312253df7d0d9a0b6bcadbe7fc1b45416e6"
+      "bytes": 142056,
+      "sha256": "2fcd5130388864fe011d61bbb4b5f81ffb7065f2ee4227ad375210fbc505139f"
     },
     {
       "path": "functional/10-pdf-rendered.png",
       "width": 1280,
       "height": 720,
-      "bytes": 80784,
-      "sha256": "5d2a70c6557f2acd5fb19b8b51080f9390ec5baa7f779acd81ac650c6dcacac5"
+      "bytes": 80148,
+      "sha256": "ac3af3c1a4778de9b6a398a1a99b6e695d78d87074f6c368ec9c2bd71af02b0e"
     },
     {
       "path": "functional/11-pdf-page-note-saved.png",
       "width": 1280,
       "height": 720,
-      "bytes": 103153,
-      "sha256": "21e339769896583981e2e6bdee4aacb660338f43946aa30497f4a5f0e50e0c46"
+      "bytes": 102030,
+      "sha256": "97480e3ef4550549ab8d86b98e55ced60cb33bc993e5c45f43fc4f787617f45d"
     },
     {
       "path": "functional/12-playlist-created.png",
       "width": 1280,
       "height": 720,
-      "bytes": 168054,
-      "sha256": "072092d09e661d9eb344245222ebdb1315d69b92bcd3f6d5d106df34a4933862"
+      "bytes": 127706,
+      "sha256": "87a70adf341a69bfe4b6dd527be0fca28d81a6df87337cf821e44b44a2db2b27"
     },
     {
       "path": "functional/13-theme-switched.png",
       "width": 1280,
       "height": 720,
-      "bytes": 106227,
-      "sha256": "b1d14e662962c2cb155bc71c34db0371e7a75321fb4054a8016cca4fd9967089"
+      "bytes": 110824,
+      "sha256": "020be85ea09b25d392e58394a53c5a081967b121e521c75f8d2feacb015cfef3"
     },
     {
       "path": "functional/14-type-scale-increased.png",
       "width": 1280,
       "height": 720,
-      "bytes": 112367,
-      "sha256": "b00234dd64bb756ed5b35e14f4d9e6212ced87615088935fe5f46c3aa9c71ccd"
+      "bytes": 118515,
+      "sha256": "740338cb97e962bc6519075648059d41ae2b5a7ed3f1f452b70680f60f453a88"
     },
     {
       "path": "functional/15-search-query-entered.png",
       "width": 1280,
       "height": 720,
-      "bytes": 132590,
-      "sha256": "ba9f87fe5c9f842d0ce6e08d7d7ecbf92be024b25ed5dca2b9ed80c0695cbbed"
+      "bytes": 281402,
+      "sha256": "88f0ec5c7e19d21cd5d9f5db0caf3f8d8f293178752151cb29ee428639b3099b"
     },
     {
       "path": "functional/15b-global-search-results.png",
       "width": 1280,
       "height": 720,
-      "bytes": 132586,
-      "sha256": "599ae1a9824f0c4898863c255398bf2f2b6a4044113dfe5a7e0445d71056ba3e"
+      "bytes": 281398,
+      "sha256": "9928675c578104b4a2ad6de264e5e9b1bb588e8cad2260ed98c8318adc4ca33f"
     },
     {
       "path": "functional/16-search-result-opened.png",
       "width": 1280,
       "height": 720,
-      "bytes": 110289,
-      "sha256": "9b8f9d3a483634d3f6923ea9b3a5aedbedc8a18151705ea7e1a804500425c0a7"
+      "bytes": 264576,
+      "sha256": "a95f792edbc274d7ce37be8f4295b5f3f2c674cc907b131550c81944114857fc"
     },
     {
       "path": "functional/17-real-local-video-playing.png",
       "width": 1280,
       "height": 720,
-      "bytes": 144628,
-      "sha256": "96e9ce9a418048cf68fa80731e1e5fb8ed803983b65d5616d2f0c4133c150243"
+      "bytes": 133118,
+      "sha256": "5961e2b0b34e81f0dc86a87714c6fdb38bd5e2c74e229b989f2d1925c08fc0ad"
     },
     {
       "path": "functional/18-video-timestamp-bookmarked.png",
       "width": 1280,
       "height": 720,
-      "bytes": 146408,
-      "sha256": "bb8a12d0e4ba10ec3339541550b225b93fe010b6e4aa6b9bcc197d338a485bfb"
+      "bytes": 132330,
+      "sha256": "bb9677f8e21341751bd4e7300c1395f8c6461c47b808611508a87ebdb5c8b104"
     },
     {
       "path": "functional/19-bookmark-visible-after-video.png",
       "width": 1280,
       "height": 720,
-      "bytes": 92923,
-      "sha256": "dcd7090a7f5bf8894ce4d9bfd694f9b43248b2942b42378f8e308008e7fbedf7"
+      "bytes": 88739,
+      "sha256": "7250ab376f38ff9388fa07462f575a0808df89699d8febed071bbe7452334c1e"
     },
     {
       "path": "functional/20-studio-note-added.png",
       "width": 1280,
       "height": 720,
-      "bytes": 97162,
-      "sha256": "340e8a0b1455b70d9c20152e950fe449bb3be41d73c339962ca0022de6c72196"
+      "bytes": 88612,
+      "sha256": "3603293c8e1711ba6420b0cf04178bb187e45b6f887e7636563bead8e2585caf"
     },
     {
       "path": "functional/21-studio-shapes-added.png",
       "width": 1280,
       "height": 720,
-      "bytes": 112389,
-      "sha256": "214e08fb64d913b2fb3c49c00f228b0aa054c0fddbd84d61559b09361d98e115"
+      "bytes": 94469,
+      "sha256": "220d22de14a3ae238d13aa319b3f9d2da9662d8158c8b1ce738c11fb822d8106"
     },
     {
       "path": "functional/22-studio-reopened.png",
       "width": 1280,
       "height": 720,
-      "bytes": 108994,
-      "sha256": "b0a7cbae45895e65cdde2dfa78823f9651c01aa4eb75997ad48b3c5fcfbeac77"
+      "bytes": 97141,
+      "sha256": "976b9d9a110c06a177348777881b9f63e203fbbbed7ba6fb2e5e1b693a1279a3"
     },
     {
       "path": "functional/23-settings-ai-panel.png",
       "width": 1280,
       "height": 720,
-      "bytes": 105779,
-      "sha256": "e8b4ed9b0551360fe980380590a7762a55e4dfbe8ad907789bf58689b87c9e05"
+      "bytes": 97966,
+      "sha256": "c90cde32248b6959e89d68f5490e5da3f1124d897205daf76276a174ddf25f22"
     },
     {
       "path": "functional/24-settings-storage-panel.png",
       "width": 1280,
       "height": 720,
-      "bytes": 94613,
-      "sha256": "292fea3e132a509375743fb459b27b1d2bece68f672f5bd4468e30d1522072fa"
+      "bytes": 90309,
+      "sha256": "7110c87f24793fdf7d7605aed4ec5b61dd223104e5477ad0f19f27553cdbbacc"
     },
     {
       "path": "functional/25-pdf-zoom-in-working.png",
       "width": 1280,
       "height": 720,
-      "bytes": 82827,
-      "sha256": "39889fd2df146eb601a4cedcaa743962cf75c448ab56414c689f8628db90265f"
+      "bytes": 90028,
+      "sha256": "c76db1a002452dcdf6a06ec5a85083dc573188ae3ef4f3a5944d39a8b7543b01"
     },
     {
       "path": "standalone/01-standalone-course-summary.png",
@@ -722,8 +724,8 @@
       "path": "standalone/02-hierarchy-drilldown.png",
       "width": 1280,
       "height": 720,
-      "bytes": 219780,
-      "sha256": "cfadac2d2a3ebdc7f6553f47b2ba8eb926dd0f3c05646df2196a9ffb1f65e164"
+      "bytes": 219767,
+      "sha256": "1a3270d073703043a77fac3f335b87d05af28493341458c61dfcc44724398a9c"
     },
     {
       "path": "standalone/03-pdf-resource-saved.png",
@@ -743,15 +745,15 @@
       "path": "standalone/05-mobile-standalone.png",
       "width": 390,
       "height": 844,
-      "bytes": 251447,
-      "sha256": "66145be5bd08caa4f95444f5843ffb6859e4b524c361ab6becffe2c5f10b7b9e"
+      "bytes": 222867,
+      "sha256": "71369272cf4a1ac74057d54a8f76e0cdee3ba362a17adb2ad0f67902e6820c8c"
     },
     {
       "path": "standalone/06-mobile-search-results.png",
       "width": 390,
       "height": 844,
-      "bytes": 106085,
-      "sha256": "6aaae076d5b0fbba188134aabd9d93521be1ee0b7baf4f71193df6925e581508"
+      "bytes": 105904,
+      "sha256": "a0bc920cf53b79cb809b17b8dc38c6956150202a4dcb0fbf16f73a3951a73ff0"
     }
   ],
   "contactSheets": [
@@ -759,56 +761,56 @@
       "path": "contact-sheets/contact-sheet-desktop.png",
       "width": 1572,
       "height": 762,
-      "bytes": 331598,
-      "sha256": "50d97b36d30ac0d08efe49d7ce5b7e305f670530d7e7e4514c784a99596faf51"
+      "bytes": 278877,
+      "sha256": "9ee995536a166b053e1b90ed633bae2387904f4084cc694751d36fc29d5b3513"
     },
     {
       "path": "contact-sheets/contact-sheet-tablet.png",
       "width": 1572,
       "height": 762,
-      "bytes": 272952,
-      "sha256": "2fcda438fde466ba72368af6fc55b06cca2310b26947f54f8f1017a72025d7a0"
+      "bytes": 249225,
+      "sha256": "de01df311cec41e443fd649964a755a91faacbf6fa2bf2b6f913d2444f0a5d69"
     },
     {
       "path": "contact-sheets/contact-sheet-mobile.png",
       "width": 1572,
       "height": 762,
-      "bytes": 253413,
-      "sha256": "2e0c7e2b9ca9cc18574b81f270c7be932c9981919d635e40523315a1d18224ec"
+      "bytes": 225643,
+      "sha256": "d8429d012b844bd5261bb2f05856a0f7c9c65c824759fa9ef62d779992e66ab8"
     },
     {
       "path": "contact-sheets/contact-sheet-light-desktop.png",
       "width": 1572,
       "height": 762,
-      "bytes": 309340,
-      "sha256": "2a178477d408a287f4ea857b93dae5d32ef367dd70bc6da4a62042a25b2d7df7"
+      "bytes": 278877,
+      "sha256": "6c1a41c24b86754b1f19a787193b9b45c1b06de6a653aa97bba1571f4f127935"
     },
     {
       "path": "contact-sheets/contact-sheet-light-mobile.png",
       "width": 1572,
       "height": 762,
-      "bytes": 240433,
-      "sha256": "7b4046245f89be154af9aed0a58913d4973ddc535a607c50a0114218d6deba39"
+      "bytes": 225667,
+      "sha256": "56bc642c10ac42b8f86511d11f530c5d881b3a225943de6eed51720d490d5632"
     },
     {
       "path": "contact-sheets/contact-sheet-functional.png",
       "width": 1262,
       "height": 1746,
-      "bytes": 592359,
-      "sha256": "ab205cc47534be0a54e414c66ae22081d0b84bae823aa15a563b29256286e5c2"
+      "bytes": 532604,
+      "sha256": "725d3e97f77edd950de56f4e572042ed3b7e54a11e3e2ba843df84e89833d9f4"
     },
     {
       "path": "contact-sheets/contact-sheet-standalone.png",
-      "width": 1572,
+      "width": 1262,
       "height": 516,
-      "bytes": 226373,
-      "sha256": "267edbe3e222befb983d952cc3856fe0b7d5f652907fe1607da935b52e84d62e"
+      "bytes": 219496,
+      "sha256": "bee437cb9994dda34c656947c757d3d6326a72315584984859f173b86a90108b"
     }
   ],
   "observations": {
     "path": "observations.jsonl",
-    "bytes": 39504,
-    "sha256": "904efa017874d88246d9bae9deae49443b774be38f2fcbc83afab0a4ddf2ca16"
+    "bytes": 241870,
+    "sha256": "030ecc812f50284cdb3e6820291e15da70fda72b1867b8728088516d1af54f3e"
   },
   "totalScreenshots": 107,
   "totalContactSheets": 7
