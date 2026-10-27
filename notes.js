@@ -792,6 +792,10 @@ import DOMPurify from 'dompurify';
 
     _sanitize(html) {
       return controlRemoteNoteImages(noteSanitizer.sanitize(String(html ?? ''), {
+        // The note privacy gate handles HTML <img>, not SVG <image>/<use>/
+        // <feImage>. HTML-only sanitization forbids network-loading foreign
+        // content even if an imported note contains SVG resource references.
+        USE_PROFILES: { html: true },
         FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
         FORBID_ATTR: ['style', 'srcset', 'sizes'],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
