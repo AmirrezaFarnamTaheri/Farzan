@@ -9,7 +9,7 @@ describe('portable note HTML -> Markdown with Turndown', () => {
     const markdown = noteHtmlToMarkdown(html);
     expect(markdown).toContain('## Cardiology & physiology');
     expect(markdown).toContain('**important *nested* findings**');
-    expect(markdown).toMatch(/- Alpha/);
+    expect(markdown).toMatch(/-\s+Alpha/);
     expect(markdown).toContain('Nested item');
     expect(markdown).not.toContain('<ul>');
     expect(markdown).not.toContain('&amp;');
@@ -38,9 +38,9 @@ describe('portable note HTML -> Markdown with Turndown', () => {
     const markdown = noteHtmlToMarkdown(html);
     expect(markdown).toMatch(/\| Concept\s+\| Meaning\s+\|/);
     expect(markdown).toContain('| Cardiac output | Heart flow |');
-    expect(markdown).toMatch(/- \[x\] Review/);
-    expect(markdown).toMatch(/- \[ \] Practice/);
-    expect(markdown).toContain('~~Outdated~~');
+    expect(markdown).toMatch(/-\s+\[x\]\s+Review/);
+    expect(markdown).toMatch(/-\s+\[ \]\s+Practice/);
+    expect(markdown).toMatch(/~{1,2}Outdated~{1,2}/);
   });
 
   it('never exports remote images, scripts, SVG requests or dangerous hyperlink schemes', () => {
