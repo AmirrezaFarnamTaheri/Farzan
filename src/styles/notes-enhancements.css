@@ -542,10 +542,15 @@
   /* Keep the document editor discoverable above the fold on small phones,
      without making folders or the saved-note list inaccessible. */
   .notes-sidebar {
-    max-height: none;
-    overflow-y: visible;
+    /* Do not let a tall editor stretch the library beyond the first phone
+       viewport. One accessible scroll region retains folders and all notes. */
+    align-self: start;
+    max-height: min(350px, 42dvh);
+    overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  .notes-library-list { overflow: visible; }
 
   /* Screenshot QA: a new learner's single-note list stretched the
      sidebar beyond 500px and pushed the editor below the first phone screen.
@@ -556,10 +561,9 @@
   }
 
   .notes-list {
-    max-height: min(160px, 24dvh);
+    max-height: none;
     min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    overflow: visible;
   }
 
   .notes-header-actions {
