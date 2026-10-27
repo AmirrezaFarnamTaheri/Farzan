@@ -116,7 +116,7 @@ jobs:
 
       - name: Upload screenshot matrix, interaction captures, and browser traces
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: farzan-plasmato-edition-v1.0.6-visual-evidence
           path: |
@@ -137,7 +137,7 @@ jobs:
           (cd release-assets && sha256sum farzan-plasmato-edition-v1.0.6-visual-evidence.zip > SHA256SUMS.visual)
 
       - name: Upload verified downloadable app and checksums
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: farzan-plasmato-edition-v1.0.6-web
           path: release-assets/
@@ -223,7 +223,7 @@ jobs:
           # upgrade, WebView2 UI acceptance, code signing, or licensed content.
 
       - name: Upload verified Windows installer and checksum
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: farzan-plasmato-edition-v1.0.6-windows
           path: release-native/
