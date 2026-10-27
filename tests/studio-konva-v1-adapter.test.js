@@ -149,6 +149,35 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     expect(planKonvaV1Board(board).compatible).toBe(false);
   });
 
+
+  it.each([
+    ['unmapped custom paint property', { id: 'r', type: 'rect', x: 10, y: 15, width: 90, height: 40, blendMode: 'multiply' }],
+    ['arrowhead tint', { id: 'a', type: 'arrow', x1: 1, y1: 2, x2: 50, y2: 60, headFill: '#f0f' }],
+    ['SVG-only dash pattern', { id: 'd', type: 'line', x1: 0, y1: 0, x2: 10, y2: 10, dashPattern: [4, 2] }],
+    ['hidden individual element', { id: 'h', type: 'circle', x: 5, y: 5, radius: 3, hidden: true }],
+    ['unsupported gradient fill', { id: 'g', type: 'rect', x: 0, y: 0, width: 20, height: 30, fill: { type: 'linear', stops: [] } }],
+    ['nonfinite coordinate', { id: 'nf', type: 'rect', x: 'not-a-number', y: 5, width: 10, height: 10 }],
+  ])('refuses %s rather than silently changing its appearance', (_label, element) => {
+    const board = fixture();
+    board.layers[0].elements = [element];
+    const before = structuredClone(board);
+    const result = planKonvaV1Board(board);
+    expect(result.compatible).toBe(false);
+    expect(result.reason).toMatch(/unsupported|invalid/);
+    expect(board).toEqual(before);
+  });
+
+  it('preserves an explicitly round-capped legacy line', () => {
+    const board = fixture();
+    board.layers[0].elements = [{ id: 'cap', type: 'line', x1: 0, y1: 10,
+      x2: 60, y2: 70, lineCap: 'round', stroke: '#fff', strokeWidth: 4 }];
+    const plan = planKonvaV1Board(board);
+    expect(plan.compatible).toBe(true);
+    const [line] = buildKonvaNodes(plan.layers[0]);
+    expect(line.lineCap()).toBe('round');
+    line.destroy();
+  });
+
   it('preserves locked/hidden layer visibility and opacity attributes in the plan', () => {
     const board = fixture();
     board.layers[0].visible = false;
