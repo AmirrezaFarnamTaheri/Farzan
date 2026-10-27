@@ -1,65 +1,39 @@
 /**
- * TranslationCache — IndexedDB-backed cache for translation results.
- * Composite key: (engine, paramsHash, sourceText). TTL: 30 days.
+ * Translation results cache: compatibility facade backed by Dexie.
  *
- * Usage:
- *   await translationCache.init();
- *   const cached = await translationCache.get(text, 'google', { from: 'en', to: 'fa' });
- *   if (!cached) { const result = doTranslate(); await translationCache.set(text, 'google', { from, to }, result); }
+ * Preserves the original raw IndexedDB database's native version 1,
+ * primary key, secondary indexes, records and TTL semantics. Dexie uses
+ * versions multiplied by 10 at the IDB boundary; .version(0.1) is native v1.
+ *
+ * This database contains cached translation results only. Course data,
+ * note HTML, progress, saved study records and credentials are not migrated.
  */
+import Dexie from 'dexie';
 
 const DB_NAME = 'opencoursedeck-translations';
-const DB_VERSION = 1;
-const STORE_NAME = 'translations';
-const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-let _db = null;
-let _initPromise = null;
+let db = null;
 
-function openDb() {
-  if (_db) return Promise.resolve(_db);
-  if (_initPromise) return _initPromise;
-
-  _initPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'key' });
-        store.createIndex('createdAt', 'createdAt', { unique: false });
-        store.createIndex('engine', 'engine', { unique: false });
-      }
-    };
-
-    request.onsuccess = () => {
-      _db = request.result;
-      resolve(_db);
-    };
-
-    request.onerror = () => {
-      _initPromise = null;
-      reject(request.error);
-    };
-  });
-
-  return _initPromise;
+function database() {
+  if (!db) {
+    db = new Dexie(DB_NAME);
+    // Existing raw IndexedDB v1: 'translations' keyPath='key',
+    // two nonunique indexes ('createdAt', 'engine'). Do not bump the native
+    // version or add a migration just to adopt an existing query wrapper.
+    db.version(0.1).stores({ translations: 'key, createdAt, engine' });
+  }
+  return db;
 }
 
-function txStore(mode) {
-  return openDb().then(db => {
-    const tx = db.transaction(STORE_NAME, mode);
-    return tx.objectStore(STORE_NAME);
-  });
+function expired(record, now) {
+  return now - record.createdAt > (record.ttl || DEFAULT_TTL_MS);
 }
 
-function reqToPromise(req) {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
+/**
+ * Preserve the original deterministic FNV-1a hash. Existing keys must be
+ * readable after the adapter swap, even if the params property order differs.
+ */
 /**
  * Deterministic hash of sorted JSON params.
  * @param {Object} params
@@ -84,30 +58,23 @@ function makeKey(text, engine, params) {
   return `${engine}:${hashParams(params)}:${text}`;
 }
 
-/**
- * Initialize the cache. Must be called before get/set.
- * @returns {Promise<void>}
- */
+/** Open the existing schema or create the same schema for a fresh install. */
 export async function init() {
-  await openDb();
+  await database().open();
 }
 
 /**
- * Get a cached translation.
- * @param {string} text — source text
- * @param {string} engine — translator engine name
- * @param {Object} params — translation params (from, to, etc.)
- * @returns {Promise<string|null>} — cached translation or null
+ * Read a translation; expired entries are evicted without affecting other
+ * providers or sessions. Missing/disabled storage is a cache miss.
  */
 export async function get(text, engine, params) {
   const key = makeKey(text, engine, params);
   try {
-    const store = await txStore('readonly');
-    const record = await reqToPromise(store.get(key));
+    const table = database().table('translations');
+    const record = await table.get(key);
     if (!record) return null;
-    if (Date.now() - record.createdAt > (record.ttl || DEFAULT_TTL_MS)) {
-      // Expired — delete asynchronously
-      txStore('readwrite').then(s => s.delete(key)).catch(() => {});
+    if (expired(record, Date.now())) {
+      await table.delete(key);
       return null;
     }
     return record.translation;
@@ -116,19 +83,10 @@ export async function get(text, engine, params) {
   }
 }
 
-/**
- * Store a translation in the cache.
- * @param {string} text — source text
- * @param {string} engine — translator engine name
- * @param {Object} params — translation params
- * @param {string} translation — translated text
- * @param {number} [ttl] — TTL in ms (default 30 days)
- * @returns {Promise<void>}
- */
+/** Write an entry with the exact same key, attributes and TTL contract. */
 export async function set(text, engine, params, translation, ttl) {
-  const key = makeKey(text, engine, params);
   const record = {
-    key,
+    key: makeKey(text, engine, params),
     engine,
     paramsHash: hashParams(params),
     sourceText: text,
@@ -137,95 +95,51 @@ export async function set(text, engine, params, translation, ttl) {
     ttl: ttl || DEFAULT_TTL_MS,
   };
   try {
-    const store = await txStore('readwrite');
-    await reqToPromise(store.put(record));
+    await database().table('translations').put(record);
   } catch {
-    // Cache write failure is non-fatal
+    // Offline translation must continue if this optional cache is disabled.
   }
 }
 
-/**
- * Clear all cached translations.
- * @returns {Promise<void>}
- */
+/** Clear all cached translations, without deleting the database schema. */
 export async function clear() {
-  try {
-    const store = await txStore('readwrite');
-    await reqToPromise(store.clear());
-  } catch {}
+  try { await database().table('translations').clear(); } catch {}
 }
 
-/**
- * Count cached translations.
- * @returns {Promise<number>}
- */
 export async function size() {
-  try {
-    const store = await txStore('readonly');
-    return await reqToPromise(store.count());
-  } catch {
-    return 0;
-  }
+  try { return await database().table('translations').count(); } catch { return 0; }
 }
 
 /**
- * Remove expired entries.
- * @returns {Promise<number>} — number of pruned entries
+ * Remove per-record expired entries in one Dexie transaction.
+ * Using a single write transaction avoids raw IDB cursors crossing awaits.
  */
 export async function prune() {
   try {
-    const store = await txStore('readwrite');
-    const idx = store.index('createdAt');
-    const now = Date.now();
-    let pruned = 0;
-    await new Promise((resolve, reject) => {
-      const req = idx.openCursor();
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) { resolve(); return; }
-        const record = cursor.value;
-        if (now - record.createdAt > (record.ttl || DEFAULT_TTL_MS)) {
-          cursor.delete();
-          pruned++;
-        }
-        cursor.continue();
-      };
-      req.onerror = () => reject(req.error);
+    const table = database().table('translations');
+    return await database().transaction('rw', table, async () => {
+      const now = Date.now();
+      const keys = await table.toCollection().filter(item => expired(item, now)).primaryKeys();
+      if (keys.length) await table.bulkDelete(keys);
+      return keys.length;
     });
-    return pruned;
   } catch {
     return 0;
   }
 }
 
-/**
- * Remove all entries for a specific engine.
- * @param {string} engine
- * @returns {Promise<number>}
- */
+/** Delete only the requested provider's keys atomically. */
 export async function clearEngine(engine) {
-  try {
-    const store = await txStore('readwrite');
-    const idx = store.index('engine');
-    const keys = await reqToPromise(idx.getAllKeys(engine));
-    let removed = 0;
-    for (const key of keys) {
-      await reqToPromise(store.delete(key));
-      removed++;
-    }
-    return removed;
-  } catch {
-    return 0;
-  }
+  try { return await database().table('translations').where('engine').equals(engine).delete(); }
+  catch { return 0; }
+}
+
+/** Release the connection (testing, explicit teardown, or safe app reload). */
+export function close() {
+  db?.close();
+  db = null;
 }
 
 export const translationCache = {
-  init,
-  get,
-  set,
-  clear,
-  size,
-  prune,
-  clearEngine,
-  hashParams,
+  init, get, set, clear, size, prune, clearEngine, hashParams, close,
 };
