@@ -399,6 +399,15 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     resumeAction.querySelector('use')?.setAttribute('href', focusRecord ? '#i-play' : '#i-curriculum');
     resumeAction.addEventListener('click', openFocus);
   }
+  // Avoid repeating empty counters and the same browse CTA twice on the
+  // mobile first-run screen. This is presentation-only: all saved state,
+  // resume behavior, and navigation targets remain unchanged.
+  const hasSavedActivity = Boolean(focusRecord || active.length || notes.length || dueReviews.length);
+  const hero = document.querySelector('.home-hero');
+  if (hero) hero.dataset.homeHasProgress = hasSavedActivity ? 'true' : 'false';
+  const commandStrip = document.querySelector('[data-home-command-strip]');
+  if (commandStrip) commandStrip.hidden = !hasSavedActivity;
+
   // On a new profile the primary action already opens Courses, so a second
   // identical hero button adds visual noise and needless keyboard stops.
   // Once there is saved progress the two actions have distinct purposes:

@@ -115,6 +115,25 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect(height).toBeLessThanOrEqual(245);
   });
 
+  test('prioritizes course discovery above redundant zero-data panels on a new phone profile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    const hero = page.locator('.home-hero');
+    await expect(hero).toHaveAttribute('data-home-has-progress', 'false');
+    // Only the first action should take a full row; secondary actions share a row.
+    await expect(page.locator('[data-home-resume]')).toBeVisible();
+    await expect(page.locator('[data-home-command-strip]')).toBeHidden();
+    await expect(hero.locator('.home-focus-panel')).toBeHidden();
+    const metrics = await hero.evaluate(element => ({
+      height: element.getBoundingClientRect().height,
+      width: element.getBoundingClientRect().width,
+      overflow: element.scrollWidth - element.clientWidth,
+    }));
+    expect(metrics.height).toBeLessThan(630);
+    expect(metrics.width).toBeLessThanOrEqual(390);
+    expect(metrics.overflow).toBeLessThanOrEqual(2);
+  });
+
   test('keeps a usable mobile shell with no body-level double scrollbars', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });

@@ -436,6 +436,7 @@ input[type="file"][hidden] {
 .home-actions .btn.btn-primary:hover { background: #e8f4ff; }
 .home-command-strip { margin-top: 24px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,.17); color: #d5e4ee; }
 .home-command-strip strong { color: #fff; }
+.home-command-strip[hidden] { display: none; }
 .home-focus-panel {
   min-height: 0;
   padding: 24px;
@@ -812,9 +813,17 @@ input[type="file"][hidden] {
 @media (max-width: 440px) {
   .topbar { height: 58px; min-height: 58px; flex-basis: 58px; }
   .view-container { padding: 13px 12px 36px; }
-  .view-home .home-hero.card.card-filled { padding: 20px 16px; }
-  .home-actions .btn { flex: 1 1 100%; }
-  .home-hero .home-focus-panel { padding: 19px; }
+  /* Capture-derived: the first-run hero previously exceeded a 390x844 viewport
+     before the learner could reach the catalog. Keep a single dominant action. */
+  .view-home .home-hero.card.card-filled { padding: 17px 16px; gap: 13px; }
+  .view-home .home-eyebrow { margin-bottom: 8px; }
+  .view-home .home-title { margin-bottom: 9px; font-size: clamp(2rem, 7vw, 2.45rem); line-height: 1.06; }
+  .view-home .home-subtitle { line-height: 1.45; }
+  .view-home .home-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 15px; }
+  .view-home .home-actions .btn { width: 100%; min-width: 0; padding: 8px 7px; }
+  .view-home .home-actions .btn:first-child { grid-column: 1 / -1; }
+  .view-home .home-hero[data-home-has-progress="false"] .home-focus-panel { display: none; }
+  .home-hero .home-focus-panel { padding: 16px; }
   .home-grid { gap: 12px; }
   .home-card .card-body { padding: 17px; }
   .progress-metric { min-height: 104px; padding: 14px; }
