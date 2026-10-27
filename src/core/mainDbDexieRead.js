@@ -26,7 +26,7 @@ export async function withExistingIndexedDBStore(nativeConnection, store, operat
       throw new Error('Primary database schema changed during the read');
     }
     const table = db.table(store);
-    return await operation(table);
+    return await operation(table, db);
   } finally {
     db.close();
   }

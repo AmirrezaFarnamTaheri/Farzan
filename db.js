@@ -230,21 +230,21 @@ return Promise.all(list.map(item => this._open(item)));
 }
 
 async add(store, data) {
-// Whole-mutation retry: a fresh transaction per attempt clears transient
-// failures (version-change aborts, quota pressure, inactive transactions).
-return withMutationRetry(async () => {
-const payload = await this._seal(store, data);
-const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.add(payload));
-});
+  return withMutationRetry(async () => {
+    const payload = await this._seal(store, data);
+    const connection = await this.open();
+    // Dexie's add/put promises settle only after their underlying IDB
+    // transaction commits, preserving the previous durability contract.
+    return withExistingIndexedDBStore(connection, store, table => table.add(payload));
+  });
 }
 
 async put(store, data) {
-return withMutationRetry(async () => {
-const payload = await this._seal(store, data);
-const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.put(payload));
-});
+  return withMutationRetry(async () => {
+    const payload = await this._seal(store, data);
+    const connection = await this.open();
+    return withExistingIndexedDBStore(connection, store, table => table.put(payload));
+  });
 }
 
 async get(store, id) {
@@ -259,18 +259,20 @@ async getAll(store) {
   return this._openAll(values);
 }
 
-async delete(store,id){
-return withMutationRetry(async () => {
-const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.delete(id), () => true);
-});
+async delete(store, id) {
+  return withMutationRetry(async () => {
+    const connection = await this.open();
+    await withExistingIndexedDBStore(connection, store, table => table.delete(id));
+    return true;
+  });
 }
 
-async clear(store){
-return withMutationRetry(async () => {
-const { tx, objectStore } = await this._transaction(store,"readwrite");
-return this._waitForTransaction(tx, objectStore.clear(), () => true);
-});
+async clear(store) {
+  return withMutationRetry(async () => {
+    const connection = await this.open();
+    await withExistingIndexedDBStore(connection, store, table => table.clear());
+    return true;
+  });
 }
 
 async query(store, filterFn){
@@ -322,70 +324,49 @@ async count(store) {
   return withExistingIndexedDBStore(connection, store, table => table.count());
 }
 
-async bulkAdd(store, list){
-return withMutationRetry(async () => {
-const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
-const db = await this.open();
-const tx = db.transaction(store,"readwrite");
-return new Promise((res, rej) => {
-  // Register completion before queuing requests. A synchronous DataError or
-  // DataCloneError does not automatically abort the transaction: without
-  // explicit abort, earlier queued writes could still commit after rejection.
-  tx.oncomplete = () => res(true);
-  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
-  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
-  try {
-    const target = tx.objectStore(store);
-    for (const item of sealed) target.add(item);
-  } catch (error) {
-    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
-    rej(error);
-  }
-});
-});
+async bulkAdd(store, list) {
+  return withMutationRetry(async () => {
+    const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
+    const connection = await this.open();
+    return withExistingIndexedDBStore(connection, store, async (table, db) => {
+      // An explicit transaction makes a mid-batch constraint failure abort
+      // earlier queued inserts; implicit bulkAdd can partially commit.
+      await db.transaction('rw', table, async () => {
+        if (sealed.length) await table.bulkAdd(sealed);
+      });
+      return true;
+    });
+  });
 }
 
-async bulkPut(store,list){
-return withMutationRetry(async () => {
-const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
-const db = await this.open();
-const tx = db.transaction(store,"readwrite");
-return new Promise((res, rej) => {
-  tx.oncomplete = () => res(true);
-  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
-  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
-  try {
-    const target = tx.objectStore(store);
-    for (const item of sealed) target.put(item);
-  } catch (error) {
-    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
-    rej(error);
-  }
-});
-});
+async bulkPut(store, list) {
+  return withMutationRetry(async () => {
+    const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
+    const connection = await this.open();
+    return withExistingIndexedDBStore(connection, store, async (table, db) => {
+      await db.transaction('rw', table, async () => {
+        if (sealed.length) await table.bulkPut(sealed);
+      });
+      return true;
+    });
+  });
 }
 
-async bulkPutWithCheckpoint(store,list,checkpoint){
-return withMutationRetry(async () => {
-const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
-const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) : null;
-const db = await this.open();
-const stores = store === 'settings' ? ['settings'] : [store, 'settings'];
-const tx = db.transaction(stores,"readwrite");
-return new Promise((res, rej) => {
-  tx.oncomplete = () => res(true);
-  tx.onerror = () => rej(tx.error || new Error('Transaction failed'));
-  tx.onabort = () => rej(tx.error || new Error('Transaction aborted'));
-  try {
-    const target = tx.objectStore(store);
-    for (const item of sealed) target.put(item);
-    if (sealedCheckpoint) tx.objectStore('settings').put(sealedCheckpoint);
-  } catch (error) {
-    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
-    rej(error);
-  }
-});
-});
+async bulkPutWithCheckpoint(store, list, checkpoint) {
+  return withMutationRetry(async () => {
+    const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
+    const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) : null;
+    const connection = await this.open();
+    return withExistingIndexedDBStore(connection, store, async (table, db) => {
+      const settings = db.table('settings');
+      const transactionStores = store === 'settings' ? [table] : [table, settings];
+      await db.transaction('rw', ...transactionStores, async () => {
+        if (sealed.length) await table.bulkPut(sealed);
+        if (sealedCheckpoint) await settings.put(sealedCheckpoint);
+      });
+      return true;
+    });
+  });
 }
 
 async export(){
