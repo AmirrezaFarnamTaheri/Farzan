@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initCommandPalette } from '../src/features/commandPalette.js';
+import Fuse from 'fuse.js';
 
 describe('command palette uses vendored Fuse.js matching', () => {
+  afterEach(() => { delete window.Fuse; });
   beforeEach(() => {
     document.body.innerHTML = `
       <main id="ocd-app"></main>
@@ -16,6 +18,7 @@ describe('command palette uses vendored Fuse.js matching', () => {
           <ul id="cp-results"></ul>
         </div>
       </div>`;
+    window.Fuse = Fuse;
     window.OpenCourseDeck = {
       Router: { navigate: vi.fn() },
       ThemeManager: { apply: vi.fn(), set: vi.fn() },
