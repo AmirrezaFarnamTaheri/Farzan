@@ -1,10 +1,10 @@
 # Farzan Plasmato - Actual App Screenshots
 
-These are unchanged Chrome/Playwright PNG captures from successful [visual acceptance run 38177326118](https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/38177326118).
+These are unchanged Chrome/Playwright PNG captures from the published [Farzan Plasmato Edition v1.0.6 acceptance run](https://github.com/AmirrezaFarnamTaheri/Farzan/actions/runs/40479110207), built from commit `8c7d755`.
 They document actual application states, not concepts, generated mockups, or claims of third-party media availability.
 The functional video capture plays a browser-recorded WebM fixture through the native player; it does not prove remote media hosts are reachable.
 
-There are 107 screenshots across 15 routes and working interaction states, plus seven contact sheets.
+This curated in-repository gallery includes 107 screenshots across 15 routes and working interaction states, plus seven contact sheets. The complete 476-screenshot / 35-group evidence set remains downloadable from the [immutable v1.0.6 release](https://github.com/AmirrezaFarnamTaheri/Farzan/releases/tag/plasmato-edition-v1.0.6).
 The complete SHA-256, dimensions, and byte counts are in [manifest.json](manifest.json).
 
 ## Overview contact sheets
