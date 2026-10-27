@@ -28,6 +28,21 @@ describe('Tiptap StarterKit edit adapter', () => {
     }
   });
 
+  it('inserts all blocks in a compatible multi-paragraph paste without silently truncating content', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createTiptapNoteEditor({
+      element, html: '<p>Original note</p>', onUpdate: updates,
+    });
+    try {
+      instance.editor.commands.insertContent('<p>First inserted paragraph</p><p>Second inserted paragraph</p>');
+      const html = instance.getHTML();
+      expect(html).toContain('First inserted paragraph');
+      expect(html).toContain('Second inserted paragraph');
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('Second inserted paragraph'));
+    } finally { instance.destroy(); }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
