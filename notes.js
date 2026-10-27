@@ -872,7 +872,7 @@ import { countWords } from './src/core/textMetrics.js';
     // ── Toolbar state sync ────────────────────────────────
     _updateToolbar() {
       if (this._tiptap) {
-        $('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._tiptap.isActive(btn.dataset.cmd)));
+        $$('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._tiptap.isActive(btn.dataset.cmd)));
         return;
       }
       const commands = ['bold', 'italic', 'underline', 'strikeThrough',
