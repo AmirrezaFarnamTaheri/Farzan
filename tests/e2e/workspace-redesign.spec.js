@@ -91,6 +91,22 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
   });
 
+  test('keeps a newly opened note editor visible without scrolling past an empty library panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    const editor = page.locator('[data-notes-main-pane]');
+    await expect(editor).toBeVisible();
+    await expect(page.locator('[data-note-title-input]')).toBeVisible();
+    const measure = await page.evaluate(() => ({
+      libraryHeight: document.querySelector('.notes-sidebar').getBoundingClientRect().height,
+      editorTop: document.querySelector('[data-notes-main-pane]').getBoundingClientRect().top,
+      overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth,
+    }));
+    expect(measure.libraryHeight).toBeLessThan(400);
+    expect(measure.editorTop).toBeLessThan(720);
+    expect(measure.overflow).toBeLessThanOrEqual(2);
+  });
+
   test('keeps RTL mobile navigation fully off-canvas until opened', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
