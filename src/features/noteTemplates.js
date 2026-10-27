@@ -1,3 +1,5 @@
+import Dexie from 'dexie';
+
 const BUILTIN_TEMPLATES = {
   cornell: {
     id: 'builtin-cornell',
@@ -89,55 +91,50 @@ const BUILTIN_TEMPLATES = {
 // primary opencoursedeck database schema.
 const DB_NAME = 'opencoursedeck-templates';
 const STORE_NAME = 'noteTemplates';
-const DB_VERSION = 1;
+// Preserve native IndexedDB v1 and its existing keyPath, with no data rewrite.
+// Dexie maps version(0.1) to native IDB version 1.
+let _db = null;
+function database() {
+  if (!_db) {
+    _db = new Dexie(DB_NAME);
+    _db.version(0.1).stores({ [STORE_NAME]: 'id' });
+  }
+  return _db;
+}
 
-let _dbPromise = null;
+export function closeTemplateStore() {
+  _db?.close();
+  _db = null;
+}
 
-function getDB() {
-  if (_dbPromise) return _dbPromise;
-  _dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-    };
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => {
-        db.close();
-        _dbPromise = null;
-      };
-      resolve(db);
-    };
-    req.onblocked = () => reject(new Error('Opening note template storage was blocked by another tab'));
-    req.onerror = () => reject(req.error || new Error('Unable to open note template storage'));
-  }).catch((error) => {
-    _dbPromise = null;
-    throw error;
-  });
-  return _dbPromise;
+function isClosedConnection(error) {
+  const names = [error?.name, error?.inner?.name];
+  return names.some(name => ['InvalidStateError', 'UnknownError', 'DatabaseClosedError'].includes(name));
+}
+
+async function withDatabase(operation) {
+  const db = database();
+  try {
+    return await operation(db);
+  } catch (error) {
+    if (!isClosedConnection(error)) throw error;
+    closeTemplateStore();
+    return operation(database());
+  }
 }
 
 async function loadUserTemplates() {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
-    req.onerror = () => reject(req.error || new Error('Unable to read note templates'));
-  });
+  return withDatabase(db => db.table(STORE_NAME).toArray());
 }
 
 async function saveUserTemplates(templates) {
-  const db = await getDB();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.clear();
-    for (const template of templates) store.put(template);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error || new Error('Unable to save note templates'));
-    tx.onabort = () => reject(tx.error || new Error('Note template save was aborted'));
+  await withDatabase(async db => {
+    const table = db.table(STORE_NAME);
+    // Clear + repopulate remains one atomic IndexedDB transaction, as before.
+    await db.transaction('rw', table, async () => {
+      await table.clear();
+      if (templates.length) await table.bulkPut(templates);
+    });
   });
   window.OpenCourseDeck?.bus?.emit?.('templates:changed', templates);
   return { committed: true, count: templates.length };
