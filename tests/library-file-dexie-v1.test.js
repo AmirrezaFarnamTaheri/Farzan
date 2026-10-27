@@ -41,7 +41,7 @@ function readNative(dbFactory, id) {
 }
 
 describe('Dexie media-library native v1 compatibility', () => {
-  let factory, library, originalCreateObjectURL;
+  let factory, library, originalCreateObjectURL, originalRevokeObjectURL;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -49,6 +49,7 @@ describe('Dexie media-library native v1 compatibility', () => {
     vi.stubGlobal('indexedDB', factory);
     vi.stubGlobal('IDBKeyRange', IDBKeyRange);
     originalCreateObjectURL = URL.createObjectURL;
+    originalRevokeObjectURL = URL.revokeObjectURL;
     URL.createObjectURL = vi.fn(() => 'blob:legacy-library-record');
     URL.revokeObjectURL = vi.fn();
     window.OpenCourseDeck = { bus: { emit: vi.fn() } };
@@ -58,6 +59,7 @@ describe('Dexie media-library native v1 compatibility', () => {
   afterEach(async () => {
     await library.clearLibraryFiles();
     URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
