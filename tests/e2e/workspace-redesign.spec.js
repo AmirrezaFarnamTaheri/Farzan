@@ -137,6 +137,26 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('keeps destructive Progress reset behind a native disclosure on mobile and desktop', async ({ page }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+      const disclosure = page.locator('details.progress-manage-menu');
+      const reset = page.locator('#btn-reset-all');
+      await expect(disclosure.locator('summary')).toHaveAccessibleName('Manage saved data');
+      await expect(disclosure).not.toHaveAttribute('open');
+      await expect(reset).toBeHidden();
+      await disclosure.locator('summary').click();
+      await expect(disclosure).toHaveAttribute('open');
+      await expect(reset).toBeVisible();
+      const rect = await reset.boundingBox();
+      expect(rect.x).toBeGreaterThanOrEqual(-1);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(viewport.width + 1);
+      await disclosure.locator('summary').click();
+      await expect(reset).toBeHidden();
+    }
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
