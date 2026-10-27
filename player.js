@@ -1,3 +1,5 @@
+import { createNativeMediaTransport } from './src/features/nativeMediaTransport.js';
+
 // ============================================================
 // OpenCourseDeck - player.js
 // Full Media Player System
@@ -167,6 +169,7 @@
 
       // Build DOM
       this._buildDOM();
+      this._transport = createNativeMediaTransport(this._media);
       this._bindNative();
       if (this._opts.keyboard) this._bindKeyboard();
       if (this._opts.visualizer && this._opts.type === 'audio') {
@@ -797,13 +800,13 @@
     // PUBLIC TRANSPORT API
     // ──────────────────────────────────────────────────────
     play() {
-      return this._media.play().catch(err => {
+      return this._transport.play().catch(err => {
         if (err.name !== 'AbortError') console.warn('[MediaPlayer]', err);
       });
     }
 
     pause() {
-      this._media.pause();
+      this._transport.pause();
     }
 
     toggle() {
@@ -811,23 +814,15 @@
     }
 
     seekTo(seconds) {
-      if (!isFinite(seconds)) return;
-      if (!this._state.duration) return;
-      this._media.currentTime = Math.min(
-        Math.max(0, seconds),
-        this._state.duration
-      );
+      this._transport.seek(seconds, this._state.duration);
     }
 
     seekBy(delta) {
-      this.seekTo(this._media.currentTime + delta);
+      this._transport.seekBy(delta, this._state.duration);
     }
 
     setVolume(level) {
-      const v = Math.min(1, Math.max(0, level));
-      this._media.volume = v;
-      this._state.volume = v;
-      if (v > 0) this._media.muted = false;
+      this._state.volume = this._transport.volume(level);
     }
 
     setVolumeBoost(multiplier = 1.0) {
@@ -849,7 +844,7 @@
     }
 
     toggleMute() {
-      this._media.muted = !this._media.muted;
+      this._transport.toggleMute();
     }
 
     toggleShuffle() {
