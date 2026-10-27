@@ -247,22 +247,16 @@ return this._waitForTransaction(tx, objectStore.put(payload));
 });
 }
 
-async get(store,id) {
-const { objectStore } = await this._transaction(store);
-return new Promise((res,rej)=>{
-const r=objectStore.get(id);
-r.onsuccess=()=>res(this._open(r.result));
-r.onerror=()=>rej(r.error);
-});
+async get(store, id) {
+  const connection = await this.open();
+  const value = await withExistingIndexedDBStore(connection, store, table => table.get(id));
+  return this._open(value);
 }
 
 async getAll(store) {
-const { objectStore } = await this._transaction(store);
-return new Promise((res,rej)=>{
-const r=objectStore.getAll();
-r.onsuccess=()=>res(this._openAll(r.result));
-r.onerror=()=>rej(r.error);
-});
+  const connection = await this.open();
+  const values = await withExistingIndexedDBStore(connection, store, table => table.toArray());
+  return this._openAll(values);
 }
 
 async delete(store,id){
@@ -323,13 +317,9 @@ req.onerror=()=>rej(req.error);
 });
 }
 
-async count(store){
-const { objectStore } = await this._transaction(store);
-return new Promise((res,rej)=>{
-const r=objectStore.count();
-r.onsuccess=()=>res(r.result);
-r.onerror=()=>rej(r.error);
-});
+async count(store) {
+  const connection = await this.open();
+  return withExistingIndexedDBStore(connection, store, table => table.count());
 }
 
 async bulkAdd(store, list){
