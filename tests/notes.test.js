@@ -216,11 +216,23 @@ describe('notes route filters', () => {
     expect(result).toMatchObject({ ok: true });
     const proseMirror = document.querySelector('[data-notes-editor] .ProseMirror');
     expect(proseMirror).not.toBeNull();
-    proseMirror.focus();
-    expect(document.activeElement).toBe(proseMirror);
-    document.dispatchEvent(new Event('selectionchange'));
-    expect(() => vi.advanceTimersByTime(150)).not.toThrow();
-    expect(boldButton.classList.contains('active')).toBe(false);
+    // jsdom lacks Range#getClientRects, which ProseMirror needs during
+    // selection-change scroll measurement; provide measurement only.
+    const originalRects = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value: () => [{ left: 0, right: 1, top: 0, bottom: 1, width: 1, height: 1 }],
+    });
+    try {
+      proseMirror.focus();
+      expect(document.activeElement).toBe(proseMirror);
+      document.dispatchEvent(new Event('selectionchange'));
+      expect(() => vi.advanceTimersByTime(150)).not.toThrow();
+      expect(boldButton.classList.contains('active')).toBe(false);
+    } finally {
+      if (originalRects) Object.defineProperty(Range.prototype, 'getClientRects', originalRects);
+      else delete Range.prototype.getClientRects;
+    }
   });
 
   it('round-trips legacy rich HTML without losing a table, code, RTL text or blocked external images', () => {
