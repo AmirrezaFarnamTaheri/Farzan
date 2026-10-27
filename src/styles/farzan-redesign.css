@@ -160,20 +160,26 @@ input[type="file"][hidden] {
   justify-content: center;
   gap: 1px;
   min-width: 0;
+  flex: 1 1 auto;
   font-size: 20px;
   line-height: 1.1;
   font-weight: 760;
   letter-spacing: -.035em;
   overflow: visible;
   text-overflow: clip;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: #f3f8ff;
 }
 .sidebar-logo-text small {
+  display: block;
+  min-width: 0;
   font-size: 9px;
-  line-height: 1.6;
+  line-height: 1.35;
   font-weight: 680;
-  letter-spacing: .15em;
+  letter-spacing: .04em;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: #a5c4de;
 }
 .sidebar-collapse-btn {
