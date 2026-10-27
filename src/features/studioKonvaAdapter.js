@@ -115,7 +115,8 @@ function planShape(item) {
       }
       break;
     case 'polyline':
-      if (!Array.isArray(item.points) || !item.points.every(p => Array.isArray(p) && p.length >= 2)) {
+      if (!Array.isArray(item.points) || !item.points.every(p => Array.isArray(p) && p.length === 2
+        && p.every(value => typeof value === 'number' && Number.isFinite(value)))) {
         return unsupported('invalid-pen-points');
       }
       kind = 'Line';
