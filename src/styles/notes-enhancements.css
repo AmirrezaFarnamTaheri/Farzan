@@ -536,6 +536,9 @@
 }
 
 @media (max-width: 560px) {
+  /* A grid row defaults to align-items:stretch. The tall notes editor was
+     stretching the library sidebar to ~720px even with a short note list. */
+  .notes-shell { align-items: start; }
   /* Keep the document editor discoverable above the fold on small phones,
      without making folders or the saved-note list inaccessible. */
   .notes-sidebar {
