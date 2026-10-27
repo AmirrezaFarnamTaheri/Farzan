@@ -215,6 +215,24 @@ describe('progress backup exports', () => {
     expect(markdown).toContain('Current body');
   });
 
+  it('retains nested Markdown structure from HTML when exporting existing notes', async () => {
+    window.DB.getAllNotes.mockResolvedValueOnce([{
+      id: 'nested-one', title: 'Nested note', topicId: 'topic-1',
+      content: '<h3>فیزیولوژی قلب</h3><p><strong>Bold <em>nested</em></strong> &amp; safe.</p>'
+        + '<ul><li>First</li><li>Second</li></ul>'
+        + '<img src="https://tracker.example/pixel.png">'
+        + '<script>window.__notesExportXss = true</script>',
+    }]);
+    await window.ProgressStats.exportNotesMarkdown();
+    const markdown = await downloadedBlob.text();
+    expect(markdown).toContain('### فیزیولوژی قلب');
+    expect(markdown).toContain('**Bold *nested***');
+    expect(markdown).toContain('- First');
+    expect(markdown).not.toContain('tracker.example');
+    expect(markdown).not.toContain('__notesExportXss');
+    expect(window.__notesExportXss).toBeUndefined();
+  });
+
   it('exports a vault-style Markdown manifest with note files and source metadata', async () => {
     window.DB.getAllNotes.mockResolvedValueOnce([
       {
