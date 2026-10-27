@@ -30,10 +30,19 @@ export function mountProgressView({ setView } = {}) {
               <button type="button" id="btn-export-vault-directory">Export Vault Folder</button>
             </div>
           </details>
-          <button class="btn btn-danger" id="btn-reset-all" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
-            Reset all
-          </button>
+          <details class="progress-manage-menu">
+            <summary class="btn btn-ghost" aria-label="Manage saved data">
+              <svg class="icon" aria-hidden="true"><use href="#i-more-h"/></svg>
+              Manage data
+            </summary>
+            <div class="progress-manage-popover" role="group" aria-label="Destructive data actions">
+              <p>Reset removes saved learning progress and local study data. Export a backup first.</p>
+              <button class="btn btn-danger" id="btn-reset-all" type="button">
+                <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+                Reset all
+              </button>
+            </div>
+          </details>
         </div>
       </div>
 
