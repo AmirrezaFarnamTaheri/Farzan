@@ -34,14 +34,16 @@
   min-height: 40px;
 }
 
-.progress-export-menu {
+.progress-export-menu,
+.progress-manage-menu {
   position: relative;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
-.progress-export-menu > summary {
+.progress-export-menu > summary,
+.progress-manage-menu > summary {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -50,7 +52,9 @@
 }
 
 .progress-export-menu > summary::before,
-.progress-export-menu > summary::-webkit-details-marker {
+.progress-export-menu > summary::-webkit-details-marker,
+.progress-manage-menu > summary::before,
+.progress-manage-menu > summary::-webkit-details-marker {
   display: none;
   content: none;
 }
@@ -69,6 +73,37 @@
   box-shadow: var(--shadow-xl);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+/* Keep destructive operations behind a deliberate native disclosure,
+   avoiding a prominent one-tap reset next to routine backup actions. */
+.progress-manage-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-dropdown);
+  display: grid;
+  gap: var(--space-2);
+  width: min(280px, calc(100vw - 32px));
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-xl);
+}
+.progress-manage-popover p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.progress-manage-popover #btn-reset-all {
+  width: 100%;
+  justify-content: center;
+}
+.progress-manage-menu > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .progress-export-popover button {
@@ -340,7 +375,9 @@
 
   .progress-toolbar .btn,
   .progress-export-menu,
-  .progress-export-menu > summary {
+  .progress-export-menu > summary,
+  .progress-manage-menu,
+  .progress-manage-menu > summary {
     width: 100%;
     min-width: 0;
     justify-content: center;
@@ -350,10 +387,6 @@
     white-space: normal;
     overflow-wrap: anywhere;
     text-align: center;
-  }
-
-  .progress-toolbar #btn-reset-all {
-    grid-column: 1 / -1;
   }
 
   .progress-export-popover {
