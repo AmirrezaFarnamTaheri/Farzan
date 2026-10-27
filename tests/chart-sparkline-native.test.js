@@ -46,4 +46,22 @@ describe('Chart.js native sparkline compatibility', () => {
       borderColor: '#fedcba', borderWidth: 5, fill: false, pointRadius: 0,
     });
   });
+
+  it('restores configured styling when Chart.js replaces datasets after creation', () => {
+    const chart = fixture();
+    chartSparkline.beforeInit(chart);
+    chart.data.datasets = [{ data: [4, 1, 6, 3] }];
+    chartSparkline.beforeUpdate(chart);
+    expect(chart.data.datasets[0]).toMatchObject({
+      data: [4, 1, 6, 3],
+      borderColor: '#123456',
+      backgroundColor: '#abcdef',
+      borderWidth: 3,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: 'origin',
+    });
+  });
+
 });
