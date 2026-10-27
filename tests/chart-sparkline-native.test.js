@@ -81,4 +81,11 @@ describe('Chart.js native sparkline compatibility', () => {
   });
 
 
+  it('initializes when Chart.js invokes an unbound plugin hook', () => {
+    const chart = fixture();
+    const initHook = chartSparkline.beforeInit;
+    expect(() => initHook(chart)).not.toThrow();
+    expect(chart.data.datasets[0].borderColor).toBe('#123456');
+  });
+
 });
