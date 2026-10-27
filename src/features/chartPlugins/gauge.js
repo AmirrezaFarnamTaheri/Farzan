@@ -47,7 +47,19 @@ export const chartGauge = {
 
     const min = Number(options.min ?? 0);
     const max = Number(options.max ?? 100);
-    const value = Math.max(min, Math.min(max, Number(options.value ?? 0)));
+    // Chart.js interpolates ArcElement circumference each animation frame.
+    // The CanvasGauge adapter uses two transparent arc data points; read the
+    // live proportion so the needle and numerical value animate along with
+    // the built-in chart transition instead of jumping to the target early.
+    let displayed = Number(options.value ?? 0);
+    if (options.trackDatasetAnimation === true) {
+      const circumference = chart.getDatasetMeta?.(0)?.data?.[0]?.circumference;
+      if (Number.isFinite(circumference)) {
+        const ratio = Math.max(0, Math.min(1, circumference / Math.PI));
+        displayed = min + ratio * (max - min);
+      }
+    }
+    const value = Math.max(min, Math.min(max, displayed));
     const unit = options.unit || '';
     const lineWidth = options.lineWidth || 20;
     const zones = Array.isArray(options.zones) ? options.zones : [];
