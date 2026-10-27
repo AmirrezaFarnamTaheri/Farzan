@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CanvasAreaChart } from '../src/features/canvasCharts/area.js';
+import { loadVendorScript } from '../src/core/vendorLoader.js';
+vi.mock('../src/core/vendorLoader.js', () => ({ loadVendorScript: vi.fn() }));
 
 const originalChart = globalThis.Chart;
 
 afterEach(() => {
   globalThis.Chart = originalChart;
+  vi.mocked(loadVendorScript).mockReset();
   vi.restoreAllMocks();
 });
 
@@ -59,11 +62,32 @@ describe('CanvasAreaChart delegates rendering and interaction to the supported C
     expect(instance.destroy).toHaveBeenCalledOnce();
   });
 
-  it('fails explicitly when Chart.js has not loaded, never paints a misleading fallback', () => {
-    const { canvas } = harness();
+  it('loads Chart.js on demand and ignores a stale render when destroyed before loading', async () => {
+    const { canvas, constructor } = harness();
+    let supplyLibrary;
+    vi.mocked(loadVendorScript).mockImplementationOnce(() => new Promise(resolve => { supplyLibrary = resolve; }));
     globalThis.Chart = undefined;
     const chart = new CanvasAreaChart(canvas);
-    expect(() => chart.render({ labels: ['x'], series: [{ label: 'Hours', data: [1] }] }))
-      .toThrow(/Chart\.js.*unavailable/);
+    const ready = chart.render({ labels: ['x'], series: [{ label: 'Hours', data: [1] }] });
+    expect(loadVendorScript).toHaveBeenCalledWith('chartjs');
+    chart.destroy();
+    supplyLibrary(constructor);
+    await ready;
+    expect(constructor).not.toHaveBeenCalled();
+  });
+
+  it('uses the latest data if two renders occur before the vendor library loads', async () => {
+    const { canvas, constructor, instance } = harness();
+    let supplyLibrary;
+    vi.mocked(loadVendorScript).mockImplementation(() => new Promise(resolve => { supplyLibrary = resolve; }));
+    globalThis.Chart = undefined;
+    const chart = new CanvasAreaChart(canvas);
+    const first = chart.render({ labels: ['old'], series: [{ data: [1] }] });
+    const second = chart.render({ labels: ['new'], series: [{ data: [9] }] });
+    supplyLibrary(constructor);
+    await Promise.all([first, second]);
+    expect(instance.data.labels).toEqual(['new']);
+    expect(constructor).toHaveBeenCalledOnce();
+    chart.destroy();
   });
 });
