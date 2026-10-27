@@ -1,3 +1,5 @@
+import Dexie from 'dexie';
+
 /**
  * WaveformScrubber — AudioContext → Float32Array → canvas bars.
  * Based on Splayer WaveformScrubber pattern.
@@ -18,53 +20,38 @@ const CACHE_STORE = 'waveforms';
  */
 const MAX_WAVEFORM_SOURCE_BYTES = 60 * 1024 * 1024;
 
-function openCacheDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(CACHE_DB, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(CACHE_STORE)) {
-        db.createObjectStore(CACHE_STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+// Keep the existing native IndexedDB v1 cache and id primary key.
+// Dexie abstracts native request/transaction callbacks without a data rewrite.
+let waveformDb = null;
+
+function database() {
+  if (!waveformDb) {
+    waveformDb = new Dexie(CACHE_DB);
+    waveformDb.version(0.1).stores({ [CACHE_STORE]: 'id' });
+  }
+  return waveformDb;
+}
+
+export function closeWaveformCache() {
+  waveformDb?.close();
+  waveformDb = null;
 }
 
 async function getCachedWaveform(id) {
   try {
-    const db = await openCacheDB();
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(CACHE_STORE, 'readonly');
-        const req = tx.objectStore(CACHE_STORE).get(id);
-        req.onsuccess = () => resolve(req.result?.data ?? null);
-        req.onerror = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
+    return (await database().table(CACHE_STORE).get(id))?.data ?? null;
   } catch {
-    return null;
+    return null; // Optional cache must not prevent playback.
   }
 }
 
 async function setCachedWaveform(id, data) {
   try {
-    const db = await openCacheDB();
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(CACHE_STORE, 'readwrite');
-        const req = tx.objectStore(CACHE_STORE).put({ id, data });
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve();
-      } catch {
-        resolve();
-      }
-    });
+    // Resolve only once the write transaction is committed, not when a raw
+    // put request succeeds before its enclosing transaction completes.
+    await database().table(CACHE_STORE).put({ id, data });
   } catch {
-    // Cache is optional
+    // Optional cache must not prevent playback.
   }
 }
 
