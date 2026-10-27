@@ -3,6 +3,7 @@
  * Stores volume, muted, time, rate, quality, language, and captions per media.
  */
 
+import Dexie from 'dexie';
 import { createOperationContext } from '../core/operationContext.js';
 import { committedReceipt, failedReceipt } from '../core/mutationReceipt.js';
 import { throttle } from '../lib/dom.js';
@@ -21,8 +22,16 @@ const DEFAULT_STATE = Object.freeze({
   captions: false,
 });
 
-let _cachedDB = null;
-let _openingDB = null;
+// A single Dexie facade preserves the existing native IndexedDB v3 schema.
+// Dexie versions are multiplied by ten at the IDB boundary; 0.3 is native v3.
+let _db = null;
+function database() {
+  if (!_db) {
+    _db = new Dexie(DB_NAME);
+    _db.version(0.3).stores({ [STORE_NAME]: 'mediaId' });
+  }
+  return _db;
+}
 let _nextOwnerId = 0;
 let _nextGeneration = 0;
 const _activeGeneration = new Map();
@@ -60,88 +69,33 @@ function normalizeState(record) {
   };
 }
 
-function openDB() {
-  if (_cachedDB) return Promise.resolve(_cachedDB);
-  if (_openingDB) return _openingDB;
-
-  _openingDB = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 3);
-    let settled = false;
-    const fail = (error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    };
-
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'mediaId' });
-      }
-    };
-    req.onsuccess = () => {
-      const db = req.result;
-      if (settled) {
-        db.close();
-        return;
-      }
-      settled = true;
-      db.onversionchange = () => {
-        db.close();
-        if (_cachedDB === db) _cachedDB = null;
-      };
-      _cachedDB = db;
-      resolve(db);
-    };
-    req.onerror = () => fail(req.error || new Error('Unable to open media storage'));
-    req.onblocked = () => fail(new Error('Media storage upgrade is blocked by another tab; close other OpenCourseDeck tabs and retry'));
-  }).finally(() => {
-    _openingDB = null;
-  });
-
-  return _openingDB;
-}
-
-// A cached connection can be closed out from under us: a storage reset closes
-// auxiliary databases through AuxiliaryDbLifecycle, and the browser may close
-// one directly. Operations on a closed handle throw InvalidStateError.
+// The reset lifecycle may close native handles while a player is active.
+// Dexie normally reopens automatically; retry a failed operation just once
+// after explicitly closing its facade if a stale connection was observed.
 function isClosedConnection(error) {
-  return error?.name === 'InvalidStateError' || error?.name === 'UnknownError';
+  return ['InvalidStateError', 'UnknownError', 'DatabaseClosedError'].includes(error?.name)
+    || ['InvalidStateError', 'UnknownError', 'DatabaseClosedError'].includes(error?.inner?.name);
 }
 
-// Run a storage operation, reopening the connection once if the cached handle
-// turned out to be closed. Without this, everything after a reset silently
-// fails until the page is reloaded.
 async function withDb(operation) {
-  const db = await openDB();
+  const db = database();
   try {
     return await operation(db);
   } catch (error) {
-    if (!isClosedConnection(error) || _cachedDB !== db) throw error;
-    _cachedDB = null;
-    return operation(await openDB());
+    if (!isClosedConnection(error)) throw error;
+    db.close();
+    if (_db === db) _db = null;
+    return operation(database());
   }
 }
 
 async function dbGet(mediaId) {
-  return withDb((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(mediaId);
-    req.onsuccess = () => resolve(req.result ?? null);
-    req.onerror = () => reject(req.error || new Error('Media storage read failed'));
-  }));
+  return withDb(db => db.table(STORE_NAME).get(mediaId).then(record => record ?? null));
 }
 
 async function dbPut(record) {
-  return withDb((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const req = tx.objectStore(STORE_NAME).put(record);
-    let requestError = null;
-    req.onerror = () => { requestError = req.error; };
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error || requestError || new Error('Media storage transaction failed'));
-    tx.onabort = () => reject(tx.error || requestError || new Error('Media storage transaction aborted'));
-  }));
+  // Dexie's put() resolves on transaction completion and propagates failures.
+  await withDb(db => db.table(STORE_NAME).put(record));
 }
 
 if (typeof window !== 'undefined') window.OpenCourseDeck = window.OpenCourseDeck ?? {};
