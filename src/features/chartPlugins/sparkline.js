@@ -9,16 +9,7 @@ export const chartSparkline = {
   id: 'sparkline',
   beforeInit(chart) {
     const opts = chart.options || {};
-    const config = opts.plugins?.sparkline || {};
-    for (const data of chart.data?.datasets || []) {
-      data.borderColor ??= config.lineColor || '#6366f1';
-      if (config.fillColor) data.backgroundColor ??= config.fillColor;
-      data.borderWidth ??= config.lineWidth ?? 2;
-      data.pointRadius = 0;
-      data.pointHoverRadius = 0;
-      data.tension ??= 0.35;
-      if (data.fill == null && config.fillColor) data.fill = 'origin';
-    }
+    this.beforeUpdate(chart);
 
     // Assign shallowly to avoid re-entering Chart.js v4's option Proxy.
     Object.assign(opts, {
@@ -36,5 +27,18 @@ export const chartSparkline = {
         tooltip: { enabled: false },
       },
     });
+  },
+  beforeUpdate(chart) {
+    const config = chart.options?.plugins?.sparkline || {};
+    for (const data of chart.data?.datasets || []) {
+      data.borderColor ??= config.lineColor || '#6366f1';
+      if (config.fillColor) data.backgroundColor ??= config.fillColor;
+      data.borderWidth ??= config.lineWidth ?? 2;
+      data.pointRadius = 0;
+      data.pointHoverRadius = 0;
+      data.tension ??= 0.35;
+      if (data.fill == null && config.fillColor) data.fill = 'origin';
+    }
+
   },
 };
