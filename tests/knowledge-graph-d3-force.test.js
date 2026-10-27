@@ -132,4 +132,16 @@ describe('KnowledgeGraph established force layout compatibility', () => {
     graph.destroy();
   });
 
+  it('initializes numeric D3 indexes for imported nodes before collision', () => {
+    const graph = graphFixture();
+    for (const node of graph._nodes) delete node.index;
+    graph._edges = [];
+    graph._initSimulation(800, 600);
+    expect(graph._nodes.map(node => node.index)).toEqual([0, 1, 2]);
+    for (let i = 0; i < 20; i++) graph._tick();
+    expect(graph._nodes.every(node => Number.isFinite(node.x) && Number.isFinite(node.y))).toBe(true);
+    graph.destroy();
+  });
+
+
 });
