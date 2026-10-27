@@ -1,3 +1,5 @@
+import { loadVendorScript } from '../../core/vendorLoader.js';
+
 /**
  * Chart.js adapter for the historical CanvasAreaChart public contract.
  *
@@ -34,13 +36,34 @@ export class CanvasAreaChart {
     this._chart = null;
     this._data = null;
     this._destroyed = false;
+    this._renderGeneration = 0;
+    this._loading = null;
+    this.ready = Promise.resolve();
   }
 
   render(data) {
     if (this._destroyed) throw new Error('CanvasAreaChart has been destroyed');
-    const Chart = globalThis.Chart;
+    this._data = data;
+    const generation = ++this._renderGeneration;
+    if (typeof globalThis.Chart !== 'function') {
+      this._loading ||= loadVendorScript('chartjs').catch(error => {
+        this._loading = null;
+        throw error;
+      });
+      this.ready = this._loading.then(Chart => {
+        if (!this._destroyed && generation === this._renderGeneration) {
+          this._renderWithChart(this._data, Chart);
+        }
+      });
+      return this.ready;
+    }
+    this._renderWithChart(data, globalThis.Chart);
+  }
+
+  _renderWithChart(data, Chart) {
+    if (this._destroyed) return;
     if (typeof Chart !== 'function') {
-      throw new Error('CanvasAreaChart: Chart.js is unavailable; load the vendored Chart.js library first');
+      throw new Error('CanvasAreaChart: Chart.js is unavailable after the vendor loader completed');
     }
     const labels = Array.isArray(data?.labels) ? data.labels.map(String) : [];
     const series = Array.isArray(data?.series) ? data.series : [];
@@ -60,7 +83,6 @@ export class CanvasAreaChart {
         pointHoverRadius: Math.max(4, opts.dotRadius ?? 3),
       };
     });
-    this._data = { labels, series };
     const nextData = { labels, datasets };
     if (this._chart) {
       this._chart.data = nextData;
@@ -96,6 +118,7 @@ export class CanvasAreaChart {
 
   destroy() {
     if (this._destroyed) return;
+    ++this._renderGeneration;
     this._chart?.destroy();
     this._chart = null;
     this._data = null;
