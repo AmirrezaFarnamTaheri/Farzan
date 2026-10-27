@@ -60,7 +60,8 @@
     "fuse.js": "7.5.0",
     "pdfjs-dist": "6.4.299",
     "dexie": "4.4.7",
-    "fflate": "0.8.3"
+    "fflate": "0.8.3",
+    "turndown": "7.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
