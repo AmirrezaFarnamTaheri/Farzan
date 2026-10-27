@@ -29,6 +29,20 @@ describe('portable note HTML -> Markdown with Turndown', () => {
     expect(markdown).not.toMatch(/<script|<pre|<h3/);
   });
 
+  it('keeps study tables and task-list checkboxes in GitHub-flavored Markdown', () => {
+    const html = '<table><thead><tr><th>Concept</th><th>Meaning</th></tr></thead>'
+      + '<tbody><tr><td>Cardiac output</td><td>Heart flow</td></tr></tbody></table>'
+      + '<ul><li><input type="checkbox" checked> Review</li>'
+      + '<li><input type="checkbox"> Practice</li></ul>'
+      + '<p><del>Outdated</del> Updated</p>';
+    const markdown = noteHtmlToMarkdown(html);
+    expect(markdown).toMatch(/\\| Concept\\s+\\| Meaning\\s+\\|/);
+    expect(markdown).toContain('| Cardiac output | Heart flow |');
+    expect(markdown).toMatch(/- \\[x\\] Review/);
+    expect(markdown).toMatch(/- \\[ \\] Practice/);
+    expect(markdown).toContain('~~Outdated~~');
+  });
+
   it('never exports remote images, scripts, SVG requests or dangerous hyperlink schemes', () => {
     const html = '<p>Safe sentence <a href="javascript:alert(1)">Unsafe link</a></p>'
       + '<img src="https://tracker.example/pixel.png" onerror="window.__exportXss = true">'
