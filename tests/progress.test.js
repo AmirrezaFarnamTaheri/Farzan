@@ -227,7 +227,7 @@ describe('progress backup exports', () => {
     const markdown = await downloadedBlob.text();
     expect(markdown).toContain('### فیزیولوژی قلب');
     expect(markdown).toContain('**Bold *nested***');
-    expect(markdown).toContain('- First');
+    expect(markdown).toMatch(/-\s+First/);
     expect(markdown).not.toContain('tracker.example');
     expect(markdown).not.toContain('__notesExportXss');
     expect(window.__notesExportXss).toBeUndefined();
