@@ -69,6 +69,8 @@ describe('Dexie media-library native v1 compatibility', () => {
       id: 'legacy-lecture', name: 'study.mp4', kind: 'video',
       type: 'video/mp4', size: 5, createdAt: 1700,
       blob: new Blob(['video'], { type: 'video/mp4' }),
+      bytes: Array.from(new TextEncoder().encode('video')),
+
     };
     await seedNativeV1(factory, [original]);
 
@@ -101,8 +103,8 @@ describe('Dexie media-library native v1 compatibility', () => {
 
   it('fully clears the native store and invalidates blob URLs after reset', async () => {
     await seedNativeV1(factory, [
-      { id: 'legacy-one', blob: new Blob(['first']), size: 5 },
-      { id: 'legacy-two', blob: new Blob(['second']), size: 6 },
+      { id: 'legacy-one', blob: new Blob(['first']), bytes: [102, 105, 114, 115, 116], size: 5 },
+      { id: 'legacy-two', blob: new Blob(['second']), bytes: [115, 101, 99, 111, 110, 100], size: 6 },
     ]);
     await library.resolveMediaUrl('library-file:legacy-one');
     expect(await library.clearLibraryFiles()).toBe(true);
