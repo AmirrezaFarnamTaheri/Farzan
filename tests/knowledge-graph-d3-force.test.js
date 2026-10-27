@@ -81,6 +81,23 @@ describe('KnowledgeGraph established force layout compatibility', () => {
     expect(distanceAfter(true)).toBeLessThan(distanceAfter(false));
   });
 
+  it('preserves original notes and wikilink identifiers across force ticks', () => {
+    const notes = [
+      { id: 'note-1', title: 'Heart', content: '<p>See [[Lungs]]</p>', tags: ['medicine'] },
+      { id: 'note-2', title: 'Lungs', content: '<p>Alveoli</p>', tags: ['medicine'] },
+    ];
+    const before = structuredClone(notes);
+    const graph = new KnowledgeGraph();
+    graph._buildGraph(notes);
+    expect(graph._edges).toEqual([{ source: 'note-1', target: 'note-2' }]);
+    graph._initSimulation(800, 600);
+    for (let i = 0; i < 20; i++) graph._tick();
+    expect(graph._edges).toEqual([{ source: 'note-1', target: 'note-2' }]);
+    expect(graph._nodes.map(node => node.id)).toEqual(['note-1', 'note-2']);
+    expect(notes).toEqual(before);
+    graph.destroy();
+  });
+
   it('pins a dragging node while continuing to simulate neighbours', () => {
     const graph = graphFixture();
     graph._initSimulation(800, 600);
