@@ -342,7 +342,14 @@
   .progress-export-menu,
   .progress-export-menu > summary {
     width: 100%;
+    min-width: 0;
     justify-content: center;
+  }
+
+  .progress-toolbar .btn {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 
   .progress-toolbar #btn-reset-all {

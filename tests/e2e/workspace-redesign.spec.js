@@ -113,6 +113,54 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(hint).toBeHidden();
   });
 
+  test('shows the mobile course catalog instead of a grid of zero progress metrics', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toHaveAttribute('data-home-has-progress', 'false');
+    await expect(page.locator('[data-home-progress-card]')).toBeHidden();
+    const catalog = page.locator('.home-grid .home-card').filter({ hasText: 'Catalog' }).first();
+    await expect(catalog).toBeVisible();
+    expect((await catalog.boundingBox()).y).toBeLessThan(650);
+  });
+
+  test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const exportButton = page.locator('#btn-export-json');
+    const importButton = page.locator('#btn-import-json');
+    await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
+    for (const button of [exportButton, importButton]) {
+      await expect(button).toBeVisible();
+      const rect = await button.boundingBox();
+      expect(rect.x).toBeGreaterThanOrEqual(-1);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(391);
+    }
+  });
+
+  test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    const input = page.locator('#sidebar-search');
+    await expect(input).toHaveAttribute('placeholder', 'Search…');
+    await expect(input).toHaveAttribute('aria-label', 'Quick search courses and lessons');
+  });
+
+  test('keeps a newly opened note editor visible without scrolling past an empty library panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    const editor = page.locator('[data-notes-main-pane]');
+    await expect(editor).toBeVisible();
+    await expect(page.locator('[data-note-title-input]')).toBeVisible();
+    const measure = await page.evaluate(() => ({
+      libraryHeight: document.querySelector('.notes-sidebar').getBoundingClientRect().height,
+      editorTop: document.querySelector('[data-notes-main-pane]').getBoundingClientRect().top,
+      overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth,
+    }));
+    expect(measure.libraryHeight).toBeLessThan(400);
+    expect(measure.editorTop).toBeLessThan(720);
+    expect(measure.overflow).toBeLessThanOrEqual(2);
+  });
+
   test('keeps RTL mobile navigation fully off-canvas until opened', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });

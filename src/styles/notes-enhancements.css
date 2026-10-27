@@ -536,18 +536,34 @@
 }
 
 @media (max-width: 560px) {
+  /* A grid row defaults to align-items:stretch. The tall notes editor was
+     stretching the library sidebar to ~720px even with a short note list. */
+  .notes-shell { align-items: start; }
   /* Keep the document editor discoverable above the fold on small phones,
      without making folders or the saved-note list inaccessible. */
   .notes-sidebar {
-    max-height: none;
-    overflow-y: visible;
+    /* Do not let a tall editor stretch the library beyond the first phone
+       viewport. One accessible scroll region retains folders and all notes. */
+    align-self: start;
+    max-height: min(350px, 42dvh);
+    overflow-y: auto;
     overscroll-behavior: contain;
   }
 
+  .notes-library-list { overflow: visible; }
+
+  /* Screenshot QA: a new learner's single-note list stretched the
+     sidebar beyond 500px and pushed the editor below the first phone screen.
+     Keep the folder/search UI but let the list grow only with real notes. */
+  .notes-library-list {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+  }
+
   .notes-list {
-    max-height: min(240px, 34dvh);
-    min-height: 112px;
-    overflow-y: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
   }
 
   .notes-header-actions {
