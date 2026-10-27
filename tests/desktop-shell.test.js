@@ -70,8 +70,15 @@ describe('desktop shell wiring', () => {
     expect(stageNative).toContain("'open-course-deck.exe'");
     expect(stageNative).toContain('OpenCourseDeck-Native');
 
-    expect(tauriCargo).toContain('tauri = { version = "=2.11.6"');
-    expect(tauriCargo).toContain('tauri-build = { version = "=2.7.1"');
+    // The lockfile is the stable build contract, not a permanently frozen
+    // Tauri version literal in the test. Verify that exact manifest pins match
+    // the committed Cargo lock and remain registry-backed.
+    const tauriLock = read('src-tauri/Cargo.lock');
+    for (const crate of ['tauri', 'tauri-build']) {
+      const pin = tauriCargo.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
+      expect(pin, `${crate} must use an exact version pin`).toBeTruthy();
+      expect(tauriLock).toContain(`name = "${crate}"\\nversion = "${pin[1]}"`);
+    }
     expect(tauriCargo).toContain('custom-protocol = ["tauri/custom-protocol"]');
     expect(tauriCargo).toContain('publish = false');
     expect(tauriCargo).toContain('license-file = "../../LICENSE"');
