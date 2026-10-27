@@ -54,6 +54,8 @@ describe('progress route workspace', () => {
 
     requiredIds.forEach(id => expect(document.getElementById(id), id).not.toBeNull());
     expect(document.querySelectorAll('.progress-metric')).toHaveLength(7);
+    expect(document.querySelector('.progress-metric .progress-metric-label')?.textContent).toBe('Completion');
+    expect(document.querySelector('.progress-metric:first-child')?.classList.contains('progress-metric-featured')).toBe(true);
     expect(document.querySelector('.progress-export-menu')).not.toBeNull();
     expect(document.querySelector('.progress-table-wrap')?.getAttribute('role')).toBe('region');
     expect(window.OpenCourseDeck.ProgressStatsInit).toHaveBeenCalledOnce();
