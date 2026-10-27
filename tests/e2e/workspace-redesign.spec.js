@@ -91,6 +91,16 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
   });
 
+  test('shows the mobile course catalog instead of a grid of zero progress metrics', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toHaveAttribute('data-home-has-progress', 'false');
+    await expect(page.locator('[data-home-progress-card]')).toBeHidden();
+    const catalog = page.locator('.home-grid .home-card').filter({ hasText: 'Catalog' }).first();
+    await expect(catalog).toBeVisible();
+    expect((await catalog.boundingBox()).y).toBeLessThan(650);
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
