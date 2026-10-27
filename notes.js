@@ -6,6 +6,7 @@
 
 import DOMPurify from 'dompurify';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
+import { countWords } from './src/core/textMetrics.js';
 
 (() => {
   'use strict';
@@ -26,31 +27,6 @@ import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
     return typeof crypto?.randomUUID === 'function'
       ? `${prefix}-${crypto.randomUUID().slice(0, 8)}`
       : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  }
-
-  // Use the browser's maintained Unicode word-break engine rather than
-  // treating whitespace as the only word boundary (which undercounts CJK).
-  // Cached by locale; unchanged saved-note schema and no extra dependency.
-  const wordSegmenters = new Map();
-  function countWords(text) {
-    const source = String(text ?? '').trim();
-    if (!source) return 0;
-    if (typeof Intl.Segmenter !== 'function') {
-      return source.split(/\s+/).filter(Boolean).length;
-    }
-    const locale = document.documentElement.lang || navigator.language || 'en';
-    let segmenter = wordSegmenters.get(locale);
-    if (!segmenter) {
-      try {
-        segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
-        wordSegmenters.set(locale, segmenter);
-      } catch {
-        return source.split(/\s+/).filter(Boolean).length;
-      }
-    }
-    let count = 0;
-    for (const part of segmenter.segment(source)) if (part.isWordLike) count++;
-    return count;
   }
 
   function debounce(fn, ms = 300) {

@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from '../lib/eventEmitter.js';
+import { countWords } from '../core/textMetrics.js';
 
 function extractWikilinks(content) {
   if (!content) return [];
@@ -18,11 +19,6 @@ function extractWikilinks(content) {
     links.push(match[1].trim().toLowerCase());
   }
   return links;
-}
-
-function wordCount(text) {
-  if (!text) return 0;
-  return String(text).replace(/<[^>]+>/g, ' ').split(/\s+/).filter(w => w.length > 0).length;
 }
 
 const COURSE_COLORS = [
@@ -106,7 +102,7 @@ export class KnowledgeGraph extends EventEmitter {
     const wcValues = [];
 
     for (const note of noteMap.values()) {
-      const wc = wordCount(note.content || '');
+      const wc = countWords(note.content || '', { html: true });
       wcValues.push(wc);
     }
 
@@ -122,7 +118,7 @@ export class KnowledgeGraph extends EventEmitter {
     let idx = 0;
     for (const note of noteMap.values()) {
       const id = String(note.id || note.title || '').toLowerCase();
-      const wc = wordCount(note.content || '');
+      const wc = countWords(note.content || '', { html: true });
       const radius = this._minNodeRadius + ((wc - minWc) / range) * (this._maxNodeRadius - this._minNodeRadius);
       const course = note.courseId || note.course || 'uncategorized';
 
