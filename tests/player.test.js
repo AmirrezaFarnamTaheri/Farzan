@@ -23,6 +23,30 @@ describe('MediaPlayer queue rendering', () => {
     vi.restoreAllMocks();
   });
 
+  it('delegates volume/seek/mute through the actual media element without invalid writes', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
+    player._state.duration = 120;
+    const native = document.querySelector('#player audio');
+    expect(native).toBe(player._media);
+    const initialVolume = native.volume;
+    player.setVolume(NaN);
+    expect(native.volume).toBe(initialVolume);
+    expect(player._state.volume).toBe(initialVolume);
+    player.setVolume(0.42);
+    expect(native.volume).toBeCloseTo(0.42);
+    player.toggleMute();
+    expect(native.muted).toBe(true);
+    player.toggleMute();
+    expect(native.muted).toBe(false);
+    player.seekTo(250);
+    expect(native.currentTime).toBe(120);
+    player.seekBy(-40);
+    expect(native.currentTime).toBe(80);
+    player.seekTo(Infinity);
+    expect(native.currentTime).toBe(80);
+    player.destroy();
+  });
+
   it('renders queue metadata as text instead of executable HTML', () => {
     const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([
