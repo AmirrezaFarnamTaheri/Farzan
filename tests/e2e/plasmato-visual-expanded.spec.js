@@ -124,8 +124,10 @@ for (const config of configurations) {
     await page.waitForFunction(() => Boolean(window.OpenCourseDeck?.Router &&
       window.DataStore?.getState), null, { timeout: 20000 });
     if (config.light) {
-      await page.locator('#btn-theme-toggle').click();
-      await expect.poll(() => page.locator('html').getAttribute('data-theme')).not.toBe('dark');
+      // Initial theme is light after the redesign. Toggle only if needed.
+      if (await page.locator('html').getAttribute('data-theme') !== 'light')
+        await page.locator('#btn-theme-toggle').click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     }
     if (config.enlarged) {
       const before = await page.locator('#font-scale-label').textContent();
@@ -151,7 +153,9 @@ for (const config of configurations) {
         }
         if (route === 'home') {
           await expect(page.locator('#view-container .home-hero')).toBeInViewport({ ratio: 0.5 });
-          await expect(page.locator('#view-container .home-title')).toContainText('Back to your studies');
+          await expect(page.locator('#view-container .home-title')).toHaveText(
+            /^(What will you learn today\?|Welcome back to your studies\.)$/,
+          );
         }
         if (config.focus) {
           const target = await page.evaluate(() => {
@@ -374,7 +378,11 @@ test('Studio shape, note, layer and template actions update its real canvas', as
   await page.locator('[data-studio-add-text]').click();
   await expect(page.locator('[data-studio-status]')).toContainText('Note added');
   await stateShot(page, 'studio-states', '02-real-board-note');
-  await page.locator('[data-studio-add-rect]').click();
+  const advanced = page.locator('[data-studio-more-tools]');
+  await expect(advanced.locator('[data-studio-add-rect]')).toBeHidden();
+  await advanced.locator('summary').click();
+  await expect(advanced.locator('[data-studio-add-rect]')).toBeVisible();
+  await advanced.locator('[data-studio-add-rect]').click();
   await expect(page.locator('[data-studio-status]')).toContainText('Rectangle added');
   await stateShot(page, 'studio-states', '03-board-rectangle');
   await page.locator('[data-studio-add-circle]').click();
