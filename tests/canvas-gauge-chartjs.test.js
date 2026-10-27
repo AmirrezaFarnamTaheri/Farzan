@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CanvasGauge } from '../src/features/canvasCharts/gauge.js';
+import { loadVendorScript } from '../src/core/vendorLoader.js';
+vi.mock('../src/core/vendorLoader.js', () => ({ loadVendorScript: vi.fn() }));
 import { chartGauge } from '../src/features/chartPlugins/gauge.js';
 
 const previous = globalThis.Chart;
-afterEach(() => { globalThis.Chart = previous; vi.restoreAllMocks(); });
+afterEach(() => { globalThis.Chart = previous; vi.mocked(loadVendorScript).mockReset(); vi.restoreAllMocks(); });
 
 describe('CanvasGauge reuses the installed Chart.js gauge renderer', () => {
   it('delegates the gauge geometry to the registered plugin without duplicating drawing', () => {
@@ -31,8 +33,31 @@ describe('CanvasGauge reuses the installed Chart.js gauge renderer', () => {
     expect(instance.destroy).toHaveBeenCalledOnce();
   });
 
-  it('reports a missing bundled chart dependency before displaying an empty gauge', () => {
+  it('mounts only after on-demand Chart.js resolves and preserves an interim value update', async () => {
+    let supplyLibrary;
+    vi.mocked(loadVendorScript).mockImplementationOnce(() => new Promise(resolve => { supplyLibrary = resolve; }));
     globalThis.Chart = undefined;
-    expect(() => new CanvasGauge(document.createElement('canvas'))).toThrow(/Chart\.js.*unavailable/);
+    const fakeChart = { data: { datasets: [{ data: [] }] }, options: { plugins: { gauge: {} } }, update: vi.fn(), destroy: vi.fn() };
+    const constructor = vi.fn(function MockChart() { return fakeChart; });
+    const gauge = new CanvasGauge(document.createElement('canvas'), { min: 0, max: 100, value: 10 });
+    gauge.setValue(84, false);
+    expect(loadVendorScript).toHaveBeenCalledWith('chartjs');
+    supplyLibrary(constructor);
+    await gauge.ready;
+    expect(constructor.mock.calls[0][1].options.plugins.gauge.value).toBe(84);
+    gauge.destroy();
+    expect(fakeChart.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('does not leak a chart when its owner is destroyed during vendor loading', async () => {
+    let supplyLibrary;
+    vi.mocked(loadVendorScript).mockImplementationOnce(() => new Promise(resolve => { supplyLibrary = resolve; }));
+    globalThis.Chart = undefined;
+    const constructor = vi.fn();
+    const gauge = new CanvasGauge(document.createElement('canvas'));
+    gauge.destroy();
+    supplyLibrary(constructor);
+    await gauge.ready;
+    expect(constructor).not.toHaveBeenCalled();
   });
 });
