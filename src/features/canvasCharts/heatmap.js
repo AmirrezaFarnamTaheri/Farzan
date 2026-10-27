@@ -8,75 +8,7 @@
  *   hm.destroy();
  */
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
-
-function parseDate(str) {
-  const parts = String(str).split('-');
-  if (parts.length < 3) return null;
-  const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  // An Invalid Date (e.g. an ISO datetime string, or non-numeric parts) is
-  // still truthy, so callers must explicitly reject it — otherwise it
-  // poisons min/maxDate with NaN and the grid-walk loop below never
-  // terminates (NaN comparisons are always false).
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function buildGrid(data) {
-  const grid = new Map();
-  let minDate = null;
-  let maxDate = null;
-  let maxVal = 0;
-
-  for (const item of data) {
-    const date = parseDate(item.date);
-    if (!date) continue;
-    const val = Math.max(0, Number(item.value) || 0);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    grid.set(key, val);
-    if (!minDate || date < minDate) minDate = date;
-    if (!maxDate || date > maxDate) maxDate = date;
-    if (val > maxVal) maxVal = val;
-  }
-
-  if (!minDate || !maxDate) return { cells: [], months: [], maxVal: 0, weeks: 0 };
-
-  const cells = [];
-  const months = [];
-  const startOfWeek = new Date(minDate);
-  const dow = startOfWeek.getDay();
-  startOfWeek.setDate(startOfWeek.getDate() - (dow === 0 ? 6 : dow - 1));
-
-  let current = new Date(startOfWeek);
-  let weekIdx = 0;
-  let lastMonth = -1;
-
-  // Iteration cap as defense-in-depth: even with parseDate's Invalid Date
-  // guard, a future change to the loop condition should not be able to
-  // hang the tab.
-  const maxIterations = 7 * 400;
-  let iterations = 0;
-  while ((current <= maxDate || current.getDay() !== 1) && iterations++ < maxIterations) {
-    const dayOfWeek = current.getDay() === 0 ? 6 : current.getDay() - 1;
-    const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
-    const val = grid.get(key) || 0;
-
-    if (current >= minDate && current <= maxDate) {
-      cells.push({ week: weekIdx, day: dayOfWeek, value: val, date: key });
-    }
-
-    if (current.getMonth() !== lastMonth) {
-      months.push({ week: weekIdx, label: MONTH_NAMES[current.getMonth()] });
-      lastMonth = current.getMonth();
-    }
-
-    current.setDate(current.getDate() + 1);
-    if (current.getDay() === 1 && current > maxDate) break;
-    if (current.getDay() === 1) weekIdx++;
-  }
-
-  return { cells, months, maxVal, weeks: weekIdx + 1 };
-}
+import { buildCalendarGrid, DAY_LABELS } from '../chartPlugins/calendarGrid.js';
 
 export class CanvasHeatmap {
   constructor(canvas, options = {}) {
@@ -101,7 +33,7 @@ export class CanvasHeatmap {
   render(data) {
     const items = Array.isArray(data) ? data : (data?.data || []);
     this._data = items;
-    this._grid = buildGrid(items);
+    this._grid = buildCalendarGrid(items);
     this._draw();
   }
 
