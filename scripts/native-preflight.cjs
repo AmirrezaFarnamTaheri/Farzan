@@ -135,7 +135,7 @@ if (packageJson) {
 if (cargoToml) {
   // Dependency upgrades must keep exact registry pins AND update Cargo.lock.
   // Do not make an otherwise-valid future Tauri update fail on stale literals.
-  const cargoLock = cargoLockExists ? fs.readFileSync(rel('src-tauri', 'Cargo.lock'), 'utf8') : '';
+  const cargoLock = cargoLockExists ? fs.readFileSync(rel('src-tauri', 'Cargo.lock'), 'utf8').replace(/\r\n/g, '\n') : '';
   for (const [crate, label] of [['tauri', 'Tauri runtime'], ['tauri-build', 'Tauri build helper']]) {
     const pinned = cargoToml.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
     const locked = pinned && cargoLock.includes(`name = "${crate}"\nversion = "${pinned[1]}"`);
