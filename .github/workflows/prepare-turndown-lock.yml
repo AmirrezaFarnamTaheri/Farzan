@@ -31,6 +31,10 @@ jobs:
       - name: Prove Markdown conversion and full progress export compatibility
         run: |
           node node_modules/vitest/vitest.mjs run --configLoader runner --pool vmThreads tests/markdown-export-turndown.test.js tests/progress.test.js tests/notes.test.js
+      - name: Enforce source lint and release policy checks
+        run: |
+          npm run lint
+          npm run validate
       - name: Verify offline production build
         run: |
           npm run build:release
