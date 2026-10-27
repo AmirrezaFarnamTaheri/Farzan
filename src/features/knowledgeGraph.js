@@ -217,7 +217,9 @@ export class KnowledgeGraph extends EventEmitter {
       ['links', linkForce],
       ['collide', forceCollide(node => node.radius + 2).strength(0.95)],
     ]);
-    for (const node of this._nodes) {
+    for (const [index, node] of this._nodes.entries()) {
+      // D3 collision forces require stable integer indexes for all fixtures.
+      node.index = index;
       node.vx = Number.isFinite(node.vx) ? node.vx : 0;
       node.vy = Number.isFinite(node.vy) ? node.vy : 0;
     }
