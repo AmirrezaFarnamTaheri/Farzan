@@ -217,4 +217,32 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect(metrics.rootOverflow).toBeLessThanOrEqual(2);
     expect(metrics.header.top).toBeGreaterThanOrEqual(-1);
   });
+  test('keeps Studio drawing surface aligned at portrait and short-landscape sizes', async ({ page }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+      const canvas = page.locator('#studio-canvas');
+      await expect(canvas).toBeVisible();
+      const dimensions = await canvas.evaluate(element => {
+        const canvasRect = element.getBoundingClientRect();
+        const shellRect = element.closest('.studio-shell').getBoundingClientRect();
+        return {
+          canvasHeight: canvasRect.height,
+          shellHeight: shellRect.height,
+          canvasWidth: canvasRect.width,
+          shellWidth: shellRect.width,
+        };
+      });
+      expect(Math.abs(dimensions.canvasHeight - dimensions.shellHeight),
+        'Canvas must not clip strokes below its parent surface').toBeLessThanOrEqual(2);
+      expect(Math.abs(dimensions.canvasWidth - dimensions.shellWidth)).toBeLessThanOrEqual(2);
+      if (viewport.height < 500) {
+        expect(dimensions.shellHeight,
+          'Landscape canvas should not exceed most of the short viewport').toBeLessThanOrEqual(310);
+        expect(dimensions.shellHeight).toBeGreaterThanOrEqual(225);
+      }
+    }
+  });
+
+
 });

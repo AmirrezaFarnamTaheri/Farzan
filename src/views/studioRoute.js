@@ -443,9 +443,10 @@ printStudioBoardPdf,
       const hint = document.querySelector('[data-studio-empty-hint]');
       if (hint) hint.hidden = true;
     });
-    // Give it a size; canvas.js reads offsetWidth/Height
+    // Canvas drawing coordinates must match the actual shell at every viewport.
+    // A fixed 70vh canvas overflowed its 55/60/66vh parent and clipped strokes.
     canvas.style.width = '100%';
-    canvas.style.height = '70vh';
+    canvas.style.height = '100%';
     try { window.OpenCourseDeck?.Canvas?.init?.(canvas); } catch (e) { console.warn('[Studio view] init failed', e); }
   }
   const loadSavedBoard = async (quiet = false) => {

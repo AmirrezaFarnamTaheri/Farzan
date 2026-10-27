@@ -894,3 +894,19 @@ input[type="file"][hidden] {
 [data-theme="sunset"], [data-theme="rose"] { --canvas-bg: var(--surface); }
 .view-studio .studio-canvas-card { background: var(--canvas-bg, var(--surface)); }
 .view-studio .studio-canvas { background: var(--canvas-bg, var(--surface)); }
+
+/* Short mobile/tablet landscape viewports: the old 380px minimum consumed
+ * the entire 390px screen, while an inline 70vh canvas was clipped inside it.
+ * Use the real viewport height (not CSS zoom) and keep the board interactive. */
+@media (max-width: 1023px) and (max-height: 500px) {
+  .view-studio { gap: 10px; }
+  .view-studio .studio-toolbar-panel { padding: 8px 12px; }
+  .view-studio .studio-shell {
+    height: clamp(225px, 65dvh, 300px);
+    min-height: 225px;
+  }
+  .view-studio .studio-empty-hint {
+    top: 18px;
+    padding: 12px 16px;
+  }
+}
