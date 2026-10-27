@@ -41,6 +41,7 @@ export class CanvasGauge {
       min: this._min,
       max: this._max,
       value: this._value,
+      trackDatasetAnimation: true,
       unit: options.unit || '',
       lineWidth: options.lineWidth || 20,
       zones: Array.isArray(options.zones) ? options.zones : [
