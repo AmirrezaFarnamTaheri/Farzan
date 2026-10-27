@@ -1,0 +1,46 @@
+name: Prepare Dexie lockfile (integration only)
+
+on:
+  push:
+    branches:
+      - refactor/dexie-translation-cache-compat
+    paths:
+      - .github/workflows/prepare-dexie-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refactor/dexie-translation-cache-compat
+          persist-credentials: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Resolve pinned Dexie dependency and install reproducibly
+        run: |
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+          npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Prove raw IndexedDB v1 migration with focused regression tests
+        run: |
+          node node_modules/vitest/vitest.mjs run --configLoader runner --pool vmThreads tests/translation-cache-dexie.test.js
+      - name: Check that browser bundle includes Dexie without CDN
+        run: |
+          npm run build:release
+          test -f dist/opencoursedeck.js
+      - name: Commit package manager generated lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'Lockfile already matches'; exit 0
+          fi
+          git commit -m 'build(deps): lock pinned Dexie for isolated translation cache'
+          git push origin HEAD:refactor/dexie-translation-cache-compat
