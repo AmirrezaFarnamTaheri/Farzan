@@ -18,6 +18,8 @@ export function initCommandPalette() {
   let cpCleanupFocusGuard = null;
   let cpPrevFocus = null;
   let cpSelectedIdx = -1;
+  let visibleItems = [];
+  const fuseIndices = new Map();
   let cpActiveCat = 'all';
   let fuseConstructor = typeof window.Fuse === 'function' ? window.Fuse : null;
   let fusePending = null;
@@ -29,7 +31,7 @@ export function initCommandPalette() {
       .then(Constructor => {
         if (typeof Constructor !== 'function') throw new Error('Fuse.js did not expose a constructor');
         fuseConstructor = Constructor;
-        if (cpOverlay.classList.contains('open')) renderResults(cpInput.value ?? '');
+        if (cpOverlay.classList.contains('open')) renderResults(cpInput.value ?? '', { preserveSelection: true });
       })
       .catch(error => {
         console.warn('[Command palette] local fuzzy search unavailable', error);
@@ -134,16 +136,18 @@ export function initCommandPalette() {
     if (!query) return base;
     // Fuse.js is already vendored for the search worker. Reuse it here,
     // rather than building another fuzzy scorer or shipping a second library.
-    if (!fuseConstructor) {
+    if (!fuseConstructor || query.length < 2) {
       return base.filter(i => (i.label ?? '').toLowerCase().includes(query));
     }
-    const ranked = new fuseConstructor(base, {
+    const indexKey = cpActiveCat;
+    if (!fuseIndices.has(indexKey)) fuseIndices.set(indexKey, new fuseConstructor(base, {
       keys: ['label'],
       threshold: 0.36,
       ignoreLocation: true,
       includeScore: true,
       minMatchCharLength: 2,
-    }).search(query).map(result => result.item);
+    }));
+    const ranked = fuseIndices.get(indexKey).search(query).map(result => result.item);
     const exact = [];
     const starts = [];
     const fuzzy = [];
@@ -171,8 +175,7 @@ export function initCommandPalette() {
     const row = cpResults.querySelector('.cp-item[aria-selected="true"][data-idx]');
     const idx = row ? Number(row.getAttribute('data-idx')) : -1;
     if (idx < 0) return;
-    const list = getFiltered(cpInput.value ?? '');
-    const item = list[idx];
+    const item = visibleItems[idx];
     if (!item) return;
     if (item.hash) app().Router?.navigate?.(item.hash);
     if (typeof item.action === 'function') {
@@ -181,8 +184,10 @@ export function initCommandPalette() {
     cpClose();
   };
 
-  const renderResults = (q = '') => {
+  const renderResults = (q = '', { preserveSelection = false } = {}) => {
+    const previousItem = preserveSelection ? visibleItems[cpSelectedIdx] : null;
     const filtered = getFiltered(q).slice(0, 25);
+    visibleItems = filtered;
     cpResults.replaceChildren();
     if (!filtered.length) {
       const li = document.createElement('li');
@@ -221,7 +226,7 @@ export function initCommandPalette() {
 
       cpResults.appendChild(li);
     }
-    setSelected(filtered.length ? 0 : -1);
+    setSelected(preserveSelection ? (previousItem ? filtered.indexOf(previousItem) : -1) : 0);
   };
 
   // Overlay click to close
@@ -275,14 +280,14 @@ export function initCommandPalette() {
   cpResults.addEventListener('click', (e) => {
     const el = eventTargetEl(e);
     const li = el?.closest?.('.cp-item[data-idx]');
-    if (!li) return;
+    if (!li || !cpResults.contains(li)) return;
     setSelected(Number(li.getAttribute('data-idx')));
     activateSelected();
   });
   cpResults.addEventListener('mousemove', debounce((e) => {
     const el = eventTargetEl(e);
     const li = el?.closest?.('.cp-item[data-idx]');
-    if (!li) return;
+    if (!li || !cpResults.contains(li)) return;
     setSelected(Number(li.getAttribute('data-idx')));
   }, 25));
 
