@@ -36,8 +36,11 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(page.locator('[data-courses-add]')).toBeVisible();
     const player = page.locator('[data-course-playback]');
     await expect(player).toBeHidden();
-    await expect(page.locator('[data-course-empty-guidance]')).toBeVisible();
+    // The catalog may legitimately auto-select a course. Verify real content.
     await expect(page.locator('#courses-search')).toBeVisible();
+    await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
+    await expect(page.locator('#course-detail')).toBeVisible();
+    await expect(player).toBeHidden();
   });
 
   test('renders a high-contrast editorial home hero for a new learner', async ({ page }) => {

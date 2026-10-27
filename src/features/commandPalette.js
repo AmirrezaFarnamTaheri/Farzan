@@ -1,4 +1,5 @@
 import { debounce, eventTargetEl, restoreFocus, setAppInert, trapFocus } from '../lib/dom.js';
+import { loadVendorScript } from '../core/vendorLoader.js';
 
 export function initCommandPalette() {
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
@@ -18,6 +19,22 @@ export function initCommandPalette() {
   let cpPrevFocus = null;
   let cpSelectedIdx = -1;
   let cpActiveCat = 'all';
+  let fuseConstructor = typeof window.Fuse === 'function' ? window.Fuse : null;
+  let fusePending = null;
+  // Preserve the initial zero-network experience. Search works with basic
+  // prefix matching while the local, same-origin Fuse.js bundle loads.
+  const ensureFuse = () => {
+    if (fuseConstructor || fusePending) return;
+    fusePending = loadVendorScript('fusejs')
+      .then(Constructor => {
+        if (typeof Constructor !== 'function') throw new Error('Fuse.js did not expose a constructor');
+        fuseConstructor = Constructor;
+        if (cpOverlay.classList.contains('open')) renderResults(cpInput.value ?? '');
+      })
+      .catch(error => {
+        console.warn('[Command palette] local fuzzy search unavailable', error);
+      });
+  };
 
   const app = () => window.OpenCourseDeck ?? OpenCourseDeck;
   const applyTheme = (theme) => {
@@ -52,6 +69,7 @@ export function initCommandPalette() {
     cpInput.setAttribute('aria-expanded', 'true');
     cpInput.focus();
     cpInput.select();
+    ensureFuse();
     setAppInert(true);
     try { cpCleanupFocusTrap = trapFocus(cpRoot, { initialFocus: false }); } catch { /* ignore */ }
     const onFocusIn = (event) => {
@@ -113,7 +131,29 @@ export function initCommandPalette() {
   const getFiltered = (q = '') => {
     const query = q.trim().toLowerCase();
     const base = (cpActiveCat && cpActiveCat !== 'all') ? items.filter(i => i.cat === cpActiveCat) : items;
-    return query ? base.filter(i => (i.label ?? '').toLowerCase().includes(query)) : base;
+    if (!query) return base;
+    // Fuse.js is already vendored for the search worker. Reuse it here,
+    // rather than building another fuzzy scorer or shipping a second library.
+    if (!fuseConstructor) {
+      return base.filter(i => (i.label ?? '').toLowerCase().includes(query));
+    }
+    const ranked = new fuseConstructor(base, {
+      keys: ['label'],
+      threshold: 0.36,
+      ignoreLocation: true,
+      includeScore: true,
+      minMatchCharLength: 2,
+    }).search(query).map(result => result.item);
+    const exact = [];
+    const starts = [];
+    const fuzzy = [];
+    for (const item of ranked) {
+      const label = item.label.toLowerCase();
+      if (label === query) exact.push(item);
+      else if (label.startsWith(query)) starts.push(item);
+      else fuzzy.push(item);
+    }
+    return [...exact, ...starts, ...fuzzy];
   };
 
   const setSelected = (idx) => {
