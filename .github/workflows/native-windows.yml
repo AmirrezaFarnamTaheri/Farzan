@@ -12,6 +12,8 @@ on:
       - 'app.js'
       - 'notes.js'
       - 'player.js'
+      - 'db.js'
+      - 'src/core/**'
       - 'progress.js'
       - 'src/index.js'
       - 'src/features/**'
