@@ -48,6 +48,7 @@ async function main() {
     HTMLCanvasElement: global.HTMLCanvasElement,
     CustomEvent: global.CustomEvent,
     Event: global.Event,
+    EventTarget: global.EventTarget,
     HashChangeEvent: global.HashChangeEvent,
     Node: global.Node,
     sessionStorage: global.sessionStorage,
@@ -68,9 +69,19 @@ async function main() {
   global.location = window.location;
   global.HTMLElement = window.HTMLElement;
   global.HTMLCanvasElement = window.HTMLCanvasElement;
+  // A Node EventTarget rejects jsdom CustomEvents as foreign Event instances.
+  // Use one DOM realm for the browser smoke harness, as real browsers do.
+  global.EventTarget = window.EventTarget;
   global.CustomEvent = window.CustomEvent;
   global.Event = window.Event;
   global.HashChangeEvent = window.HashChangeEvent;
+  // Guard native and fluent event compatibility against a future harness
+  // regression that accidentally mixes Node EventTarget with jsdom Events.
+  const eventRealmProbe = new EventTarget();
+  let realmDelivered = false;
+  eventRealmProbe.addEventListener('farzan:realm-probe', () => { realmDelivered = true; });
+  eventRealmProbe.dispatchEvent(new CustomEvent('farzan:realm-probe', { detail: ['ok'] }));
+  if (!realmDelivered) throw new Error('Browser smoke event realm probe was not delivered');
   global.Node = window.Node;
   global.sessionStorage = window.sessionStorage;
   global.localStorage = window.localStorage;

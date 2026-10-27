@@ -323,6 +323,7 @@ export class CourseGraph extends EventEmitter {
     this._roots = [];
     this._nodes = [];
     this._edges = [];
-    this._listeners.clear();
+    // EventTarget-backed fluent listeners must be detached, not only untracked.
+    this.clear();
   }
 }

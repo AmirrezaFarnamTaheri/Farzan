@@ -1,129 +1,138 @@
 /**
- * EventEmitter — Standard Web Platform EventTarget with fluent Node/wolf-table compat.
- * Backed by WHATWG EventTarget standard:
- * https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
- * https://dom.spec.whatwg.org/#interface-eventtarget
+ * Fluent compatibility adapter over the WHATWG EventTarget standard.
+ *
+ * Named events are dispatched by EventTarget only, so a listener registered
+ * with on() can receive either emit() or dispatchEvent(). Legacy multi-arg
+ * callbacks receive the values spread from CustomEvent.detail.
+ *
+ * Wildcard '*' is a legacy emitter-only convention and is not delivered by
+ * the browser for other event names; it remains intentionally separate.
  */
-export class EventEmitter extends EventTarget {
+// Node's EventTarget refuses a CustomEvent from jsdom's Window realm.
+// Browser smoke tests construct the app under jsdom in Node, so the target
+// and its events must originate from the same window when one exists.
+const eventRealm = globalThis.window?.EventTarget && globalThis.window?.CustomEvent
+  ? globalThis.window : globalThis;
+const NativeEventTarget = eventRealm.EventTarget;
+const NativeCustomEvent = eventRealm.CustomEvent;
+
+export class EventEmitter extends NativeEventTarget {
   constructor() {
     super();
-    /** @type {Map<string, Set<Function>>} */
+    /** @type {Map<string, Set<{handler: Function, listener: Function, kind: string}>>} */
     this._listeners = new Map();
   }
 
-  /**
-   * Register a listener for an event. Use '*' to receive all events.
-   * @param {string} event
-   * @param {Function} handler
-   * @returns {this}
-   */
-  on(event, handler) {
+  _removeRecord(event, record) {
+    const records = this._listeners.get(event);
+    if (!records || !records.has(record)) return;
+    records.delete(record);
+    if (event !== '*') this.removeEventListener(event, record.listener);
+    if (!records.size) this._listeners.delete(event);
+  }
+
+  _register(event, handler, once = false) {
     if (typeof handler !== 'function') return this;
-    let set = this._listeners.get(event);
-    if (!set) {
-      set = new Set();
-      this._listeners.set(event, set);
+    let records = this._listeners.get(event);
+    if (!records) {
+      records = new Set();
+      this._listeners.set(event, records);
     }
-    set.add(handler);
+    // on() has Set-like semantics: the same callback is registered once.
+    // once() historically creates a distinct disposable wrapper each time.
+    if (!once && [...records].some(record => record.kind === 'on' && record.handler === handler)) {
+      return this;
+    }
+
+    const record = { handler, listener: null, kind: once ? 'once' : 'on' };
+    if (event === '*') {
+      record.listener = (...args) => {
+        if (once) this._removeRecord(event, record);
+        try { handler(...args); }
+        catch (error) { console.error('[EventEmitter] *', error); }
+      };
+    } else {
+      record.listener = (nativeEvent) => {
+        if (once) this._removeRecord(event, record);
+        const detail = nativeEvent?.detail;
+        const args = Array.isArray(detail) ? detail : detail === undefined ? [] : [detail];
+        try { handler(...args); }
+        catch (error) { console.error('[EventEmitter]', event, error); }
+      };
+    }
+
+    records.add(record);
+    if (event !== '*') this.addEventListener(event, record.listener);
     return this;
   }
 
+  /** @returns {this} */
+  on(event, handler) {
+    return this._register(event, handler);
+  }
+
   /**
-   * Remove a specific listener for an event, or all listeners for an event if no handler given.
-   * @param {string} event
-   * @param {Function} [handler]
+   * Remove one original listener (including all of its once registrations),
+   * or all fluent listeners for the event. Native listeners registered
+   * directly with addEventListener() remain owned by their callers.
    * @returns {this}
    */
   off(event, handler) {
-    const set = this._listeners.get(event);
-    if (set) {
-      if (handler) {
-        set.delete(handler);
-        // once() registers an internal wrapper, so removing by original handler
-        for (const registered of [...set]) {
-          if (registered.listener === handler) {
-            set.delete(registered);
-          }
-        }
-        if (set.size === 0) this._listeners.delete(event);
-      } else {
-        this._listeners.delete(event);
-      }
+    const records = this._listeners.get(event);
+    if (!records) return this;
+    for (const record of [...records]) {
+      if (handler && record.handler !== handler && record.listener !== handler) continue;
+      this._removeRecord(event, record);
     }
     return this;
   }
 
   /**
-   * Emit an event, calling all listeners for that event and wildcard '*' listeners.
-   * @param {string} event
-   * @param  {...any} args
+   * Emit a standard CustomEvent, then notify the legacy wildcard listeners.
+   * Native EventTarget and fluent listeners now share one dispatch path.
    * @returns {this}
    */
   emit(event, ...args) {
-    const set = this._listeners.get(event);
-    if (set) {
-      for (const handler of [...set]) {
-        try { handler(...args); } catch (e) { console.error('[EventEmitter]', event, e); }
-      }
-    }
+    this.dispatchEvent(new NativeCustomEvent(event, { detail: args }));
     if (event !== '*') {
-      const wildcardSet = this._listeners.get('*');
-      if (wildcardSet) {
+      const records = this._listeners.get('*');
+      if (records) {
         const payload = { type: event, args };
-        for (const handler of [...wildcardSet]) {
-          try { handler(payload); } catch (e) { console.error('[EventEmitter] *', e); }
+        for (const record of [...records]) {
+          // Reentrancy: an earlier handler may have removed the next record.
+          if (records.has(record)) record.listener(payload);
+        }
+      }
+    } else {
+      const records = this._listeners.get('*');
+      if (records) {
+        for (const record of [...records]) {
+          if (records.has(record)) record.listener(...args);
         }
       }
     }
-    // Also dispatch to standard DOM EventTarget listeners added via addEventListener()
-    try {
-      this.dispatchEvent(new CustomEvent(event, { detail: args }));
-    } catch {}
     return this;
   }
 
-  /**
-   * Register a one-time listener that auto-removes after first fire.
-   * @param {string} event
-   * @param {Function} handler
-   * @returns {this}
-   */
+  /** Register a callback for only the next native or fluent event. */
   once(event, handler) {
-    if (typeof handler !== 'function') return this;
-    const wrapper = (...args) => {
-      this.off(event, wrapper);
-      handler(...args);
-    };
-    wrapper.listener = handler;
-    return this.on(event, wrapper);
+    return this._register(event, handler, true);
   }
 
-  /**
-   * Count listeners for a given event (or total across all events if no event specified).
-   * @param {string} [event]
-   * @returns {number}
-   */
+  /** Count fluent listeners; native listeners are tracked by EventTarget. */
   listenerCount(event) {
-    if (event != null) {
-      return this._listeners.get(event)?.size ?? 0;
-    }
+    if (event != null) return this._listeners.get(event)?.size ?? 0;
     let count = 0;
-    for (const set of this._listeners.values()) count += set.size;
+    for (const records of this._listeners.values()) count += records.size;
     return count;
   }
 
-  /**
-   * List all registered event names.
-   * @returns {string[]}
-   */
   eventNames() {
     return [...this._listeners.keys()];
   }
 
-  /**
-   * Remove all listeners.
-   */
+  /** Detach all fluent listeners without disturbing external native ones. */
   clear() {
-    this._listeners.clear();
+    for (const event of [...this._listeners.keys()]) this.off(event);
   }
 }
