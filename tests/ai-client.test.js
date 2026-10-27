@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexedDB } from 'fake-indexeddb';
+import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 import { createAIClient, GEMMA_MODEL_OPTIONS, initAIClient } from '../src/features/aiClient.js';
 
 describe('AI client', () => {
@@ -100,6 +100,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
     };
     const client = createAIClient(root);
@@ -120,6 +121,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
     };
     const client = createAIClient(root);
@@ -134,6 +136,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
       fetch: vi.fn(async () => ({
         ok: true,
@@ -178,6 +181,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
       fetch: vi.fn(async () => ({
         ok: true,
@@ -195,6 +199,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
     };
     const client = createAIClient(root);
@@ -213,7 +218,7 @@ describe('AI client', () => {
   });
 
   it('does not treat unrelated words as identical because of hash collisions', async () => {
-    const root = { DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) }, indexedDB, sessionStorage };
+    const root = { DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) }, indexedDB, IDBKeyRange, sessionStorage };
     const client = createAIClient(root);
     await client.clearEmbeddings();
     await client.upsertEmbedding({ id: 'plants', text: 'photosynthesis', metadata: { type: 'note' } });
@@ -227,6 +232,7 @@ describe('AI client', () => {
     const root = {
       DB: { getSetting: vi.fn(async () => ({ mode: 'local-gemma' })) },
       indexedDB,
+      IDBKeyRange,
       sessionStorage,
     };
     const client = createAIClient(root);

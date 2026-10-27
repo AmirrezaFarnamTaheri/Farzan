@@ -266,39 +266,40 @@ function assertModelSize(size, maxBytes = MAX_MODEL_BYTES) {
   return value;
 }
 
-function openModelDb(root) {
-  const indexedDB = root.indexedDB;
-  if (!indexedDB) return Promise.resolve(null);
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(AI_MODEL_DB, AI_MODEL_DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(AI_MODEL_STORE)) db.createObjectStore(AI_MODEL_STORE, { keyPath: 'id' });
-      if (!db.objectStoreNames.contains(AI_EMBEDDING_STORE)) db.createObjectStore(AI_EMBEDDING_STORE, { keyPath: 'id' });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+/**
+ * Local model bytes and lexical embeddings share an isolated native v2
+ * database. Dexie 4 uses version(n/10) to name native IDB version n.
+ * Lazy-import Dexie here so the main app shell does not eagerly load it.
+ *
+ * Preserve caller-supplied IndexedDB factories used by tests and embed hosts;
+ * the matching IDBKeyRange is required by Dexie's constructor contract.
+ */
+async function withModelDatabase(root, operation) {
+  if (!root?.indexedDB) return null;
+  const { default: Dexie } = await import('dexie');
+  const db = new Dexie(AI_MODEL_DB, {
+    indexedDB: root.indexedDB,
+    IDBKeyRange: root.IDBKeyRange || globalThis.IDBKeyRange || Dexie.dependencies.IDBKeyRange,
   });
+  db.version(AI_MODEL_DB_VERSION / 10).stores({
+    [AI_MODEL_STORE]: 'id',
+    [AI_EMBEDDING_STORE]: 'id',
+  });
+  try {
+    return await operation(db);
+  } finally {
+    // The old wrapper closed after each transaction; retain that lifecycle
+    // for model blobs and external reset/delete requests.
+    db.close();
+  }
 }
 
-async function modelStore(root, mode, fn, storeName = AI_MODEL_STORE) {
-  const db = await openModelDb(root);
-  if (!db) return null;
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode);
-    const store = tx.objectStore(storeName);
-    const request = fn(store);
-    let result;
-    request.onsuccess = () => { result = request.result; };
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => {
-      db.close();
-      resolve(result);
-    };
-    tx.onerror = () => {
-      try { db.close(); } catch {}
-      reject(tx.error);
-    };
+async function modelStore(root, mode, operation, storeName = AI_MODEL_STORE) {
+  return withModelDatabase(root, db => {
+    const table = db.table(storeName);
+    // Resolves when the transaction commits, not when an individual put
+    // request succeeds before the transaction might abort.
+    return db.transaction(mode === 'readwrite' ? 'rw' : 'r', table, () => operation(table));
   });
 }
 
@@ -564,7 +565,7 @@ export function createAIClient(root = window) {
     // searchable through their text preview until they are next updated.
     const queryTerms = new Set(tokenize(query, 2));
     if (!queryTerms.size) return [];
-    const records = await modelStore(root, 'readonly', store => store.getAll(), AI_EMBEDDING_STORE) || [];
+    const records = await modelStore(root, 'readonly', store => store.toArray(), AI_EMBEDDING_STORE) || [];
     return records.map(record => {
       const terms = new Set(Array.isArray(record.tokens) ? record.tokens : tokenize(record.textPreview || '', 2));
       const shared = [...queryTerms].filter(term => terms.has(term)).length;
@@ -576,15 +577,7 @@ export function createAIClient(root = window) {
   }
 
   async function clearEmbeddings() {
-    const db = await openModelDb(root);
-    if (!db) return;
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(AI_EMBEDDING_STORE, 'readwrite');
-      tx.objectStore(AI_EMBEDDING_STORE).clear();
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await modelStore(root, 'readwrite', store => store.clear(), AI_EMBEDDING_STORE);
   }
 
   async function generateFlashcardsFromText(text = '', { limit = 5 } = {}) {
