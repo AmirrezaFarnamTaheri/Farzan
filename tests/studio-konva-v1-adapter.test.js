@@ -185,4 +185,17 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     const plan = planKonvaV1Board(board);
     expect(plan.layers[0]).toMatchObject({ visible: false, locked: true, opacity: 0.9 });
   });
+  it.each([
+    ['nonfinite coordinate', [[0, 0], [Number.NaN, 12]]],
+    ['infinite coordinate', [[0, 0], [10, Infinity]]],
+    ['nonnumeric coordinate', [[0, 0], ['missing', 12]]],
+    ['extra point data', [[0, 0, 7], [10, 12]]],
+  ])('refuses lossy pen geometry: %s', (_label, points) => {
+    const board = fixture();
+    board.layers[0].elements = [{ id: 'pen-unsafe', type: 'polyline', points }];
+    const result = planKonvaV1Board(board);
+    expect(result.compatible).toBe(false);
+    expect(result.reason).toMatch(/invalid|unsupported/);
+  });
+
 });
