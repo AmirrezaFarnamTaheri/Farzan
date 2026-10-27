@@ -1,3 +1,5 @@
+import Dexie from 'dexie';
+
 /**
  * WaveformScrubber — AudioContext → Float32Array → canvas bars.
  * Based on Splayer WaveformScrubber pattern.
@@ -18,53 +20,54 @@ const CACHE_STORE = 'waveforms';
  */
 const MAX_WAVEFORM_SOURCE_BYTES = 60 * 1024 * 1024;
 
-function openCacheDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(CACHE_DB, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(CACHE_STORE)) {
-        db.createObjectStore(CACHE_STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+// Dexie uses native IndexedDB version 1 for version(0.1), preserving
+// the original waveform cache store, keyPath and existing cached bars.
+let _waveformDb = null;
+function database() {
+  if (!_waveformDb) {
+    _waveformDb = new Dexie(CACHE_DB);
+    _waveformDb.version(0.1).stores({ [CACHE_STORE]: 'id' });
+  }
+  return _waveformDb;
+}
+
+export function closeWaveformCache() {
+  _waveformDb?.close();
+  _waveformDb = null;
+}
+
+function isClosedConnection(error) {
+  return [error?.name, error?.inner?.name].some(
+    name => ['InvalidStateError', 'UnknownError', 'DatabaseClosedError'].includes(name),
+  );
+}
+
+async function withDatabase(operation) {
+  const db = database();
+  try {
+    return await operation(db);
+  } catch (error) {
+    if (!isClosedConnection(error)) throw error;
+    closeWaveformCache();
+    return operation(database());
+  }
 }
 
 async function getCachedWaveform(id) {
   try {
-    const db = await openCacheDB();
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(CACHE_STORE, 'readonly');
-        const req = tx.objectStore(CACHE_STORE).get(id);
-        req.onsuccess = () => resolve(req.result?.data ?? null);
-        req.onerror = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
+    const record = await withDatabase(db => db.table(CACHE_STORE).get(id));
+    return record?.data ?? null;
   } catch {
+    // Cached waveform data is optional. Playback continues without it.
     return null;
   }
 }
 
 async function setCachedWaveform(id, data) {
   try {
-    const db = await openCacheDB();
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(CACHE_STORE, 'readwrite');
-        const req = tx.objectStore(CACHE_STORE).put({ id, data });
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve();
-      } catch {
-        resolve();
-      }
-    });
+    await withDatabase(db => db.table(CACHE_STORE).put({ id, data }));
   } catch {
-    // Cache is optional
+    // Cache is optional; a storage error cannot interrupt media playback.
   }
 }
 
