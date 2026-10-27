@@ -4,7 +4,7 @@ export const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 
 function parseDate(str) {
   const parts = String(str).split('-');
-  if (parts.length !== 3 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(str)) return null;
+  if (parts.length !== 3 || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
   const [year, month, day] = parts.map(Number);
   const date = new Date(year, month - 1, day);
   // Date constructor normalizes invalid dates (February 30 -> March 2).
