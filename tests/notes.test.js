@@ -764,7 +764,7 @@ describe('notes route filters', () => {
     expect(saved).toContain('href="mailto:test@example.org"');
     expect(saved).not.toMatch(/onerror|<iframe|<script|window\\.__offsite/);
     expect(saved).toContain('data-remote-src="https://example.org/tracker.png"');
-    expect(saved).not.toContain('src="https://example.org/tracker.png"');
+    expect(saved).not.toMatch(/\\ssrc="https:\\/\\/example\\.org\\/tracker\\.png"/);
     expect(window.__offsite).toBeUndefined();
   });
 
