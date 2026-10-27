@@ -744,6 +744,54 @@ describe('notes route filters', () => {
     expect(window.__importScriptXss).toBeUndefined();
   });
 
+  it('sanitizes imported HTML offline without requiring a separately loaded DOMPurify global', async () => {
+    // A bundled sanitizer must remain available when no runtime vendor script
+    // has established window.DOMPurify yet.
+    delete window.DOMPurify;
+    window.DB.saveNote.mockImplementation(note => Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'offline-html',
+      title: 'Imported offline',
+      content: '<p><strong>Preserve formatting</strong> <a href="mailto:test@example.org">Email</a></p>'
+        + '<img src="https://example.org/tracker.png" onerror="window.__offsite = true">'
+        + '<iframe src="https://example.org"></iframe><script>alert(1)</script>',
+    }])], 'notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.PlasmaNotesStore.getNote('offline-html')).toBeTruthy(), { timeout: 5000 });
+    const saved = window.PlasmaNotesStore.getNote('offline-html').content;
+    expect(saved).toContain('<strong>Preserve formatting</strong>');
+    expect(saved).toContain('href="mailto:test@example.org"');
+    expect(saved).not.toMatch(/onerror|<iframe|<script|window\.__offsite/);
+    expect(saved).toContain('data-remote-src="https://example.org/tracker.png"');
+    expect(saved).not.toMatch(/\ssrc="https:\/\/example\.org\/tracker\.png"/);
+    expect(window.__offsite).toBeUndefined();
+  });
+
+  it('blocks externally loaded SVG image/use/filter content from imported notes', async () => {
+    window.DB.saveNote.mockImplementation(note => Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'svg-remote-note',
+      title: 'External SVG regression',
+      content: '<p>Safe note</p>'
+        + '<svg xmlns="http://www.w3.org/2000/svg">'
+        + '<image href="https://tracker.example/one.png" width="5" height="5"/>'
+        + '<use href="https://tracker.example/remote.svg#shape"/>'
+        + '<filter id="f"><feImage href="https://tracker.example/two.png"/></filter>'
+        + '</svg>',
+    }])], 'notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(
+      () => expect(window.PlasmaNotesStore.getNote('svg-remote-note')).toBeTruthy(),
+      { timeout: 5000 },
+    );
+    const content = window.PlasmaNotesStore.getNote('svg-remote-note').content;
+    expect(content).toContain('Safe note');
+    expect(content).not.toMatch(/<svg|<image|<use|<feImage/i);
+    expect(content).not.toContain('https://tracker.example');
+  });
+
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     window.PlasmaNotesStore.updateNote('regular-note', {

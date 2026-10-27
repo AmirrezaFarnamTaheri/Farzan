@@ -259,7 +259,7 @@ describe('app.js fallback sanitizer', () => {
 });
 
 // ───────────────────────────────────────────────────────────
-// notes.js -- editor teardown and the fallback sanitizer
+// notes.js -- editor lifecycle and bundled HTML sanitizer
 // ───────────────────────────────────────────────────────────
 
 describe('notes.js editor teardown', () => {
@@ -293,48 +293,32 @@ describe('notes.js editor teardown', () => {
   });
 });
 
-describe('notes.js fallback sanitizer', () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    document.body.innerHTML = '';
-    delete window.DOMPurify;
-    window.OpenCourseDeck = {};
-    await import('../notes.js');
-  });
-  afterEach(() => { document.body.innerHTML = ''; });
-
-  const sanitize = (html) => window.OpenCourseDeck.NotesApp
-    ? window.OpenCourseDeck.Editor?._sanitize?.(html)
-    : null;
-
-  it('parses into an inert template, never a live element', () => {
-    // A live <div> issues a network request for every <img> in untrusted
-    // markup as a side effect of "sanitizing" it.
+describe('notes.js established sanitizer integration', () => {
+  it('bundles DOMPurify instead of maintaining a second handwritten HTML sanitizer', () => {
     const src = read('notes.js');
-    const fn = src.slice(src.indexOf('function fallbackSanitize('), src.indexOf('function fallbackSanitize(') + 1200);
-    expect(fn).toContain("createElement('template')");
-    expect(fn).not.toContain("createElement('div')");
+    expect(src).toContain("import DOMPurify from 'dompurify'");
+    expect(src).toContain('noteSanitizer.sanitize(');
+    expect(src).not.toContain('function fallbackSanitize(');
+    expect(src).not.toContain('function scrubFragment(');
   });
 
-  it('uses an allowlist of schemes, not a denylist of two', () => {
+  it('retains an explicit policy for HTML elements, attributes, and navigation schemes', () => {
     const src = read('notes.js');
-    expect(src).toContain('SANITIZE_FORBIDDEN');
-    expect(src).toContain('SANITIZE_DROP_ATTRS');
-    expect(src).toContain('NAV_SCHEMES');
-    // The old denylist tested for exactly these two and let everything else by.
+    expect(src).toContain('USE_PROFILES: { html: true }');
+    expect(src).toContain('FORBID_TAGS:');
+    expect(src).toContain('FORBID_ATTR:');
+    expect(src).toContain('ALLOWED_URI_REGEXP:');
+    expect(src).toContain('mailto|tel');
     expect(src).not.toMatch(/\/\^\\s\*javascript:\/i\.test\(v\)/);
   });
 
-  it('permits mailto: and tel:, which app.js policy would reject', () => {
-    // Note bodies legitimately carry these; the app-shell navigation policy
-    // does not, which is why this file keeps its own scheme list.
+  it('enforces remote-image privacy in an inert template after library sanitization', () => {
     const src = read('notes.js');
-    expect(src).toContain("'mailto:'");
-    expect(src).toContain("'tel:'");
-  });
-
-  it('sanitize() is unused as a name only when DOMPurify is present', () => {
-    expect(typeof sanitize).toBe('function');
+    const fragment = src.slice(src.indexOf('function controlRemoteNoteImages('), src.indexOf('const Editor ='));
+    expect(fragment).toContain("createElement('template')");
+    expect(fragment).not.toContain("createElement('div')");
+    expect(fragment).toContain("image.setAttribute('data-remote-src'");
+    expect(fragment).toContain("image.removeAttribute('src')");
   });
 });
 

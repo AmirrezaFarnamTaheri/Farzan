@@ -4,6 +4,8 @@
 // Features: Editor, Folders, Tags, Search, Autosave, Export
 // ============================================================
 
+import DOMPurify from 'dompurify';
+
 (() => {
   'use strict';
 
@@ -542,92 +544,11 @@
   };
 
 
-  // ──────────────────────────────────────────────────────────
-  // 1b. FALLBACK SANITIZER
-  // ──────────────────────────────────────────────────────────
+  // DOMPurify 3.4.17 is bundled by esbuild as an explicit module import;
+  // no script-global race and no second home-made HTML sanitizer.
+  const noteSanitizer = typeof DOMPurify.sanitize === 'function'
+    ? DOMPurify : DOMPurify(window);
 
-  /*
-   * Used only when DOMPurify is unavailable (blocked CDN, subresource-integrity
-   * failure). DOMPurify is vendored and preloaded, so this is a genuine last
-   * resort -- but it is the resort for *note content*, which is the most
-   * attacker-reachable data in the app (imported .json bundles, pasted markup,
-   * synced notes), so it is written as an allowlist and not a denylist.
-   *
-   * It deliberately does not delegate to app.js's sanitizeHtml. Root modules
-   * are loaded through boot.js in an order this file cannot assume, and the
-   * scheme policy differs: note bodies legitimately contain mailto: and tel:
-   * links, which app.js's navigation policy (an app-shell policy) rejects.
-   *
-   * The previous implementation here was a denylist of exactly two schemes
-   * (javascript:, data:text/html) applied to four attributes, and it parsed
-   * into a live <div> -- which issues a network request for every <img> in the
-   * untrusted markup as a side effect of "sanitizing" it.
-   */
-
-  const SANITIZE_FORBIDDEN = 'script, style, meta, link, base, iframe, object, embed, form, template, noscript';
-  /** Executes, navigates, or beacons; no note needs any of them. */
-  const SANITIZE_DROP_ATTRS = new Set(['srcdoc', 'ping', 'srcset', 'sizes', 'http-equiv', 'formaction']);
-
-  function safeUrl(value, schemes, dataPattern) {
-    const raw = String(value ?? '').trim();
-    if (!raw) return false;
-    if (raw.startsWith('#')) return true;
-    let url;
-    try {
-      url = new URL(raw, document.baseURI);
-    } catch {
-      return false;
-    }
-    if (url.protocol === 'data:') return Boolean(dataPattern) && dataPattern.test(raw);
-    return schemes.includes(url.protocol);
-  }
-
-  const NAV_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'];
-  const MEDIA_SCHEMES = ['http:', 'https:', 'blob:'];
-
-  /**
-   * Scrub a parsed fragment in place. Extracted so the mutation-XSS check can
-   * run the identical pass on the re-parsed output.
-   * @param {DocumentFragment} fragment
-   */
-  function scrubFragment(fragment) {
-    fragment.querySelectorAll(SANITIZE_FORBIDDEN).forEach(node => node.remove());
-    fragment.querySelectorAll('*').forEach(node => {
-      const tag = node.tagName.toLowerCase();
-      for (const attr of [...node.attributes]) {
-        const name = attr.name.toLowerCase();
-        const value = attr.value;
-        if (name.startsWith('on') || SANITIZE_DROP_ATTRS.has(name)) {
-          node.removeAttribute(attr.name);
-          continue;
-        }
-        if (name === 'xlink:href') {
-          // Same-document references only; an external one pulls in a foreign
-          // document fragment through <use>.
-          if (!String(value).trim().startsWith('#')) node.removeAttribute(attr.name);
-          continue;
-        }
-        if (name === 'href' || name === 'action') {
-          if (!safeUrl(value, NAV_SCHEMES, null)) node.removeAttribute(attr.name);
-          continue;
-        }
-        if (name === 'poster' || name === 'background' || (name === 'src' && (tag === 'img' || tag === 'image'))) {
-          // data:image/ is how a pasted screenshot survives a round trip.
-          if (!safeUrl(value, MEDIA_SCHEMES, /^data:image\//i)) node.removeAttribute(attr.name);
-          continue;
-        }
-        if (name === 'src' && !safeUrl(value, MEDIA_SCHEMES, /^data:(?:video|audio|application\/pdf)\//i)) {
-          node.removeAttribute(attr.name);
-        }
-      }
-    });
-  }
-
-  /**
-   * @param {unknown} html
-   * @returns {string} sanitized markup, or escaped text if the markup is not
-   *   stable under re-parsing
-   */
   const REMOTE_IMAGE_PERMISSION = 'ocd_note_external_images_session';
 
   function remoteImagesAllowed() {
@@ -658,30 +579,6 @@
       }
     }
     return template.innerHTML;
-  }
-
-  function fallbackSanitize(html) {
-    // <template> content is inert: parsing it loads no resources and runs no
-    // script, unlike the <div> this used to build.
-    const template = document.createElement('template');
-    template.innerHTML = String(html ?? '');
-    scrubFragment(template.content);
-    const once = template.innerHTML;
-
-    // Mutation-XSS guard. Serializing a parsed tree and re-parsing it can yield
-    // a different tree (foreign-content and table-scope confusion are the usual
-    // culprits), so markup that inspected as safe can become dangerous when the
-    // caller assigns this string to innerHTML. If the pass is not a fixed
-    // point, refuse to emit markup at all.
-    const verify = document.createElement('template');
-    verify.innerHTML = once;
-    scrubFragment(verify.content);
-    if (verify.innerHTML !== once) {
-      return String(verify.content.textContent ?? '').replace(/[&<>"']/g, char => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-      }[char]));
-    }
-    return once;
   }
 
   // ──────────────────────────────────────────────────────────
@@ -894,17 +791,15 @@
     },
 
     _sanitize(html) {
-      const purify = window.DOMPurify;
-      if (purify?.sanitize) {
-        return controlRemoteNoteImages(purify.sanitize(String(html ?? ''), {
-          FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
-          FORBID_ATTR: ['style', 'srcset', 'sizes'],
-          // Block javascript: etc while still allowing normal links/images.
-          ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-        }));
-      }
-
-      return controlRemoteNoteImages(fallbackSanitize(html));
+      return controlRemoteNoteImages(noteSanitizer.sanitize(String(html ?? ''), {
+        // The note privacy gate handles HTML <img>, not SVG <image>/<use>/
+        // <feImage>. HTML-only sanitization forbids network-loading foreign
+        // content even if an imported note contains SVG resource references.
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
+        FORBID_ATTR: ['style', 'srcset', 'sizes'],
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+      }));
     },
 
     // ── Toolbar state sync ────────────────────────────────
