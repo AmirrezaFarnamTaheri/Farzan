@@ -38,6 +38,16 @@ export function mountProgressView({ setView } = {}) {
       </div>
 
       <div class="progress-metric-grid" aria-label="Learning summary" aria-busy="true" data-progress-loading>
+        <article class="progress-metric progress-metric-featured">
+          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
+          <span class="progress-metric-label">Completion</span>
+          <strong id="stat-completion-pct">—</strong>
+          <span class="progress-metric-note">Across all tracked topics</span>
+          <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
+            <div class="mini-bar" id="stat-overall-bar"></div>
+          </div>
+        </article>
+
         <article class="progress-metric">
           <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg></span>
           <span class="progress-metric-label">Total topics</span>
@@ -57,16 +67,6 @@ export function mountProgressView({ setView } = {}) {
           <span class="progress-metric-label">In progress</span>
           <strong id="stat-in-progress">—</strong>
           <span class="progress-metric-note">Active learning threads</span>
-        </article>
-
-        <article class="progress-metric progress-metric-featured">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
-          <span class="progress-metric-label">Completion</span>
-          <strong id="stat-completion-pct">—</strong>
-          <span class="progress-metric-note">Across all tracked topics</span>
-          <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
-            <div class="mini-bar" id="stat-overall-bar"></div>
-          </div>
         </article>
 
         <article class="progress-metric">
