@@ -91,6 +91,14 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(advanced.locator('[data-studio-export-json]')).toBeVisible();
   });
 
+  test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    const input = page.locator('#sidebar-search');
+    await expect(input).toHaveAttribute('placeholder', 'Search…');
+    await expect(input).toHaveAttribute('aria-label', 'Quick search courses and lessons');
+  });
+
   test('keeps a newly opened note editor visible without scrolling past an empty library panel', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
