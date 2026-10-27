@@ -768,6 +768,30 @@ describe('notes route filters', () => {
     expect(window.__offsite).toBeUndefined();
   });
 
+  it('blocks externally loaded SVG image/use/filter content from imported notes', async () => {
+    window.DB.saveNote.mockImplementation(note => Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'svg-remote-note',
+      title: 'External SVG regression',
+      content: '<p>Safe note</p>'
+        + '<svg xmlns="http://www.w3.org/2000/svg">'
+        + '<image href="https://tracker.example/one.png" width="5" height="5"/>'
+        + '<use href="https://tracker.example/remote.svg#shape"/>'
+        + '<filter id="f"><feImage href="https://tracker.example/two.png"/></filter>'
+        + '</svg>',
+    }])], 'notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(
+      () => expect(window.PlasmaNotesStore.getNote('svg-remote-note')).toBeTruthy(),
+      { timeout: 5000 },
+    );
+    const content = window.PlasmaNotesStore.getNote('svg-remote-note').content;
+    expect(content).toContain('Safe note');
+    expect(content).not.toMatch(/<svg|<image|<use|<feImage/i);
+    expect(content).not.toContain('https://tracker.example');
+  });
+
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     window.PlasmaNotesStore.updateNote('regular-note', {
