@@ -64,4 +64,21 @@ describe('Chart.js native sparkline compatibility', () => {
     });
   });
 
+  it('reapplies configured defaults after chart updates replace the dataset array', () => {
+    const chart = fixture();
+    chartSparkline.beforeInit(chart);
+    chart.data.datasets = [{ data: [7, 2, 8] }];
+    chartSparkline.beforeUpdate(chart);
+    expect(chart.data.datasets[0]).toMatchObject({
+      data: [7, 2, 8],
+      borderColor: '#123456',
+      backgroundColor: '#abcdef',
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: 'origin',
+    });
+  });
+
+
 });
