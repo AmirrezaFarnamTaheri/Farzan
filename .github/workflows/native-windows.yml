@@ -14,6 +14,8 @@ on:
       - 'progress.js'
       - 'src/styles/**'
       - 'src/views/**'
+      - 'src/features/mediaStorage.js'
+      - 'src/features/translationCache.js'
       - 'src/core/themeManager.js'
       - 'data/opencoursedeck-starter.json'
       - 'src-tauri/**'
