@@ -1,6 +1,8 @@
 // ============================================================
 // progress.js  — OpenCourseDeck bulk progress & export
 // ============================================================
+import { createVaultZip } from './src/features/vaultZip.js';
+
 'use strict';
 
 /** Sprite-backed inline icon: <svg class="icon"><use href="#i-{id}"/></svg> */
@@ -46,12 +48,6 @@ const ProgressStats = (() => {
     return h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
              : `${m}:${String(s).padStart(2,'0')}`;
   };
-  const _crcTable = Array.from({ length: 256 }, (_, n) => {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    return c >>> 0;
-  });
-
   /* ══════════════════════════════════════════════════════════
      AGGREGATE STATS
   ══════════════════════════════════════════════════════════ */
@@ -594,7 +590,7 @@ const ProgressStats = (() => {
 
   async function exportVaultZip() {
     const archive = await _vaultArchivePayload();
-    _downloadBlob(_zipFiles(archive.files), `opencoursedeck-vault-${_isoDate()}.zip`);
+    _downloadBlob(createVaultZip(archive.files), `opencoursedeck-vault-${_isoDate()}.zip`);
     pdToast(`Vault ZIP export downloaded (${archive.files.length} files)`, 'success');
   }
 
@@ -1367,57 +1363,6 @@ const ProgressStats = (() => {
       a.remove();
       URL.revokeObjectURL(url);
     }, 60_000);
-  }
-
-  function _zipFiles(files) {
-    const encoder = new TextEncoder();
-    const localParts = [];
-    const centralParts = [];
-    let offset = 0;
-    files.forEach((file) => {
-      const name = encoder.encode(file.path);
-      const body = encoder.encode(file.content ?? '');
-      const crc = _crc32(body);
-      const local = _zipHeader(30, 0x04034b50);
-      local.setUint16(4, 20, true);
-      local.setUint32(14, crc, true);
-      local.setUint32(18, body.length, true);
-      local.setUint32(22, body.length, true);
-      local.setUint16(26, name.length, true);
-      localParts.push(local, name, body);
-      const central = _zipHeader(46, 0x02014b50);
-      central.setUint16(4, 20, true);
-      central.setUint16(6, 20, true);
-      central.setUint32(16, crc, true);
-      central.setUint32(20, body.length, true);
-      central.setUint32(24, body.length, true);
-      central.setUint16(28, name.length, true);
-      central.setUint32(42, offset, true);
-      centralParts.push(central, name);
-      offset += local.byteLength + name.length + body.length;
-    });
-    const centralSize = centralParts.reduce((sum, part) => sum + part.byteLength, 0);
-    const end = _zipHeader(22, 0x06054b50);
-    end.setUint16(8, files.length, true);
-    end.setUint16(10, files.length, true);
-    end.setUint32(12, centralSize, true);
-    end.setUint32(16, offset, true);
-    return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
-  }
-
-  function _zipHeader(size, signature) {
-    const buffer = new ArrayBuffer(size);
-    const view = new DataView(buffer);
-    view.setUint32(0, signature, true);
-    return view;
-  }
-
-  function _crc32(bytes) {
-    let crc = -1;
-    for (let i = 0; i < bytes.length; i += 1) {
-      crc = (crc >>> 8) ^ _crcTable[(crc ^ bytes[i]) & 255];
-    }
-    return (crc ^ -1) >>> 0;
   }
 
   async function _vaultArchivePayload() {
