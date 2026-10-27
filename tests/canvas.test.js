@@ -162,6 +162,62 @@ describe('Canvas renderer scheduling', () => {
     expect(serialized.layers[0].elements).toHaveLength(1);
   });
 
+  it('preserves the app-owned v1 board JSON when a future canvas renderer is substituted', () => {
+    const board = window.OpenCourseDeck.Canvas;
+    const legacy = {
+      version: 1,
+      viewport: { offsetX: -76, offsetY: 18, zoom: 2.25, rotation: 15 },
+      tool: 'select',
+      style: {
+        strokeColor: '#e11d48', fillColor: '#fef9c3', strokeWidth: 3,
+        opacity: 0.75, lineCap: 'round', lineJoin: 'bevel', dashPattern: [4, 2],
+        fontSize: 22, fontFamily: 'Inter, sans-serif',
+      },
+      grid: { enabled: true, size: 32, snap: false },
+      activeLayerIdx: 1,
+      layers: [
+        {
+          id: 'locked-annotations', name: 'Annotations', visible: false, locked: true,
+          opacity: 0.55,
+          elements: [{
+            id: 'legacy-ink', type: 'path', x: 12, y: 24,
+            points: [{ x: 0, y: 0 }, { x: 19, y: 27 }],
+            stroke: '#e11d48', strokeWidth: 3,
+          }],
+        },
+        {
+          id: 'lesson-map', name: 'Lesson map', visible: true, locked: false,
+          opacity: 1,
+          elements: [
+            { id: 'note-fa', type: 'text', text: 'فیزیولوژی قلب', x: 98, y: 50, fontSize: 22 },
+            { id: 'shape-circle', type: 'circle', x: 130, y: 140, radius: 26, fill: '#fef9c3' },
+            { id: 'diagram-img', type: 'image', x: 260, y: 95,
+              width: 150, height: 90, src: 'https://example.org/diagram.png' },
+          ],
+        },
+      ],
+    };
+
+    const restored = board.loadState(JSON.parse(JSON.stringify(legacy)));
+    expect(restored.version).toBe(1);
+    expect(restored.viewport).toEqual(legacy.viewport);
+    expect(restored.style).toEqual(legacy.style);
+    expect(restored.grid).toEqual(legacy.grid);
+    expect(restored.activeLayerIdx).toBe(1);
+    expect(restored.layers).toEqual(legacy.layers);
+
+    const persisted = JSON.parse(JSON.stringify(board.serialize()));
+    expect(persisted.layers[0].locked).toBe(true);
+    expect(persisted.layers[0].visible).toBe(false);
+    expect(persisted.layers[0].elements[0].points).toEqual(legacy.layers[0].elements[0].points);
+    expect(persisted.layers[1].elements.map(el => el.id))
+      .toEqual(['note-fa', 'shape-circle', 'diagram-img']);
+    expect(persisted.layers[1].elements[0].text).toBe('فیزیولوژی قلب');
+
+    board.loadState(persisted);
+    expect(board.serialize().layers).toEqual(legacy.layers);
+  });
+
   it('can reload synced Studio board state while preserving local viewport, tool, and valid selection', () => {
     const canvas = window.OpenCourseDeck.Canvas;
 
