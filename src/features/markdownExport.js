@@ -9,7 +9,7 @@
  */
 import DOMPurify from 'dompurify';
 import TurndownService from 'turndown';
-import turndownGfm from 'turndown-plugin-gfm';
+import { gfm } from 'turndown-plugin-gfm';
 
 const purifier = typeof DOMPurify.sanitize === 'function'
   ? DOMPurify
@@ -24,7 +24,7 @@ const converter = new TurndownService({
   linkStyle: 'inlined',
 });
 // Reuse the established GFM rules instead of custom table/list rendering.
-converter.use(turndownGfm.gfm);
+converter.use(gfm);
 
 export function noteHtmlToMarkdown(input) {
   const source = String(input ?? '');
