@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTiptapNoteEditor } from '../src/features/notesTiptapAdapter.js';
+import { createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
 
-describe('Tiptap StarterKit edit adapter', () => {
+describe('Squire HTML-canonical edit adapter', () => {
   it('edits compatible HTML and retains rich content and Unicode text', () => {
     const element = document.createElement('div');
     document.body.appendChild(element);

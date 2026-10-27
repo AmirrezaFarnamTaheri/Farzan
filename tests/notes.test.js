@@ -170,7 +170,7 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getNote('regular-note').content).toContain('<table>');
   });
 
-  it('refuses an unsaved legacy table draft before attempting any ProseMirror conversion', async () => {
+  it('refuses an unsaved legacy table draft before attempting any modern-editor conversion', async () => {
     const store = window.PlasmaNotesStore;
     const app = window.PlasmaNotesApp;
     store.updateNote('regular-note', { content: '<p>Original compatible note</p>' });
@@ -183,7 +183,7 @@ describe('notes route filters', () => {
     const result = await app.enableModernEditor();
     expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
     expect(editor.querySelector('table td')?.textContent).toBe('Never drop 70 mL');
-    expect(editor.querySelector('.ProseMirror')).toBeNull();
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
     expect(editor.getAttribute('contenteditable')).toBe('true');
     app.flushPendingSave();
     expect(store.getNote('regular-note').content).toContain('Never drop 70 mL');
@@ -198,10 +198,10 @@ describe('notes route filters', () => {
     const result = await window.PlasmaNotesApp.enableModernEditor();
     expect(result).toMatchObject({ ok: true });
     const editor = document.querySelector('[data-notes-editor]');
-    expect(editor.querySelector('.ProseMirror')?.textContent).toContain('你好世界');
+    expect(editor.querySelector('.notes-modern-editor')?.textContent).toContain('你好世界');
     expect(window.PlasmaNotesStore.getNote('regular-note').content).toBe(savedBefore);
     expect(window.PlasmaNotesApp.disableModernEditor()).toBe(true);
-    expect(editor.querySelector('.ProseMirror')).toBeNull();
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
     expect(editor.textContent).toContain('هوا و ریه');
   });
 
@@ -214,7 +214,7 @@ describe('notes route filters', () => {
     app.openNote('regular-note');
     const result = await app.enableModernEditor();
     expect(result).toMatchObject({ ok: true });
-    const proseMirror = document.querySelector('[data-notes-editor] .ProseMirror');
+    const proseMirror = document.querySelector('[data-notes-editor] .notes-modern-editor');
     expect(proseMirror).not.toBeNull();
     // jsdom lacks Range#getClientRects, which ProseMirror needs during
     // selection-change scroll measurement; provide measurement only.

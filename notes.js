@@ -592,7 +592,7 @@ import { countWords } from './src/core/textMetrics.js';
       const before = node.innerHTML;
       let adapterModule;
       try {
-        adapterModule = await import('./src/features/notesTiptapAdapter.js');
+        adapterModule = await import('./src/features/notesSquireAdapter.js');
       } catch (error) {
         console.warn('[Notes] Tiptap preview unavailable', error);
         return { ok: false, reason: 'unavailable' };
