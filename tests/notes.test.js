@@ -762,9 +762,9 @@ describe('notes route filters', () => {
     const saved = window.PlasmaNotesStore.getNote('offline-html').content;
     expect(saved).toContain('<strong>Preserve formatting</strong>');
     expect(saved).toContain('href="mailto:test@example.org"');
-    expect(saved).not.toMatch(/onerror|<iframe|<script|window\\.__offsite/);
+    expect(saved).not.toMatch(/onerror|<iframe|<script|window\.__offsite/);
     expect(saved).toContain('data-remote-src="https://example.org/tracker.png"');
-    expect(saved).not.toMatch(/\\ssrc="https:\\/\\/example\\.org\\/tracker\\.png"/);
+    expect(saved).not.toMatch(/\ssrc="https:\/\/example\.org\/tracker\.png"/);
     expect(window.__offsite).toBeUndefined();
   });
 
