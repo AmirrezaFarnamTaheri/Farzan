@@ -73,7 +73,7 @@ describe('desktop shell wiring', () => {
     // The lockfile is the stable build contract, not a permanently frozen
     // Tauri version literal in the test. Verify that exact manifest pins match
     // the committed Cargo lock and remain registry-backed.
-    const tauriLock = read('src-tauri/Cargo.lock');
+    const tauriLock = read('src-tauri/Cargo.lock').replace(/\r\n/g, '\n');
     for (const crate of ['tauri', 'tauri-build']) {
       const pin = tauriCargo.match(new RegExp('^' + crate + '\\s*=\\s*\\{\\s*version\\s*=\\s*"=([^"]+)"', 'm'));
       expect(pin, `${crate} must use an exact version pin`).toBeTruthy();
