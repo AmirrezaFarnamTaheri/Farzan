@@ -5,7 +5,7 @@
  * unsupported structures must be rejected before parsing, never silently
  * rewritten. The adapter owns only a small compatible subset of editing.
  */
-import { Schema, DOMParser as PMDOMParser, DOMSerializer } from '@tiptap/pm/model';
+import { Schema, DOMParser as PMDOMParser, DOMSerializer, Slice } from '@tiptap/pm/model';
 import { EditorState, TextSelection } from '@tiptap/pm/state';
 import { EditorView } from '@tiptap/pm/view';
 import { keymap } from '@tiptap/pm/keymap';
@@ -151,7 +151,7 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
     commands: {
       insertContent(fragment) {
         const candidate = compatibleDocument(fragment);
-        view.dispatch(view.state.tr.replaceSelectionWith(candidate.content.firstChild || schema.nodes.paragraph.create()));
+        view.dispatch(view.state.tr.replaceSelection(new Slice(candidate.content, 0, 0)));
         return true;
       },
       focus(position) {
