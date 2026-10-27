@@ -11,9 +11,52 @@ const TYPES = new Set(['rect', 'roundRect', 'circle', 'ellipse', 'line', 'arrow'
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const unsupported = reason => ({ compatible: false, reason });
 
+/*
+ * The canonical Canvas v1 format allows caller-defined element properties.
+ * A renderer migration must not ignore one of them silently: some fields
+ * affect appearance, while others (links, shadows, metadata) affect exports.
+ * Admit only the fields this preview maps or deliberately preserves.
+ */
+const COMMON_KEYS = ['id', 'type', 'x', 'y', 'stroke', 'strokeWidth', 'fill', 'opacity'];
+const TYPE_KEYS = Object.freeze({
+  rect: ['width', 'height'],
+  roundRect: ['width', 'height', 'radius'],
+  circle: ['radius'],
+  ellipse: ['radiusX', 'radiusY', 'rotation'],
+  line: ['x1', 'y1', 'x2', 'y2', 'width', 'height', 'lineCap', 'dash'],
+  arrow: ['x1', 'y1', 'x2', 'y2', 'width', 'height', 'headSize'],
+  polyline: ['points', 'lineCap', 'lineJoin', 'dash'],
+  polygon: ['points'],
+  text: ['text', 'fontSize', 'fontFamily', 'align', 'baseline'],
+});
+
+function validateMappedElement(item, type) {
+  const allowed = new Set([...COMMON_KEYS, ...(TYPE_KEYS[type] || [])]);
+  for (const key of Object.keys(item)) {
+    if (!allowed.has(key)) return unsupported('unsupported-element-attribute-' + key);
+  }
+  // Konva's paints are CSS colors here, not Canvas gradients/patterns.
+  if (item.fill != null && typeof item.fill !== 'string') return unsupported('unsupported-fill');
+  if (item.stroke != null && typeof item.stroke !== 'string') return unsupported('unsupported-stroke');
+  // Do not coerce malformed coordinates into a different visible shape.
+  const numeric = ['x', 'y', 'x1', 'y1', 'x2', 'y2',
+    'width', 'height', 'radius', 'radiusX', 'radiusY', 'rotation',
+    'strokeWidth', 'opacity', 'headSize', 'fontSize'];
+  for (const name of numeric) {
+    if (Object.hasOwn(item, name) && item[name] != null
+      && (typeof item[name] !== 'number' || !Number.isFinite(item[name]))) {
+      return unsupported('invalid-element-number-' + name);
+    }
+  }
+  return { compatible: true };
+}
+
+
 function planShape(item) {
   const type = String(item?.type || '');
   if (!TYPES.has(type)) return unsupported('unsupported-element-' + type);
+  const mapped = validateMappedElement(item, type);
+  if (!mapped.compatible) return mapped;
   if (item?.transform || item?.shadow || item?.linkTarget || item?.linkType || item?.children
     || (type !== 'text' && item?.text)
     || (Array.isArray(item?.dash) && item.dash.length)
@@ -65,6 +108,7 @@ function planShape(item) {
       attrs = { ...common, x: 0, y: 0,
         points: [finite(item.x1, x), finite(item.y1, y),
           finite(item.x2, x + finite(item.width)), finite(item.y2, y + finite(item.height))] };
+      if (type === 'line' && item.lineCap) attrs.lineCap = item.lineCap;
       if (type === 'arrow') {
         attrs.pointerLength = finite(item.headSize, 12);
         attrs.pointerWidth = finite(item.headSize, 12);
