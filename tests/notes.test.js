@@ -744,6 +744,30 @@ describe('notes route filters', () => {
     expect(window.__importScriptXss).toBeUndefined();
   });
 
+  it('sanitizes imported HTML offline without requiring a separately loaded DOMPurify global', async () => {
+    // A bundled sanitizer must remain available when no runtime vendor script
+    // has established window.DOMPurify yet.
+    delete window.DOMPurify;
+    window.DB.saveNote.mockImplementation(note => Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'offline-html',
+      title: 'Imported offline',
+      content: '<p><strong>Preserve formatting</strong> <a href="mailto:test@example.org">Email</a></p>'
+        + '<img src="https://example.org/tracker.png" onerror="window.__offsite = true">'
+        + '<iframe src="https://example.org"></iframe><script>alert(1)</script>',
+    }])], 'notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.PlasmaNotesStore.getNote('offline-html')).toBeTruthy(), { timeout: 5000 });
+    const saved = window.PlasmaNotesStore.getNote('offline-html').content;
+    expect(saved).toContain('<strong>Preserve formatting</strong>');
+    expect(saved).toContain('href="mailto:test@example.org"');
+    expect(saved).not.toMatch(/onerror|<iframe|<script|window\\.__offsite/);
+    expect(saved).toContain('data-remote-src="https://example.org/tracker.png"');
+    expect(saved).not.toContain('src="https://example.org/tracker.png"');
+    expect(window.__offsite).toBeUndefined();
+  });
+
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     window.PlasmaNotesStore.updateNote('regular-note', {
