@@ -175,27 +175,6 @@ const tx = db.transaction(store, mode);
 return { tx, objectStore: tx.objectStore(store) };
 }
 
-_waitForTransaction(tx, request, mapResult = value => value) {
-return new Promise((resolve, reject) => {
-let requestResult;
-let requestCompleted = false;
-request.onsuccess = () => {
-requestResult = request.result;
-requestCompleted = true;
-};
-request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
-tx.oncomplete = () => {
-if (!requestCompleted) {
-reject(new Error('IndexedDB transaction completed without a request result'));
-return;
-}
-resolve(mapResult(requestResult));
-};
-tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
-tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
-});
-}
-
 _storeDef(store) {
 return (this.schema || []).find(item => item.name === store) || {};
 }
