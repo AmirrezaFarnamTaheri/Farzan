@@ -446,6 +446,7 @@ export class KnowledgeGraph extends EventEmitter {
     if (this._canvas) this._canvas.remove();
     this._nodes = [];
     this._edges = [];
-    this._listeners.clear();
+    // EventTarget-backed fluent listeners must be detached, not only untracked.
+    this.clear();
   }
 }
