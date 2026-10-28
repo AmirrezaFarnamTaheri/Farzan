@@ -1131,6 +1131,34 @@ describe('notes route filters', () => {
     }));
   });
 
+  it('does not append an AI summary outside Squire during unfinished IME composition', async () => {
+    let respond;
+    window.OpenCourseDeck.AI = {
+      summarizeText: vi.fn(() => new Promise(resolve => { respond = resolve; })),
+    };
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const pending = app.summarizeCurrentNote();
+
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'متن در حال تکمیل';
+    respond({ ok: true, text: '- Outdated AI result', provider: 'local' });
+    const result = await pending;
+
+    expect(result).toMatchObject({ ok: false, reason: 'stale-note' });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    expect(document.querySelector('[data-notes-editor] [data-ai-summary-block]')).toBeNull();
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith('Summary added');
+
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن در حال تکمیل');
+    expect(store.getNote('regular-note').content).not.toContain('Outdated AI result');
+  });
+
   it('does not insert a delayed AI summary into a different note after navigation', async () => {
     let respond;
     window.OpenCourseDeck.AI = {
