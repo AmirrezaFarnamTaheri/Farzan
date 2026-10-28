@@ -1207,6 +1207,9 @@ input[type="file"][hidden] {
   flex-wrap: wrap;
   gap: 6px;
 }
+.view-courses .course-jump-lessons {
+  display: none;
+}
 .view-courses .course-session-actions .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1251,6 +1254,12 @@ input[type="file"][hidden] {
   }
 }
 @media (max-width: 1023px) {
+  .view-courses .course-jump-lessons {
+    display: inline-flex;
+  }
+  .view-courses .courses-shell[data-playback-active="true"] .course-detail {
+    scroll-margin-top: calc(var(--topbar-height, 56px) + 12px);
+  }
   .view-courses .courses-shell[data-playback-active="true"] .courses-main {
     display: flex;
     flex-direction: column;

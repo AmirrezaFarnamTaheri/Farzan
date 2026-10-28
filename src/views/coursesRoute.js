@@ -63,6 +63,7 @@ export async function mountCoursesView(deps = {}) {
             <header class="course-session-head">
               <span class="course-session-label">Now studying</span>
               <div class="course-session-actions">
+                <button class="btn btn-ghost btn-sm course-jump-lessons" type="button" data-course-jump-topics aria-controls="course-detail">Lessons</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-toggle-catalog aria-controls="courses-catalog" aria-expanded="false">Browse catalog</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
               </div>
@@ -115,7 +116,7 @@ export async function mountCoursesView(deps = {}) {
           </div>
           </section>
 
-          <div id="course-detail" class="course-detail">
+          <div id="course-detail" class="course-detail" role="region" aria-label="Current course lesson outline" tabindex="-1">
             <div class="card card-filled catalog-placeholder">
               <div class="card-body catalog-empty">
                 <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
@@ -166,6 +167,15 @@ export async function mountCoursesView(deps = {}) {
   };
   catalogToggleEl?.addEventListener('click', () => {
     setCatalogOpen(coursesShellEl?.dataset.catalogOpen !== 'true');
+  });
+  // The optional timestamp form follows the video before the topic outline.
+  // Keep the next-lesson action one tap away on narrow screens, rather than
+  // forcing users to scroll through editing controls every time.
+  document.querySelector('[data-course-jump-topics]')?.addEventListener('click', () => {
+    if (!detailEl || coursesShellEl?.dataset.playbackActive !== 'true') return;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    detailEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    detailEl.focus({ preventScroll: true });
   });
   document.querySelector('[data-course-close-playback]')?.addEventListener('click', () => {
     try { playerEl?._pdPlayer?.pause?.(); } catch {}
