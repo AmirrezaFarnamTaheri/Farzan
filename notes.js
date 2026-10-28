@@ -571,6 +571,10 @@ import { countWords } from './src/core/textMetrics.js';
     async enableModern() {
       if (this._tiptap) return { ok: true, alreadyEnabled: true };
       if (!this._el || !this._currentId) return { ok: false, reason: 'no-note' };
+      // Never replace the native editing surface mid-IME. Composition DOM is
+      // provisional, and Squire would discard the browser's active composition.
+      if (this._compositionActive) return { ok: false, reason: 'composing' };
+      if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
       // Check the *original* HTML before sanitization. A schema-based editor
       // would otherwise drop unsupported saved metadata and silently replace
       // it when a title-only save occurs.
@@ -608,6 +612,9 @@ import { countWords } from './src/core/textMetrics.js';
           || node.innerHTML !== before || !node.isConnected) {
         return { ok: false, reason: 'stale-mount' };
       }
+      // An IME or storage refresh might start while the editor module loads.
+      if (this._compositionActive) return { ok: false, reason: 'composing' };
+      if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
       try {
         node.setAttribute('contenteditable', 'false');
         node.replaceChildren();
