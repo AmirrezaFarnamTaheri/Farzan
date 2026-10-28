@@ -775,6 +775,57 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-note-title-input]').value).toContain('Recovered');
   });
 
+  it('does not resurrect a remotely deleted note while its hydration read is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    window.DB.saveNote.mockClear();
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft pending slow sync</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const remote = store.getNotes().filter(note => note.id !== 'regular-note');
+    let finishRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      finishRead = resolve;
+    }));
+    const pending = app.refreshFromSync({ kind: 'note', action: 'delete' });
+    await vi.advanceTimersByTimeAsync(900);
+    const obsoleteWrites = window.DB.saveNote.mock.calls.filter(([note]) => note.id === 'regular-note');
+    finishRead(remote);
+    const result = await pending;
+
+    expect(obsoleteWrites).toHaveLength(0);
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Draft pending slow sync');
+  });
+
+  it('recovers an unfinished Squire IME draft after remote deletion without persisting partial text', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    mounted.querySelector('p').textContent = 'متن فارسی ناتمام';
+    mounted.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).not.toContain('متن فارسی ناتمام');
+
+    mounted.querySelector('p').textContent = 'متن فارسی کامل';
+    mounted.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
+  });
+
   it('repairs split notes storage by merging local and canonical DB records', async () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
