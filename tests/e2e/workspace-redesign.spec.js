@@ -126,6 +126,13 @@ test.describe('Farzan desktop workspace redesign', () => {
     });
     expect(positions.detailTop).toBeGreaterThan(positions.sessionBottom - 4);
     expect(positions.detailWidth).toBeLessThanOrEqual(positions.viewportWidth);
+    // The player is tall on phones and the timestamp form sits above the
+    // outline. One explicit action must make the first lesson accessible.
+    const jumpToLessons = page.locator('[data-course-jump-topics]');
+    await expect(jumpToLessons).toBeVisible();
+    await expect(jumpToLessons).toHaveAttribute('aria-controls', 'course-detail');
+    await jumpToLessons.click();
+    await expect(page.locator('#course-detail .topic-row').first()).toBeInViewport({ ratio: 0.5 });
     await page.locator('[data-course-toggle-catalog]').click();
     await expect(page.locator('.courses-sidebar')).toBeVisible();
   });
