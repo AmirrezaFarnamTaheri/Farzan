@@ -138,6 +138,18 @@ describe('home entry and resume contracts', () => {
     }
   });
 
+  it('does not pair the Continue widget topic with a different topic timestamp', async () => {
+    const now = Date.now();
+    const { Router, setPendingCourseMedia } = mountDashboard({
+      progress: [{ topicId: 'topic-1', percent: 60, position: 90, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-2', position: 10, updatedAt: now - 60000 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    document.querySelector('[data-home-widget="continue"]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+  });
+
   it('only resumes a position belonging to the focused topic', async () => {
     const now = Date.now();
     const { setPendingCourseMedia } = mountDashboard({
