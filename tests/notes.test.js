@@ -299,6 +299,20 @@ describe('notes route filters', () => {
     ))).toBe(true);
   });
 
+  it('flushes a final unobserved Squire keystroke before navigating away', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.querySelector('p').textContent = 'Most recent unsignaled text';
+    // Squire may batch its final DOM update in a MutationObserver; no input
+    // notification has fired before the route's synchronous leave handler.
+    expect(app.flushPendingSave()).toBe(true);
+    expect(store.getNote('regular-note').content).toContain('Most recent unsignaled text');
+    expect(app.disableModernEditor()).toBe(true);
+  });
+
   it('has one Note textbox role during modern editing and restores classic semantics on exit', async () => {
     const app = window.PlasmaNotesApp;
     app.openNote('regular-note');
