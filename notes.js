@@ -789,27 +789,20 @@ import { countWords } from './src/core/textMetrics.js';
       const sourceEpoch = this._loadEpoch;
 
       const doSave = () => {
-        // Never apply a delayed save from an older editor session to a note
-        // opened later. Remote-deletion recovery rebinds the ID, not the epoch.
-        if (this._loadEpoch !== sourceEpoch) {
-          this._saveTimer = null;
-          return;
-        }
+        // Clear the handle before returning or re-arming; otherwise a stale
+        // timer makes the dirty-draft check report false positives forever.
+        this._saveTimer = null;
+        // The editor may have been torn down while this callback was pending.
+        if (!this._el) return;
+        // A delayed save must not target a different note opened afterwards.
+        // Recovery of a deleted note rebinds its ID without changing epoch.
+        if (this._loadEpoch !== sourceEpoch) return;
         if (this._syncReadInProgress) {
-          // Keep the draft pending while the canonical DB read decides
-          // whether the original record survived or needs recovery.
+          // Pause writes until the canonical read confirms the note still
+          // exists or has established a separate recovered draft.
           this._saveTimer = setTimeout(doSave, 150);
           return;
         }
-        // Clearing the handle is what makes _hasPendingLocalEdit() honest.
-        // clearTimeout alone leaves the numeric id in place, so after the very
-        // first debounced save the editor looked permanently dirty and the
-        // cross-tab sync refresh stopped reloading it, forever.
-        this._saveTimer = null;
-        // The editor can be torn down between scheduling and firing (route
-        // change, tab close). Writing then would persist the empty content of
-        // a detached node over a real note.
-        if (!this._el) return;
         const content  = this.getContent();
         const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
