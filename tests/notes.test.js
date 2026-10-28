@@ -853,8 +853,10 @@ describe('notes route filters', () => {
     root.querySelector('p').textContent = 'Finished change before composition + 中途入力';
     root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
 
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
     app.flushPendingSave();
     expect(store.getNote('regular-note').content).not.toContain('中途入力');
+    expect(window.OpenCourseDeck.beforeUnload.unmark).not.toHaveBeenCalledWith('notes-body');
 
     root.querySelector('p').textContent = 'Finished change before composition + 完成';
     root.dispatchEvent(new Event('compositionend', { bubbles: true }));
@@ -871,8 +873,10 @@ describe('notes route filters', () => {
     editor.innerHTML = '<p>Unfinished IME 下書き</p>';
     editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
 
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
     app.flushPendingSave();
     expect(store.getNote('regular-note').content).not.toContain('下書き');
+    expect(window.OpenCourseDeck.beforeUnload.unmark).not.toHaveBeenCalledWith('notes-body');
 
     editor.innerHTML = '<p>Committed IME 完了</p>';
     editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
