@@ -5,10 +5,10 @@
  * policy because properties such as background-image can load remote assets.
  * Parsing occurs in a detached element; never attach untrusted CSS to the DOM.
  */
-const COLOR = /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?)\(\s*[0-9.%+\-,\s]+\s*\)|[a-z]{1,24})$/i;
+const COLOR = /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?)\(\s*[0-9.%+,\s-]+\s*\)|[a-z]{1,24})$/i;
 const LENGTH = /^(?:\d+(?:\.\d+)?(?:px|pt|em|rem|%)|small|medium|large|x-large|xx-large|smaller|larger)$/i;
 const ALIGN = /^(?:left|right|center|justify|start|end)$/i;
-const FONTS = /^[\p{L}\p{N}\s,"'\-]+$/u;
+const FONTS = /^[\p{L}\p{N}\s,"'-]+$/u;
 
 function allowed(name, value) {
   if (!value || /(?:url|expression|var|attr)\s*\(|[{}]|javascript\s*:/i.test(value)) return false;
