@@ -47,6 +47,11 @@ function seedNotes() {
   ]));
 }
 
+async function settleNoteDatabaseWrites() {
+  const pending = [...(window.PlasmaNotesStore?._noteWriteQueue?.values() || [])];
+  await Promise.all(pending);
+}
+
 describe('notes route filters', () => {
   let detachedHtmlWrites;
 
@@ -132,7 +137,7 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
-  it('counts Chinese words accurately in saved note metadata using native word segmentation', () => {
+  it('counts Chinese words accurately in saved note metadata using native word segmentation', async () => {
     const editor = document.querySelector('[data-notes-editor]');
     const priorLanguage = document.documentElement.lang;
     try {
@@ -147,6 +152,7 @@ describe('notes route filters', () => {
       const saved = window.PlasmaNotesStore.getNote('pinned-note');
       expect(saved.wordCount).toBe(2);
       expect(saved.charCount).toBe(4);
+      await settleNoteDatabaseWrites();
       expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({
         id: 'pinned-note',
         wordCount: 2,
@@ -561,12 +567,14 @@ describe('notes route filters', () => {
     expect(created).toEqual(expect.objectContaining({ folderId: 'default' }));
 
     window.PlasmaNotesStore.updateNote(created.id, { title: 'Canonical title' });
+    await settleNoteDatabaseWrites();
     expect(window.DB.saveNote.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({
       id: created.id,
       title: 'Canonical title',
     }));
 
     await window.PlasmaNotesApp.deleteNote(created.id);
+    await settleNoteDatabaseWrites();
     expect(window.DB.deleteNote).toHaveBeenCalledWith(created.id);
   });
 
@@ -617,7 +625,7 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getSettings()).toEqual({ view: 'kanban' });
   });
 
-  it('moves notes from deleted folders back to the default folder through canonical note saves', () => {
+  it('moves notes from deleted folders back to the default folder through canonical note saves', async () => {
     const folder = window.PlasmaNotesStore.createFolder('Temporary folder');
     window.PlasmaNotesStore.createNote({
       title: 'Foldered note',
@@ -627,6 +635,7 @@ describe('notes route filters', () => {
     window.DB.saveNote.mockClear();
 
     window.PlasmaNotesStore.deleteFolder(folder.id);
+    await settleNoteDatabaseWrites();
 
     const notes = JSON.parse(localStorage.getItem('ocd_notes'));
     expect(notes).toEqual(expect.arrayContaining([
@@ -911,6 +920,57 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
   });
 
+  it('keeps each note protected while its queued database write is unsettled', async () => {
+    const store = window.PlasmaNotesStore;
+    let releaseWrite;
+    window.DB.saveNote.mockImplementationOnce(() => new Promise(resolve => {
+      releaseWrite = resolve;
+    }));
+    window.OpenCourseDeck.beforeUnload.mark.mockClear();
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+
+    store.updateNote('regular-note', { title: 'Still writing' });
+    expect(window.OpenCourseDeck.beforeUnload.mark)
+      .toHaveBeenCalledWith('notes-durable-write:regular-note');
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .not.toHaveBeenCalledWith('notes-durable-write:regular-note');
+
+    releaseWrite(true);
+    await settleNoteDatabaseWrites();
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .toHaveBeenCalledWith('notes-durable-write:regular-note');
+  });
+
+  it('keeps the unload guard active until an IndexedDB save succeeds after a rejection', async () => {
+    const app = window.PlasmaNotesApp;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Durability matters</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    let rejectWrite;
+    window.DB.saveNote.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectWrite = reject;
+    }));
+    window.OpenCourseDeck.beforeUnload.mark.mockClear();
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    const pending = app.flushPendingSaveDurably();
+    expect(window.OpenCourseDeck.beforeUnload.mark)
+      .toHaveBeenCalledWith('notes-durable-write:regular-note');
+
+    rejectWrite(new Error('IndexedDB quota exceeded'));
+    expect(await pending).toBe(false);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .not.toHaveBeenCalledWith('notes-durable-write:regular-note');
+
+    expect(await app.flushPendingSaveDurably()).toBe(true);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .toHaveBeenCalledWith('notes-durable-write:regular-note');
+    const persisted = await window.DB.getAllNotes();
+    expect(persisted.find(note => note.id === 'regular-note')?.content)
+      .toContain('Durability matters');
+  });
+
   it('does not write unfinished Squire IME text when an earlier edit is pending', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
@@ -996,6 +1056,140 @@ describe('notes route filters', () => {
     expect(result.recoveredDraftId).toEqual(expect.any(String));
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('Uncommitted work');
     expect(store.getNote(result.recoveredDraftId).content).toContain('Uncommitted work');
+  });
+
+  it('serializes creation and editing writes so a delayed empty note cannot overwrite its content', async () => {
+    const store = window.PlasmaNotesStore;
+    let releaseFirst;
+    const committed = [];
+    window.DB.saveNote.mockImplementationOnce(note => {
+      const snapshot = { ...note };
+      return new Promise(resolve => {
+        releaseFirst = () => { committed.push(snapshot); resolve(snapshot); };
+      });
+    }).mockImplementation(note => {
+      const snapshot = { ...note };
+      committed.push(snapshot);
+      return Promise.resolve(snapshot);
+    });
+
+    const note = store.createNote({ title: 'New note with an in-flight creation write' });
+    store.updateNote(note.id, { content: '<p>Final text</p><table><tr><td>70 mL</td></tr></table>' });
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    // A second concurrent write can finish before creation, after which the
+    // stale empty creation transaction overwrites the edited note.
+    expect(window.DB.saveNote).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.saveNote).toHaveBeenCalledTimes(2);
+    expect(committed.at(-1)).toMatchObject({
+      id: note.id,
+      content: '<p>Final text</p><table><tr><td>70 mL</td></tr></table>',
+    });
+  });
+
+  it('does not resurrect a deleted note when its creation write finishes late', async () => {
+    const store = window.PlasmaNotesStore;
+    const persisted = new Map();
+    let releaseCreate;
+    window.DB.saveNote.mockImplementationOnce(note => {
+      const snapshot = { ...note };
+      return new Promise(resolve => {
+        releaseCreate = () => { persisted.set(snapshot.id, snapshot); resolve(snapshot); };
+      });
+    });
+    window.DB.deleteNote.mockImplementation(id => {
+      persisted.delete(id);
+      return Promise.resolve(true);
+    });
+
+    const note = store.createNote({ title: 'Delete during pending create' });
+    store.deleteNote(note.id);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    expect(window.DB.deleteNote).not.toHaveBeenCalled();
+
+    releaseCreate();
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.deleteNote).toHaveBeenCalledWith(note.id);
+    expect(persisted.has(note.id)).toBe(false);
+    expect(store.getNote(note.id)).toBeNull();
+  });
+
+  it('preserves a note created during a pending canonical hydration read', async () => {
+    const store = window.PlasmaNotesStore;
+    let resolveRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRead = resolve;
+    }));
+    const hydration = store.hydrateFromDB({ force: true });
+    const created = store.createNote({ title: 'Created while loading', content: '<p>Keep this</p>' });
+
+    // The canonical snapshot was taken before this new note was created.
+    resolveRead([]);
+    await hydration;
+    expect(store.getNote(created.id)).toMatchObject({
+      title: 'Created while loading',
+      content: '<p>Keep this</p>',
+    });
+  });
+
+  it('does not resurrect a note deleted while a stale canonical read was pending', async () => {
+    const store = window.PlasmaNotesStore;
+    const staleSnapshot = store.getNotes();
+    let resolveRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRead = resolve;
+    }));
+    const hydration = store.hydrateFromDB({ force: true });
+    store.deleteNote('regular-note');
+    resolveRead(staleSnapshot);
+    await hydration;
+    expect(store.getNote('regular-note')).toBeNull();
+  });
+
+  it('keeps an unsaved draft mounted if its current note disappears before switching', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft never committed</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+
+    expect(app.openNote('pinned-note')).toBe(false);
+    expect(editor.textContent).toContain('Draft never committed');
+    expect(document.querySelector('[data-note-title-input]').value).toBe('Regular note');
+  });
+
+  it('refuses new-note creation when the existing editor cannot commit its draft', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Do not discard this new-note draft</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+    const previousIds = store.getNotes().map(note => note.id);
+
+    expect(app.newNote()).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(previousIds);
+    expect(editor.textContent).toContain('Do not discard this new-note draft');
+  });
+
+  it('refuses duplicate-note creation when the current draft cannot be committed', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Do not discard this duplicate-note draft</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+    const previousIds = store.getNotes().map(note => note.id);
+
+    expect(app.duplicateNote('pinned-note')).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(previousIds);
+    expect(editor.textContent).toContain('Do not discard this duplicate-note draft');
   });
 
   it('does not create an orphan note when new-note navigation is blocked by IME', async () => {
@@ -1516,6 +1710,7 @@ describe('notes route filters', () => {
     ));
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('AI summary');
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('Important idea');
+    await settleNoteDatabaseWrites();
     expect(window.DB.saveNote.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({
       id: 'pinned-note',
       content: expect.stringContaining('data-ai-summary-block'),
