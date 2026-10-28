@@ -159,6 +159,36 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('flushes an unobserved native edit before an editor handoff', () => {
+    const updates = vi.fn();
+    const el = document.createElement('div');
+    const instance = createTiptapNoteEditor({
+      element: el, html: '<p>Previous text</p>', onUpdate: updates,
+    });
+    try {
+      el.querySelector('.notes-modern-editor p').textContent = 'Latest text';
+      expect(instance.syncChanges()).toBe(true);
+      expect(instance.getHTML()).toContain('Latest text');
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('Latest text'));
+    } finally { instance.destroy(); }
+  });
+
+  it('refuses an editor handoff during unfinished IME composition', () => {
+    const el = document.createElement('div');
+    const instance = createTiptapNoteEditor({
+      element: el, html: '<p>Previous text</p>',
+    });
+    try {
+      const root = el.querySelector('.notes-modern-editor');
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = '中间输入';
+      expect(instance.syncChanges()).toBe(false);
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(instance.syncChanges()).toBe(true);
+      expect(instance.getHTML()).toContain('中间输入');
+    } finally { instance.destroy(); }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
