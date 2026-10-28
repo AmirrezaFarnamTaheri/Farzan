@@ -645,6 +645,8 @@ import { countWords } from './src/core/textMetrics.js';
     },
     _el:         null,
     _currentId:  null,
+    // Distinguishes a new editor session even when reopening the same note.
+    _loadEpoch:  0,
     _saveTimer:  null,
     _history:    [],      // undo stack (snapshots)
     _historyIdx: -1,
@@ -718,6 +720,7 @@ import { countWords } from './src/core/textMetrics.js';
     // ── Load note into editor ─────────────────────────────
     load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
+      this._loadEpoch += 1;
       this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
@@ -2132,7 +2135,11 @@ import { countWords } from './src/core/textMetrics.js';
       if (!ai?.summarizeText) return { ok: false, reason: 'unavailable' };
       if (!Editor._currentId) return { ok: false, reason: 'no-note' };
       Editor.save(true);
-      const text = plainTextFromHtml(Editor.getContent());
+      const sourceNoteId = Editor._currentId;
+      const sourceEpoch = Editor._loadEpoch;
+      const sourceElement = Editor._el;
+      const sourceContent = Editor.getContent();
+      const text = plainTextFromHtml(sourceContent);
       if (!text) {
         window.OpenCourseDeck?.Toast?.info?.('Nothing to summarize');
         return { ok: false, reason: 'empty-note' };
@@ -2144,6 +2151,14 @@ import { countWords } from './src/core/textMetrics.js';
         if (!result?.ok || !result.text) {
           window.OpenCourseDeck?.Toast?.error?.('AI summary unavailable');
           return { ok: false, reason: result?.reason || 'summary-failed' };
+        }
+        // AI work may finish after navigation, route unmount, cross-tab sync,
+        // or intervening edits. Never append an old result to a newer draft.
+        if (!this._inited || !sourceElement?.isConnected || Editor._el !== sourceElement
+            || Editor._currentId !== sourceNoteId || Editor._loadEpoch !== sourceEpoch
+            || Editor.getContent() !== sourceContent
+            || Store.getNote(sourceNoteId)?.content !== sourceContent) {
+          return { ok: false, reason: 'stale-note' };
         }
         const inserted = Editor.appendAISummary(result.text);
         if (inserted) {
