@@ -27,6 +27,13 @@ const ProgressStats = (() => {
   // progress views silently ignored the user's chosen language.
   function _locale() { return window.OpenCourseDeck?.locale?.getCurrentLang?.() ?? undefined; }
   const fmtDate  = d => new Date(d).toLocaleDateString(_locale());
+  // Keep raw statistics numeric for charts and exports. Only the UI layer
+  // localizes whole-number counters, using the chosen app language (or the
+  // document language before locale initialization).
+  const fmtCount = value => new Intl.NumberFormat(
+    _locale() || document.documentElement?.lang || 'en',
+    { maximumFractionDigits: 0 },
+  ).format(value);
   /** Toast via app shell (avoid bridge App shim). */
   function pdToast(message, type = 'info') {
     const T = window.OpenCourseDeck?.Toast;
@@ -170,16 +177,16 @@ const ProgressStats = (() => {
     const stats = await getStats();
 
     // summary cards
-    _setText('#stat-total-topics',      stats.totalTopics);
-    _setText('#stat-done-topics',       stats.doneTopics);
-    _setText('#stat-in-progress',       stats.inProgress);
+    _setText('#stat-total-topics',      fmtCount(stats.totalTopics));
+    _setText('#stat-done-topics',       fmtCount(stats.doneTopics));
+    _setText('#stat-in-progress',       fmtCount(stats.inProgress));
     _setText('#stat-completion-pct',    `${stats.completionPct}%`);
     _setText('#stat-watched-time',      stats.watchedFmt);
     // The route template renders the unit in a sibling <small>; keep the
     // number and the unit separate so the metric never reads "0 days days".
-    _setText('#stat-streak',            stats.streak);
+    _setText('#stat-streak',            fmtCount(stats.streak));
     _setText('#stat-streak-unit',       ` ${stats.streak === 1 ? 'day' : 'days'}`);
-    _setText('#stat-active-days',       stats.activeDays);
+    _setText('#stat-active-days',       fmtCount(stats.activeDays));
     _setText('#stat-active-days-unit',  ` ${stats.activeDays === 1 ? 'day' : 'days'}`);
 
     // overall progress bar
