@@ -1083,7 +1083,13 @@ input[type="file"][hidden] {
   gap: 6px;
 }
 .view-studio .studio-toolbar-clusters > .studio-tool-group {
-  padding-inline-end: 10px;
+  padding-inline-end: 5px;
+}
+.view-studio .studio-toolbar-panel .studio-tool-group .input {
+  max-width: 128px;
+}
+.view-studio .studio-toolbar-panel .studio-tool-group .btn {
+  padding-inline: 9px;
 }
 .view-studio .studio-toolbar-panel .studio-more-tools {
   width: auto;
