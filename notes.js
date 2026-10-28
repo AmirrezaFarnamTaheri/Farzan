@@ -398,6 +398,11 @@ import { countWords } from './src/core/textMetrics.js';
 
     _enqueueNoteMutation(id, action, operation) {
       const key = String(id);
+      const durableReason = `notes-durable-write:${key}`;
+      // Even ordinary autosaves must remain flagged until IndexedDB confirms
+      // completion. A later success may clear an earlier failure for this
+      // note, but cannot clear a different note's unsaved-work warning.
+      window.OpenCourseDeck?.beforeUnload?.mark?.(durableReason);
       const previous = this._noteWriteQueue.get(key);
       let started;
       if (previous) {
@@ -418,8 +423,14 @@ import { countWords } from './src/core/textMetrics.js';
         return false;
       });
       this._noteWriteQueue.set(key, tracked);
-      void tracked.then(() => {
-        if (this._noteWriteQueue.get(key) === tracked) this._noteWriteQueue.delete(key);
+      void tracked.then(result => {
+        // Do not acknowledge an older write if a newer write for this ID is
+        // still outstanding. A failed latest write remains protected.
+        if (this._noteWriteQueue.get(key) !== tracked) return;
+        this._noteWriteQueue.delete(key);
+        if (result !== false) {
+          window.OpenCourseDeck?.beforeUnload?.unmark?.(durableReason);
+        }
       });
       return tracked;
     },
@@ -2624,7 +2635,8 @@ import { countWords } from './src/core/textMetrics.js';
   NotesApp.flushPendingSaveDurably = async function flushPendingSaveDurably() {
     const id = Editor._currentId;
     const guard = window.OpenCourseDeck?.beforeUnload;
-    guard?.mark?.('notes-durable-write');
+    const durableReason = `notes-durable-write:${String(id ?? 'new')}`;
+    guard?.mark?.(durableReason);
     let durable = false;
     try {
       if (this.flushPendingSave() === false) return false;
@@ -2638,7 +2650,7 @@ import { countWords } from './src/core/textMetrics.js';
       console.warn('[Notes] durable write acknowledgment failed', error);
       return false;
     } finally {
-      if (durable) guard?.unmark?.('notes-durable-write');
+      if (durable) guard?.unmark?.(durableReason);
     }
   };
 
