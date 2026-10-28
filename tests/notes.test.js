@@ -725,6 +725,56 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('متن فارسی کامل');
   });
 
+  it('recovers a dirty Squire draft if a different window deletes its source note', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.querySelector('p').textContent = 'Unsent draft after deletion';
+    mounted.dispatchEvent(new Event('input', { bubbles: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+
+    expect(result).toMatchObject({ refreshed: true, editorReloaded: false });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(result.recoveredDraftId).not.toBe('regular-note');
+    expect(result.currentId).toBe(result.recoveredDraftId);
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId)).toEqual(expect.objectContaining({
+      content: expect.stringContaining('Unsent draft after deletion'),
+    }));
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+
+    mounted.querySelector('p').textContent = 'Continue editing recovered Squire draft';
+    mounted.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Continue editing recovered Squire draft');
+    expect(store.getNote('regular-note')).toBeNull();
+  });
+
+  it('recovers a dirty classic draft if another window removes the original note', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Work in progress despite deletion</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Work in progress despite deletion');
+    expect(editor.textContent).toContain('Work in progress despite deletion');
+    expect(document.querySelector('[data-note-title-input]').value).toContain('Recovered');
+  });
+
   it('repairs split notes storage by merging local and canonical DB records', async () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
