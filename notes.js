@@ -2157,8 +2157,12 @@ import { countWords } from './src/core/textMetrics.js';
 
       const notes = Store.getNotes();
       if (notes.length) {
-        if (!pendingLocalEdit) this.openNote(notes[0].id, { preventScroll: true });
-        return { currentId: notes[0].id, editorReloaded: !pendingLocalEdit };
+        // The previous ID might have been deleted by the canonical sync.
+        // With no dirty local draft, activate the reconciled note directly
+        // rather than trying to save the now-absent source record.
+        const reloaded = !pendingLocalEdit
+          && this._activateSavedNote(notes[0].id, { preventScroll: true });
+        return { currentId: notes[0].id, editorReloaded: Boolean(reloaded) };
       }
 
       return { currentId: null, editorReloaded: false };
@@ -2259,15 +2263,40 @@ import { countWords } from './src/core/textMetrics.js';
       return true;
     },
 
-    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
-      // Prevent orphan notes if navigation cannot leave an unfinished edit.
+    _commitCurrentBeforeSwitch() {
       if (!this._canLeaveCurrentEditor()) return false;
+      // The first note has no previously bound record to persist.
+      if (!Editor._currentId) return true;
+      try {
+        if (Editor.save(true) !== false) return true;
+      } catch (error) {
+        console.warn('[Notes] current note could not be saved before switching', error);
+      }
+      window.OpenCourseDeck?.Toast?.error?.(
+        'Could not save your current note. The draft is still open; retry before switching.',
+      );
+      return false;
+    },
+
+    // Used only after a successful draft commit, or after a canonical refresh
+    // has proven there is no unsaved local edit. Do not call from click handlers.
+    _activateSavedNote(id, { preventScroll = false } = {}) {
+      const note = Store.getNote(id);
+      if (!note) return false;
+      Editor.load(note, { preventScroll });
+      NotesList.setActive(id);
+      const pane = $('[data-notes-main-pane]');
+      if (pane) pane.classList.add('has-note');
+      return true;
+    },
+
+    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
+      // Do not allocate an orphan note until the previous draft can be saved.
+      if (!this._commitCurrentBeforeSwitch()) return false;
       const note = Store.createNote({ folderId });
       NotesList.render();
-      // Folder counts are a separate view; refresh them after creating notes.
-      // Otherwise the list can show two notes while All Notes still says 0.
       FoldersPanel.render();
-      this.openNote(note.id, { preventScroll });
+      if (!this._activateSavedNote(note.id, { preventScroll })) return false;
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
       return note;
     },
@@ -2276,16 +2305,9 @@ import { countWords } from './src/core/textMetrics.js';
     disableModernEditor() { return Editor.disableModern(); },
 
     openNote(id, { preventScroll = false } = {}) {
-      if (!this._canLeaveCurrentEditor()) return false;
-      Editor.save(true); // Flush current draft before changing the editor.
-      const note = Store.getNote(id);
-      if (!note) return false;
-      Editor.load(note, { preventScroll });
-      NotesList.setActive(id);
-
-      const pane = $('[data-notes-main-pane]');
-      if (pane) pane.classList.add('has-note');
-      return true;
+      if (!Store.getNote(id)) return false;
+      if (!this._commitCurrentBeforeSwitch()) return false;
+      return this._activateSavedNote(id, { preventScroll });
     },
 
     async deleteNote(id) {
@@ -2311,9 +2333,11 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     duplicateNote(id) {
-      if (!this._canLeaveCurrentEditor()) return false;
+      if (!Store.getNote(id)) return false;
+      // Flush first so duplicating the current note includes its newest text.
+      if (!this._commitCurrentBeforeSwitch()) return false;
       const note = Store.getNote(id);
-      if (!note) return;
+      if (!note) return false;
       const copy = Store.createNote({
         ...note,
         id:    undefined,
@@ -2321,7 +2345,7 @@ import { countWords } from './src/core/textMetrics.js';
       });
       NotesList.render();
       FoldersPanel.render();
-      this.openNote(copy.id);
+      if (!this._activateSavedNote(copy.id)) return false;
       return copy;
     },
 
