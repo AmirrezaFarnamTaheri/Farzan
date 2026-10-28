@@ -1040,7 +1040,9 @@ import { countWords } from './src/core/textMetrics.js';
       ];
 
       const sel  = window.getSelection();
-      const rect = sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : { left: 0, bottom: 0 };
+      const selectionRange = sel?.rangeCount ? sel.getRangeAt(0) : null;
+      const rect = selectionRange && typeof selectionRange.getBoundingClientRect === 'function'
+        ? selectionRange.getBoundingClientRect() : { left: 0, bottom: 0 };
 
       const menu = document.createElement('div');
       menu.className = 'slash-menu';
