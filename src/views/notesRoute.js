@@ -174,8 +174,16 @@ export function mountNotesView({ setView } = {}) {
   // or the optional Squire editor. Keep the draft mounted until IME commits.
   const editor = document.querySelector('[data-notes-editor]');
   let composing = false;
-  const onCompositionStart = () => { composing = true; };
-  const onCompositionEnd = () => { composing = false; };
+  const onCompositionStart = () => {
+    composing = true;
+    // A composing character may have no committed input event yet. Keep a
+    // separate unload reason until compositionend, regardless of autosave.
+    window.OpenCourseDeck?.beforeUnload?.mark?.('notes-ime');
+  };
+  const onCompositionEnd = () => {
+    composing = false;
+    window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-ime');
+  };
   editor?.addEventListener('compositionstart', onCompositionStart);
   editor?.addEventListener('compositionend', onCompositionEnd);
 
@@ -197,6 +205,7 @@ export function mountNotesView({ setView } = {}) {
     unmount() {
       editor?.removeEventListener('compositionstart', onCompositionStart);
       editor?.removeEventListener('compositionend', onCompositionEnd);
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-ime');
       try { window.PlasmaNotesApp?.destroy?.(); } catch {}
     },
   };
