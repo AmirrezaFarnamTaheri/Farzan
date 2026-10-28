@@ -2213,7 +2213,22 @@ import { countWords } from './src/core/textMetrics.js';
       return result;
     },
 
+    _canLeaveCurrentEditor() {
+      if (!Editor._currentId) return true;
+      if (Editor._compositionActive) {
+        window.OpenCourseDeck?.Toast?.info?.('Finish typing before switching notes.');
+        return false;
+      }
+      if (Editor._syncReadInProgress) {
+        window.OpenCourseDeck?.Toast?.info?.('Notes are synchronizing. Your draft is being preserved.');
+        return false;
+      }
+      return true;
+    },
+
     newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
+      // Prevent orphan notes if navigation cannot leave an unfinished edit.
+      if (!this._canLeaveCurrentEditor()) return false;
       const note = Store.createNote({ folderId });
       NotesList.render();
       // Folder counts are a separate view; refresh them after creating notes.
@@ -2221,29 +2236,35 @@ import { countWords } from './src/core/textMetrics.js';
       FoldersPanel.render();
       this.openNote(note.id, { preventScroll });
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
+      return note;
     },
 
     enableModernEditor() { return Editor.enableModern(); },
     disableModernEditor() { return Editor.disableModern(); },
 
     openNote(id, { preventScroll = false } = {}) {
-      Editor.save(true); // Save current
+      if (!this._canLeaveCurrentEditor()) return false;
+      Editor.save(true); // Flush current draft before changing the editor.
       const note = Store.getNote(id);
-      if (!note) return;
+      if (!note) return false;
       Editor.load(note, { preventScroll });
       NotesList.setActive(id);
 
       const pane = $('[data-notes-main-pane]');
       if (pane) pane.classList.add('has-note');
+      return true;
     },
 
     async deleteNote(id) {
+      if (Editor._currentId === id && !this._canLeaveCurrentEditor()) return false;
       if (!await pdConfirm({
         title: 'Delete note',
         message: 'Delete this note permanently?',
         confirmLabel: 'Delete note',
         cancelLabel: 'Keep note',
       })) return;
+      // A composition or sync could have started while the dialog was open.
+      if (Editor._currentId === id && !this._canLeaveCurrentEditor()) return false;
       Store.deleteNote(id);
       if (Editor._currentId === id) {
         Editor._currentId = null;
@@ -2257,6 +2278,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     duplicateNote(id) {
+      if (!this._canLeaveCurrentEditor()) return false;
       const note = Store.getNote(id);
       if (!note) return;
       const copy = Store.createNote({
@@ -2267,6 +2289,7 @@ import { countWords } from './src/core/textMetrics.js';
       NotesList.render();
       FoldersPanel.render();
       this.openNote(copy.id);
+      return copy;
     },
 
     promptColor(id) {
