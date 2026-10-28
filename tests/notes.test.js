@@ -299,6 +299,22 @@ describe('notes route filters', () => {
     ))).toBe(true);
   });
 
+  it('has one Note textbox role during modern editing and restores classic semantics on exit', async () => {
+    const app = window.PlasmaNotesApp;
+    app.openNote('regular-note');
+    const outer = document.querySelector('[data-notes-editor]');
+    expect(outer.getAttribute('role')).toBe('textbox');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const modern = outer.querySelector('.notes-modern-editor');
+    expect(modern?.getAttribute('role')).toBe('textbox');
+    expect(outer.hasAttribute('role')).toBe(false);
+    expect(outer.hasAttribute('aria-multiline')).toBe(false);
+    expect(app.disableModernEditor()).toBe(true);
+    expect(outer.getAttribute('role')).toBe('textbox');
+    expect(outer.getAttribute('aria-multiline')).toBe('true');
+    expect(outer.getAttribute('aria-label')).toBe('Note editor');
+  });
+
   it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
