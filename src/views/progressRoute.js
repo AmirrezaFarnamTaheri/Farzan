@@ -8,20 +8,16 @@ export function mountProgressView({ setView } = {}) {
         </div>
 
         <div class="progress-toolbar" aria-label="Progress data actions">
-          <button class="btn btn-primary" id="btn-export-json" type="button" aria-label="Export app-data JSON">
-            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-            Export data
-          </button>
-          <button class="btn btn-ghost" id="btn-import-json" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-            Import
-          </button>
           <details class="progress-export-menu">
-            <summary class="btn btn-ghost" aria-label="More export formats">
-              <svg class="icon" aria-hidden="true"><use href="#i-more-h"/></svg>
-              More exports
+            <summary class="btn btn-primary" aria-label="Data and backup options">
+              <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+              Data &amp; backups
             </summary>
-            <div class="progress-export-popover">
+            <div class="progress-export-popover" role="group" aria-label="Backup and export formats">
+              <p class="progress-export-label">Backup &amp; restore</p>
+              <button type="button" id="btn-export-json" aria-label="Export app-data JSON">Export app-data JSON</button>
+              <button type="button" id="btn-import-json">Import backup</button>
+              <p class="progress-export-label progress-export-other">Other formats</p>
               <button type="button" id="btn-export-csv">Export CSV</button>
               <button type="button" id="btn-export-md">Export Notes Markdown</button>
               <button type="button" id="btn-export-vault">Export Vault Markdown</button>
@@ -46,57 +42,40 @@ export function mountProgressView({ setView } = {}) {
         </div>
       </div>
 
-      <div class="progress-metric-grid" aria-label="Learning summary" aria-busy="true" data-progress-loading>
+            <div class="progress-metric-grid" aria-label="Learning summary" aria-busy="true" data-progress-loading>
         <article class="progress-metric progress-metric-featured">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-insights"/></svg></span>
           <span class="progress-metric-label">Completion</span>
           <strong id="stat-completion-pct">—</strong>
-          <span class="progress-metric-note">Across all tracked topics</span>
+          <span class="progress-metric-note progress-completion-detail">
+            <span id="stat-done-topics">—</span> of <span id="stat-total-topics">—</span> topics done
+          </span>
           <div class="mini-bar-wrap progress-overall-track" aria-hidden="true">
             <div class="mini-bar" id="stat-overall-bar"></div>
           </div>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg></span>
-          <span class="progress-metric-label">Total topics</span>
-          <strong id="stat-total-topics">—</strong>
-          <span class="progress-metric-note">Available in your catalog</span>
-        </article>
-
-        <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"/></svg></span>
-          <span class="progress-metric-label">Completed</span>
-          <strong id="stat-done-topics">—</strong>
-          <span class="progress-metric-note">Topics marked done</span>
-        </article>
-
-        <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon icon--spin" aria-hidden="true"><use href="#i-spinner"/></svg></span>
           <span class="progress-metric-label">In progress</span>
           <strong id="stat-in-progress">—</strong>
           <span class="progress-metric-note">Active learning threads</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
-          <span class="progress-metric-label">Watched</span>
+          <span class="progress-metric-label">Study time</span>
           <strong id="stat-watched-time">—</strong>
-          <span class="progress-metric-note">Recorded learning time</span>
+          <span class="progress-metric-note">Recorded watch time</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
           <span class="progress-metric-label">Current streak</span>
           <strong><span id="stat-streak">—</span><small id="stat-streak-unit"></small></strong>
           <span class="progress-metric-note">Consecutive active days</span>
         </article>
 
         <article class="progress-metric">
-          <span class="progress-metric-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar-check"/></svg></span>
           <span class="progress-metric-label">Active days</span>
           <strong><span id="stat-active-days">—</span><small id="stat-active-days-unit"></small></strong>
-          <span class="progress-metric-note">Days with saved activity</span>
+          <span class="progress-metric-note">Days with study activity</span>
         </article>
       </div>
 

@@ -123,11 +123,26 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect((await catalog.boundingBox()).y).toBeLessThan(650);
   });
 
+  test('fits the five Progress summary metrics in one row at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const metrics = page.locator('.view-progress .progress-metric');
+    await expect(metrics).toHaveCount(5);
+    const topPositions = await metrics.evaluateAll(nodes =>
+      nodes.map(node => Math.round(node.getBoundingClientRect().top)));
+    expect(Math.max(...topPositions) - Math.min(...topPositions)).toBeLessThanOrEqual(2);
+  });
+
   test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     const exportButton = page.locator('#btn-export-json');
     const importButton = page.locator('#btn-import-json');
+    const backupMenu = page.locator('details.progress-export-menu');
+    await expect(backupMenu.locator('summary')).toHaveAccessibleName('Data and backup options');
+    await expect(exportButton).toBeHidden();
+    await expect(importButton).toBeHidden();
+    await backupMenu.locator('summary').click();
     await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
     for (const button of [exportButton, importButton]) {
       await expect(button).toBeVisible();
@@ -155,6 +170,31 @@ test.describe('Farzan desktop workspace redesign', () => {
       await disclosure.locator('summary').click();
       await expect(reset).toBeHidden();
     }
+  });
+
+  test('shows a five-row Appearance ledger with aligned controls and swatches', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
+    const rows = page.locator('#settings-appearance .settings-control-card');
+    await expect(rows).toHaveCount(5);
+    const coords = await rows.evaluateAll(elements =>
+      elements.map(element => ({
+        left: Math.round(element.getBoundingClientRect().left),
+        top: Math.round(element.getBoundingClientRect().top),
+      })));
+    expect(Math.max(...coords.map(row => row.left)) - Math.min(...coords.map(row => row.left)))
+      .toBeLessThanOrEqual(2);
+    expect(coords.every((row, index) => !index || row.top > coords[index - 1].top)).toBe(true);
+    const fontControls = page.locator('#settings-appearance .settings-inline-controls').first();
+    const positions = await fontControls.locator('button').evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(positions).toHaveLength(3);
+    expect(Math.max(...positions) - Math.min(...positions)).toBeLessThanOrEqual(2);
+    const swatches = page.locator('#settings-appearance .settings-accent-row .accent-dot');
+    await expect(swatches).toHaveCount(7);
+    const swatchPositions = await swatches.evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(Math.max(...swatchPositions) - Math.min(...swatchPositions)).toBeLessThanOrEqual(2);
   });
 
   test('keeps an expanded Studio canvas with reversible inspector and no inaccessible tools', async ({ page }) => {

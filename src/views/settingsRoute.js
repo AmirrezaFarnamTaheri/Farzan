@@ -49,7 +49,6 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
                 <div>
-                  <span class="eyebrow">Appearance</span>
                   <h2 id="settings-appearance-title">Appearance</h2>
                   <p>Adjust readability and information density without changing your learning data.</p>
                 </div>
@@ -123,7 +122,6 @@ export function mountSettingsView(deps = {}) {
               <div class="settings-section-heading settings-section-heading-status">
                 <div class="settings-section-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
                 <div>
-                  <span class="eyebrow">AI connection</span>
                   <h2 id="settings-ai-title">AI & privacy</h2>
                   <p>Local summaries extract sentences from your notes on-device; they do not execute a language model. Model files cannot run in this release. Remote API use requires explicit approval. API keys remain in this browser session only.</p>
                 </div>

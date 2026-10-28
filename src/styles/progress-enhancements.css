@@ -458,3 +458,101 @@
   background: var(--glass-border);
 }
 .step-item.done .step-connector { background: var(--accent); }
+
+
+/* Compact Progress summary: five meaningful KPIs without discarding any
+   existing storage ids or export operations.  Uses the shared theme tokens. */
+.view-progress .progress-metric-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.view-progress .progress-metric-grid > .progress-metric {
+  /* The later Farzan layout sheet still assigns each card a three-column span. */
+  grid-column: auto;
+}
+.view-progress .progress-metric,
+.view-progress .progress-metric:nth-child(n+5) {
+  grid-column: auto;
+  min-height: 108px;
+  padding: 14px 16px;
+  gap: 7px;
+}
+.view-progress .progress-metric::after,
+.view-progress .progress-metric-icon,
+.view-progress .progress-metric:nth-child(n+5) .progress-metric-icon {
+  display: none;
+}
+.view-progress .progress-metric strong,
+.view-progress .progress-metric:nth-child(n+5) strong {
+  font-size: clamp(1.35rem, 1.6vw, 1.8rem);
+  line-height: 1.2;
+}
+.view-progress .progress-metric-note,
+.view-progress .progress-metric:nth-child(n+5) .progress-metric-note {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.view-progress .progress-completion-detail {
+  font-variant-numeric: tabular-nums;
+}
+.view-progress .progress-overall-track {
+  min-height: 6px;
+  flex: 0 0 auto;
+}
+.view-progress .progress-export-popover {
+  max-height: min(75dvh, 560px);
+  overflow-y: auto;
+}
+.view-progress .progress-export-label {
+  margin: 4px 8px 3px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.view-progress .progress-export-other {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.view-progress .progress-toolbar > details > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 1280px) {
+  .view-progress .progress-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .view-progress .progress-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .view-progress .progress-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .view-progress .progress-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .view-progress .progress-metric,
+  .view-progress .progress-metric:nth-child(n+5) {
+    min-height: 106px;
+    padding: 13px;
+  }
+  .view-progress .progress-metric:last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 360px) {
+  .view-progress .progress-metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .view-progress .progress-metric:last-child {
+    grid-column: auto;
+  }
+}
