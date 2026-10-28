@@ -83,6 +83,18 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('uses one meaningful Appearance and AI heading without duplicate eyebrow text', () => {
+    const { controller } = mountSettings();
+    expect(document.querySelector('#settings-appearance .settings-section-heading h2')?.textContent)
+      .toBe('Appearance');
+    expect(document.querySelector('#settings-appearance .settings-section-heading .eyebrow')).toBeNull();
+    expect(document.querySelector('#settings-ai .settings-section-heading h2')?.textContent)
+      .toBe('AI & privacy');
+    expect(document.querySelector('#settings-ai .settings-section-heading .eyebrow')).toBeNull();
+    expect(document.querySelectorAll('#settings-appearance .settings-control-card')).toHaveLength(5);
+    controller.unmount();
+  });
+
   it('labels the built-in local summary as extractive and hides non-executable model installers', async () => {
     const { controller } = mountSettings({ mode: 'local-gemma', model: 'gemma-4-local' });
     await vi.waitFor(() => expect(window.DB.getSetting).toHaveBeenCalled());

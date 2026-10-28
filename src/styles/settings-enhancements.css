@@ -646,3 +646,79 @@
     justify-content: center;
   }
 }
+
+
+/* Appearance ledger: semantic setting rows, one border per row, and controls
+   that remain reachable without a multi-column grid of nested cards. */
+.view-settings #settings-appearance .settings-control-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.view-settings #settings-appearance .settings-control-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  min-height: 78px;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.view-settings #settings-appearance .settings-control-card:last-child {
+  border-bottom: 0;
+}
+.view-settings #settings-appearance .settings-control-card > :last-child {
+  min-width: 0;
+  justify-self: end;
+  align-self: center;
+}
+.view-settings #settings-appearance .settings-control-card > .select {
+  width: min(100%, 260px);
+}
+.view-settings #settings-appearance .settings-inline-controls {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 6px;
+}
+.view-settings #settings-appearance .settings-accent-row {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 5px;
+  scrollbar-width: thin;
+}
+.view-settings #settings-appearance .settings-accent-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+@media (max-width: 1180px) {
+  /* Sidebar + settings navigation leave too little width for a two-column
+     ledger on laptop screens; retain each control on its own line instead. */
+  .view-settings #settings-appearance .settings-control-card,
+  .view-settings #settings-appearance .settings-accent-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+  }
+  .view-settings #settings-appearance .settings-control-card > :last-child {
+    justify-self: start;
+  }
+}
+@media (max-width: 560px) {
+  .view-settings #settings-appearance .settings-control-card {
+    min-height: 0;
+    padding: 14px 0;
+  }
+  .view-settings #settings-appearance .settings-control-card > .select {
+    width: min(100%, 340px);
+    max-width: none;
+  }
+  .view-settings #settings-appearance .settings-accent-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
