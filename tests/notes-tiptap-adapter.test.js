@@ -125,6 +125,40 @@ describe('Squire HTML-canonical edit adapter', () => {
     }
   });
 
+  it('round-trips inserted text through native undo and redo without losing content', () => {
+    const instance = createTiptapNoteEditor({
+      element: document.createElement('div'), html: '<p>Before editing</p>',
+    });
+    try {
+      instance.editor.commands.insertContent('<p>Inserted after selection</p>');
+      expect(instance.getHTML()).toContain('Inserted after selection');
+      expect(instance.run('undo')).toBe(true);
+      expect(instance.getHTML()).not.toContain('Inserted after selection');
+      expect(instance.run('redo')).toBe(true);
+      expect(instance.getHTML()).toContain('Inserted after selection');
+    } finally { instance.destroy(); }
+  });
+
+  it('notifies only once composition is complete, never for unfinished IME text', () => {
+    const updates = vi.fn();
+    const element = document.createElement('div');
+    const instance = createTiptapNoteEditor({
+      element, html: '<p>Original</p>', onUpdate: updates,
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = 'متن ناتمام';
+      root.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(updates).not.toHaveBeenCalled();
+
+      root.querySelector('p').textContent = 'متن کامل';
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('متن کامل'));
+      expect(updates).toHaveBeenCalledTimes(1);
+    } finally { instance.destroy(); }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';

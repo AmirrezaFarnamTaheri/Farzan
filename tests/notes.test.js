@@ -208,6 +208,27 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('<table>');
   });
 
+  it('does not autosave incomplete IME input through the outer Notes event handler', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    window.DB.saveNote.mockClear();
+
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'متن ناتمام';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).not.toContain('متن ناتمام');
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+
+    root.querySelector('p').textContent = 'متن کامل';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن کامل');
+  });
+
   it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
