@@ -45,6 +45,38 @@ describe('createRouter', () => {
     router.destroy();
   });
 
+  it('does not tear down a route that vetoes navigation while its draft is unsafe to leave', async () => {
+    window.location.hash = '#/notes';
+    const bus = { emit: vi.fn() };
+    const beforeLeave = vi.fn(() => false);
+    const unmount = vi.fn();
+    const home = vi.fn(async () => undefined);
+    const router = createRouter({
+      $: () => [], bus,
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/notes', async () => ({ beforeLeave, unmount }));
+    router.on('#/home', home);
+    try {
+      await router.init();
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(beforeLeave).toHaveBeenCalledTimes(1));
+      await router.ready();
+      expect(window.location.hash).toBe('#/notes');
+      expect(unmount).not.toHaveBeenCalled();
+      expect(home).not.toHaveBeenCalled();
+
+      beforeLeave.mockReturnValue(true);
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(home).toHaveBeenCalledTimes(1));
+      await router.ready();
+      expect(unmount).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe('#/home');
+    } finally {
+      router.destroy();
+    }
+  });
+
   it('resets persistent shell scroll on route changes without resetting same-view query navigation', async () => {
     const main = document.createElement('main');
     main.id = 'main-content';
