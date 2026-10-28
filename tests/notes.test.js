@@ -313,6 +313,23 @@ describe('notes route filters', () => {
     expect(app.disableModernEditor()).toBe(true);
   });
 
+  it('keeps the classic editor mounted while a canonical Notes read is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    let releaseRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => { releaseRead = resolve; }));
+    const pending = app.refreshFromSync({ kind: 'note', action: 'update' });
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'synchronizing' });
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    releaseRead(store.getNotes());
+    await pending;
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+  });
+
   it('refuses to switch an unfinished classic IME draft into Squire', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
