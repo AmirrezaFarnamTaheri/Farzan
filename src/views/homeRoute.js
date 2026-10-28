@@ -186,8 +186,17 @@ async function renderCatalogCounts() {
     const topics = window.DataStore?.allTopics?.() ?? [];
     const courseCount = document.getElementById('home-course-count');
     const topicCount = document.getElementById('home-topic-count');
-    if (courseCount) courseCount.textContent = String(courses.length);
-    if (topicCount) topicCount.textContent = String(topics.length);
+    // Use the browser's locale-aware numeric formatter instead of manually
+    // rendering raw digits (e.g. "6421") or introducing a custom separator
+    // algorithm. This also honors Persian numerals when the document is fa.
+    let formatter;
+    try {
+      formatter = new Intl.NumberFormat(document.documentElement.lang || 'en-US');
+    } catch {
+      formatter = new Intl.NumberFormat('en-US');
+    }
+    if (courseCount) courseCount.textContent = formatter.format(courses.length);
+    if (topicCount) topicCount.textContent = formatter.format(topics.length);
   } catch {
     const note = document.querySelector('.home-card-note');
     if (note) note.textContent = 'Catalog details are unavailable right now. Check the local data files and rebuild.';
