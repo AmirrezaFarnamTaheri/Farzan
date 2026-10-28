@@ -123,11 +123,26 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect((await catalog.boundingBox()).y).toBeLessThan(650);
   });
 
+  test('fits the five Progress summary metrics in one row at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const metrics = page.locator('.view-progress .progress-metric');
+    await expect(metrics).toHaveCount(5);
+    const topPositions = await metrics.evaluateAll(nodes =>
+      nodes.map(node => Math.round(node.getBoundingClientRect().top)));
+    expect(Math.max(...topPositions) - Math.min(...topPositions)).toBeLessThanOrEqual(2);
+  });
+
   test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     const exportButton = page.locator('#btn-export-json');
     const importButton = page.locator('#btn-import-json');
+    const backupMenu = page.locator('details.progress-export-menu');
+    await expect(backupMenu.locator('summary')).toHaveAccessibleName('Data and backup options');
+    await expect(exportButton).toBeHidden();
+    await expect(importButton).toBeHidden();
+    await backupMenu.locator('summary').click();
     await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
     for (const button of [exportButton, importButton]) {
       await expect(button).toBeVisible();

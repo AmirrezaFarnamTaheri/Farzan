@@ -53,9 +53,19 @@ describe('progress route workspace', () => {
     ];
 
     requiredIds.forEach(id => expect(document.getElementById(id), id).not.toBeNull());
-    expect(document.querySelectorAll('.progress-metric')).toHaveLength(7);
+    expect(document.querySelectorAll('.progress-metric')).toHaveLength(5);
     expect(document.querySelector('.progress-metric .progress-metric-label')?.textContent).toBe('Completion');
     expect(document.querySelector('.progress-metric:first-child')?.classList.contains('progress-metric-featured')).toBe(true);
+    const backupMenu = document.querySelector('details.progress-export-menu');
+    expect(backupMenu).not.toBeNull();
+    expect(backupMenu.querySelector('summary').textContent).toMatch(/Data & backups/i);
+    expect(backupMenu.contains(document.getElementById('btn-export-json'))).toBe(true);
+    expect(backupMenu.contains(document.getElementById('btn-import-json'))).toBe(true);
+    expect(document.querySelector('.progress-toolbar > #btn-export-json')).toBeNull();
+    expect(document.getElementById('stat-done-topics').closest('.progress-metric'))
+      .toBe(document.getElementById('stat-completion-pct').closest('.progress-metric'));
+    expect(document.getElementById('stat-total-topics').closest('.progress-metric'))
+      .toBe(document.getElementById('stat-completion-pct').closest('.progress-metric'));
     expect(document.querySelector('.progress-export-menu')).not.toBeNull();
     expect(document.querySelector('.progress-table-wrap')?.getAttribute('role')).toBe('region');
     expect(window.OpenCourseDeck.ProgressStatsInit).toHaveBeenCalledOnce();
