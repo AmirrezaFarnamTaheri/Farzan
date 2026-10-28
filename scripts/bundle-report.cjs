@@ -7,7 +7,7 @@ const dist = path.join(root, 'dist');
 const indexPath = path.join(root, 'index.html');
 
 const limits = {
-  totalJsBytes: 1024 * 1024,   // 1 MiB total application JavaScript budget
+  totalJsBytes: 1088 * 1024,   // 1 MiB + 64 KiB explicit UX allowance (2026-10-28); other limits unchanged
   largestJsBytes: 320 * 1024,  // 320 KiB largest generated chunk
   entryBytes: 240 * 1024,      // 240 KiB raw entry budget; measured 2026-09-18 is ~217 KiB
   entryGzipBytes: 80 * 1024,   // 80 KiB transfer budget; measured 2026-09-18 is ~65 KiB
