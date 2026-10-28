@@ -998,6 +998,51 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('Uncommitted work');
   });
 
+  it('keeps an unsaved draft mounted if its current note disappears before switching', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft never committed</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+
+    expect(app.openNote('pinned-note')).toBe(false);
+    expect(editor.textContent).toContain('Draft never committed');
+    expect(document.querySelector('[data-note-title-input]').value).toBe('Regular note');
+    expect(window.DB.saveNote.mock.calls.some(([note]) => note.id === 'pinned-note')).toBe(false);
+  });
+
+  it('refuses new-note creation when the existing editor cannot commit its draft', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Do not discard this new-note draft</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+    const previousIds = store.getNotes().map(note => note.id);
+
+    expect(app.newNote()).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(previousIds);
+    expect(editor.textContent).toContain('Do not discard this new-note draft');
+  });
+
+  it('refuses duplicate-note creation when the current draft cannot be committed', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Do not discard this duplicate-note draft</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    store._notes = store.getNotes().filter(note => note.id !== 'regular-note');
+    const previousIds = store.getNotes().map(note => note.id);
+
+    expect(app.duplicateNote('pinned-note')).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(previousIds);
+    expect(editor.textContent).toContain('Do not discard this duplicate-note draft');
+  });
+
   it('does not create an orphan note when new-note navigation is blocked by IME', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
