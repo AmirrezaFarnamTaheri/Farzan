@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from '../lib/eventEmitter.js';
-import { forceManyBody, forceCollide } from 'd3-force';
+import { forceSimulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
 import { countWords } from '../core/textMetrics.js';
 
 function extractWikilinks(content) {
@@ -178,9 +178,9 @@ export class KnowledgeGraph extends EventEmitter {
   }
 
   _initSimulation(width, height) {
-    // Replace the previous per-frame O(n^2) handwritten charge and collision
-    // loops with d3-force's Barnes-Hut charge and quadtree collision engines.
-    // Keep our node/edge IDs and Canvas drawing as the public app contract.
+    // Use the already-installed D3 engine end to end rather than maintaining
+    // a second alpha, velocity, link and collision scheduler in Farzan.
+    // Stop D3's internal timer: the app's existing bounded RAF loop owns ticks.
     this._simulation?.stop();
     this._width = width;
     this._height = height;
@@ -191,59 +191,25 @@ export class KnowledgeGraph extends EventEmitter {
         node.x = cx + (Math.random() - 0.5) * width * 0.6;
         node.y = cy + (Math.random() - 0.5) * height * 0.6;
       }
-    }
-    const byId = new Map(this._nodes.map(node => [node.id, node]));
-    const links = this._edges.map(edge => ({
-      source: byId.get(edge.source), target: byId.get(edge.target),
-    })).filter(link => link.source && link.target);
-
-    // Use D3's quadtree/Barnes-Hut charge and collision algorithms. The
-    // small O(edges) spring force retains the original 80px distance without
-    // including another unused D3 module in the strict 1 MiB bundle.
-    const linkForce = alpha => {
-      for (const { source, target } of links) {
-        const dx = target.x - source.x;
-        const dy = target.y - source.y;
-        const distance = Math.hypot(dx, dy) || 1;
-        const pull = (distance - 80) * alpha * 0.05 / distance;
-        source.vx += dx * pull;
-        source.vy += dy * pull;
-        target.vx -= dx * pull;
-        target.vy -= dy * pull;
-      }
-    };
-    const forces = new Map([
-      ['charge', forceManyBody().strength(-120)],
-      ['links', linkForce],
-      ['collide', forceCollide(node => node.radius + 2).strength(0.95)],
-    ]);
-    for (const [index, node] of this._nodes.entries()) {
-      // D3 collision forces require stable integer indexes for all fixtures.
-      node.index = index;
       node.vx = Number.isFinite(node.vx) ? node.vx : 0;
       node.vy = Number.isFinite(node.vy) ? node.vy : 0;
     }
-    for (const force of forces.values()) force.initialize?.(this._nodes, Math.random);
-    let alpha = 1;
-    const nodes = this._nodes;
-    const graph = this;
-    this._simulation = {
-      force(name) { return forces.get(name); },
-      tick() {
-        alpha += (0 - alpha) * 0.015;
-        for (const force of forces.values()) force(alpha);
-        for (const node of nodes) {
-          // Centering is already in the existing Farzan frame scheduler.
-          node.vx += ((graph._width / 2) - node.x) * 0.015 * alpha;
-          node.vy += ((graph._height / 2) - node.y) * 0.015 * alpha;
-          if (node.fx == null) node.x += (node.vx *= 0.85);
-          else { node.x = node.fx; node.vx = 0; }
-          if (node.fy == null) node.y += (node.vy *= 0.85);
-          else { node.y = node.fy; node.vy = 0; }
-        }
-      },
-      stop() { /* No independent timer to cancel: Farzan owns RAF. */ },
-    };
+
+    // The saved graph belongs to Farzan, not D3: forceLink only receives a
+    // temporary edge projection so node IDs and persisted wikilinks never
+    // change when D3 normalizes its source/target references.
+    const byId = new Map(this._nodes.map(node => [node.id, node]));
+    const links = this._edges
+      .map(edge => ({ source: byId.get(edge.source), target: byId.get(edge.target) }))
+      .filter(link => link.source && link.target);
+    this._simulation = forceSimulation(this._nodes)
+      .force('charge', forceManyBody().strength(-120))
+      .force('links', forceLink(links).id(node => node.id).distance(80).strength(0.11))
+      .force('collide', forceCollide(node => node.radius + 2).strength(0.95))
+      .force('center', forceCenter(cx, cy).strength(0.16))
+      .alphaDecay(0.015)
+      .velocityDecay(0.15)
+      .stop();
   }
 
   _tick() {
