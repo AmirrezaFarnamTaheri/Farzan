@@ -313,6 +313,29 @@ describe('notes route filters', () => {
     expect(app.disableModernEditor()).toBe(true);
   });
 
+  it('refuses to switch an unfinished classic IME draft into Squire', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    const initial = store.getNote('regular-note').content;
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.innerHTML = '<p>Partial classic IME 入力中</p>';
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'composing' });
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.innerHTML).toContain('入力中');
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    expect(store.getNote('regular-note').content).toBe(initial);
+
+    editor.innerHTML = '<p>Committed IME 入力済み</p>';
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    expect(editor.querySelector('.notes-modern-editor')).not.toBeNull();
+  });
+
   it('has one Note textbox role during modern editing and restores classic semantics on exit', async () => {
     const app = window.PlasmaNotesApp;
     app.openNote('regular-note');
