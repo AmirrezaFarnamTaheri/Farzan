@@ -1029,6 +1029,33 @@ describe('notes route filters', () => {
     });
   });
 
+  it('does not resurrect a deleted note when its creation write finishes late', async () => {
+    const store = window.PlasmaNotesStore;
+    const persisted = new Map();
+    let releaseCreate;
+    window.DB.saveNote.mockImplementationOnce(note => {
+      const snapshot = { ...note };
+      return new Promise(resolve => {
+        releaseCreate = () => { persisted.set(snapshot.id, snapshot); resolve(snapshot); };
+      });
+    });
+    window.DB.deleteNote.mockImplementation(id => {
+      persisted.delete(id);
+      return Promise.resolve(true);
+    });
+
+    const note = store.createNote({ title: 'Delete during pending create' });
+    store.deleteNote(note.id);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    expect(window.DB.deleteNote).not.toHaveBeenCalled();
+
+    releaseCreate();
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.deleteNote).toHaveBeenCalledWith(note.id);
+    expect(persisted.has(note.id)).toBe(false);
+    expect(store.getNote(note.id)).toBeNull();
+  });
+
   it('keeps an unsaved draft mounted if its current note disappears before switching', () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
