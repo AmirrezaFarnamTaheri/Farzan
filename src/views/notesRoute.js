@@ -169,11 +169,33 @@ export function mountNotesView({ setView } = {}) {
   try { window.PlasmaNotesApp?.init?.(); } catch (error) {
     console.warn('[Notes view] init failed', error);
   }
+  // Composition events bubble from either the native contenteditable area
+  // or the optional Squire editor. Keep the draft mounted until IME commits.
+  const editor = document.querySelector('[data-notes-editor]');
+  let composing = false;
+  const onCompositionStart = () => { composing = true; };
+  const onCompositionEnd = () => { composing = false; };
+  editor?.addEventListener('compositionstart', onCompositionStart);
+  editor?.addEventListener('compositionend', onCompositionEnd);
+
   return {
     beforeLeave() {
-      try { window.PlasmaNotesApp?.flushPendingSave?.(); } catch {}
+      if (composing) {
+        window.OpenCourseDeck?.Toast?.info?.('Finish composing text before leaving Notes.');
+        return false;
+      }
+      try {
+        if (window.PlasmaNotesApp?.canLeaveEditor?.() === false) return false;
+        // A deferred/failed flush must not be mistaken for a saved draft.
+        return window.PlasmaNotesApp?.flushPendingSave?.() !== false;
+      } catch (error) {
+        console.warn('[Notes view] could not commit pending data before navigation', error);
+        return false;
+      }
     },
     unmount() {
+      editor?.removeEventListener('compositionstart', onCompositionStart);
+      editor?.removeEventListener('compositionend', onCompositionEnd);
       try { window.PlasmaNotesApp?.destroy?.(); } catch {}
     },
   };
