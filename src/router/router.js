@@ -105,7 +105,10 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           try {
             canLeave = await previousController.beforeLeave?.(context) !== false;
           } catch (error) {
-            console.warn('[OpenCourseDeck Router] beforeLeave failed', error);
+            // An unknown save outcome must never be interpreted as permission
+            // to tear down an editor carrying potentially unsaved user work.
+            canLeave = false;
+            console.warn('[OpenCourseDeck Router] beforeLeave failed; route preserved', error);
           }
           if (!canLeave) {
             // A route can veto navigation when a draft is still composing or
