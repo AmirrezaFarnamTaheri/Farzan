@@ -920,6 +920,36 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
   });
 
+  it('keeps the unload guard active until an IndexedDB save succeeds after a rejection', async () => {
+    const app = window.PlasmaNotesApp;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Durability matters</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    let rejectWrite;
+    window.DB.saveNote.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectWrite = reject;
+    }));
+    window.OpenCourseDeck.beforeUnload.mark.mockClear();
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    const pending = app.flushPendingSaveDurably();
+    expect(window.OpenCourseDeck.beforeUnload.mark)
+      .toHaveBeenCalledWith('notes-durable-write');
+
+    rejectWrite(new Error('IndexedDB quota exceeded'));
+    expect(await pending).toBe(false);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .not.toHaveBeenCalledWith('notes-durable-write');
+
+    expect(await app.flushPendingSaveDurably()).toBe(true);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .toHaveBeenCalledWith('notes-durable-write');
+    const persisted = await window.DB.getAllNotes();
+    expect(persisted.find(note => note.id === 'regular-note')?.content)
+      .toContain('Durability matters');
+  });
+
   it('does not write unfinished Squire IME text when an earlier edit is pending', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
