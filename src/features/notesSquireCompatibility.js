@@ -37,10 +37,13 @@ export function assessNoteForSquire(html) {
           element.removeAttribute(name);
           continue;
         }
-        if (name === 'class' && tag === 'span') {
-          if (!attr.value.trim().split(/\s+/).every(value => SAFE_CLASSES.has(value))) {
-            return reject('unsupported-class');
-          }
+        if (name === 'class') {
+          const classes = attr.value.trim().split(/\s+/).filter(Boolean);
+          const acceptable = classes.every(value =>
+            (tag === 'span' && SAFE_CLASSES.has(value))
+            || (BLOCKS.has(tag) && /^align-(?:left|right|center|justify|start|end)$/.test(value))
+          );
+          if (!classes.length || !acceptable) return reject('unsupported-class');
           element.removeAttribute(name);
           continue;
         }
