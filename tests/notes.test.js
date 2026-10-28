@@ -284,6 +284,21 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('Recent Squire editing');
   });
 
+  it('does not rewrite persisted empty HTML when a Squire preview is opened and closed untouched', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', { content: '' });
+    app.openNote('regular-note');
+    window.DB.saveNote.mockClear();
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    expect(app.disableModernEditor()).toBe(true);
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toBe('');
+    expect(window.DB.saveNote.mock.calls.every(([note]) => (
+      note.id !== 'regular-note' || note.content === ''
+    ))).toBe(true);
+  });
+
   it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });

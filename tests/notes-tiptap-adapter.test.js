@@ -159,6 +159,33 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('does not notify about Squire normalization of untouched initial HTML', () => {
+    for (const html of ['', '<p></p>', '<p><br></p>']) {
+      const updates = vi.fn();
+      const instance = createTiptapNoteEditor({
+        element: document.createElement('div'), html, onUpdate: updates,
+      });
+      try {
+        expect(instance.syncChanges()).toBe(true);
+        expect(updates).not.toHaveBeenCalled();
+        expect(instance.getHTML()).toBe(html);
+      } finally { instance.destroy(); }
+    }
+  });
+
+  it('uses the rendered baseline after setContent without treating normalization as editing', () => {
+    const updates = vi.fn();
+    const instance = createTiptapNoteEditor({
+      element: document.createElement('div'), html: '<p>Before</p>', onUpdate: updates,
+    });
+    try {
+      instance.setContent('<p></p>');
+      expect(instance.syncChanges()).toBe(true);
+      expect(instance.getHTML()).toBe('<p></p>');
+      expect(updates).not.toHaveBeenCalled();
+    } finally { instance.destroy(); }
+  });
+
   it('flushes an unobserved native edit before an editor handoff', () => {
     const updates = vi.fn();
     const el = document.createElement('div');
