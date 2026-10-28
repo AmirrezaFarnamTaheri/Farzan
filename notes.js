@@ -826,10 +826,11 @@ import { countWords } from './src/core/textMetrics.js';
           window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
           window.OpenCourseDeck?.bus?.emit('note:save', { note: updated });
         }
+        return Boolean(updated);
       };
 
       if (immediate) {
-        doSave();
+        return doSave();
       } else {
         this._saveTimer = setTimeout(doSave, 800);
       }
