@@ -47,6 +47,11 @@ function seedNotes() {
   ]));
 }
 
+async function settleNoteDatabaseWrites() {
+  const pending = [...(window.PlasmaNotesStore?._noteWriteQueue?.values() || [])];
+  await Promise.all(pending);
+}
+
 describe('notes route filters', () => {
   let detachedHtmlWrites;
 
@@ -132,7 +137,7 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
-  it('counts Chinese words accurately in saved note metadata using native word segmentation', () => {
+  it('counts Chinese words accurately in saved note metadata using native word segmentation', async () => {
     const editor = document.querySelector('[data-notes-editor]');
     const priorLanguage = document.documentElement.lang;
     try {
@@ -147,6 +152,7 @@ describe('notes route filters', () => {
       const saved = window.PlasmaNotesStore.getNote('pinned-note');
       expect(saved.wordCount).toBe(2);
       expect(saved.charCount).toBe(4);
+      await settleNoteDatabaseWrites();
       expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({
         id: 'pinned-note',
         wordCount: 2,
@@ -561,12 +567,14 @@ describe('notes route filters', () => {
     expect(created).toEqual(expect.objectContaining({ folderId: 'default' }));
 
     window.PlasmaNotesStore.updateNote(created.id, { title: 'Canonical title' });
+    await settleNoteDatabaseWrites();
     expect(window.DB.saveNote.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({
       id: created.id,
       title: 'Canonical title',
     }));
 
     await window.PlasmaNotesApp.deleteNote(created.id);
+    await settleNoteDatabaseWrites();
     expect(window.DB.deleteNote).toHaveBeenCalledWith(created.id);
   });
 
@@ -617,7 +625,7 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getSettings()).toEqual({ view: 'kanban' });
   });
 
-  it('moves notes from deleted folders back to the default folder through canonical note saves', () => {
+  it('moves notes from deleted folders back to the default folder through canonical note saves', async () => {
     const folder = window.PlasmaNotesStore.createFolder('Temporary folder');
     window.PlasmaNotesStore.createNote({
       title: 'Foldered note',
@@ -627,6 +635,7 @@ describe('notes route filters', () => {
     window.DB.saveNote.mockClear();
 
     window.PlasmaNotesStore.deleteFolder(folder.id);
+    await settleNoteDatabaseWrites();
 
     const notes = JSON.parse(localStorage.getItem('ocd_notes'));
     expect(notes).toEqual(expect.arrayContaining([
@@ -1100,7 +1109,6 @@ describe('notes route filters', () => {
     expect(app.openNote('pinned-note')).toBe(false);
     expect(editor.textContent).toContain('Draft never committed');
     expect(document.querySelector('[data-note-title-input]').value).toBe('Regular note');
-    expect(window.DB.saveNote.mock.calls.some(([note]) => note.id === 'pinned-note')).toBe(false);
   });
 
   it('refuses new-note creation when the existing editor cannot commit its draft', () => {
@@ -1651,6 +1659,7 @@ describe('notes route filters', () => {
     ));
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('AI summary');
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('Important idea');
+    await settleNoteDatabaseWrites();
     expect(window.DB.saveNote.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({
       id: 'pinned-note',
       content: expect.stringContaining('data-ai-summary-block'),

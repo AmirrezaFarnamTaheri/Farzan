@@ -2323,6 +2323,13 @@ import { countWords } from './src/core/textMetrics.js';
       if (!this._canLeaveCurrentEditor()) return false;
       // The first note has no previously bound record to persist.
       if (!Editor._currentId) return true;
+      // Squire may still have a DOM mutation awaiting its observer. Resolve
+      // that before deciding an editor has no pending local work.
+      if (Editor._tiptap && Editor._tiptap.syncChanges() === false) return false;
+      // A canonical refresh can delete the previous (clean) note. In that
+      // case there is nothing to save: allow opening the newly loaded record.
+      // An edited missing note must stay mounted for recovery instead.
+      if (!Store.getNote(Editor._currentId) && !this._hasPendingLocalEdit()) return true;
       try {
         if (Editor.save(true) !== false) return true;
       } catch (error) {
