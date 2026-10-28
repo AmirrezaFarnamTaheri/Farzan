@@ -2595,8 +2595,14 @@ import { countWords } from './src/core/textMetrics.js';
       const bodyCommitted = Editor.save(true);
       const titleInput = $('[data-note-title-input]');
       if (titleInput && Editor._currentId) {
-        Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
-        NotesList.render();
+        const title = titleInput.value.trim() || 'Untitled';
+        // Editor.save(true) already writes the current title. Avoid a second
+        // duplicate DB write: it can obscure a failed first write and race
+        // against an in-flight canonical hydration.
+        if (Store.getNote(Editor._currentId)?.title !== title) {
+          Store.updateNote(Editor._currentId, { title });
+          NotesList.render();
+        }
         window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
       }
       // A composing IME or unresolved sync deliberately defers the body write.
@@ -2609,6 +2615,32 @@ import { countWords } from './src/core/textMetrics.js';
     }
   };
 
+
+  /**
+   * Use for route changes: an updated in-memory note is not a durable write.
+   * Await the final per-note DB mutation before allowing the editor to unmount.
+   * On failure, retain a before-unload reason until a successful retry.
+   */
+  NotesApp.flushPendingSaveDurably = async function flushPendingSaveDurably() {
+    const id = Editor._currentId;
+    const guard = window.OpenCourseDeck?.beforeUnload;
+    guard?.mark?.('notes-durable-write');
+    let durable = false;
+    try {
+      if (this.flushPendingSave() === false) return false;
+      const pending = id == null ? null : Store._noteWriteQueue.get(String(id));
+      if (pending && await pending === false) return false;
+      // A different note may have opened while the asynchronous save settled.
+      if (id !== Editor._currentId) return false;
+      durable = true;
+      return true;
+    } catch (error) {
+      console.warn('[Notes] durable write acknowledgment failed', error);
+      return false;
+    } finally {
+      if (durable) guard?.unmark?.('notes-durable-write');
+    }
+  };
 
   // ──────────────────────────────────────────────────────────
   // BOOT
