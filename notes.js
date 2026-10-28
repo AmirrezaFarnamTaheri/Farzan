@@ -365,19 +365,49 @@ import { countWords } from './src/core/textMetrics.js';
       this._notes = notes;
     },
 
+    // Serialize writes for the same note ID. A new-note creation and the
+    // editor's first save can otherwise complete in reverse order, restoring
+    // an older empty body after the user's latest edit. Queue deletes as well
+    // so an in-flight save cannot resurrect a removed record.
+    _noteWriteQueue: new Map(),
+
+    _enqueueNoteMutation(id, action, operation) {
+      const key = String(id);
+      const previous = this._noteWriteQueue.get(key);
+      let started;
+      if (previous) {
+        started = previous.then(operation);
+      } else {
+        // Preserve the existing immediate-first-call contract (the bridge is
+        // invoked synchronously), while tracking asynchronous completion.
+        try { started = Promise.resolve(operation()); }
+        catch (error) { started = Promise.reject(error); }
+      }
+      const tracked = started.catch(error => {
+        console.warn(`[Notes] DB.${action} failed`, error);
+        window.OpenCourseDeck?.Toast?.error?.(
+          action === 'save'
+            ? 'Could not save this note to the database. Retry before leaving.'
+            : 'Could not delete this note from the database.',
+        );
+        return false;
+      });
+      this._noteWriteQueue.set(key, tracked);
+      void tracked.then(() => {
+        if (this._noteWriteQueue.get(key) === tracked) this._noteWriteQueue.delete(key);
+      });
+      return tracked;
+    },
+
     persistNote(note, fallbackNotes = null) {
       if (!note) return;
       this._cacheNote(note, fallbackNotes);
-      if (window.DB?.saveNote) {
-        try {
-          window.DB.saveNote(note).catch?.(err => {
-            console.warn('[Notes] DB.saveNote failed', err);
-            window.OpenCourseDeck?.Toast?.error?.('Note save failed — stored locally.');
-          });
-          return;
-        } catch { /* fallback below */ }
+      if (typeof window.DB?.saveNote === 'function') {
+        // Capture immutable values now, not when the queued operation starts.
+        const snapshot = { ...note };
+        return this._enqueueNoteMutation(note.id, 'save', () => window.DB.saveNote(snapshot));
       }
-      this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
+      return this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
     },
 
     getNote(id) {
@@ -422,10 +452,10 @@ import { countWords } from './src/core/textMetrics.js';
     deleteNote(id) {
       const notes = this.getNotes().filter(n => n.id !== id);
       this._notes = notes;
-      if (window.DB?.deleteNote) {
-        try { window.DB.deleteNote(id).catch?.(() => {}); return; } catch { /* fallback below */ }
+      if (typeof window.DB?.deleteNote === 'function') {
+        return this._enqueueNoteMutation(id, 'delete', () => window.DB.deleteNote(id));
       }
-      this.saveNotes(notes);
+      return this.saveNotes(notes);
     },
 
     // ── Folders ───────────────────────────────────────────
