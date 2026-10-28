@@ -685,6 +685,13 @@ describe('notes route filters', () => {
     expect(result).toMatchObject({ refreshed: true, currentId: 'regular-note', editorReloaded: false });
     expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
     expect(mounted.textContent).toContain('متن فارسی ناتمام');
+    // Both concurrent versions must survive: protecting the local IME draft
+    // cannot silently erase the new remote note after the debounced save.
+    const remoteCopy = store.getNotes().find(note => (
+      note.id !== 'regular-note' && note.content === '<p>Remote version</p>'
+      && note.title.includes('synced copy')
+    ));
+    expect(remoteCopy).toBeDefined();
 
     mounted.querySelector('p').textContent = 'متن فارسی کامل';
     mounted.dispatchEvent(new Event('compositionend', { bubbles: true }));
