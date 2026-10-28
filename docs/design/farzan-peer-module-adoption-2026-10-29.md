@@ -1,7 +1,7 @@
 # Farzan — evidence-gated peer-module adoption registry
 
 **Review date:** 2026-10-29  
-**Source baseline:** `main` at `2dda5e4752cdfbfe2bd4b246a47666e47a75fc29`  
+**Source baseline:** `main` at `9fd315ed468cab7b3522b95b315957b166132e5d`  
 **Source of design intent:** [Plasmato UX execution plan](./plasmato-ux-execution-2026-10-28.md), the four October 28 supplied visual reports, and the last archived PR #124 screenshots. The screenshots predate some subsequent PRs; they are not evidence that those defects persist in the latest executable build.
 
 ## Ground rules
@@ -38,22 +38,22 @@ These ten package IDs come from instructions with a wider product vocabulary. Th
 | `src/lib/timeline.js`: custom animation scheduler, exported globally | Native Web Animations API (`Element.animate`) for simple UI motion; **Motion mini** for supported cross-browser sequencing | **Conditional.** No confirmed app runtime caller. The existing pause/reverse/callback contract is richer than the native replacement; keep until parity tests justify changing it. [Motion](https://motion.dev/docs/animate). |
 | `src/features/canvasCharts/*` and `src/features/chartPlugins/*`: bespoke Canvas chart engines eagerly imported by `app.js` | Installed **Chart.js 4**, already loaded on the Progress route | **Audit consumers first.** Do not load the full Chart.js package eagerly or delete exported APIs without deprecation/compatibility coverage. |
 | `canvas.js`: stateful 2D Studio editing, history, layers, exports | Installed **Konva 10** with strict v1 read-only compatibility adapter (merged PR #113) | **Incremental parity-gated migration**, not a renderer swap: transform, pen, selection, undo/redo, text, export, roundtrip and Tauri acceptance before write access. |
-| `notes.js`: classic editor, autosave, persisted HTML | Installed **Squire RTE** and conservative compatibility preflight (merged PRs #112/#118) | Preview is opt-in. Keep unsupported rich HTML in the classic editor until table/image/metadata/undo and IME losslessness are demonstrated. Durable-write guard merged in #127; navigation handoff is PR #125. |
+| `notes.js`: classic editor, autosave, persisted HTML | Installed **Squire RTE** and conservative compatibility preflight (merged PRs #112/#118) | Preview is opt-in. Keep unsupported rich HTML in the classic editor until table/image/metadata/undo and IME losslessness are demonstrated. Durable-write guard merged in #127; navigation handoff and IME veto merged in #125. |
 | Home/Courses topic counts, multilingual text, text search and dates | `Intl.NumberFormat`, `Intl.Segmenter`, `<bdi>`, installed Fuse.js | **Prefer native/installed APIs** to bespoke formatting and tokenizer loops; audit locale display and dynamic direction without new dependencies. |
 | `db.js`/IndexedDB and local settings | Installed **Dexie 4** transactions and native IndexedDB | **Already adopted.** Avoid a second source of truth; extend transactional recovery and canonical receipt tests. No SQLite layer. |
 
 ## Design-audit application (not an unverified global CSS replacement)
 
-Historical PRs #120–#124 and #126 are merged. They implement the workbench foundation, accessible lesson actions, five-metric Progress, Settings ledger, Studio focus and topic-correct resume. PR #128 adds the reversible Courses focus/player outline. Preserve their tested behavior instead of importing the supplied remote-font/whole-shell CSS proposals.
+Historical PRs #120–#124 and #126 are merged. They implement the workbench foundation, accessible lesson actions, five-metric Progress, Settings ledger, Studio focus and topic-correct resume. Draft PR #128 adds the reversible Courses focus/player outline; its current head extends visual QA to capture live playback on desktop/mobile/RTL. Preserve their tested behavior instead of importing the supplied remote-font/whole-shell CSS proposals.
 
 Remaining acceptance is specific: Notes typography/toolbar prominence, split-pane focus, Studio actual canvas area and controls, Persian/English truncation, mobile course scrolling, current screenshot diffs and accurate 200% zoom. The old PR #124 screenshots cannot establish present-day PR #128 behavior.
 
 ## Implementation sequence and evidence
 
-1. **Data integrity first:** PR #127 merged; integrate #125 and verify actual rejected/slow IndexedDB writes before route teardown; keep final-head CI, browser, visual and Windows gates green.
+1. **Data integrity first:** PRs #127 and #125 merged with final-head CI, browser, visual (where relevant) and Windows verification. Keep cross-tab and rejection/retry probes in the durable-write regression suite.
 2. **Low-risk peer replacement:** complete #130 with native D3 engine and preserved graph contracts; quantify bundle effect.
 3. **User-facing study workbench:** accept #128 on a head synchronized with current main; inspect current captured screenshots, especially player mini-state and keyboard/mobile paths.
-4. **Eager bundle and list profiling:** inspect `app.js` optional exports and large Courses/Notes list render paths. A dependency is justified only by a measured performance or correctness win.
+4. **Eager bundle and list profiling:** inspect `app.js` optional exports and large Courses/Notes list render paths. A dependency is justified only by a measured performance or correctness win. Native number grouping in the Home catalog is covered by [PR #132](https://github.com/AmirrezaFarnamTaheri/Farzan/pull/132), which uses `Intl.NumberFormat` rather than a new package.
 5. **High-risk editor parity:** separately qualify full Studio Konva edits and Squire rich-HTML migration with rollback/backup trials; do not replace persisted schemas to satisfy a library-adoption target.
 6. **Release:** finish only after final-head repository CI, Browser Assurance, visual QA, Native Windows build and actual installer/media/backup acceptance. Passing a web CI job is not equivalent to a signed published installer.
 
