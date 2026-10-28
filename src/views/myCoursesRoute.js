@@ -45,7 +45,6 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </dialog>
-      <div class="stat-grid" data-my-course-metrics></div>
       <div class="card card-filled my-courses-list-card">
         <div class="card-body">
           <div class="grid grid-3" data-my-course-list>
@@ -53,6 +52,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
+      <div class="stat-grid my-courses-metrics" data-my-course-metrics></div>
       <section class="card card-filled" aria-labelledby="media-folder-heading">
         <div class="card-body">
           <h2 class="text-lg font-semibold" id="media-folder-heading">Keep a copy of your imported files</h2>
@@ -266,7 +266,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       list.append(notice);
       return;
     }
-    metrics.replaceChildren(metric('Courses', courses.length), metric('Topics', courses.reduce((count, course) => count + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)), metric('With descriptions', courses.filter(course => course.description).length));
+    metrics.replaceChildren(
+      metric('Courses', courses.length),
+      metric('Topics', courses.reduce((count, course) => count
+        + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)),
+    );
     list.replaceChildren();
     if (!courses.length) {
       const empty = document.createElement('div');
