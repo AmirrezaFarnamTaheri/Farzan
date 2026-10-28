@@ -986,7 +986,9 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     appendAISummary(summary) {
-      if (this._tiptap) this.disableModern();
+      // Never insert outside an active Squire root if an IME composition makes
+      // it unsafe to switch editing engines yet.
+      if (this._tiptap && !this.disableModern()) return false;
       if (!this._el || !this._currentId) return false;
       const lines = String(summary || '')
         .split(/\r?\n/)
@@ -2269,7 +2271,8 @@ import { countWords } from './src/core/textMetrics.js';
         }
         // AI work may finish after navigation, route unmount, cross-tab sync,
         // or intervening edits. Never append an old result to a newer draft.
-        if (!this._inited || !sourceElement?.isConnected || Editor._el !== sourceElement
+        if (!this._inited || Editor._compositionActive
+            || !sourceElement?.isConnected || Editor._el !== sourceElement
             || Editor._currentId !== sourceNoteId || Editor._loadEpoch !== sourceEpoch
             || Editor.getContent() !== sourceContent
             || Store.getNote(sourceNoteId)?.content !== sourceContent) {
