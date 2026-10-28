@@ -56,5 +56,23 @@ export function assessNoteForSquire(html) {
   for (const span of [...template.content.querySelectorAll('span')].reverse()) {
     span.replaceWith(...span.childNodes);
   }
+  // Squire can wrap browser-generated root text in paragraphs. Validate an
+  // inert structural copy, keeping the stored HTML untouched.
+  let paragraph = null;
+  for (const node of [...template.content.childNodes]) {
+    const inline = (node.nodeType === Node.TEXT_NODE && Boolean(node.textContent.trim()))
+      || (node.nodeType === Node.ELEMENT_NODE && MARKS.has(node.localName));
+    if (inline) {
+      if (!paragraph) {
+        paragraph = document.createElement('p');
+        template.content.insertBefore(paragraph, node);
+      }
+      paragraph.appendChild(node);
+    } else if (paragraph && node.nodeType === Node.TEXT_NODE) {
+      paragraph.appendChild(node);
+    } else {
+      paragraph = null;
+    }
+  }
   return assessNoteForTiptap(template.innerHTML);
 }
