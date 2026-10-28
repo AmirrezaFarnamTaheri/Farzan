@@ -280,6 +280,8 @@ test.describe('Farzan desktop workspace redesign', () => {
     await toggle.click();
     const modern = page.locator('[data-notes-editor] .notes-modern-editor');
     await expect(modern).toBeVisible();
+    await expect(outer).not.toHaveAttribute('role', 'textbox');
+    await expect(modern).toHaveAttribute('role', 'textbox');
     await expect(modern).toContainText('فیزیولوژی قلب');
     await modern.click();
     await modern.press('ControlOrMeta+End');
@@ -288,6 +290,7 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect.poll(storedContent).toContain('Extra saved edit');
     await toggle.click();
     await expect(modern).toHaveCount(0);
+    await expect(outer).toHaveAttribute('role', 'textbox');
     await expect(outer).toContainText('Extra saved edit');
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
