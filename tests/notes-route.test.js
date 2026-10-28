@@ -11,6 +11,30 @@ describe('notes route workspace', () => {
     };
   });
 
+  it('vetoes a route leave while Notes IME composition is active', () => {
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    expect(controller.beforeLeave()).toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(controller.beforeLeave()).toBe(true);
+    expect(window.PlasmaNotesApp.flushPendingSave).toHaveBeenCalledOnce();
+    controller.unmount();
+  });
+
+  it('refuses to leave when the Notes app reports an uncommitted storage write', () => {
+    window.PlasmaNotesApp.flushPendingSave.mockReturnValue(false);
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    expect(controller.beforeLeave()).toBe(false);
+    controller.unmount();
+  });
+
   it('preserves editor, formatting, search, folder, import, and export hooks', () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },
