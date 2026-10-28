@@ -631,6 +631,11 @@ import { countWords } from './src/core/textMetrics.js';
 
     disableModern({ preserveContent = true } = {}) {
       if (!this._tiptap) return false;
+      // Squire batches DOM input notifications via MutationObserver. Capture
+      // any unobserved final keystroke before asking getContent() whether the
+      // document changed; otherwise an immediate fallback can restore the
+      // previous HTML and silently discard the latest edit.
+      if (preserveContent && this._tiptap.syncChanges() === false) return false;
       const preserved = preserveContent ? this.getContent() : '';
       try { this._tiptap.destroy(); } catch {}
       this._tiptap = null;
