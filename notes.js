@@ -588,6 +588,9 @@ import { countWords } from './src/core/textMetrics.js';
       if (this._saveTimer) this.save(true);
       const node = this._el;
       const noteId = this._currentId;
+      // Keep this mount identity fixed even if a deleted note is recovered
+      // under a new ID without replacing the active Squire editor.
+      const mountEpoch = this._loadEpoch;
       const original = node.innerHTML;
       const safe = this._sanitize(original);
       const before = node.innerHTML;
@@ -601,6 +604,7 @@ import { countWords } from './src/core/textMetrics.js';
       // Route unmounts, note switches, and intervening keystrokes must never
       // cause an async editor import to replace a newer user draft.
       if (node !== this._el || noteId !== this._currentId
+          || this._loadEpoch !== mountEpoch
           || node.innerHTML !== before || !node.isConnected) {
         return { ok: false, reason: 'stale-mount' };
       }
@@ -611,7 +615,9 @@ import { countWords } from './src/core/textMetrics.js';
           element: node,
           html: safe,
           onUpdate: () => {
-            if (this._el !== node || this._currentId !== noteId) return;
+            // The current ID may be rebound to a recovered copy after remote
+            // deletion; the mount epoch, not the old note ID, owns the editor.
+            if (this._el !== node || this._loadEpoch !== mountEpoch || !this._currentId) return;
             this._tiptapChanged = true;
             this._onInput();
           },
@@ -2081,7 +2087,8 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _renderAfterCanonicalRefresh(options = {}) {
-      const pendingLocalEdit = options.preserveDirtyEditor && this._hasPendingLocalEdit();
+      const pendingLocalEdit = options.preserveDirtyEditor
+        && (options.forcePreserveEditor === true || this._hasPendingLocalEdit());
       const currentId = Editor._currentId;
       NotesList.render();
       FoldersPanel.render();
@@ -2124,6 +2131,11 @@ import { countWords } from './src/core/textMetrics.js';
       }
 
       const editedNoteId = Editor._currentId;
+      const sourceElement = Editor._el;
+      const sourceEpoch = Editor._loadEpoch;
+      // Flush any pending Squire MutationObserver notification before the
+      // canonical read. An unfinished IME composition stays in the live editor.
+      if (Editor._tiptap && !Editor._compositionActive) Editor._tiptap.syncChanges();
       const previousNote = editedNoteId && Store.getNote(editedNoteId);
       const dirtyBeforeSync = this._hasPendingLocalEdit();
       const changed = await Store.hydrateFromDB({ force: true });
@@ -2132,8 +2144,31 @@ import { countWords } from './src/core/textMetrics.js';
       // A conflicting remote version must not silently vanish when the local
       // draft is eventually saved. Store a separate synced copy first.
       const incoming = editedNoteId && Store.getNote(editedNoteId);
-      const dirtyDuringSync = dirtyBeforeSync || this._hasPendingLocalEdit();
+      const stillEditingSource = Editor._el === sourceElement
+        && Editor._loadEpoch === sourceEpoch && Editor._currentId === editedNoteId;
+      const dirtyDuringSync = stillEditingSource
+        && (dirtyBeforeSync || this._hasPendingLocalEdit());
       let conflictCopyId = null;
+      let recoveredDraftId = null;
+      if (dirtyDuringSync && previousNote && !incoming) {
+        // Remote deletion must not discard a pending local draft, nor should
+        // saving resurrect the deleted ID. Bind the live editor to a new note.
+        const titleInput = $('[data-note-title-input]');
+        const draftTitle = titleInput?.value.trim() || previousNote.title || 'Untitled Note';
+        const recovered = Store.createNote({
+          ...previousNote,
+          title: `${draftTitle.slice(0, 170)} (Recovered draft)`,
+          // Incomplete IME text is intentionally not persisted before commit.
+          // The editor remains mounted, then compositionend saves final text.
+          content: Editor._compositionActive ? previousNote.content : Editor.getContent(),
+        });
+        Editor._currentId = recovered.id;
+        if (titleInput) titleInput.value = recovered.title;
+        recoveredDraftId = recovered.id;
+        window.OpenCourseDeck?.Toast?.info?.(
+          'This note was deleted in another window. Your unsaved draft was recovered as a separate note.',
+        );
+      }
       if (dirtyDuringSync && previousNote && incoming
           && (previousNote.content !== incoming.content || previousNote.title !== incoming.title)) {
         this._syncConflictVersions ??= new Map();
@@ -2154,8 +2189,11 @@ import { countWords } from './src/core/textMetrics.js';
           window.OpenCourseDeck?.Toast?.info?.('Another window updated this note. Its version was saved as a separate copy.');
         }
       }
-      const render = this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
-      const result = { refreshed: true, kind, conflictCopyId, ...render };
+      const render = this._renderAfterCanonicalRefresh({
+        preserveDirtyEditor: true,
+        forcePreserveEditor: Boolean(recoveredDraftId),
+      });
+      const result = { refreshed: true, kind, conflictCopyId, recoveredDraftId, ...render };
       window.OpenCourseDeck?.bus?.emit?.('notes:sync-refresh', result);
       return result;
     },
