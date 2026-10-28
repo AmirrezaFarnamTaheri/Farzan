@@ -128,6 +128,11 @@ test.describe('Farzan desktop workspace redesign', () => {
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     const exportButton = page.locator('#btn-export-json');
     const importButton = page.locator('#btn-import-json');
+    const backupMenu = page.locator('details.progress-export-menu');
+    await expect(backupMenu.locator('summary')).toHaveAccessibleName('Data and backup options');
+    await expect(exportButton).toBeHidden();
+    await expect(importButton).toBeHidden();
+    await backupMenu.locator('summary').click();
     await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
     for (const button of [exportButton, importButton]) {
       await expect(button).toBeVisible();
