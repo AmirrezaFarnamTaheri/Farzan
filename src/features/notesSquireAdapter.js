@@ -227,6 +227,14 @@ export function createTiptapNoteEditor({
       return formats ? formats.some(tag => editor.hasFormat(tag)) : false;
     },
     getHTML: facade.getHTML,
+    // An immediate mode switch may occur before Squire's MutationObserver
+    // delivers the final edit. Publish that live DOM change synchronously.
+    // Never commit an unfinished IME composition during a mode switch.
+    syncChanges() {
+      if (composing) return false;
+      notify();
+      return true;
+    },
     setContent(value) {
       const next = preflight(value);
       suppress = true;
