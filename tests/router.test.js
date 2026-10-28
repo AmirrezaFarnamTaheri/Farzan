@@ -77,6 +77,38 @@ describe('createRouter', () => {
     }
   });
 
+  it('keeps the current draft mounted when beforeLeave rejects unexpectedly', async () => {
+    window.location.hash = '#/notes';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const bus = { emit: vi.fn() };
+    const teardown = vi.fn();
+    const nextRoute = vi.fn();
+    const router = createRouter({
+      $: () => [],
+      bus,
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/notes', async () => ({
+      beforeLeave: async () => { throw new Error('Notes storage cannot confirm save'); },
+      unmount: teardown,
+    }));
+    router.on('#/home', async () => { nextRoute(); });
+    try {
+      await router.init();
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(bus.emit).toHaveBeenCalledWith(
+        'route:blocked', { from: '#/notes', to: '#/home' },
+      ));
+      await router.ready();
+      expect(window.location.hash).toBe('#/notes');
+      expect(nextRoute).not.toHaveBeenCalled();
+      expect(teardown).not.toHaveBeenCalled();
+    } finally {
+      router.destroy();
+      warn.mockRestore();
+    }
+  });
+
   it('aborts a previous route signal even when its handler returned no controller', async () => {
     window.location.hash = '#/empty';
     let emptySignal;
