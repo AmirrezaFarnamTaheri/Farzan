@@ -58,6 +58,12 @@ Current code already includes `src/styles/farzan-redesign.css`, semantic themes,
 5. Verify zero unintended outer scroll bleed; avoid hiding scrollbars that are necessary for discoverability.
 6. Finalize release only after all final-head gates, real Windows bundle/build, backup/restore and local-media workflows pass.
 
+## Bundle budget decision — explicit and bounded
+
+Baseline `main` CI #40663026669 measured **1,047,917 B / 1,048,576 B** aggregate JS (659 B headroom). The first complete wave-1 implementation measured **1,049,703 B**, only **1,786 B** higher, but above the gate by **1,127 B**. All 1,171 tests and lint passed; only the aggregate bundle check failed.
+
+The approved adjustment for the UI branch is **1,088 KiB (1,114,112 B)**, giving 64 KiB growth allowance while keeping the 320 KiB largest-chunk, 240 KiB entry, 80 KiB gzipped-entry and CSP enforcement unchanged. Existing generated chunks remain counted; no vendor relabeling or exclusions. This is separate from the draft Squire editor's proposed 1.25 MiB decision. The allowance is explicit in code and asserted by `tests/bundle-report.test.js`. Do not escalate further without a measured change and written rationale.
+
 ## Non-negotiable engineering constraints
 
 - No second source of truth for Notes/course/library data; no storage-schema rewrite driven by appearance alone.
