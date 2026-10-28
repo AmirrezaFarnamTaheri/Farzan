@@ -426,7 +426,9 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       detail: latestProgress ? `${Math.round(focusPercent)}% complete` : latestTimestamp ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'Start with the course catalog.',
       action: 'courses',
       topicId: focusTopicId,
-      position: latestTimestamp?.position,
+      // Use the same topic-scoped position as the Home hero. A later
+      // timestamp from another topic must never be handed to this topic.
+      position: focusPosition || undefined,
     },
     {
       id: 'review',
