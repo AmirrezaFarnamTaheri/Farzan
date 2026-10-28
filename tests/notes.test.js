@@ -258,6 +258,32 @@ describe('notes route filters', () => {
     expect(document.execCommand).not.toHaveBeenCalledWith('delete');
   });
 
+  it('does not undo across a stale classic history after switching back from Squire', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const outer = document.querySelector('[data-notes-editor]');
+
+    outer.innerHTML = '<p>Earlier classic checkpoint</p>';
+    outer.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+
+    const root = outer.querySelector('.notes-modern-editor');
+    root.querySelector('p').textContent = 'Recent Squire editing';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(app.disableModernEditor()).toBe(true);
+    expect(outer.textContent).toContain('Recent Squire editing');
+
+    const preserved = outer.innerHTML;
+    outer.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(outer.innerHTML).toBe(preserved);
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('Recent Squire editing');
+  });
+
   it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
