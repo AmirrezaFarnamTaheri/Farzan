@@ -998,6 +998,37 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('Uncommitted work');
   });
 
+  it('serializes creation and editing writes so a delayed empty note cannot overwrite its content', async () => {
+    const store = window.PlasmaNotesStore;
+    let releaseFirst;
+    const committed = [];
+    window.DB.saveNote.mockImplementationOnce(note => {
+      const snapshot = { ...note };
+      return new Promise(resolve => {
+        releaseFirst = () => { committed.push(snapshot); resolve(snapshot); };
+      });
+    }).mockImplementation(note => {
+      const snapshot = { ...note };
+      committed.push(snapshot);
+      return Promise.resolve(snapshot);
+    });
+
+    const note = store.createNote({ title: 'New note with an in-flight creation write' });
+    store.updateNote(note.id, { content: '<p>Final text</p><table><tr><td>70 mL</td></tr></table>' });
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    // A second concurrent write can finish before creation, after which the
+    // stale empty creation transaction overwrites the edited note.
+    expect(window.DB.saveNote).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.saveNote).toHaveBeenCalledTimes(2);
+    expect(committed.at(-1)).toMatchObject({
+      id: note.id,
+      content: '<p>Final text</p><table><tr><td>70 mL</td></tr></table>',
+    });
+  });
+
   it('keeps an unsaved draft mounted if its current note disappears before switching', () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
