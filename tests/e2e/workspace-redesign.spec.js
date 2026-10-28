@@ -123,6 +123,16 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect((await catalog.boundingBox()).y).toBeLessThan(650);
   });
 
+  test('fits the five Progress summary metrics in one row at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const metrics = page.locator('.view-progress .progress-metric');
+    await expect(metrics).toHaveCount(5);
+    const topPositions = await metrics.evaluateAll(nodes =>
+      nodes.map(node => Math.round(node.getBoundingClientRect().top)));
+    expect(Math.max(...topPositions) - Math.min(...topPositions)).toBeLessThanOrEqual(2);
+  });
+
   test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
