@@ -841,6 +841,45 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
   });
 
+  it('does not write unfinished Squire IME text when an earlier edit is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.querySelector('p').textContent = 'Finished change before composition';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'Finished change before composition + 中途入力';
+    root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).not.toContain('中途入力');
+
+    root.querySelector('p').textContent = 'Finished change before composition + 完成';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('完成');
+  });
+
+  it('does not write unfinished classic Notes IME text during an explicit flush', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.innerHTML = '<p>Unfinished IME 下書き</p>';
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).not.toContain('下書き');
+
+    editor.innerHTML = '<p>Committed IME 完了</p>';
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('完了');
+  });
+
   it('keeps the current Squire note open until IME composition is committed', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
