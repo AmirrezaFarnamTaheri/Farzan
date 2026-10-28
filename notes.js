@@ -797,11 +797,16 @@ import { countWords } from './src/core/textMetrics.js';
         // A delayed save must not target a different note opened afterwards.
         // Recovery of a deleted note rebinds its ID without changing epoch.
         if (this._loadEpoch !== sourceEpoch) return;
-        if (this._syncReadInProgress) {
-          // Pause writes until the canonical read confirms the note still
-          // exists or has established a separate recovered draft.
+        if (this._compositionActive) {
+          // DOM content during an IME composition is provisional, not a
+          // committed edit. Retry after compositionend without saving it.
           this._saveTimer = setTimeout(doSave, 150);
-          return;
+          return false;
+        }
+        if (this._syncReadInProgress) {
+          // A canonical read must settle before any write may proceed.
+          this._saveTimer = setTimeout(doSave, 150);
+          return false;
         }
         const content  = this.getContent();
         const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
