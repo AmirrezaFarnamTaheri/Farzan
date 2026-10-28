@@ -300,15 +300,36 @@ import { countWords } from './src/core/textMetrics.js';
       const DB = window.DB;
       if (!DB || (this._hydrated && !options.force)) return false;
       let changed = false;
+      // Canonical reads are asynchronous. A note created/edited/deleted after
+      // getAllNotes() starts must not be overwritten by its earlier snapshot.
+      // Record only mutations during this read, rather than merging the
+      // entire localStorage mirror (which could resurrect old deletions).
+      const overlay = new Map();
+      this._activeHydrationReads.add(overlay);
       try {
         if (typeof DB.getAllNotes === 'function') {
           const notes = await DB.getAllNotes();
           if (Array.isArray(notes)) {
-            this._notes = notes.slice();
+            const latest = notes.slice();
+            for (const [id, updated] of overlay) {
+              const index = latest.findIndex(note => String(note?.id) === id);
+              if (updated === null) {
+                if (index >= 0) latest.splice(index, 1);
+              } else if (index >= 0) {
+                latest[index] = updated;
+              } else {
+                latest.unshift(updated);
+              }
+            }
+            this._notes = latest;
             changed = true;
           }
         }
-      } catch {}
+      } catch {
+        // Keep the existing in-memory draft when canonical reads are offline.
+      } finally {
+        this._activeHydrationReads.delete(overlay);
+      }
       try {
         if (typeof DB.getAllFolders === 'function') {
           const folders = await DB.getAllFolders();
@@ -354,6 +375,9 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _cacheNote(note, fallbackNotes = null) {
+      for (const read of this._activeHydrationReads) {
+        read.set(String(note.id), { ...note });
+      }
       if (Array.isArray(fallbackNotes)) {
         this._notes = fallbackNotes.slice();
         return;
@@ -365,19 +389,61 @@ import { countWords } from './src/core/textMetrics.js';
       this._notes = notes;
     },
 
+    // Serialize writes for the same note ID. A new-note creation and the
+    // editor's first save can otherwise complete in reverse order, restoring
+    // an older empty body after the user's latest edit. Queue deletes as well
+    // so an in-flight save cannot resurrect a removed record.
+    _activeHydrationReads: new Set(),
+    _noteWriteQueue: new Map(),
+
+    _enqueueNoteMutation(id, action, operation) {
+      const key = String(id);
+      const durableReason = `notes-durable-write:${key}`;
+      // Even ordinary autosaves must remain flagged until IndexedDB confirms
+      // completion. A later success may clear an earlier failure for this
+      // note, but cannot clear a different note's unsaved-work warning.
+      window.OpenCourseDeck?.beforeUnload?.mark?.(durableReason);
+      const previous = this._noteWriteQueue.get(key);
+      let started;
+      if (previous) {
+        started = previous.then(operation);
+      } else {
+        // Preserve the existing immediate-first-call contract (the bridge is
+        // invoked synchronously), while tracking asynchronous completion.
+        try { started = Promise.resolve(operation()); }
+        catch (error) { started = Promise.reject(error); }
+      }
+      const tracked = started.catch(error => {
+        console.warn(`[Notes] DB.${action} failed`, error);
+        window.OpenCourseDeck?.Toast?.error?.(
+          action === 'save'
+            ? 'Could not save this note to the database. Retry before leaving.'
+            : 'Could not delete this note from the database.',
+        );
+        return false;
+      });
+      this._noteWriteQueue.set(key, tracked);
+      void tracked.then(result => {
+        // Do not acknowledge an older write if a newer write for this ID is
+        // still outstanding. A failed latest write remains protected.
+        if (this._noteWriteQueue.get(key) !== tracked) return;
+        this._noteWriteQueue.delete(key);
+        if (result !== false) {
+          window.OpenCourseDeck?.beforeUnload?.unmark?.(durableReason);
+        }
+      });
+      return tracked;
+    },
+
     persistNote(note, fallbackNotes = null) {
       if (!note) return;
       this._cacheNote(note, fallbackNotes);
-      if (window.DB?.saveNote) {
-        try {
-          window.DB.saveNote(note).catch?.(err => {
-            console.warn('[Notes] DB.saveNote failed', err);
-            window.OpenCourseDeck?.Toast?.error?.('Note save failed — stored locally.');
-          });
-          return;
-        } catch { /* fallback below */ }
+      if (typeof window.DB?.saveNote === 'function') {
+        // Capture immutable values now, not when the queued operation starts.
+        const snapshot = { ...note };
+        return this._enqueueNoteMutation(note.id, 'save', () => window.DB.saveNote(snapshot));
       }
-      this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
+      return this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
     },
 
     getNote(id) {
@@ -420,12 +486,13 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     deleteNote(id) {
+      for (const read of this._activeHydrationReads) read.set(String(id), null);
       const notes = this.getNotes().filter(n => n.id !== id);
       this._notes = notes;
-      if (window.DB?.deleteNote) {
-        try { window.DB.deleteNote(id).catch?.(() => {}); return; } catch { /* fallback below */ }
+      if (typeof window.DB?.deleteNote === 'function') {
+        return this._enqueueNoteMutation(id, 'delete', () => window.DB.deleteNote(id));
       }
-      this.saveNotes(notes);
+      return this.saveNotes(notes);
     },
 
     // ── Folders ───────────────────────────────────────────
@@ -2157,8 +2224,12 @@ import { countWords } from './src/core/textMetrics.js';
 
       const notes = Store.getNotes();
       if (notes.length) {
-        if (!pendingLocalEdit) this.openNote(notes[0].id, { preventScroll: true });
-        return { currentId: notes[0].id, editorReloaded: !pendingLocalEdit };
+        // The previous ID might have been deleted by the canonical sync.
+        // With no dirty local draft, activate the reconciled note directly
+        // rather than trying to save the now-absent source record.
+        const reloaded = !pendingLocalEdit
+          && this._activateSavedNote(notes[0].id, { preventScroll: true });
+        return { currentId: notes[0].id, editorReloaded: Boolean(reloaded) };
       }
 
       return { currentId: null, editorReloaded: false };
@@ -2259,15 +2330,47 @@ import { countWords } from './src/core/textMetrics.js';
       return true;
     },
 
-    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
-      // Prevent orphan notes if navigation cannot leave an unfinished edit.
+    _commitCurrentBeforeSwitch() {
       if (!this._canLeaveCurrentEditor()) return false;
+      // The first note has no previously bound record to persist.
+      if (!Editor._currentId) return true;
+      // Squire may still have a DOM mutation awaiting its observer. Resolve
+      // that before deciding an editor has no pending local work.
+      if (Editor._tiptap && Editor._tiptap.syncChanges() === false) return false;
+      // A canonical refresh can delete the previous (clean) note. In that
+      // case there is nothing to save: allow opening the newly loaded record.
+      // An edited missing note must stay mounted for recovery instead.
+      if (!Store.getNote(Editor._currentId) && !this._hasPendingLocalEdit()) return true;
+      try {
+        if (Editor.save(true) !== false) return true;
+      } catch (error) {
+        console.warn('[Notes] current note could not be saved before switching', error);
+      }
+      window.OpenCourseDeck?.Toast?.error?.(
+        'Could not save your current note. The draft is still open; retry before switching.',
+      );
+      return false;
+    },
+
+    // Used only after a successful draft commit, or after a canonical refresh
+    // has proven there is no unsaved local edit. Do not call from click handlers.
+    _activateSavedNote(id, { preventScroll = false } = {}) {
+      const note = Store.getNote(id);
+      if (!note) return false;
+      Editor.load(note, { preventScroll });
+      NotesList.setActive(id);
+      const pane = $('[data-notes-main-pane]');
+      if (pane) pane.classList.add('has-note');
+      return true;
+    },
+
+    newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
+      // Do not allocate an orphan note until the previous draft can be saved.
+      if (!this._commitCurrentBeforeSwitch()) return false;
       const note = Store.createNote({ folderId });
       NotesList.render();
-      // Folder counts are a separate view; refresh them after creating notes.
-      // Otherwise the list can show two notes while All Notes still says 0.
       FoldersPanel.render();
-      this.openNote(note.id, { preventScroll });
+      if (!this._activateSavedNote(note.id, { preventScroll })) return false;
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
       return note;
     },
@@ -2276,16 +2379,9 @@ import { countWords } from './src/core/textMetrics.js';
     disableModernEditor() { return Editor.disableModern(); },
 
     openNote(id, { preventScroll = false } = {}) {
-      if (!this._canLeaveCurrentEditor()) return false;
-      Editor.save(true); // Flush current draft before changing the editor.
-      const note = Store.getNote(id);
-      if (!note) return false;
-      Editor.load(note, { preventScroll });
-      NotesList.setActive(id);
-
-      const pane = $('[data-notes-main-pane]');
-      if (pane) pane.classList.add('has-note');
-      return true;
+      if (!Store.getNote(id)) return false;
+      if (!this._commitCurrentBeforeSwitch()) return false;
+      return this._activateSavedNote(id, { preventScroll });
     },
 
     async deleteNote(id) {
@@ -2311,9 +2407,11 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     duplicateNote(id) {
-      if (!this._canLeaveCurrentEditor()) return false;
+      if (!Store.getNote(id)) return false;
+      // Flush first so duplicating the current note includes its newest text.
+      if (!this._commitCurrentBeforeSwitch()) return false;
       const note = Store.getNote(id);
-      if (!note) return;
+      if (!note) return false;
       const copy = Store.createNote({
         ...note,
         id:    undefined,
@@ -2321,7 +2419,7 @@ import { countWords } from './src/core/textMetrics.js';
       });
       NotesList.render();
       FoldersPanel.render();
-      this.openNote(copy.id);
+      if (!this._activateSavedNote(copy.id)) return false;
       return copy;
     },
 
@@ -2508,8 +2606,14 @@ import { countWords } from './src/core/textMetrics.js';
       const bodyCommitted = Editor.save(true);
       const titleInput = $('[data-note-title-input]');
       if (titleInput && Editor._currentId) {
-        Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
-        NotesList.render();
+        const title = titleInput.value.trim() || 'Untitled';
+        // Editor.save(true) already writes the current title. Avoid a second
+        // duplicate DB write: it can obscure a failed first write and race
+        // against an in-flight canonical hydration.
+        if (Store.getNote(Editor._currentId)?.title !== title) {
+          Store.updateNote(Editor._currentId, { title });
+          NotesList.render();
+        }
         window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
       }
       // A composing IME or unresolved sync deliberately defers the body write.
@@ -2522,6 +2626,33 @@ import { countWords } from './src/core/textMetrics.js';
     }
   };
 
+
+  /**
+   * Use for route changes: an updated in-memory note is not a durable write.
+   * Await the final per-note DB mutation before allowing the editor to unmount.
+   * On failure, retain a before-unload reason until a successful retry.
+   */
+  NotesApp.flushPendingSaveDurably = async function flushPendingSaveDurably() {
+    const id = Editor._currentId;
+    const guard = window.OpenCourseDeck?.beforeUnload;
+    const durableReason = `notes-durable-write:${String(id ?? 'new')}`;
+    guard?.mark?.(durableReason);
+    let durable = false;
+    try {
+      if (this.flushPendingSave() === false) return false;
+      const pending = id == null ? null : Store._noteWriteQueue.get(String(id));
+      if (pending && await pending === false) return false;
+      // A different note may have opened while the asynchronous save settled.
+      if (id !== Editor._currentId) return false;
+      durable = true;
+      return true;
+    } catch (error) {
+      console.warn('[Notes] durable write acknowledgment failed', error);
+      return false;
+    } finally {
+      if (durable) guard?.unmark?.(durableReason);
+    }
+  };
 
   // ──────────────────────────────────────────────────────────
   // BOOT
