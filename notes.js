@@ -2478,16 +2478,20 @@ import { countWords } from './src/core/textMetrics.js';
    */
   NotesApp.flushPendingSave = function flushPendingSave() {
     try {
-      Editor.save(true);
+      const bodyCommitted = Editor.save(true);
       const titleInput = $('[data-note-title-input]');
       if (titleInput && Editor._currentId) {
         Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
         NotesList.render();
+        window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
       }
+      // A composing IME or unresolved sync deliberately defers the body write.
+      // Do not clear unload protection until that body was actually committed.
+      if (bodyCommitted === false) return false;
       window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
-      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
+      return true;
     } catch {
-      /* ignore */
+      return false;
     }
   };
 
