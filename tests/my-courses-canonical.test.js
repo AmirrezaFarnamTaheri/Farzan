@@ -25,6 +25,36 @@ describe('My Courses canonical ownership and legacy recovery', () => {
     initUserLibrary(window);
   });
 
+  it('keeps creation hidden until requested and restores focus on cancellation', async () => {
+    mount();
+    const opener = document.querySelector('[data-my-course-create]');
+    const dialog = document.querySelector('[data-my-course-dialog]');
+    expect(opener).not.toBeNull();
+    expect(dialog).not.toBeNull();
+    expect(dialog.hasAttribute('open')).toBe(false);
+    opener.click();
+    expect(dialog.hasAttribute('open')).toBe(true);
+    expect(document.activeElement).toBe(document.querySelector('[data-my-course-title]'));
+    dialog.querySelector('[data-my-course-cancel]').click();
+    expect(dialog.hasAttribute('open')).toBe(false);
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('opens course creation from the empty state and closes it after a successful save', async () => {
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('No custom courses'));
+    const emptyCreate = document.querySelector('[data-my-course-empty-create]');
+    expect(emptyCreate).not.toBeNull();
+    emptyCreate.click();
+    const dialog = document.querySelector('[data-my-course-dialog]');
+    expect(dialog.hasAttribute('open')).toBe(true);
+    document.querySelector('[data-my-course-title]').value = 'Study track';
+    document.querySelector('[data-my-course-save]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('Study track'));
+    expect(dialog.hasAttribute('open')).toBe(false);
+    expect(settings.ocd_my_courses).toBeUndefined();
+  });
+
   it('lists courses created through Add Course even without a legacy outline record', async () => {
     const course = await upsertCourse({ title: 'Anatomy', description: 'Modules' });
     expect(settings.ocd_my_courses).toBeUndefined();

@@ -1173,4 +1173,112 @@
   }
 }
 
+/* Plasmato workbench: focused creation and readable mixed-script playlists.
+ * Built on existing semantic theme tokens; no external network fonts/assets. */
+.my-course-dialog {
+  box-sizing: border-box;
+  width: min(540px, calc(100vw - 28px));
+  max-height: min(720px, calc(100dvh - 36px));
+  margin: auto;
+  padding: 0;
+  overflow-y: auto;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .3);
+}
 
+.my-course-dialog:not([open]) { display: none; }
+.my-course-dialog::backdrop { background: rgba(8, 16, 27, .64); }
+.my-course-dialog > .card-body { padding: clamp(20px, 3vw, 30px); }
+.my-course-dialog .my-courses-form { max-width: none; }
+.my-course-dialog .my-courses-form .button-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.view-my-courses [data-my-course-list] { min-width: 0; }
+.view-my-courses .my-course-title,
+.view-my-courses .my-course-desc {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+.view-playlists [data-playlist-list] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
+  align-items: stretch;
+}
+
+.playlist-card { min-width: 0; }
+.playlist-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 9px;
+  height: 100%;
+  min-width: 0;
+}
+.playlist-card-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+.playlist-source-label {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.playlist-source-label[hidden] { display: none; }
+.playlist-card-detail { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.playlist-preview {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding-inline-start: 22px;
+}
+.playlist-preview-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+.playlist-more { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); }
+.playlist-more[hidden] { display: none; }
+.playlist-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.playlist-card-actions .btn { max-width: 100%; }
+
+/* Put the learner's courses before supporting counters, not beneath a form. */
+.view-my-courses .my-courses-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 520px;
+  gap: 10px;
+  margin-top: 12px;
+}
+.view-my-courses .my-courses-metrics .stat-card {
+  min-height: 66px;
+  padding: 10px 14px;
+}
+@media (max-width: 480px) {
+  .view-my-courses .my-courses-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+  }
+  .my-course-dialog { width: calc(100vw - 20px); }
+  .playlist-card-actions .btn { flex: 1 1 100%; }
+}
