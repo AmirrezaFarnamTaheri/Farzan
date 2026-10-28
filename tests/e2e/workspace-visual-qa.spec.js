@@ -47,6 +47,32 @@ for (const setup of setups) {
       const name = path.join(folder, route + '.png');
       const shot = await page.screenshot({ path: name, animations: 'disabled', caret: 'hide' });
       expect(shot.byteLength, `${setup.name}/${route} blank screenshot`).toBeGreaterThan(11000);
+
+      // The original visual suite captured only an idle Courses page. Study
+      // focus is a distinct, interactive layout; save its real state for
+      // desktop/dark and both mobile writing directions.
+      if (route === 'courses' && ['desktop-dark', 'mobile-light', 'mobile-rtl'].includes(setup.name)) {
+        const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+        await expect(course).toBeVisible({ timeout: 20000 });
+        await course.click();
+        const play = page.locator('#course-detail button[data-action="play-video"]').first();
+        await expect(play).toBeVisible();
+        await play.click();
+        await expect(page.locator('.courses-shell')).toHaveAttribute('data-playback-active', 'true');
+        await expect(page.locator('#course-player')).toBeVisible();
+        await expect(page.locator('#course-detail .topic-row').first()).toBeVisible();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        const overflow = await page.evaluate(() => Math.max(
+          document.body.scrollWidth, document.documentElement.scrollWidth,
+        ) - window.innerWidth);
+        expect(overflow, `${setup.name} focus-mode horizontal overflow`).toBeLessThanOrEqual(3);
+        const focusShot = await page.screenshot({
+          path: path.join(folder, 'courses-study-focus.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+        expect(focusShot.byteLength, `${setup.name} empty study-focus screenshot`).toBeGreaterThan(11000);
+      }
     }
   });
 }
