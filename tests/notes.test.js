@@ -826,6 +826,65 @@ describe('notes route filters', () => {
     expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
   });
 
+  it('keeps the current Squire note open until IME composition is committed', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'در حال نوشتن';
+    root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    const attempt = app.openNote('pinned-note');
+    expect(attempt).toBe(false);
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    expect(root.textContent).toContain('در حال نوشتن');
+
+    root.querySelector('p').textContent = 'متن نهایی';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(app.openNote('pinned-note')).toBe(true);
+    expect(store.getNote('regular-note').content).toContain('متن نهایی');
+    expect(document.querySelector('[data-notes-editor]').textContent).toContain('Important');
+  });
+
+  it('blocks note switching during an unresolved sync instead of losing the local draft', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Uncommitted work</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    let finishRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      finishRead = resolve;
+    }));
+    const remote = store.getNotes().filter(note => note.id !== 'regular-note');
+    const pending = app.refreshFromSync({ kind: 'note', action: 'delete' });
+    const attempted = app.openNote('pinned-note');
+    finishRead(remote);
+    const result = await pending;
+    expect(attempted).toBe(false);
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(document.querySelector('[data-notes-editor]').textContent).toContain('Uncommitted work');
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Uncommitted work');
+  });
+
+  it('does not create an orphan note when new-note navigation is blocked by IME', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    const before = store.getNotes().map(note => note.id);
+    const attempt = app.newNote();
+    expect(attempt).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(before);
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+  });
+
   it('repairs split notes storage by merging local and canonical DB records', async () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
