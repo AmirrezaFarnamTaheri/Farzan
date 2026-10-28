@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
 
-function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards = [], failNotes = false } = {}) {
+function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards = [], failNotes = false, catalogTopics = null } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
   window.DataStore = {
     init: vi.fn(async () => true),
     allCourses: vi.fn(() => [{ id: 'course-1' }, { id: 'course-2' }]),
-    allTopics: vi.fn(() => [
+    allTopics: vi.fn(() => catalogTopics ?? [
       { topicId: 'topic-1', title: 'Design Systems' },
       { topicId: 'topic-2', title: 'Frontend Performance' },
     ]),
@@ -62,6 +62,18 @@ describe('home dashboard', () => {
     expect(document.querySelectorAll('.home-widget')).toHaveLength(3);
     expect(document.querySelectorAll('.home-activity-item').length).toBeGreaterThan(0);
     expect(document.body.textContent).toContain('Spacing principles');
+  });
+
+  it('formats large catalog totals using the active document locale without rounding the count', async () => {
+    const previousLanguage = document.documentElement.lang;
+    document.documentElement.lang = 'en-US';
+    try {
+      mountDashboard({ catalogTopics: Array.from({ length: 6421 }, (_, i) => ({ topicId: `topic-${i}` })) });
+      await vi.waitFor(() => expect(document.getElementById('home-topic-count')?.textContent).toBe('6,421'));
+      expect(document.getElementById('home-course-count')?.textContent).toBe('2');
+    } finally {
+      document.documentElement.lang = previousLanguage;
+    }
   });
 
   it('counts only actual scheduled flashcards and opens the Review screen', async () => {
