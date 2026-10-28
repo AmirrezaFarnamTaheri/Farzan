@@ -29,6 +29,7 @@ printStudioBoardPdf,
         </div>
       </div>
 
+      <div class="studio-workspace-grid">
       <div class="card card-filled studio-toolbar-panel">
         <div class="studio-toolbar-clusters">
           <div class="studio-tool-group" role="group" aria-label="Canvas tools">
@@ -124,7 +125,7 @@ printStudioBoardPdf,
         </div>
       </div>
 
-      <div class="studio-workspace-grid">
+
         <div class="studio-canvas-card">
           <div class="studio-shell">
             <canvas id="studio-canvas" class="studio-canvas" aria-label="Editable Studio canvas"></canvas>
