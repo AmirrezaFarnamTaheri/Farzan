@@ -11,6 +11,67 @@ describe('notes route workspace', () => {
     };
   });
 
+  it('vetoes a route leave while Notes IME composition is active', () => {
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    expect(controller.beforeLeave()).toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(controller.beforeLeave()).toBe(true);
+    expect(window.PlasmaNotesApp.flushPendingSave).toHaveBeenCalledOnce();
+    controller.unmount();
+  });
+
+  it('marks an unfinished IME composition as unsafe for browser tab close', () => {
+    const mark = vi.fn();
+    const unmark = vi.fn();
+    window.OpenCourseDeck = { beforeUnload: { mark, unmark } };
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    expect(mark).toHaveBeenCalledWith('notes-ime');
+    expect(unmark).not.toHaveBeenCalledWith('notes-ime');
+
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(unmark).toHaveBeenCalledWith('notes-ime');
+    controller.unmount();
+  });
+
+  it('awaits durable note persistence rather than treating an in-memory save as complete', async () => {
+    let acceptWrite;
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(
+      () => new Promise(resolve => { acceptWrite = resolve; }),
+    );
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const leaving = controller.beforeLeave();
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    let finished = false;
+    void leaving.then(() => { finished = true; });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    acceptWrite(false);
+    expect(await leaving).toBe(false);
+    controller.unmount();
+  });
+
+  it('refuses to leave when the Notes app reports an uncommitted storage write', () => {
+    window.PlasmaNotesApp.flushPendingSave.mockReturnValue(false);
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    expect(controller.beforeLeave()).toBe(false);
+    controller.unmount();
+  });
+
   it('preserves editor, formatting, search, folder, import, and export hooks', () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },

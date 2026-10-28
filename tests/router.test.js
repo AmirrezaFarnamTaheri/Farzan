@@ -45,6 +45,96 @@ describe('createRouter', () => {
     router.destroy();
   });
 
+  it('does not tear down a route that vetoes navigation while its draft is unsafe to leave', async () => {
+    window.location.hash = '#/notes';
+    const bus = { emit: vi.fn() };
+    const beforeLeave = vi.fn(() => false);
+    const unmount = vi.fn();
+    const home = vi.fn(async () => undefined);
+    const router = createRouter({
+      $: () => [], bus,
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/notes', async () => ({ beforeLeave, unmount }));
+    router.on('#/home', home);
+    try {
+      await router.init();
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(beforeLeave).toHaveBeenCalledTimes(1));
+      await router.ready();
+      expect(window.location.hash).toBe('#/notes');
+      expect(unmount).not.toHaveBeenCalled();
+      expect(home).not.toHaveBeenCalled();
+
+      beforeLeave.mockReturnValue(true);
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(home).toHaveBeenCalledTimes(1));
+      await router.ready();
+      expect(unmount).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe('#/home');
+    } finally {
+      router.destroy();
+    }
+  });
+
+  it('keeps the current draft mounted when beforeLeave rejects unexpectedly', async () => {
+    window.location.hash = '#/notes';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const bus = { emit: vi.fn() };
+    const teardown = vi.fn();
+    const nextRoute = vi.fn();
+    const router = createRouter({
+      $: () => [],
+      bus,
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/notes', async () => ({
+      beforeLeave: async () => { throw new Error('Notes storage cannot confirm save'); },
+      unmount: teardown,
+    }));
+    router.on('#/home', async () => { nextRoute(); });
+    try {
+      await router.init();
+      router.navigate('#/home');
+      await vi.waitFor(() => expect(bus.emit).toHaveBeenCalledWith(
+        'route:blocked', { from: '#/notes', to: '#/home' },
+      ));
+      await router.ready();
+      expect(window.location.hash).toBe('#/notes');
+      expect(nextRoute).not.toHaveBeenCalled();
+      expect(teardown).not.toHaveBeenCalled();
+    } finally {
+      router.destroy();
+      warn.mockRestore();
+    }
+  });
+
+  it('aborts a previous route signal even when its handler returned no controller', async () => {
+    window.location.hash = '#/empty';
+    let emptySignal;
+    const next = vi.fn(async () => undefined);
+    const router = createRouter({
+      $: () => [],
+      bus: { emit: vi.fn() },
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/empty', async (_hash, context) => {
+      emptySignal = context.signal;
+      return undefined;
+    });
+    router.on('#/next', next);
+    try {
+      await router.init();
+      expect(emptySignal?.aborted).toBe(false);
+      router.navigate('#/next');
+      await router.refresh();
+      expect(next).toHaveBeenCalled();
+      expect(emptySignal?.aborted).toBe(true);
+    } finally {
+      router.destroy();
+    }
+  });
+
   it('resets persistent shell scroll on route changes without resetting same-view query navigation', async () => {
     const main = document.createElement('main');
     main.id = 'main-content';

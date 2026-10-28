@@ -65,7 +65,8 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
 
         const from = this._current;
         const previousController = this._currentController;
-        this._currentAbortController?.abort?.();
+        const previousAbortController = this._currentAbortController;
+        const previousNavSeq = this._navSeq;
 
         const abortController = typeof AbortController === 'undefined'
           ? null
@@ -100,11 +101,35 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
         bus?.emit?.('route:beforechange', beforeEvent);
 
         if (previousController) {
+          let canLeave;
           try {
-            await previousController.beforeLeave?.(context);
+            canLeave = await previousController.beforeLeave?.(context) !== false;
           } catch (error) {
-            console.warn('[OpenCourseDeck Router] beforeLeave failed', error);
+            // An unknown save outcome must never be interpreted as permission
+            // to tear down an editor carrying potentially unsaved user work.
+            canLeave = false;
+            console.warn('[OpenCourseDeck Router] beforeLeave failed; route preserved', error);
           }
+          if (!canLeave) {
+            // A route can veto navigation when a draft is still composing or
+            // its canonical write cannot commit. The previous view stays live
+            // and its abort signal must remain valid. Use replaceState so a
+            // reverted hash does not trigger another navigation.
+            if (isCurrent()) {
+              abortController?.abort?.();
+              this._navSeq = previousNavSeq;
+              this._currentAbortController = previousAbortController;
+              this._current = from;
+              this._currentController = previousController;
+              if (window.location.hash !== from) {
+                const url = window.location.pathname + window.location.search + (from || '#/');
+                window.history.replaceState(window.history.state, '', url);
+              }
+              bus?.emit?.('route:blocked', { from, to: hash });
+            }
+            return;
+          }
+          previousAbortController?.abort?.();
           // Deliberately NOT gated on isCurrent(). unmount() is teardown, and
           // teardown of a route we have already committed to leaving is always
           // correct. Returning early here (as this did) stranded the previous
@@ -120,6 +145,8 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
             console.warn('[OpenCourseDeck Router] unmount failed', error);
           }
           if (!isCurrent()) return;
+        } else {
+          previousAbortController?.abort?.();
         }
 
         if (typeof $$ === 'function') {

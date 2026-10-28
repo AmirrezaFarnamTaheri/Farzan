@@ -170,11 +170,48 @@ export function mountNotesView({ setView } = {}) {
   try { window.PlasmaNotesApp?.init?.(); } catch (error) {
     console.warn('[Notes view] init failed', error);
   }
+  // Composition events bubble from either the native contenteditable area
+  // or the optional Squire editor. Keep the draft mounted until IME commits.
+  const editor = document.querySelector('[data-notes-editor]');
+  let composing = false;
+  const onCompositionStart = () => {
+    composing = true;
+    // A composing character may have no committed input event yet. Keep a
+    // separate unload reason until compositionend, regardless of autosave.
+    window.OpenCourseDeck?.beforeUnload?.mark?.('notes-ime');
+  };
+  const onCompositionEnd = () => {
+    composing = false;
+    window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-ime');
+  };
+  editor?.addEventListener('compositionstart', onCompositionStart);
+  editor?.addEventListener('compositionend', onCompositionEnd);
+
   return {
     beforeLeave() {
-      try { window.PlasmaNotesApp?.flushPendingSave?.(); } catch {}
+      if (composing) {
+        window.OpenCourseDeck?.Toast?.info?.('Finish composing text before leaving Notes.');
+        return false;
+      }
+      try {
+        const app = window.PlasmaNotesApp;
+        if (app?.canLeaveEditor?.() === false) return false;
+        // Newer persistence adapters can await the final IndexedDB write;
+        // older installed builds still use the synchronous compatibility path.
+        if (typeof app?.flushPendingSaveDurably === 'function') {
+          return app.flushPendingSaveDurably();
+        }
+        // A deferred/failed flush must not be mistaken for a saved draft.
+        return app?.flushPendingSave?.() !== false;
+      } catch (error) {
+        console.warn('[Notes view] could not commit pending data before navigation', error);
+        return false;
+      }
     },
     unmount() {
+      editor?.removeEventListener('compositionstart', onCompositionStart);
+      editor?.removeEventListener('compositionend', onCompositionEnd);
+      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-ime');
       try { window.PlasmaNotesApp?.destroy?.(); } catch {}
     },
   };
