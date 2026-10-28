@@ -72,6 +72,64 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(session).toBeHidden();
   });
 
+  test('switches to a reversible study-focus layout when playing a course lesson', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    const shell = page.locator('.courses-shell');
+    const catalog = page.locator('.courses-sidebar');
+    await expect(catalog).toBeVisible();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    await expect(shell).toHaveAttribute('data-playback-active', 'true');
+    await expect(catalog).toBeHidden();
+    await expect(page.locator('#course-player')).toBeVisible();
+    await expect(page.locator('#course-detail .topic-row').first()).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const session = document.querySelector('.course-session').getBoundingClientRect();
+      const outline = document.querySelector('#course-detail').getBoundingClientRect();
+      return { session: { top: session.top, right: session.right, width: session.width },
+        outline: { top: outline.top, left: outline.left, width: outline.width } };
+    });
+    expect(layout.session.width).toBeGreaterThan(450);
+    expect(layout.outline.width).toBeGreaterThan(250);
+    expect(Math.abs(layout.session.top - layout.outline.top)).toBeLessThan(40);
+    expect(layout.outline.left).toBeGreaterThanOrEqual(layout.session.right - 2);
+    const toggle = page.locator('[data-course-toggle-catalog]');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(catalog).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await toggle.click();
+    await expect(catalog).toBeHidden();
+    await page.locator('[data-course-close-playback]').click();
+    await expect(catalog).toBeVisible();
+    await expect(shell).not.toHaveAttribute('data-playback-active', 'true');
+  });
+
+  test('keeps study topics reachable below the player on a narrow screen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    await expect(page.locator('.courses-shell')).toHaveAttribute('data-playback-active', 'true');
+    await expect(page.locator('.courses-sidebar')).toBeHidden();
+    await expect(page.locator('#course-detail .topic-row').first()).toBeVisible();
+    const positions = await page.evaluate(() => {
+      const session = document.querySelector('.course-session').getBoundingClientRect();
+      const detail = document.querySelector('#course-detail').getBoundingClientRect();
+      return { sessionBottom: session.bottom, detailTop: detail.top,
+        detailWidth: detail.width, viewportWidth: window.innerWidth };
+    });
+    expect(positions.detailTop).toBeGreaterThan(positions.sessionBottom - 4);
+    expect(positions.detailWidth).toBeLessThanOrEqual(positions.viewportWidth);
+    await page.locator('[data-course-toggle-catalog]').click();
+    await expect(page.locator('.courses-sidebar')).toBeVisible();
+  });
+
   test('shows meaningful first-run progress guidance instead of empty charts', async ({ page }) => {
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-progress')).toBeVisible();
