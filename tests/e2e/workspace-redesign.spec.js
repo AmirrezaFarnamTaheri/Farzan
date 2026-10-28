@@ -123,11 +123,26 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect((await catalog.boundingBox()).y).toBeLessThan(650);
   });
 
+  test('fits the five Progress summary metrics in one row at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
+    const metrics = page.locator('.view-progress .progress-metric');
+    await expect(metrics).toHaveCount(5);
+    const topPositions = await metrics.evaluateAll(nodes =>
+      nodes.map(node => Math.round(node.getBoundingClientRect().top)));
+    expect(Math.max(...topPositions) - Math.min(...topPositions)).toBeLessThanOrEqual(2);
+  });
+
   test('keeps both backup actions inside a narrow Progress toolbar', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/progress', { waitUntil: 'domcontentloaded' });
     const exportButton = page.locator('#btn-export-json');
     const importButton = page.locator('#btn-import-json');
+    const backupMenu = page.locator('details.progress-export-menu');
+    await expect(backupMenu.locator('summary')).toHaveAccessibleName('Data and backup options');
+    await expect(exportButton).toBeHidden();
+    await expect(importButton).toBeHidden();
+    await backupMenu.locator('summary').click();
     await expect(exportButton).toHaveAccessibleName('Export app-data JSON');
     for (const button of [exportButton, importButton]) {
       await expect(button).toBeVisible();
@@ -157,12 +172,147 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('shows a five-row Appearance ledger with aligned controls and swatches', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
+    const rows = page.locator('#settings-appearance .settings-control-card');
+    await expect(rows).toHaveCount(5);
+    const coords = await rows.evaluateAll(elements =>
+      elements.map(element => ({
+        left: Math.round(element.getBoundingClientRect().left),
+        top: Math.round(element.getBoundingClientRect().top),
+      })));
+    expect(Math.max(...coords.map(row => row.left)) - Math.min(...coords.map(row => row.left)))
+      .toBeLessThanOrEqual(2);
+    expect(coords.every((row, index) => !index || row.top > coords[index - 1].top)).toBe(true);
+    const fontControls = page.locator('#settings-appearance .settings-inline-controls').first();
+    const positions = await fontControls.locator('button').evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(positions).toHaveLength(3);
+    expect(Math.max(...positions) - Math.min(...positions)).toBeLessThanOrEqual(2);
+    const swatches = page.locator('#settings-appearance .settings-accent-row .accent-dot');
+    await expect(swatches).toHaveCount(7);
+    const swatchPositions = await swatches.evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(Math.max(...swatchPositions) - Math.min(...swatchPositions)).toBeLessThanOrEqual(2);
+  });
+
+  test('keeps an expanded Studio canvas with reversible inspector and no inaccessible tools', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    const canvas = page.locator('.studio-canvas-card');
+    const toolbar = page.locator('.studio-toolbar-panel');
+    const inspector = page.locator('[data-studio-inspector]');
+    const toggle = page.locator('[data-studio-toggle-inspector]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const bounds = await page.evaluate(() => {
+      const rect = selector => {
+        const element = document.querySelector(selector);
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, width: box.width };
+      };
+      return {
+        canvas: rect('.studio-canvas-card'),
+        toolbar: rect('.studio-toolbar-panel'),
+      };
+    });
+    expect(bounds.canvas.width).toBeGreaterThan(650);
+    expect(bounds.toolbar.width).toBeLessThan(bounds.canvas.width * 0.9);
+    expect(bounds.canvas.top).toBeLessThan(bounds.toolbar.bottom);
+    await expect(inspector).toBeVisible();
+    await toggle.click();
+    await expect(inspector).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('button[data-studio-tool="pen"]')).toBeVisible();
+    await expect(page.locator('[data-studio-save]')).toBeVisible();
+    await toggle.click();
+    await expect(inspector).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-studio-layers]')).toBeVisible();
+  });
+
+  test('lets narrow Studio devices reveal the inspector without hiding the canvas', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    const toggle = page.locator('[data-studio-toggle-inspector]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('[data-studio-inspector]')).toBeHidden();
+    await toggle.click();
+    await expect(page.locator('[data-studio-inspector]')).toBeVisible();
+    await expect(page.locator('#studio-canvas')).toBeVisible();
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
     const input = page.locator('#sidebar-search');
     await expect(input).toHaveAttribute('placeholder', 'Search…');
     await expect(input).toHaveAttribute('aria-label', 'Quick search courses and lessons');
+  });
+
+
+  test('round-trips a multilingual note through the opt-in Squire editor in Chromium', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.OpenCourseDeck = window.OpenCourseDeck || {};
+      window.OpenCourseDeck.featureFlags = {
+        ...(window.OpenCourseDeck.featureFlags || {}),
+        notesTiptapPreview: true,
+      };
+    });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notes')).toBeVisible();
+    await page.locator('[data-action="new-note"]').first().click();
+    const title = 'Squire browser round-trip';
+    await page.locator('[data-note-title-input]').fill(title);
+    const outer = page.locator('[data-notes-editor]');
+    await outer.fill('فیزیولوژی قلب 你好世界');
+    const storedContent = () => page.evaluate(async noteTitle => {
+      const notes = await window.DB.getAllNotes();
+      return notes.find(note => note.title === noteTitle)?.content ?? '';
+    }, title);
+    await expect.poll(storedContent).toContain('你好世界');
+    const toggle = page.locator('[data-notes-modern-toggle]');
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    await expect(modern).toBeVisible();
+    await expect(modern).toContainText('فیزیولوژی قلب');
+    await modern.click();
+    await modern.press('ControlOrMeta+End');
+    await page.keyboard.insertText(' Extra saved edit');
+    await expect(modern).toContainText('Extra saved edit');
+    await expect.poll(storedContent).toContain('Extra saved edit');
+    await toggle.click();
+    await expect(modern).toHaveCount(0);
+    await expect(outer).toContainText('Extra saved edit');
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-notes-list]')).toContainText(title);
+    await expect.poll(storedContent).toContain('Extra saved edit');
+  });
+
+  test('refuses unsupported unsaved table content without replacing the classic Notes DOM', async ({ page }) => {
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notes')).toBeVisible();
+    await page.locator('[data-action="new-note"]').first().click();
+    const result = await page.evaluate(async () => {
+      const node = document.querySelector('[data-notes-editor]');
+      node.innerHTML = '<p>Important material</p><table><tbody><tr><td>70 mL</td></tr></tbody></table>';
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      return window.PlasmaNotesApp.enableModernEditor();
+    });
+    expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
+    await expect(page.locator('[data-notes-editor] table td')).toHaveText('70 mL');
+    await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toHaveCount(0);
+    await page.evaluate(() => window.PlasmaNotesApp.flushPendingSave());
+    await expect.poll(async () => page.evaluate(async () => {
+      const notes = await window.DB.getAllNotes();
+      return notes.some(note => note.content?.includes('70 mL') && note.content?.includes('<table'));
+    })).toBe(true);
   });
 
   test('keeps a newly opened note editor visible without scrolling past an empty library panel', async ({ page }) => {

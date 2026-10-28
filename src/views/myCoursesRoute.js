@@ -10,17 +10,21 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           <p class="page-subtitle">Add courses and organize your own study topics.</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-primary" type="button" data-my-course-create aria-haspopup="dialog" aria-controls="my-course-create-dialog">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            New course
+          </button>
           <button class="btn btn-ghost" type="button" data-my-courses-add>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             Add media
           </button>
         </div>
       </div>
-      <div class="card card-filled my-courses-create-card">
+      <dialog class="my-course-dialog" data-my-course-dialog id="my-course-create-dialog" aria-labelledby="my-course-dialog-title">
         <div class="card-body">
           <div class="my-courses-form" data-my-course-form>
             <div class="my-courses-create-copy">
-              <h2 class="my-courses-create-title">Start a course</h2>
+              <h2 class="my-courses-create-title" id="my-course-dialog-title">Create a course</h2>
               <p class="text-muted text-sm">Name the track first. Add lectures from the plus menu or by dropping files onto the page.</p>
             </div>
             <label class="my-courses-field">
@@ -34,13 +38,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
             <div class="button-row">
               <button class="btn btn-primary" type="button" data-my-course-save>
                 <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                Save Course
+                Create course
               </button>
+              <button class="btn btn-ghost" type="button" data-my-course-cancel>Cancel</button>
             </div>
           </div>
         </div>
-      </div>
-      <div class="stat-grid" data-my-course-metrics></div>
+      </dialog>
       <div class="card card-filled my-courses-list-card">
         <div class="card-body">
           <div class="grid grid-3" data-my-course-list>
@@ -48,6 +52,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
+      <div class="stat-grid my-courses-metrics" data-my-course-metrics></div>
       <section class="card card-filled" aria-labelledby="media-folder-heading">
         <div class="card-body">
           <h2 class="text-lg font-semibold" id="media-folder-heading">Keep a copy of your imported files</h2>
@@ -71,6 +76,34 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
 
   document.querySelector('[data-my-courses-add]')?.addEventListener('click', () => {
     window.OpenCourseDeck?.AddContent?.openMenu?.();
+  });
+
+  const createDialog = document.querySelector('[data-my-course-dialog]');
+  let createOpener = null;
+  const openCreateDialog = (opener = document.querySelector('[data-my-course-create]')) => {
+    if (!createDialog || createDialog.open) return;
+    createOpener = opener;
+    // Native modal when available; jsdom and older embedded webviews receive
+    // an accessible open-state fallback without changing the storage flow.
+    if (typeof createDialog.showModal === 'function') createDialog.showModal();
+    else createDialog.setAttribute('open', '');
+    createDialog.querySelector('[data-my-course-title]')?.focus();
+  };
+  const closeCreateDialog = () => {
+    if (!createDialog?.open) return;
+    if (typeof createDialog.close === 'function') createDialog.close();
+    else createDialog.removeAttribute('open');
+    const focusTarget = createOpener?.isConnected
+      ? createOpener : document.querySelector('[data-my-course-create]');
+    focusTarget?.focus?.();
+  };
+  document.querySelector('[data-my-course-create]')?.addEventListener('click', event => {
+    openCreateDialog(event.currentTarget);
+  });
+  document.querySelector('[data-my-course-cancel]')?.addEventListener('click', closeCreateDialog);
+  createDialog?.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeCreateDialog();
   });
 
   const backupStatus = document.querySelector('[data-media-backup-status]');
@@ -142,6 +175,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       if (descriptionInput) descriptionInput.value = '';
       Toast?.success?.('Course saved');
       await renderCourses();
+      closeCreateDialog();
     } catch (error) {
       console.warn('[My Courses] failed to save course:', error);
       Toast?.error?.('Unable to save the course. Check local storage and try again.');
@@ -232,7 +266,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       list.append(notice);
       return;
     }
-    metrics.replaceChildren(metric('Courses', courses.length), metric('Topics', courses.reduce((count, course) => count + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)), metric('With descriptions', courses.filter(course => course.description).length));
+    metrics.replaceChildren(
+      metric('Courses', courses.length),
+      metric('Topics', courses.reduce((count, course) => count
+        + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)),
+    );
     list.replaceChildren();
     if (!courses.length) {
       const empty = document.createElement('div');
@@ -252,9 +290,8 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       create.className = 'btn btn-primary btn-sm';
       create.type = 'button';
       create.textContent = 'Create a course';
-      create.addEventListener('click', () => {
-        document.querySelector('[data-my-course-title]')?.focus?.();
-      });
+      create.dataset.myCourseEmptyCreate = '';
+      create.addEventListener('click', () => openCreateDialog(create));
       const catalog = document.createElement('a');
       catalog.className = 'btn btn-ghost btn-sm';
       catalog.href = '#/courses';
@@ -283,9 +320,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     const title = document.createElement('h2');
     title.className = 'my-course-title';
     title.textContent = course.title || 'Untitled course';
+    title.dir = 'auto';
     const description = document.createElement('p');
     description.className = 'my-course-desc';
     description.textContent = course.description || 'No description';
+    description.dir = 'auto';
     const meta = document.createElement('p');
     meta.className = 'text-muted text-sm my-course-meta';
     meta.textContent = course.updatedAt ? `Updated ${new Date(course.updatedAt).toLocaleDateString()}` : 'Saved course';

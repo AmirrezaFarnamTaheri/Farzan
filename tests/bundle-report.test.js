@@ -12,15 +12,6 @@ describe('bundle and CSP reporting', () => {
     expect(csp['media-src']).toEqual(["'self'", 'http:', 'https:']);
   });
 
-  it('sets a documented 1.25 MiB total JS budget while preserving per-chunk and entry constraints', async () => {
-    const { createBundleReport } = await import('../scripts/bundle-report.cjs');
-    const report = createBundleReport();
-    expect(report.limits.totalJsBytes).toBe(1280 * 1024);
-    expect(report.limits.largestJsBytes).toBe(320 * 1024);
-    expect(report.limits.entryBytes).toBe(240 * 1024);
-    expect(report.limits.entryGzipBytes).toBe(80 * 1024);
-  });
-
   it('fails reports that exceed raw or compressed size budgets or weaken critical CSP rules', async () => {
     const { evaluateReport } = await import('../scripts/bundle-report.cjs');
 
@@ -48,6 +39,17 @@ describe('bundle and CSP reporting', () => {
       'CSP script-src must not include unsafe-inline',
       'CSP media-src must keep remote http:/https: support',
     ]));
+  });
+
+  it('documents the Squire integration budget without weakening entry and gzip caps', async () => {
+    const { createBundleReport } = await import('../scripts/bundle-report.cjs');
+    const { limits } = createBundleReport();
+    expect(limits).toEqual({
+      totalJsBytes: 1280 * 1024,
+      largestJsBytes: 320 * 1024,
+      entryBytes: 240 * 1024,
+      entryGzipBytes: 80 * 1024,
+    });
   });
 
   it('keeps the bundle report gate wired into CI', async () => {
