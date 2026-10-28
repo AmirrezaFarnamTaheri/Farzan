@@ -300,15 +300,36 @@ import { countWords } from './src/core/textMetrics.js';
       const DB = window.DB;
       if (!DB || (this._hydrated && !options.force)) return false;
       let changed = false;
+      // Canonical reads are asynchronous. A note created/edited/deleted after
+      // getAllNotes() starts must not be overwritten by its earlier snapshot.
+      // Record only mutations during this read, rather than merging the
+      // entire localStorage mirror (which could resurrect old deletions).
+      const overlay = new Map();
+      this._activeHydrationReads.add(overlay);
       try {
         if (typeof DB.getAllNotes === 'function') {
           const notes = await DB.getAllNotes();
           if (Array.isArray(notes)) {
-            this._notes = notes.slice();
+            const latest = notes.slice();
+            for (const [id, updated] of overlay) {
+              const index = latest.findIndex(note => String(note?.id) === id);
+              if (updated === null) {
+                if (index >= 0) latest.splice(index, 1);
+              } else if (index >= 0) {
+                latest[index] = updated;
+              } else {
+                latest.unshift(updated);
+              }
+            }
+            this._notes = latest;
             changed = true;
           }
         }
-      } catch {}
+      } catch {
+        // Keep the existing in-memory draft when canonical reads are offline.
+      } finally {
+        this._activeHydrationReads.delete(overlay);
+      }
       try {
         if (typeof DB.getAllFolders === 'function') {
           const folders = await DB.getAllFolders();
@@ -354,6 +375,9 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _cacheNote(note, fallbackNotes = null) {
+      for (const read of this._activeHydrationReads) {
+        read.set(String(note.id), { ...note });
+      }
       if (Array.isArray(fallbackNotes)) {
         this._notes = fallbackNotes.slice();
         return;
@@ -369,6 +393,7 @@ import { countWords } from './src/core/textMetrics.js';
     // editor's first save can otherwise complete in reverse order, restoring
     // an older empty body after the user's latest edit. Queue deletes as well
     // so an in-flight save cannot resurrect a removed record.
+    _activeHydrationReads: new Set(),
     _noteWriteQueue: new Map(),
 
     _enqueueNoteMutation(id, action, operation) {
@@ -450,6 +475,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     deleteNote(id) {
+      for (const read of this._activeHydrationReads) read.set(String(id), null);
       const notes = this.getNotes().filter(n => n.id !== id);
       this._notes = notes;
       if (typeof window.DB?.deleteNote === 'function') {
