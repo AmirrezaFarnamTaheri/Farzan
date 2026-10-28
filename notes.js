@@ -667,6 +667,9 @@ import { countWords } from './src/core/textMetrics.js';
     // An IME composition is an unsaved draft even when Squire deliberately
     // suppresses input/autosave notifications until compositionend.
     _compositionActive: false,
+    // A remote hydration must settle before any local autosave can write
+    // a note that may have been deleted in another window.
+    _syncReadInProgress: 0,
     _saveTimer:  null,
     _history:    [],      // undo stack (snapshots)
     _historyIdx: -1,
@@ -783,8 +786,21 @@ import { countWords } from './src/core/textMetrics.js';
     save(immediate = false) {
       if (!this._currentId) return;
       clearTimeout(this._saveTimer);
+      const sourceEpoch = this._loadEpoch;
 
       const doSave = () => {
+        // Never apply a delayed save from an older editor session to a note
+        // opened later. Remote-deletion recovery rebinds the ID, not the epoch.
+        if (this._loadEpoch !== sourceEpoch) {
+          this._saveTimer = null;
+          return;
+        }
+        if (this._syncReadInProgress) {
+          // Keep the draft pending while the canonical DB read decides
+          // whether the original record survived or needs recovery.
+          this._saveTimer = setTimeout(doSave, 150);
+          return;
+        }
         // Clearing the handle is what makes _hasPendingLocalEdit() honest.
         // clearTimeout alone leaves the numeric id in place, so after the very
         // first debounced save the editor looked permanently dirty and the
@@ -2138,7 +2154,13 @@ import { countWords } from './src/core/textMetrics.js';
       if (Editor._tiptap && !Editor._compositionActive) Editor._tiptap.syncChanges();
       const previousNote = editedNoteId && Store.getNote(editedNoteId);
       const dirtyBeforeSync = this._hasPendingLocalEdit();
-      const changed = await Store.hydrateFromDB({ force: true });
+      Editor._syncReadInProgress += 1;
+      let changed;
+      try {
+        changed = await Store.hydrateFromDB({ force: true });
+      } finally {
+        Editor._syncReadInProgress -= 1;
+      }
       if (!changed || !this._inited) return { refreshed: false, reason: 'unchanged' };
 
       // A conflicting remote version must not silently vanish when the local
