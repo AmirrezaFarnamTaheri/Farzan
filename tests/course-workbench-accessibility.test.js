@@ -51,7 +51,7 @@ describe('Courses workbench progress and accessible row actions', () => {
       getAllProgress: vi.fn(async () => [
         { topicId: 'anemia', courseId: COURSE_ID, status: 'done', percent: 100 },
       ]),
-      getProgress: vi.fn(async () => null),
+      getProgress: vi.fn(async id => id === 'anemia' ? { topicId: id, courseId: COURSE_ID, status: 'done' } : null),
       saveProgress: vi.fn(async () => true),
     };
   });
@@ -92,6 +92,26 @@ describe('Courses workbench progress and accessible row actions', () => {
     await vi.waitFor(() => expect(window.DB.saveProgress).toHaveBeenCalledWith(
       'anemia', COURSE_ID, expect.objectContaining({ status: 'not-started' }),
     ));
+    controller.unmount();
+  });
+
+  it('supports older progress adapters that expose only the per-topic read API', async () => {
+    delete window.DB.getAllProgress;
+    window.DB.getProgress.mockImplementation(async id => id === 'anemia'
+      ? { topicId: id, courseId: COURSE_ID, status: 'done' } : null);
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
+    expect(window.DB.getProgress).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[data-topic-id="anemia"] [data-status="done"]')).not.toBeNull();
+    controller.unmount();
+  });
+
+  it('does not disguise rejected legacy reads as empty progress', async () => {
+    delete window.DB.getAllProgress;
+    window.DB.getProgress.mockRejectedValueOnce(new Error('Database offline'));
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelector('[data-retry-course-progress]')).not.toBeNull());
+    expect(document.querySelectorAll('.topic-row')).toHaveLength(0);
     controller.unmount();
   });
 
