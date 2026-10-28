@@ -835,7 +835,11 @@ import { countWords } from './src/core/textMetrics.js';
       const ctrl = e.ctrlKey || e.metaKey;
 
       if (ctrl && e.key === 's') { e.preventDefault(); this.save(true); return; }
-      // Tiptap owns editing shortcuts, selection and its native history.
+      // Slash commands are a Notes UX feature, not tied to a particular
+      // editing engine. Let Squire keep its own formatting/history shortcuts.
+      if (!e.isComposing && e.key === '/' && this._isEmptyBlock()) {
+        this._showSlashMenu();
+      }
       if (this._tiptap) return;
       if (ctrl && e.key === 'z') { e.preventDefault(); this.undo(); return; }
       if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); this.redo(); return; }
@@ -851,10 +855,6 @@ import { countWords } from './src/core/textMetrics.js';
         else document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
       }
 
-      // Slash commands
-      if (e.key === '/' && this._isEmptyBlock()) {
-        this._showSlashMenu();
-      }
     },
 
     // ── Paste handler ─────────────────────────────────────
@@ -1001,6 +1001,28 @@ import { countWords } from './src/core/textMetrics.js';
       return block ? block.textContent.trim() === '' : false;
     },
 
+    _removeSlashPrefix() {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      if (!range.collapsed || !this._el?.contains(range.startContainer)) return;
+      let textNode = range.startContainer;
+      let offset = range.startOffset;
+      if (textNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
+        const previous = textNode.childNodes[offset - 1];
+        if (previous?.nodeType === Node.TEXT_NODE) {
+          textNode = previous;
+          offset = previous.textContent.length;
+        }
+      }
+      if (textNode.nodeType !== Node.TEXT_NODE || offset < 1
+          || textNode.textContent[offset - 1] !== '/') return;
+      range.setStart(textNode, offset - 1);
+      range.deleteContents();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    },
+
     _showSlashMenu() {
       this._hideSlashMenu();
 
@@ -1033,12 +1055,36 @@ import { countWords } from './src/core/textMetrics.js';
         const item = document.createElement('button');
         item.className = 'slash-menu-item';
         item.textContent = label;
+        const apply = () => {
+          // Focus restores Squire's saved selection after keyboard navigation.
+          if (this._tiptap) this._tiptap.editor.commands.focus();
+          else this._el?.focus();
+          // Delete only the literal slash if one was actually typed, never an
+          // arbitrary preceding character via document.execCommand('delete').
+          this._removeSlashPrefix();
+          if (this._tiptap?.supports(cmd)) {
+            this._tiptap.run(cmd);
+          } else {
+            if (this._tiptap) {
+              // Tables and other unsupported structures remain available in
+              // the classic editor without losing a compatible existing note.
+              this.disableModern();
+              this._el?.focus();
+              this._placeCursorAtEnd();
+            }
+            this.COMMANDS[cmd]?.();
+          }
+          this._hideSlashMenu();
+        };
         RouteListeners.on(item, 'mousedown', ev => {
           ev.preventDefault();
-          // Delete the slash character first
-          document.execCommand('delete');
-          this.COMMANDS[cmd]?.();
-          this._hideSlashMenu();
+          apply();
+        });
+        RouteListeners.on(item, 'click', ev => {
+          // Keyboard activation triggers click(detail=0), not mousedown.
+          if (ev.detail !== 0) return;
+          ev.preventDefault();
+          apply();
         });
         menu.appendChild(item);
       });
