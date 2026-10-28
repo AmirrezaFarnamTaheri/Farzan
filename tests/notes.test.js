@@ -1056,6 +1056,38 @@ describe('notes route filters', () => {
     expect(store.getNote(note.id)).toBeNull();
   });
 
+  it('preserves a note created during a pending canonical hydration read', async () => {
+    const store = window.PlasmaNotesStore;
+    let resolveRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRead = resolve;
+    }));
+    const hydration = store.hydrateFromDB({ force: true });
+    const created = store.createNote({ title: 'Created while loading', content: '<p>Keep this</p>' });
+
+    // The canonical snapshot was taken before this new note was created.
+    resolveRead([]);
+    await hydration;
+    expect(store.getNote(created.id)).toMatchObject({
+      title: 'Created while loading',
+      content: '<p>Keep this</p>',
+    });
+  });
+
+  it('does not resurrect a note deleted while a stale canonical read was pending', async () => {
+    const store = window.PlasmaNotesStore;
+    const staleSnapshot = store.getNotes();
+    let resolveRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRead = resolve;
+    }));
+    const hydration = store.hydrateFromDB({ force: true });
+    store.deleteNote('regular-note');
+    resolveRead(staleSnapshot);
+    await hydration;
+    expect(store.getNote('regular-note')).toBeNull();
+  });
+
   it('keeps an unsaved draft mounted if its current note disappears before switching', () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
