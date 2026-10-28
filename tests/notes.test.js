@@ -170,6 +170,24 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.getNote('regular-note').content).toContain('<table>');
   });
 
+  it('retains safe note typography but strips remote-loading CSS from saved notes', () => {
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p dir="rtl" style="text-align:right"><span style="color:#ff0000;font-size:18px;background-image:url(https://tracker.example/a.png)">عنوان فارسی</span></p>',
+    });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const html = document.querySelector('[data-notes-editor]').innerHTML;
+    expect(html).toContain('عنوان فارسی');
+    expect(html).toContain('text-align');
+    expect(html).toContain('color:');
+    expect(html).not.toContain('background-image');
+    expect(html).not.toContain('tracker.example');
+    window.PlasmaNotesApp.flushPendingSave();
+    const persisted = store.getNote('regular-note').content;
+    expect(persisted).toContain('font-size');
+    expect(persisted).not.toContain('tracker.example');
+  });
+
   it('refuses an unsaved legacy table draft before attempting any modern-editor conversion', async () => {
     const store = window.PlasmaNotesStore;
     const app = window.PlasmaNotesApp;

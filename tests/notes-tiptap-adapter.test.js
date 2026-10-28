@@ -56,6 +56,36 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('does not save empty formatting marks as user content', () => {
+    const element = document.createElement('div');
+    const instance = createTiptapNoteEditor({
+      element, html: '<h2>فیزیولوژی قلب</h2><p><strong>Heart</strong></p>',
+    });
+    try {
+      expect(instance.run('bold')).toBe(true);
+      expect(instance.run('h3')).toBe(true);
+      expect(instance.getHTML()).toContain('<h3>فیزیولوژی قلب</h3>');
+      expect(instance.getHTML()).not.toMatch(/<(?:b|strong|i|em|u|span)>\\s*<\\/(?:b|strong|i|em|u|span)>/i);
+      expect(instance.getHTML()).toContain('Heart');
+    } finally { instance.destroy(); }
+  });
+
+  it('reopens supported direction and typography without silently losing styled text', () => {
+    const html = '<p dir="rtl" style="text-align:right"><span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
+    const parent = document.createElement('div');
+    const first = createTiptapNoteEditor({ element: parent, html });
+    try {
+      expect(first.getHTML()).toContain('عنوان فارسی');
+      expect(first.run('alignRight')).toBe(true);
+      const edited = first.getHTML();
+      const second = createTiptapNoteEditor({ element: document.createElement('div'), html: edited });
+      try {
+        expect(second.getHTML()).toContain('عنوان فارسی');
+        expect(second.getHTML()).toMatch(/dir=["']rtl["']/);
+      } finally { second.destroy(); }
+    } finally { first.destroy(); }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
