@@ -898,6 +898,51 @@ describe('notes route filters', () => {
     }));
   });
 
+  it('does not insert a delayed AI summary into a different note after navigation', async () => {
+    let respond;
+    window.OpenCourseDeck.AI = {
+      summarizeText: vi.fn(() => new Promise(resolve => { respond = resolve; })),
+    };
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('pinned-note');
+    const pending = app.summarizeCurrentNote();
+    expect(window.OpenCourseDeck.AI.summarizeText).toHaveBeenCalled();
+    app.openNote('regular-note');
+    const regularBefore = store.getNote('regular-note').content;
+
+    respond({ ok: true, text: '- Result from previous note', provider: 'local' });
+    const result = await pending;
+
+    expect(result).toMatchObject({ ok: false, reason: 'stale-note' });
+    expect(store.getNote('regular-note').content).toBe(regularBefore);
+    expect(store.getNote('pinned-note').content).not.toContain('Result from previous note');
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith('Summary added');
+  });
+
+  it('does not append a delayed AI result when the user edits the source note', async () => {
+    let respond;
+    window.OpenCourseDeck.AI = {
+      summarizeText: vi.fn(() => new Promise(resolve => { respond = resolve; })),
+    };
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const pending = app.summarizeCurrentNote();
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Updated text while AI is running</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    respond({ ok: true, text: '- Stale result', provider: 'local' });
+    const result = await pending;
+    app.flushPendingSave();
+
+    expect(result).toMatchObject({ ok: false, reason: 'stale-note' });
+    expect(store.getNote('regular-note').content).toContain('Updated text while AI is running');
+    expect(store.getNote('regular-note').content).not.toContain('Stale result');
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith('Summary added');
+  });
+
   it('reveals enabled AI note summaries and appends the generated summary to the current note', async () => {
     window.PlasmaNotesApp.destroy();
     window.OpenCourseDeck.AI = {
