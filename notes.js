@@ -641,6 +641,12 @@ import { countWords } from './src/core/textMetrics.js';
         this._el.setAttribute('contenteditable', 'true');
         if (preserveContent) this._el.innerHTML = preserved;
       }
+      // The classic snapshot stack predates the Squire editing session.
+      // Continuing to undo through it can silently restore obsolete content.
+      // Start a clean classic history boundary at the preserved document.
+      this._history = [];
+      this._historyIdx = -1;
+      if (preserveContent && this._el) this._snapshot();
       return true;
     },
     _el:         null,
