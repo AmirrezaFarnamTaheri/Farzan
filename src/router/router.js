@@ -101,7 +101,7 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
         bus?.emit?.('route:beforechange', beforeEvent);
 
         if (previousController) {
-          let canLeave = true;
+          let canLeave;
           try {
             canLeave = await previousController.beforeLeave?.(context) !== false;
           } catch (error) {
