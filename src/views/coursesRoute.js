@@ -866,8 +866,15 @@ export async function mountCoursesView(deps = {}) {
     // An unavailable store must not be misrepresented as all topics unstarted.
     let progList;
     try {
-      if (typeof window.DB?.getAllProgress !== 'function') throw new Error('Progress storage unavailable');
-      progList = await window.DB.getAllProgress();
+      if (typeof window.DB?.getAllProgress === 'function') {
+        progList = await window.DB.getAllProgress();
+      } else if (typeof window.DB?.getProgress === 'function') {
+        // Legacy bridges and test adapters predate the bulk read API.
+        // Never interpret a rejected individual read as empty progress.
+        progList = await Promise.all(topics.map(topic => window.DB.getProgress(topic.topicId)));
+      } else {
+        throw new Error('Progress storage unavailable');
+      }
       if (!Array.isArray(progList)) throw new Error('Unexpected progress response');
     } catch {
       if (renderToken !== detailRenderToken) return;
