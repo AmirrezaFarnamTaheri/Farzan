@@ -185,7 +185,7 @@ test.describe('Farzan desktop workspace redesign', () => {
     await toggle.click();
     await expect(inspector).toBeHidden();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('[data-studio-tool="pen"]')).toBeVisible();
+    await expect(page.locator('button[data-studio-tool="pen"]')).toBeVisible();
     await expect(page.locator('[data-studio-save]')).toBeVisible();
     await toggle.click();
     await expect(inspector).toBeVisible();
