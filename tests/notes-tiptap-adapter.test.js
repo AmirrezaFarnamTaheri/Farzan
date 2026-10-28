@@ -86,6 +86,45 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { first.destroy(); }
   });
 
+  it('rejects unsafe link destinations rather than inserting executable URLs', () => {
+    const element = document.createElement('div');
+    const instance = createTiptapNoteEditor({ element, html: '<p>Reference</p>' });
+    try {
+      expect(instance.supports('link')).toBe(true);
+      expect(instance.run('link', 'javascript:alert(1)')).toBe(false);
+      expect(instance.getHTML()).not.toContain('javascript:');
+      expect(instance.getHTML()).toContain('Reference');
+    } finally { instance.destroy(); }
+  });
+
+  it('preserves pasted text when incompatible rich HTML is rejected', async () => {
+    const element = document.createElement('div');
+    document.body.appendChild(element);
+    const onUpdate = vi.fn();
+    const onPasteFallback = vi.fn();
+    const instance = createTiptapNoteEditor({
+      element, html: '<p>Before</p>', onUpdate, onPasteFallback,
+    });
+    try {
+      const paste = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, 'clipboardData', { value: {
+        items: null, types: ['text/html'],
+        getData: type => type === 'text/html'
+          ? '<table><tbody><tr><td>Kept plaintext</td></tr></tbody></table>' : '',
+      } });
+      element.querySelector('.notes-modern-editor').dispatchEvent(paste);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(paste.defaultPrevented).toBe(true);
+      expect(instance.getHTML()).toContain('Kept plaintext');
+      expect(onUpdate).toHaveBeenCalled();
+      expect(onPasteFallback).toHaveBeenCalled();
+    } finally {
+      instance.destroy();
+      element.remove();
+    }
+  });
+
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
