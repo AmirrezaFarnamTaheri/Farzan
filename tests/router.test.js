@@ -77,6 +77,32 @@ describe('createRouter', () => {
     }
   });
 
+  it('aborts a previous route signal even when its handler returned no controller', async () => {
+    window.location.hash = '#/empty';
+    let emptySignal;
+    const next = vi.fn(async () => undefined);
+    const router = createRouter({
+      $: () => [],
+      bus: { emit: vi.fn() },
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/empty', async (_hash, context) => {
+      emptySignal = context.signal;
+      return undefined;
+    });
+    router.on('#/next', next);
+    try {
+      await router.init();
+      expect(emptySignal?.aborted).toBe(false);
+      router.navigate('#/next');
+      await router.refresh();
+      expect(next).toHaveBeenCalled();
+      expect(emptySignal?.aborted).toBe(true);
+    } finally {
+      router.destroy();
+    }
+  });
+
   it('resets persistent shell scroll on route changes without resetting same-view query navigation', async () => {
     const main = document.createElement('main');
     main.id = 'main-content';
