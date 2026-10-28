@@ -65,7 +65,7 @@ describe('Squire HTML-canonical edit adapter', () => {
       expect(instance.run('bold')).toBe(true);
       expect(instance.run('h3')).toBe(true);
       expect(instance.getHTML()).toContain('<h3>فیزیولوژی قلب</h3>');
-      expect(instance.getHTML()).not.toMatch(/<(?:b|strong|i|em|u|span)>\\s*<\\/(?:b|strong|i|em|u|span)>/i);
+      expect(instance.getHTML()).not.toMatch(/<(?:b|strong|i|em|u|span)>\s*<\/(?:b|strong|i|em|u|span)>/i);
       expect(instance.getHTML()).toContain('Heart');
     } finally { instance.destroy(); }
   });
