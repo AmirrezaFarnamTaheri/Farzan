@@ -1042,3 +1042,150 @@ input[type="file"][hidden] {
   }
   .view-courses .topic-row > .topic-meta { display: none; }
 }
+
+
+/* Studio focus stage: the same, fully functional canvas and inspector, with
+   compact floating chrome rather than tool panels taking drawing space. */
+.view-studio .studio-workspace-grid {
+  display: block;
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+}
+.view-studio .studio-canvas-card {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.view-studio .studio-shell {
+  height: clamp(520px, calc(100dvh - var(--topbar-height) - 160px), 1050px);
+  min-height: 520px;
+  background-image: radial-gradient(color-mix(in srgb, var(--text-tertiary) 18%, transparent) .8px, transparent .8px);
+  background-size: 20px 20px;
+}
+.view-studio .studio-toolbar-panel {
+  position: absolute;
+  z-index: 11;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 30px);
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+.view-studio .studio-toolbar-clusters {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.view-studio .studio-toolbar-clusters > .studio-tool-group {
+  padding-inline-end: 10px;
+}
+.view-studio .studio-toolbar-panel .studio-more-tools {
+  width: auto;
+  position: relative;
+  flex: 0 0 auto;
+}
+.view-studio .studio-more-tools > summary {
+  white-space: nowrap;
+}
+.view-studio .studio-more-tools-content {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(620px, calc(100vw - 100px));
+  max-height: min(65dvh, 520px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+.view-studio .studio-sidebar-card {
+  position: absolute;
+  z-index: 8;
+  top: 84px;
+  inset-inline-end: 16px;
+  width: min(290px, 33%);
+  max-height: calc(100% - 102px);
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+.view-studio .studio-sidebar-card[hidden] {
+  display: none !important;
+}
+.view-studio .studio-inspector-toggle {
+  flex: 0 0 auto;
+}
+.view-studio .studio-inspector-toggle[aria-expanded="true"] {
+  color: var(--accent);
+}
+@media (max-width: 1150px) {
+  .view-studio .studio-toolbar-panel {
+    max-width: calc(100% - 24px);
+  }
+  .view-studio .studio-tool-group .input {
+    max-width: 140px;
+  }
+}
+@media (max-width: 900px) {
+  .view-studio .studio-workspace-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .view-studio .studio-toolbar-panel {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    padding: 10px;
+    z-index: 12;
+  }
+  .view-studio .studio-toolbar-clusters {
+    flex-wrap: wrap;
+  }
+  .view-studio .studio-toolbar-clusters > .studio-tool-group {
+    padding-inline-end: 0;
+  }
+  .view-studio .studio-more-tools-content {
+    right: auto;
+    left: 0;
+    width: min(620px, calc(100vw - 48px));
+  }
+  .view-studio .studio-canvas-card {
+    order: 1;
+  }
+  .view-studio .studio-shell {
+    height: clamp(300px, 65dvh, 650px);
+    min-height: 300px;
+  }
+  .view-studio .studio-sidebar-card {
+    position: relative;
+    order: 2;
+    inset: auto;
+    width: 100%;
+    max-height: none;
+    overflow-y: visible;
+    box-shadow: none;
+  }
+}
+@media (max-width: 560px) {
+  .view-studio .studio-toolbar-panel .studio-tool-group .input {
+    max-width: 115px;
+  }
+  .view-studio .studio-toolbar-clusters {
+    column-gap: 8px;
+    row-gap: 7px;
+  }
+}
