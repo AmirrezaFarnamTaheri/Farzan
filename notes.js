@@ -5,6 +5,7 @@
 // ============================================================
 
 import DOMPurify from 'dompurify';
+import { sanitizeNoteStyles } from './src/features/safeNoteStyles.js';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 import { countWords } from './src/core/textMetrics.js';
 
@@ -563,10 +564,127 @@ import { countWords } from './src/core/textMetrics.js';
   // ──────────────────────────────────────────────────────────
 
   const Editor = {
+    _tiptap: null,
+    _tiptapChanged: false,
+    _tiptapOriginal: null,
+
+    async enableModern() {
+      if (this._tiptap) return { ok: true, alreadyEnabled: true };
+      if (!this._el || !this._currentId) return { ok: false, reason: 'no-note' };
+      // Never replace the native editing surface mid-IME. Composition DOM is
+      // provisional, and Squire would discard the browser's active composition.
+      if (this._compositionActive) return { ok: false, reason: 'composing' };
+      if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
+      // Check the *original* HTML before sanitization. A schema-based editor
+      // would otherwise drop unsupported saved metadata and silently replace
+      // it when a title-only save occurs.
+      const originalNote = Store.getNote(this._currentId);
+      const { assessNoteForSquire } = await import('./src/features/notesSquireCompatibility.js');
+      const preflight = assessNoteForSquire(originalNote?.content ?? '');
+      if (!preflight.compatible) return { ok: false, reason: 'incompatible', detail: preflight.reason };
+      // A compatible persisted record does not imply the current, unsaved
+      // draft is compatible. Reject tables/images/styles in the live editor
+      // BEFORE flushing a debounced save or replacing the DOM with ProseMirror.
+      const draftCheck = assessNoteForSquire(this._el.innerHTML);
+      if (!draftCheck.compatible) {
+        return { ok: false, reason: 'incompatible', detail: draftCheck.reason };
+      }
+      if (this._saveTimer) this.save(true);
+      const node = this._el;
+      const noteId = this._currentId;
+      // Keep this mount identity fixed even if a deleted note is recovered
+      // under a new ID without replacing the active Squire editor.
+      const mountEpoch = this._loadEpoch;
+      const original = node.innerHTML;
+      const safe = this._sanitize(original);
+      const before = node.innerHTML;
+      let adapterModule;
+      try {
+        adapterModule = await import('./src/features/notesSquireAdapter.js');
+      } catch (error) {
+        console.warn('[Notes] Squire preview unavailable', error);
+        return { ok: false, reason: 'unavailable' };
+      }
+      // Route unmounts, note switches, and intervening keystrokes must never
+      // cause an async editor import to replace a newer user draft.
+      if (node !== this._el || noteId !== this._currentId
+          || this._loadEpoch !== mountEpoch
+          || node.innerHTML !== before || !node.isConnected) {
+        return { ok: false, reason: 'stale-mount' };
+      }
+      // An IME or storage refresh might start while the editor module loads.
+      if (this._compositionActive) return { ok: false, reason: 'composing' };
+      if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
+      try {
+        node.setAttribute('contenteditable', 'false');
+        node.replaceChildren();
+        const instance = adapterModule.createTiptapNoteEditor({
+          element: node,
+          html: safe,
+          onUpdate: () => {
+            // The current ID may be rebound to a recovered copy after remote
+            // deletion; the mount epoch, not the old note ID, owns the editor.
+            if (this._el !== node || this._loadEpoch !== mountEpoch || !this._currentId) return;
+            this._tiptapChanged = true;
+            this._onInput();
+          },
+        });
+        this._tiptap = instance;
+        this._tiptapOriginal = safe;
+        this._tiptapChanged = false;
+        // Squire owns the accessible textbox while mounted; avoid two nested
+        // textbox roles announcing the same note content to screen readers.
+        node.removeAttribute('role');
+        node.removeAttribute('aria-multiline');
+        node.removeAttribute('aria-label');
+        return { ok: true };
+      } catch (error) {
+        node.replaceChildren();
+        node.innerHTML = original;
+        node.setAttribute('contenteditable', 'true');
+        console.warn('[Notes] Squire preview rejected this note', error);
+        return { ok: false, reason: 'incompatible' };
+      }
+    },
+
+    disableModern({ preserveContent = true } = {}) {
+      if (!this._tiptap) return false;
+      // Squire batches DOM input notifications via MutationObserver. Capture
+      // any unobserved final keystroke before asking getContent() whether the
+      // document changed; otherwise an immediate fallback can restore the
+      // previous HTML and silently discard the latest edit.
+      if (preserveContent && this._tiptap.syncChanges() === false) return false;
+      const preserved = preserveContent ? this.getContent() : '';
+      try { this._tiptap.destroy(); } catch {}
+      this._tiptap = null;
+      this._tiptapOriginal = null;
+      this._tiptapChanged = false;
+      if (this._el) {
+        this._el.replaceChildren();
+        this._el.setAttribute('contenteditable', 'true');
+        this._el.setAttribute('role', 'textbox');
+        this._el.setAttribute('aria-multiline', 'true');
+        this._el.setAttribute('aria-label', 'Note editor');
+        if (preserveContent) this._el.innerHTML = preserved;
+      }
+      // The classic snapshot stack predates the Squire editing session.
+      // Continuing to undo through it can silently restore obsolete content.
+      // Start a clean classic history boundary at the preserved document.
+      this._history = [];
+      this._historyIdx = -1;
+      if (preserveContent && this._el) this._snapshot();
+      return true;
+    },
     _el:         null,
     _currentId:  null,
-    // Distinguishes each editor session, including reopening the same note.
+    // Distinguishes a new editor session even when reopening the same note.
     _loadEpoch:  0,
+    // An IME composition is an unsaved draft even when Squire deliberately
+    // suppresses input/autosave notifications until compositionend.
+    _compositionActive: false,
+    // A remote hydration must settle before any local autosave can write
+    // a note that may have been deleted in another window.
+    _syncReadInProgress: 0,
     _saveTimer:  null,
     _history:    [],      // undo stack (snapshots)
     _historyIdx: -1,
@@ -612,9 +730,21 @@ import { countWords } from './src/core/textMetrics.js';
       this._el.setAttribute('data-placeholder', 'Start writing your note...');
 
       // Input → autosave + snapshot
-      RouteListeners.on(this._el, 'input', () => {
+      RouteListeners.on(this._el, 'input', e => {
+        // Squire owns its edit/IME notifications; a bubbled input must not
+        // schedule a separate save with an unfinished composition string.
+        if (this._tiptap || e.isComposing) return;
         this._onInput();
         this._scheduleSnapshot();
+      });
+      RouteListeners.on(this._el, 'compositionstart', () => {
+        this._compositionActive = true;
+      });
+      RouteListeners.on(this._el, 'compositionend', () => {
+        this._compositionActive = false;
+        // Some browsers do not issue a second input after completing IME.
+        // Squire owns the modern editor's final-composition notification.
+        if (!this._tiptap) this._onInput();
       });
 
       // Keyboard shortcuts
@@ -641,6 +771,8 @@ import { countWords } from './src/core/textMetrics.js';
     load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
       this._loadEpoch += 1;
+      this._compositionActive = false;
+      this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
       this._history    = [];
@@ -659,26 +791,52 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Get current HTML ──────────────────────────────────
     getContent() {
-      return this._sanitize(this._el?.innerHTML ?? '');
+      const html = this._tiptap
+        ? (this._tiptapChanged ? this._tiptap.getHTML() : this._tiptapOriginal)
+        : this._el?.innerHTML;
+      return this._sanitize(html ?? '');
     },
 
     // ── Save ──────────────────────────────────────────────
     save(immediate = false) {
       if (!this._currentId) return;
       clearTimeout(this._saveTimer);
+      const sourceEpoch = this._loadEpoch;
 
       const doSave = () => {
-        // Clearing the handle is what makes _hasPendingLocalEdit() honest.
-        // clearTimeout alone leaves the numeric id in place, so after the very
-        // first debounced save the editor looked permanently dirty and the
-        // cross-tab sync refresh stopped reloading it, forever.
+        // Clear the handle before returning or re-arming; otherwise a stale
+        // timer makes the dirty-draft check report false positives forever.
         this._saveTimer = null;
-        // The editor can be torn down between scheduling and firing (route
-        // change, tab close). Writing then would persist the empty content of
-        // a detached node over a real note.
+        // The editor may have been torn down while this callback was pending.
         if (!this._el) return;
+        // A delayed save must not target a different note opened afterwards.
+        // Recovery of a deleted note rebinds its ID without changing epoch.
+        if (this._loadEpoch !== sourceEpoch) return;
+        if (this._compositionActive) {
+          // DOM content during an IME composition is provisional, not a
+          // committed edit. Retry after compositionend without saving it.
+          this._saveTimer = setTimeout(doSave, 150);
+          return false;
+        }
+        if (this._syncReadInProgress) {
+          // A canonical read must settle before any write may proceed.
+          this._saveTimer = setTimeout(doSave, 150);
+          return false;
+        }
+        if (this._tiptap) {
+          // A final Squire mutation may predate its queued input event. Read
+          // the live editor synchronously before saving or leaving the route.
+          // syncChanges can schedule its own debounce through onUpdate, so
+          // clear that redundant timer before performing the current write.
+          if (this._tiptap.syncChanges() === false) {
+            this._saveTimer = setTimeout(doSave, 150);
+            return false;
+          }
+          clearTimeout(this._saveTimer);
+          this._saveTimer = null;
+        }
         const content  = this.getContent();
-        const text     = this._el.innerText ?? '';
+        const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
         const chars    = text.length;
         // `?? ` does not catch the empty string, so clearing the title field
@@ -695,10 +853,11 @@ import { countWords } from './src/core/textMetrics.js';
           window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
           window.OpenCourseDeck?.bus?.emit('note:save', { note: updated });
         }
+        return Boolean(updated);
       };
 
       if (immediate) {
-        doSave();
+        return doSave();
       } else {
         this._saveTimer = setTimeout(doSave, 800);
       }
@@ -706,6 +865,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Undo / Redo ───────────────────────────────────────
     _snapshot() {
+      if (this._tiptap) return;
       const html = this._el?.innerHTML ?? '';
       // Trim future history if we branched
       this._history = this._history.slice(0, this._historyIdx + 1);
@@ -717,6 +877,7 @@ import { countWords } from './src/core/textMetrics.js';
     _scheduleSnapshot: debounce(function() { Editor._snapshot(); }, 500),
 
     undo() {
+      if (this._tiptap) { this._tiptap.run('undo'); return; }
       if (this._historyIdx <= 0) return;
       this._historyIdx--;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -724,6 +885,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     redo() {
+      if (this._tiptap) { this._tiptap.run('redo'); return; }
       if (this._historyIdx >= this._history.length - 1) return;
       this._historyIdx++;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -732,7 +894,8 @@ import { countWords } from './src/core/textMetrics.js';
 
     _setRichHTML(html) {
       if (!this._el) return;
-      this._el.innerHTML = this._sanitize(html);
+      if (this._tiptap) this._tiptap.setContent(this._sanitize(html));
+      else this._el.innerHTML = this._sanitize(html);
     },
 
     // ── Keyboard shortcuts ────────────────────────────────
@@ -740,6 +903,12 @@ import { countWords } from './src/core/textMetrics.js';
       const ctrl = e.ctrlKey || e.metaKey;
 
       if (ctrl && e.key === 's') { e.preventDefault(); this.save(true); return; }
+      // Slash commands are a Notes UX feature, not tied to a particular
+      // editing engine. Let Squire keep its own formatting/history shortcuts.
+      if (!e.isComposing && e.key === '/' && this._isEmptyBlock()) {
+        this._showSlashMenu();
+      }
+      if (this._tiptap) return;
       if (ctrl && e.key === 'z') { e.preventDefault(); this.undo(); return; }
       if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); this.redo(); return; }
       if (ctrl && e.key === 'b') { e.preventDefault(); this.COMMANDS.bold(); return; }
@@ -754,14 +923,11 @@ import { countWords } from './src/core/textMetrics.js';
         else document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
       }
 
-      // Slash commands
-      if (e.key === '/' && this._isEmptyBlock()) {
-        this._showSlashMenu();
-      }
     },
 
     // ── Paste handler ─────────────────────────────────────
     _onPaste(e) {
+      if (this._tiptap) return; // ProseMirror owns paste parsing and history.
       e.preventDefault();
       const text = e.clipboardData.getData('text/html')
         || e.clipboardData.getData('text/plain');
@@ -771,19 +937,23 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _sanitize(html) {
-      return controlRemoteNoteImages(noteSanitizer.sanitize(String(html ?? ''), {
+      return controlRemoteNoteImages(sanitizeNoteStyles(noteSanitizer.sanitize(String(html ?? ''), {
         // The note privacy gate handles HTML <img>, not SVG <image>/<use>/
         // <feImage>. HTML-only sanitization forbids network-loading foreign
         // content even if an imported note contains SVG resource references.
         USE_PROFILES: { html: true },
         FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
-        FORBID_ATTR: ['style', 'srcset', 'sizes'],
+        FORBID_ATTR: ['srcset', 'sizes'],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-      }));
+      })));
     },
 
     // ── Toolbar state sync ────────────────────────────────
     _updateToolbar() {
+      if (this._tiptap) {
+        $$('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._tiptap.isActive(btn.dataset.cmd)));
+        return;
+      }
       const commands = ['bold', 'italic', 'underline', 'strikeThrough',
                         'justifyLeft', 'justifyCenter', 'justifyRight'];
       commands.forEach(cmd => {
@@ -864,6 +1034,9 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     appendAISummary(summary) {
+      // Never insert outside an active Squire root if an IME composition makes
+      // it unsafe to switch editing engines yet.
+      if (this._tiptap && !this.disableModern()) return false;
       if (!this._el || !this._currentId) return false;
       const lines = String(summary || '')
         .split(/\r?\n/)
@@ -898,6 +1071,28 @@ import { countWords } from './src/core/textMetrics.js';
       return block ? block.textContent.trim() === '' : false;
     },
 
+    _removeSlashPrefix() {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      if (!range.collapsed || !this._el?.contains(range.startContainer)) return;
+      let textNode = range.startContainer;
+      let offset = range.startOffset;
+      if (textNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
+        const previous = textNode.childNodes[offset - 1];
+        if (previous?.nodeType === Node.TEXT_NODE) {
+          textNode = previous;
+          offset = previous.textContent.length;
+        }
+      }
+      if (textNode.nodeType !== Node.TEXT_NODE || offset < 1
+          || textNode.textContent[offset - 1] !== '/') return;
+      range.setStart(textNode, offset - 1);
+      range.deleteContents();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    },
+
     _showSlashMenu() {
       this._hideSlashMenu();
 
@@ -915,7 +1110,9 @@ import { countWords } from './src/core/textMetrics.js';
       ];
 
       const sel  = window.getSelection();
-      const rect = sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : { left: 0, bottom: 0 };
+      const selectionRange = sel?.rangeCount ? sel.getRangeAt(0) : null;
+      const rect = selectionRange && typeof selectionRange.getBoundingClientRect === 'function'
+        ? selectionRange.getBoundingClientRect() : { left: 0, bottom: 0 };
 
       const menu = document.createElement('div');
       menu.className = 'slash-menu';
@@ -930,12 +1127,36 @@ import { countWords } from './src/core/textMetrics.js';
         const item = document.createElement('button');
         item.className = 'slash-menu-item';
         item.textContent = label;
+        const apply = () => {
+          // Focus restores Squire's saved selection after keyboard navigation.
+          if (this._tiptap) this._tiptap.editor.commands.focus();
+          else this._el?.focus();
+          // Delete only the literal slash if one was actually typed, never an
+          // arbitrary preceding character via document.execCommand('delete').
+          this._removeSlashPrefix();
+          if (this._tiptap?.supports(cmd)) {
+            this._tiptap.run(cmd);
+          } else {
+            if (this._tiptap) {
+              // Tables and other unsupported structures remain available in
+              // the classic editor without losing a compatible existing note.
+              this.disableModern();
+              this._el?.focus();
+              this._placeCursorAtEnd();
+            }
+            this.COMMANDS[cmd]?.();
+          }
+          this._hideSlashMenu();
+        };
         RouteListeners.on(item, 'mousedown', ev => {
           ev.preventDefault();
-          // Delete the slash character first
-          document.execCommand('delete');
-          this.COMMANDS[cmd]?.();
-          this._hideSlashMenu();
+          apply();
+        });
+        RouteListeners.on(item, 'click', ev => {
+          // Keyboard activation triggers click(detail=0), not mousedown.
+          if (ev.detail !== 0) return;
+          ev.preventDefault();
+          apply();
         });
         menu.appendChild(item);
       });
@@ -996,6 +1217,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _placeCursorAtEnd() {
+      if (this._tiptap) { this._tiptap.editor.commands.focus('end'); return; }
       const range = document.createRange();
       const sel   = window.getSelection();
       range.selectNodeContents(this._el);
@@ -1670,8 +1892,17 @@ import { countWords } from './src/core/textMetrics.js';
     init(toolbarEl) {
       if (!toolbarEl) return;
       const runCommand = btn => {
-        if (btn.dataset.cmdBlock) Editor.COMMANDS[btn.dataset.cmdBlock]?.();
-        else Editor.COMMANDS[btn.dataset.cmd]?.();
+        const command = btn.dataset.cmdBlock || btn.dataset.cmd;
+        if (Editor._tiptap) {
+          if (Editor._tiptap.supports(command)) {
+            Editor._tiptap.run(command);
+            return;
+          }
+          // Unsupported advanced formatting requires the legacy schema.
+          // Preserve the current HTML rather than silently strip styles.
+          Editor.disableModern();
+        }
+        Editor.COMMANDS[command]?.();
       };
 
       // Pointer activation. mousedown (not click) with preventDefault is
@@ -1698,7 +1929,8 @@ import { countWords } from './src/core/textMetrics.js';
         // Focus must go back to the editable before execCommand: it acts on
         // the focused editable, and focus is currently on the button. A
         // contenteditable restores its previous selection when refocused.
-        Editor._el?.focus();
+        if (Editor._tiptap) Editor._tiptap.editor.commands.focus();
+        else Editor._el?.focus();
         runCommand(btn);
       });
 
@@ -1706,6 +1938,8 @@ import { countWords } from './src/core/textMetrics.js';
       const sizeSelect = toolbarEl.querySelector('[data-font-size]');
       if (sizeSelect) {
         RouteListeners.on(sizeSelect, 'change', () => {
+          if (Editor._tiptap?.supports('fontSize')) { Editor._tiptap.run('fontSize', sizeSelect.value); return; }
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontSize', false, sizeSelect.value);
         });
       }
@@ -1714,6 +1948,8 @@ import { countWords } from './src/core/textMetrics.js';
       const fontSelect = toolbarEl.querySelector('[data-font-family]');
       if (fontSelect) {
         RouteListeners.on(fontSelect, 'change', () => {
+          if (Editor._tiptap?.supports('fontFamily')) { Editor._tiptap.run('fontFamily', fontSelect.value); return; }
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontName', false, fontSelect.value);
         });
       }
@@ -1722,6 +1958,8 @@ import { countWords } from './src/core/textMetrics.js';
       const colorInput = toolbarEl.querySelector('[data-text-color]');
       if (colorInput) {
         RouteListeners.on(colorInput, 'input', () => {
+          if (Editor._tiptap?.supports('textColor')) { Editor._tiptap.run('textColor', colorInput.value); return; }
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('foreColor', false, colorInput.value);
         });
       }
@@ -1730,6 +1968,8 @@ import { countWords } from './src/core/textMetrics.js';
       const hlInput = toolbarEl.querySelector('[data-highlight-color]');
       if (hlInput) {
         RouteListeners.on(hlInput, 'input', () => {
+          if (Editor._tiptap?.supports('highlightColor')) { Editor._tiptap.run('highlightColor', hlInput.value); return; }
+          if (Editor._tiptap) Editor.disableModern();
           document.execCommand('hiliteColor', false, hlInput.value);
         });
       }
@@ -1789,6 +2029,29 @@ import { countWords } from './src/core/textMetrics.js';
           Editor.save(true);
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
+        });
+      }
+
+      // Quality-assurance preview is deliberately opt-in while rich legacy
+      // tables/images/style extensions and the full bundle gate are unfinished.
+      const modernToggle = $('[data-notes-modern-toggle]');
+      if (modernToggle) {
+        modernToggle.hidden = window.OpenCourseDeck?.featureFlags?.notesTiptapPreview !== true;
+        RouteListeners.on(modernToggle, 'click', async () => {
+          if (Editor._tiptap) {
+            Editor.disableModern();
+          } else {
+            const result = await this.enableModernEditor();
+            if (!result.ok) {
+              window.OpenCourseDeck?.Toast?.info?.(
+                result.reason === 'incompatible'
+                  ? 'This note needs the classic editor to preserve its formatting.'
+                  : 'The preview editor is unavailable.',
+              );
+            }
+          }
+          modernToggle.textContent = Editor._tiptap
+            ? 'Use classic editor' : 'Try modern editor (preview)';
         });
       }
 
@@ -1862,11 +2125,12 @@ import { countWords } from './src/core/textMetrics.js';
 
     _hasPendingLocalEdit() {
       const titleInput = $('[data-note-title-input]');
-      return Boolean(Editor._saveTimer || titleInput?._pdTitleT);
+      return Boolean(Editor._compositionActive || Editor._saveTimer || titleInput?._pdTitleT);
     },
 
     _renderAfterCanonicalRefresh(options = {}) {
-      const pendingLocalEdit = options.preserveDirtyEditor && this._hasPendingLocalEdit();
+      const pendingLocalEdit = options.preserveDirtyEditor
+        && (options.forcePreserveEditor === true || this._hasPendingLocalEdit());
       const currentId = Editor._currentId;
       NotesList.render();
       FoldersPanel.render();
@@ -1874,9 +2138,21 @@ import { countWords } from './src/core/textMetrics.js';
 
       const current = currentId && Store.getNote(currentId);
       if (current) {
-        if (!pendingLocalEdit) Editor.load(current, { preventScroll: true });
+        // Other notes/folders syncing must not destroy a Squire editor,
+        // its selection, or its undo stack when the open note is unchanged.
+        const contentMatches = Editor._el
+          && Editor.getContent() === Editor._sanitize(current.content || '');
+        const shouldReload = !pendingLocalEdit && !contentMatches;
+        if (shouldReload) {
+          Editor.load(current, { preventScroll: true });
+        } else if (!pendingLocalEdit) {
+          // Apply a remote title-only change without rebuilding the editor.
+          const titleInput = $('[data-note-title-input]');
+          if (titleInput) titleInput.value = current.title;
+          Editor._updateMeta(current);
+        }
         NotesList.setActive(current.id);
-        return { currentId: current.id, editorReloaded: !pendingLocalEdit };
+        return { currentId: current.id, editorReloaded: Boolean(shouldReload) };
       }
 
       const notes = Store.getNotes();
@@ -1896,16 +2172,96 @@ import { countWords } from './src/core/textMetrics.js';
         return { refreshed: false, reason: 'ignored-kind' };
       }
 
-      const changed = await Store.hydrateFromDB({ force: true });
+      const editedNoteId = Editor._currentId;
+      const sourceElement = Editor._el;
+      const sourceEpoch = Editor._loadEpoch;
+      // Flush any pending Squire MutationObserver notification before the
+      // canonical read. An unfinished IME composition stays in the live editor.
+      if (Editor._tiptap && !Editor._compositionActive) Editor._tiptap.syncChanges();
+      const previousNote = editedNoteId && Store.getNote(editedNoteId);
+      const dirtyBeforeSync = this._hasPendingLocalEdit();
+      Editor._syncReadInProgress += 1;
+      let changed;
+      try {
+        changed = await Store.hydrateFromDB({ force: true });
+      } finally {
+        Editor._syncReadInProgress -= 1;
+      }
       if (!changed || !this._inited) return { refreshed: false, reason: 'unchanged' };
 
-      const render = this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
-      const result = { refreshed: true, kind, ...render };
+      // A conflicting remote version must not silently vanish when the local
+      // draft is eventually saved. Store a separate synced copy first.
+      const incoming = editedNoteId && Store.getNote(editedNoteId);
+      const stillEditingSource = Editor._el === sourceElement
+        && Editor._loadEpoch === sourceEpoch && Editor._currentId === editedNoteId;
+      const dirtyDuringSync = stillEditingSource
+        && (dirtyBeforeSync || this._hasPendingLocalEdit());
+      let conflictCopyId = null;
+      let recoveredDraftId = null;
+      if (dirtyDuringSync && previousNote && !incoming) {
+        // Remote deletion must not discard a pending local draft, nor should
+        // saving resurrect the deleted ID. Bind the live editor to a new note.
+        const titleInput = $('[data-note-title-input]');
+        const draftTitle = titleInput?.value.trim() || previousNote.title || 'Untitled Note';
+        const recovered = Store.createNote({
+          ...previousNote,
+          title: `${draftTitle.slice(0, 170)} (Recovered draft)`,
+          // Incomplete IME text is intentionally not persisted before commit.
+          // The editor remains mounted, then compositionend saves final text.
+          content: Editor._compositionActive ? previousNote.content : Editor.getContent(),
+        });
+        Editor._currentId = recovered.id;
+        if (titleInput) titleInput.value = recovered.title;
+        recoveredDraftId = recovered.id;
+        window.OpenCourseDeck?.Toast?.info?.(
+          'This note was deleted in another window. Your unsaved draft was recovered as a separate note.',
+        );
+      }
+      if (dirtyDuringSync && previousNote && incoming
+          && (previousNote.content !== incoming.content || previousNote.title !== incoming.title)) {
+        this._syncConflictVersions ??= new Map();
+        const alreadySaved = this._syncConflictVersions.get(editedNoteId);
+        if (!alreadySaved || alreadySaved.content !== incoming.content || alreadySaved.title !== incoming.title) {
+          const copy = Store.createNote({
+            ...incoming,
+            title: `${String(incoming.title || 'Untitled').slice(0, 170)} (synced copy)`,
+          });
+          conflictCopyId = copy.id;
+          this._syncConflictVersions.set(editedNoteId, {
+            content: incoming.content,
+            title: incoming.title,
+          });
+          if (this._syncConflictVersions.size > 32) {
+            this._syncConflictVersions.delete(this._syncConflictVersions.keys().next().value);
+          }
+          window.OpenCourseDeck?.Toast?.info?.('Another window updated this note. Its version was saved as a separate copy.');
+        }
+      }
+      const render = this._renderAfterCanonicalRefresh({
+        preserveDirtyEditor: true,
+        forcePreserveEditor: Boolean(recoveredDraftId),
+      });
+      const result = { refreshed: true, kind, conflictCopyId, recoveredDraftId, ...render };
       window.OpenCourseDeck?.bus?.emit?.('notes:sync-refresh', result);
       return result;
     },
 
+    _canLeaveCurrentEditor() {
+      if (!Editor._currentId) return true;
+      if (Editor._compositionActive) {
+        window.OpenCourseDeck?.Toast?.info?.('Finish typing before switching notes.');
+        return false;
+      }
+      if (Editor._syncReadInProgress) {
+        window.OpenCourseDeck?.Toast?.info?.('Notes are synchronizing. Your draft is being preserved.');
+        return false;
+      }
+      return true;
+    },
+
     newNote(folderId = NotesList._filter.folderId ?? 'default', { preventScroll = false } = {}) {
+      // Prevent orphan notes if navigation cannot leave an unfinished edit.
+      if (!this._canLeaveCurrentEditor()) return false;
       const note = Store.createNote({ folderId });
       NotesList.render();
       // Folder counts are a separate view; refresh them after creating notes.
@@ -1913,26 +2269,35 @@ import { countWords } from './src/core/textMetrics.js';
       FoldersPanel.render();
       this.openNote(note.id, { preventScroll });
       window.OpenCourseDeck?.bus?.emit('note:create', { note });
+      return note;
     },
 
+    enableModernEditor() { return Editor.enableModern(); },
+    disableModernEditor() { return Editor.disableModern(); },
+
     openNote(id, { preventScroll = false } = {}) {
-      Editor.save(true); // Save current
+      if (!this._canLeaveCurrentEditor()) return false;
+      Editor.save(true); // Flush current draft before changing the editor.
       const note = Store.getNote(id);
-      if (!note) return;
+      if (!note) return false;
       Editor.load(note, { preventScroll });
       NotesList.setActive(id);
 
       const pane = $('[data-notes-main-pane]');
       if (pane) pane.classList.add('has-note');
+      return true;
     },
 
     async deleteNote(id) {
+      if (Editor._currentId === id && !this._canLeaveCurrentEditor()) return false;
       if (!await pdConfirm({
         title: 'Delete note',
         message: 'Delete this note permanently?',
         confirmLabel: 'Delete note',
         cancelLabel: 'Keep note',
       })) return;
+      // A composition or sync could have started while the dialog was open.
+      if (Editor._currentId === id && !this._canLeaveCurrentEditor()) return false;
       Store.deleteNote(id);
       if (Editor._currentId === id) {
         Editor._currentId = null;
@@ -1946,6 +2311,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     duplicateNote(id) {
+      if (!this._canLeaveCurrentEditor()) return false;
       const note = Store.getNote(id);
       if (!note) return;
       const copy = Store.createNote({
@@ -1956,6 +2322,7 @@ import { countWords } from './src/core/textMetrics.js';
       NotesList.render();
       FoldersPanel.render();
       this.openNote(copy.id);
+      return copy;
     },
 
     promptColor(id) {
@@ -2011,9 +2378,10 @@ import { countWords } from './src/core/textMetrics.js';
           window.OpenCourseDeck?.Toast?.error?.('AI summary unavailable');
           return { ok: false, reason: result?.reason || 'summary-failed' };
         }
-        // A response may arrive after navigation, route unmount, cross-tab sync
-        // or edits. Never append a summary generated for an obsolete draft.
-        if (!this._inited || !sourceElement?.isConnected || Editor._el !== sourceElement
+        // AI work may finish after navigation, route unmount, cross-tab sync,
+        // or intervening edits. Never append an old result to a newer draft.
+        if (!this._inited || Editor._compositionActive
+            || !sourceElement?.isConnected || Editor._el !== sourceElement
             || Editor._currentId !== sourceNoteId || Editor._loadEpoch !== sourceEpoch
             || Editor.getContent() !== sourceContent
             || Store.getNote(sourceNoteId)?.content !== sourceContent) {
@@ -2102,6 +2470,7 @@ import { countWords } from './src/core/textMetrics.js';
     destroy() {
       this._unbindSyncRefresh();
       this.flushPendingSave?.();
+      Editor.disableModern({ preserveContent: false });
       RouteListeners.clear();
       ContextMenu.hide();
       Editor._hideSlashMenu?.();
@@ -2113,6 +2482,7 @@ import { countWords } from './src/core/textMetrics.js';
         titleInput._pdTitleT = null;
       }
       Editor._el = null;
+      Editor._compositionActive = false;
       // Drop the note binding along with the DOM it was bound to. Leaving it
       // set survives the route unmount, so a later remount that does not reach
       // a load() -- an IndexedDB-only account whose localStorage mirror is
@@ -2135,16 +2505,20 @@ import { countWords } from './src/core/textMetrics.js';
    */
   NotesApp.flushPendingSave = function flushPendingSave() {
     try {
-      Editor.save(true);
+      const bodyCommitted = Editor.save(true);
       const titleInput = $('[data-note-title-input]');
       if (titleInput && Editor._currentId) {
         Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
         NotesList.render();
+        window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
       }
+      // A composing IME or unresolved sync deliberately defers the body write.
+      // Do not clear unload protection until that body was actually committed.
+      if (bodyCommitted === false) return false;
       window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
-      window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
+      return true;
     } catch {
-      /* ignore */
+      return false;
     }
   };
 

@@ -156,6 +156,264 @@ describe('notes route filters', () => {
     }
   });
 
+  it('does not replace unsupported legacy notes when Tiptap preview is requested', async () => {
+    const original = '<h2>Legacy</h2><table><tbody><tr><td>70 mL</td></tr></tbody></table>'
+      + '<img data-remote-src="https://example.test/image.png" alt="Chart">';
+    window.PlasmaNotesStore.updateNote('regular-note', { content: original });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const result = await window.PlasmaNotesApp.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('table td')?.textContent).toBe('70 mL');
+    expect(editor.querySelector('img[data-remote-src]')).not.toBeNull();
+    window.PlasmaNotesApp.flushPendingSave();
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toContain('<table>');
+  });
+
+  it('retains safe note typography but strips remote-loading CSS from saved notes', () => {
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p dir="rtl" style="text-align:right"><span style="color:#ff0000;font-size:18px;background-image:url(https://tracker.example/a.png)">عنوان فارسی</span></p>',
+    });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const html = document.querySelector('[data-notes-editor]').innerHTML;
+    expect(html).toContain('عنوان فارسی');
+    expect(html).toContain('text-align');
+    expect(html).toContain('color:');
+    expect(html).not.toContain('background-image');
+    expect(html).not.toContain('tracker.example');
+    window.PlasmaNotesApp.flushPendingSave();
+    const persisted = store.getNote('regular-note').content;
+    expect(persisted).toContain('font-size');
+    expect(persisted).not.toContain('tracker.example');
+  });
+
+  it('refuses an unsaved legacy table draft before attempting any modern-editor conversion', async () => {
+    const store = window.PlasmaNotesStore;
+    const app = window.PlasmaNotesApp;
+    store.updateNote('regular-note', { content: '<p>Original compatible note</p>' });
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    const draft = '<p>Unsaved user text</p><table><tbody><tr><td>Never drop 70 mL</td></tr></tbody></table>';
+    editor.innerHTML = draft;
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'incompatible' });
+    expect(editor.querySelector('table td')?.textContent).toBe('Never drop 70 mL');
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('Never drop 70 mL');
+    expect(store.getNote('regular-note').content).toContain('<table>');
+  });
+
+  it('does not autosave incomplete IME input through the outer Notes event handler', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    window.DB.saveNote.mockClear();
+
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'متن ناتمام';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).not.toContain('متن ناتمام');
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+
+    root.querySelector('p').textContent = 'متن کامل';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن کامل');
+  });
+
+  it('offers the familiar slash-command menu in Squire and runs a heading without legacy execCommand', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', { content: '<p></p>' });
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const paragraph = root.querySelector('p');
+    expect(paragraph).not.toBeNull();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    root.focus();
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+
+    const items = [...document.querySelectorAll('.slash-menu-item')];
+    expect(items.some(item => item.textContent.includes('Heading 2'))).toBe(true);
+    const heading = items.find(item => item.textContent.includes('Heading 2'));
+    heading.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).not.toBeNull();
+    expect(root.querySelector('h2')).not.toBeNull();
+    expect(document.execCommand).not.toHaveBeenCalledWith('delete');
+  });
+
+  it('does not undo across a stale classic history after switching back from Squire', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const outer = document.querySelector('[data-notes-editor]');
+
+    outer.innerHTML = '<p>Earlier classic checkpoint</p>';
+    outer.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+
+    const root = outer.querySelector('.notes-modern-editor');
+    root.querySelector('p').textContent = 'Recent Squire editing';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(app.disableModernEditor()).toBe(true);
+    expect(outer.textContent).toContain('Recent Squire editing');
+
+    const preserved = outer.innerHTML;
+    outer.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(outer.innerHTML).toBe(preserved);
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('Recent Squire editing');
+  });
+
+  it('does not rewrite persisted empty HTML when a Squire preview is opened and closed untouched', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', { content: '' });
+    app.openNote('regular-note');
+    window.DB.saveNote.mockClear();
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    expect(app.disableModernEditor()).toBe(true);
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toBe('');
+    expect(window.DB.saveNote.mock.calls.every(([note]) => (
+      note.id !== 'regular-note' || note.content === ''
+    ))).toBe(true);
+  });
+
+  it('flushes a final unobserved Squire keystroke before navigating away', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.querySelector('p').textContent = 'Most recent unsignaled text';
+    // Squire may batch its final DOM update in a MutationObserver; no input
+    // notification has fired before the route's synchronous leave handler.
+    expect(app.flushPendingSave()).toBe(true);
+    expect(store.getNote('regular-note').content).toContain('Most recent unsignaled text');
+    expect(app.disableModernEditor()).toBe(true);
+  });
+
+  it('keeps the classic editor mounted while a canonical Notes read is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    let releaseRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => { releaseRead = resolve; }));
+    const pending = app.refreshFromSync({ kind: 'note', action: 'update' });
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'synchronizing' });
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    releaseRead(store.getNotes());
+    await pending;
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+  });
+
+  it('refuses to switch an unfinished classic IME draft into Squire', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    const initial = store.getNote('regular-note').content;
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.innerHTML = '<p>Partial classic IME 入力中</p>';
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: false, reason: 'composing' });
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.innerHTML).toContain('入力中');
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    expect(store.getNote('regular-note').content).toBe(initial);
+
+    editor.innerHTML = '<p>Committed IME 入力済み</p>';
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    expect(editor.querySelector('.notes-modern-editor')).not.toBeNull();
+  });
+
+  it('has one Note textbox role during modern editing and restores classic semantics on exit', async () => {
+    const app = window.PlasmaNotesApp;
+    app.openNote('regular-note');
+    const outer = document.querySelector('[data-notes-editor]');
+    expect(outer.getAttribute('role')).toBe('textbox');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const modern = outer.querySelector('.notes-modern-editor');
+    expect(modern?.getAttribute('role')).toBe('textbox');
+    expect(outer.hasAttribute('role')).toBe(false);
+    expect(outer.hasAttribute('aria-multiline')).toBe(false);
+    expect(app.disableModernEditor()).toBe(true);
+    expect(outer.getAttribute('role')).toBe('textbox');
+    expect(outer.getAttribute('aria-multiline')).toBe('true');
+    expect(outer.getAttribute('aria-label')).toBe('Note editor');
+  });
+
+  it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
+    const existing = '<p>هوا و ریه 你好世界</p>';
+    window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
+    window.PlasmaNotesApp.openNote('regular-note');
+    const savedBefore = window.PlasmaNotesStore.getNote('regular-note').content;
+    const result = await window.PlasmaNotesApp.enableModernEditor();
+    expect(result).toMatchObject({ ok: true });
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('.notes-modern-editor')?.textContent).toContain('你好世界');
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toBe(savedBefore);
+    expect(window.PlasmaNotesApp.disableModernEditor()).toBe(true);
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+    expect(editor.textContent).toContain('هوا و ریه');
+  });
+
+  it('updates the modern toolbar after an editor selection changes without crashing', async () => {
+    const app = window.PlasmaNotesApp;
+    const toolbar = document.querySelector('[data-notes-toolbar]');
+    const boldButton = document.createElement('button');
+    boldButton.dataset.cmd = 'bold';
+    toolbar.appendChild(boldButton);
+    app.openNote('regular-note');
+    const result = await app.enableModernEditor();
+    expect(result).toMatchObject({ ok: true });
+    const proseMirror = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    expect(proseMirror).not.toBeNull();
+    // jsdom lacks Range#getClientRects, which ProseMirror needs during
+    // selection-change scroll measurement; provide measurement only.
+    const originalRects = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value: () => [{ left: 0, right: 1, top: 0, bottom: 1, width: 1, height: 1 }],
+    });
+    try {
+      proseMirror.focus();
+      expect(document.activeElement).toBe(proseMirror);
+      document.dispatchEvent(new Event('selectionchange'));
+      expect(() => vi.advanceTimersByTime(150)).not.toThrow();
+      expect(boldButton.classList.contains('active')).toBe(false);
+    } finally {
+      if (originalRects) Object.defineProperty(Range.prototype, 'getClientRects', originalRects);
+      else delete Range.prototype.getClientRects;
+    }
+  });
+
   it('round-trips legacy rich HTML without losing a table, code, RTL text or blocked external images', () => {
     const original = [
       '<h2>فیزیولوژی قلب</h2>',
@@ -490,6 +748,269 @@ describe('notes route filters', () => {
       kind: 'note',
       editorReloaded: false,
     }));
+  });
+
+  it('keeps an unchanged Squire editor mounted when another note arrives through sync', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    expect(mounted).not.toBeNull();
+
+    window.DB.getAllNotes.mockResolvedValueOnce([
+      ...store.getNotes(),
+      {
+        id: 'synced-other-note',
+        title: 'Another window saved this',
+        content: '<p>Different note</p>',
+        folderId: 'default',
+        tags: [],
+        pinned: false,
+        createdAt: now + 400,
+        updatedAt: now + 400,
+      },
+    ]);
+    const result = await app.refreshFromSync({ kind: 'note', action: 'save' });
+    expect(result).toMatchObject({ refreshed: true, currentId: 'regular-note', editorReloaded: false });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Another window saved this');
+  });
+
+  it('preserves in-progress Squire IME composition across canonical sync refresh', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    mounted.querySelector('p').textContent = 'متن فارسی ناتمام';
+    mounted.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(store.getNotes().map(note => (
+      note.id === 'regular-note'
+        ? { ...note, title: 'Remote title', content: '<p>Remote version</p>', updatedAt: now + 1000 }
+        : note
+    )));
+    const result = await app.refreshFromSync({ kind: 'note', action: 'save' });
+    expect(result).toMatchObject({ refreshed: true, currentId: 'regular-note', editorReloaded: false });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(mounted.textContent).toContain('متن فارسی ناتمام');
+    // Both concurrent versions must survive: protecting the local IME draft
+    // cannot silently erase the new remote note after the debounced save.
+    const remoteCopy = store.getNotes().find(note => (
+      note.id !== 'regular-note' && note.content === '<p>Remote version</p>'
+      && note.title.includes('synced copy')
+    ));
+    expect(remoteCopy).toBeDefined();
+
+    mounted.querySelector('p').textContent = 'متن فارسی کامل';
+    mounted.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن فارسی کامل');
+  });
+
+  it('recovers a dirty Squire draft if a different window deletes its source note', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.querySelector('p').textContent = 'Unsent draft after deletion';
+    mounted.dispatchEvent(new Event('input', { bubbles: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+
+    expect(result).toMatchObject({ refreshed: true, editorReloaded: false });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(result.recoveredDraftId).not.toBe('regular-note');
+    expect(result.currentId).toBe(result.recoveredDraftId);
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId)).toEqual(expect.objectContaining({
+      content: expect.stringContaining('Unsent draft after deletion'),
+    }));
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+
+    mounted.querySelector('p').textContent = 'Continue editing recovered Squire draft';
+    mounted.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Continue editing recovered Squire draft');
+    expect(store.getNote('regular-note')).toBeNull();
+  });
+
+  it('recovers a dirty classic draft if another window removes the original note', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Work in progress despite deletion</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Work in progress despite deletion');
+    expect(editor.textContent).toContain('Work in progress despite deletion');
+    expect(document.querySelector('[data-note-title-input]').value).toContain('Recovered');
+  });
+
+  it('does not resurrect a remotely deleted note while its hydration read is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    window.DB.saveNote.mockClear();
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft pending slow sync</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const remote = store.getNotes().filter(note => note.id !== 'regular-note');
+    let finishRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      finishRead = resolve;
+    }));
+    const pending = app.refreshFromSync({ kind: 'note', action: 'delete' });
+    await vi.advanceTimersByTimeAsync(900);
+    const obsoleteWrites = window.DB.saveNote.mock.calls.filter(([note]) => note.id === 'regular-note');
+    finishRead(remote);
+    const result = await pending;
+
+    expect(obsoleteWrites).toHaveLength(0);
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Draft pending slow sync');
+  });
+
+  it('recovers an unfinished Squire IME draft after remote deletion without persisting partial text', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    mounted.querySelector('p').textContent = 'متن فارسی ناتمام';
+    mounted.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(
+      store.getNotes().filter(note => note.id !== 'regular-note'),
+    );
+    const result = await app.refreshFromSync({ kind: 'note', action: 'delete' });
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(store.getNote('regular-note')).toBeNull();
+    expect(store.getNote(result.recoveredDraftId).content).not.toContain('متن فارسی ناتمام');
+
+    mounted.querySelector('p').textContent = 'متن فارسی کامل';
+    mounted.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote(result.recoveredDraftId).content).toContain('متن فارسی کامل');
+  });
+
+  it('does not write unfinished Squire IME text when an earlier edit is pending', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.querySelector('p').textContent = 'Finished change before composition';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'Finished change before composition + 中途入力';
+    root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).not.toContain('中途入力');
+    expect(window.OpenCourseDeck.beforeUnload.unmark).not.toHaveBeenCalledWith('notes-body');
+
+    root.querySelector('p').textContent = 'Finished change before composition + 完成';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('完成');
+  });
+
+  it('does not write unfinished classic Notes IME text during an explicit flush', () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.innerHTML = '<p>Unfinished IME 下書き</p>';
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).not.toContain('下書き');
+    expect(window.OpenCourseDeck.beforeUnload.unmark).not.toHaveBeenCalledWith('notes-body');
+
+    editor.innerHTML = '<p>Committed IME 完了</p>';
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    app.flushPendingSave();
+    expect(store.getNote('regular-note').content).toContain('完了');
+  });
+
+  it('keeps the current Squire note open until IME composition is committed', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'در حال نوشتن';
+    root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    const attempt = app.openNote('pinned-note');
+    expect(attempt).toBe(false);
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    expect(root.textContent).toContain('در حال نوشتن');
+
+    root.querySelector('p').textContent = 'متن نهایی';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(app.openNote('pinned-note')).toBe(true);
+    expect(store.getNote('regular-note').content).toContain('متن نهایی');
+    expect(document.querySelector('[data-notes-editor]').textContent).toContain('Important');
+  });
+
+  it('blocks note switching during an unresolved sync instead of losing the local draft', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Uncommitted work</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    let finishRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      finishRead = resolve;
+    }));
+    const remote = store.getNotes().filter(note => note.id !== 'regular-note');
+    const pending = app.refreshFromSync({ kind: 'note', action: 'delete' });
+    const attempted = app.openNote('pinned-note');
+    finishRead(remote);
+    const result = await pending;
+    expect(attempted).toBe(false);
+    expect(result.recoveredDraftId).toEqual(expect.any(String));
+    expect(document.querySelector('[data-notes-editor]').textContent).toContain('Uncommitted work');
+    expect(store.getNote(result.recoveredDraftId).content).toContain('Uncommitted work');
+  });
+
+  it('does not create an orphan note when new-note navigation is blocked by IME', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    const before = store.getNotes().map(note => note.id);
+    const attempt = app.newNote();
+    expect(attempt).toBe(false);
+    expect(store.getNotes().map(note => note.id)).toEqual(before);
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
   });
 
   it('repairs split notes storage by merging local and canonical DB records', async () => {
@@ -896,6 +1417,34 @@ describe('notes route filters', () => {
       id: 'pinned-note',
       title: 'Newer duplicate',
     }));
+  });
+
+  it('does not append an AI summary outside Squire during unfinished IME composition', async () => {
+    let respond;
+    window.OpenCourseDeck.AI = {
+      summarizeText: vi.fn(() => new Promise(resolve => { respond = resolve; })),
+    };
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const pending = app.summarizeCurrentNote();
+
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'متن در حال تکمیل';
+    respond({ ok: true, text: '- Outdated AI result', provider: 'local' });
+    const result = await pending;
+
+    expect(result).toMatchObject({ ok: false, reason: 'stale-note' });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    expect(document.querySelector('[data-notes-editor] [data-ai-summary-block]')).toBeNull();
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith('Summary added');
+
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن در حال تکمیل');
+    expect(store.getNote('regular-note').content).not.toContain('Outdated AI result');
   });
 
   it('does not insert a delayed AI summary into a different note after navigation', async () => {
