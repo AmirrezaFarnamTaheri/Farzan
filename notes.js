@@ -816,6 +816,18 @@ import { countWords } from './src/core/textMetrics.js';
           this._saveTimer = setTimeout(doSave, 150);
           return false;
         }
+        if (this._tiptap) {
+          // A final Squire mutation may predate its queued input event. Read
+          // the live editor synchronously before saving or leaving the route.
+          // syncChanges can schedule its own debounce through onUpdate, so
+          // clear that redundant timer before performing the current write.
+          if (this._tiptap.syncChanges() === false) {
+            this._saveTimer = setTimeout(doSave, 150);
+            return false;
+          }
+          clearTimeout(this._saveTimer);
+          this._saveTimer = null;
+        }
         const content  = this.getContent();
         const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
