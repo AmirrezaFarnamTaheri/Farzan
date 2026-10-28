@@ -229,6 +229,35 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('متن کامل');
   });
 
+  it('offers the familiar slash-command menu in Squire and runs a heading without legacy execCommand', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', { content: '<p></p>' });
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const paragraph = root.querySelector('p');
+    expect(paragraph).not.toBeNull();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    root.focus();
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+
+    const items = [...document.querySelectorAll('.slash-menu-item')];
+    expect(items.some(item => item.textContent.includes('Heading 2'))).toBe(true);
+    const heading = items.find(item => item.textContent.includes('Heading 2'));
+    heading.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).not.toBeNull();
+    expect(root.querySelector('h2')).not.toBeNull();
+    expect(document.execCommand).not.toHaveBeenCalledWith('delete');
+  });
+
   it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
