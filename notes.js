@@ -647,6 +647,9 @@ import { countWords } from './src/core/textMetrics.js';
     _currentId:  null,
     // Distinguishes a new editor session even when reopening the same note.
     _loadEpoch:  0,
+    // An IME composition is an unsaved draft even when Squire deliberately
+    // suppresses input/autosave notifications until compositionend.
+    _compositionActive: false,
     _saveTimer:  null,
     _history:    [],      // undo stack (snapshots)
     _historyIdx: -1,
@@ -699,8 +702,13 @@ import { countWords } from './src/core/textMetrics.js';
         this._onInput();
         this._scheduleSnapshot();
       });
+      RouteListeners.on(this._el, 'compositionstart', () => {
+        this._compositionActive = true;
+      });
       RouteListeners.on(this._el, 'compositionend', () => {
+        this._compositionActive = false;
         // Some browsers do not issue a second input after completing IME.
+        // Squire owns the modern editor's final-composition notification.
         if (!this._tiptap) this._onInput();
       });
 
@@ -728,6 +736,7 @@ import { countWords } from './src/core/textMetrics.js';
     load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
       this._loadEpoch += 1;
+      this._compositionActive = false;
       this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
@@ -2055,7 +2064,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     _hasPendingLocalEdit() {
       const titleInput = $('[data-note-title-input]');
-      return Boolean(Editor._saveTimer || titleInput?._pdTitleT);
+      return Boolean(Editor._compositionActive || Editor._saveTimer || titleInput?._pdTitleT);
     },
 
     _renderAfterCanonicalRefresh(options = {}) {
@@ -2067,9 +2076,21 @@ import { countWords } from './src/core/textMetrics.js';
 
       const current = currentId && Store.getNote(currentId);
       if (current) {
-        if (!pendingLocalEdit) Editor.load(current, { preventScroll: true });
+        // Other notes/folders syncing must not destroy a Squire editor,
+        // its selection, or its undo stack when the open note is unchanged.
+        const contentMatches = Editor._el
+          && Editor.getContent() === Editor._sanitize(current.content || '');
+        const shouldReload = !pendingLocalEdit && !contentMatches;
+        if (shouldReload) {
+          Editor.load(current, { preventScroll: true });
+        } else if (!pendingLocalEdit) {
+          // Apply a remote title-only change without rebuilding the editor.
+          const titleInput = $('[data-note-title-input]');
+          if (titleInput) titleInput.value = current.title;
+          Editor._updateMeta(current);
+        }
         NotesList.setActive(current.id);
-        return { currentId: current.id, editorReloaded: !pendingLocalEdit };
+        return { currentId: current.id, editorReloaded: Boolean(shouldReload) };
       }
 
       const notes = Store.getNotes();
@@ -2089,11 +2110,39 @@ import { countWords } from './src/core/textMetrics.js';
         return { refreshed: false, reason: 'ignored-kind' };
       }
 
+      const editedNoteId = Editor._currentId;
+      const previousNote = editedNoteId && Store.getNote(editedNoteId);
+      const dirtyBeforeSync = this._hasPendingLocalEdit();
       const changed = await Store.hydrateFromDB({ force: true });
       if (!changed || !this._inited) return { refreshed: false, reason: 'unchanged' };
 
+      // A conflicting remote version must not silently vanish when the local
+      // draft is eventually saved. Store a separate synced copy first.
+      const incoming = editedNoteId && Store.getNote(editedNoteId);
+      const dirtyDuringSync = dirtyBeforeSync || this._hasPendingLocalEdit();
+      let conflictCopyId = null;
+      if (dirtyDuringSync && previousNote && incoming
+          && (previousNote.content !== incoming.content || previousNote.title !== incoming.title)) {
+        this._syncConflictVersions ??= new Map();
+        const alreadySaved = this._syncConflictVersions.get(editedNoteId);
+        if (!alreadySaved || alreadySaved.content !== incoming.content || alreadySaved.title !== incoming.title) {
+          const copy = Store.createNote({
+            ...incoming,
+            title: `${String(incoming.title || 'Untitled').slice(0, 170)} (synced copy)`,
+          });
+          conflictCopyId = copy.id;
+          this._syncConflictVersions.set(editedNoteId, {
+            content: incoming.content,
+            title: incoming.title,
+          });
+          if (this._syncConflictVersions.size > 32) {
+            this._syncConflictVersions.delete(this._syncConflictVersions.keys().next().value);
+          }
+          window.OpenCourseDeck?.Toast?.info?.('Another window updated this note. Its version was saved as a separate copy.');
+        }
+      }
       const render = this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
-      const result = { refreshed: true, kind, ...render };
+      const result = { refreshed: true, kind, conflictCopyId, ...render };
       window.OpenCourseDeck?.bus?.emit?.('notes:sync-refresh', result);
       return result;
     },
@@ -2310,6 +2359,7 @@ import { countWords } from './src/core/textMetrics.js';
         titleInput._pdTitleT = null;
       }
       Editor._el = null;
+      Editor._compositionActive = false;
       // Drop the note binding along with the DOM it was bound to. Leaving it
       // set survives the route unmount, so a later remount that does not reach
       // a load() -- an IndexedDB-only account whose localStorage mirror is
