@@ -254,6 +254,33 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(input).toHaveAttribute('aria-label', 'Quick search courses and lessons');
   });
 
+  test('preserves an IME Notes draft when route navigation is vetoed', async ({ page }) => {
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notes')).toBeVisible();
+    await page.locator('[data-action="new-note"]').first().click();
+    const editor = page.locator('[data-notes-editor]');
+    await editor.fill('Initial note');
+    await page.evaluate(() => {
+      window.__notesBlockedRoutes = 0;
+      window.OpenCourseDeck.bus.on('route:blocked', () => { window.__notesBlockedRoutes += 1; });
+      const node = document.querySelector('[data-notes-editor]');
+      node.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      node.innerHTML = '<p>Draft being composed 你好世界</p>';
+      location.hash = '#/home';
+    });
+    await expect.poll(() => page.evaluate(() => window.__notesBlockedRoutes)).toBe(1);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/notes');
+    await expect(editor).toContainText('Draft being composed 你好世界');
+    await page.evaluate(() => {
+      document.querySelector('[data-notes-editor]')
+        .dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      location.hash = '#/home';
+    });
+    await expect(page.locator('.view-home')).toBeVisible();
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-notes-editor]')).toContainText('Draft being composed 你好世界');
+  });
+
   test('keeps a newly opened note editor visible without scrolling past an empty library panel', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
