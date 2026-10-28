@@ -26,6 +26,23 @@ describe('notes route workspace', () => {
     controller.unmount();
   });
 
+  it('marks an unfinished IME composition as unsafe for browser tab close', () => {
+    const mark = vi.fn();
+    const unmark = vi.fn();
+    window.OpenCourseDeck = { beforeUnload: { mark, unmark } };
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    expect(mark).toHaveBeenCalledWith('notes-ime');
+    expect(unmark).not.toHaveBeenCalledWith('notes-ime');
+
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    expect(unmark).toHaveBeenCalledWith('notes-ime');
+    controller.unmount();
+  });
+
   it('refuses to leave when the Notes app reports an uncommitted storage write', () => {
     window.PlasmaNotesApp.flushPendingSave.mockReturnValue(false);
     const controller = mountNotesView({
