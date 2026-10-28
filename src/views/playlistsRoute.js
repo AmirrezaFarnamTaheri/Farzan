@@ -146,7 +146,8 @@ async function renderPlaylists(deps) {
       sourceGroups.set(key, {
         id: `source-${sourceGroups.size + 1}`,
         label: 'Catalog',
-        title: topic.sourceLabel || topic.courseTitle || topic.courseId || 'Catalog source',
+        title: topic.courseTitle || topic.courseId || topic.sourceLabel || 'Catalog course',
+        sourceLabel: topic.sourceLabel || '',
         courseId: topic.courseId,
         href: '#/courses',
         items: [],
@@ -162,7 +163,7 @@ async function renderPlaylists(deps) {
     .forEach(group => {
       playlists.push({
         ...group,
-        detail: `${group.items.length} video topic${group.items.length === 1 ? '' : 's'} from ${group.title}`,
+        detail: `${group.items.length} video topic${group.items.length === 1 ? '' : 's'}`,
       });
     });
 
@@ -195,44 +196,67 @@ async function renderPlaylists(deps) {
 
   playlists.slice(0, 24).forEach(playlist => {
     const card = document.createElement('article');
-    card.className = 'card';
+    card.className = 'card playlist-card';
     card.dataset.playlistId = playlist.id;
     if (playlist.courseId) card.dataset.courseId = String(playlist.courseId);
     const body = document.createElement('div');
-    body.className = 'card-body';
+    body.className = 'card-body playlist-card-body';
     const badge = document.createElement('span');
     badge.className = playlist.label === 'Live' ? 'badge badge-success' : 'badge badge-info';
     badge.textContent = playlist.label;
     const title = document.createElement('h2');
-    title.className = 'h4';
+    title.className = 'h4 playlist-card-title';
+    title.dir = 'auto';
     title.textContent = playlist.title;
+    const section = document.createElement('p');
+    section.className = 'playlist-source-label';
+    if (playlist.sourceLabel && playlist.sourceLabel !== playlist.title) {
+      const isolator = document.createElement('bdi');
+      isolator.dir = 'auto';
+      isolator.textContent = playlist.sourceLabel;
+      section.appendChild(isolator);
+    } else {
+      section.hidden = true;
+    }
     const detail = document.createElement('p');
+    detail.className = 'playlist-card-detail';
     detail.textContent = playlist.detail;
     const preview = document.createElement('ol');
-    preview.className = 'compact-list';
+    preview.className = 'compact-list playlist-preview';
     playlist.items.slice(0, 4).forEach(item => {
       const li = document.createElement('li');
+      li.className = 'playlist-preview-item';
+      li.dir = 'auto';
       li.textContent = item;
+      li.title = item;
       preview.appendChild(li);
     });
+    const more = document.createElement('p');
+    more.className = 'playlist-more';
+    const remaining = Math.max(0, playlist.items.length - 4);
+    more.textContent = `${remaining.toLocaleString()} more topic${remaining === 1 ? '' : 's'}`;
+    more.hidden = remaining === 0;
+    const actions = document.createElement('div');
+    actions.className = 'playlist-card-actions';
     const link = document.createElement('a');
     link.className = 'btn btn-ghost';
     link.href = playlist.href;
     link.textContent = playlist.label === 'Resume' ? 'Open bookmarks' : 'Open courses';
-    body.append(badge, title, detail, preview, link);
+    body.append(badge, title, section, detail, preview, more, actions);
+    actions.appendChild(link);
     if (playlist.saved) {
       const openQueue = document.createElement('button');
       openQueue.className = 'btn btn-primary btn-sm';
       openQueue.type = 'button';
       openQueue.dataset.openPlaylist = playlist.id;
       openQueue.textContent = 'Open saved queue';
-      body.appendChild(openQueue);
+      actions.appendChild(openQueue);
       const remove = document.createElement('button');
       remove.className = 'btn btn-ghost';
       remove.type = 'button';
       remove.dataset.deletePlaylist = playlist.id;
       remove.textContent = 'Delete saved';
-      body.appendChild(remove);
+      actions.appendChild(remove);
     }
     card.appendChild(body);
     listRoot.appendChild(card);
