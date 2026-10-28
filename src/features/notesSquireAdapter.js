@@ -64,6 +64,17 @@ function withEditor(editor) {
     undo: () => editor.undo(),
     redo: () => editor.redo(),
     clearFormat: () => editor.removeAllFormatting(),
+    link: input => {
+      const raw = input ?? window.prompt('Enter URL:', 'https://');
+      if (!raw) return false;
+      const href = String(raw).trim();
+      if (!/^(?:https?:\/\/|mailto:|tel:)/i.test(href)) return false;
+      try {
+        if (!['http:', 'https:', 'mailto:', 'tel:'].includes(new URL(href).protocol)) return false;
+      } catch { return false; }
+      editor.makeLink(href);
+      return true;
+    },
     rtl: () => editor.setTextDirection('rtl'),
     ltr: () => editor.setTextDirection('ltr'),
     alignRight: () => editor.setTextAlignment('right'),
@@ -77,7 +88,7 @@ function withEditor(editor) {
 }
 
 const inlineFormats = {
-  bold: ['B', 'STRONG'], italic: ['I', 'EM'], underline: ['U'],
+  bold: ['B', 'STRONG'], italic: ['I', 'EM'], underline: ['U'], link: ['A'],
   strikethrough: ['S', 'STRIKE', 'DEL'], code: ['CODE'],
 };
 const blockFormats = {
@@ -97,7 +108,10 @@ function editorHTML(editor) {
   return template.innerHTML;
 }
 
-export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {} } = {}) {
+export function createTiptapNoteEditor({
+  element, html = '', onUpdate = () => {},
+  onPasteFallback = message => window.OpenCourseDeck?.Toast?.info?.(message),
+} = {}) {
   if (!element) throw new TypeError('A modern Notes editor container is required');
   let original = preflight(html);
   const root = document.createElement('div');
@@ -140,7 +154,26 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
       const candidate = event.detail?.html;
       if (typeof candidate !== 'string') return;
       if (!assessNoteForSquire(candidate).compatible) {
+        // Reject unsafe/unsupported formatting without losing the clipboard's
+        // meaningful text or silently pretending the paste was successful.
+        // Squire's willPaste fires before it commits the HTML fragment.
         event.preventDefault();
+        const clean = purifier.sanitize(candidate, {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math'],
+        });
+        const template = document.createElement('template');
+        template.innerHTML = clean;
+        const plain = template.content.textContent ?? '';
+        try {
+          onPasteFallback(plain
+            ? 'Pasted as plain text; unsupported formatting was removed.'
+            : 'This clipboard content cannot be pasted as text. Use the classic editor for images or tables.');
+        } catch { /* Keep clipboard preservation independent from notifications. */ }
+        if (plain) queueMicrotask(() => {
+          editor.insertPlainText(plain);
+          notify();
+        });
       }
     });
     element.appendChild(root);
@@ -174,7 +207,7 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
     run: (command, value) => {
       const action = commands[command];
       if (!action) return false;
-      action(value);
+      if (action(value) === false) return false;
       notify();
       return true;
     },
