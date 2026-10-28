@@ -43,6 +43,26 @@ describe('notes route workspace', () => {
     controller.unmount();
   });
 
+  it('awaits durable note persistence rather than treating an in-memory save as complete', async () => {
+    let acceptWrite;
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(
+      () => new Promise(resolve => { acceptWrite = resolve; }),
+    );
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const leaving = controller.beforeLeave();
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    let finished = false;
+    void leaving.then(() => { finished = true; });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    acceptWrite(false);
+    expect(await leaving).toBe(false);
+    controller.unmount();
+  });
+
   it('refuses to leave when the Notes app reports an uncommitted storage write', () => {
     window.PlasmaNotesApp.flushPendingSave.mockReturnValue(false);
     const controller = mountNotesView({
