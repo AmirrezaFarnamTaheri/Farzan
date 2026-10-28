@@ -128,14 +128,23 @@ export function createTiptapNoteEditor({
   });
   let dirty = false;
   let suppress = false;
+  let composing = false;
   let lastHTML = original;
   const notify = () => {
-    if (suppress) return;
+    if (suppress || composing) return;
     const nextHTML = editorHTML(editor);
     if (nextHTML === lastHTML) return;
     dirty = true;
     lastHTML = nextHTML;
     onUpdate(nextHTML);
+  };
+
+  const onCompositionStart = () => { composing = true; };
+  const onCompositionEnd = () => {
+    composing = false;
+    // Publish the final value after IME commit; a subsequent input event is
+    // deduplicated by notify(), so this is safe across browser event orders.
+    notify();
   };
 
   try {
@@ -150,6 +159,8 @@ export function createTiptapNoteEditor({
       throw new Error('Editor changed initial note text during import');
     }
     editor.addEventListener('input', notify);
+    root.addEventListener('compositionstart', onCompositionStart);
+    root.addEventListener('compositionend', onCompositionEnd);
     editor.addEventListener('willPaste', event => {
       const candidate = event.detail?.html;
       if (typeof candidate !== 'string') return;
@@ -230,6 +241,8 @@ export function createTiptapNoteEditor({
     },
     destroy() {
       editor.removeEventListener('input', notify);
+      root.removeEventListener('compositionstart', onCompositionStart);
+      root.removeEventListener('compositionend', onCompositionEnd);
       editor.destroy();
       root.remove();
     },

@@ -692,9 +692,16 @@ import { countWords } from './src/core/textMetrics.js';
       this._el.setAttribute('data-placeholder', 'Start writing your note...');
 
       // Input → autosave + snapshot
-      RouteListeners.on(this._el, 'input', () => {
+      RouteListeners.on(this._el, 'input', e => {
+        // Squire owns its edit/IME notifications; a bubbled input must not
+        // schedule a separate save with an unfinished composition string.
+        if (this._tiptap || e.isComposing) return;
         this._onInput();
         this._scheduleSnapshot();
+      });
+      RouteListeners.on(this._el, 'compositionend', () => {
+        // Some browsers do not issue a second input after completing IME.
+        if (!this._tiptap) this._onInput();
       });
 
       // Keyboard shortcuts
