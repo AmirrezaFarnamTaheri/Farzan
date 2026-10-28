@@ -41,11 +41,11 @@ describe('bundle and CSP reporting', () => {
     ]));
   });
 
-  it('keeps the explicit UX allowance narrow while retaining chunk, entry and gzip caps', async () => {
+  it('documents the Squire integration budget without weakening entry and gzip caps', async () => {
     const { createBundleReport } = await import('../scripts/bundle-report.cjs');
     const { limits } = createBundleReport();
     expect(limits).toEqual({
-      totalJsBytes: 1088 * 1024,
+      totalJsBytes: 1280 * 1024,
       largestJsBytes: 320 * 1024,
       entryBytes: 240 * 1024,
       entryGzipBytes: 80 * 1024,
