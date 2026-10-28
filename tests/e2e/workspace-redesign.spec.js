@@ -157,6 +157,31 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('shows a five-row Appearance ledger with aligned controls and swatches', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
+    const rows = page.locator('#settings-appearance .settings-control-card');
+    await expect(rows).toHaveCount(5);
+    const coords = await rows.evaluateAll(elements =>
+      elements.map(element => ({
+        left: Math.round(element.getBoundingClientRect().left),
+        top: Math.round(element.getBoundingClientRect().top),
+      })));
+    expect(Math.max(...coords.map(row => row.left)) - Math.min(...coords.map(row => row.left)))
+      .toBeLessThanOrEqual(2);
+    expect(coords.every((row, index) => !index || row.top > coords[index - 1].top)).toBe(true);
+    const fontControls = page.locator('#settings-appearance .settings-inline-controls').first();
+    const positions = await fontControls.locator('button').evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(positions).toHaveLength(3);
+    expect(Math.max(...positions) - Math.min(...positions)).toBeLessThanOrEqual(2);
+    const swatches = page.locator('#settings-appearance .settings-accent-row .accent-dot');
+    await expect(swatches).toHaveCount(7);
+    const swatchPositions = await swatches.evaluateAll(elements =>
+      elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(Math.max(...swatchPositions) - Math.min(...swatchPositions)).toBeLessThanOrEqual(2);
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
