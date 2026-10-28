@@ -149,6 +149,10 @@ export function createTiptapNoteEditor({
 
   try {
     editor.setHTML(original);
+    // Squire normalizes empty blocks and other inert HTML on mount. Compare
+    // subsequent DOM changes with its rendered baseline, not the raw source,
+    // or an untouched note is falsely reported as edited during handoff.
+    lastHTML = editorHTML(editor);
     // Fail closed if initialization loses textual information.
     const input = document.createElement('template');
     input.innerHTML = original;
@@ -241,7 +245,7 @@ export function createTiptapNoteEditor({
       try {
         editor.setHTML(next);
         original = next;
-        lastHTML = next;
+        lastHTML = editorHTML(editor);
         dirty = false;
       } finally {
         suppress = false;
