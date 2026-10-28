@@ -466,6 +466,10 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
+.view-progress .progress-metric-grid > .progress-metric {
+  /* The later Farzan layout sheet still assigns each card a three-column span. */
+  grid-column: auto;
+}
 .view-progress .progress-metric,
 .view-progress .progress-metric:nth-child(n+5) {
   grid-column: auto;
