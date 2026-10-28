@@ -639,6 +639,59 @@ describe('notes route filters', () => {
     }));
   });
 
+  it('keeps an unchanged Squire editor mounted when another note arrives through sync', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    expect(mounted).not.toBeNull();
+
+    window.DB.getAllNotes.mockResolvedValueOnce([
+      ...store.getNotes(),
+      {
+        id: 'synced-other-note',
+        title: 'Another window saved this',
+        content: '<p>Different note</p>',
+        folderId: 'default',
+        tags: [],
+        pinned: false,
+        createdAt: now + 400,
+        updatedAt: now + 400,
+      },
+    ]);
+    const result = await app.refreshFromSync({ kind: 'note', action: 'save' });
+    expect(result).toMatchObject({ refreshed: true, currentId: 'regular-note', editorReloaded: false });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Another window saved this');
+  });
+
+  it('preserves in-progress Squire IME composition across canonical sync refresh', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const mounted = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    mounted.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    mounted.querySelector('p').textContent = 'متن فارسی ناتمام';
+    mounted.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+
+    window.DB.getAllNotes.mockResolvedValueOnce(store.getNotes().map(note => (
+      note.id === 'regular-note'
+        ? { ...note, title: 'Remote title', content: '<p>Remote version</p>', updatedAt: now + 1000 }
+        : note
+    )));
+    const result = await app.refreshFromSync({ kind: 'note', action: 'save' });
+    expect(result).toMatchObject({ refreshed: true, currentId: 'regular-note', editorReloaded: false });
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(mounted);
+    expect(mounted.textContent).toContain('متن فارسی ناتمام');
+
+    mounted.querySelector('p').textContent = 'متن فارسی کامل';
+    mounted.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('متن فارسی کامل');
+  });
+
   it('repairs split notes storage by merging local and canonical DB records', async () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
