@@ -146,7 +146,7 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           previousAbortController?.abort?.();
         }
 
-        if (typeof $ === 'function') {
+        if (typeof $$ === 'function') {
           $$('.nav-item').forEach((item) => {
             const href = item.getAttribute('href') || '';
             const active = href === path || href === hash;
