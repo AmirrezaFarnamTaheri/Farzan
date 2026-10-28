@@ -751,7 +751,7 @@ export async function mountCoursesView(deps = {}) {
     const mediaLabel = meta.mediaClass === 'mixed' ? 'video + pdf' : meta.mediaClass === 'none' ? 'no media' : meta.mediaClass;
     mediaMeta.append(badgeNode(mediaLabel, meta.mediaClass === 'none' ? '' : 'badge-primary'));
     btn.append(
-      createElement('div', { class: 'course-item-title' }, course.title),
+      createElement('div', { class: 'course-item-title', dir: 'auto' }, course.title),
       createElement('div', { class: 'course-item-meta' },
         createElement('bdi', { dir: 'ltr' }, `${meta.topicCount} topics - ${meta.sourceCount || 0} source(s)`)),
       mediaMeta
@@ -769,11 +769,16 @@ export async function mountCoursesView(deps = {}) {
       'data-course-id': topic.courseId,
       'data-media': mediaClass(topic),
     });
-    const copy = createElement('div');
-    copy.append(
-      createElement('div', { class: 'topic-title' }, topic.title),
-      createElement('div', { class: 'topic-submeta' }, topic.sourceLabel ?? '')
-    );
+    const primaryAction = hasVideo ? 'play-video' : hasPdf ? 'open-pdf' : hasEmbed ? 'open-embed' : null;
+    const primaryLabel = hasVideo ? 'Play' : hasPdf ? 'Open PDF' : 'Open';
+    const copy = primaryAction
+      ? createElement('button', {
+          type: 'button',
+          class: 'topic-primary-action',
+          'data-action': primaryAction,
+          'aria-label': `${primaryLabel}: ${topic.title}`,
+        }, createElement('span', { class: 'topic-title', dir: 'auto' }, topic.title))
+      : createElement('div', { class: 'topic-title', dir: 'auto' }, topic.title);
     const meta = createElement('div', { class: 'topic-meta' });
     const indicator = statusBadgeNode(status);
     if (status === 'not-started') indicator.classList.add('sr-only');
@@ -782,10 +787,16 @@ export async function mountCoursesView(deps = {}) {
     if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('No attached media'));
 
     const actions = createElement('div', { class: 'topic-actions' });
-    if (hasVideo) actions.appendChild(actionButton('play-video', 'Play'));
-    if (hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
-    if (hasEmbed) actions.appendChild(actionButton('open-embed', 'Open'));
-    if (toggle) actions.appendChild(actionButton('toggle-done', status === 'done' ? 'Undone' : 'Done'));
+    if (hasVideo && hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
+    if (hasEmbed && (hasVideo || hasPdf)) actions.appendChild(actionButton('open-embed', 'Open'));
+    if (toggle) actions.appendChild(createElement('button', {
+      class: 'topic-completion-toggle',
+      type: 'button',
+      'data-action': 'toggle-done',
+      'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
+      'aria-pressed': status === 'done' ? 'true' : 'false',
+      title: status === 'done' ? 'Mark not started' : 'Mark completed',
+    }, createElement('span', { 'aria-hidden': 'true' }, status === 'done' ? '✓' : '')));
     row.append(copy, meta, actions);
     return row;
   };
@@ -851,9 +862,27 @@ export async function mountCoursesView(deps = {}) {
     const activeFilter = detailEl.dataset.topicFilter || 'all';
 
     // Load progress for this course topics
-    const progList = await Promise.all(topics.map(t => window.DB?.getProgress?.(t.topicId)));
+    // One canonical snapshot avoids hundreds of separate IndexedDB reads.
+    // An unavailable store must not be misrepresented as all topics unstarted.
+    let progList;
+    try {
+      if (typeof window.DB?.getAllProgress !== 'function') throw new Error('Progress storage unavailable');
+      progList = await window.DB.getAllProgress();
+      if (!Array.isArray(progList)) throw new Error('Unexpected progress response');
+    } catch {
+      if (renderToken !== detailRenderToken) return;
+      const error = createElement('div', { class: 'empty-state', role: 'alert' });
+      error.append(
+        createElement('p', {}, 'Could not load saved progress. Your data has not been changed.'),
+        createElement('button', { class: 'btn btn-primary', type: 'button', 'data-retry-course-progress': '' }, 'Retry'),
+      );
+      detailEl.replaceChildren(error);
+      error.querySelector('[data-retry-course-progress]')?.addEventListener('click', () => renderCourseDetail(courseId));
+      return;
+    }
     if (renderToken !== detailRenderToken) return;
-    const progById = new Map(progList.filter(Boolean).map(p => [p.topicId, p]));
+    const courseTopicIds = new Set(topics.map(t => t.topicId));
+    const progById = new Map(progList.filter(p => p?.topicId && courseTopicIds.has(p.topicId)).map(p => [p.topicId, p]));
     const filteredTopics = topics.filter((topic) => passCourseFilter(topic, progById.get(topic.topicId)?.status ?? 'not-started', activeFilter));
     const grouped = filteredTopics.reduce((acc, topic) => {
       const key = sourceKey(topic);
@@ -873,7 +902,7 @@ export async function mountCoursesView(deps = {}) {
 
     const summaryCard = createElement('div', { class: 'card card-filled' });
     const summaryBody = createElement('div', { class: 'card-body' });
-    const title = createElement('h2', {}, course.title);
+    const title = createElement('h2', { dir: 'auto' }, course.title);
     title.style.margin = '0 0 6px 0';
     summaryBody.appendChild(title);
     if (productUrl) {
