@@ -7,13 +7,14 @@
  */
 import Squire from 'squire-rte';
 import DOMPurify from 'dompurify';
-import { assessNoteForTiptap } from './notesEditorCompatibility.js';
+import { assessNoteForSquire } from './notesSquireCompatibility.js';
+import { sanitizeNoteStyles } from './safeNoteStyles.js';
 
 const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurify(window);
 
 function preflight(html) {
   const value = String(html ?? '');
-  const result = assessNoteForTiptap(value);
+  const result = assessNoteForSquire(value);
   if (!result.compatible) throw new Error('Incompatible note HTML for modern editor: ' + result.reason);
   return value;
 }
@@ -27,7 +28,7 @@ function inertSanitize(html) {
     ADD_ATTR: ['data-remote-src', 'data-ai-summary-block'],
   });
   const template = document.createElement('template');
-  template.innerHTML = cleaned;
+  template.innerHTML = sanitizeNoteStyles(cleaned);
   return template.content;
 }
 
@@ -84,12 +85,28 @@ const blockFormats = {
   blockquote: ['BLOCKQUOTE'], codeblock: ['PRE'],
 };
 
+function editorHTML(editor) {
+  const template = document.createElement('template');
+  template.innerHTML = editor.getHTML();
+  // Squire may create empty inline marks as caret placeholders when a format
+  // is toggled with a collapsed selection. They are not saved note content.
+  // Work on an inert copy only: the live editor needs its own selection state.
+  for (const mark of template.content.querySelectorAll('b,strong,i,em,u,s,strike,del,span')) {
+    if (!mark.childNodes.length) mark.remove();
+  }
+  return template.innerHTML;
+}
+
 export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {} } = {}) {
   if (!element) throw new TypeError('A modern Notes editor container is required');
   let original = preflight(html);
   const root = document.createElement('div');
   root.className = 'notes-modern-editor';
   root.setAttribute('dir', 'auto');
+  root.setAttribute('role', 'textbox');
+  root.setAttribute('aria-multiline', 'true');
+  root.setAttribute('aria-label', 'Note content');
+  root.setAttribute('spellcheck', 'true');
   const editor = new Squire(root, {
     blockTag: 'P',
     addLinks: false,
@@ -97,10 +114,14 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
   });
   let dirty = false;
   let suppress = false;
+  let lastHTML = original;
   const notify = () => {
     if (suppress) return;
+    const nextHTML = editorHTML(editor);
+    if (nextHTML === lastHTML) return;
     dirty = true;
-    onUpdate(editor.getHTML());
+    lastHTML = nextHTML;
+    onUpdate(nextHTML);
   };
 
   try {
@@ -108,14 +129,17 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
     // Fail closed if initialization loses textual information.
     const input = document.createElement('template');
     input.innerHTML = original;
-    if (editor.getHTML().replace(/<[^>]*>/g, '') === '' && input.content.textContent.trim()) {
-      throw new Error('Editor discarded initial note text');
+    const output = document.createElement('template');
+    output.innerHTML = editorHTML(editor);
+    const text = value => (value?.textContent ?? '').replace(/\u200b/g, '');
+    if (text(input.content) !== text(output.content)) {
+      throw new Error('Editor changed initial note text during import');
     }
     editor.addEventListener('input', notify);
     editor.addEventListener('willPaste', event => {
       const candidate = event.detail?.html;
       if (typeof candidate !== 'string') return;
-      if (!assessNoteForTiptap(candidate).compatible) {
+      if (!assessNoteForSquire(candidate).compatible) {
         event.preventDefault();
       }
     });
@@ -128,7 +152,7 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
 
   const commands = withEditor(editor);
   const facade = {
-    getHTML: () => dirty ? editor.getHTML() : original,
+    getHTML: () => dirty ? editorHTML(editor) : original,
     getText: () => root.textContent || '',
     commands: {
       insertContent(fragment) {
@@ -165,6 +189,7 @@ export function createTiptapNoteEditor({ element, html = '', onUpdate = () => {}
       try {
         editor.setHTML(next);
         original = next;
+        lastHTML = next;
         dirty = false;
       } finally {
         suppress = false;

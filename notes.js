@@ -5,6 +5,7 @@
 // ============================================================
 
 import DOMPurify from 'dompurify';
+import { sanitizeNoteStyles } from './src/features/safeNoteStyles.js';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 import { countWords } from './src/core/textMetrics.js';
 
@@ -574,13 +575,13 @@ import { countWords } from './src/core/textMetrics.js';
       // would otherwise drop unsupported saved metadata and silently replace
       // it when a title-only save occurs.
       const originalNote = Store.getNote(this._currentId);
-      const { assessNoteForTiptap } = await import('./src/features/notesEditorCompatibility.js');
-      const preflight = assessNoteForTiptap(originalNote?.content ?? '');
+      const { assessNoteForSquire } = await import('./src/features/notesSquireCompatibility.js');
+      const preflight = assessNoteForSquire(originalNote?.content ?? '');
       if (!preflight.compatible) return { ok: false, reason: 'incompatible', detail: preflight.reason };
       // A compatible persisted record does not imply the current, unsaved
       // draft is compatible. Reject tables/images/styles in the live editor
       // BEFORE flushing a debounced save or replacing the DOM with ProseMirror.
-      const draftCheck = assessNoteForTiptap(this._el.innerHTML);
+      const draftCheck = assessNoteForSquire(this._el.innerHTML);
       if (!draftCheck.compatible) {
         return { ok: false, reason: 'incompatible', detail: draftCheck.reason };
       }
@@ -594,7 +595,7 @@ import { countWords } from './src/core/textMetrics.js';
       try {
         adapterModule = await import('./src/features/notesSquireAdapter.js');
       } catch (error) {
-        console.warn('[Notes] Tiptap preview unavailable', error);
+        console.warn('[Notes] Squire preview unavailable', error);
         return { ok: false, reason: 'unavailable' };
       }
       // Route unmounts, note switches, and intervening keystrokes must never
@@ -623,7 +624,7 @@ import { countWords } from './src/core/textMetrics.js';
         node.replaceChildren();
         node.innerHTML = original;
         node.setAttribute('contenteditable', 'true');
-        console.warn('[Notes] Tiptap preview rejected this note', error);
+        console.warn('[Notes] Squire preview rejected this note', error);
         return { ok: false, reason: 'incompatible' };
       }
     },
@@ -858,15 +859,15 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _sanitize(html) {
-      return controlRemoteNoteImages(noteSanitizer.sanitize(String(html ?? ''), {
+      return controlRemoteNoteImages(sanitizeNoteStyles(noteSanitizer.sanitize(String(html ?? ''), {
         // The note privacy gate handles HTML <img>, not SVG <image>/<use>/
         // <feImage>. HTML-only sanitization forbids network-loading foreign
         // content even if an imported note contains SVG resource references.
         USE_PROFILES: { html: true },
         FORBID_TAGS: ['script', 'style', 'meta', 'link', 'iframe', 'object', 'embed', 'form'],
-        FORBID_ATTR: ['style', 'srcset', 'sizes'],
+        FORBID_ATTR: ['srcset', 'sizes'],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-      }));
+      })));
     },
 
     // ── Toolbar state sync ────────────────────────────────
@@ -1800,7 +1801,8 @@ import { countWords } from './src/core/textMetrics.js';
         // Focus must go back to the editable before execCommand: it acts on
         // the focused editable, and focus is currently on the button. A
         // contenteditable restores its previous selection when refocused.
-        Editor._el?.focus();
+        if (Editor._tiptap) Editor._tiptap.editor.commands.focus();
+        else Editor._el?.focus();
         runCommand(btn);
       });
 
@@ -1808,6 +1810,7 @@ import { countWords } from './src/core/textMetrics.js';
       const sizeSelect = toolbarEl.querySelector('[data-font-size]');
       if (sizeSelect) {
         RouteListeners.on(sizeSelect, 'change', () => {
+          if (Editor._tiptap?.supports('fontSize')) { Editor._tiptap.run('fontSize', sizeSelect.value); return; }
           if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontSize', false, sizeSelect.value);
         });
@@ -1817,6 +1820,7 @@ import { countWords } from './src/core/textMetrics.js';
       const fontSelect = toolbarEl.querySelector('[data-font-family]');
       if (fontSelect) {
         RouteListeners.on(fontSelect, 'change', () => {
+          if (Editor._tiptap?.supports('fontFamily')) { Editor._tiptap.run('fontFamily', fontSelect.value); return; }
           if (Editor._tiptap) Editor.disableModern();
           document.execCommand('fontName', false, fontSelect.value);
         });
@@ -1826,6 +1830,7 @@ import { countWords } from './src/core/textMetrics.js';
       const colorInput = toolbarEl.querySelector('[data-text-color]');
       if (colorInput) {
         RouteListeners.on(colorInput, 'input', () => {
+          if (Editor._tiptap?.supports('textColor')) { Editor._tiptap.run('textColor', colorInput.value); return; }
           if (Editor._tiptap) Editor.disableModern();
           document.execCommand('foreColor', false, colorInput.value);
         });
@@ -1835,6 +1840,7 @@ import { countWords } from './src/core/textMetrics.js';
       const hlInput = toolbarEl.querySelector('[data-highlight-color]');
       if (hlInput) {
         RouteListeners.on(hlInput, 'input', () => {
+          if (Editor._tiptap?.supports('highlightColor')) { Editor._tiptap.run('highlightColor', hlInput.value); return; }
           if (Editor._tiptap) Editor.disableModern();
           document.execCommand('hiliteColor', false, hlInput.value);
         });
