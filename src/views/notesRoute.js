@@ -194,9 +194,15 @@ export function mountNotesView({ setView } = {}) {
         return false;
       }
       try {
-        if (window.PlasmaNotesApp?.canLeaveEditor?.() === false) return false;
+        const app = window.PlasmaNotesApp;
+        if (app?.canLeaveEditor?.() === false) return false;
+        // Newer persistence adapters can await the final IndexedDB write;
+        // older installed builds still use the synchronous compatibility path.
+        if (typeof app?.flushPendingSaveDurably === 'function') {
+          return app.flushPendingSaveDurably();
+        }
         // A deferred/failed flush must not be mistaken for a saved draft.
-        return window.PlasmaNotesApp?.flushPendingSave?.() !== false;
+        return app?.flushPendingSave?.() !== false;
       } catch (error) {
         console.warn('[Notes view] could not commit pending data before navigation', error);
         return false;
