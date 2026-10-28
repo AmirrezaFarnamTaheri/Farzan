@@ -1,7 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
+import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 
 describe('Squire HTML-canonical edit adapter', () => {
+  it('accepts ordinary browser root text but still rejects unsupported tables', () => {
+    for (const value of ['فیزیولوژی قلب 你好世界', '<strong>Important</strong> plain text', '<p>Intro</p> trailing words']) {
+      expect(assessNoteForSquire(value).compatible).toBe(true);
+    }
+    expect(assessNoteForSquire('<table><tr><td>70 mL</td></tr></table>').compatible).toBe(false);
+  });
+
+  it('does not rewrite a saved root-text note when switching editors without edits', () => {
+    const original = 'فیزیولوژی قلب 你好世界';
+    const listener = vi.fn();
+    const instance = createTiptapNoteEditor({
+      element: document.createElement('div'), html: original, onUpdate: listener,
+    });
+    try {
+      expect(instance.syncChanges()).toBe(true);
+      expect(listener).not.toHaveBeenCalled();
+      expect(instance.getHTML()).toBe(original);
+    } finally { instance.destroy(); }
+  });
   it('edits compatible HTML and retains rich content and Unicode text', () => {
     const element = document.createElement('div');
     document.body.appendChild(element);
