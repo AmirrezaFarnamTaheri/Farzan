@@ -29,6 +29,7 @@ printStudioBoardPdf,
         </div>
       </div>
 
+      <div class="studio-workspace-grid">
       <div class="card card-filled studio-toolbar-panel">
         <div class="studio-toolbar-clusters">
           <div class="studio-tool-group" role="group" aria-label="Canvas tools">
@@ -62,6 +63,12 @@ printStudioBoardPdf,
               <span>Save</span>
             </button>
           </div>
+
+          <button class="btn btn-ghost btn-sm studio-inspector-toggle" type="button"
+            data-studio-toggle-inspector aria-controls="studio-inspector" aria-expanded="true">
+            <svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg>
+            <span data-studio-inspector-label>Hide layers</span>
+          </button>
 
           <details class="studio-more-tools" data-studio-more-tools>
             <summary>More tools &amp; export</summary>
@@ -118,7 +125,7 @@ printStudioBoardPdf,
         </div>
       </div>
 
-      <div class="studio-workspace-grid">
+
         <div class="studio-canvas-card">
           <div class="studio-shell">
             <canvas id="studio-canvas" class="studio-canvas" aria-label="Editable Studio canvas"></canvas>
@@ -129,7 +136,7 @@ printStudioBoardPdf,
           </div>
         </div>
 
-        <div class="card card-filled studio-sidebar-card">
+        <aside class="card card-filled studio-sidebar-card" id="studio-inspector" data-studio-inspector aria-label="Studio layers and properties">
           <div>
             <div class="button-row mb-3">
               <input class="input input-sm flex-1" data-studio-layer-name placeholder="New layer name" aria-label="New layer name" />
@@ -144,7 +151,7 @@ printStudioBoardPdf,
             <div data-studio-elements class="stack-sm"></div>
             <div data-studio-properties class="mt-3"></div>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   `);
@@ -155,6 +162,18 @@ printStudioBoardPdf,
     target.addEventListener(type, handler, options);
     routeListeners.push({ target, type, handler, options });
   };
+  const inspectorRoot = document.querySelector('[data-studio-inspector]');
+  const inspectorToggle = document.querySelector('[data-studio-toggle-inspector]');
+  const setInspectorOpen = (open) => {
+    if (!inspectorRoot || !inspectorToggle) return;
+    inspectorRoot.hidden = !open;
+    inspectorToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const label = inspectorToggle.querySelector('[data-studio-inspector-label]');
+    if (label) label.textContent = open ? 'Hide layers' : 'Show layers';
+  };
+  setInspectorOpen(!window.matchMedia?.('(max-width: 900px)')?.matches);
+  on(inspectorToggle, 'click', () => setInspectorOpen(inspectorRoot?.hidden));
+
   const status = document.querySelector('[data-studio-status]');
   const setStatus = (message) => {
     if (status) status.textContent = message;

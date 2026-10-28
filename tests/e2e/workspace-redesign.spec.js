@@ -197,6 +197,55 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect(Math.max(...swatchPositions) - Math.min(...swatchPositions)).toBeLessThanOrEqual(2);
   });
 
+  test('keeps an expanded Studio canvas with reversible inspector and no inaccessible tools', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    const canvas = page.locator('.studio-canvas-card');
+    const toolbar = page.locator('.studio-toolbar-panel');
+    const inspector = page.locator('[data-studio-inspector]');
+    const toggle = page.locator('[data-studio-toggle-inspector]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const bounds = await page.evaluate(() => {
+      const rect = selector => {
+        const element = document.querySelector(selector);
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, width: box.width };
+      };
+      return {
+        canvas: rect('.studio-canvas-card'),
+        toolbar: rect('.studio-toolbar-panel'),
+      };
+    });
+    expect(bounds.canvas.width).toBeGreaterThan(650);
+    expect(bounds.toolbar.width).toBeLessThan(bounds.canvas.width * 0.9);
+    expect(bounds.canvas.top).toBeLessThan(bounds.toolbar.bottom);
+    await expect(inspector).toBeVisible();
+    await toggle.click();
+    await expect(inspector).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('button[data-studio-tool="pen"]')).toBeVisible();
+    await expect(page.locator('[data-studio-save]')).toBeVisible();
+    await toggle.click();
+    await expect(inspector).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-studio-layers]')).toBeVisible();
+  });
+
+  test('lets narrow Studio devices reveal the inspector without hiding the canvas', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    const toggle = page.locator('[data-studio-toggle-inspector]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('[data-studio-inspector]')).toBeHidden();
+    await toggle.click();
+    await expect(page.locator('[data-studio-inspector]')).toBeVisible();
+    await expect(page.locator('#studio-canvas')).toBeVisible();
+  });
+
   test('keeps desktop quick search legible without truncating its visible hint', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
