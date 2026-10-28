@@ -625,6 +625,11 @@ import { countWords } from './src/core/textMetrics.js';
         this._tiptap = instance;
         this._tiptapOriginal = safe;
         this._tiptapChanged = false;
+        // Squire owns the accessible textbox while mounted; avoid two nested
+        // textbox roles announcing the same note content to screen readers.
+        node.removeAttribute('role');
+        node.removeAttribute('aria-multiline');
+        node.removeAttribute('aria-label');
         return { ok: true };
       } catch (error) {
         node.replaceChildren();
@@ -650,6 +655,9 @@ import { countWords } from './src/core/textMetrics.js';
       if (this._el) {
         this._el.replaceChildren();
         this._el.setAttribute('contenteditable', 'true');
+        this._el.setAttribute('role', 'textbox');
+        this._el.setAttribute('aria-multiline', 'true');
+        this._el.setAttribute('aria-label', 'Note editor');
         if (preserveContent) this._el.innerHTML = preserved;
       }
       // The classic snapshot stack predates the Squire editing session.
