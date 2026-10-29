@@ -51,7 +51,8 @@ describe('My Courses canonical ownership and legacy recovery', () => {
 
   it('keeps creation hidden until requested and restores focus on cancellation', async () => {
     mount();
-    const opener = document.querySelector('[data-my-course-create]');
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-empty-create]')).not.toBeNull());
+    const opener = document.querySelector('[data-my-course-empty-create]');
     const dialog = document.querySelector('[data-my-course-dialog]');
     expect(opener).not.toBeNull();
     expect(dialog).not.toBeNull();
