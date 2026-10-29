@@ -72,6 +72,30 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(session).toBeHidden();
   });
 
+  test('explains a failed lesson in the real browser instead of leaving a spinner visible', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    const player = page.locator('#course-player');
+    await expect(player).toBeVisible();
+    await page.waitForFunction(() => Boolean(document.querySelector('#course-player')?._pdPlayer));
+    await page.evaluate(() => {
+      const media = document.querySelector('#course-player')._pdPlayer._media;
+      Object.defineProperty(media, 'error', { configurable: true, value: { code: 4 } });
+      media.dispatchEvent(new Event('error'));
+    });
+    const alert = player.locator('.pd-error-banner');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('not supported');
+    await expect(player.locator('.pd-loading-overlay')).toBeHidden();
+    await expect(alert.locator('[data-pd="retry"]')).toBeHidden();
+    await page.locator('[data-course-close-playback]').click();
+    await expect(page.locator('.courses-sidebar')).toBeVisible();
+  });
+
   test('switches to a reversible study-focus layout when playing a course lesson', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
