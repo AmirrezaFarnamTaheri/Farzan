@@ -222,6 +222,9 @@ function setMenuOpen(open, { restoreFocus = false } = {}) {
     void populateCourseDestination();
     positionMenu();
     requestAnimationFrame(() => {
+      // Route changes can dismiss the menu before this frame executes.
+      // Never return focus to an inert menu once navigation has begun.
+      if (!isMenuOpen()) return;
       positionMenu();
       menuItems()[0]?.focus?.();
     });
@@ -674,6 +677,11 @@ export function initAddContent(root = window) {
       setMenuOpen(false);
     });
     window.addEventListener('resize', () => { if (isMenuOpen()) positionMenu(); });
+    // Keep route screenshots and actual navigation unobstructed: the menu is
+    // scoped to the page where it was opened and must not survive hash routes.
+    window.addEventListener('hashchange', () => {
+      if (isMenuOpen()) setMenuOpen(false);
+    });
   }
 
   return pd.AddContent;
