@@ -74,20 +74,34 @@ function normalizeSettings(settings = {}) {
 }
 
 /**
- * Extract plain text from HTML using inert DOMParser (no resource loads or handlers).
- * Falls back to regex-based tag stripping if DOMParser fails.
+ * Convert user-authored HTML to text without creating a live document.
+ * HTMLTemplateElement.content is inert and never inserted into the page:
+ * image/iframe URLs and inline event handlers cannot run during extraction.
  * @param {string} value - HTML or text content
  * @returns {string} - Plain text, whitespace normalized
  */
 function plainText(value = '') {
-  // DOMParser instead of innerHTML on a detached element: innerHTML still
-  // triggers resource loads and inline handlers (<img onerror>), so
-  // summarizing hostile note content could execute script.
+  const source = String(value ?? '');
   try {
-    const doc = new DOMParser().parseFromString(String(value || ''), 'text/html');
-    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+    const template = document.createElement('template');
+    template.innerHTML = source;
+    template.content.querySelectorAll(
+      'script, style, noscript, iframe, object, embed, link, meta, template, img, svg, math, source, picture, video, audio',
+    ).forEach(node => node.remove());
+    // textContent does not insert spaces between HTML block elements.
+    // Preserve reading boundaries for Persian/Latin sentence tokenization.
+    template.content.querySelectorAll(
+      'p, div, section, article, li, blockquote, h1, h2, h3, h4, h5, h6, br, hr',
+    ).forEach(node => node.before(document.createTextNode(' ')));
+    return (template.content.textContent || '').replace(/\s+/g, ' ').trim();
   } catch {
-    return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    // No parsing/network APIs in the fallback; strip non-content elements as
+    // well as the tags, never echo executable or style text into summaries.
+    return source
+      .replace(/<(script|style|noscript|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }
 
