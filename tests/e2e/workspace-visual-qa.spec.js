@@ -95,6 +95,9 @@ for (const setup of setups) {
     const missingView = page.locator('#view-container .view-notfound');
     await expect(missingView).toBeVisible();
     await expect(missingView.locator('h1')).toHaveText('Page not found');
+    // The shell must describe this route, not leak the old internal product name.
+    await expect(page.locator('#breadcrumb-list')).toContainText('Page not found');
+    await expect(page.locator('#breadcrumb-list')).not.toContainText('OpenCourseDeck');
     await expect(page.locator('[data-missing-route]')).toContainText('this-route-does-not-exist');
     await expect(missingView.getByRole('link', { name: /return home/i })).toBeVisible();
     if (setup.rtl) {
