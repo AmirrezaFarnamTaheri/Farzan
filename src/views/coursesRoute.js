@@ -1183,22 +1183,34 @@ export async function mountCoursesView(deps = {}) {
     const throttleMs = 2500;
     let lastSave = 0;
 
-    const save = async (track, { currentTime, duration, percent } = {}) => {
+    const save = async (track, { currentTime, duration, percent, activityOnly = false } = {}) => {
       const t = track ?? inst?.queue?.[inst?.trackIndex ?? 0] ?? null;
       const topicId = t?.topicId;
       const courseId = t?.courseId;
-      if (!topicId || !courseId) return;
+      if (!topicId || !courseId || typeof window.DB?.saveProgress !== 'function') return;
 
-      const cur = currentTime ?? inst?.currentTime ?? 0;
-      const dur = duration ?? inst?.duration ?? 0;
-      const pct = percent ?? (dur > 0 ? Math.round((cur / dur) * 100) : 0);
-
-      const status = pct >= 98 ? 'done' : (pct > 0 ? 'in-progress' : 'not-started');
-      await window.DB?.saveProgress?.(topicId, courseId, {
+      // Completion is a learning decision, not an alias for the current media
+      // position. Reading inside the canonical per-topic write queue is
+      // necessary to avoid a stale trackChange resetting an earlier lesson.
+      if (activityOnly) {
+        await window.DB.saveProgress(topicId, courseId, { updatedAt: Date.now() });
+        return;
+      }
+      const cur = Number(currentTime ?? inst?.currentTime ?? 0);
+      const dur = Number(duration ?? inst?.duration ?? 0);
+      const pct = Number(percent ?? (dur > 0 ? Math.round((cur / dur) * 100) : 0));
+      if (![cur, dur, pct].every(Number.isFinite)) return;
+      const previous = await window.DB?.getProgress?.(topicId);
+      // Do not overwrite manual or previously achieved completion when a
+      // learner replays or seeks backward. Explicit "Mark incomplete" uses
+      // its separate action and remains the only completion-reset path.
+      const wasDone = previous?.status === 'done' || Number(previous?.percent) >= 100;
+      const completed = wasDone || pct >= 98;
+      await window.DB.saveProgress(topicId, courseId, {
         position: Math.max(0, cur),
-        duration: Math.max(0, dur || 0),
-        percent: Math.max(0, Math.min(100, pct || 0)),
-        status,
+        duration: Math.max(0, dur),
+        percent: completed ? 100 : Math.max(0, Math.min(100, pct)),
+        status: completed ? 'done' : (pct > 0 ? 'in-progress' : 'not-started'),
         updatedAt: Date.now(),
       });
     };
@@ -1224,8 +1236,9 @@ export async function mountCoursesView(deps = {}) {
       await save(track);
     };
     const onTrackChange = async (track) => {
-      // Record a "start" touch so it shows up in activity/streaks
-      await save(track, { currentTime: 0, duration: inst?.duration ?? 0, percent: 0 });
+      // Record activity without erasing completion or the persisted resume
+      // point. Track changes can fire while HTMLMediaElement resets to zero.
+      await save(track, { activityOnly: true });
     };
     const onBeforeUnload = () => { saveCurrent(); };
 

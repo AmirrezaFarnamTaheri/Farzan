@@ -408,57 +408,105 @@ import { Pointer } from './src/lib/pointer.js';
       const track = snapshot.track || {};
       const title = String(track.title || 'Current lesson');
       const meta = String(track.artist || track.courseTitle || track.courseId || 'Course media');
-      const percent = snapshot.duration > 0 ? Math.min(100, (snapshot.currentTime / snapshot.duration) * 100) : 0;
+      const percent = snapshot.duration > 0
+        ? Math.min(100, (snapshot.currentTime / snapshot.duration) * 100) : 0;
+      const live = Boolean(livePlayerEl);
+      const stateLabel = snapshot.playing ? 'Playing' : 'Ready to resume';
+      const timeLabel = formatMediaClock(snapshot.currentTime) + ' / '
+        + (snapshot.duration ? formatMediaClock(snapshot.duration) : '--:--');
+      const announcementKey = String(track.id || track.topicId || track.src || title)
+        + '|' + String(snapshot.playing);
 
+      // Construct the transport controls once. Replacing the subtree on
+      // every media tick stole keyboard focus and caused assistive technology
+      // to read changing progress as a brand-new status message.
       if (!node) {
         node = createElement('aside', {
           class: 'global-mini-player',
           'data-mini-player': '',
-          role: 'status',
-          'aria-live': 'polite',
+          role: 'group',
+          'aria-label': 'Media playback',
         });
-        document.body.appendChild(node);
-      }
-      node.classList.toggle('has-live-player', Boolean(livePlayerEl));
-
-      node.replaceChildren(
-        createElement('div', { class: 'global-mini-player__body' },
-          createElement('div', { class: 'global-mini-player__eyebrow' }, snapshot.playing ? 'Playing' : 'Ready to resume'),
-          createElement('div', { class: 'global-mini-player__title' }, title),
-          createElement('div', { class: 'global-mini-player__meta' }, meta),
-          createElement('div', {
-            class: 'global-mini-player__progress',
-            role: 'progressbar',
-            'aria-valuemin': '0',
-            'aria-valuemax': '100',
-            'aria-valuenow': String(Math.round(percent)),
-          }, createElement('span', { style: { width: `${percent}%` } })),
-          createElement('div', { class: 'global-mini-player__time' },
-            `${formatMediaClock(snapshot.currentTime)} / ${snapshot.duration ? formatMediaClock(snapshot.duration) : '--:--'}`
-          )
-        ),
-        createElement('div', { class: 'global-mini-player__actions' },
-          ...(livePlayerEl ? [
+        node.replaceChildren(
+          createElement('span', {
+            class: 'sr-only',
+            'data-mini-announcement': '',
+            'aria-live': 'polite',
+            'aria-atomic': 'true',
+          }, stateLabel + ': ' + title),
+          createElement('div', { class: 'global-mini-player__body' },
+            createElement('div', { class: 'global-mini-player__eyebrow' }, stateLabel),
+            createElement('div', { class: 'global-mini-player__title' }, title),
+            createElement('div', { class: 'global-mini-player__meta' }, meta),
+            createElement('div', {
+              class: 'global-mini-player__progress',
+              role: 'progressbar',
+              'aria-valuemin': '0',
+              'aria-valuemax': '100',
+              'aria-valuenow': String(Math.round(percent)),
+            }, createElement('span', { style: { width: percent + '%' } })),
+            createElement('div', { class: 'global-mini-player__time' }, timeLabel)
+          ),
+          createElement('div', { class: 'global-mini-player__actions' },
             createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-prev': '', 'aria-label': 'Previous track' }, 'Prev'),
             createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-play': '', 'aria-label': snapshot.playing ? 'Pause' : 'Play' }, snapshot.playing ? 'Pause' : 'Play'),
             createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-next': '', 'aria-label': 'Next track' }, 'Next'),
             createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-queue': '', 'aria-label': 'Toggle queue' }, 'Queue'),
-          ] : []),
-          createElement('button', { class: 'btn btn-primary btn-sm', type: 'button', 'data-mini-resume': '' }, 'Resume'),
-          createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-close': '', 'aria-label': 'Close mini player' }, 'Close')
-        )
-      );
-      if (livePlayerEl) {
-        const liveSlot = createElement('div', { class: 'global-mini-player__live', 'data-mini-player-live': '' });
-        liveSlot.appendChild(livePlayerEl);
-        node.insertBefore(liveSlot, node.firstChild);
+            createElement('button', { class: 'btn btn-primary btn-sm', type: 'button', 'data-mini-resume': '' }, 'Resume'),
+            createElement('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-mini-close': '', 'aria-label': 'Close mini player' }, 'Close')
+          )
+        );
+        node.querySelector('[data-mini-prev]')?.addEventListener('click', () => liveAction('prev'));
+        node.querySelector('[data-mini-play]')?.addEventListener('click', () => liveAction('play'));
+        node.querySelector('[data-mini-next]')?.addEventListener('click', () => liveAction('next'));
+        node.querySelector('[data-mini-queue]')?.addEventListener('click', () => liveAction('queue'));
+        node.querySelector('[data-mini-resume]')?.addEventListener('click', resume);
+        node.querySelector('[data-mini-close]')?.addEventListener('click', hide);
+        node.dataset.pdAnnouncementKey = announcementKey;
+        document.body.appendChild(node);
       }
-      node.querySelector('[data-mini-prev]')?.addEventListener('click', () => liveAction('prev'));
-      node.querySelector('[data-mini-play]')?.addEventListener('click', () => liveAction('play'));
-      node.querySelector('[data-mini-next]')?.addEventListener('click', () => liveAction('next'));
-      node.querySelector('[data-mini-queue]')?.addEventListener('click', () => liveAction('queue'));
-      node.querySelector('[data-mini-resume]')?.addEventListener('click', resume, { once: true });
-      node.querySelector('[data-mini-close]')?.addEventListener('click', hide, { once: true });
+
+      node.classList.toggle('has-live-player', live);
+      const setText = (selector, text) => {
+        const element = node.querySelector(selector);
+        if (element && element.textContent !== text) element.textContent = text;
+      };
+      setText('.global-mini-player__eyebrow', stateLabel);
+      setText('.global-mini-player__title', title);
+      setText('.global-mini-player__meta', meta);
+      setText('.global-mini-player__time', timeLabel);
+      const progressBar = node.querySelector('.global-mini-player__progress');
+      progressBar?.setAttribute('aria-valuenow', String(Math.round(percent)));
+      const progressFill = progressBar?.querySelector('span');
+      if (progressFill) progressFill.style.width = percent + '%';
+
+      const playButton = node.querySelector('[data-mini-play]');
+      if (playButton) {
+        playButton.textContent = snapshot.playing ? 'Pause' : 'Play';
+        playButton.setAttribute('aria-label', snapshot.playing ? 'Pause' : 'Play');
+      }
+      for (const action of ['prev', 'play', 'next', 'queue']) {
+        const button = node.querySelector('[data-mini-' + action + ']');
+        if (button) button.hidden = !live;
+      }
+
+      let liveSlot = node.querySelector('[data-mini-player-live]');
+      if (live) {
+        if (!liveSlot) {
+          liveSlot = createElement('div', {
+            class: 'global-mini-player__live', 'data-mini-player-live': '',
+          });
+          node.insertBefore(liveSlot, node.querySelector('.global-mini-player__body'));
+        }
+        if (livePlayerEl.parentElement !== liveSlot) liveSlot.appendChild(livePlayerEl);
+      } else if (liveSlot) {
+        liveSlot.remove();
+      }
+
+      if (node.dataset.pdAnnouncementKey !== announcementKey) {
+        setText('[data-mini-announcement]', stateLabel + ': ' + title);
+        node.dataset.pdAnnouncementKey = announcementKey;
+      }
       return node;
     };
 
@@ -2809,6 +2857,9 @@ import { Pointer } from './src/lib/pointer.js';
     init() {
       this._badge = $('.topbar-notif-badge, [data-notif-badge]');
 
+      document.getElementById('notif-mark-read')?.addEventListener('click', () => {
+        this.markAllRead();
+      });
       const clearBtn = document.getElementById('notif-clear-all');
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -2825,8 +2876,9 @@ import { Pointer } from './src/lib/pointer.js';
         if (btn) {
           const panel = document.getElementById('notifications-panel');
           if (panel) {
+            // Reading the notification history is not an acknowledgement.
+            // The user controls when messages are marked read or cleared.
             Drawer.open(panel);
-            this.markAllRead();
           }
         }
       });
@@ -2835,11 +2887,15 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     setCount(n) {
-      this._count = Math.max(0, n);
+      this._count = Math.max(0, Number(n) || 0);
       if (this._badge) {
         this._badge.textContent = this._count > 99 ? '99+' : String(this._count);
         this._badge.hidden = this._count === 0;
       }
+      const trigger = document.querySelector('[data-notifications-toggle]');
+      trigger?.setAttribute('aria-label', this._count
+        ? `Notifications (${this._count} unread)`
+        : 'Notifications');
     },
 
     increment() {
@@ -2848,7 +2904,7 @@ import { Pointer } from './src/lib/pointer.js';
 
     markAllRead() {
       this.setCount(0);
-      $$('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+      document.querySelectorAll('#notifications-panel .notif-item.unread').forEach(el => el.classList.remove('unread'));
     },
 
     _onNew({ message, type = 'info', title = '' }) {
@@ -3047,7 +3103,7 @@ import { Pointer } from './src/lib/pointer.js';
       '#/help': 'Help',
       '#/achievements': 'Achievements',
       '#/settings': 'Settings',
-    }[hash] ?? 'OpenCourseDeck';
+    }[hash] ?? 'Page not found';
   }
 
   const Router = createRouter({
@@ -3561,7 +3617,7 @@ import { Pointer } from './src/lib/pointer.js';
         const normalized = String(hash || '#/home').split('?')[0].replace(/\/$/, '') || '#/home';
         const isHome = normalized === '#/home' || normalized === '#' || normalized === '';
         const title = routeTitle(normalized);
-        if (isHome || title === 'OpenCourseDeck' || window.matchMedia?.('(max-width: 460px)')?.matches) {
+        if (isHome || title === 'Page not found' || window.matchMedia?.('(max-width: 460px)')?.matches) {
           // At narrow widths the menu already provides Home navigation. A
           // current-page-only breadcrumb cannot be squeezed by a redundant
           // Home link and separator, even while the view changes asynchronously.

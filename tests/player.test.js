@@ -106,6 +106,109 @@ describe('MediaPlayer queue rendering', () => {
     expect(document.querySelector('#player .pd-art-img').getAttribute('src')).toBe('data:image/png;base64,AAAA');
   });
 
+  it('shows an accessible network error with a retry that preserves the current lesson', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'lecture-a', title: 'Lecture A', src: 'https://example.org/lecture.mp4' }]);
+    const media = player._media;
+    media.dispatchEvent(new Event('loadstart'));
+    expect(player._dom.loadingOverlay.hidden).toBe(false);
+    Object.defineProperty(media, 'error', { configurable: true, value: { code: 2 } });
+    const reported = vi.fn();
+    player.on('error', reported);
+    media.dispatchEvent(new Event('error'));
+
+    const alert = document.querySelector('#player .pd-error-banner');
+    const retry = alert?.querySelector('[data-pd="retry"]');
+    expect(alert?.getAttribute('role')).toBe('alert');
+    expect(alert?.hidden).toBe(false);
+    expect(alert?.textContent).toMatch(/network|connection/i);
+    expect(retry?.hidden).toBe(false);
+    expect(player._dom.loadingOverlay.hidden).toBe(true);
+    expect(reported).toHaveBeenCalledWith({ code: 2, message: 'Network error' });
+
+    const priorLoads = vi.mocked(media.load).mock.calls.length;
+    retry.click();
+    expect(media.load).toHaveBeenCalledTimes(priorLoads + 1);
+    expect(media.play).toHaveBeenCalled();
+    expect(player.queue[0].id).toBe('lecture-a');
+    expect(player.trackIndex).toBe(0);
+    expect(alert.hidden).toBe(true);
+    player.destroy();
+  });
+
+  it('preserves a mid-lesson position across a retry load reset', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'lecture', title: 'Lesson', src: 'https://example.org/lesson.mp4' }]);
+    const media = player._media;
+    Object.defineProperty(media, 'duration', { configurable: true, value: 180 });
+    media.currentTime = 73;
+    media.dispatchEvent(new Event('timeupdate'));
+    const saved = JSON.parse(sessionStorage.getItem('pd-player'));
+    const updates = vi.fn();
+    player.on('timeupdate', updates);
+    vi.mocked(media.load).mockImplementationOnce(() => {
+      media.currentTime = 0;
+      media.dispatchEvent(new Event('timeupdate'));
+      media.dispatchEvent(new Event('loadedmetadata'));
+    });
+    Object.defineProperty(media, 'error', { configurable: true, value: { code: 2 } });
+    media.dispatchEvent(new Event('error'));
+    player._dom.errorRetry.click();
+    await vi.waitFor(() => expect(media.currentTime).toBe(73));
+    expect(updates).not.toHaveBeenCalledWith(expect.objectContaining({ currentTime: 0 }));
+    expect(JSON.parse(sessionStorage.getItem('pd-player')).currentTime).toBe(saved.currentTime);
+    player.destroy();
+  });
+
+  it('restores a visible error when a retry play promise rejects', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'lecture', src: 'https://example.org/lesson.mp4' }]);
+    Object.defineProperty(player._media, 'error', { configurable: true, value: { code: 2 } });
+    player._media.dispatchEvent(new Event('error'));
+    vi.mocked(player._media.play).mockRejectedValueOnce(Object.assign(new Error('Playback denied'), {
+      name: 'NotAllowedError',
+    }));
+    player._dom.errorRetry.click();
+    await vi.waitFor(() => expect(player._dom.errorBanner.hidden).toBe(false));
+    expect(player._dom.loadingOverlay.hidden).toBe(true);
+    expect(player._dom.errorText.textContent).toMatch(/retry|playback|media/i);
+    player.destroy();
+  });
+
+  it('never applies an old retry resume position to a subsequently selected lesson', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'first', src: 'https://example.test/first.mp4' }]);
+    const media = player._media;
+    media.currentTime = 61;
+    media.dispatchEvent(new Event('timeupdate'));
+    Object.defineProperty(media, 'error', { configurable: true, value: { code: 2 } });
+    media.dispatchEvent(new Event('error'));
+    vi.mocked(media.load).mockImplementationOnce(() => { media.currentTime = 0; });
+    player._dom.errorRetry.click();
+    player.loadPlaylist([{ id: 'second', src: 'https://example.test/second.mp4' }], false);
+    media.currentTime = 0;
+    media.dispatchEvent(new Event('loadedmetadata'));
+    expect(player.queue[0].id).toBe('second');
+    expect(media.currentTime).toBe(0);
+    expect(player._retryResumeAt).toBeNull();
+    player.destroy();
+  });
+
+  it('explains unsupported media without offering a futile retry and clears errors for another lesson', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'incompatible', title: 'Bad format', src: 'https://example.org/bad.mp4' }]);
+    Object.defineProperty(player._media, 'error', { configurable: true, value: { code: 4 } });
+    player._media.dispatchEvent(new Event('error'));
+    const alert = document.querySelector('#player .pd-error-banner');
+    expect(alert?.hidden).toBe(false);
+    expect(alert?.textContent).toMatch(/not supported|unsupported|format/i);
+    expect(alert?.querySelector('[data-pd="retry"]')?.hidden).toBe(true);
+    player.loadPlaylist([{ id: 'valid', title: 'Next lesson', src: 'https://example.org/next.mp4' }]);
+    expect(alert?.hidden).toBe(true);
+    expect(player.queue[0].id).toBe('valid');
+    player.destroy();
+  });
+
   it('clears stale media and tolerates empty playlists', () => {
     const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
     player.loadPlaylist([{ title: 'Old track', artist: 'Old artist', src: 'old.mp3' }]);
