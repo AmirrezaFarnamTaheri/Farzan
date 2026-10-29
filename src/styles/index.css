@@ -21,6 +21,7 @@
 @import './workspace.css' layer(enhancements);
 @import './farzan-redesign.css' layer(enhancements);
 @import './persian-typography.css' layer(enhancements);
+@import './player-theater.css' layer(enhancements);
 
 @media (prefers-reduced-motion: reduce) {
   *,
