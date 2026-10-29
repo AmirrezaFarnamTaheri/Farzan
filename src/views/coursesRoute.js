@@ -937,7 +937,9 @@ export async function mountCoursesView(deps = {}) {
     const productUrl = safeExternalUrl(course.productUrl);
 
     const summaryCard = createElement('div', { class: 'card card-filled' });
-    const summaryBody = createElement('div', { class: 'card-body' });
+    // In mixed English/Persian catalogs, align the heading, link and metadata
+    // to the selected course's natural reading direction.
+    const summaryBody = createElement('div', { class: 'card-body', dir: 'auto' });
     const title = createElement('h2', { dir: 'auto' }, course.title);
     title.style.margin = '0 0 6px 0';
     summaryBody.appendChild(title);
