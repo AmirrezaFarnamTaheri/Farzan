@@ -426,6 +426,35 @@ describe('progress backup exports', () => {
     expect(await downloadedBlob.text()).toContain('Edited body');
   });
 
+  it('formats the Progress completion denominator with native locale grouping', async () => {
+    const previousLanguage = document.documentElement.lang;
+    document.documentElement.lang = 'en-US';
+    try {
+      document.body.innerHTML = `
+        <strong id="stat-total-topics"></strong>
+        <strong id="stat-done-topics"></strong>
+        <strong id="stat-in-progress"></strong>
+        <strong id="stat-completion-pct"></strong>
+        <strong id="stat-watched-time"></strong>
+        <strong id="stat-streak"></strong>
+        <strong id="stat-active-days"></strong>
+        <div id="stat-overall-bar"></div>
+        <table><tbody id="stat-course-table-body"></tbody></table>
+      `;
+      window.DataStore.allCourses = vi.fn(() => [{ id: 'course-1', title: 'Study' }]);
+      window.DataStore.allTopics = vi.fn(() => Array.from({ length: 6421 }, (_, i) => ({
+        topicId: `topic-${i}`, courseId: 'course-1',
+      })));
+      window.DB.getAllProgress.mockResolvedValueOnce([]);
+
+      await window.ProgressStats.renderStatsPage();
+      expect(document.getElementById('stat-total-topics').textContent).toBe('6,421');
+      expect(document.getElementById('stat-done-topics').textContent).toBe('0');
+    } finally {
+      document.documentElement.lang = previousLanguage;
+    }
+  });
+
   it('renders course stats titles as text instead of HTML', async () => {
     document.body.innerHTML = `
       <strong id="stat-total-topics"></strong>
