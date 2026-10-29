@@ -101,6 +101,14 @@ for (const setup of setups) {
       // A full reload resets the temporary direction override used for QA.
       await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     }
+    // Visibility alone does not guarantee a painted frame: this SPA's
+    // .view animation starts at opacity 0 and is still 'visible' to Playwright.
+    // Wait for an actual on-screen, fully opaque recovery panel.
+    await expect(missingView).toBeInViewport({ ratio: 0.1 });
+    await expect.poll(() => missingView.evaluate(el =>
+      Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.99);
+    await page.evaluate(() => new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const invalidWidth = await page.evaluate(() =>
       Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth);
     expect(invalidWidth, `${setup.name}/notfound horizontal overflow`).toBeLessThanOrEqual(3);
