@@ -130,6 +130,7 @@ function main() {
     { pkg: '@fontsource/inter', out: 'fonts/inter', weights: [400, 500, 600, 700, 800] },
     { pkg: '@fontsource/jetbrains-mono', out: 'fonts/jetbrains-mono', weights: [400, 600, 700] },
     { pkg: '@fontsource/playfair-display', out: 'fonts/playfair-display', weights: [400, 700, 800] },
+    { pkg: '@fontsource/vazirmatn', out: 'fonts/vazirmatn', weights: [400, 500, 600, 700, 800], subset: 'arabic', license: true },
   ];
 
   const fontImports = [];
@@ -146,7 +147,7 @@ function main() {
     const cssBlocks = [];
     const referenced = new Set();
     for (const weight of font.weights) {
-      const cssFile = path.join(pkgRoot, `${weight}.css`);
+      const cssFile = path.join(pkgRoot, font.subset ? `${font.subset}-${weight}.css` : `${weight}.css`);
       if (!fs.existsSync(cssFile)) throw new Error(`Missing Fontsource weight CSS: ${cssFile}`);
       let css = fs.readFileSync(cssFile, 'utf8');
       css = css.replace(/src:\s*url\(([^)]+\.woff2)\)\s*format\(['"]woff2['"]\)[^;]*;/g, (_match, woff2) => {
@@ -155,6 +156,9 @@ function main() {
         return `src: url(${woff2}) format('woff2');`;
       });
       if (/\.woff(?:['")])/.test(css)) throw new Error(`Legacy WOFF source remained in ${cssFile}`);
+      if (font.subset === 'arabic') {
+        css = css.replace(/}\s*$/, '  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200D, U+FB50-FDFF, U+FE70-FEFF;\n}');
+      }
       cssBlocks.push(css.trim());
     }
 
@@ -165,6 +169,7 @@ function main() {
       fs.mkdirSync(path.dirname(destination), { recursive: true });
       fs.copyFileSync(source, destination);
     }
+    if (font.license) fs.copyFileSync(path.join(pkgRoot, 'LICENSE'), path.join(outputRoot, 'LICENSE'));
     writeText(`${font.out}/index.css`, `${cssBlocks.join('\n\n')}\n`);
     fontImports.push(`@import "./${path.basename(font.out)}/index.css";`);
     ok += referenced.size + 1;
