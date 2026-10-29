@@ -816,6 +816,12 @@ export async function mountCoursesView(deps = {}) {
           'aria-label': `${primaryLabel}: ${topic.title}`,
         }, createElement('span', { class: 'topic-title', dir: 'auto' }, topic.title))
       : createElement('div', { class: 'topic-title', dir: 'auto' }, topic.title);
+    if (primaryAction) {
+      copy.appendChild(createElement('span', {
+        class: 'topic-primary-hint',
+        'aria-hidden': 'true',
+      }, primaryLabel));
+    }
     const meta = createElement('div', { class: 'topic-meta' });
     const indicator = statusBadgeNode(status);
     if (status === 'not-started') indicator.classList.add('sr-only');
@@ -826,14 +832,21 @@ export async function mountCoursesView(deps = {}) {
     const actions = createElement('div', { class: 'topic-actions' });
     if (hasVideo && hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
     if (hasEmbed && (hasVideo || hasPdf)) actions.appendChild(actionButton('open-embed', 'Open'));
-    if (toggle) actions.appendChild(createElement('button', {
-      class: 'topic-completion-toggle',
-      type: 'button',
-      'data-action': 'toggle-done',
-      'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
-      'aria-pressed': status === 'done' ? 'true' : 'false',
-      title: status === 'done' ? 'Mark not started' : 'Mark completed',
-    }, createElement('span', { 'aria-hidden': 'true' }, status === 'done' ? '✓' : '')));
+    if (toggle) {
+      const completion = createElement('button', {
+        class: 'topic-completion-toggle',
+        type: 'button',
+        'data-action': 'toggle-done',
+        'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
+        'aria-pressed': status === 'done' ? 'true' : 'false',
+        title: status === 'done' ? 'Mark not started' : 'Mark completed',
+      }, createElement('span', { 'aria-hidden': 'true' }, status === 'done' ? '✓' : '○'));
+      completion.appendChild(createElement('span', {
+        class: 'topic-completion-label',
+        'aria-hidden': 'true',
+      }, status === 'done' ? 'Done' : 'Mark done'));
+      actions.appendChild(completion);
+    }
     row.append(copy, meta, actions);
     return row;
   };

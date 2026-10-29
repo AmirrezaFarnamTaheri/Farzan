@@ -997,10 +997,14 @@ input[type="file"][hidden] {
   gap: 10px;
 }
 .view-courses .topic-primary-action {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
+  min-height: 44px;
   width: 100%;
-  padding: 10px 4px;
+  padding: 8px 4px;
   border: 0;
   background: transparent;
   color: var(--text-primary);
@@ -1016,16 +1020,40 @@ input[type="file"][hidden] {
 }
 .view-courses .topic-primary-action .topic-title {
   display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   unicode-bidi: plaintext;
 }
+.view-courses .topic-primary-hint {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.view-courses .topic-primary-action:hover .topic-primary-hint {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
 .view-courses .topic-completion-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-height: 40px;
+  min-width: 78px;
+  padding: 7px 10px;
   border: 1.5px solid var(--text-tertiary);
-  border-radius: 50%;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
@@ -1035,6 +1063,26 @@ input[type="file"][hidden] {
   color: var(--bg);
   background: var(--success, #16a34a);
   border-color: var(--success, #16a34a);
+}
+.view-courses .topic-completion-label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.view-courses .topic-completion-toggle[aria-pressed="false"]:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+@media (max-width: 560px) {
+  .view-courses .topic-primary-hint {
+    min-height: 26px;
+    padding-inline: 7px;
+  }
+  .view-courses .topic-completion-toggle {
+    min-width: 72px;
+    padding-inline: 8px;
+  }
 }
 @media (max-width: 1120px) {
   .view-courses .topic-row {
