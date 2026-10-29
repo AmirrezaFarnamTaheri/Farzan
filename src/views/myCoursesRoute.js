@@ -94,8 +94,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     if (!createDialog?.open) return;
     if (typeof createDialog.close === 'function') createDialog.close();
     else createDialog.removeAttribute('open');
-    const focusTarget = createOpener?.isConnected
-      ? createOpener : document.querySelector('[data-my-course-create]');
+    // The page header creation button is intentionally hidden on first use.
+    // Return keyboard focus to the *visible* empty-state action instead.
+    const visible = node => node?.isConnected && !node.hidden && !node.closest('[hidden]');
+    const focusTarget = visible(createOpener)
+      ? createOpener
+      : document.querySelector('[data-my-course-empty-create]')
+        ?? document.querySelector('[data-my-course-create]');
     focusTarget?.focus?.();
   };
   document.querySelector('[data-my-course-create]')?.addEventListener('click', event => {
