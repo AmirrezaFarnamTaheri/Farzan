@@ -1106,8 +1106,19 @@
       }
       if (DOM.totalPagesLabel) DOM.totalPagesLabel.textContent = String(State.totalPages);
       if (DOM.zoomLevelDisplay) DOM.zoomLevelDisplay.textContent = `${Math.round(State.scale * 100)}%`;
+      // The file-open state is intentionally a distinct working surface:
+      // avoid exposing navigation, search and annotation actions for a PDF
+      // that has not been loaded. Keep the existing reader state authoritative.
+      const shell = DOM.viewerContainer?.closest('.pdf-shell');
+      const loading = shell?.dataset.documentState === 'loading';
+      if (shell && !loading) shell.dataset.documentState = hasDocument ? 'ready' : 'empty';
+      const emptyStage = shell?.querySelector('[data-pdf-empty-screen]');
+      if (emptyStage) emptyStage.hidden = hasDocument || loading;
+      shell?.querySelectorAll('[data-pdf-requires-document]').forEach(group => {
+        group.hidden = !hasDocument;
+      });
       const emptyHint = $('[data-pdf-empty-hint]');
-      if (emptyHint) emptyHint.hidden = hasDocument;
+      if (emptyHint) emptyHint.hidden = hasDocument || loading;
       const noteInput = $('[data-pdf-page-note-input]');
       if (noteInput) {
         noteInput.disabled = !hasDocument;
@@ -1126,6 +1137,22 @@
 
     _showLoading(show) {
       if (DOM.loadingOverlay) DOM.loadingOverlay.hidden = !show;
+      const shell = DOM.viewerContainer?.closest('.pdf-shell');
+      if (!shell) return;
+      const ready = Boolean(State.pdfDoc && State.totalPages > 0);
+      if (show) {
+        shell.dataset.documentState = 'loading';
+      } else if (shell.dataset.documentState !== 'error') {
+        shell.dataset.documentState = ready ? 'ready' : 'empty';
+      }
+      const showEmpty = !show && !ready && shell.dataset.documentState !== 'error';
+      const stage = shell.querySelector('[data-pdf-empty-screen]');
+      if (stage) stage.hidden = !showEmpty;
+      const emptyHint = shell.querySelector('[data-pdf-empty-hint]');
+      if (emptyHint) emptyHint.hidden = !showEmpty;
+      shell.querySelectorAll('[data-pdf-requires-document]').forEach(group => {
+        group.hidden = !ready;
+      });
     },
 
     _updateProgress(pct) {
@@ -1140,10 +1167,18 @@
         DOM.errorBanner.textContent = msg;
         DOM.errorBanner.hidden = false;
       }
+      const shell = DOM.viewerContainer?.closest('.pdf-shell');
+      if (shell && !(State.pdfDoc && State.totalPages > 0)) {
+        shell.dataset.documentState = 'error';
+      }
     },
 
     _clearError() {
       if (DOM.errorBanner) DOM.errorBanner.hidden = true;
+      const shell = DOM.viewerContainer?.closest('.pdf-shell');
+      if (shell?.dataset.documentState === 'error') {
+        shell.dataset.documentState = State.pdfDoc && State.totalPages > 0 ? 'ready' : 'empty';
+      }
     },
 
     async _loadAnnotations() {
