@@ -93,6 +93,11 @@ describe('Courses workbench progress and accessible row actions', () => {
     expect(primary?.textContent).toContain('Anemia and Iron Deficiency');
     expect(primary?.getAttribute('aria-label')).toContain('Play');
     expect(completion?.getAttribute('aria-pressed')).toBe('true');
+    expect(primary?.querySelector('.topic-primary-hint')?.textContent).toMatch(/Play/i);
+    expect(completion?.querySelector('.topic-completion-label')?.textContent).toMatch(/Done/i);
+    expect(primary?.getAttribute('aria-label')).toContain('Anemia');
+    expect(completion?.getAttribute('title')).toMatch(/Mark not started/i);
+
     expect(completion?.getAttribute('aria-label')).toContain('Anemia and Iron Deficiency');
     expect(row.querySelector('[data-action="open-pdf"]')).not.toBeNull();
     expect(row.querySelector('.topic-submeta')).toBeNull();
