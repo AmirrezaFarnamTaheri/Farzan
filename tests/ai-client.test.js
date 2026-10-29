@@ -249,6 +249,25 @@ describe('AI client', () => {
     await client.clearEmbeddings();
   });
 
+  it('extracts hostile HTML without DOMParser or including scripts and styling in summaries', () => {
+    const parse = vi.spyOn(DOMParser.prototype, 'parseFromString');
+    try {
+      const client = createAIClient({ sessionStorage });
+      const payload = '<img src="https://untrusted.example.test/track" onerror="stealSecretToken()">'
+        + '<iframe src="https://untrusted.example.test/beacon"></iframe>'
+        + '<script>stealSecretToken() and privateInfo()</script>'
+        + '<style>.secretCSS { color: red }</style>'
+        + '<p>Active recall helps consolidate information by repeatedly retrieving it.</p>'
+        + '<p>Spaced repetition makes learning more durable by spreading reviews over time.</p>';
+      const result = client._localSummary(payload, { bullets: 2 });
+      expect(parse).not.toHaveBeenCalled();
+      expect(result).toContain('Active recall');
+      expect(result).not.toMatch(/stealSecretToken|privateInfo|secretCSS|beacon/);
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
   it('splits Persian sentences on the Arabic question mark when summarizing', () => {
     const client = createAIClient({ sessionStorage });
     const summary = client._localSummary('سرمایه بانک‌ها باید کافی باشد؟ الزامات بازل این سرمایه را تعیین می‌کند. بانک‌های سایه خارج از این چارچوب هستند.', { bullets: 3 });
