@@ -47,24 +47,16 @@ export function mountAchievementsView(deps = {}) {
     let loaded;
     try {
       loaded = await Promise.all([
-      (async () => { return await window.DB?.getAllProgress?.() ?? []; })(),
-      (async () => { return await window.DB?.getAllNotes?.() ?? []; })(),
-      (async () => { return await window.DB?.getAllTimestamps?.() ?? []; })(),
-      (async () => {
-        try {
+        window.DB?.getAllProgress?.() ?? [],
+        window.DB?.getAllNotes?.() ?? [],
+        window.DB?.getAllTimestamps?.() ?? [],
+        (async () => {
           await window.DataStore?.init?.();
           return window.DataStore?.allTopics?.() ?? [];
-        } catch (error) {
-          throw error;
-        }
-      })(),
-      (async () => {
-        return await window.DB?.getAllWatchedSegments?.() ?? [];
-      })(),
-      (async () => {
-        return await window.DB?.getSetting?.('ocd_flashcards') ?? [];
-      })(),
-    ]);
+        })(),
+        window.DB?.getAllWatchedSegments?.() ?? [],
+        window.DB?.getSetting?.('ocd_flashcards') ?? [],
+      ]);
     } catch (error) {
       // A failed canonical read must not masquerade as "0 achievements".
       // Users can retry without navigating away or losing their actual data.
