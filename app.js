@@ -2809,6 +2809,9 @@ import { Pointer } from './src/lib/pointer.js';
     init() {
       this._badge = $('.topbar-notif-badge, [data-notif-badge]');
 
+      document.getElementById('notif-mark-read')?.addEventListener('click', () => {
+        this.markAllRead();
+      });
       const clearBtn = document.getElementById('notif-clear-all');
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -2825,8 +2828,9 @@ import { Pointer } from './src/lib/pointer.js';
         if (btn) {
           const panel = document.getElementById('notifications-panel');
           if (panel) {
+            // Reading the notification history is not an acknowledgement.
+            // The user controls when messages are marked read or cleared.
             Drawer.open(panel);
-            this.markAllRead();
           }
         }
       });
@@ -2835,11 +2839,15 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     setCount(n) {
-      this._count = Math.max(0, n);
+      this._count = Math.max(0, Number(n) || 0);
       if (this._badge) {
         this._badge.textContent = this._count > 99 ? '99+' : String(this._count);
         this._badge.hidden = this._count === 0;
       }
+      const trigger = document.querySelector('[data-notifications-toggle]');
+      trigger?.setAttribute('aria-label', this._count
+        ? `Notifications (${this._count} unread)`
+        : 'Notifications');
     },
 
     increment() {
@@ -2848,7 +2856,7 @@ import { Pointer } from './src/lib/pointer.js';
 
     markAllRead() {
       this.setCount(0);
-      $$('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+      $('#notifications-panel .notif-item.unread').forEach(el => el.classList.remove('unread'));
     },
 
     _onNew({ message, type = 'info', title = '' }) {
