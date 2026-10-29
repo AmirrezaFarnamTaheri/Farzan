@@ -975,6 +975,54 @@
   margin-top: var(--space-3);
 }
 
+/* First-use course library: one action instead of layered empty panels. */
+.view-my-courses [hidden] { display: none !important; }
+.view-my-courses[data-empty="true"] .my-courses-list-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.view-my-courses[data-empty="true"] .my-courses-list-card > .card-body {
+  padding: 0;
+}
+.view-my-courses[data-empty="true"] .my-courses-empty {
+  min-height: 320px;
+  padding: clamp(24px, 4vw, 48px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+}
+.view-my-courses .my-courses-backup-details {
+  margin-top: var(--space-3);
+  overflow: visible;
+}
+.view-my-courses .my-courses-backup-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+.view-my-courses .my-courses-backup-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.view-my-courses .my-courses-backup-details[open] .my-courses-backup-summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+@media (max-width: 560px) {
+  .view-my-courses[data-empty="true"] .my-courses-empty {
+    min-height: 280px;
+    padding: var(--space-5);
+  }
+}
+
+
 .my-course-card {
   display: flex;
   flex-direction: column;

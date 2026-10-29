@@ -25,9 +25,34 @@ describe('My Courses canonical ownership and legacy recovery', () => {
     initUserLibrary(window);
   });
 
+  it('presents one primary Create action without duplicate zero metrics or a persistent backup warning', async () => {
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('No custom courses'));
+    expect(document.querySelector('[data-my-course-metrics]').hidden).toBe(true);
+    expect(document.querySelector('[data-my-course-create]').hidden).toBe(true);
+    expect(document.querySelector('[data-my-courses-add]').hidden).toBe(true);
+    const backup = document.querySelector('details[data-media-backup-options]');
+    expect(backup).not.toBeNull();
+    expect(backup.open).toBe(false);
+    expect(backup.querySelector('[data-backup-media-folder]')).not.toBeNull();
+    expect(document.querySelectorAll('[data-my-course-empty-create]')).toHaveLength(1);
+    document.querySelector('[data-my-course-empty-create]').click();
+    expect(document.querySelector('[data-my-course-dialog]').open).toBe(true);
+  });
+
+  it('restores create, import and metrics controls for an existing custom course', async () => {
+    await upsertCourse({ title: 'Biochemistry' });
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('Biochemistry'));
+    expect(document.querySelector('[data-my-course-metrics]').hidden).toBe(false);
+    expect(document.querySelector('[data-my-course-create]').hidden).toBe(false);
+    expect(document.querySelector('[data-my-courses-add]').hidden).toBe(false);
+  });
+
   it('keeps creation hidden until requested and restores focus on cancellation', async () => {
     mount();
-    const opener = document.querySelector('[data-my-course-create]');
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-empty-create]')).not.toBeNull());
+    const opener = document.querySelector('[data-my-course-empty-create]');
     const dialog = document.querySelector('[data-my-course-dialog]');
     expect(opener).not.toBeNull();
     expect(dialog).not.toBeNull();

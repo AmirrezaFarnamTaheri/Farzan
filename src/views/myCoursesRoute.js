@@ -10,11 +10,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           <p class="page-subtitle">Add courses and organize your own study topics.</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-primary" type="button" data-my-course-create aria-haspopup="dialog" aria-controls="my-course-create-dialog">
+          <button class="btn btn-primary" type="button" data-my-course-create hidden aria-haspopup="dialog" aria-controls="my-course-create-dialog">
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New course
           </button>
-          <button class="btn btn-ghost" type="button" data-my-courses-add>
+          <button class="btn btn-ghost" type="button" data-my-courses-add hidden>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             Add media
           </button>
@@ -52,10 +52,11 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
         </div>
       </div>
-      <div class="stat-grid my-courses-metrics" data-my-course-metrics></div>
-      <section class="card card-filled" aria-labelledby="media-folder-heading">
+      <div class="stat-grid my-courses-metrics" data-my-course-metrics hidden></div>
+      <details class="card card-filled my-courses-backup-details" data-media-backup-options>
+        <summary class="my-courses-backup-summary" id="media-folder-heading">Media backup &amp; restore <span class="text-xs text-muted">(advanced)</span></summary>
         <div class="card-body">
-          <h2 class="text-lg font-semibold" id="media-folder-heading">Keep a copy of your imported files</h2>
+          <h2 class="text-lg font-semibold">Keep a copy of your imported files</h2>
           <p class="text-sm text-muted">The JSON backup includes notes, courses and saved study state, but not your PDF/video bytes. Export these files to a folder alongside your JSON backup. Restore the JSON first, then restore this media folder on the new device. Available in supported browsers with folder access.</p>
           <div class="button-row">
             <button class="btn btn-ghost btn-sm" type="button" data-backup-media-folder>Export media folder</button>
@@ -63,7 +64,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
           </div>
           <p class="text-sm text-muted" data-media-backup-status role="status" aria-live="polite"></p>
         </div>
-      </section>
+      </details>
       <section class="card card-filled" aria-label="Missing imported files" data-missing-library-section>
         <div class="card-body">
           <h2 class="text-lg font-semibold">Missing local files</h2>
@@ -93,8 +94,13 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     if (!createDialog?.open) return;
     if (typeof createDialog.close === 'function') createDialog.close();
     else createDialog.removeAttribute('open');
-    const focusTarget = createOpener?.isConnected
-      ? createOpener : document.querySelector('[data-my-course-create]');
+    // The page header creation button is intentionally hidden on first use.
+    // Return keyboard focus to the *visible* empty-state action instead.
+    const visible = node => node?.isConnected && !node.hidden && !node.closest('[hidden]');
+    const focusTarget = visible(createOpener)
+      ? createOpener
+      : document.querySelector('[data-my-course-empty-create]')
+        ?? document.querySelector('[data-my-course-create]');
     focusTarget?.focus?.();
   };
   document.querySelector('[data-my-course-create]')?.addEventListener('click', event => {
@@ -266,11 +272,22 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
       list.append(notice);
       return;
     }
-    metrics.replaceChildren(
-      metric('Courses', courses.length),
-      metric('Topics', courses.reduce((count, course) => count
-        + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)),
-    );
+    const firstUse = courses.length === 0;
+    const view = document.querySelector('.view-my-courses');
+    if (view) view.dataset.empty = String(firstUse);
+    metrics.hidden = firstUse;
+    const createTop = document.querySelector('[data-my-course-create]');
+    const addMedia = document.querySelector('[data-my-courses-add]');
+    if (createTop) createTop.hidden = firstUse;
+    if (addMedia) addMedia.hidden = firstUse;
+    metrics.replaceChildren();
+    if (!firstUse) {
+      metrics.append(
+        metric('Courses', courses.length),
+        metric('Topics', courses.reduce((count, course) => count
+          + (course.sources || []).reduce((total, src) => total + (src.topics || []).length, 0), 0)),
+      );
+    }
     list.replaceChildren();
     if (!courses.length) {
       const empty = document.createElement('div');
