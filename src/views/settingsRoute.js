@@ -659,6 +659,11 @@ export function mountSettingsView(deps = {}) {
         keyStorage: 'session',
         hasKey: saved?.hasKey === true && Boolean(sessionStorage.getItem(keyName)),
         approvedEndpointOrigin: saved?.approvedEndpointOrigin || '',
+        // Preserve the revision/transaction identity from the authority read.
+        // Without it, an unchanged valid key appears unbound at the next save
+        // and would be cleared even when the user did not edit the provider.
+        authorityRevision: Number(saved?.authorityRevision) || 0,
+        authorityTransactionId: String(saved?.authorityTransactionId || ''),
         localModelStatus: ['installed', 'imported'].includes(saved?.localModelStatus) ? saved.localModelStatus : 'not-installed',
         localModelSource: saved?.localModelSource || gemmaOptions[0]?.url || 'https://ai.google.dev/gemma',
         localModelFile: saved?.localModelFile && typeof saved.localModelFile === 'object' ? saved.localModelFile : null,
