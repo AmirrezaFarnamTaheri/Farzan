@@ -631,11 +631,15 @@ export function mountSettingsView(deps = {}) {
     };
 
     const apply = (next = {}) => {
+      const authority = window.OpenCourseDeck?.AIAuthority;
+      const hasBoundKey = typeof authority?.getCredential === 'function'
+        ? Boolean(authority.getCredential(next))
+        : next.hasKey === true && Boolean(sessionStorage.getItem(keyName));
       Object.assign(current, next, {
         keyStorage: 'session',
-        // An unbound key left in sessionStorage is not an active credential.
-        // The authority's getSetting() response only marks a verified binding.
-        hasKey: next.hasKey === true && Boolean(sessionStorage.getItem(keyName)),
+        // Session key bytes alone do not prove this endpoint/model/revision is
+        // authorized. Use the already-installed authority validator.
+        hasKey: hasBoundKey,
       });
       mode.value = current.mode;
       model.value = current.model;
