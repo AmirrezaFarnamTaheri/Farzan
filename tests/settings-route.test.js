@@ -148,6 +148,170 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('allows a newly entered HTTPS API origin to be explicitly approved and saved', async () => {
+    const { controller, saveSetting, Toast } = mountSettings({
+      mode: 'custom-api',
+      model: 'baseline-model',
+      endpoint: 'https://old.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://old.example.test',
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-model]').value).toBe('baseline-model'));
+    const endpoint = document.querySelector('[data-ai-endpoint]');
+    const checkbox = document.querySelector('[data-ai-approve-endpoint]');
+    endpoint.value = 'https://new.example.test/v1/chat/completions';
+    endpoint.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(checkbox.disabled).toBe(false);
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(checkbox.checked).toBe(true);
+    document.querySelector('[data-ai-save]').click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    expect(saveSetting.mock.calls[0][1]).toMatchObject({
+      endpoint: 'https://new.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://new.example.test',
+    });
+    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('AI options saved'));
+    controller.unmount();
+  });
+
+  it('restores the prior session credential and draft after an AI settings write rejects', async () => {
+    const { controller, saveSetting, Toast } = mountSettings({
+      mode: 'custom-api',
+      model: 'original-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-model]').value).toBe('original-model'));
+    sessionStorage.setItem('ocd_ai_api_key_session', 'previous-session-key');
+    saveSetting.mockRejectedValueOnce(new Error('IndexedDB transaction rejected'));
+    document.querySelector('[data-ai-model]').value = 'new-model';
+    document.querySelector('[data-ai-key]').value = 'replacement-session-key';
+    const checkbox = document.querySelector('[data-ai-approve-endpoint]');
+    checkbox.checked = true;
+    document.querySelector('[data-ai-save]').click();
+
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringContaining('not saved')));
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('previous-session-key');
+    expect(document.querySelector('[data-ai-model]').value).toBe('new-model');
+    expect(window.OpenCourseDeck.AISettings.model).toBe('original-model');
+    expect(Toast.success).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('restores a previously committed session key if disabling AI fails to persist', async () => {
+    const { controller, saveSetting, Toast } = mountSettings({
+      mode: 'custom-api',
+      model: 'original-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-mode]').value).toBe('custom-api'));
+    sessionStorage.setItem('ocd_ai_api_key_session', 'previous-session-key');
+    saveSetting.mockRejectedValueOnce(new Error('Settings database unavailable'));
+    document.querySelector('[data-ai-mode]').value = 'disabled';
+    document.querySelector('[data-ai-save]').click();
+
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringContaining('not saved')));
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('previous-session-key');
+    expect(Toast.success).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('keeps a valid unchanged credential bound across a save by retaining authority revision metadata', async () => {
+    const { controller, saveSetting } = mountSettings({
+      mode: 'custom-api',
+      model: 'existing-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+      authorityRevision: 23,
+      authorityTransactionId: 'ai-auth-23',
+    });
+    sessionStorage.setItem('ocd_ai_api_key_session', 'bound-session-key');
+    window.OpenCourseDeck.AIAuthority = {
+      getCredential: vi.fn(settings => (
+        settings.authorityRevision === 23
+        && settings.authorityTransactionId === 'ai-auth-23'
+          ? 'bound-session-key' : ''
+      )),
+    };
+    await vi.waitFor(() => expect(window.OpenCourseDeck?.AISettings?.model).toBe('existing-model'));
+    expect(document.querySelector('[data-ai-approve-endpoint]').checked).toBe(true);
+    document.querySelector('[data-ai-save]').click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    expect(saveSetting.mock.calls[0][1].hasKey).toBe(true);
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('bound-session-key');
+    controller.unmount();
+  });
+
+  it('does not silently reuse an old API key when its selected model changes', async () => {
+    const { controller, saveSetting } = mountSettings({
+      mode: 'custom-api',
+      model: 'original-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-model]').value).toBe('original-model'));
+    sessionStorage.setItem('ocd_ai_api_key_session', 'old-key-for-original-model');
+    document.querySelector('[data-ai-model]').value = 'different-provider-model';
+    document.querySelector('[data-ai-approve-endpoint]').checked = true;
+    document.querySelector('[data-ai-save]').click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    expect(saveSetting.mock.calls[0][1].hasKey).toBe(false);
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBeNull();
+    controller.unmount();
+  });
+
+  it('serializes UI saves so a second click cannot replace an in-flight key transaction', async () => {
+    const { controller, saveSetting } = mountSettings();
+    let finishCommit;
+    saveSetting.mockImplementationOnce(() => new Promise(resolve => { finishCommit = resolve; }));
+    const button = document.querySelector('[data-ai-save]');
+    document.querySelector('[data-ai-mode]').value = 'disabled';
+    button.click();
+    button.click();
+    expect(saveSetting).toHaveBeenCalledTimes(1);
+    expect(button.disabled).toBe(true);
+    finishCommit(true);
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+    controller.unmount();
+  });
+
+  it('uses authority binding verification rather than only the presence of session key bytes', async () => {
+    const { controller } = mountSettings({
+      mode: 'custom-api',
+      model: 'existing-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+      authorityRevision: 24,
+      authorityTransactionId: 'ai-auth-24',
+    });
+    sessionStorage.setItem('ocd_ai_api_key_session', 'unbound-credential-bytes');
+    window.OpenCourseDeck.AIAuthority = { getCredential: vi.fn(() => '') };
+    await vi.waitFor(() => expect(window.OpenCourseDeck?.AISettings?.model).toBe('existing-model'));
+    expect(window.OpenCourseDeck.AISettings.hasKey).toBe(false);
+    expect(document.querySelector('[data-ai-summary]').textContent).toContain('Not present');
+    controller.unmount();
+  });
+
+  it('does not advertise an unbound session key as an available credential', async () => {
+    const { controller } = mountSettings({
+      mode: 'custom-api',
+      model: 'private-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: false,
+    });
+    sessionStorage.setItem('ocd_ai_api_key_session', 'stale-key-from-another-provider');
+    await vi.waitFor(() => expect(window.OpenCourseDeck?.AISettings?.model).toBe('private-model'));
+    expect(window.OpenCourseDeck.AISettings.hasKey).toBe(false);
+    expect(document.querySelector('[data-ai-summary]').textContent).toContain('Not present');
+    controller.unmount();
+  });
+
   it('refuses a full reset before deleting anything when media storage cannot be reached', async () => {
     const { controller, Toast } = mountSettings();
     document.getElementById('select-clear-scope').value = 'all';
