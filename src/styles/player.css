@@ -416,6 +416,30 @@
   -webkit-backdrop-filter: blur(2px);
 }
 
+/* The native hidden attribute must win over layout display rules. */
+.pd-loading-overlay[hidden],
+.pd-error-banner[hidden],
+.pd-error-banner [hidden] {
+  display: none !important;
+}
+
+/* Media decoding/network failures stay visible with an explicit next action. */
+.pd-error-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  font-size: var(--text-sm);
+}
+.pd-error-text { flex: 1 1 220px; min-width: 0; }
+.pd-error-banner [data-pd="retry"] { flex: 0 0 auto; }
+
 .pd-spinner {
   width: 28px;
   height: 28px;
