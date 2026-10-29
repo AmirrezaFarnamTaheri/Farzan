@@ -34,7 +34,7 @@ export async function mountCoursesView(deps = {}) {
       </div>
 
       <div class="courses-shell">
-        <aside class="courses-sidebar">
+        <aside class="courses-sidebar" id="courses-catalog">
           <label class="courses-search-field">
             <span class="sr-only">Search courses</span>
             <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
@@ -62,7 +62,11 @@ export async function mountCoursesView(deps = {}) {
           <section class="course-session" data-course-playback hidden aria-label="Currently playing lesson">
             <header class="course-session-head">
               <span class="course-session-label">Now studying</span>
-              <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
+              <div class="course-session-actions">
+                <button class="btn btn-ghost btn-sm course-jump-lessons" type="button" data-course-jump-topics aria-controls="course-detail">Lessons</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-course-toggle-catalog aria-controls="courses-catalog" aria-expanded="false">Browse catalog</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
+              </div>
             </header>
           <div class="card card-filled course-session-player">
             <div class="card-body">
@@ -112,7 +116,7 @@ export async function mountCoursesView(deps = {}) {
           </div>
           </section>
 
-          <div id="course-detail" class="course-detail">
+          <div id="course-detail" class="course-detail" role="region" aria-label="Current course lesson outline" tabindex="-1">
             <div class="card card-filled catalog-placeholder">
               <div class="card-body catalog-empty">
                 <span class="catalog-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-curriculum"/></svg></span>
@@ -145,14 +149,39 @@ export async function mountCoursesView(deps = {}) {
   let playerEl = document.getElementById('course-player');
   playerEl = window.OpenCourseDeck?.MiniPlayer?.restorePlayer?.(playerEl) || playerEl;
   const playbackSection = document.querySelector('[data-course-playback]');
+  const coursesShellEl = document.querySelector('.courses-shell');
+  const catalogToggleEl = document.querySelector('[data-course-toggle-catalog]');
+  const setCatalogOpen = (open) => {
+    if (coursesShellEl) coursesShellEl.dataset.catalogOpen = open ? 'true' : 'false';
+    if (catalogToggleEl) {
+      catalogToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      catalogToggleEl.textContent = open ? 'Hide catalog' : 'Browse catalog';
+    }
+  };
   const openPlayback = ({ scroll = true } = {}) => {
     if (!playbackSection) return;
     playbackSection.hidden = false;
+    coursesShellEl?.setAttribute('data-playback-active', 'true');
+    setCatalogOpen(false);
     if (scroll) requestAnimationFrame(() => playbackSection.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
+  catalogToggleEl?.addEventListener('click', () => {
+    setCatalogOpen(coursesShellEl?.dataset.catalogOpen !== 'true');
+  });
+  // The optional timestamp form follows the video before the topic outline.
+  // Keep the next-lesson action one tap away on narrow screens, rather than
+  // forcing users to scroll through editing controls every time.
+  document.querySelector('[data-course-jump-topics]')?.addEventListener('click', () => {
+    if (!detailEl || coursesShellEl?.dataset.playbackActive !== 'true') return;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    detailEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    detailEl.focus({ preventScroll: true });
+  });
   document.querySelector('[data-course-close-playback]')?.addEventListener('click', () => {
     try { playerEl?._pdPlayer?.pause?.(); } catch {}
     if (playbackSection) playbackSection.hidden = true;
+    coursesShellEl?.removeAttribute('data-playback-active');
+    setCatalogOpen(true);
   });
   const timestampStatusEl = document.querySelector('[data-timestamp-note-status]');
   const learningMarkerStatusEl = document.querySelector('[data-learning-marker-status]');
