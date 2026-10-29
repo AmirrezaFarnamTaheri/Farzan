@@ -136,6 +136,45 @@ describe('MediaPlayer queue rendering', () => {
     player.destroy();
   });
 
+  it('preserves a mid-lesson position across a retry load reset', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'lecture', title: 'Lesson', src: 'https://example.org/lesson.mp4' }]);
+    const media = player._media;
+    Object.defineProperty(media, 'duration', { configurable: true, value: 180 });
+    media.currentTime = 73;
+    media.dispatchEvent(new Event('timeupdate'));
+    const saved = JSON.parse(sessionStorage.getItem('pd-player'));
+    const updates = vi.fn();
+    player.on('timeupdate', updates);
+    vi.mocked(media.load).mockImplementationOnce(() => {
+      media.currentTime = 0;
+      media.dispatchEvent(new Event('timeupdate'));
+      media.dispatchEvent(new Event('loadedmetadata'));
+    });
+    Object.defineProperty(media, 'error', { configurable: true, value: { code: 2 } });
+    media.dispatchEvent(new Event('error'));
+    player._dom.errorRetry.click();
+    await vi.waitFor(() => expect(media.currentTime).toBe(73));
+    expect(updates).not.toHaveBeenCalledWith(expect.objectContaining({ currentTime: 0 }));
+    expect(JSON.parse(sessionStorage.getItem('pd-player')).currentTime).toBe(saved.currentTime);
+    player.destroy();
+  });
+
+  it('restores a visible error when a retry play promise rejects', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'lecture', src: 'https://example.org/lesson.mp4' }]);
+    Object.defineProperty(player._media, 'error', { configurable: true, value: { code: 2 } });
+    player._media.dispatchEvent(new Event('error'));
+    vi.mocked(player._media.play).mockRejectedValueOnce(Object.assign(new Error('Playback denied'), {
+      name: 'NotAllowedError',
+    }));
+    player._dom.errorRetry.click();
+    await vi.waitFor(() => expect(player._dom.errorBanner.hidden).toBe(false));
+    expect(player._dom.loadingOverlay.hidden).toBe(true);
+    expect(player._dom.errorText.textContent).toMatch(/retry|playback|media/i);
+    player.destroy();
+  });
+
   it('explains unsupported media without offering a futile retry and clears errors for another lesson', () => {
     const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
     player.loadPlaylist([{ id: 'incompatible', title: 'Bad format', src: 'https://example.org/bad.mp4' }]);
