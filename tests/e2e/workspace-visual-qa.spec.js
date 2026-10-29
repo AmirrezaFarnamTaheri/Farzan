@@ -62,6 +62,33 @@ for (const setup of setups) {
       const shot = await page.screenshot({ path: name, animations: 'disabled', caret: 'hide' });
       expect(shot.byteLength, `${setup.name}/${route} blank screenshot`).toBeGreaterThan(11000);
 
+      // Record real opened overlays as separate visual states; close them
+      // before subsequent routes to avoid accidentally obscuring screenshots.
+      if (route === 'home' && setup.name === 'desktop-light') {
+        await page.evaluate(() => {
+          window.OpenCourseDeck?.bus?.emit?.('notification:new', {
+            title: 'Lesson note saved', message: 'A note is ready to review.',
+          });
+        });
+        await page.locator('[data-notifications-toggle]').click();
+        await expect(page.locator('#notifications-panel')).toBeVisible();
+        await page.screenshot({
+          path: path.join(folder, 'notifications-open.png'),
+          animations: 'disabled', caret: 'hide',
+        });
+        await page.locator('#notif-close').click();
+        await expect(page.locator('#notifications-panel')).toBeHidden();
+
+        await page.locator('#topbar-add-btn').click();
+        await expect(page.locator('#add-content-menu')).toBeVisible();
+        await page.screenshot({
+          path: path.join(folder, 'add-content-menu.png'),
+          animations: 'disabled', caret: 'hide',
+        });
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'true');
+      }
+
       // The original visual suite captured only an idle Courses page. Study
       // focus is a distinct, interactive layout; capture it in every viewport
       // and theme, not only desktop-dark or mobile.
