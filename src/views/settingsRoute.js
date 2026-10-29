@@ -540,6 +540,7 @@ export function mountSettingsView(deps = {}) {
       localModelFile: null,
     };
     let activeDownloadController = null;
+    let saveInFlight = false;
 
     const selectedModelOption = () => gemmaOptions.find(option => option.id === localPackage.value) || gemmaOptions[0];
     const parseEndpoint = (value) => {
@@ -632,7 +633,9 @@ export function mountSettingsView(deps = {}) {
     const apply = (next = {}) => {
       Object.assign(current, next, {
         keyStorage: 'session',
-        hasKey: Boolean(sessionStorage.getItem(keyName)),
+        // An unbound key left in sessionStorage is not an active credential.
+        // The authority's getSetting() response only marks a verified binding.
+        hasKey: next.hasKey === true && Boolean(sessionStorage.getItem(keyName)),
       });
       mode.value = current.mode;
       model.value = current.model;
@@ -654,7 +657,7 @@ export function mountSettingsView(deps = {}) {
         model: saved?.model || 'gemma-local',
         endpoint: saved?.endpoint || '',
         keyStorage: 'session',
-        hasKey: Boolean(sessionStorage.getItem(keyName)),
+        hasKey: saved?.hasKey === true && Boolean(sessionStorage.getItem(keyName)),
         approvedEndpointOrigin: saved?.approvedEndpointOrigin || '',
         localModelStatus: ['installed', 'imported'].includes(saved?.localModelStatus) ? saved.localModelStatus : 'not-installed',
         localModelSource: saved?.localModelSource || gemmaOptions[0]?.url || 'https://ai.google.dev/gemma',
@@ -673,11 +676,17 @@ export function mountSettingsView(deps = {}) {
     });
     on(endpoint, 'input', renderEndpointApproval);
     on(approval, 'change', () => {
-      const parsed = renderEndpointApproval();
-      if (parsed.valid && approval.checked) {
-        endpointWarning.textContent = `${parsed.origin} will be approved when you save.`;
-        endpointWarning.dataset.tone = 'success';
+      // Do not re-run renderEndpointApproval here: it deliberately resets
+      // authorization on origin *input* changes, but invoking it on the
+      // checkbox change itself would immediately uncheck a newly approved
+      // origin and make the approval control impossible to use.
+      const parsed = parseEndpoint(endpoint.value);
+      if (!parsed.valid || !approval.checked) {
+        renderEndpointApproval();
+        return;
       }
+      endpointWarning.textContent = `${parsed.origin} will be approved when you save.`;
+      endpointWarning.dataset.tone = 'success';
     });
     on(localPackage, 'change', () => {
       const option = selectedModelOption();
@@ -685,44 +694,95 @@ export function mountSettingsView(deps = {}) {
       if (option?.url && (!localSource.value || localSource.value === current.localModelSource)) localSource.value = option.url;
     });
 
-    on(document.querySelector('[data-ai-save]'), 'click', async () => {
-      const rawKey = apiKey.value.trim();
-      const next = {
-        mode: mode.value,
-        model: model.value.trim() || 'gemma-local',
-        endpoint: endpoint.value.trim(),
-        keyStorage: 'session',
-        hasKey: false,
-        approvedEndpointOrigin: '',
-        localModelStatus: current.localModelStatus,
-        localModelSource: localSource.value.trim() || selectedModelOption()?.url || 'https://ai.google.dev/gemma',
-        localModelFile: current.localModelFile,
-      };
+    const saveAIButton = document.querySelector('[data-ai-save]');
+    on(saveAIButton, 'click', async () => {
+      if (saveInFlight) return;
+      saveInFlight = true;
+      if (saveAIButton) saveAIButton.disabled = true;
+      const previousKey = sessionStorage.getItem(keyName);
+      const bindingName = 'ocd_ai_authority_session';
+      const previousBinding = sessionStorage.getItem(bindingName);
 
-      if (next.mode === 'custom-api') {
-        const parsed = parseEndpoint(next.endpoint);
-        if (!parsed.valid) {
-          Toast?.error?.(parsed.reason);
-          endpoint.focus();
-          return;
+      try {
+        const rawKey = apiKey.value.trim();
+        const next = {
+          mode: mode.value,
+          model: model.value.trim() || 'gemma-local',
+          endpoint: endpoint.value.trim(),
+          keyStorage: 'session',
+          hasKey: false,
+          approvedEndpointOrigin: '',
+          localModelStatus: current.localModelStatus,
+          localModelSource: localSource.value.trim() || selectedModelOption()?.url || 'https://ai.google.dev/gemma',
+          localModelFile: current.localModelFile,
+        };
+
+        if (next.mode === 'custom-api') {
+          const parsed = parseEndpoint(next.endpoint);
+          if (!parsed.valid) {
+            Toast?.error?.(parsed.reason);
+            endpoint.focus();
+            return;
+          }
+          if (!approval.checked) {
+            Toast?.error?.(`Approve ${parsed.origin} before saving.`);
+            approval.focus();
+            return;
+          }
+          next.endpoint = parsed.href;
+          next.approvedEndpointOrigin = parsed.origin;
+
+          // Never silently use a credential for a different endpoint/model.
+          // An unchanged, still-bound configuration can retain its key.
+          const unchanged = current.mode === 'custom-api'
+            && current.endpoint === parsed.href
+            && current.model === next.model
+            && current.approvedEndpointOrigin === parsed.origin;
+          const authority = window.OpenCourseDeck?.AIAuthority;
+          const bound = typeof authority?.getCredential === 'function'
+            ? Boolean(authority.getCredential(current))
+            : current.hasKey === true && Boolean(previousKey);
+          if (rawKey) {
+            sessionStorage.setItem(keyName, rawKey);
+            next.hasKey = true;
+          } else if (unchanged && bound) {
+            next.hasKey = true;
+          } else {
+            sessionStorage.removeItem(keyName);
+          }
+        } else {
+          sessionStorage.removeItem(keyName);
         }
-        if (!approval.checked) {
-          Toast?.error?.(`Approve ${parsed.origin} before saving.`);
-          approval.focus();
-          return;
+
+        if (typeof window.DB?.saveSetting !== 'function') {
+          throw new Error('Settings storage is not available');
         }
-        next.endpoint = parsed.href;
-        next.approvedEndpointOrigin = parsed.origin;
-        if (rawKey) sessionStorage.setItem(keyName, rawKey);
-        next.hasKey = Boolean(sessionStorage.getItem(keyName));
-      } else {
-        sessionStorage.removeItem(keyName);
-        next.hasKey = false;
+        const committed = await window.DB.saveSetting('ocd_ai_settings', next);
+        if (committed == null || committed === false
+          || committed?.receipt?.committed === false
+          || committed?.committed === false) {
+          throw new Error('Settings storage did not confirm the update');
+        }
+        // AIAuthority returns the authoritative committed settings, including
+        // the new revision; simple legacy bridges may only return true.
+        apply(committed && typeof committed === 'object'
+          ? { ...next, ...committed }
+          : next);
+        Toast?.success?.('AI options saved');
+      } catch (error) {
+        // AIAuthority restores its persisted settings and binding on rejected
+        // commits. Restore the previous session key *as seen by the UI before
+        // staging*, otherwise its internal rollback captures the new key.
+        if (previousKey === null) sessionStorage.removeItem(keyName);
+        else sessionStorage.setItem(keyName, previousKey);
+        if (previousBinding === null) sessionStorage.removeItem(bindingName);
+        else sessionStorage.setItem(bindingName, previousBinding);
+        console.warn('[Settings] AI options save failed', error);
+        Toast?.error?.('AI options were not saved. Your previous session credential was restored; retry.');
+      } finally {
+        saveInFlight = false;
+        if (saveAIButton) saveAIButton.disabled = false;
       }
-
-      await Promise.resolve(window.DB?.saveSetting?.('ocd_ai_settings', next));
-      apply(next);
-      Toast?.success?.('AI options saved');
     });
 
     on(document.querySelector('[data-ai-open-local-source]'), 'click', () => {
