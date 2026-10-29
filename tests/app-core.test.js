@@ -60,6 +60,69 @@ describe('app shell resilience helpers', () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+
+  it('keeps notifications unread when history opens and marks read only after an explicit action', async () => {
+    await loadApp([
+      '<div id="ocd-app">',
+      '<button type="button" data-notifications-toggle aria-label="Notifications">',
+      '<span data-notif-badge hidden></span></button>',
+      '<main id="view-container"></main></div>',
+      '<aside class="drawer" id="notifications-panel" hidden aria-hidden="true">',
+      '<button data-drawer-close>Close</button>',
+      '<button type="button" id="notif-mark-read">Mark all read</button>',
+      '<button type="button" id="notif-clear-all">Clear all</button>',
+      '<ul class="notif-list"></ul></aside>',
+    ].join(''));
+    window.OpenCourseDeck.bus.emit('notification:new', {
+      title: 'Notes saved', message: 'Your lesson note is ready.',
+    });
+    const toggle = document.querySelector('[data-notifications-toggle]');
+    const badge = document.querySelector('[data-notif-badge]');
+    expect(badge.hidden).toBe(false);
+    expect(badge.textContent).toBe('1');
+    expect(document.querySelectorAll('.notif-item.unread')).toHaveLength(1);
+
+    toggle.click();
+    expect(document.getElementById('notifications-panel').getAttribute('aria-hidden')).toBe('false');
+    expect(badge.textContent).toBe('1');
+    expect(document.querySelectorAll('.notif-item.unread')).toHaveLength(1);
+    document.getElementById('notif-mark-read').click();
+
+    expect(badge.hidden).toBe(true);
+    expect(document.querySelectorAll('.notif-item.unread')).toHaveLength(0);
+    expect(document.querySelectorAll('.notif-item')).toHaveLength(1);
+    expect(toggle.getAttribute('aria-label')).toBe('Notifications');
+  });
+
+  it('preserves a focused mini-player action and does not reannounce each time update', async () => {
+    await loadApp();
+    const makeSnapshot = (currentTime) => ({
+      queue: [
+        { id: 'lecture-1', title: 'Cardiology lecture', topicId: 'topic-1',
+          courseId: 'course-a', src: 'https://example.test/lesson.mp4' },
+      ],
+      queueIndex: 0,
+      currentTime,
+      duration: 240,
+      playing: false,
+    });
+    const mini = window.OpenCourseDeck.MiniPlayer.show(makeSnapshot(30));
+    const resumeButton = mini.querySelector('[data-mini-resume]');
+    resumeButton.focus();
+    const announcement = mini.querySelector('[data-mini-announcement]');
+    expect(announcement?.getAttribute('aria-live')).toBe('polite');
+    expect(mini.getAttribute('aria-live')).not.toBe('polite');
+    const originalMessage = announcement.textContent;
+
+    window.OpenCourseDeck.MiniPlayer.show(makeSnapshot(95));
+    expect(document.querySelector('[data-mini-resume]')).toBe(resumeButton);
+    expect(document.activeElement).toBe(resumeButton);
+    expect(mini.querySelector('.global-mini-player__time').textContent).toContain('1:35');
+    expect(mini.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('40');
+    expect(announcement.textContent).toBe(originalMessage);
+    window.OpenCourseDeck.MiniPlayer.hide();
+  });
+
   it('removes culled toasts from active toast bookkeeping', async () => {
     await loadApp();
     window.OpenCourseDeck.config.toastMaxStack = 2;
