@@ -87,3 +87,20 @@ No route may count as covered just because the shell rendered. Record before/aft
 ## Open PR dependencies and status
 
 PRs #134, #135, #136, #137 and #138 are currently draft. #137 is stacked on #134; an earlier CI head failed two retry regressions and needs the underlying fix carried forward or rebased. #138 had an earlier lockfile integrity audit failure; a newer head includes the integrity hash but still needs final-head verification. No redesign component is considered shipped until merged and validated.
+
+## Latest expanded screenshot results (PR #139, run 40880201415)
+
+The expanded visual run captured 68 PNGs: all 15 sidebar routes, missing-route recovery, and study-focus playback in each of desktop-light/dark and mobile-light/RTL. Its first run failed on an image-size-only assertion: a minimal mobile-light not-found screenshot compressed to 6,534 bytes and fell under an arbitrary 9,000-byte floor. Importantly, that screenshot appears *visually blank* despite DOM being present; do not dismiss it solely as compression. Follow-up now asserts actual in-viewport bounds, fully painted opacity, route heading, and recovery links before capture.
+
+Current full-resolution route observations (no longer just historical):
+- Materials: 6,421 items; search/filter plus a second pagination panel consume substantial space before results; no-media entries appear before playable lectures.
+- PDF: full navigation/search/rotation/annotation controls displayed before document open; mobile toolbar wraps into multiple rows.
+- Playlists: 1 active queue, 0 saved playlists, catalog previews dominate; mobile stacked metrics/form push playlist content below the fold.
+- Bookmarks: four counters and a large results card wrap a single Untitled Note.
+- Tags: four zero metrics and unused filter chips lack an obvious creation path.
+- Flashcards: three zero counters and a large empty state; review/create action should be task-first.
+- Achievements: six oversized locked cards and five zero counters, no progress toward next milestone.
+- Help: technical first-run commands and local port URLs are crowded and unsuitable as default user guidance.
+- Not found: breadcrumb incorrectly says OpenCourseDeck. Fixed by replacing the unknown-route fallback label with Page not found in app.js and guarding it in the e2e suite.
+
+Current artifacts and screenshots cannot yet prove actual playing media, populated decks, successful saves, native Windows rendering, 200% zoom, or true Persian translation. Those require seeded state and interactive acceptance.
