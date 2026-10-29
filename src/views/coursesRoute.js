@@ -64,6 +64,7 @@ export async function mountCoursesView(deps = {}) {
               <span class="course-session-label">Now studying</span>
               <div class="course-session-actions">
                 <button class="btn btn-ghost btn-sm course-jump-lessons" type="button" data-course-jump-topics aria-controls="course-detail">Lessons</button>
+                <button class="btn btn-primary btn-sm" type="button" data-course-take-note aria-controls="course-timestamp-note">Take note</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-toggle-catalog aria-controls="courses-catalog" aria-expanded="false">Browse catalog</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
               </div>
@@ -74,7 +75,7 @@ export async function mountCoursesView(deps = {}) {
             </div>
           </div>
 
-          <div class="card card-filled timestamp-note-card">
+          <div class="card card-filled timestamp-note-card" id="course-timestamp-note">
             <div class="card-body">
               <div class="timestamp-note-grid">
                 <div class="timestamp-note-copy">
@@ -176,6 +177,13 @@ export async function mountCoursesView(deps = {}) {
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     detailEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
     detailEl.focus({ preventScroll: true });
+  });
+  document.querySelector('[data-course-take-note]')?.addEventListener('click', () => {
+    if (playbackSection?.hidden) return;
+    const field = playbackSection.querySelector('[data-timestamp-note-body]');
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    field?.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    field?.focus?.({ preventScroll: true });
   });
   document.querySelector('[data-course-close-playback]')?.addEventListener('click', () => {
     try { playerEl?._pdPlayer?.pause?.(); } catch {}
