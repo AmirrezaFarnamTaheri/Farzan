@@ -126,4 +126,73 @@ describe('Courses workbench progress and accessible row actions', () => {
     expect(window.DB.getAllProgress).toHaveBeenCalledTimes(2);
     controller.unmount();
   });
+
+  it('does not erase a completed lesson when playback opens or moves backward', async () => {
+    const records = new Map([['anemia', {
+      topicId: 'anemia', courseId: COURSE_ID, status: 'done', percent: 100,
+      position: 105, duration: 120,
+    }]]);
+    window.DB.getProgress.mockImplementation(async id => records.get(id) ?? null);
+    window.DB.saveProgress.mockImplementation(async (topicId, courseId, patch) => {
+      const next = { ...records.get(topicId), ...patch, topicId, courseId };
+      records.set(topicId, next);
+      return next;
+    });
+
+    const callbacks = new Map();
+    const track = { id: 'lecture-1', topicId: 'anemia', courseId: COURSE_ID, src: 'https://example.test/anemia.mp4' };
+    const player = {
+      queue: [track], trackIndex: 0, currentTime: 105, duration: 120,
+      on: vi.fn((event, cb) => callbacks.set(event, cb)),
+      off: vi.fn((event) => callbacks.delete(event)),
+      loadPlaylist: vi.fn(),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+
+    const controller = await mountCourses();
+    expect(callbacks.has('trackChange')).toBe(true);
+
+    // Opening an existing lesson is an activity touch, never a progress reset.
+    await callbacks.get('trackChange')(track);
+    expect(records.get('anemia')).toMatchObject({ status: 'done', percent: 100, position: 105 });
+
+    // Replaying an already-completed lesson at an earlier position is not
+    // equivalent to the learner explicitly marking it incomplete.
+    await callbacks.get('timeupdate')({ currentTime: 12, duration: 120, percent: 10 });
+    expect(records.get('anemia')).toMatchObject({ status: 'done', percent: 100, position: 12 });
+    controller.unmount();
+  });
+
+  it('retains an unfinished lesson resume point when it is opened again', async () => {
+    const records = new Map([['anemia', {
+      topicId: 'anemia', courseId: COURSE_ID, status: 'in-progress',
+      percent: 40, position: 48, duration: 120,
+    }]]);
+    window.DB.getProgress.mockImplementation(async id => records.get(id) ?? null);
+    window.DB.saveProgress.mockImplementation(async (id, courseId, patch) => {
+      const next = { ...records.get(id), ...patch, topicId: id, courseId };
+      records.set(id, next);
+      return next;
+    });
+    const callbacks = new Map();
+    const track = { id: 'lecture-1', topicId: 'anemia', courseId: COURSE_ID };
+    const player = {
+      queue: [track], trackIndex: 0, currentTime: 0, duration: 120,
+      on: vi.fn((event, cb) => callbacks.set(event, cb)),
+      off: vi.fn((event) => callbacks.delete(event)),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+
+    const controller = await mountCourses();
+    await callbacks.get('trackChange')(track);
+    expect(records.get('anemia')).toMatchObject({
+      status: 'in-progress', percent: 40, position: 48,
+    });
+    controller.unmount();
+  });
+
 });
