@@ -3,7 +3,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const output = path.resolve('artifacts/farzan-redesign');
-const routes = ['home', 'courses', 'my-courses', 'notes', 'progress', 'studio', 'settings'];
+const routes = [
+  'home', 'courses', 'my-courses', 'materials', 'tags', 'playlists',
+  'studio', 'notes', 'pdf', 'bookmarks', 'flashcards',
+  'progress', 'achievements', 'help', 'settings',
+];
+
+// The sidebar defines every product destination. If one is added, visual
+// assurance must include it instead of silently rendering only seven routes.
+const navigationRoutes = [...new Set(
+  [...fs.readFileSync(path.resolve('index.html'), 'utf8').matchAll(/data-route="\/([^"]+)"/g)]
+    .map(match => match[1]),
+)].sort();
+test('visual QA covers all sidebar navigation destinations', () => {
+  expect([...routes].sort()).toEqual(navigationRoutes);
+});
 const setups = [
   { name: 'desktop-light', width: 1440, height: 900 },
   { name: 'desktop-dark', width: 1440, height: 900, dark: true },
@@ -11,10 +25,10 @@ const setups = [
   { name: 'mobile-rtl', width: 390, height: 844, rtl: true },
 ];
 test.use({ channel: 'chrome' });
-test.setTimeout(180000);
+test.setTimeout(240000);
 
 for (const setup of setups) {
-  test(`visual acceptance across key routes: ${setup.name}`, async ({ page }) => {
+  test(`visual acceptance across all navigation routes: ${setup.name}`, async ({ page }) => {
     await page.setViewportSize({ width: setup.width, height: setup.height });
     if (setup.dark) {
       await page.addInitScript(() => {
@@ -49,9 +63,9 @@ for (const setup of setups) {
       expect(shot.byteLength, `${setup.name}/${route} blank screenshot`).toBeGreaterThan(11000);
 
       // The original visual suite captured only an idle Courses page. Study
-      // focus is a distinct, interactive layout; save its real state for
-      // desktop/dark and both mobile writing directions.
-      if (route === 'courses' && ['desktop-dark', 'mobile-light', 'mobile-rtl'].includes(setup.name)) {
+      // focus is a distinct, interactive layout; capture it in every viewport
+      // and theme, not only desktop-dark or mobile.
+      if (route === 'courses') {
         const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
         await expect(course).toBeVisible({ timeout: 20000 });
         await course.click();
@@ -74,5 +88,18 @@ for (const setup of setups) {
         expect(focusShot.byteLength, `${setup.name} empty study-focus screenshot`).toBeGreaterThan(11000);
       }
     }
+
+    // The missing-route recovery screen is not in sidebar navigation, but it
+    // is user-facing and must be visually checked for each layout direction.
+    await page.goto('/#/this-route-does-not-exist', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#view-container .view-notfound')).toBeVisible();
+    await expect(page.locator('[data-missing-route]')).toContainText('this-route-does-not-exist');
+    const invalidWidth = await page.evaluate(() =>
+      Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth);
+    expect(invalidWidth, `${setup.name}/notfound horizontal overflow`).toBeLessThanOrEqual(3);
+    const notfound = await page.screenshot({
+      path: path.join(folder, 'notfound.png'), animations: 'disabled', caret: 'hide',
+    });
+    expect(notfound.byteLength, `${setup.name} blank notfound screenshot`).toBeGreaterThan(9000);
   });
 }
