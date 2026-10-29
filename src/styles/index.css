@@ -20,6 +20,7 @@
 @import './study-polish.css' layer(enhancements);
 @import './workspace.css' layer(enhancements);
 @import './farzan-redesign.css' layer(enhancements);
+@import './player-theater.css' layer(enhancements);
 
 @media (prefers-reduced-motion: reduce) {
   *,
