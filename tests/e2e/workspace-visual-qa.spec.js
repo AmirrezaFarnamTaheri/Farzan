@@ -80,6 +80,10 @@ for (const setup of setups) {
           path: path.join(folder, 'add-content-menu.png'),
           animations: 'disabled', caret: 'hide',
         });
+        // Leave subsequent route screenshots unobscured. A separately tested
+        // navigation regression covers the menu's automatic dismissal.
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'true');
       }
 
 
