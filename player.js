@@ -333,6 +333,12 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
           <div class="pd-spinner"></div>
         </div>
 
+        <!-- Live, recoverable media failure: no dead-end spinner. -->
+        <div class="pd-error-banner" role="alert" hidden>
+          <span class="pd-error-text"></span>
+          <button class="pd-btn pd-btn-sm" type="button" data-pd="retry">Retry</button>
+        </div>
+
         <!-- Resume hint overlay -->
         <div class="pd-resume-hint" hidden>
           <span class="pd-resume-text"></span>
@@ -423,6 +429,9 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         pipBtn:     $('[data-pd="pip"]',     controls),
         likeBtn:    $('[data-pd="like"]',    controls),
         loadingOverlay: $('.pd-loading-overlay', controls),
+        errorBanner: $('.pd-error-banner', controls),
+        errorText: $('.pd-error-text', controls),
+        errorRetry: $('[data-pd="retry"]', controls),
         queueList:  $('.pd-queue-list', this._queuePanel),
       };
       this._learningMode = null;
@@ -436,8 +445,8 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
     _bindNative() {
       const m = this._media;
 
-      this._on(m, 'loadstart',  () => this._setLoading(true));
-      this._on(m, 'canplay',    () => this._setLoading(false));
+      this._on(m, 'loadstart', () => { this._clearMediaError(); this._setLoading(true); });
+      this._on(m, 'canplay',   () => { this._clearMediaError(); this._setLoading(false); });
       this._on(m, 'waiting',    () => this._setBuffering(true));
       this._on(m, 'playing',    () => { this._setBuffering(false); this._onPlay(); });
       this._on(m, 'pause',      () => this._onPause());
@@ -464,6 +473,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         if (!btn) return;
         switch (btn.dataset.pd) {
           case 'play':       this.toggle();                  break;
+          case 'retry':      this._retryMedia();             break;
           case 'prev':       this.prev();                    break;
           case 'next':       this.next();                    break;
           case 'mute':       this.toggleMute();              break;
@@ -716,7 +726,43 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         : 'Unknown';
       console.warn(`[MediaPlayer] Error: ${msg}`);
       this._setLoading(false);
+      this._setBuffering(false);
+      this._showMediaError(err?.code);
       this._emit('error', { code: err?.code, message: msg });
+    }
+
+    _clearMediaError() {
+      if (this._dom?.errorBanner) this._dom.errorBanner.hidden = true;
+      if (this._dom?.errorText) this._dom.errorText.textContent = '';
+    }
+
+    _showMediaError(code) {
+      if (!this._dom?.errorBanner) return;
+      const copy = {
+        1: 'Playback was interrupted. You can retry this lesson.',
+        2: 'The media could not load because of a network problem. Check your connection and retry.',
+        3: 'The media could not be decoded. Try a different source.',
+        4: 'This media format is not supported. Choose a different lesson or source.',
+      };
+      this._dom.errorText.textContent = copy[code] || 'This media could not be played. Try another source.';
+      const hasSource = Boolean(this._media?.currentSrc || this._media?.getAttribute('src'));
+      this._dom.errorRetry.hidden = !hasSource || Number(code) === 4 || Number(code) === 3;
+      this._dom.errorBanner.hidden = false;
+    }
+
+    _retryMedia() {
+      // Retain the current queue, chapter context, and persisted media state.
+      // The retry is directly initiated by the learner (autoplay-safe).
+      if (this._destroyed || !(this._media?.currentSrc || this._media?.getAttribute('src'))) return;
+      this._clearMediaError();
+      this._setLoading(true);
+      try {
+        this._media.load();
+        this.play();
+      } catch {
+        this._setLoading(false);
+        this._showMediaError(2);
+      }
     }
 
     _onDurationChange() {
@@ -918,6 +964,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
      * @param {boolean} autoplay
      */
     loadPlaylist(tracks, autoplay = false) {
+      this._clearMediaError();
       this._queue = tracks.map((t, i) => ({ ...t, _id: t.id ?? uid('trk'), _index: i }));
       this._state.queueIndex = 0;
       if (this._state.shuffle) this._buildShuffleOrder();
@@ -1044,6 +1091,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       if (!this._queue.length) return;
       const track = this._queue[index];
       if (!track) return;
+      this._clearMediaError();
       const previous = this._currentTrack();
       if (previous && previous !== track) {
         this._emit('beforeTrackChange', previous);
