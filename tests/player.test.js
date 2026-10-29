@@ -216,6 +216,25 @@ describe('MediaPlayer queue rendering', () => {
     player.destroy();
   });
 
+  it('never applies an old retry resume position to a subsequently selected lesson', async () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    player.loadPlaylist([{ id: 'first', src: 'https://example.test/first.mp4' }]);
+    const media = player._media;
+    media.currentTime = 61;
+    media.dispatchEvent(new Event('timeupdate'));
+    Object.defineProperty(media, 'error', { configurable: true, value: { code: 2 } });
+    media.dispatchEvent(new Event('error'));
+    vi.mocked(media.load).mockImplementationOnce(() => { media.currentTime = 0; });
+    player._dom.errorRetry.click();
+    player.loadPlaylist([{ id: 'second', src: 'https://example.test/second.mp4' }], false);
+    media.currentTime = 0;
+    media.dispatchEvent(new Event('loadedmetadata'));
+    expect(player.queue[0].id).toBe('second');
+    expect(media.currentTime).toBe(0);
+    expect(player._retryResumeAt).toBeNull();
+    player.destroy();
+  });
+
   it('explains unsupported media without offering a futile retry and clears errors for another lesson', () => {
     const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
     player.loadPlaylist([{ id: 'incompatible', title: 'Bad format', src: 'https://example.org/bad.mp4' }]);
