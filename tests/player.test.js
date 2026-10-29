@@ -106,6 +106,47 @@ describe('MediaPlayer queue rendering', () => {
     expect(document.querySelector('#player .pd-art-img').getAttribute('src')).toBe('data:image/png;base64,AAAA');
   });
 
+  it('keeps loading, errors, captions and resume prompts on the media stage, not over transport controls', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    const stage = document.querySelector('#player .pd-media-stage');
+    expect(stage).not.toBeNull();
+    expect(stage.contains(player._media)).toBe(true);
+    expect(stage.contains(player._dom.loadingOverlay)).toBe(true);
+    expect(stage.contains(player._dom.errorBanner)).toBe(true);
+    expect(stage.contains(player._dom.resumeHint)).toBe(true);
+    expect(stage.contains(player._captionOverlay)).toBe(true);
+    expect(stage.contains(player._dom.playBtn)).toBe(false);
+    expect(player._dom.loadingOverlay.querySelector('[role="status"]')?.textContent)
+      .toMatch(/loading/i);
+    player.destroy();
+  });
+
+  it('keeps essential controls visible while video-only secondary tools live in a native more menu', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
+    const controls = player._controls;
+    const more = controls.querySelector('details.pd-advanced-tools');
+    expect(more).not.toBeNull();
+    expect(more.open).toBe(false);
+    expect(more.querySelector('summary')?.textContent).toMatch(/more/i);
+    for (const kind of ['shuffle', 'repeat', 'abloop', 'screenshot', 'chapters', 'transcript', 'queue']) {
+      expect(more.querySelector('[data-pd="' + kind + '"]')).not.toBeNull();
+    }
+    for (const kind of ['prev', 'play', 'next', 'mute', 'speed', 'captions', 'pip']) {
+      expect(more.querySelector('[data-pd="' + kind + '"]')).toBeNull();
+      expect(controls.querySelector('[data-pd="' + kind + '"]')).not.toBeNull();
+    }
+    player.destroy();
+  });
+
+  it('preserves the simple audio mode without creating a video stage or collapsing audio controls', () => {
+    const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'audio' });
+    expect(document.querySelector('#player .pd-media-stage')).toBeNull();
+    expect(player._media.parentElement).toBe(player._container);
+    expect(player._controls.querySelector('details.pd-advanced-tools')).toBeNull();
+    expect(player._controls.querySelector('[data-pd="shuffle"]')).not.toBeNull();
+    player.destroy();
+  });
+
   it('shows an accessible network error with a retry that preserves the current lesson', () => {
     const player = new window.OpenCourseDeck.MediaPlayer('#player', { type: 'video' });
     player.loadPlaylist([{ id: 'lecture-a', title: 'Lecture A', src: 'https://example.org/lecture.mp4' }]);

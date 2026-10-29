@@ -123,6 +123,58 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
       expect(all.length).toBe(0);
     });
 
+    it('imports large Anki decks in one durable write and skips identical cards on reimport', async () => {
+      const manager = window.OpenCourseDeck.Flashcards.manager;
+      manager.reset();
+      window.DB = {
+        deck: [],
+        getSetting: vi.fn(async () => window.DB.deck),
+        saveSetting: vi.fn(async (_key, cards) => {
+          window.DB.deck = cards.map(card => ({ ...card }));
+          return true;
+        }),
+      };
+      manager.invalidateCache();
+      const payload = {
+        name: 'Clinical medicine',
+        cards: Array.from({ length: 96 }, (_, i) => ({
+          sfld: 'Question ' + i,
+          flds: 'Question ' + i + '\x1fAnswer ' + i,
+        })),
+      };
+      const first = await manager.importAnkiDeck(payload);
+      expect(first.importedCount).toBe(96);
+      expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
+      expect(await manager.getCards()).toHaveLength(96);
+      expect(first.cards.every(card => card.deck === 'Clinical medicine')).toBe(true);
+      window.DB.saveSetting.mockClear();
+      const second = await manager.importAnkiDeck(payload);
+      expect(second.importedCount).toBe(0);
+      expect(window.DB.saveSetting).not.toHaveBeenCalled();
+      expect(await manager.getCards()).toHaveLength(96);
+    });
+
+    it('leaves the existing flashcard deck untouched if a batch import fails to persist', async () => {
+      const manager = window.OpenCourseDeck.Flashcards.manager;
+      manager.reset();
+      window.DB = {
+        deck: [],
+        getSetting: vi.fn(async () => window.DB.deck),
+        saveSetting: vi.fn(async (_key, cards) => {
+          if (cards.length > 1) throw new Error('Flashcard storage full');
+          window.DB.deck = cards.map(card => ({ ...card }));
+          return true;
+        }),
+      };
+      manager.invalidateCache();
+      await manager.addCard({ front: 'Keep', back: 'Original', deck: 'Medicine' });
+      await expect(manager.importAnkiDeck({
+        name: 'Medicine', cards: [{ front: 'New', back: 'Question' }],
+      })).rejects.toThrow('Flashcard storage full');
+      expect((await manager.getCards()).map(card => card.front)).toEqual(['Keep']);
+      expect(window.DB.deck.map(card => card.front)).toEqual(['Keep']);
+    });
+
     it('imports and exports Anki deck JSON payloads', async () => {
       const { manager } = window.OpenCourseDeck.Flashcards;
       const ankiPayload = {

@@ -208,7 +208,22 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       } else {
         this._media.style.display = 'none';
       }
-      this._container.appendChild(this._media);
+      // Keep media overlays in a dedicated stage, never in the transport
+      // region. Audio retains the original flat DOM for compatibility.
+      this._mediaStage = null;
+      if (this._opts.type === 'video') {
+        const stage = document.createElement('div');
+        stage.className = 'pd-media-stage';
+        stage.appendChild(this._media);
+        const empty = document.createElement('div');
+        empty.className = 'pd-stage-empty';
+        empty.textContent = 'Choose a lesson to start watching';
+        stage.appendChild(empty);
+        this._mediaStage = stage;
+        this._container.appendChild(stage);
+      } else {
+        this._container.appendChild(this._media);
+      }
 
       if (!this._opts.controls) return;
 
@@ -361,6 +376,34 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         controls.insertBefore(this._vizCanvas, controls.firstChild);
       }
 
+      if (this._mediaStage) {
+        // Move every stage-related overlay out of the controls. This fixes
+        // loading blur and alerts physically covering the playback buttons.
+        const loading = controls.querySelector('.pd-loading-overlay');
+        loading.innerHTML = '<div class="pd-loading-status" role="status" aria-live="polite"><div class="pd-spinner" aria-hidden="true"></div><span>Loading lesson…</span></div>';
+        for (const selector of ['.pd-loading-overlay', '.pd-error-banner', '.pd-resume-hint']) {
+          const overlay = controls.querySelector(selector);
+          if (overlay) this._mediaStage.appendChild(overlay);
+        }
+
+        // Disclose specialist playback features only on demand. This reuses
+        // the existing actions and event handlers, not a second player.
+        const more = document.createElement('details');
+        more.className = 'pd-advanced-tools';
+        const summary = document.createElement('summary');
+        summary.textContent = 'More tools';
+        summary.setAttribute('aria-label', 'More playback tools');
+        const menu = document.createElement('div');
+        menu.className = 'pd-advanced-menu';
+        menu.setAttribute('role', 'group');
+        menu.setAttribute('aria-label', 'Advanced playback tools');
+        for (const key of ['shuffle', 'repeat', 'abloop', 'screenshot', 'chapters', 'transcript', 'queue']) {
+          const button = controls.querySelector('[data-pd="' + key + '"]');
+          if (button) menu.appendChild(button);
+        }
+        more.append(summary, menu);
+        controls.querySelector('.pd-extras')?.appendChild(more);
+      }
       this._container.appendChild(controls);
       this._controls = controls;
 
@@ -390,7 +433,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       this._captionOverlay.className = 'pd-caption-overlay';
       this._captionOverlay.hidden = true;
       this._captionOverlay.setAttribute('aria-live', 'polite');
-      this._container.appendChild(this._captionOverlay);
+      (this._mediaStage || this._container).appendChild(this._captionOverlay);
 
       // Cache DOM refs
       this._dom = {
@@ -407,8 +450,8 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         waveformCanvas:  $('.pd-waveform-canvas', controls),
         watchedOverlay:  $('.pd-watched-overlay', controls),
         abLoopRegion:    $('.pd-ab-loop-region', controls),
-        resumeHint:      $('.pd-resume-hint', controls),
-        resumeText:      $('.pd-resume-text', controls),
+        resumeHint:      $('.pd-resume-hint', this._container),
+        resumeText:      $('.pd-resume-text', this._container),
         speedPanel:      $('.pd-speed-panel', controls),
         speedSlider:     $('.pd-speed-slider', controls),
         speedValue:      $('.pd-speed-value', controls),
@@ -428,10 +471,10 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         captionsBtn: $('[data-pd="captions"]', controls),
         pipBtn:     $('[data-pd="pip"]',     controls),
         likeBtn:    $('[data-pd="like"]',    controls),
-        loadingOverlay: $('.pd-loading-overlay', controls),
-        errorBanner: $('.pd-error-banner', controls),
-        errorText: $('.pd-error-text', controls),
-        errorRetry: $('[data-pd="retry"]', controls),
+        loadingOverlay: $('.pd-loading-overlay', this._container),
+        errorBanner: $('.pd-error-banner', this._container),
+        errorText: $('.pd-error-text', this._container),
+        errorRetry: $('[data-pd="retry"]', this._container),
         queueList:  $('.pd-queue-list', this._queuePanel),
       };
       this._learningMode = null;
@@ -468,7 +511,10 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       if (!this._opts.controls) return;
 
       // Play/pause button
-      this._on(this._controls, 'click', e => {
+      // Stage retry/resume controls and transport share one delegated handler.
+      // Queue buttons are handled in the queue panel's own listener below.
+      this._on(this._container, 'click', e => {
+        if (e.target.closest('.pd-queue-panel')) return;
         const btn = e.target.closest('[data-pd]');
         if (!btn) return;
         switch (btn.dataset.pd) {
@@ -802,8 +848,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
 
     _onTimeUpdate() {
       const cur = this._media.currentTime;
-      // During a retry, load() is allowed to emit a transient timeupdate at
-      // zero before we can restore the actual watched position.
+      // load() can emit a false zero timeupdate before resume restoration.
       if (this._retryResumeAt != null && cur === 0) return;
       this._state.currentTime = cur;
       const dur = this._state.duration;
