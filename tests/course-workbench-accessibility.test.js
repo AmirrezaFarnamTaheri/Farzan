@@ -73,6 +73,19 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('keeps a one-click note entry point in study-focus chrome', async () => {
+    const controller = await mountCourses();
+    const focus = document.querySelector('[data-course-take-note]');
+    const playback = document.querySelector('[data-course-playback]');
+    const textarea = document.querySelector('[data-timestamp-note-body]');
+    expect(focus?.getAttribute('aria-controls')).toBe('course-timestamp-note');
+    playback.hidden = false;
+    focus.click();
+    expect(document.activeElement).toBe(textarea);
+    expect(textarea.closest('#course-timestamp-note')).not.toBeNull();
+    controller.unmount();
+  });
+
   it('uses distinct native controls for primary media and completion and avoids repeated source subtitles', async () => {
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
