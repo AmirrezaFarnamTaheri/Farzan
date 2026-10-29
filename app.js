@@ -2904,7 +2904,7 @@ import { Pointer } from './src/lib/pointer.js';
 
     markAllRead() {
       this.setCount(0);
-      $('#notifications-panel .notif-item.unread').forEach(el => el.classList.remove('unread'));
+      document.querySelectorAll('#notifications-panel .notif-item.unread').forEach(el => el.classList.remove('unread'));
     },
 
     _onNew({ message, type = 'info', title = '' }) {
