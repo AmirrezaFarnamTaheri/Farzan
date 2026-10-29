@@ -279,6 +279,24 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('uses authority binding verification rather than only the presence of session key bytes', async () => {
+    const { controller } = mountSettings({
+      mode: 'custom-api',
+      model: 'existing-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+      authorityRevision: 24,
+      authorityTransactionId: 'ai-auth-24',
+    });
+    sessionStorage.setItem('ocd_ai_api_key_session', 'unbound-credential-bytes');
+    window.OpenCourseDeck.AIAuthority = { getCredential: vi.fn(() => '') };
+    await vi.waitFor(() => expect(window.OpenCourseDeck?.AISettings?.model).toBe('existing-model'));
+    expect(window.OpenCourseDeck.AISettings.hasKey).toBe(false);
+    expect(document.querySelector('[data-ai-summary]').textContent).toContain('Not present');
+    controller.unmount();
+  });
+
   it('does not advertise an unbound session key as an available credential', async () => {
     const { controller } = mountSettings({
       mode: 'custom-api',
