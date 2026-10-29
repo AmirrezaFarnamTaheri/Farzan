@@ -756,12 +756,13 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       // HTMLMediaElement.load() resets currentTime and can synchronously emit
       // zero-position timeupdates. Keep the last lesson position and protect
       // both the session snapshot and canonical progress until metadata returns.
+      const retryTrack = this._currentTrack();
       const resumeAt = Number(this._media.currentTime || this._state.currentTime) || 0;
       this._retryResumeAt = resumeAt > 0 ? resumeAt : null;
       this._clearMediaError();
       this._setLoading(true);
       const restore = () => {
-        if (this._destroyed || this._retryResumeAt == null) return;
+        if (this._destroyed || this._retryResumeAt == null || this._currentTrack() !== retryTrack) return;
         try {
           this._media.currentTime = this._retryResumeAt;
           this._state.currentTime = this._retryResumeAt;
@@ -779,7 +780,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         // Keep the user gesture for autoplay policy, but make rejected play()
         // observable here rather than swallowing it as a console warning.
         Promise.resolve(this.play({ propagateError: true })).catch((error) => {
-          if (this._destroyed) return;
+          if (this._destroyed || this._currentTrack() !== retryTrack) return;
           this._setLoading(false);
           if (error?.name === 'AbortError') return;
           this._showMediaError(5);
@@ -993,6 +994,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
      * @param {boolean} autoplay
      */
     loadPlaylist(tracks, autoplay = false) {
+      this._retryResumeAt = null;
       this._clearMediaError();
       this._queue = tracks.map((t, i) => ({ ...t, _id: t.id ?? uid('trk'), _index: i }));
       this._state.queueIndex = 0;
@@ -1120,6 +1122,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       if (!this._queue.length) return;
       const track = this._queue[index];
       if (!track) return;
+      this._retryResumeAt = null;
       this._clearMediaError();
       const previous = this._currentTrack();
       if (previous && previous !== track) {
