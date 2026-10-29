@@ -34,6 +34,19 @@ describe('KnowledgeGraph established force layout compatibility', () => {
     graph.destroy();
   });
 
+  it('uses the established d3-force simulation engine without duplicating its lifecycle', () => {
+    const graph = graphFixture();
+    graph._initSimulation(800, 600);
+    const simulation = graph._simulation;
+    expect(typeof simulation.alpha).toBe('function');
+    expect(typeof simulation.alphaTarget).toBe('function');
+    expect(typeof simulation.nodes).toBe('function');
+    expect(simulation.nodes()).toBe(graph._nodes);
+    expect(simulation.force('links').links()).toHaveLength(1);
+    expect(graph._edges).toEqual([{ source: 'heart', target: 'vessels' }]);
+    graph.destroy();
+  });
+
   it('ignores a stale or deleted link without losing valid graph nodes', () => {
     const graph = graphFixture();
     graph._edges.push({ source: 'heart', target: 'deleted-note' });
