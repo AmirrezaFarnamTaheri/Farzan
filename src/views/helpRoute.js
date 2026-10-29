@@ -32,10 +32,10 @@ export function mountHelpView(deps = {}) {
           <div class="card-body">
             <h2 class="help-card-title">First-run checklist</h2>
             <ol class="help-checklist">
-              <li><span aria-hidden="true">1</span><p>Start with <code>npm start</code> or the Windows launcher, then open <code>http://localhost:5173/</code>.</p></li>
-              <li><span aria-hidden="true">2</span><p>Use Courses or Materials to open content from the active catalog.</p></li>
-              <li><span aria-hidden="true">3</span><p>Create a note, try the PDF view, and open Studio for canvas work.</p></li>
-              <li><span aria-hidden="true">4</span><p>Export a backup before switching ports, browsers, profiles, or catalogs.</p></li>
+              <li><span aria-hidden="true">1</span><p>Open Farzan in your browser or installed Windows app, then choose Courses to start studying.</p></li>
+              <li><span aria-hidden="true">2</span><p>Select a lesson and use Play or Resume. Farzan saves your progress as you study.</p></li>
+              <li><span aria-hidden="true">3</span><p>Create Notes, review Flashcards, open PDFs, or use Studio to organize ideas visually.</p></li>
+              <li><span aria-hidden="true">4</span><p>Export a backup from Settings before changing devices, browser profiles, or installations.</p></li>
             </ol>
           </div>
         </section>
@@ -43,7 +43,7 @@ export function mountHelpView(deps = {}) {
         <section class="card card-filled help-card">
           <div class="card-body">
             <h2 class="help-card-title">Where your data lives</h2>
-            <p>Farzan stores your data in this browser profile for this exact origin. Changing from <code>localhost:5173</code> to another port creates a different storage bucket.</p>
+            <p>Farzan stores study progress and notes locally in this browser profile or Windows installation. Different browser profiles and installations do not automatically share your learning data. Use backups when moving between them.</p>
             <dl class="help-facts">
               <div><dt>Progress</dt><dd>IndexedDB</dd></div>
               <div><dt>Preferences</dt><dd>localStorage</dd></div>
@@ -82,17 +82,30 @@ export function mountHelpView(deps = {}) {
             <div class="help-recovery-list">
               <div>
                 <strong>Blank or stuck loading?</strong>
-                <p>Run <code>npm run build</code>, hard refresh, then open <code>?debug=1</code> if it still stalls.</p>
+                <p>Reload Farzan or restart the Windows app. Check that your browser has enough storage space, then try again. Open Developer diagnostics below if the issue persists.</p>
               </div>
               <div>
                 <strong>Data looks missing?</strong>
-                <p>Check that you are using the same browser, profile, hostname, and port as before.</p>
+                <p>Confirm that you are in the same browser profile or Windows installation. If you moved devices or profiles, restore your latest app-data backup.</p>
               </div>
               <div>
                 <strong>Offline app seems stale?</strong>
-                <p>Run <code>npm run build:sw</code>, reload once online, or clear the service worker in browser devtools.</p>
+                <p>Connect to the internet and reopen Farzan to check for updates. Previously downloaded study content should remain available when offline.</p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="card card-filled help-card">
+          <div class="card-body">
+            <details class="help-developer" data-help-developer>
+              <summary class="btn btn-ghost">Developer diagnostics (advanced)</summary>
+              <div class="help-recovery-list">
+                <p>For development builds, run <code>npm start</code> and open <code>http://localhost:5173/</code> in your browser.</p>
+                <p>Build generated assets with <code>npm run build</code>. For offline cache updates, use <code>npm run build:sw</code> and reload. Advanced debugging is available through <code>?debug=1</code>.</p>
+                <p>Browser origins, including different localhost ports, have separate storage buckets. Back up before moving data.</p>
+              </div>
+            </details>
           </div>
         </section>
 

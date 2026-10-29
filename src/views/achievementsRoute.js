@@ -44,27 +44,46 @@ export function mountAchievementsView(deps = {}) {
     const reviewRoot = document.querySelector('[data-review-list]');
     if (!metricsRoot || !listRoot) return;
 
-    const [progress, notes, timestamps, topics, watchedSegments, cards] = await Promise.all([
-      (async () => { try { return await window.DB?.getAllProgress?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-      (async () => {
-        try {
+    let loaded;
+    try {
+      loaded = await Promise.all([
+        window.DB?.getAllProgress?.() ?? [],
+        window.DB?.getAllNotes?.() ?? [],
+        window.DB?.getAllTimestamps?.() ?? [],
+        (async () => {
           await window.DataStore?.init?.();
           return window.DataStore?.allTopics?.() ?? [];
-        } catch {
-          return [];
-        }
-      })(),
-      (async () => {
-        try { return await window.DB?.getAllWatchedSegments?.() ?? []; }
-        catch { return []; }
-      })(),
-      (async () => {
-        try { return await window.DB?.getSetting?.('ocd_flashcards') ?? []; }
-        catch { return []; }
-      })(),
-    ]);
+        })(),
+        window.DB?.getAllWatchedSegments?.() ?? [],
+        window.DB?.getSetting?.('ocd_flashcards') ?? [],
+      ]);
+    } catch (error) {
+      // A failed canonical read must not masquerade as "0 achievements".
+      // Users can retry without navigating away or losing their actual data.
+      if (!document.body.contains(listRoot)) return;
+      console.warn('[Achievements] unable to read learning activity:', error);
+      metricsRoot.replaceChildren();
+      reviewRoot?.replaceChildren();
+      const notice = document.createElement('div');
+      notice.className = 'card card-filled achievement-load-error';
+      notice.dataset.achievementsError = '';
+      notice.setAttribute('role', 'alert');
+      const label = document.createElement('p');
+      label.textContent = 'Your learning activity could not load. Your saved progress has not been changed.';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-primary btn-sm';
+      retry.dataset.achievementsRetry = '';
+      retry.textContent = 'Try again';
+      retry.addEventListener('click', () => {
+        retry.disabled = true;
+        void renderAchievements();
+      });
+      notice.append(label, retry);
+      listRoot.replaceChildren(notice);
+      return;
+    }
+    const [progress, notes, timestamps, topics, watchedSegments, cards] = loaded;
     if (!document.body.contains(listRoot)) return;
 
     const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
