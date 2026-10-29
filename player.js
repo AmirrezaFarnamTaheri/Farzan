@@ -789,6 +789,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
         2: 'The media could not load because of a network problem. Check your connection and retry.',
         3: 'The media could not be decoded. Try a different source.',
         4: 'This media format is not supported. Choose a different lesson or source.',
+        5: 'Playback could not start. Press Play or retry after checking browser permissions.',
       };
       this._dom.errorText.textContent = copy[code] || 'This media could not be played. Try another source.';
       const hasSource = Boolean(this._media?.currentSrc || this._media?.getAttribute('src'));
@@ -797,14 +798,39 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
     }
 
     _retryMedia() {
-      // Retain the current queue, chapter context, and persisted media state.
-      // The retry is directly initiated by the learner (autoplay-safe).
       if (this._destroyed || !(this._media?.currentSrc || this._media?.getAttribute('src'))) return;
+      // HTMLMediaElement.load() resets currentTime and can synchronously emit
+      // zero-position timeupdates. Keep the last lesson position and protect
+      // both the session snapshot and canonical progress until metadata returns.
+      const retryTrack = this._currentTrack();
+      const resumeAt = Number(this._media.currentTime || this._state.currentTime) || 0;
+      this._retryResumeAt = resumeAt > 0 ? resumeAt : null;
       this._clearMediaError();
       this._setLoading(true);
+      const restore = () => {
+        if (this._destroyed || this._retryResumeAt == null || this._currentTrack() !== retryTrack) return;
+        try {
+          this._media.currentTime = this._retryResumeAt;
+          this._state.currentTime = this._retryResumeAt;
+          this._retryResumeAt = null;
+          this._saveSession(true);
+        } catch {
+          // Metadata may be temporarily unavailable. Keep the saved position
+          // protected until a subsequent loadedmetadata event or track change.
+        }
+      };
+      this._on(this._media, 'loadedmetadata', restore, { once: true });
       try {
         this._media.load();
-        this.play();
+        if (this._media.readyState >= 1) restore();
+        // Keep the user gesture for autoplay policy, but make rejected play()
+        // observable here rather than swallowing it as a console warning.
+        Promise.resolve(this.play({ propagateError: true })).catch((error) => {
+          if (this._destroyed || this._currentTrack() !== retryTrack) return;
+          this._setLoading(false);
+          if (error?.name === 'AbortError') return;
+          this._showMediaError(5);
+        });
       } catch {
         this._setLoading(false);
         this._showMediaError(2);
@@ -822,6 +848,8 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
 
     _onTimeUpdate() {
       const cur = this._media.currentTime;
+      // load() can emit a false zero timeupdate before resume restoration.
+      if (this._retryResumeAt != null && cur === 0) return;
       this._state.currentTime = cur;
       const dur = this._state.duration;
       const pct = dur > 0 ? clampPct((cur / dur) * 100) : 0;
@@ -891,9 +919,10 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
     // ──────────────────────────────────────────────────────
     // PUBLIC TRANSPORT API
     // ──────────────────────────────────────────────────────
-    play() {
+    play({ propagateError = false } = {}) {
       return this._transport.play().catch(err => {
         if (err.name !== 'AbortError') console.warn('[MediaPlayer]', err);
+        if (propagateError && err.name !== 'AbortError') throw err;
       });
     }
 
@@ -1010,6 +1039,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
      * @param {boolean} autoplay
      */
     loadPlaylist(tracks, autoplay = false) {
+      this._retryResumeAt = null;
       this._clearMediaError();
       this._queue = tracks.map((t, i) => ({ ...t, _id: t.id ?? uid('trk'), _index: i }));
       this._state.queueIndex = 0;
@@ -1137,6 +1167,7 @@ import { createNativeMediaTransport } from './src/features/nativeMediaTransport.
       if (!this._queue.length) return;
       const track = this._queue[index];
       if (!track) return;
+      this._retryResumeAt = null;
       this._clearMediaError();
       const previous = this._currentTrack();
       if (previous && previous !== track) {
