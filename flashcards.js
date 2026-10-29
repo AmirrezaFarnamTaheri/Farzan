@@ -239,17 +239,45 @@ let studioKeyController = null;
 
     async importAnkiDeck(ankiData) {
       if (!ankiData) throw new Error('Invalid Anki data');
-      const deckName = ankiData.name || ankiData.deck || 'Imported Anki Deck';
-      const rawCards = Array.isArray(ankiData) ? ankiData : (ankiData.cards || []);
+      const deckName = String(ankiData.name || ankiData.deck || 'Imported Anki Deck').trim()
+        || 'Imported Anki Deck';
+      const rawCards = Array.isArray(ankiData) ? ankiData : ankiData.cards ?? [];
+      if (!Array.isArray(rawCards)) throw new TypeError('Anki cards must be an array');
+
+      // Importing cards individually used to persist the whole growing deck
+      // after every insertion (quadratic writes and partial-failure risks).
+      // Parse, validate and deduplicate the full batch before a single write.
+      const existing = [...await this.getCards()];
+      const seen = new Set(existing.map(card => JSON.stringify([
+        card.deck, card.front, card.back,
+      ])));
       const imported = [];
+      const createdAt = new Date().toISOString();
       for (const item of rawCards) {
-        const front = item.front || item.sfld || (item.flds ? item.flds.split('\x1f')[0] : '');
-        const back = item.back || (item.flds ? item.flds.split('\x1f')[1] : '');
-        if (front && back) {
-          const card = await this.addCard({ front, back, deck: deckName });
-          imported.push(card);
-        }
+        if (!item || typeof item !== 'object') continue;
+        const fields = typeof item.flds === 'string' ? item.flds.split('\x1f') : [];
+        const front = String(item.front ?? item.sfld ?? fields[0] ?? '').trim();
+        const back = String(item.back ?? fields[1] ?? '').trim();
+        if (!front || !back) continue;
+        const key = JSON.stringify([deckName, front, back]);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        imported.push({
+          id: 'fc_' + Date.now() + '_' + imported.length.toString(36)
+            + '_' + Math.random().toString(36).slice(2, 7),
+          deck: deckName,
+          front,
+          back,
+          sourceNoteId: null,
+          repetitions: 0,
+          interval: 0,
+          easeFactor: 2.5,
+          nextReviewDate: createdAt.slice(0, 10),
+          createdAt,
+        });
       }
+      // No-op reimports must not write or mutate persistent storage.
+      if (imported.length) await this.saveStorage([...existing, ...imported]);
       return { deck: deckName, importedCount: imported.length, cards: imported };
     }
 
