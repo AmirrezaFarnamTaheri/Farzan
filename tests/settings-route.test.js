@@ -218,6 +218,33 @@ describe('settings route', () => {
     controller.unmount();
   });
 
+  it('keeps a valid unchanged credential bound across a save by retaining authority revision metadata', async () => {
+    const { controller, saveSetting } = mountSettings({
+      mode: 'custom-api',
+      model: 'existing-model',
+      endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test',
+      hasKey: true,
+      authorityRevision: 23,
+      authorityTransactionId: 'ai-auth-23',
+    });
+    sessionStorage.setItem('ocd_ai_api_key_session', 'bound-session-key');
+    window.OpenCourseDeck.AIAuthority = {
+      getCredential: vi.fn(settings => (
+        settings.authorityRevision === 23
+        && settings.authorityTransactionId === 'ai-auth-23'
+          ? 'bound-session-key' : ''
+      )),
+    };
+    await vi.waitFor(() => expect(window.OpenCourseDeck?.AISettings?.model).toBe('existing-model'));
+    expect(document.querySelector('[data-ai-approve-endpoint]').checked).toBe(true);
+    document.querySelector('[data-ai-save]').click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    expect(saveSetting.mock.calls[0][1].hasKey).toBe(true);
+    expect(sessionStorage.getItem('ocd_ai_api_key_session')).toBe('bound-session-key');
+    controller.unmount();
+  });
+
   it('does not silently reuse an old API key when its selected model changes', async () => {
     const { controller, saveSetting } = mountSettings({
       mode: 'custom-api',
