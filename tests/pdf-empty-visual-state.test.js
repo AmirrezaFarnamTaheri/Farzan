@@ -25,6 +25,45 @@ describe('PDF empty document and loaded page state', () => {
     delete window.DB;
   });
 
+  it('starts with a document-first empty view instead of inactive reader chrome', () => {
+    const view = mountPdfView();
+    const shell = document.querySelector('.pdf-shell');
+    const empty = document.querySelector('[data-pdf-empty-screen]');
+    const open = document.querySelector('[data-pdf-empty-open]');
+    const input = document.querySelector('[data-pdf-open]');
+    const choose = vi.spyOn(input, 'click').mockImplementation(() => {});
+    expect(shell?.dataset.documentState).toBe('empty');
+    expect(empty?.hidden).toBe(false);
+    expect(open).toBeTruthy();
+    const groups = [...document.querySelectorAll('[data-pdf-requires-document]')];
+    expect(groups.length).toBeGreaterThanOrEqual(3);
+    expect(groups.every(group => group.hidden)).toBe(true);
+
+    open.click();
+    expect(choose).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('transitions the document stage from loading to ready and reveals actual reading actions', () => {
+    const view = mountPdfView();
+    const shell = document.querySelector('.pdf-shell');
+    const viewer = window.PlasmaPDFViewer;
+    viewer._showLoading(true);
+    expect(shell.dataset.documentState).toBe('loading');
+
+    const state = window.PlasmaPDFState;
+    state.pdfDoc = { numPages: 2 };
+    state.totalPages = 2;
+    state.currentPage = 1;
+    viewer._updatePageUI();
+    viewer._showLoading(false);
+    expect(shell.dataset.documentState).toBe('ready');
+    expect(document.querySelector('[data-pdf-empty-screen]').hidden).toBe(true);
+    expect([...document.querySelectorAll('[data-pdf-requires-document]')].every(group => !group.hidden)).toBe(true);
+    expect(document.querySelector('[data-pdf-page-note-input]').disabled).toBe(false);
+    view.unmount();
+  });
+
   it('disables nonexistent PDF page controls and rejects phantom notes', () => {
     const view = mountPdfView();
     const page = document.querySelector('[data-pdf-current-page]');

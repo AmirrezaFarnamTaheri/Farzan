@@ -72,6 +72,57 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(session).toBeHidden();
   });
 
+  test('actually decodes and plays a local VP8 lesson, not merely a visible player shell', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    await page.waitForFunction(() => Boolean(document.querySelector('#course-player')?._pdPlayer));
+    const mediaUrl = new URL('/tests/fixtures/tiny-black-vp8.webm', page.url()).href;
+    await page.evaluate(source => {
+      document.querySelector('#course-player')._pdPlayer.loadPlaylist([{
+        id: 'offline-test-video', title: 'Deterministic test video',
+        src: source, topicId: 'test-lecture', courseId: 'test-course',
+      }], false);
+    }, mediaUrl);
+    const media = page.locator('#course-player video');
+    await expect.poll(() => media.evaluate(el => el.readyState), { timeout: 15000 })
+      .toBeGreaterThanOrEqual(2);
+    await media.evaluate(el => el.play());
+    await expect.poll(() => media.evaluate(el => el.currentTime), { timeout: 10000 })
+      .toBeGreaterThan(0.15);
+    await expect(page.locator('#course-player .pd-loading-overlay')).toBeHidden();
+    await expect(page.locator('#course-player .pd-error-banner')).toBeHidden();
+    await page.locator('[data-course-close-playback]').click();
+    await expect(page.locator('.courses-sidebar')).toBeVisible();
+  });
+
+  test('explains a failed lesson in the real browser instead of leaving a spinner visible', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    const player = page.locator('#course-player');
+    await expect(player).toBeVisible();
+    await page.waitForFunction(() => Boolean(document.querySelector('#course-player')?._pdPlayer));
+    await page.evaluate(() => {
+      const media = document.querySelector('#course-player')._pdPlayer._media;
+      Object.defineProperty(media, 'error', { configurable: true, value: { code: 4 } });
+      media.dispatchEvent(new Event('error'));
+    });
+    const alert = player.locator('.pd-error-banner');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('not supported');
+    await expect(player.locator('.pd-loading-overlay')).toBeHidden();
+    await expect(alert.locator('[data-pd="retry"]')).toBeHidden();
+    await page.locator('[data-course-close-playback]').click();
+    await expect(page.locator('.courses-sidebar')).toBeVisible();
+  });
+
   test('switches to a reversible study-focus layout when playing a course lesson', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });

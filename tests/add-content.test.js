@@ -68,6 +68,19 @@ describe('add content chrome', () => {
     expect(document.getElementById('add-content-menu').getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('dismisses Add Content when route changes without requiring an outside click', () => {
+    initAddContent(window);
+    const trigger = document.getElementById('topbar-add-btn');
+    const menu = document.getElementById('add-content-menu');
+    trigger.click();
+    expect(menu.getAttribute('aria-hidden')).toBe('false');
+
+    window.dispatchEvent(new Event('hashchange'));
+    expect(menu.getAttribute('aria-hidden')).toBe('true');
+    expect(menu.hasAttribute('inert')).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('marks the closed add menu inert', () => {
     initAddContent(window);
     const menu = document.getElementById('add-content-menu');

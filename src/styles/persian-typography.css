@@ -1,0 +1,30 @@
+/* Arabic-only Vazirmatn is applied through --font-sans.
+ * Mixed Persian/Latin text retains natural direction without flipping the page.
+ */
+:where([lang="fa"], [lang^="fa-"], [dir="rtl"]) { letter-spacing: normal; }
+
+:where(.course-item-title, .topic-title, .course-detail h2, .pd-title,
+  .playlist-card-title, .notes-list-title, .note-title, .source-group-title)[dir="auto"] {
+  unicode-bidi: plaintext;
+  text-align: start;
+  letter-spacing: normal;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+:where(.course-item-title, .topic-title, .course-detail h2,
+  .playlist-card-title, .source-group-title) {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  line-height: 1.6;
+}
+
+:where([lang="fa"], [lang^="fa-"]) :where(h1, h2, h3, p, label, button, input, textarea) {
+  line-height: 1.65;
+}
+
+:where(.pd-time-cur, .pd-time-dur, .tabular-nums, .timecode) {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
