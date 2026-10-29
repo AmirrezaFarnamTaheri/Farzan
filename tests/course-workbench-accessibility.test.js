@@ -73,6 +73,17 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('keeps the Persian course header, product link and metadata in one reading direction', async () => {
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelector('.course-detail h2')).not.toBeNull());
+    const heading = document.querySelector('.course-detail h2');
+    const body = heading.closest('.card-body');
+    expect(heading?.getAttribute('dir')).toBe('auto');
+    expect(body?.getAttribute('dir')).toBe('auto');
+    expect(body?.querySelector('.course-detail-meta bdi')?.getAttribute('dir')).toBe('ltr');
+    controller.unmount();
+  });
+
   it('uses distinct native controls for primary media and completion and avoids repeated source subtitles', async () => {
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
