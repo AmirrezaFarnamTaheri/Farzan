@@ -72,6 +72,53 @@ describe('notes route workspace', () => {
     controller.unmount();
   });
 
+  it('keeps advanced formatting collapsed while preserving editor commands and Persian font choice', () => {
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    const advanced = document.querySelector('details.notes-format-more');
+    expect(advanced).not.toBeNull();
+    expect(advanced.open).toBe(false);
+    expect(advanced.querySelector('[data-font-size]')).not.toBeNull();
+    expect(advanced.querySelector('[data-font-family] option[value="Vazirmatn"]')).not.toBeNull();
+    expect(document.querySelector('[data-notes-toolbar] [data-cmd="bold"]')).not.toBeNull();
+    expect(document.querySelector('[data-notes-editor]')).not.toBeNull();
+    advanced.querySelector('summary').click();
+    expect(advanced.open).toBe(true);
+    controller.unmount();
+  });
+
+  it('opens mobile notes in the editor and reveals the library only when requested', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({
+      matches: query.includes('max-width: 760px'),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    }));
+    try {
+      const controller = mountNotesView({
+        setView: html => { document.getElementById('main-content').innerHTML = html; },
+      });
+      const shell = document.querySelector('.notes-shell');
+      const toggle = document.querySelector('[data-notes-toggle-library]');
+      expect(shell.dataset.mobilePane).toBe('editor');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+      toggle.click();
+      expect(shell.dataset.mobilePane).toBe('library');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(toggle.textContent).toMatch(/editor/i);
+      const note = document.createElement('button');
+      note.dataset.noteId = 'saved-note';
+      document.querySelector('[data-notes-list]').appendChild(note);
+      note.click();
+      expect(shell.dataset.mobilePane).toBe('editor');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      controller.unmount();
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
   it('preserves editor, formatting, search, folder, import, and export hooks', () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },

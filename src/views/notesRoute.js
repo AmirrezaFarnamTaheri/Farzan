@@ -7,6 +7,10 @@ export function mountNotesView({ setView } = {}) {
           <p class="page-subtitle"><bdi>Write notes, organize them in folders, and link them to courses.</bdi></p>
         </div>
         <div class="notes-header-actions">
+          <button class="btn btn-ghost btn-sm notes-library-toggle" type="button"
+            data-notes-toggle-library aria-controls="notes-library-panel" aria-expanded="false">
+            Browse notes
+          </button>
           <button class="btn btn-primary" type="button" data-action="new-note">
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New note
@@ -25,8 +29,8 @@ export function mountNotesView({ setView } = {}) {
         </div>
       </div>
 
-      <div class="notes-shell">
-        <aside class="notes-sidebar" aria-label="Notes library">
+      <div class="notes-shell" data-mobile-pane="editor">
+        <aside class="notes-sidebar" id="notes-library-panel" aria-label="Notes library">
           <div class="notes-sidebar-head">
             <div>
               <h2>Your notes</h2>
@@ -118,7 +122,9 @@ export function mountNotesView({ setView } = {}) {
               </button>
             </div>
 
-            <div class="notes-format-row">
+            <details class="notes-format-more">
+              <summary class="notes-format-summary" aria-label="More text formatting">Text styles <span aria-hidden="true">⌄</span></summary>
+              <div class="notes-format-row">
               <label class="notes-format-control">
                 <span>Size</span>
                 <select class="input input-sm" data-font-size aria-label="Text size">
@@ -134,6 +140,7 @@ export function mountNotesView({ setView } = {}) {
                 <span>Font</span>
                 <select class="input input-sm" data-font-family aria-label="Font family">
                   <option value="Inter">Inter</option>
+                  <option value="Vazirmatn">وزیرمتن (فارسی)</option>
                   <option value="JetBrains Mono">JetBrains Mono</option>
                   <option value="Playfair Display">Playfair Display</option>
                   <option value="system-ui">System</option>
@@ -147,7 +154,8 @@ export function mountNotesView({ setView } = {}) {
                 <span>Highlight</span>
                 <input type="color" data-highlight-color value="#f59e0b" aria-label="Highlight color" />
               </label>
-            </div>
+              </div>
+            </details>
           </div>
 
           <div class="notes-editor-wrap">
@@ -170,6 +178,30 @@ export function mountNotesView({ setView } = {}) {
   try { window.PlasmaNotesApp?.init?.(); } catch (error) {
     console.warn('[Notes view] init failed', error);
   }
+  // Mobile screens show one useful pane at a time. Desktop keeps the
+  // existing two-pane layout, and neither the note model nor saved HTML changes.
+  const notesShell = document.querySelector('.notes-shell');
+  const libraryToggle = document.querySelector('[data-notes-toggle-library]');
+  const libraryPanel = document.querySelector('[data-notes-list]');
+  const setMobilePane = (pane) => {
+    if (!notesShell) return;
+    const showLibrary = pane === 'library';
+    notesShell.dataset.mobilePane = showLibrary ? 'library' : 'editor';
+    libraryToggle?.setAttribute('aria-expanded', showLibrary ? 'true' : 'false');
+    if (libraryToggle) libraryToggle.textContent = showLibrary ? 'Back to editor' : 'Browse notes';
+  };
+  setMobilePane('editor');
+  libraryToggle?.addEventListener('click', () => {
+    setMobilePane(notesShell?.dataset.mobilePane === 'library' ? 'editor' : 'library');
+  });
+  libraryPanel?.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (target?.closest?.('[data-note-id]')) setMobilePane('editor');
+  });
+  document.querySelector('.view-notes')?.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (target?.closest?.('[data-action="new-note"]')) setMobilePane('editor');
+  });
   // Composition events bubble from either the native contenteditable area
   // or the optional Squire editor. Keep the draft mounted until IME commits.
   const editor = document.querySelector('[data-notes-editor]');
