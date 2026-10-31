@@ -990,6 +990,7 @@ import { Pointer } from './src/lib/pointer.js';
     _data: [],
     _universalData: null,
     _hasDataOverride: false,
+    _searchEpoch: 0,
 
     init() {
       this.input = $('#sidebar-search') || $('.topbar-search input, .topbar-search [data-search-input]');
@@ -1033,12 +1034,15 @@ import { Pointer } from './src/lib/pointer.js';
      * Provide data for client-side search (optional — falls back to server fetch)
      */
     setData(data) {
+      // A data-source switch invalidates any outstanding universal search.
+      this._searchEpoch += 1;
       this._data = Array.isArray(data) ? data : [];
       this._universalData = null;
       this._hasDataOverride = true;
     },
 
     async _onInput(value) {
+      const requestEpoch = ++this._searchEpoch;
       if (value.trim().length < 2) { this._close(); return; }
 
       let results;
@@ -1051,6 +1055,9 @@ import { Pointer } from './src/lib/pointer.js';
         results = await this._queryUniversal(value);
       }
 
+      // A slow data read must not replace newer results, reopen a dismissed
+      // dropdown, or render after the user has typed during the debounce.
+      if (requestEpoch !== this._searchEpoch || this.input?.value !== value) return;
       this._render(results, value);
     },
 
@@ -1291,6 +1298,9 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _close() {
+      // Clearing the input, Escape, and an outside click all cancel pending
+      // result rendering, even when there is no newer search to supersede it.
+      this._searchEpoch += 1;
       this.resultsBox.classList.remove('open');
       $$('.search-result-item', this.resultsBox).forEach(el => el.removeAttribute('aria-selected'));
     },
