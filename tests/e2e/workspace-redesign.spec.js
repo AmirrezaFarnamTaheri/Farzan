@@ -1042,4 +1042,66 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(topbar).toBeFocused();
   });
 
+
+  test('downloads and reimports canonical Konva v1 draft JSON without overwriting classic Studio', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    await page.waitForFunction(() => typeof window.OpenCourseDeck?.Canvas?.loadState === 'function'
+      && typeof window.DB?.saveSetting === 'function');
+    const board = {
+      version: 1, tool: 'select',
+      viewport: { offsetX: 11, offsetY: -8, zoom: 1.5, rotation: 0 },
+      grid: { enabled: false, size: 24, snap: false },
+      layers: [{
+        id: 'layer-a', name: 'Layer', visible: true, locked: false, opacity: 1,
+        elements: [{
+          id: 'signed-rect', type: 'rect', x: 60, y: 70,
+          width: -40, height: -25, fill: '#df3870', stroke: '#ffffff', strokeWidth: 2,
+        }],
+      }],
+    };
+    await page.evaluate(async source => {
+      await window.DB.saveSetting('ocd_studio_konva_draft', null);
+      window.OpenCourseDeck.Canvas.loadState(source);
+      window.OpenCourseDeck.UI = {
+        ...(window.OpenCourseDeck.UI || {}),
+        confirm: async () => true,
+      };
+    }, board);
+    await page.locator('[data-studio-more-tools] > summary').click();
+    await page.locator('[data-studio-konva-open]').click();
+    const dialog = page.locator('[data-studio-konva-dialog]');
+    await expect(dialog).toBeVisible();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('[data-studio-konva-export]').click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('farzan-konva-draft-v1.json');
+    expect(await page.evaluate(() => window.DB.getSetting('ocd_studio_konva_draft'))).toBeNull();
+
+    const replacement = structuredClone(board);
+    replacement.layers[0].elements[0].x = 122;
+    await page.locator('[data-studio-konva-import]').setInputFiles({
+      name: 'imported-studio-v1.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(replacement)),
+    });
+    await expect.poll(() => page.evaluate(async () =>
+      (await window.DB.getSetting('ocd_studio_konva_draft'))?.layers?.[0]?.elements?.[0]?.x))
+      .toBe(122);
+    await expect(page.locator('[data-studio-konva-status]')).toContainText('Imported isolated');
+    expect(await page.evaluate(() =>
+      window.OpenCourseDeck.Canvas.serialize().layers[0].elements[0].x)).toBe(60);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+    await page.locator('[data-studio-konva-open]').click();
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => page.evaluate(async () =>
+      (await window.DB.getSetting('ocd_studio_konva_draft'))?.layers?.[0]?.elements?.[0]?.x))
+      .toBe(122);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+  });
+
 });
