@@ -1137,6 +1137,51 @@
   gap: var(--space-4);
 }
 
+.view-playlists .grid[data-playlist-list] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 340px));
+  justify-content: start;
+  gap: var(--space-3);
+}
+
+.view-playlists [hidden] { display: none !important; }
+.playlists-discover {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  background: var(--surface-2);
+}
+.playlists-discover-summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+.playlists-discover-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.playlists-discover[open] > .playlists-discover-summary {
+  margin-bottom: var(--space-4);
+}
+.playlists-discover .playlists-create-card {
+  margin-bottom: var(--space-4);
+}
+.playlists-empty {
+  max-width: 55ch;
+  padding: var(--space-3);
+}
+.playlists-load-error {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.playlists-load-error p { margin: 0; }
+
 .playlists-create-card {
   margin-bottom: var(--space-2);
 }
