@@ -105,4 +105,72 @@ describe('Flashcard canonical write serialization', () => {
     expect((await manager.getCards()).map(card => card.front)).toEqual(['Committed']);
     expect(calls).toBe(2);
   });
+  it('does not announce a successful rating when canonical persistence rejects it', async () => {
+    const existing = {
+      id: 'fc_uncommitted_review', deck: 'Review', front: 'Question', back: 'Answer',
+      repetitions: 0, interval: 0, easeFactor: 2.5,
+      nextReviewDate: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+    };
+    const records = [existing];
+    window.DB = {
+      getSetting: vi.fn(async () => records),
+      saveSetting: vi.fn(async () => { throw new Error('Canonical database unavailable'); }),
+    };
+    manager.invalidateCache();
+    document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
+    const container = document.getElementById('studio-host');
+    await window.OpenCourseDeck.Flashcards.renderStudio(container);
+    container.querySelector('#fc-flip-btn').click();
+
+    container.dispatchEvent(new KeyboardEvent('keydown', {
+      key: '4', bubbles: true, cancelable: true,
+    }));
+    await vi.waitFor(() => {
+      expect(document.getElementById('aria-announcer').textContent)
+        .toContain('Canonical database unavailable');
+    });
+    expect(document.getElementById('aria-announcer').textContent).not.toContain('Card rated');
+    expect(container.querySelector('#fc-grade-btns button[data-grade="4"]').disabled).toBe(false);
+    expect(records[0].repetitions).toBe(0);
+  });
+
+  it('does not grade the same visible card twice while its first save is pending', async () => {
+    const existing = {
+      id: 'fc_double_click', deck: 'Review', front: 'Question', back: 'Answer',
+      repetitions: 0, interval: 0, easeFactor: 2.5,
+      nextReviewDate: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+    };
+    let records = [existing];
+    let startWrite;
+    let releaseWrite;
+    const entered = new Promise(resolve => { startWrite = resolve; });
+    const pending = new Promise(resolve => { releaseWrite = resolve; });
+    window.DB = {
+      getSetting: vi.fn(async () => records),
+      saveSetting: vi.fn(async (_key, snapshot) => {
+        startWrite();
+        await pending;
+        records = snapshot;
+        return true;
+      }),
+    };
+    manager.invalidateCache();
+    document.body.innerHTML = '<div id="aria-announcer" aria-live="polite"></div><div id="studio-host"></div>';
+    const container = document.getElementById('studio-host');
+    await window.OpenCourseDeck.Flashcards.renderStudio(container);
+    container.querySelector('#fc-flip-btn').click();
+    const grade = container.querySelector('#fc-grade-btns button[data-grade="4"]');
+    grade.click();
+    grade.click();
+    await entered;
+    releaseWrite();
+    await vi.waitFor(() => {
+      expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
+    });
+    expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
+    expect(records[0].repetitions).toBe(1);
+  });
+
 });
