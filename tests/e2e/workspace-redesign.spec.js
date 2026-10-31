@@ -775,4 +775,38 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(dialog).toBeHidden();
   });
 
+
+  test('reorders and reopens a saved five-topic queue at phone width with keyboard input', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.DB?.saveSetting === 'function');
+    await page.evaluate(async () => {
+      await window.DB.saveSetting('ocd_playlists', [{
+        id: 'e2e-order', title: 'فارسی Review queue',
+        topicIds: ['saved-a', 'saved-b', 'saved-c', 'saved-d', 'saved-e'],
+        metadata: { owner: 'local', language: 'fa-IR' },
+        createdAt: 1,
+      }]);
+    });
+    await page.goto('/#/playlists', { waitUntil: 'domcontentloaded' });
+    const card = page.locator('[data-playlist-id="e2e-order"]');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.playlist-preview li')).toHaveCount(4);
+    await card.locator('.playlist-reorder > summary').click();
+    const fifthUp = card.locator('[data-playlist-move="up"][data-topic-index="4"]');
+    await expect(fifthUp).toBeVisible();
+    await expect(fifthUp).toHaveAttribute('aria-label', /move.*up/i);
+    await fifthUp.focus();
+    await fifthUp.press('Enter');
+    const savedOrder = () => page.evaluate(async () =>
+      (await window.DB.getSetting('ocd_playlists'))?.find(p => p.id === 'e2e-order'));
+    await expect.poll(async () => (await savedOrder())?.topicIds)
+      .toEqual(['saved-a', 'saved-b', 'saved-c', 'saved-e', 'saved-d']);
+    expect((await savedOrder()).metadata).toEqual({ owner: 'local', language: 'fa-IR' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-playlist-id="e2e-order"]')).toBeVisible();
+    await expect.poll(async () => (await savedOrder())?.topicIds)
+      .toEqual(['saved-a', 'saved-b', 'saved-c', 'saved-e', 'saved-d']);
+  });
+
 });
