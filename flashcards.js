@@ -449,12 +449,33 @@ let studioKeyController = null;
         gradeRow.hidden = false;
       });
 
-      gradeRow.querySelectorAll('button[data-grade]').forEach((btn) => {
+      const gradeButtons = [...gradeRow.querySelectorAll('button[data-grade]')];
+      let ratingPending = false;
+      gradeButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
+          // A rapid second click must not grade the same visible card again.
+          // Only the canonical storage receipt can confirm a review.
+          if (ratingPending || !dueCards.length) return;
+          ratingPending = true;
+          gradeButtons.forEach(button => { button.disabled = true; });
           const grade = parseInt(btn.getAttribute('data-grade'), 10);
-          if (dueCards.length > 0) {
+          try {
             await manager.reviewCard(dueCards[0].id, grade);
-            renderStudio(container);
+          } catch (error) {
+            ratingPending = false;
+            gradeButtons.forEach(button => { button.disabled = false; });
+            announce('Could not save review: ' + (error?.message || 'Please try again.'));
+            return;
+          }
+
+          announce('Card rated: ' + btn.textContent.replace(/\\s*\\(\\d\\)\\s*/, ' ').trim());
+          try {
+            await renderStudio(container);
+          } catch (error) {
+            // The rating is saved; do not re-enable stale buttons that could
+            // repeat it if a subsequent view refresh encounters a read error.
+            announce('Review saved, but the view could not refresh: '
+              + (error?.message || 'Open Flashcards again to reload.'));
           }
         });
       });
@@ -484,7 +505,7 @@ let studioKeyController = null;
         const btn = gradeRowLive.querySelector('button[data-grade="' + event.key + '"]');
         if (!btn) return;
         event.preventDefault();
-        announce('Card rated: ' + btn.textContent.replace(/\s*\(\d\)\s*/, ' ').trim());
+        // The click handler announces only after the canonical write settles.
         btn.click();
       }
     }, { signal: studioKeyController.signal });
