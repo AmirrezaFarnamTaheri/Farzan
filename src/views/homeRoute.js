@@ -326,7 +326,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   if (homeHeading) {
     // Preserve the bidirectional isolate when asynchronous progress arrives.
     // Replacing the h1 textContent destroyed <bdi> and broke RTL punctuation.
-    const label = progress.length ? 'Welcome back to your studies.' : 'What will you learn today?';
+    const label = (progress.length || notes.length || timestamps.length)
+      ? 'Welcome back to your studies.' : 'What will you learn today?';
     let isolate = homeHeading.querySelector('bdi');
     if (!isolate) {
       isolate = document.createElement('bdi');
@@ -337,16 +338,39 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   if (!document.body.contains(widgetsRoot)) return;
 
   const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
-  const latestProgress = [...progress]
-    .filter(record => record?.topicId && (Number(record.percent) > 0 || Number(record.position) > 0 || record.status))
-    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+  // Use the freshest canonical row for each topic. Earlier unfinished rows
+  // cannot resurrect a lesson that a later update already completed.
+  const progressByTopic = new Map();
+  [...progress].filter(record => record?.topicId)
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))
+    .forEach(record => {
+      if (!progressByTopic.has(record.topicId)) progressByTopic.set(record.topicId, record);
+    });
+  const isFinished = record => record?.status === 'done' || Number(record?.percent) >= 100;
+  const canResume = record => record?.topicId && !isFinished(record)
+    && (Number(record?.percent) > 0 || Number(record?.position) > 0
+      || record.status === 'in-progress');
   const latestTimestamp = [...timestamps]
     .filter(item => item?.topicId)
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
 
-  const completed = progress.filter(record => record?.status === 'done' || Number(record?.percent) >= 100);
-  const active = progress.filter(record => record?.topicId && Number(record?.percent) > 0 && Number(record?.percent) < 100);
+  const completed = progress.filter(isFinished);
+  const active = [...progressByTopic.values()].filter(canResume);
+  // Resume the most recently saved *unfinished* work, regardless of whether
+  // its latest position came from video progress or a timestamp. A completed
+  // topic must never displace the next active lesson.
+  const focusCandidates = [
+    ...active.map(record => ({ record, source: 'progress' })),
+    ...timestamps.filter(item => item?.topicId
+      && Number.isFinite(Number(item.position)) && Number(item.position) >= 0
+      && !isFinished(progressByTopic.get(item.topicId)))
+      .map(record => ({ record, source: 'timestamp' })),
+  ];
+  const focusCandidate = focusCandidates.sort((a, b) =>
+    getRecordTime(b.record) - getRecordTime(a.record)
+      || (a.source === 'progress' ? -1 : 1))[0];
+  const focusRecord = focusCandidate?.record ?? null;
   const dueReviews = dueReviewCards(flashcards);
   const weekCutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
   const weeklyActivity = [...progress, ...notes, ...timestamps].filter(item => getRecordTime(item) >= weekCutoff).length;
@@ -363,16 +387,19 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-pulse-week]', weeklyActivity);
   setText('[data-pulse-average]', `${averageProgress}%`);
 
-  const focusRecord = latestProgress || latestTimestamp;
-  const focusTimestamp = [...timestamps]
-    .filter(item => item?.topicId === focusRecord?.topicId)
-    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
-  const focusPosition = Number(focusTimestamp?.position ?? focusRecord?.position ?? 0) || 0;
   const focusTopicId = focusRecord?.topicId;
-  const focusProgress = focusTopicId
-    ? progress.filter(record => record?.topicId === focusTopicId)
-      .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0]
-    : null;
+  const focusProgress = progressByTopic.get(focusTopicId) ?? null;
+  const focusTimestamp = [...timestamps]
+    .filter(item => item?.topicId === focusTopicId)
+    .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
+  const progressPosition = Math.max(0, Number(focusProgress?.position) || 0);
+  const timestampPosition = Math.max(0, Number(focusTimestamp?.position) || 0);
+  // A stale bookmark is not the current playback position. Conversely, a
+  // newly saved timestamp takes precedence when it is the fresher activity.
+  const focusPosition = focusTimestamp && (
+    !focusProgress || getRecordTime(focusTimestamp) > getRecordTime(focusProgress)
+      || !progressPosition
+  ) ? timestampPosition : progressPosition || timestampPosition;
   const focusTopic = topicMap.get(focusTopicId);
   const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
   const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
@@ -411,7 +438,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   // Avoid repeating empty counters and the same browse CTA twice on the
   // mobile first-run screen. This is presentation-only: all saved state,
   // resume behavior, and navigation targets remain unchanged.
-  const hasSavedActivity = Boolean(focusRecord || active.length || notes.length || dueReviews.length);
+  const hasSavedActivity = Boolean(progress.length || timestamps.length || notes.length || dueReviews.length);
   const hero = document.querySelector('.home-hero');
   if (hero) hero.dataset.homeHasProgress = hasSavedActivity ? 'true' : 'false';
   const view = document.querySelector('.view-home');
@@ -432,7 +459,10 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       icon: 'i-play',
       label: 'Continue studying',
       title: focusTitle,
-      detail: latestProgress ? `${Math.round(focusPercent)}% complete` : latestTimestamp ? `Saved at ${formatDuration(latestTimestamp.position)}` : 'Start with the course catalog.',
+      detail: focusRecord
+        ? (focusPercent > 0 ? `${Math.round(focusPercent)}% complete`
+          : focusPosition ? `Saved at ${formatDuration(focusPosition)}` : 'Continue your saved topic.')
+        : 'Start with the course catalog.',
       action: 'courses',
       topicId: focusTopicId,
       // Use the same topic-scoped position as the Home hero. A later
