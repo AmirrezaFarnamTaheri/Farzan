@@ -1,5 +1,6 @@
 import { debounce, eventTargetEl, restoreFocus, setAppInert, trapFocus } from '../lib/dom.js';
 import { loadVendorScript } from '../core/vendorLoader.js';
+import { normalizeSearchQuery, rankLexicalMatches } from '../core/searchRanking.js';
 
 export function initCommandPalette() {
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
@@ -131,13 +132,13 @@ export function initCommandPalette() {
   ];
 
   const getFiltered = (q = '') => {
-    const query = q.trim().toLowerCase();
+    const query = normalizeSearchQuery(q);
     const base = (cpActiveCat && cpActiveCat !== 'all') ? items.filter(i => i.cat === cpActiveCat) : items;
     if (!query) return base;
     // Fuse.js is already vendored for the search worker. Reuse it here,
     // rather than building another fuzzy scorer or shipping a second library.
     if (!fuseConstructor || query.length < 2) {
-      return base.filter(i => (i.label ?? '').toLowerCase().includes(query));
+      return rankLexicalMatches(base, query, { keys: ['label'], limit: base.length });
     }
     const indexKey = cpActiveCat;
     if (!fuseIndices.has(indexKey)) fuseIndices.set(indexKey, new fuseConstructor(base, {
@@ -152,7 +153,7 @@ export function initCommandPalette() {
     const starts = [];
     const fuzzy = [];
     for (const item of ranked) {
-      const label = item.label.toLowerCase();
+      const label = normalizeSearchQuery(item.label);
       if (label === query) exact.push(item);
       else if (label.startsWith(query)) starts.push(item);
       else fuzzy.push(item);
