@@ -21,6 +21,7 @@ function createBuildOptions(outputDir = outdir, watch = false) {
     format: 'esm',
     splitting: true,
     sourcemap: watch ? 'inline' : false,
+    metafile: !watch,
     minify: !watch,
     target: ['es2020'],
     platform: 'browser',
@@ -175,7 +176,13 @@ async function main() {
     return;
   }
 
-  await esbuild.build(options);
+  const built = await esbuild.build(options);
+  if (built.metafile) {
+    // Inspectable provenance remains outside the release and SW precache.
+    const reportFile = path.join(root, 'reports', 'ci', 'bundle-metafile.json');
+    fs.mkdirSync(path.dirname(reportFile), { recursive: true });
+    fs.writeFileSync(reportFile, JSON.stringify(built.metafile, null, 2) + '\n');
+  }
   stageStaticAssets();
   await bundleReleaseStyles();
   removeProductionSourceMaps();
