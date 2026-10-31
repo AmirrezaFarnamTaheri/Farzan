@@ -77,13 +77,20 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
         expect([...after.content.querySelectorAll('a[href]')].some(link =>
           link.getAttribute('href') === originalLink.getAttribute('href'))).toBe(true);
       }
-      const reopened = createSquireNoteEditor({
-        element: document.createElement('div'), html: saved,
-      });
+      const compatibility = assessNoteForSquire(saved);
+      if (!compatibility.compatible) {
+        throw new Error('Squire first-edit HTML not safe for reopening: '
+          + compatibility.reason + ' — ' + saved);
+      }
+      // Verify an actual attached editable DOM, not just the original-html
+      // cache returned by getHTML for an unmodified detached editor.
+      const reopenHost = document.createElement('div');
+      document.body.appendChild(reopenHost);
+      const reopened = createSquireNoteEditor({ element: reopenHost, html: saved });
       try {
         expect(reopened.getHTML()).toContain('new review note');
-        expect(cleanText(reopened.editor.getText())).toContain('new review note');
-      } finally { reopened.destroy(); }
+        expect(cleanText(reopenHost.textContent)).toContain('new review note');
+      } finally { reopened.destroy(); reopenHost.remove(); }
     } finally { editor.destroy(); }
   });
 
