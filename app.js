@@ -315,7 +315,9 @@ import { Pointer } from './src/lib/pointer.js';
   function setPendingPdfPage(docId, page = null) {
     try {
       if (docId) sessionStorage.setItem('ocd_pending_pdf_doc', String(docId));
-      if (Number.isFinite(Number(page)) && Number(page) > 0) {
+      else sessionStorage.removeItem('ocd_pending_pdf_doc');
+      // Never apply an unanchored page to an earlier document's pending ID.
+      if (docId && Number.isFinite(Number(page)) && Number(page) > 0) {
         sessionStorage.setItem('ocd_pending_pdf_page', String(Math.max(1, Math.floor(Number(page)))));
       } else {
         sessionStorage.removeItem('ocd_pending_pdf_page');
