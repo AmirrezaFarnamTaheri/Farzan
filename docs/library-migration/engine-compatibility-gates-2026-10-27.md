@@ -37,12 +37,15 @@ separately saved `ocd_studio_konva_draft` on subsequent visits. The lab does not
 write `ocd_studio_board`, switch export engines, or auto-apply edits to the live
 board. Unsupported v1 metadata and unsupported geometry must fail closed.
 
-Initial capabilities: visible/unlocked shape drag, rectangle and card transform
-handles, object selection, accessible nudge controls, canonical-v1 undo/redo,
-and affirmative draft persistence receipts with rollback on refusal. This is
-**not** pen, image, links, multi-touch, grid, SVG/PDF export or full accessibility
-parity. Keep the classic editor as the only main-board writer until all of those
-gates pass in real Chromium, mobile and Windows builds.
+Current draft capabilities: visible/unlocked shape drag, rectangle and card transform
+handles, object selection, accessible nudge controls, single-pointer pen strokes
+stored as legacy-v1 polylines, canonical-v1 undo/redo, and affirmative draft
+persistence receipts with rollback on refusal. Pen strokes use world coordinates
+under the saved viewport; a second touch cancels the active stroke instead of
+turning a pinch gesture into ink. This is **not** image, links, multi-touch
+pan/zoom, grid, SVG/PDF export or full accessibility parity. Keep the classic
+editor as the only main-board writer until all of those gates pass in real
+Chromium, mobile and Windows builds.
 
 Safety acceptance: test the saved draft separately from the unchanged original
 board, returning to the original after closing, resuming the draft, incompatible
