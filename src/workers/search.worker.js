@@ -5,6 +5,38 @@ try {
   console.warn('[SearchWorker] Failed to load vendored Fuse.js:', error);
 }
 
+// Worker is intentionally a classic (importScripts) offline asset; importing
+// the app ESM normalizer here would break the worker's current delivery type.
+// Keep this equivalent to src/core/searchRanking.js and pin parity in tests.
+function normalizeWorkerQuery(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\u064a\u0649]/g, '\u06cc')
+    .replace(/\u0643/g, '\u06a9')
+    .replace(/[\u064b-\u065f\u0670\u0640]/g, '')
+    .replace(/\u200c/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function canonicalWorkerIdentity(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const sourceType = normalizeWorkerQuery(item.sourceType);
+  const sourceId = item.sourceId == null ? '' : String(item.sourceId).trim();
+  if (sourceType && sourceId) return 'source:' + sourceType + ':' + sourceId;
+  const category = normalizeWorkerQuery(item.category || item.cat);
+  const id = item.id == null ? '' : String(item.id).trim();
+  if (id) return 'id:' + category + ':' + id;
+  const label = normalizeWorkerQuery(item.label || item.title);
+  const href = typeof item.href === 'string' ? item.href.trim() : '';
+  if (!label && !href) return null;
+  return 'fallback:' + category + ':' + label + ':' + href;
+}
+
+const NORMALIZED_FIELD = '__pdNormalizedSearch';
+const ORIGINAL_INDEX = '__pdWorkerIndex';
+
 const MAX_CANCELLED = 2048;
 const CANCEL_TTL = 60000;
 const state = {
@@ -60,30 +92,66 @@ function initFuse(data, options = {}) {
   if (typeof Fuse !== 'function') throw Object.assign(new Error('Vendored Fuse.js is unavailable'), { code: 'SEARCH_ENGINE_UNAVAILABLE' });
   if (!Array.isArray(data)) throw new TypeError('Search index items must be an array');
   state.data = data;
-  state.fuse = new Fuse(data, {
-    keys: ['title', 'label', 'description', 'searchText'],
+  const defaultKeys = ['title', 'label', 'description', 'searchText'];
+  const keys = Array.isArray(options.keys) && options.keys.length
+    ? options.keys : defaultKeys;
+  const fieldNames = keys.map(key => typeof key === 'string' ? key : key?.name)
+    .filter(key => typeof key === 'string' && !key.startsWith('__'));
+  // Index only private copies so caller-provided records and response items
+  // remain byte-for-byte unchanged. Keep raw fields for Fuse fuzzy matching
+  // while adding a normalized field for Persian/Arabic keyboard equivalence.
+  const indexed = data.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalizeWorkerQuery(item) };
+    }
+    const normalized = fieldNames.map(key => {
+      const value = item[key];
+      return Array.isArray(value)
+        ? value.map(normalizeWorkerQuery).join(' ')
+        : normalizeWorkerQuery(value);
+    }).join(' ').trim();
+    return { ...item, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
+  });
+  state.fuse = new Fuse(indexed, {
     threshold: 0.3,
     distance: 100,
     includeMatches: true,
     includeScore: true,
     minMatchCharLength: 2,
     ...options,
+    keys: [...keys, NORMALIZED_FIELD],
   });
   state.revision += 1;
 }
 
 function search(query, options = {}) {
   if (!state.fuse) throw Object.assign(new Error('Search worker is not initialized'), { code: 'SEARCH_WORKER_NOT_READY' });
-  const normalized = String(query ?? '');
-  if (!normalized.trim()) return { results: [], query: normalized, matches: [], indexRevision: state.revision };
+  const originalQuery = String(query ?? '');
+  const normalized = normalizeWorkerQuery(originalQuery);
+  if (!normalized) return { results: [], query: originalQuery, matches: [], indexRevision: state.revision };
   const limit = Math.max(1, Math.min(250, Number(options.limit) || 25));
-  const fuseResults = state.fuse.search(normalized, { limit });
-  return {
-    results: fuseResults.map(result => result.item),
-    query: normalized,
-    matches: fuseResults.map(result => ({ item: result.item, matches: result.matches || [] })),
-    indexRevision: state.revision,
-  };
+  // Deduplicate after Fuse ranks the full collection, not before fuzzy ranking
+  // or after the final cap. Otherwise repeated source records can monopolize
+  // every visible row and hide the next relevant source.
+  const fuseResults = state.fuse.search(normalized);
+  const results = [];
+  const matches = [];
+  const seen = new Set();
+  for (const result of fuseResults) {
+    const item = state.data[result.item[ORIGINAL_INDEX]];
+    const id = canonicalWorkerIdentity(item);
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    results.push(item);
+    // Synthetic normalized-field offsets do not index user-visible content.
+    // Only publish real display-field match offsets under the old protocol.
+    matches.push({
+      item,
+      matches: (result.matches || []).filter(match => match.key !== NORMALIZED_FIELD),
+    });
+    if (results.length >= limit) break;
+  }
+  return { results, query: originalQuery, matches, indexRevision: state.revision };
 }
 
 self.onmessage = function onMessage(event) {
