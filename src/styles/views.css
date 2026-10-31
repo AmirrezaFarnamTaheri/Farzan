@@ -1137,6 +1137,20 @@
   gap: var(--space-4);
 }
 
+.view-playlists .playlists-list-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.view-playlists .playlists-list-card > .card-body {
+  padding: 0;
+}
+.view-playlists .grid[data-playlist-list] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 340px));
+  justify-content: start;
+  gap: var(--space-3);
+}
+
 .view-playlists [hidden] { display: none !important; }
 .playlists-discover {
   border: 1px solid var(--border);
