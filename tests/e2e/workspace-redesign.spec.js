@@ -317,8 +317,6 @@ test.describe('Farzan desktop workspace redesign', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-studio')).toBeVisible();
-    const canvas = page.locator('.studio-canvas-card');
-    const toolbar = page.locator('.studio-toolbar-panel');
     const inspector = page.locator('[data-studio-inspector]');
     const toggle = page.locator('[data-studio-toggle-inspector]');
     await expect(toggle).toBeVisible();
