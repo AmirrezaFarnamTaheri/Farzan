@@ -180,6 +180,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="right" title="Move right">Right</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-undo>Undo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export>Download draft JSON</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-import-trigger>Import draft JSON</button>
+            <input type="file" hidden accept=".json,application/json" data-studio-konva-import aria-label="Import isolated Konva draft JSON" />
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reset>Start fresh from Studio</button>
           </div>
           <div class="studio-konva-stage" data-studio-konva-stage aria-label="Interactive experimental Konva canvas"></div>
@@ -673,6 +676,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let konvaOpening = false;
   let konvaClosing = false;
   let konvaResetting = false;
+  let konvaImporting = false;
   let focusBeforeKonva = null;
   const setKonvaStatus = message => {
     if (konvaStatus) konvaStatus.textContent = message;
@@ -741,8 +745,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   };
   const createKonvaWorkspace = (source, loaded) => {
     const db = window.DB;
-    konvaWorkspace?.destroy?.();
-    konvaWorkspace = loaded.createStudioKonvaDraftWorkspace({
+    const previousWorkspace = konvaWorkspace;
+    const candidate = loaded.createStudioKonvaDraftWorkspace({
       container: konvaStage,
       board: source,
       // Only this experimental key is writable here. The live canvas owns
@@ -764,6 +768,10 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       },
       onError: () => setKonvaStatus('Experimental draft save failed; earlier draft retained'),
     });
+    // Do not destroy the currently editable board until the new renderer has
+    // passed its own validation and mounted successfully.
+    previousWorkspace?.destroy?.();
+    konvaWorkspace = candidate;
     populateKonvaObjects();
     return konvaWorkspace;
   };
@@ -805,9 +813,89 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   });
   on(konvaDialog, 'close', () => disposeKonva());
   on(konvaSelect, 'change', () => konvaWorkspace?.select?.(konvaSelect.value || null));
+  const konvaImportInput = document.querySelector('[data-studio-konva-import]');
+  on(document.querySelector('[data-studio-konva-import-trigger]'), 'click', () => {
+    if (!unmounted && konvaWorkspace && !konvaClosing && !konvaResetting && !konvaImporting) {
+      konvaImportInput?.click();
+    }
+  });
+  on(document.querySelector('[data-studio-konva-export]'), 'click', async () => {
+    if (unmounted || !konvaWorkspace || !konvaModule || konvaClosing || konvaResetting || konvaImporting) return;
+    const previous = konvaWorkspace;
+    try {
+      await previous.flush();
+      if (unmounted || konvaWorkspace !== previous) return;
+      const json = konvaModule.exportKonvaV1DraftJSON(previous.getBoard());
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const href = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'farzan-konva-draft-v1.json';
+        document.body.appendChild(link);
+        try { link.click(); } finally { link.remove(); }
+      } finally {
+        // Revoke after the browser has had an opportunity to start the save.
+        setTimeout(() => URL.revokeObjectURL(href), 1000);
+      }
+      setKonvaStatus('Experimental draft JSON download started; Studio board unchanged');
+    } catch {
+      if (!unmounted) setKonvaStatus('Draft JSON export failed; saved board unchanged');
+    }
+  });
+  on(konvaImportInput, 'change', async () => {
+    const file = konvaImportInput?.files?.[0];
+    if (konvaImportInput) konvaImportInput.value = '';
+    if (!file || unmounted || !konvaWorkspace || !konvaModule
+      || konvaClosing || konvaResetting || konvaImporting) return;
+    const previous = konvaWorkspace;
+    const loaded = konvaModule;
+    konvaImporting = true;
+    if (konvaStage) konvaStage.inert = true;
+    let saved = false;
+    try {
+      if (file.size > (loaded.MAX_KONVA_DRAFT_JSON_CHARS || 8 * 1024 * 1024)) {
+        throw new RangeError('Draft import exceeds JSON size limit');
+      }
+      const confirmImport = window.OpenCourseDeck?.UI?.confirm || window.confirm;
+      const approved = typeof confirmImport === 'function'
+        ? await confirmImport('Replace the experimental Konva draft with this JSON file? The main Studio board is unchanged. Download a draft backup first if needed.')
+        : false;
+      if (!approved) {
+        setKonvaStatus('Experimental draft import cancelled');
+        return;
+      }
+      if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
+      const contents = await file.text();
+      if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
+      const imported = loaded.importKonvaV1DraftJSON(contents);
+      await previous.flush();
+      if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
+      const receipt = await window.DB?.saveSetting?.(loaded.DRAFT_KEY, structuredClone(imported));
+      if (receipt !== true) throw new Error('Draft import not acknowledged');
+      saved = true;
+      if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
+      createKonvaWorkspace(imported, loaded);
+      setKonvaStatus('Imported isolated Konva draft JSON; main Studio board unchanged');
+    } catch {
+      if (!unmounted) {
+        if (saved) {
+          // The imported board was durably acknowledged, but its preview
+          // failed to mount; do not keep an obsolete writer alive.
+          disposeKonva();
+          setStatus('Imported draft saved, but preview unavailable. Reopen Konva draft lab.');
+        } else {
+          setKonvaStatus('Draft JSON import failed; previous draft unchanged');
+        }
+      }
+    } finally {
+      konvaImporting = false;
+      if (konvaStage) konvaStage.inert = false;
+    }
+  });
   document.querySelectorAll('[data-studio-konva-mode]').forEach(button => {
     on(button, 'click', () => {
-      if (!konvaWorkspace || konvaClosing || konvaResetting) return;
+      if (!konvaWorkspace || konvaClosing || konvaResetting || konvaImporting) return;
       try {
         const mode = konvaWorkspace.setMode(button.dataset.studioKonvaMode);
         setKonvaStatus(mode === 'pen'
@@ -825,7 +913,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
     on(button, 'click', async () => {
       const id = konvaSelect?.value;
-      if (!id || !konvaWorkspace) return;
+      if (!id || !konvaWorkspace || konvaImporting) return;
       const [dx, dy] = nudge[button.dataset.studioKonvaNudge] || [0, 0];
       try {
         await konvaWorkspace.move(id, dx, dy);
@@ -835,7 +923,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   });
   for (const action of ['undo', 'redo']) {
     on(document.querySelector('[data-studio-konva-' + action + ']'), 'click', async () => {
-      if (!konvaWorkspace) return;
+      if (!konvaWorkspace || konvaImporting) return;
       try {
         await konvaWorkspace[action]();
         populateKonvaObjects();
@@ -844,7 +932,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     });
   }
   on(document.querySelector('[data-studio-konva-reset]'), 'click', async () => {
-    if (!konvaWorkspace || !konvaModule || konvaResetting || konvaClosing) return;
+    if (!konvaWorkspace || !konvaModule || konvaResetting || konvaClosing || konvaImporting) return;
     const confirmReset = window.OpenCourseDeck?.UI?.confirm || window.confirm;
     let approved;
     try { approved = typeof confirmReset === 'function'
