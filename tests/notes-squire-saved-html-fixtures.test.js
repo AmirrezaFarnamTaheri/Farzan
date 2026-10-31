@@ -61,7 +61,14 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
       const after = document.createElement('template');
       after.innerHTML = saved;
       const cleanText = node => (node.textContent ?? '').replace(/\s+/g, ' ').trim();
-      expect(cleanText(after.content)).toContain(cleanText(before.content));
+      // The first edit inserts text within a paragraph, so the original
+      // document's *whole* text is not necessarily one contiguous substring.
+      // Every original nonempty text node must still survive independently.
+      const walker = document.createTreeWalker(before.content, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const originalSegment = cleanText(node);
+        if (originalSegment) expect(cleanText(after.content)).toContain(originalSegment);
+      }
       for (const tag of ['h2', 'ul', 'ol', 'li', 'blockquote', 'pre', 'a']) {
         expect(after.content.querySelectorAll(tag).length)
           .toBeGreaterThanOrEqual(before.content.querySelectorAll(tag).length);
