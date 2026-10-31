@@ -347,7 +347,7 @@ let studioKeyController = null;
         `;
 
     container.innerHTML = `
-      <section class="view view-flashcards fc-wrap">
+      <section class="view view-flashcards fc-wrap" data-first-use="${cards.length === 0}">
         <header class="page-header fc-header">
           <div>
             <span class="eyebrow">Spaced repetition</span>
