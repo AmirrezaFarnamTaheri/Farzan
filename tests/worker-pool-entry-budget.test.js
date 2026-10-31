@@ -11,7 +11,8 @@ describe('worker pool runtime cost and durable offline assets', () => {
   it('does not import the unused pool into the eager application startup', () => {
     expect(indexSource).not.toContain("from './lib/workerPool.js'");
     expect(indexSource).toContain('pd.WorkerPool = lazyWorkerPool;');
-    expect(indexSource).not.toContain("import('./lib/workerPool.js')");
+    expect(indexSource).toContain("import('./lib/workerPool.js')");
+    expect(indexSource).toContain("import { createLazyWorkerPool } from './core/lazyWorkerPool.js'");
   });
 
   it('keeps stable worker asset URLs for actual production offline and browser smoke', () => {
