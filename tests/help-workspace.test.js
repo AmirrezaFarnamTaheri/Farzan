@@ -4,7 +4,7 @@ import { mountHelpView } from '../src/views/helpRoute.js';
 describe('end-user Help workspace', () => {
   it('shows actionable first-run steps without developer commands in the visible guide', () => {
     document.body.innerHTML = '<main id="main-content"></main>';
-    window.DataStore = { init: vi.fn(async () => true), allTopics: vi.fn(() => []) };
+    window.DataStore = { init: vi.fn(async () => true), allTopics: vi.fn(() => []), allCourses: vi.fn(() => []) };
     mountHelpView({
       setView: html => { document.querySelector('main').innerHTML = html; },
     });
