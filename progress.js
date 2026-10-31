@@ -3,6 +3,7 @@
 // ============================================================
 import { createVaultZip } from './src/features/vaultZip.js';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
+import { assertFlashcardBackupImportable } from './src/core/flashcardBackupSafety.js';
 
 'use strict';
 
@@ -664,6 +665,12 @@ const ProgressStats = (() => {
         const pdfBookmarkRecords = rawPdfBookmarks.filter(_isPdfBookmarkRecord);
         const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6'].includes(String(payload.version));
         if (!versionSupported) throw new Error(`Unsupported backup version: ${payload.version}`);
+        // Validate the entire imported deck before any user confirmation or
+        // canonical write. A malformed FSRS state cannot be repaired from SM-2.
+        if (payload.settings && Object.prototype.hasOwnProperty.call(payload.settings, 'flashcards')
+            && payload.settings.flashcards != null) {
+          await assertFlashcardBackupImportable(payload.settings.flashcards);
+        }
         const invalidCount =
           rawProgress.length - progressRecords.length +
           _asArray(payload.notes).length - noteRecords.length +

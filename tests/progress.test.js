@@ -184,6 +184,28 @@ describe('progress backup exports', () => {
       .toHaveBeenCalledWith(expect.stringMatching(/duplicate.*flashcard/i));
   });
 
+  it('rejects an FSRS backup with a forged rollback archive or unknown future scheduler', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    for (const invalid of [
+      {
+        id: 'fsrs-card', front: 'Q', back: 'A', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-01-02T00:00:00.000Z')),
+        fsrsMigration: { version: 1, legacyCard: { id: 'other-card' } },
+      },
+      { id: 'future', front: 'Q', back: 'A', scheduler: 'fsrs-v6' },
+    ]) {
+      window.DB.saveSetting.mockClear();
+      const file = new File([JSON.stringify({
+        version: '1.6', settings: { flashcards: [invalid] },
+      })], 'invalid-scheduler.json', { type: 'application/json' });
+      await window.ProgressStats.importJSONFile(file);
+      expect(window.DB.saveSetting).not.toHaveBeenCalled();
+      expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    }
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
   it('round-trips valid legacy and FSRS-v5 backups without changing due dates or archives', async () => {
     const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
