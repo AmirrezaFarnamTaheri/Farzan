@@ -392,13 +392,14 @@ export function mountBookmarksView(deps = {}) {
       const title = form.elements.title?.value?.trim();
       const note = form.elements.note?.value?.trim();
       try {
-        await window.DB.saveTimestamp({
+        const saved = await window.DB.saveTimestamp({
           ...original,
           id: original.id || form.dataset.timestampEditForm,
           title: title || original.title || original.topicTitle || 'Video timestamp',
           note: note || '',
           updatedAt: Date.now(),
         });
+        if (saved !== true) throw new Error('Timestamp update was not acknowledged');
         delete listRoot.dataset.editingTimestamp;
         Toast.success('Timestamp updated');
         renderBookmarks();
