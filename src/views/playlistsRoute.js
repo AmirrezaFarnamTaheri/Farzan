@@ -172,7 +172,7 @@ async function renderPlaylists(deps) {
   // Prioritize personal queues; discovery remains available without dominating the page.
   discover.hidden = catalogPlaylists.length === 0;
   discover.open = catalogPlaylists.length > 0 && playlists.length === 0;
-  discover.querySelector('summary').textContent = `Browse course queues (${catalogPlaylists.length})`;
+  discover.querySelector('summary').textContent = `Browse course queues (${catalogPlaylists.length}) · Video topics: ${videoTopics.length}`;
 
   metricsRoot.replaceChildren();
   const meaningfulMetrics = [
