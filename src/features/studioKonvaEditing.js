@@ -85,6 +85,44 @@ export function translateKonvaV1Element(board, id, dx, dy) {
 }
 
 /**
+ * Convert positive-size Konva Rect display bounds into canonical Studio v1
+ * geometry. Legacy negative width/height are orientation metadata: preserve
+ * their sign while keeping the exact same displayed bounding rectangle.
+ *
+ * Bounds use the node's *local* scene coordinates; the parent Konva group
+ * owns viewport pan/zoom. Flips, rotation and unsupported elements must be
+ * rejected rather than rewriting saved v1 boards to a lossy approximation.
+ */
+export function resizeKonvaV1Element(board, id, bounds) {
+  if (!bounds || typeof bounds !== 'object'
+    || !['x', 'y', 'width', 'height'].every(key =>
+      typeof bounds[key] === 'number' && Number.isFinite(bounds[key]))) {
+    throw new TypeError('Konva resize bounds must contain finite numeric x/y/width/height');
+  }
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    throw new RangeError('Konva resize dimensions must be positive (flips are unsupported)');
+  }
+  validBoard(board);
+  const next = structuredClone(board);
+  const { layer, index } = findUnlockedElement(next, id);
+  const item = layer.elements[index];
+  if (item.type !== 'rect' && item.type !== 'roundRect') {
+    throw new TypeError('Unsupported Studio element for Konva resizing: ' + item.type);
+  }
+  const x = item.width < 0 ? bounds.x + bounds.width : bounds.x;
+  const y = item.height < 0 ? bounds.y + bounds.height : bounds.y;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new RangeError('Konva resized geometry overflow');
+  }
+  item.x = x;
+  item.y = y;
+  item.width = item.width < 0 ? -bounds.width : bounds.width;
+  item.height = item.height < 0 ? -bounds.height : bounds.height;
+  validBoard(next);
+  return next;
+}
+
+/**
  * Wires real Konva click/tap/drag lifecycle events to canonical board writes.
  * A rejected commit restores the node and preserves the last accepted board.
  * No editing route is switched to this controller until interaction parity.
@@ -132,6 +170,23 @@ export function createKonvaV1MoveSession({
     return structuredClone(current);
   });
 
+  const resize = (id, bounds) => enqueue(async () => {
+    const next = resizeKonvaV1Element(current, id, bounds);
+    const before = findUnlockedElement(current, id);
+    const after = findUnlockedElement(next, id);
+    const oldShape = before.layer.elements[before.index];
+    const newShape = after.layer.elements[after.index];
+    // A stationary Transformer must not create a fake edit or storage write.
+    if (['x', 'y', 'width', 'height'].every(key => oldShape[key] === newShape[key])) {
+      return structuredClone(current);
+    }
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
   // Undo/redo replay whole canonical board snapshots, never Konva's own JSON.
   // The route must redraw nodes from the returned document after replay; this
   // data-only controller must not mutate a live scene before a durable write.
@@ -158,7 +213,7 @@ export function createKonvaV1MoveSession({
     if (!node || typeof node.on !== 'function' || typeof node.off !== 'function') {
       throw new TypeError('A Konva shape node is required');
     }
-    findUnlockedElement(current, id);
+    const target = findUnlockedElement(current, id);
     let origin = { x: node.x(), y: node.y() };
     node.draggable(true);
     node.on('click.farzanEdit tap.farzanEdit', () => onSelect(id));
@@ -177,6 +232,67 @@ export function createKonvaV1MoveSession({
       // to callers without emitting an unhandled Promise rejection.
       last.catch(() => {});
     });
+
+    // A Konva Transformer scales the visual node; the canonical v1 document
+    // stores rectangle bounds rather than node scales. Reconcile only mapped
+    // Rect/roundRect types, never image/ink/text or rotated/flipped geometry.
+    const canResize = ['rect', 'roundRect'].includes(target.layer.elements[target.index].type)
+      && node.getClassName?.() === 'Rect';
+    if (canResize) {
+      let transformOrigin = null;
+      const snapshotNode = () => ({
+        x: node.x(), y: node.y(), width: node.width(), height: node.height(),
+        scaleX: node.scaleX(), scaleY: node.scaleY(), rotation: node.rotation(),
+      });
+      const applyNode = attrs => {
+        node.setAttrs(attrs);
+        node.getLayer()?.batchDraw();
+      };
+      node.on('transformstart.farzanEdit', () => {
+        transformOrigin = snapshotNode();
+      });
+      node.on('transformend.farzanEdit', () => {
+        const before = transformOrigin;
+        transformOrigin = null;
+        if (!before) return;
+        let bounds;
+        try {
+          const scaleX = node.scaleX(), scaleY = node.scaleY();
+          if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY)
+            || scaleX <= 0 || scaleY <= 0) {
+            throw new RangeError('Konva transform requires positive finite scales; flips are unsupported');
+          }
+          if (node.rotation() !== 0 || before.rotation !== 0) {
+            throw new RangeError('Konva transform rotation is unsupported by canonical v1 resize');
+          }
+          bounds = {
+            x: node.x(), y: node.y(),
+            width: node.width() * scaleX, height: node.height() * scaleY,
+          };
+          // This synchronous validation also guards against infinity from
+          // multiplying finite dimensions and scales.
+          if (!Object.values(bounds).every(Number.isFinite)
+            || bounds.width <= 0 || bounds.height <= 0) {
+            throw new RangeError('Konva transform produced invalid resize bounds');
+          }
+        } catch (error) {
+          applyNode(before);
+          last = Promise.reject(error);
+          last.catch(() => {});
+          return;
+        }
+        last = resize(id, bounds).then(result => {
+          // Clear the transient Konva scale only *after* canonical persistence
+          // acknowledges the resized v1 rectangle.
+          applyNode({ ...bounds, scaleX: 1, scaleY: 1 });
+          return result;
+        }).catch(error => {
+          applyNode(before);
+          throw error;
+        });
+        last.catch(() => {});
+      });
+    }
     return () => {
       node.off('.farzanEdit');
       node.draggable(false);
@@ -186,6 +302,7 @@ export function createKonvaV1MoveSession({
   return {
     bind,
     commit,
+    resize,
     undo,
     redo,
     canUndo: () => undoStack.length > 0,

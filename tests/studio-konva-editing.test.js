@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Konva from 'konva';
-import { translateKonvaV1Element, createKonvaV1MoveSession } from '../src/features/studioKonvaEditing.js';
+import * as studioEditing from '../src/features/studioKonvaEditing.js';
+const { translateKonvaV1Element, resizeKonvaV1Element, createKonvaV1MoveSession } = studioEditing;
 
 const fixture = () => ({
   version: 1, tool: 'select',
@@ -216,4 +217,144 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
     expect(reject.getBoard()).toEqual(fixture());
     other.destroy();
   });
+  it('resizes a signed-dimension rectangle using Konva display bounds without corrupting the canonical board', () => {
+    const source = fixture();
+    const original = structuredClone(source);
+    const resized = resizeKonvaV1Element(source, 'rect', { x: 90, y: 104, width: 135, height: 60 });
+    const shape = resized.layers[0].elements[0];
+    expect(shape).toEqual({ ...original.layers[0].elements[0],
+      x: 225, y: 164, width: -135, height: -60 });
+    expect(resized.layers[0].elements.slice(1)).toEqual(original.layers[0].elements.slice(1));
+    expect(resized.metadata).toEqual(original.metadata);
+    expect(source).toEqual(original);
+  });
+
+  it('preserves card corner radius, style, and positive dimensions when resizing a round rectangle', () => {
+    const board = fixture();
+    board.layers[0].elements.push({
+      id: 'card', type: 'roundRect', x: 2, y: 3,
+      width: 40, height: 25, radius: 12, stroke: '#abc', opacity: 0.8,
+    });
+    const resized = resizeKonvaV1Element(board, 'card', {
+      x: 12, y: 18, width: 75, height: 50,
+    });
+    expect(resized.layers[0].elements.at(-1)).toEqual({
+      id: 'card', type: 'roundRect', x: 12, y: 18, width: 75,
+      height: 50, radius: 12, stroke: '#abc', opacity: 0.8,
+    });
+    expect(board.layers[0].elements.at(-1)).toMatchObject({ x: 2, width: 40 });
+  });
+
+  it('refuses unsafe, nonfinite, flipped, zero-sized, or unsupported shape resizes without mutating input', () => {
+    const board = fixture();
+    const original = structuredClone(board);
+    for (const bounds of [
+      { x: NaN, y: 0, width: 50, height: 40 },
+      { x: 5, y: 2, width: -20, height: 40 },
+      { x: 5, y: 2, width: 20, height: 0 },
+      { x: 5, y: 2, width: Infinity, height: 40 },
+      { x: Number.MAX_VALUE, y: 2, width: Number.MAX_VALUE, height: 40 },
+    ]) {
+      expect(() => resizeKonvaV1Element(board, 'rect', bounds)).toThrow();
+    }
+    expect(() => resizeKonvaV1Element(board, 'circle', {
+      x: 4, y: 5, width: 25, height: 25,
+    })).toThrow(/unsupported/i);
+    board.layers[0].locked = true;
+    expect(() => resizeKonvaV1Element(board, 'rect', {
+      x: 1, y: 1, width: 20, height: 30,
+    })).toThrow(/locked/i);
+    board.layers[0].locked = false;
+    expect(board).toEqual(original);
+  });
+
+  it('persists canonical resizes and supports undo and redo without Konva JSON', async () => {
+    const writes = [];
+    const session = createKonvaV1MoveSession({
+      board: fixture(),
+      onChange: async document => { writes.push(structuredClone(document)); return true; },
+    });
+    const grown = await session.resize('rect', { x: 90, y: 100, width: 150, height: 90 });
+    expect(grown.layers[0].elements[0]).toMatchObject({
+      x: 240, y: 190, width: -150, height: -90,
+    });
+    expect(writes).toHaveLength(1);
+    expect(writes[0].version).toBe(1);
+    expect(writes[0].layers[0].elements[0]).toEqual(grown.layers[0].elements[0]);
+    expect(session.canUndo()).toBe(true);
+    expect(await session.undo()).toEqual(fixture());
+    expect(session.canRedo()).toBe(true);
+    expect(await session.redo()).toEqual(grown);
+  });
+
+  it('leaves board and history intact when a resize is not durably acknowledged', async () => {
+    let allowed = true;
+    const session = createKonvaV1MoveSession({
+      board: fixture(), onChange: async () => allowed,
+    });
+    await session.resize('rect', { x: 90, y: 100, width: 120, height: 40 });
+    const saved = session.getBoard();
+    allowed = false;
+    await expect(session.resize('rect', {
+      x: 85, y: 105, width: 120, height: 60,
+    })).rejects.toThrow(/acknowledge/i);
+    expect(session.getBoard()).toEqual(saved);
+    expect(session.canUndo()).toBe(true);
+    expect(session.canRedo()).toBe(false);
+    allowed = true;
+    expect(await session.undo()).toEqual(fixture());
+  });
+
+  it('commits actual Konva transform events and normalizes node scale after the accepted save', async () => {
+    const writes = [];
+    const session = createKonvaV1MoveSession({
+      board: fixture(),
+      onChange: async b => { writes.push(structuredClone(b)); return true; },
+    });
+    // The preview mapper normalizes a signed 100x40 rectangle into this
+    // positive-size Konva Rect; world viewport zoom belongs to its parent.
+    const node = new Konva.Rect({ id: 'rect', x: 100, y: 110, width: 100, height: 40 });
+    const release = session.bind(node, 'rect');
+    node.fire('transformstart');
+    node.position({ x: 90, y: 105 });
+    node.scale({ x: 1.3, y: 1.5 });
+    node.fire('transformend');
+    await session.flush();
+    expect(writes).toHaveLength(1);
+    expect(session.getBoard().layers[0].elements[0]).toMatchObject({
+      x: 220, y: 165, width: -130, height: -60,
+    });
+    expect([node.x(), node.y(), node.width(), node.height(),
+      node.scaleX(), node.scaleY()]).toEqual([90, 105, 130, 60, 1, 1]);
+    release();
+    node.destroy();
+  });
+
+  it('restores Konva geometry after a rejected transform or forbidden flip', async () => {
+    const writes = [];
+    const session = createKonvaV1MoveSession({
+      board: fixture(), onChange: async b => { writes.push(b); return false; },
+    });
+    const node = new Konva.Rect({ id: 'rect', x: 100, y: 110, width: 100, height: 40 });
+    session.bind(node, 'rect');
+    node.fire('transformstart');
+    node.position({ x: 110, y: 90 });
+    node.scale({ x: 1.2, y: 1.4 });
+    node.fire('transformend');
+    await expect(session.flush()).rejects.toThrow(/acknowledge/i);
+    expect([node.x(), node.y(), node.width(), node.height(),
+      node.scaleX(), node.scaleY()]).toEqual([100, 110, 100, 40, 1, 1]);
+    expect(session.getBoard()).toEqual(fixture());
+    expect(session.canUndo()).toBe(false);
+
+    node.fire('transformstart');
+    node.scale({ x: -1.1, y: 1 });
+    node.fire('transformend');
+    await expect(session.flush()).rejects.toThrow(/transform|flip|positive/i);
+    expect(writes).toHaveLength(1);
+    expect([node.x(), node.y(), node.scaleX(), node.scaleY()]).toEqual([100, 110, 1, 1]);
+    expect(session.getBoard()).toEqual(fixture());
+    node.destroy();
+  });
+
 });
