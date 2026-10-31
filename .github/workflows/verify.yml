@@ -268,6 +268,12 @@ jobs:
         continue-on-error: true
         run: npm run report:bundle 2>&1 | tee reports/ci/bundle-report.log
 
+      - name: Attribute generated bundle consumers
+        id: bundle_consumers
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/bundle-consumers.cjs > reports/ci/bundle-consumers.json
+
       - name: Run smoke tests
         id: smoke
         if: steps.build_release.outcome == 'success'
@@ -322,6 +328,7 @@ jobs:
           DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
           PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
           BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          BUNDLE_CONSUMERS: ${{ steps.bundle_consumers.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
           FINAL_VERIFY: ${{ steps.final_verify.outcome }}
@@ -353,6 +360,7 @@ jobs:
           dependency-audit=$DEPENDENCY_AUDIT
           project-audit=$PROJECT_AUDIT
           bundle-report=$BUNDLE_REPORT
+          bundle-consumers=$BUNDLE_CONSUMERS
           smoke=$SMOKE
           browser-smoke=$BROWSER_SMOKE
           EOF_SUMMARY
@@ -392,6 +400,7 @@ jobs:
           DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
           PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
           BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          BUNDLE_CONSUMERS: ${{ steps.bundle_consumers.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
           FINAL_VERIFY: ${{ steps.final_verify.outcome }}
@@ -418,6 +427,7 @@ jobs:
           dependency-audit=$DEPENDENCY_AUDIT
           project-audit=$PROJECT_AUDIT
           bundle-report=$BUNDLE_REPORT
+          bundle-consumers=$BUNDLE_CONSUMERS
           smoke=$SMOKE
           browser-smoke=$BROWSER_SMOKE
           EOF_RESULTS
