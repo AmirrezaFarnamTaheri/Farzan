@@ -395,6 +395,7 @@ describe('flashcard first-use presentation', () => {
     const host = document.getElementById('studio-host');
     await renderStudio(host);
     expect(host.querySelector('.fc-stats')).toBeNull();
+    expect(host.querySelector('.fc-wrap')?.dataset.firstUse).toBe('true');
     const firstUse = host.querySelector('#fc-empty-create');
     expect(firstUse).not.toBeNull();
     firstUse.click();
