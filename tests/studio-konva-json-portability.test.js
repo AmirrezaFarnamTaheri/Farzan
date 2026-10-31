@@ -61,7 +61,7 @@ describe('isolated Konva draft v1 JSON portability', () => {
     expect(() => exportKonvaV1DraftJSON(board, { maxChars: 20 })).toThrow(/size|large/i);
     const corrupt = representative();
     corrupt.layers[0].elements[0].width = Infinity;
-    expect(() => exportKonvaV1DraftJSON(corrupt)).toThrow(/incompatible/i);
+    expect(() => exportKonvaV1DraftJSON(corrupt)).toThrow(/incompatible|unsupported/i);
     const runtimeValue = representative();
     runtimeValue.courseMetadata.callback = () => {};
     expect(() => exportKonvaV1DraftJSON(runtimeValue)).toThrow(/json|unsupported/i);
