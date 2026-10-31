@@ -287,6 +287,32 @@ describe('progress backup exports', () => {
     expect(window.DB.importBackup).toHaveBeenCalledOnce();
   });
 
+  it('does not count annotations or timestamps when their canonical writers refuse storage', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      progress: [], notes: [], annotations: [], timestamps: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.saveAnnotations.mockResolvedValue(false);
+    window.DB.saveTimestamp.mockResolvedValue(false);
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      annotations: [{ id: 'annot-new', docId: 'doc-1', page: 2, updatedAt: 123 }],
+      timestamps: [{ id: 'time-new', topicId: 'topic-1', position: 40 }],
+    })], 'rejected-media-receipts.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      annotations: 0, timestamps: 0, rolledBack: true,
+      errors: expect.arrayContaining([
+        expect.objectContaining({ store: 'annotations', id: 'doc-1' }),
+        expect.objectContaining({ store: 'timestamps', id: 'time-new' }),
+      ]),
+    });
+  });
+
   it('does not claim a completed rollback if restoring a protected setting is explicitly refused', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.clearUserData = vi.fn(async () => true);
