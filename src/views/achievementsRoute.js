@@ -17,14 +17,20 @@ export function mountAchievementsView(deps = {}) {
           <p class="page-subtitle">Study goals completed from your recorded activity.</p>
         </div>
       </div>
-      <div class="stat-grid" data-achievement-metrics></div>
-      <div class="card card-filled achievements-section-card">
+      <section class="card card-filled achievement-next-card" data-next-achievement hidden aria-label="Next attainable achievement"></section>
+      <div class="stat-grid" data-achievement-metrics hidden></div>
+      <div class="card card-filled achievements-section-card" data-unlocked-achievements hidden>
         <div class="card-body">
-          <div class="grid grid-3" data-achievement-list>
-            <p>Loading achievements...</p>
-          </div>
+          <h2 class="h3">Unlocked achievements</h2>
+          <div class="grid grid-3" data-achievement-list></div>
         </div>
       </div>
+      <details class="card achievement-locked-section" data-locked-achievements>
+        <summary class="h3" data-locked-achievement-summary>Locked achievements</summary>
+        <div class="card-body">
+          <div class="grid grid-3" data-locked-achievement-list></div>
+        </div>
+      </details>
       <div class="card card-filled achievements-review-card">
         <div class="card-body">
           <h2 class="h3">Review queue</h2>
@@ -41,7 +47,11 @@ export function mountAchievementsView(deps = {}) {
     const metricsRoot = document.querySelector('[data-achievement-metrics]');
     const listRoot = document.querySelector('[data-achievement-list]');
     const reviewRoot = document.querySelector('[data-review-list]');
-    if (!metricsRoot || !listRoot) return;
+    const nextRoot = document.querySelector('[data-next-achievement]');
+    const lockedDetails = document.querySelector('[data-locked-achievements]');
+    const lockedRoot = document.querySelector('[data-locked-achievement-list]');
+    const unlockedSection = document.querySelector('[data-unlocked-achievements]');
+    if (!metricsRoot || !listRoot || !nextRoot || !lockedDetails || !lockedRoot || !unlockedSection) return;
 
     let loaded;
     try {
@@ -62,6 +72,11 @@ export function mountAchievementsView(deps = {}) {
       if (!document.body.contains(listRoot)) return;
       console.warn('[Achievements] unable to read learning activity:', error);
       metricsRoot.replaceChildren();
+      metricsRoot.hidden = true;
+      nextRoot.replaceChildren();
+      nextRoot.hidden = true;
+      lockedRoot.replaceChildren();
+      listRoot.replaceChildren();
       reviewRoot?.replaceChildren();
       const notice = document.createElement('div');
       notice.className = 'card card-filled achievement-load-error';
@@ -112,7 +127,9 @@ export function mountAchievementsView(deps = {}) {
     ];
 
     metricsRoot.replaceChildren();
-    stats.forEach(([label, value]) => {
+    const meaningfulStats = stats.filter(([, value]) => value > 0);
+    metricsRoot.hidden = meaningfulStats.length === 0;
+    meaningfulStats.forEach(([label, value]) => {
       const card = document.createElement('div');
       card.className = 'stat-card';
       const strong = document.createElement('strong');
@@ -132,7 +149,57 @@ export function mountAchievementsView(deps = {}) {
       { id: 'catalog-roamer', title: 'Catalog Roamer', detail: 'Touch topics from three courses.', unlocked: new Set(activeRecords.map(record => record.courseId || topicMap.get(record.topicId)?.courseId).filter(Boolean)).size >= 3 },
     ];
 
+    // Pick the closest incomplete objective, retaining the gentle first-step
+    // order for learners with no recorded activity. These are actual activity
+    // totals, never decorative or inferred XP percentages.
+    const touchedCourses = new Set(activeRecords.map(record =>
+      record.courseId || topicMap.get(record.topicId)?.courseId).filter(Boolean)).size;
+    const progressGoals = [
+      { id: 'first-step', title: 'First Step', current: Math.min(activeRecords.length, 1), target: 1, action: 'Browse courses' },
+      { id: 'first-finish', title: 'First Finish', current: Math.min(doneRecords.length, 1), target: 1, action: 'Continue a lesson' },
+      { id: 'deep-focus', title: 'Deep Focus', current: Math.min(Math.floor(watchedSeconds / 60), 30), target: 30, action: 'Watch a lesson', unit: 'minutes' },
+      { id: 'course-complete', title: 'Course Complete', current: Math.min(completedCourses, 1), target: 1, action: 'Finish a course' },
+      { id: 'collector', title: 'Collector', current: Math.min(activeRecords.length, 10), target: 10, action: 'Study another topic' },
+      { id: 'catalog-roamer', title: 'Catalog Roamer', current: Math.min(touchedCourses, 3), target: 3, action: 'Explore courses' },
+    ];
+    const nextGoal = progressGoals
+      .filter(goal => goal.current < goal.target)
+      .sort((a, b) => (b.current / b.target) - (a.current / a.target))[0];
+    nextRoot.replaceChildren();
+    nextRoot.hidden = !nextGoal;
+    if (nextGoal) {
+      const body = document.createElement('div');
+      body.className = 'card-body';
+      const eyebrow = document.createElement('span');
+      eyebrow.className = 'eyebrow';
+      eyebrow.textContent = 'Next achievable goal';
+      const title = document.createElement('h2');
+      title.className = 'h3';
+      title.textContent = nextGoal.title;
+      const explanation = document.createElement('p');
+      explanation.className = 'text-muted';
+      explanation.textContent = `${nextGoal.current} of ${nextGoal.target}${nextGoal.unit ? ' ' + nextGoal.unit : ''}`;
+      const meter = document.createElement('progress');
+      meter.max = nextGoal.target;
+      meter.value = nextGoal.current;
+      meter.setAttribute('aria-label', nextGoal.title + ' progress');
+      const action = document.createElement('a');
+      action.className = 'btn btn-primary';
+      action.href = '#/courses';
+      action.textContent = nextGoal.action;
+      body.append(eyebrow, title, explanation, meter, action);
+      nextRoot.appendChild(body);
+    }
+
     listRoot.replaceChildren();
+    lockedRoot.replaceChildren();
+    const unlockedCount = achievementsList.filter(achievement => achievement.unlocked).length;
+    const lockedCount = achievementsList.length - unlockedCount;
+    unlockedSection.hidden = unlockedCount === 0;
+    lockedDetails.hidden = lockedCount === 0;
+    lockedDetails.open = false;
+    lockedDetails.querySelector('[data-locked-achievement-summary]').textContent =
+      `Locked achievements (${lockedCount})`;
     achievementsList.forEach(achievement => {
       const card = document.createElement('article');
       card.className = `card achievement-card ${achievement.unlocked ? 'card-filled' : 'card-locked'}`.trim();
@@ -166,7 +233,7 @@ export function mountAchievementsView(deps = {}) {
       status.setAttribute('aria-label', `Achievement status: ${status.textContent}`);
       body.append(title, detail, status);
       card.append(trophyWrap, body);
-      listRoot.appendChild(card);
+      (achievement.unlocked ? listRoot : lockedRoot).appendChild(card);
     });
 
     if (!reviewRoot) return;
