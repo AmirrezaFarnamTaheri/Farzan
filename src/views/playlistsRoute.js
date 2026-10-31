@@ -19,28 +19,32 @@ export function mountPlaylistsView({
           <p class="page-subtitle">Organize videos into a playing order and return to saved moments.</p>
         </div>
       </div>
-      <div class="stat-grid" data-playlist-metrics></div>
-      <div class="card card-filled playlists-create-card">
-        <div class="card-body">
-          <div class="playlists-form">
-            <label class="playlists-field">
-              <span class="text-sm font-semibold">Playlist name</span>
-              <input class="input" data-playlist-name placeholder="e.g. Focus Sprint & Review Queue" />
-            </label>
-            <button class="btn btn-primary" type="button" data-save-playlist>
-              <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
-              Save first catalog queue
-            </button>
-          </div>
-        </div>
-      </div>
+      <div class="stat-grid" data-playlist-metrics hidden></div>
       <div class="card card-filled playlists-list-card">
         <div class="card-body">
           <div class="grid grid-3" data-playlist-list>
-            <p>Loading playlists...</p>
+            <p>Loading your playlists...</p>
           </div>
         </div>
       </div>
+      <details class="playlists-discover" data-playlists-discover hidden>
+        <summary class="playlists-discover-summary">Browse course queues</summary>
+        <div class="card card-filled playlists-create-card">
+          <div class="card-body">
+            <div class="playlists-form">
+              <label class="playlists-field">
+                <span class="text-sm font-semibold">Playlist name</span>
+                <input class="input" data-playlist-name placeholder="e.g. Focus Sprint & Review Queue" />
+              </label>
+              <button class="btn btn-primary" type="button" data-save-playlist>
+                <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                Save first catalog queue
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-3" data-playlist-catalog></div>
+      </details>
     </section>
   `);
   renderPlaylists({ safeMediaUrl, Toast, Router, setPendingCourseSession });
@@ -75,7 +79,9 @@ async function renderPlaylists(deps) {
   const { safeMediaUrl, Router, setPendingCourseSession, Toast = window.OpenCourseDeck?.Toast } = deps;
   const metricsRoot = document.querySelector('[data-playlist-metrics]');
   const listRoot = document.querySelector('[data-playlist-list]');
-  if (!metricsRoot || !listRoot) return;
+  const catalogRoot = document.querySelector('[data-playlist-catalog]');
+  const discover = document.querySelector('[data-playlists-discover]');
+  if (!metricsRoot || !listRoot || !catalogRoot || !discover) return;
 
   const [topics, timestamps, savedPlaylists] = await Promise.all([
     (async () => {
@@ -157,24 +163,25 @@ async function renderPlaylists(deps) {
     sourceGroups.get(key).items.push(playlistTopicTitle(topic));
     sourceGroups.get(key).topicIds.push(topic.topicId);
   });
-  [...sourceGroups.values()]
-    .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title))
-    .slice(0, 10)
-    .forEach(group => {
-      playlists.push({
-        ...group,
-        detail: `${group.items.length} video topic${group.items.length === 1 ? '' : 's'}`,
-      });
-    });
+  const catalogGroups = [...sourceGroups.values()]
+    .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
+  const catalogPlaylists = catalogGroups.slice(0, 10).map(group => ({
+    ...group,
+    detail: `${group.items.length} video topic${group.items.length === 1 ? '' : 's'}`,
+  }));
+  // Prioritize personal queues; discovery remains available without dominating the page.
+  discover.hidden = catalogPlaylists.length === 0;
+  discover.open = catalogPlaylists.length > 0 && playlists.length === 0;
+  discover.querySelector('summary').textContent = `Browse course queues (${catalogPlaylists.length})`;
 
   metricsRoot.replaceChildren();
-  [
-    ['Active tracks', activeQueue.length],
+  const meaningfulMetrics = [
     ['Saved playlists', savedPlaylists.length],
-    ['Video topics', videoTopics.length],
+    ['Active tracks', activeQueue.length],
     ['Saved timestamps', timestamps.length],
-    ['Queue cards', playlists.length],
-  ].forEach(([label, value]) => {
+  ].filter(([, count]) => count > 0);
+  metricsRoot.hidden = meaningfulMetrics.length === 0;
+  meaningfulMetrics.forEach(([label, value]) => {
     const card = document.createElement('div');
     card.className = 'stat-card';
     const strong = document.createElement('strong');
@@ -186,15 +193,17 @@ async function renderPlaylists(deps) {
   });
 
   listRoot.replaceChildren();
+  catalogRoot.replaceChildren();
   if (!playlists.length) {
     const empty = document.createElement('p');
-    empty.className = 'text-muted';
-    empty.textContent = 'No playable catalog videos, saved timestamps, or active player queue were found yet.';
+    empty.className = 'text-muted playlists-empty';
+    empty.textContent = catalogPlaylists.length
+      ? 'No saved playlists yet. Browse course queues below to get started.'
+      : 'No saved queues yet. Add video lessons to your library to build a playlist.';
     listRoot.appendChild(empty);
-    return;
   }
 
-  playlists.slice(0, 24).forEach(playlist => {
+  const appendPlaylistCard = (playlist, root) => {
     const card = document.createElement('article');
     card.className = 'card playlist-card';
     card.dataset.playlistId = playlist.id;
@@ -259,11 +268,12 @@ async function renderPlaylists(deps) {
       actions.appendChild(remove);
     }
     card.appendChild(body);
-    listRoot.appendChild(card);
-  });
+    root.appendChild(card);
+  };
+  playlists.slice(0, 24).forEach(playlist => appendPlaylistCard(playlist, listRoot));
+  catalogPlaylists.forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
 
-  const firstCatalog = [...sourceGroups.values()]
-    .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title))[0];
+  const firstCatalog = catalogGroups[0];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
     saveBtn.disabled = !firstCatalog?.topicIds?.length || !window.DB?.saveSetting;
