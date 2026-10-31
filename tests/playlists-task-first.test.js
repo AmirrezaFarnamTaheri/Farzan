@@ -49,6 +49,7 @@ describe('Playlists task-first organization', () => {
     expect(list.querySelector('[data-playlist-id="source-1"]')).toBeNull();
     expect(catalog.querySelector('[data-playlist-id="source-1"]')).not.toBeNull();
     expect(discover.open).toBe(false);
+    expect(document.querySelector('.playlists-list-card')?.classList.contains('card')).toBe(false);
     expect([...document.querySelectorAll('[data-playlist-metrics] .stat-card')].map(el => el.textContent)).not.toContain('0Queue cards');
   });
 
