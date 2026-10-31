@@ -1,6 +1,37 @@
 name: Native Windows Assurance
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      # Windows packages embed the same frontend; UI reconstruction is a
+      # native release change even when no Rust file was modified.
+      - 'index.html'
+      - 'manifest.json'
+      - 'app.js'
+      - 'notes.js'
+      - 'flashcards.js'
+      - 'player.js'
+      - 'db.js'
+      - 'src/core/**'
+      - 'progress.js'
+      - 'src/index.js'
+      - 'src/features/**'
+      - 'src/lib/eventEmitter.js'
+      - 'canvas.js'
+      - 'src/styles/**'
+      - 'src/views/**'
+      - 'src/core/themeManager.js'
+      - 'data/opencoursedeck-starter.json'
+      - 'src-tauri/**'
+      - 'assets/icon-192.svg'
+      - 'scripts/native-*.cjs'
+      - 'scripts/prepare-native-assets.cjs'
+      - 'scripts/stage-native-exe.cjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/native-windows.yml'
   pull_request:
     branches:
       - main
