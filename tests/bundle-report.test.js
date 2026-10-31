@@ -41,15 +41,41 @@ describe('bundle and CSP reporting', () => {
     ]));
   });
 
-  it('documents the Squire integration budget without weakening entry and gzip caps', async () => {
+  it('adds exactly 400 KiB of aggregate JS capacity while preserving entry, chunk and gzip caps', async () => {
     const { createBundleReport } = await import('../scripts/bundle-report.cjs');
     const { limits } = createBundleReport();
     expect(limits).toEqual({
-      totalJsBytes: 1280 * 1024,
+      totalJsBytes: (1280 + 400) * 1024,
       largestJsBytes: 320 * 1024,
       entryBytes: 240 * 1024,
       entryGzipBytes: 80 * 1024,
     });
+  });
+
+  it('still rejects a total JS bundle one byte over the enlarged allowance', async () => {
+    const { createBundleReport, evaluateReport } = await import('../scripts/bundle-report.cjs');
+    const { limits } = createBundleReport();
+    const report = {
+      files: [{ path: 'dist/opencoursedeck.js' }],
+      totals: {
+        files: 1,
+        totalJsBytes: limits.totalJsBytes,
+        largestJsBytes: 1024,
+        entryBytes: 1024,
+        entryGzipBytes: 512,
+      },
+      csp: {
+        'script-src': ["'self'"],
+        'media-src': ["'self'", 'http:', 'https:'],
+        'connect-src': ["'self'", 'http:', 'https:'],
+        'frame-src': ["'self'", 'http:', 'https:'],
+      },
+    };
+    expect(evaluateReport(report)).toEqual([]);
+    expect(evaluateReport({
+      ...report,
+      totals: { ...report.totals, totalJsBytes: limits.totalJsBytes + 1 },
+    })).toContain(`total JS ${limits.totalJsBytes + 1} exceeds ${limits.totalJsBytes}`);
   });
 
   it('keeps the bundle report gate wired into CI', async () => {
