@@ -1003,7 +1003,15 @@ import { Pointer } from './src/lib/pointer.js';
       });
       this.input.parentElement.appendChild(this.resultsBox);
 
-      this.input.addEventListener('input', debounce(e => this._onInput(e.target.value), 300));
+      // Version input immediately rather than only when the debounce fires:
+      // Escape/outside-click must also dismiss a query that has not started.
+      const debouncedSearch = debounce((value, epoch) => {
+        if (epoch === this._searchEpoch) this._onInput(value);
+      }, 300);
+      this.input.addEventListener('input', e => {
+        const epoch = ++this._searchEpoch;
+        debouncedSearch(e.target.value, epoch);
+      });
       this.input.addEventListener('focus', () => {
         if (this.input.value.length > 1) this.resultsBox.classList.add('open');
       });
