@@ -42,6 +42,7 @@ import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
 import { initAddContent } from './features/addContent.js';
+import { runIndependentInitializers } from './core/deferredRuntime.js';
 
 installBridgeHardening(window);
 installAuxiliaryDbLifecycle(window);
@@ -202,30 +203,53 @@ function initServiceWorker() {
 initServiceWorker();
 pd.ProductReadiness = enforceProductReadiness(document);
 
+// The app shell is the only hard dependency. Optional utilities are isolated:
+// a broken translation provider must not prevent the command palette or
+// user-library actions from starting. Add Content runs first because the
+// palette exposes commands that call its namespace.
 import('../app.js').then(async () => {
-  try {
-    initAddContent(window);
-    const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all([
-      import('./features/translator.js'),
-      import('./features/translationCache.js'),
-      import('./features/noteTemplates.js'),
-      import('./features/commandPalette.js'),
-    ]);
-    const cacheApi = translationCache.translationCache || translationCache;
-    const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates;
-    Object.assign(pd, {
-      TranslatorRegistry: translator.TranslatorRegistry,
-      BaseTranslator: translator.BaseTranslator,
-      OpenAITranslator: translator.OpenAITranslator,
-      CustomAPITranslator: translator.CustomAPITranslator,
-      GoogleTranslator: translator.GoogleTranslator,
-      LANGUAGES: translator.LANGUAGES,
-      getLanguageName: translator.getLanguageName,
-      TranslationCache: cacheApi,
-      NoteTemplates: templateApi,
-    });
-    initCommandPalette();
-  } catch (error) {
-    console.warn('[OpenCourseDeck] deferred runtime initialization failed', error);
-  }
+  await runIndependentInitializers([
+    { name: 'add-content', run: () => initAddContent(window) },
+  ]);
+
+  await runIndependentInitializers([
+    {
+      name: 'translator',
+      run: async () => {
+        const translator = await import('./features/translator.js');
+        Object.assign(pd, {
+          TranslatorRegistry: translator.TranslatorRegistry,
+          BaseTranslator: translator.BaseTranslator,
+          OpenAITranslator: translator.OpenAITranslator,
+          CustomAPITranslator: translator.CustomAPITranslator,
+          GoogleTranslator: translator.GoogleTranslator,
+          LANGUAGES: translator.LANGUAGES,
+          getLanguageName: translator.getLanguageName,
+        });
+      },
+    },
+    {
+      name: 'translation-cache',
+      run: async () => {
+        const translationCache = await import('./features/translationCache.js');
+        const cacheApi = translationCache.translationCache || translationCache;
+        Object.assign(pd, { TranslationCache: cacheApi });
+      },
+    },
+    {
+      name: 'note-templates',
+      run: async () => {
+        const noteTemplates = await import('./features/noteTemplates.js');
+        const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates;
+        Object.assign(pd, { NoteTemplates: templateApi });
+      },
+    },
+    {
+      name: 'command-palette',
+      run: async () => {
+        const { initCommandPalette } = await import('./features/commandPalette.js');
+        initCommandPalette();
+      },
+    },
+  ]);
 }).catch(error => console.error('[OpenCourseDeck] app shell failed to load', error));

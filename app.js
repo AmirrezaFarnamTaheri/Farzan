@@ -2379,6 +2379,8 @@ import { Pointer } from './src/lib/pointer.js';
   // 13b. LIST PAGINATION (cards/lists, not tables)
   // ──────────────────────────────────────────────────────────
 
+  // Delegated listeners are stable, but their latest callback and page size are not.
+  const paginatorListenerState = new WeakMap();
   const Paginator = {
     paginate(items, { page = 1, perPage = 50 } = {}) {
       const total = items.length;
@@ -2399,36 +2401,26 @@ import { Pointer } from './src/lib/pointer.js';
       };
 
       const card = document.createElement('div');
-      card.className = 'card card-ghost';
-      card.style.padding = '12px';
+      card.className = 'card card-ghost paginator-card';
 
       const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.alignItems = 'center';
-      row.style.justifyContent = 'space-between';
-      row.style.gap = '12px';
-      row.style.flexWrap = 'wrap';
+      row.className = 'paginator-row';
 
       const summary = document.createElement('div');
-      summary.className = 'text-sm';
+      summary.className = 'text-sm paginator-summary';
       // Prevent 'Page 1/129' and count units from reordering in an RTL shell.
       // This widget's labels are English; its flex position remains logical.
       summary.dir = 'ltr';
-      summary.style.opacity = '.8';
       summary.append(`${total.toLocaleString()} items • Page `);
       const currentPage = document.createElement('strong');
       currentPage.textContent = String(page);
       summary.append(currentPage, ` / ${pages}`);
 
       const controls = document.createElement('div');
-      controls.style.display = 'flex';
-      controls.style.alignItems = 'center';
-      controls.style.gap = '8px';
-      controls.style.flexWrap = 'wrap';
+      controls.className = 'paginator-controls';
 
       const label = document.createElement('label');
-      label.className = 'text-sm';
-      label.style.opacity = '.75';
+      label.className = 'text-sm paginator-label';
       label.textContent = 'Per page';
 
       const select = document.createElement('select');
@@ -2451,6 +2443,7 @@ import { Pointer } from './src/lib/pointer.js';
       row.append(summary, controls);
       card.appendChild(row);
       container.replaceChildren(card);
+      paginatorListenerState.set(container, { onChange, perPage });
 
       if (container.dataset.pdBound) return;
       container.dataset.pdBound = 'true';
@@ -2460,7 +2453,8 @@ import { Pointer } from './src/lib/pointer.js';
         if (!btn) return;
         const next = parseInt(btn.dataset.page, 10);
         if (!Number.isFinite(next)) return;
-        onChange?.({ page: next, perPage });
+        const current = paginatorListenerState.get(container);
+        current?.onChange?.({ page: next, perPage: current.perPage });
       });
       container.addEventListener('change', (e) => {
         const t = eventTargetEl(e);
@@ -2468,7 +2462,7 @@ import { Pointer } from './src/lib/pointer.js';
         if (!sel) return;
         const nextPer = parseInt(sel.value, 10);
         if (!Number.isFinite(nextPer)) return;
-        onChange?.({ page: 1, perPage: nextPer });
+        paginatorListenerState.get(container)?.onChange?.({ page: 1, perPage: nextPer });
       });
     },
   };

@@ -82,9 +82,7 @@ export function mountAchievementsView(deps = {}) {
       listRoot.replaceChildren(notice);
       return;
     }
-    // Retain the Notes/timestamp reads above for truthful all-source failure
-    // handling, but do not bind results unused by the achievements view.
-    const [progress, , , topics, watchedSegments, cards] = loaded;
+    const [progress, notes, timestamps, topics, watchedSegments, cards] = loaded;
     if (!document.body.contains(listRoot)) return;
 
     const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
