@@ -60,7 +60,7 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
       before.innerHTML = html;
       const after = document.createElement('template');
       after.innerHTML = saved;
-      const cleanText = node => (node.textContent ?? '').replace(/\\s+/g, ' ').trim();
+      const cleanText = node => (node.textContent ?? '').replace(/\s+/g, ' ').trim();
       expect(cleanText(after.content)).toContain(cleanText(before.content));
       for (const tag of ['h2', 'ul', 'ol', 'li', 'blockquote', 'pre', 'a']) {
         expect(after.content.querySelectorAll(tag).length)
