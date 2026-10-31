@@ -21,7 +21,8 @@ import { createRouter } from './src/router/router.js';
 import { Modal as ModalOverlay } from './src/ui/overlays.js';
 import { EventEmitter } from './src/lib/eventEmitter.js';
 import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
-import { dedupeSearchResults, normalizeSearchQuery, rankLexicalMatches } from './src/core/searchRanking.js';
+import { dedupeSearchResults, normalizeSearchQuery, rankLexicalMatches, searchResultIdentity } from './src/core/searchRanking.js';
+import { nextSearchSelectionIndex, reflectSearchSelection } from './src/core/searchSelection.js';
 const Modal = ModalOverlay;
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
 import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
@@ -993,6 +994,8 @@ import { Pointer } from './src/lib/pointer.js';
     _universalData: null,
     _hasDataOverride: false,
     _searchEpoch: 0,
+    _visibleResults: [],
+    _renderedQuery: '',
 
     init() {
       this.input = $('#sidebar-search') || $('.topbar-search input, .topbar-search [data-search-input]');
@@ -1004,6 +1007,12 @@ import { Pointer } from './src/lib/pointer.js';
         'aria-label': 'Search results',
       });
       this.input.parentElement.appendChild(this.resultsBox);
+      if (!this.input.id) this.input.id = 'topbar-search-input';
+      this.resultsBox.id = this.input.id + '-results';
+      this.input.setAttribute('role', 'combobox');
+      this.input.setAttribute('aria-autocomplete', 'list');
+      this.input.setAttribute('aria-controls', this.resultsBox.id);
+      this.input.setAttribute('aria-expanded', 'false');
 
       // Version input immediately rather than only when the debounce fires:
       // Escape/outside-click must also dismiss a query that has not started.
@@ -1011,11 +1020,20 @@ import { Pointer } from './src/lib/pointer.js';
         if (epoch === this._searchEpoch) this._onInput(value);
       }, 300);
       this.input.addEventListener('input', e => {
+        // A newly typed query invalidates the old keyboard target before the
+        // debounce starts, so Enter cannot activate a stale result.
+        this._close();
         const epoch = ++this._searchEpoch;
         debouncedSearch(e.target.value, epoch);
       });
       this.input.addEventListener('focus', () => {
-        if (this.input.value.length > 1) this.resultsBox.classList.add('open');
+        if (this.input.value.length > 1 && this.resultsBox.querySelector('.search-result-item')) {
+          this.resultsBox.classList.add('open');
+          this.input.setAttribute('aria-expanded', 'true');
+          const rows = $('.search-result-item', this.resultsBox);
+          const chosen = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
+          this._selectItem(rows, chosen ? Number(chosen.dataset.index) : 0);
+        }
       });
       this.input.addEventListener('keydown', e => this._onKeydown(e));
       document.addEventListener('click', e => {
@@ -1235,6 +1253,14 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     _render(results, query) {
+      // Keep an active resource selected if the same query was reindexed and
+      // the resource moved to a different position. New queries start at 0.
+      const previousRow = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
+      const previousItem = this._renderedQuery === normalizeSearchQuery(query) && previousRow
+        ? this._visibleResults[Number(previousRow.dataset.index)] : null;
+      const previousKey = searchResultIdentity(previousItem);
+      this._visibleResults = Array.isArray(results) ? results : [];
+      this._renderedQuery = normalizeSearchQuery(query);
       this.resultsBox.replaceChildren();
       if (!results.length) {
         const empty = createElement('div', { class: 'search-no-results' }, 'No results for "');
@@ -1245,8 +1271,10 @@ import { Pointer } from './src/lib/pointer.js';
         results.forEach((item, i) => {
           const el = createElement('div', {
             class: 'search-result-item',
+            id: this.resultsBox.id + '-option-' + i,
             role: 'option',
             tabindex: '-1',
+            'aria-selected': 'false',
             'data-index': String(i),
           });
           const iconId = /^[a-z][a-z0-9-]*$/.test(String(item.icon || '')) ? item.icon : 'search';
@@ -1274,43 +1302,44 @@ import { Pointer } from './src/lib/pointer.js';
           this.resultsBox.appendChild(el);
         });
       }
+      const rows = $('.search-result-item', this.resultsBox);
+      const preservedIndex = previousKey
+        ? this._visibleResults.findIndex(item => searchResultIdentity(item) === previousKey) : -1;
+      this._selectItem(rows, preservedIndex >= 0 ? preservedIndex : (rows.length ? 0 : -1));
       this.resultsBox.classList.add('open');
+      this.input?.setAttribute('aria-expanded', 'true');
     },
 
     _onKeydown(e) {
-      const items = $$('.search-result-item', this.resultsBox);
-      const current = this.resultsBox.querySelector('[aria-selected="true"]');
-      let idx = current ? Number(current.dataset.index) : -1;
-
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        idx = Math.min(idx + 1, items.length - 1);
-        this._selectItem(items, idx);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        idx = Math.max(idx - 1, 0);
-        this._selectItem(items, idx);
-      } else if (e.key === 'Enter' && current) {
-        current.click();
-      } else if (e.key === 'Escape') {
         this._close();
+        return;
+      }
+      if (!this.resultsBox?.classList.contains('open')) return;
+      const items = $('.search-result-item', this.resultsBox);
+      const current = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
+      const index = current ? Number(current.dataset.index) : -1;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._selectItem(items, nextSearchSelectionIndex(index, items.length, e.key));
+      } else if (e.key === 'Enter' && current) {
+        e.preventDefault();
+        current.click();
       }
     },
 
     _selectItem(items, idx) {
-      items.forEach(el => el.removeAttribute('aria-selected'));
-      if (items[idx]) {
-        items[idx].setAttribute('aria-selected', 'true');
-        items[idx].scrollIntoView({ block: 'nearest' });
-      }
+      return reflectSearchSelection(this.input, items, idx);
     },
 
     _close() {
       // Clearing the input, Escape, and an outside click all cancel pending
       // result rendering, even when there is no newer search to supersede it.
       this._searchEpoch += 1;
-      this.resultsBox.classList.remove('open');
-      $$('.search-result-item', this.resultsBox).forEach(el => el.removeAttribute('aria-selected'));
+      this.resultsBox?.classList.remove('open');
+      this.input?.setAttribute('aria-expanded', 'false');
+      if (this.resultsBox) this._selectItem($('.search-result-item', this.resultsBox), -1);
     },
 
     _appendHighlighted(parent, text, query) {
