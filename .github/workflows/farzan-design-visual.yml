@@ -8,6 +8,7 @@ on:
       - 'index.html'
       - 'app.js'
       - 'canvas.js'
+      - 'flashcards.js'
       - 'progress.js'
       - 'src/styles/**'
       - 'src/views/**'
