@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const css = readFileSync(new URL('../src/styles/farzan-redesign.css', import.meta.url), 'utf8');
+const css = readFileSync('src/styles/farzan-redesign.css', 'utf8');
 
 describe('Studio toolbar single-owner stylesheet contract', () => {
   it('keeps the early Studio layout rule structural instead of overriding final focus-stage paint and spacing', () => {
