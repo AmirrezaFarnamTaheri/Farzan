@@ -211,7 +211,8 @@ async function renderPlaylists(deps) {
     ['Active tracks', activeQueue.length],
     ['Saved timestamps', timestamps.length],
   ].filter(([, count]) => count > 0);
-  metricsRoot.hidden = meaningfulMetrics.length === 0;
+  // One queue already reports its track count; do not repeat it as a lone stat.
+  metricsRoot.hidden = meaningfulMetrics.length < 2;
   meaningfulMetrics.forEach(([label, value]) => {
     const card = document.createElement('div');
     card.className = 'stat-card';
