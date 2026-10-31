@@ -1137,6 +1137,51 @@
   gap: var(--space-4);
 }
 
+.view-playlists .grid[data-playlist-list] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 340px));
+  justify-content: start;
+  gap: var(--space-3);
+}
+
+.view-playlists [hidden] { display: none !important; }
+.playlists-discover {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  background: var(--surface-2);
+}
+.playlists-discover-summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+.playlists-discover-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.playlists-discover[open] > .playlists-discover-summary {
+  margin-bottom: var(--space-4);
+}
+.playlists-discover .playlists-create-card {
+  margin-bottom: var(--space-4);
+}
+.playlists-empty {
+  max-width: 55ch;
+  padding: var(--space-3);
+}
+.playlists-load-error {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.playlists-load-error p { margin: 0; }
+
 .playlists-create-card {
   margin-bottom: var(--space-2);
 }
@@ -1241,6 +1286,66 @@
   margin-top: var(--space-3);
 }
 
+.view-tags [data-tag-metrics][hidden],
+.view-tags [data-tag-search][hidden],
+.view-tags [data-tag-filters][hidden] {
+  display: none;
+}
+
+.tags-first-use {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  min-height: 240px;
+  padding: clamp(var(--space-5), 4vw, var(--space-7));
+  text-align: center;
+}
+
+.tags-first-use h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+}
+
+.tags-first-use p {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.tags-first-use .button-row {
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 640px) {
+  .tags-first-use {
+    min-height: 210px;
+    padding: var(--space-4);
+  }
+}
+
+.tag-load-error {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.tag-load-error p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
 /* Achievements & Bookmarks */
 .view-achievements,
 .view-bookmarks {
@@ -1256,6 +1361,38 @@
 
 .bookmarks-filter-row {
   margin-bottom: var(--space-3);
+}
+
+/* Saved items lead the page; zero-only dashboards and one-type facets do not. */
+.view-bookmarks [data-bookmark-metrics][hidden],
+.view-bookmarks [data-bookmark-filters][hidden] {
+  display: none !important;
+}
+
+.bookmarks-empty-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  text-align: center;
+  padding: clamp(22px, 4vw, 40px) var(--space-3);
+}
+
+.bookmarks-empty-state h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.bookmarks-empty-state p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.bookmarks-empty-state .button-row {
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 640px) {
