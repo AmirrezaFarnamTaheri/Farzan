@@ -1,3 +1,5 @@
+import { normalizeSearchQuery } from '../core/searchRanking.js';
+
 // A stale read must not replace a more recent successful retry or a new route.
 const renderVersions = new WeakMap();
 
@@ -123,7 +125,10 @@ async function renderTags() {
   const ensureTag = (rawTag) => {
     const label = normalizeTagValue(rawTag);
     if (!label) return null;
-    const key = label.toLowerCase();
+    // Use the same multilingual matching key as topbar and command palette.
+    // Display remains the first user-provided label; the stored fields are read-only.
+    const key = normalizeSearchQuery(label);
+    if (!key) return null;
     if (!tagsByKey.has(key)) {
       tagsByKey.set(key, {
         key,
@@ -138,18 +143,22 @@ async function renderTags() {
   };
 
   notes.forEach(note => {
+    const counted = new Set();
     readTagValues(note).forEach(rawTag => {
       const entry = ensureTag(rawTag);
-      if (!entry) return;
+      if (!entry || counted.has(entry.key)) return;
+      counted.add(entry.key);
       entry.noteCount += 1;
       if (note.id) entry.notes.add(String(note.id));
     });
   });
 
   topics.forEach(topic => {
+    const counted = new Set();
     readTagValues(topic).forEach(rawTag => {
       const entry = ensureTag(rawTag);
-      if (!entry) return;
+      if (!entry || counted.has(entry.key)) return;
+      counted.add(entry.key);
       entry.topicCount += 1;
       if (topic.topicId || topic.id) entry.topics.add(String(topic.topicId || topic.id));
     });
@@ -205,9 +214,9 @@ async function renderTags() {
   // keystroke and filter click, so the query/filter must be read at render
   // time rather than captured once when renderTags() built the tag maps.
   const computeVisibleTags = () => {
-    const q = String(state.query || '').trim().toLowerCase();
+    const q = normalizeSearchQuery(state.query);
     return tagEntries.filter((tag) => {
-      const matchesQuery = !q || tag.label.toLowerCase().includes(q);
+      const matchesQuery = !q || tag.key.includes(q);
       return matchesQuery && matchesTagFilter(tag);
     });
   };
