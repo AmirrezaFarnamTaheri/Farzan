@@ -241,16 +241,11 @@ export function mountBookmarksView(deps = {}) {
       } else if (item.href === '#/pdf' && (item.docId || item.page)) {
         link.addEventListener('click', (event) => {
           event.preventDefault();
-          setPendingPdfPage(item.docId, item.page);
-          try {
-            if (item.page) window.PlasmaPDFViewer?.goTo?.(item.page);
-          } catch {}
+          // Only queue a page tied to a stable PDF identity. The PDF viewer
+          // itself consumes that handoff after the matching document loads;
+          // an immediate goTo() could seek an unrelated still-mounted PDF.
+          setPendingPdfPage(item.docId, item.docId ? item.page : null);
           Router.navigate('#/pdf');
-          setTimeout(() => {
-            try {
-              if (item.page) window.PlasmaPDFViewer?.goTo?.(item.page);
-            } catch {}
-          }, 80);
         });
       }
       body.append(badge, title, detail);
