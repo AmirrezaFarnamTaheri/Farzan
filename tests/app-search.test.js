@@ -128,6 +128,23 @@ describe('app topbar search rendering', () => {
     expect(search.resultsBox.textContent).not.toContain('Physiology lesson');
   });
 
+  it('does not execute a debounced search that Escape dismissed before it started', () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    search.setData([{ label: 'Anatomy handbook', category: 'Course' }]);
+
+    input.value = 'Anatomy';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    // Dismiss while the 300ms debounce is still waiting. No async request
+    // has started yet, so an in-flight response guard alone cannot help.
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+
+    vi.advanceTimersByTime(350);
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('Anatomy handbook');
+  });
+
   it('does not reopen stale search results after Escape closes the dropdown', async () => {
     const search = window.OpenCourseDeck.TopbarSearch;
     const input = document.querySelector('[data-search-input]');
