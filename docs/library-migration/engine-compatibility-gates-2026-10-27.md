@@ -51,6 +51,17 @@ Safety acceptance: test the saved draft separately from the unchanged original
 board, returning to the original after closing, resuming the draft, incompatible
 draft refusal, route unmount during lazy load, and late/rejected storage writes.
 
+A separate, explicit **Konva draft JSON download/import** flow now uses the
+canonical Studio-v1 board serialization, never a Konva Stage snapshot. Imports
+require confirmation and an affirmative `ocd_studio_konva_draft` write
+receipt, with strict preflight for unsupported imported shapes, transforms,
+metadata and viewport settings. Reject unsupported source boards instead of
+stripping features, and keep the live `ocd_studio_board` untouched. Export and
+reimport must round-trip signed rectangle geometry, pen points, layers and
+mixed-script text. This is *JSON portability for the isolated lab only*;
+production PNG, SVG, PDF exports, scene cutover, multi-touch pan/zoom,
+images/links and full legacy board parity remain separate outstanding gates.
+
 ## Media player: Video.js 10
 
 Candidate: Video.js 10 HTML/Web Components, installed from the dedicated @videojs/html package, rather than the legacy v8 APIs. Video.js 10 was released 2026-10-01 and is not a drop-in replacement. Source: https://videojs.org/blog/videojs-10.
