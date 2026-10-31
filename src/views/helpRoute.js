@@ -187,18 +187,52 @@ export function mountHelpView(deps = {}) {
 async function renderCatalogHealth() {
   const root = document.querySelector('[data-catalog-health]');
   if (!root) return;
-  const { topics, courses } = await (async () => {
-    try {
-      await window.DataStore?.init?.();
-      return {
-        topics: window.DataStore?.allTopics?.() ?? [],
-        courses: window.DataStore?.allCourses?.() ?? window.DataStore?.courses?.() ?? [],
-      };
-    } catch {
-      return { topics: [], courses: [] };
+  root.setAttribute('aria-busy', 'true');
+  let topics, courses;
+  try {
+    const catalog = window.DataStore;
+    if (typeof catalog?.init === 'function') await catalog.init();
+    if (typeof catalog?.allTopics !== 'function') {
+      throw new Error('Catalog topic reader is unavailable');
     }
-  })();
+    const readCourses = typeof catalog.allCourses === 'function'
+      ? catalog.allCourses.bind(catalog)
+      : typeof catalog.courses === 'function' ? catalog.courses.bind(catalog) : null;
+    if (!readCourses) throw new Error('Catalog course reader is unavailable');
+    [topics, courses] = await Promise.all([catalog.allTopics(), readCourses()]);
+    if (!Array.isArray(topics) || !Array.isArray(courses)) {
+      throw new TypeError('Catalog returned invalid course or topic records');
+    }
+  } catch {
+    if (!document.body.contains(root)) return;
+    // An unavailable catalog is not a zero-course catalog. Leave local study
+    // records untouched and let the learner retry without reloading the app.
+    root.replaceChildren();
+    root.setAttribute('aria-busy', 'false');
+    const row = document.createElement('div');
+    const term = document.createElement('dt');
+    term.textContent = 'Catalog status';
+    const description = document.createElement('dd');
+    const alert = document.createElement('p');
+    alert.setAttribute('role', 'alert');
+    alert.textContent = 'Catalog status unavailable. Could not load catalog records. Your data was not changed.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn btn-ghost btn-sm';
+    retry.dataset.helpCatalogRetry = '';
+    retry.textContent = 'Retry catalog status';
+    retry.addEventListener('click', () => {
+      if (retry.disabled) return;
+      retry.disabled = true;
+      void renderCatalogHealth();
+    });
+    description.append(alert, retry);
+    row.append(term, description);
+    root.appendChild(row);
+    return;
+  }
   if (!document.body.contains(root)) return;
+  root.setAttribute('aria-busy', 'false');
 
   const sourceKeys = new Set(topics.map(topic => `${topic.courseId || ''}:${topic.sourceIndex ?? topic.sourceLabel ?? ''}`));
   const videos = topics.reduce((sum, topic) => sum + (Array.isArray(topic.videos) ? topic.videos.length : topic.url ? 1 : 0), 0);
