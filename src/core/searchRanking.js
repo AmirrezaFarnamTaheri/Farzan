@@ -46,3 +46,43 @@ export function rankLexicalMatches(items, query, {
     .slice(0, cap)
     .map(row => row.item);
 }
+
+/**
+ * Identify a search result by the underlying learning resource, not by a
+ * mutable display title or suggestion wrapper. Callers may supply explicit
+ * sourceType/sourceId for records that share a category-local identifier.
+ * A label-only fallback is deliberately scoped to category + destination.
+ */
+export function searchResultIdentity(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const sourceType = normalizeSearchQuery(item.sourceType);
+  const sourceId = item.sourceId == null ? '' : String(item.sourceId).trim();
+  if (sourceType && sourceId) return `source:${sourceType}:${sourceId}`;
+  const category = normalizeSearchQuery(item.category || item.cat);
+  const id = item.id == null ? '' : String(item.id).trim();
+  if (id) return `id:${category}:${id}`;
+  const label = normalizeSearchQuery(item.label || item.title);
+  const href = typeof item.href === 'string' ? item.href.trim() : '';
+  if (!label && !href) return null;
+  return `fallback:${category}:${label}:${href}`;
+}
+
+/**
+ * Preserve first-ranked results, dropping records for the same resource
+ * before the final cap. A generic ID is namespaced to its category, while
+ * source-specific IDs survive display-title changes and fuzzy suggestions.
+ */
+export function dedupeSearchResults(items, { limit = 12 } = {}) {
+  if (!Array.isArray(items)) return [];
+  const cap = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : items.length;
+  const results = [];
+  const seen = new Set();
+  for (const item of items) {
+    if (results.length >= cap) break;
+    const key = searchResultIdentity(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    results.push(item);
+  }
+  return results;
+}

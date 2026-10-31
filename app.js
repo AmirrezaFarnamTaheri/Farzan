@@ -21,7 +21,7 @@ import { createRouter } from './src/router/router.js';
 import { Modal as ModalOverlay } from './src/ui/overlays.js';
 import { EventEmitter } from './src/lib/eventEmitter.js';
 import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
-import { normalizeSearchQuery, rankLexicalMatches } from './src/core/searchRanking.js';
+import { dedupeSearchResults, normalizeSearchQuery, rankLexicalMatches } from './src/core/searchRanking.js';
 const Modal = ModalOverlay;
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
 import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
@@ -1075,23 +1075,13 @@ import { Pointer } from './src/lib/pointer.js';
       const data = await this._loadUniversalData();
       const eventPayload = { value, setResults: r => { if (Array.isArray(r)) data.push(...r); } };
       OpenCourseDeck.bus.emit('search:query', eventPayload);
+      // Rank the full collection first. A pre-dedup 12-item cap can fill the
+      // dropdown with one repeated resource while hiding eleven useful hits.
       const lexical = rankLexicalMatches(data, value, {
-        keys: ['label', 'description', 'category', 'searchText'], limit: 12,
+        keys: ['label', 'description', 'category', 'searchText'], limit: data.length,
       });
       const semantic = await this._querySemanticNotes(value, data);
-      const uniqueKey = item => item.sourceType === 'note' && item.sourceId
-        ? `note:${item.sourceId}`
-        : (item.id || `${item.category}:${item.label}`);
-      const seen = new Set(lexical.map(uniqueKey));
-      return [
-        ...lexical,
-        ...semantic.filter(item => {
-          const key = uniqueKey(item);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }),
-      ].slice(0, 12);
+      return dedupeSearchResults([...lexical, ...semantic], { limit: 12 });
     },
 
     async _querySemanticNotes(value, data = []) {
@@ -1141,6 +1131,8 @@ import { Pointer } from './src/lib/pointer.js';
         if (!course?.id) return;
         results.push({
           icon: 'library',
+          sourceType: 'course',
+          sourceId: String(course.id),
           label: String(course.title || course.name || course.id),
           // Course display names can be Persian while URLs/IDs are English.
           // Index the readable slug so both language paths are discoverable.
@@ -1158,6 +1150,8 @@ import { Pointer } from './src/lib/pointer.js';
         const source = String(topic.sourceLabel || topic.courseTitle || topic.courseId || 'Catalog topic');
         results.push({
           icon: topic.pdfs?.length ? 'file-pdf' : topic.videos?.length ? 'play' : 'search',
+          sourceType: 'topic',
+          sourceId: `${String(topic.courseId || 'catalog')}:${String(topic.topicId)}`,
           label: title,
           description: source,
           searchText: `${String(topic.courseId || '').replace(/[-_]+/g, ' ')} ${topic.courseTitle || ''} ${topic.sourceLabel || ''}`,
@@ -1187,6 +1181,8 @@ import { Pointer } from './src/lib/pointer.js';
         if (!target) return;
         results.push({
           icon: 'clock',
+          sourceType: 'timestamp',
+          sourceId: `${String(target)}:${String(timestamp.position ?? 'unspecified')}:${String(timestamp.id || timestamp.title || '')}`,
           label: String(timestamp.title || timestamp.topicTitle || target),
           description: timestamp.position != null ? `Timestamp at ${this._formatDuration(timestamp.position)}` : 'Saved timestamp',
           category: 'Timestamp',
@@ -1201,14 +1197,16 @@ import { Pointer } from './src/lib/pointer.js';
         if (!target) return;
         results.push({
           icon: 'pen',
+          sourceType: 'annotation',
+          sourceId: `${String(target)}:${String(annotation.page ?? 'unspecified')}:${String(annotation.id || annotation.text || annotation.title || '')}`,
           label: String(annotation.title || annotation.text || target),
           description: `PDF annotation${annotation.page ? ` · page ${annotation.page}` : ''}`,
           category: 'PDF annotation',
           href: '#/pdf',
         });
       });
-      this._universalData = results;
-      return [...results];
+      this._universalData = dedupeSearchResults(results, { limit: results.length });
+      return [...this._universalData];
     },
 
     _formatDuration(seconds) {
