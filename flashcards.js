@@ -468,7 +468,7 @@ let studioKeyController = null;
             return;
           }
 
-          announce('Card rated: ' + btn.textContent.replace(/\\s*\\(\\d\\)\\s*/, ' ').trim());
+          announce('Card rated: ' + (btn.firstChild?.textContent?.trim() || btn.textContent.trim()));
           try {
             await renderStudio(container);
           } catch (error) {
