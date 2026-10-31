@@ -29,6 +29,21 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('keeps primary work surfaces within one readable width on ultrawide desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    for (const route of ['home', 'materials', 'my-courses']) {
+      await page.goto('/#/' + route, { waitUntil: 'domcontentloaded' });
+      const view = page.locator('.view-' + route);
+      await expect(view).toBeVisible();
+      const metrics = await view.evaluate(el => ({
+        maxWidth: getComputedStyle(el).maxWidth,
+        actualWidth: el.getBoundingClientRect().width,
+      }));
+      expect(metrics.maxWidth).toBe('1440px');
+      expect(metrics.actualWidth).toBeLessThanOrEqual(1441);
+    }
+  });
+
   test('presents a useful catalog before playback without a blank media theater', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
