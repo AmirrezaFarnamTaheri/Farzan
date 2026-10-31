@@ -141,6 +141,32 @@ describe('command palette', () => {
     }
   });
 
+  it('mirrors keyboard selection in combobox state and clears stale descendants', () => {
+    initCommandPalette();
+    window.OpenCourseDeck.CommandPalette.open();
+    const input = document.getElementById('cp-input');
+    const resultBox = document.getElementById('cp-results');
+    const first = resultBox.querySelector('.cp-item[aria-selected="true"]');
+    expect(input.getAttribute('role')).toBe('combobox');
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(first).not.toBeNull();
+    expect(input.getAttribute('aria-activedescendant')).toBe(first.id);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const second = resultBox.querySelector('.cp-item[aria-selected="true"]');
+    expect(second.id).not.toBe(first.id);
+    expect(input.getAttribute('aria-activedescendant')).toBe(second.id);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(input.getAttribute('aria-activedescendant')).toBe(first.id);
+
+    input.value = 'there-is-no-command-like-this';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
   it('keeps command palette close idempotent for inert bookkeeping', () => {
     initCommandPalette();
     const app = document.getElementById('ocd-app');

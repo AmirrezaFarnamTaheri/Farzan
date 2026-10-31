@@ -1,6 +1,7 @@
 import { debounce, eventTargetEl, restoreFocus, setAppInert, trapFocus } from '../lib/dom.js';
 import { loadVendorScript } from '../core/vendorLoader.js';
 import { normalizeSearchQuery, rankLexicalMatches } from '../core/searchRanking.js';
+import { nextSearchSelectionIndex, reflectSearchSelection } from '../core/searchSelection.js';
 
 export function initCommandPalette() {
   const OpenCourseDeck = window.OpenCourseDeck ?? {};
@@ -14,6 +15,11 @@ export function initCommandPalette() {
   if (!cpOverlay || !cpInput || !cpResults || !cpCats || !cpRoot) return;
   if (cpOverlay.dataset.pdCommandPaletteInited === 'true') return;
   cpOverlay.dataset.pdCommandPaletteInited = 'true';
+  cpInput.setAttribute('role', 'combobox');
+  cpInput.setAttribute('aria-autocomplete', 'list');
+  if (!cpResults.id) cpResults.id = 'cp-results';
+  cpInput.setAttribute('aria-controls', cpResults.id);
+  cpInput.setAttribute('aria-expanded', 'false');
 
   let cpCleanupFocusTrap = null;
   let cpCleanupFocusGuard = null;
@@ -51,6 +57,7 @@ export function initCommandPalette() {
     cpOverlay.classList.remove('open');
     cpOverlay.removeAttribute('data-open');
     cpInput.setAttribute('aria-expanded', 'false');
+    cpInput.removeAttribute('aria-activedescendant');
     if (typeof cpCleanupFocusTrap === 'function') {
       try { cpCleanupFocusTrap(); } catch { /* ignore */ }
     }
@@ -72,6 +79,7 @@ export function initCommandPalette() {
     cpInput.setAttribute('aria-expanded', 'true');
     cpInput.focus();
     cpInput.select();
+    if (visibleItems.length) setSelected(Math.max(0, cpSelectedIdx));
     ensureFuse();
     setAppInert(true);
     try { cpCleanupFocusTrap = trapFocus(cpRoot, { initialFocus: false }); } catch { /* ignore */ }
@@ -162,14 +170,8 @@ export function initCommandPalette() {
   };
 
   const setSelected = (idx) => {
-    cpSelectedIdx = idx;
     const rows = [...cpResults.querySelectorAll('.cp-item[data-idx]')];
-    rows.forEach((row) => row.setAttribute('aria-selected', 'false'));
-    const row = rows.find(r => Number(r.getAttribute('data-idx')) === idx);
-    if (row) {
-      row.setAttribute('aria-selected', 'true');
-      row.scrollIntoView?.({ block: 'nearest' });
-    }
+    cpSelectedIdx = reflectSearchSelection(cpInput, rows, idx);
   };
 
   const activateSelected = () => {
@@ -206,6 +208,7 @@ export function initCommandPalette() {
       const li = document.createElement('li');
       li.className = 'cp-item';
       li.setAttribute('role', 'option');
+      li.id = cpResults.id + '-option-' + idx;
       li.setAttribute('data-idx', String(idx));
       li.setAttribute('tabindex', '-1');
       li.setAttribute('aria-selected', 'false');
@@ -238,7 +241,10 @@ export function initCommandPalette() {
 
   // Esc to close
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && cpOverlay.classList.contains('open')) cpClose();
+    if (e.key === 'Escape' && cpOverlay.classList.contains('open')) {
+      e.preventDefault();
+      cpClose();
+    }
   });
 
   // Category click
@@ -269,13 +275,13 @@ export function initCommandPalette() {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!visibleCount) return;
-      setSelected(Math.min(visibleCount - 1, Math.max(0, cpSelectedIdx + 1)));
+      setSelected(nextSearchSelectionIndex(cpSelectedIdx, visibleCount, e.key));
       return;
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (!visibleCount) return;
-      setSelected(Math.max(0, cpSelectedIdx - 1));
+      setSelected(nextSearchSelectionIndex(cpSelectedIdx, visibleCount, e.key));
       return;
     }
   });
@@ -295,8 +301,9 @@ export function initCommandPalette() {
     setSelected(Number(li.getAttribute('data-idx')));
   }, 25));
 
-  // First render
+  // First render (the dialog starts closed, so hide active row from AT).
   renderResults('');
+  cpInput.removeAttribute('aria-activedescendant');
 
   // Expose open/close + register shortcut button hookup stays in app.js shortcuts system
   OpenCourseDeck.CommandPalette = {
