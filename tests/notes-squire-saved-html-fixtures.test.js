@@ -89,7 +89,10 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
       const reopened = createSquireNoteEditor({ element: reopenHost, html: saved });
       try {
         expect(reopened.getHTML()).toContain('new review note');
-        expect(cleanText(reopenHost.textContent)).toContain('new review note');
+        if (!cleanText(reopenHost.textContent).includes('new review note')) {
+          throw new Error('Reopened editor DOM lost visible text. Markup: '
+            + reopenHost.innerHTML.slice(0, 1200) + ' | Saved: ' + saved.slice(0, 1200));
+        }
       } finally { reopened.destroy(); reopenHost.remove(); }
     } finally { editor.destroy(); }
   });
