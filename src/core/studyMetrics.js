@@ -3,10 +3,27 @@
  * topics older than 30 days". Dates are ISO UTC calendar days, matching
  * the flashcard scheduler.
  */
-export function dueReviewCards(cards, today = new Date().toISOString().slice(0, 10)) {
+export function dueReviewCards(cards, today = new Date().toISOString().slice(0, 10), now = new Date()) {
   if (!Array.isArray(cards)) return [];
-  return cards.filter(card => card && typeof card === 'object'
-    && (!card.nextReviewDate || String(card.nextReviewDate) <= today));
+  const nowMillis = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (!Number.isFinite(nowMillis)) throw new TypeError('Invalid review clock');
+  return cards.filter(card => {
+    if (!card || typeof card !== 'object') return false;
+    if (card.scheduler === 'fsrs-v5') {
+      // FSRS learning steps use exact UTC instants. Comparing only the date
+      // would prematurely show cards due later today on Home/Achievements.
+      const due = card.fsrsState?.card?.due;
+      if (typeof due !== 'string' || !due.endsWith('Z') || !Number.isFinite(Date.parse(due))) {
+        throw new TypeError('Invalid FSRS due timestamp');
+      }
+      return Date.parse(due) <= nowMillis;
+    }
+    if (card.scheduler && card.scheduler !== 'sm2-v1') {
+      throw new TypeError('Unknown review scheduler');
+    }
+    // Keep legacy cards on their originally persisted UTC calendar date.
+    return !card.nextReviewDate || String(card.nextReviewDate) <= today;
+  });
 }
 
 /**
