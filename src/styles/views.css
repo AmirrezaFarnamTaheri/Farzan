@@ -1194,6 +1194,23 @@
   margin-top: var(--space-3);
 }
 
+.tag-load-error {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.tag-load-error p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
 /* Achievements & Bookmarks */
 .view-achievements,
 .view-bookmarks {
