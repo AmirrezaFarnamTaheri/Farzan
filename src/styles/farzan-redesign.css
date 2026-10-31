@@ -676,11 +676,8 @@ input[type="file"][hidden] {
 .view-studio { max-width: 1600px; margin: 0 auto; padding: 0; display: grid; gap: 15px; }
 .view-studio .studio-header { margin-bottom: 0; }
 .view-studio .studio-toolbar-panel {
-  padding: 12px 16px;
+  /* Paint and spacing are owned by the focus-stage rule further below. */
   border: 1px solid var(--fz-line);
-  border-radius: 13px;
-  background: var(--fz-paper);
-  box-shadow: var(--fz-shadow);
 }
 .studio-toolbar-clusters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .studio-tool-group { border: 0; padding: 0 12px 0 0; gap: 7px; }
@@ -895,7 +892,6 @@ input[type="file"][hidden] {
  * Use the real viewport height (not CSS zoom) and keep the board interactive. */
 @media (max-width: 1023px) and (max-height: 500px) {
   .view-studio { gap: 10px; }
-  .view-studio .studio-toolbar-panel { padding: 8px 12px; }
   .view-studio .studio-shell {
     height: clamp(225px, 65dvh, 300px);
     min-height: 225px;
