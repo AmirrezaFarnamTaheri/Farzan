@@ -1030,7 +1030,7 @@ import { Pointer } from './src/lib/pointer.js';
         if (this.input.value.length > 1 && this.resultsBox.querySelector('.search-result-item')) {
           this.resultsBox.classList.add('open');
           this.input.setAttribute('aria-expanded', 'true');
-          const rows = $('.search-result-item', this.resultsBox);
+          const rows = $$('.search-result-item', this.resultsBox);
           const chosen = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
           this._selectItem(rows, chosen ? Number(chosen.dataset.index) : 0);
         }
@@ -1302,7 +1302,7 @@ import { Pointer } from './src/lib/pointer.js';
           this.resultsBox.appendChild(el);
         });
       }
-      const rows = $('.search-result-item', this.resultsBox);
+      const rows = $$('.search-result-item', this.resultsBox);
       const preservedIndex = previousKey
         ? this._visibleResults.findIndex(item => searchResultIdentity(item) === previousKey) : -1;
       this._selectItem(rows, preservedIndex >= 0 ? preservedIndex : (rows.length ? 0 : -1));
@@ -1317,7 +1317,7 @@ import { Pointer } from './src/lib/pointer.js';
         return;
       }
       if (!this.resultsBox?.classList.contains('open')) return;
-      const items = $('.search-result-item', this.resultsBox);
+      const items = $$('.search-result-item', this.resultsBox);
       const current = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
       const index = current ? Number(current.dataset.index) : -1;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1339,7 +1339,7 @@ import { Pointer } from './src/lib/pointer.js';
       this._searchEpoch += 1;
       this.resultsBox?.classList.remove('open');
       this.input?.setAttribute('aria-expanded', 'false');
-      if (this.resultsBox) this._selectItem($('.search-result-item', this.resultsBox), -1);
+      if (this.resultsBox) this._selectItem($$('.search-result-item', this.resultsBox), -1);
     },
 
     _appendHighlighted(parent, text, query) {
