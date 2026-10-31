@@ -108,7 +108,7 @@ function editorHTML(editor) {
   return template.innerHTML;
 }
 
-export function createTiptapNoteEditor({
+export function createSquireNoteEditor({
   element, html = '', onUpdate = () => {},
   onPasteFallback = message => window.OpenCourseDeck?.Toast?.info?.(message),
 } = {}) {
@@ -260,3 +260,7 @@ export function createTiptapNoteEditor({
     },
   };
 }
+
+// The former entrypoint remains available for already-shipped callers and tests.
+// New routes should use the engine's accurate name; no saved format changes.
+export const createTiptapNoteEditor = createSquireNoteEditor;

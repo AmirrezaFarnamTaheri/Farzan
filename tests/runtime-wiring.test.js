@@ -64,6 +64,16 @@ describe('runtime wiring', () => {
     expect(indexSource).not.toContain('TranslationCache: translationCache,');
   });
 
+  it('loads optional runtime utilities without an all-or-nothing dependency group', () => {
+    expect(indexSource).toContain("import { runIndependentInitializers } from './core/deferredRuntime.js'");
+    expect(indexSource).not.toContain('const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all');
+    for (const name of ['add-content', 'translator', 'translation-cache', 'note-templates', 'command-palette']) {
+      expect(indexSource).toContain(`name: '${name}'`);
+    }
+    // User-library actions must exist before command-palette commands are registered.
+    expect(indexSource.indexOf("name: 'add-content'")).toBeLessThan(indexSource.indexOf("name: 'command-palette'"));
+  });
+
   it('exports stable deferred utility contracts', async () => {
     const translationCache = await import('../src/features/translationCache.js');
     const noteTemplates = await import('../src/features/noteTemplates.js');

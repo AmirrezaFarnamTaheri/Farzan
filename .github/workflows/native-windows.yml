@@ -11,6 +11,7 @@ on:
       - 'manifest.json'
       - 'app.js'
       - 'notes.js'
+      - 'flashcards.js'
       - 'player.js'
       - 'db.js'
       - 'src/core/**'

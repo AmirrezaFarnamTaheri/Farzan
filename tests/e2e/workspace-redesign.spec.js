@@ -51,6 +51,33 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('shows playable Materials results in the first viewport on desktop and mobile', async ({ page }) => {
+    for (const viewport of [
+      { width: 1440, height: 900, maxRowTop: 500 },
+      { width: 390, height: 844, maxRowTop: 540 },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
+      const first = page.locator('#materials-list [data-topic-id]').first();
+      await expect(first).toBeVisible({ timeout: 20000 });
+      const box = await first.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.y).toBeLessThan(viewport.maxRowTop);
+    }
+  });
+
+  test('keeps the selected Materials page size when moving to the next page', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
+    const size = page.locator('#materials-pager select[data-per-page]');
+    await expect(size).toHaveValue('50', { timeout: 20000 });
+    await size.selectOption('25');
+    await expect(size).toHaveValue('25');
+    await page.locator('#materials-pager button[data-page="2"]').click();
+    await expect(page.locator('#materials-pager')).toContainText('Page 2 /');
+    await expect(size).toHaveValue('25');
+  });
+
   test('presents a useful catalog before playback without a blank media theater', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
