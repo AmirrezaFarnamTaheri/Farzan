@@ -1,6 +1,7 @@
 export function mountHelpView(deps = {}) {
   const {
     setView,
+    loadNotesAudit = () => import('../features/notesMigrationAudit.js'),
     Toast = window.OpenCourseDeck?.Toast
       // Fall back to no-ops: Toast may be unregistered during partial
       // init or in test harnesses, and a bare Toast.success() then threw
@@ -104,6 +105,9 @@ export function mountHelpView(deps = {}) {
                 <p>For development builds, run <code>npm start</code> and open <code>http://localhost:5173/</code> in your browser.</p>
                 <p>Build generated assets with <code>npm run build</code>. For offline cache updates, use <code>npm run build:sw</code> and reload. Advanced debugging is available through <code>?debug=1</code>.</p>
                 <p>Browser origins, including different localhost ports, have separate storage buckets. Back up before moving data.</p>
+                <p>Check whether locally saved Notes pass the Squire editor's static HTML compatibility gate. This is read-only, does not change which editor opens, and does not upload or display note content.</p>
+                <button type="button" class="btn btn-ghost btn-sm" data-help-notes-audit>Check saved Notes editor compatibility</button>
+                <p data-help-notes-audit-status role="status" aria-live="polite">Not checked. The classic editor remains available for all notes.</p>
               </div>
             </details>
           </div>
@@ -137,6 +141,46 @@ export function mountHelpView(deps = {}) {
   });
   document.getElementById('help-shortcuts-btn')?.addEventListener('click', () => {
     window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.();
+  });
+
+  const auditButton = document.querySelector('[data-help-notes-audit]');
+  const auditStatus = document.querySelector('[data-help-notes-audit-status]');
+  let auditBusy = false;
+  auditButton?.addEventListener('click', async () => {
+    if (auditBusy) return;
+    auditBusy = true;
+    auditButton.disabled = true;
+    if (auditStatus) auditStatus.textContent = 'Checking local saved Notes...';
+    try {
+      // Never downgrade an unreadable canonical Notes store to zero notes.
+      // The compatibility engine is loaded only after an explicit click and
+      // never writes or exposes individual note IDs, titles or HTML.
+      const db = window.DB;
+      if (typeof db?.getAllNotes !== 'function') throw new Error('Notes storage unavailable');
+      const notes = await db.getAllNotes();
+      if (!Array.isArray(notes)) throw new Error('Notes storage returned invalid records');
+      if (!auditButton.isConnected) return;
+      const { auditSavedNotesForSquire } = await loadNotesAudit();
+      if (!auditButton.isConnected) return;
+      const result = auditSavedNotesForSquire(notes);
+      if (!result || !Number.isInteger(result.compatible)
+          || !Number.isInteger(result.classic)
+          || result.compatible + result.classic !== result.total) {
+        throw new Error('Notes compatibility result was invalid');
+      }
+      if (auditStatus?.isConnected) {
+        auditStatus.textContent =
+          `${result.compatible} potentially compatible notes; ${result.classic} require the classic editor; ${result.total} checked. Static preflight only: no notes were changed and no editor was switched.`;
+      }
+    } catch {
+      if (auditStatus?.isConnected) {
+        auditStatus.textContent =
+          'Notes compatibility check unavailable or failed. Your saved notes were not changed.';
+      }
+    } finally {
+      auditBusy = false;
+      if (auditButton.isConnected) auditButton.disabled = false;
+    }
   });
 }
 
