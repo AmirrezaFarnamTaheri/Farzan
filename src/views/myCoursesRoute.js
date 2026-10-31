@@ -211,7 +211,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     let missing;
     try {
       missing = await library.listMissingFiles();
-    } catch (error) {
+    } catch {
       container.textContent = 'Could not check local files. Check storage permissions and reload.';
       return;
     }

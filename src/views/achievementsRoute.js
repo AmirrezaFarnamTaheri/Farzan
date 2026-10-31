@@ -5,7 +5,6 @@ export function mountAchievementsView(deps = {}) {
   const {
     setView,
     Router,
-    setPendingCourseMedia,
   } = deps;
 
   setView(`
