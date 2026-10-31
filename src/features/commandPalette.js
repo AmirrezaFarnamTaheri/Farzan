@@ -261,17 +261,20 @@ export function initCommandPalette() {
   cpInput.addEventListener('input', () => renderResults(cpInput.value));
   cpInput.addEventListener('keydown', (e) => {
     if (!cpOverlay.classList.contains('open')) return;
-    const list = getFiltered(cpInput.value ?? '').slice(0, 25);
+    // Navigate the exact rows already rendered. Re-running a mutable lazy
+    // Fuse index here could select a phantom index if it changes between
+    // renderResults() and the user's next arrow keypress.
+    const visibleCount = visibleItems.length;
     if (e.key === 'Enter') { e.preventDefault(); activateSelected(); return; }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (!list.length) return;
-      setSelected(Math.min(list.length - 1, Math.max(0, cpSelectedIdx + 1)));
+      if (!visibleCount) return;
+      setSelected(Math.min(visibleCount - 1, Math.max(0, cpSelectedIdx + 1)));
       return;
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (!list.length) return;
+      if (!visibleCount) return;
       setSelected(Math.max(0, cpSelectedIdx - 1));
       return;
     }

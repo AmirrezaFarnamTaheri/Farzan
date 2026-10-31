@@ -107,6 +107,40 @@ describe('command palette', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('moves keyboard selection only within the rendered result list if fuzzy data changes asynchronously', () => {
+    const previous = window.Fuse;
+    class UnstableFuse {
+      constructor(items) { this.items = items; this.calls = 0; }
+      search() {
+        this.calls += 1;
+        const themes = this.items.filter(item => item.cat === 'theme');
+        // The current visible results contain one exact command. An async
+        // index update before ArrowDown must not create phantom row indices.
+        const chosen = this.calls === 1
+          ? themes.filter(item => item.label === 'Theme: Light') : themes;
+        return chosen.map(item => ({ item, score: 0 }));
+      }
+    }
+    window.Fuse = UnstableFuse;
+    try {
+      initCommandPalette();
+      window.OpenCourseDeck.CommandPalette.open();
+      const input = document.getElementById('cp-input');
+      input.value = 'theme';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      const rows = document.querySelectorAll('#cp-results .cp-item[data-idx]');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].textContent).toContain('Theme: Light');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      expect(document.querySelector('#cp-results .cp-item[aria-selected="true"]'))
+        .toBe(rows[0]);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(window.OpenCourseDeck.ThemeManager.apply).toHaveBeenCalledWith('light');
+    } finally {
+      window.Fuse = previous;
+    }
+  });
+
   it('keeps command palette close idempotent for inert bookkeeping', () => {
     initCommandPalette();
     const app = document.getElementById('ocd-app');
