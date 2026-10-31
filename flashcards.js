@@ -354,7 +354,7 @@ let studioKeyController = null;
             <h1 class="page-title fc-title">Flashcards</h1>
             <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
           </div>
-          <button id="fc-add-btn" class="btn btn-primary" type="button">
+          <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '': 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New card
           </button>
@@ -388,7 +388,7 @@ let studioKeyController = null;
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
-        <details class="card card-filled" id="fc-manage-cards">
+        <details class="card card-filled" id="fc-manage-cards" ${cards.length ? '': 'hidden'}>
           <summary class="btn btn-ghost">Manage saved cards (${cards.length})</summary>
           <div class="card-body" style="display:grid;gap:10px;max-height:360px;overflow-y:auto;">
             ${cards.length ? cards.map(card => `
