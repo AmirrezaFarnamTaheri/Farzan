@@ -46,6 +46,12 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     DRAFT_KEY: 'ocd_studio_konva_draft',
     createStudioKonvaDraftWorkspace: factory,
     isKonvaDraftCompatible: () => true,
+    exportKonvaV1DraftJSON: vi.fn(board => JSON.stringify(board)),
+    importKonvaV1DraftJSON: vi.fn(text => {
+      const parsed = JSON.parse(text);
+      if (parsed.version !== 1) throw new Error('Incompatible Studio v1 board');
+      return parsed;
+    }),
   }));
   const controller = mountStudioView({
     setView: html => { document.body.innerHTML = html; },
@@ -191,5 +197,108 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(canvasApi.getState().tool).toBe('select');
     controller.unmount();
   });
+
+  it('exports the canonical isolated draft without persisting or touching the classic board', async () => {
+    const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL;
+    const blobUrl = vi.fn(() => 'blob:studio-test');
+    const revoke = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: blobUrl });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke });
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      const saved = v1Board();
+      saved.layers[0].elements[0].width = -70;
+      const { controller, factory, saveSetting } = makeFixture({ savedDraft: saved });
+      document.querySelector('[data-studio-konva-open]').click();
+      await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+      const btn = document.querySelector('[data-studio-konva-export]');
+      expect(btn).not.toBeNull();
+      btn.click();
+      await vi.waitFor(() => expect(blobUrl).toHaveBeenCalledOnce());
+      expect(blobUrl.mock.calls[0][0]).toBeInstanceOf(Blob);
+      expect(anchorClick).toHaveBeenCalledOnce();
+      expect(saveSetting).not.toHaveBeenCalled();
+      expect(document.querySelector('[data-studio-konva-status]').textContent).toMatch(/exported|download/i);
+      controller.unmount();
+    } finally {
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: oldCreate });
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: oldRevoke });
+    }
+  });
+
+  it('imports an explicitly approved v1 draft to its isolated key, never the main board', async () => {
+    const saved = v1Board();
+    saved.layers[0].elements[0].x = 95;
+    const imported = v1Board();
+    imported.layers[0].elements[0].x = 130;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { controller, factory, saveSetting, canvasApi } = makeFixture({ savedDraft: saved });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const previous = factory.mock.results[0].value;
+    const file = document.querySelector('[data-studio-konva-import]');
+    expect(file).not.toBeNull();
+    const text = JSON.stringify(imported);
+    Object.defineProperty(file, 'files', { configurable: true,
+      value: [{ name: 'import.json', size: text.length, text: async () => text }] });
+    file.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(factory.mock.calls[1][0].board).toEqual(imported);
+    expect(previous.destroy).toHaveBeenCalledOnce();
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', imported);
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.serialize()).toEqual(v1Board());
+    controller.unmount();
+  });
+
+  it('refuses unsupported v1 imports and rejected save receipts without switching workspaces', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { controller, factory, saveSetting } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const previous = factory.mock.results[0].value;
+    const file = document.querySelector('[data-studio-konva-import]');
+    const choose = text => {
+      Object.defineProperty(file, 'files', { configurable: true,
+        value: [{ name: 'bad.json', size: text.length, text: async () => text }] });
+      file.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    choose(JSON.stringify({ version: 2, layers: [] }));
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/import failed|incompatible/i));
+    expect(saveSetting).not.toHaveBeenCalled();
+    saveSetting.mockResolvedValue(false);
+    choose(JSON.stringify(v1Board()));
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/import failed/i));
+    expect(factory).toHaveBeenCalledOnce();
+    expect(previous.destroy).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledTimes(2);
+    controller.unmount();
+  });
+
+  it('drops an in-flight import when Studio closes, never writing stale data', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { controller, factory, saveSetting } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    let deliver;
+    const reading = new Promise(resolve => { deliver = resolve; });
+    const file = document.querySelector('[data-studio-konva-import]');
+    Object.defineProperty(file, 'files', { configurable: true,
+      value: [{ name: 'late.json', size: 50, text: () => reading }] });
+    file.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(true));
+    document.querySelector('[data-studio-konva-close]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false));
+    deliver(JSON.stringify(v1Board()));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(saveSetting).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
 
 });
