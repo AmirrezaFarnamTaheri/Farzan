@@ -148,18 +148,35 @@ function planShape(item) {
 export function planKonvaV1Board(board) {
   if (!board || board.version !== 1 || !Array.isArray(board.layers)) return unsupported('invalid-v1-board');
   if (board.grid?.enabled) return unsupported('grid-renderer-not-parity-tested');
+  // Do not silently coerce corrupt viewport data into a different visible
+  // position or zoom. Omitted legacy fields still use the canonical defaults.
+  for (const key of ['offsetX', 'offsetY', 'zoom', 'rotation']) {
+    const value = board.viewport?.[key];
+    if (value != null && (typeof value !== 'number' || !Number.isFinite(value))) {
+      return unsupported('invalid-viewport-' + key);
+    }
+  }
   if (finite(board.viewport?.rotation) !== 0) return unsupported('unsupported-viewport-rotation');
   const layers = [];
+  const seenLayers = new Set();
+  const seenElements = new Set();
   for (const layer of board.layers) {
     if (!layer || !Array.isArray(layer.elements)) return unsupported('invalid-layer');
+    const layerId = String(layer.id || '');
+    if (!layerId.trim()) return unsupported('missing-layer-id');
+    if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
+    seenLayers.add(layerId);
     const elements = [];
     for (const item of layer.elements) {
       const planned = planShape(item);
       if (!planned.compatible) return planned;
+      const elementId = planned.attrs.id;
+      if (seenElements.has(elementId)) return unsupported('duplicate-element-id');
+      seenElements.add(elementId);
       elements.push({ kind: planned.kind, attrs: planned.attrs });
     }
     layers.push({
-      id: String(layer.id || ''), name: String(layer.name || ''),
+      id: layerId, name: String(layer.name || ''),
       visible: layer.visible !== false, locked: layer.locked === true,
       opacity: Math.min(1, Math.max(0, finite(layer.opacity, 1))),
       elements,
