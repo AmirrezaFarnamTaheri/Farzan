@@ -1164,6 +1164,17 @@
   max-width: 55ch;
   padding: var(--space-3);
 }
+.playlists-load-error {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.playlists-load-error p { margin: 0; }
 
 .playlists-create-card {
   margin-bottom: var(--space-2);
