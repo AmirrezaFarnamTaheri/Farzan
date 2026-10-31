@@ -28,6 +28,26 @@ Candidate: Konva for canvas rendering, hit-testing, transforms, and shape primit
 
 Acceptance: new v1 mixed-layer fixture in tests/canvas.test.js plus existing restore-race, rendering, image URL and export tests.
 
+### Experimental Konva draft lab — not a renderer migration
+
+The opt-in Studio **Konva draft lab** exists only to collect interaction-parity
+evidence. Its modal is imported on demand; normal Studio boot still uses the
+existing Canvas2D editor. It copies the current board on first use and resumes a
+separately saved `ocd_studio_konva_draft` on subsequent visits. The lab does not
+write `ocd_studio_board`, switch export engines, or auto-apply edits to the live
+board. Unsupported v1 metadata and unsupported geometry must fail closed.
+
+Initial capabilities: visible/unlocked shape drag, rectangle and card transform
+handles, object selection, accessible nudge controls, canonical-v1 undo/redo,
+and affirmative draft persistence receipts with rollback on refusal. This is
+**not** pen, image, links, multi-touch, grid, SVG/PDF export or full accessibility
+parity. Keep the classic editor as the only main-board writer until all of those
+gates pass in real Chromium, mobile and Windows builds.
+
+Safety acceptance: test the saved draft separately from the unchanged original
+board, returning to the original after closing, resuming the draft, incompatible
+draft refusal, route unmount during lazy load, and late/rejected storage writes.
+
 ## Media player: Video.js 10
 
 Candidate: Video.js 10 HTML/Web Components, installed from the dedicated @videojs/html package, rather than the legacy v8 APIs. Video.js 10 was released 2026-10-01 and is not a drop-in replacement. Source: https://videojs.org/blog/videojs-10.
