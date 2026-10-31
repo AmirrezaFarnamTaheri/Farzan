@@ -171,22 +171,28 @@ async function renderTags() {
     tag.topics.forEach(id => taggedTopics.add(id));
   });
 
+  const hasTags = tagEntries.length > 0;
+  metricsRoot.hidden = !hasTags;
+  searchEl.hidden = !hasTags;
+  filtersRoot.hidden = !hasTags;
   metricsRoot.replaceChildren();
-  [
-    ['Unique tags', tagEntries.length],
-    ['Note tags', noteTagCount],
-    ['Catalog tags', catalogTagCount],
-    ['Tagged records', taggedNotes.size + taggedTopics.size],
-  ].forEach(([label, value]) => {
-    const card = document.createElement('div');
-    card.className = 'stat-card';
-    const strong = document.createElement('strong');
-    strong.textContent = String(value);
-    const span = document.createElement('span');
-    span.textContent = label;
-    card.append(strong, span);
-    metricsRoot.appendChild(card);
-  });
+  if (hasTags) {
+    [
+      ['Unique tags', tagEntries.length],
+      ['Note tags', noteTagCount],
+      ['Catalog tags', catalogTagCount],
+      ['Tagged records', taggedNotes.size + taggedTopics.size],
+    ].forEach(([label, value]) => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      const strong = document.createElement('strong');
+      strong.textContent = String(value);
+      const span = document.createElement('span');
+      span.textContent = label;
+      card.append(strong, span);
+      metricsRoot.appendChild(card);
+    });
+  }
 
   const matchesTagFilter = (tag) => {
     if (state.filter === 'all') return true;
@@ -210,9 +216,25 @@ async function renderTags() {
     const visibleTags = computeVisibleTags();
     listRoot.replaceChildren();
     if (!tagEntries.length) {
-      const empty = document.createElement('p');
-      empty.className = 'text-muted';
-      empty.textContent = 'No tags yet. Add tags to notes or catalog records and they will appear here.';
+      const empty = document.createElement('div');
+      empty.className = 'tags-first-use';
+      empty.dataset.tagFirstUse = 'true';
+      const title = document.createElement('h2');
+      title.textContent = 'No tags yet';
+      const message = document.createElement('p');
+      message.textContent = 'Add tags to notes or course materials to organize and find them here.';
+      const actions = document.createElement('div');
+      actions.className = 'button-row';
+      const notesLink = document.createElement('a');
+      notesLink.className = 'btn btn-primary';
+      notesLink.href = '#/notes';
+      notesLink.textContent = 'Open Notes';
+      const coursesLink = document.createElement('a');
+      coursesLink.className = 'btn btn-ghost';
+      coursesLink.href = '#/courses';
+      coursesLink.textContent = 'Browse courses';
+      actions.append(notesLink, coursesLink);
+      empty.append(title, message, actions);
       listRoot.appendChild(empty);
       return;
     }
