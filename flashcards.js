@@ -423,7 +423,7 @@ let studioKeyController = null;
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
-        <details class="card card-filled" id="fc-manage-cards" ${cards.length ? '' : 'hidden'}>
+        <details class="card card-filled" id="fc-manage-cards" ${cards.length ? '': 'hidden'}>
           <summary class="btn btn-ghost">Manage saved cards (${cards.length})</summary>
           <div class="card-body" style="display:grid;gap:10px;max-height:360px;overflow-y:auto;">
             ${cards.length ? cards.map(card => `
