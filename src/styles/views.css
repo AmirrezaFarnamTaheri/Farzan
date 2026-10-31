@@ -1158,19 +1158,38 @@
 /* Materials */
 .view-materials {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .materials-controls-card {
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
 }
+.materials-controls-card > .card-body {
+  padding: var(--space-3) var(--space-4);
+}
+.paginator-card { padding: var(--space-3); }
+.paginator-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.paginator-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.paginator-summary { opacity: 0.8; }
+.paginator-label { opacity: 0.75; }
 
 .materials-filter-row {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .materials-more-filters {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 .materials-more-filters > summary {
   width: fit-content;
@@ -1195,8 +1214,18 @@
 }
 
 .materials-pager {
-  margin-top: var(--space-2);
+  margin-top: 0;
 }
+.materials-pager > .paginator-card {
+  padding: var(--space-2) var(--space-3);
+}
+.materials-pager select[data-per-page] {
+  width: 5.5rem;
+  min-width: 5.5rem;
+  max-width: 5.5rem;
+  flex: 0 0 auto;
+}
+.materials-pager .paginator-label { white-space: nowrap; }
 
 /* Tags */
 .view-tags {
