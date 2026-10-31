@@ -38,6 +38,7 @@ describe('achievement next attainable goal and meaningful first use', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-next-achievement]')?.textContent).toContain('First Step'));
     const panel = document.querySelector('[data-next-achievement]');
     expect(panel.textContent).toContain('0 of 1');
+    expect(panel.querySelector('bdi[dir="ltr"]')?.textContent).toBe('0 of 1');
     expect(panel.querySelector('a[href="#/courses"]')).not.toBeNull();
     expect(document.querySelector('[data-achievement-metrics]').hidden).toBe(true);
     expect(document.querySelector('[data-locked-achievements]')?.open).toBe(false);

@@ -188,7 +188,12 @@ export function mountAchievementsView(deps = {}) {
       title.textContent = nextGoal.title;
       const explanation = document.createElement('p');
       explanation.className = 'text-muted';
-      explanation.textContent = `${nextGoal.current} of ${nextGoal.target}${nextGoal.unit ? ' ' + nextGoal.unit : ''}`;
+      // Keep digits and the "of" connector in a stable LTR island inside
+      // Persian/RTL layouts, rather than visually reversing "0 of 1".
+      const countText = document.createElement('bdi');
+      countText.dir = 'ltr';
+      countText.textContent = `${nextGoal.current} of ${nextGoal.target}${nextGoal.unit ? ' ' + nextGoal.unit : ''}`;
+      explanation.appendChild(countText);
       const meter = document.createElement('progress');
       meter.max = nextGoal.target;
       meter.value = nextGoal.current;
