@@ -2,18 +2,19 @@
 
 This document defines concrete acceptance for replacing the remaining three substantial custom engines. **It does not claim the editor, whiteboard, or player has been replaced.** Each migration must pass the same data, browser, Windows, and release checks as the completed smaller library-first replacements.
 
-## Notes editor: Tiptap 3 / ProseMirror
+## Notes editor: Squire 2 (HTML-canonical, compatibility-gated)
 
-Candidate: Tiptap 3 with StarterKit and explicit extensions for tables, images, links, text alignment, and any note-specific nodes. The existing Notes editor uses contenteditable, deprecated execCommand, custom undo history, DOM selection, imports and autosave.
+Current: `notes.js` lazy-loads `src/features/notesSquireAdapter.js` only when the user selects the modern preview. This uses `squire-rte`, **not** Tiptap/ProseMirror. The classic editor remains the fallback for unsupported saved HTML or live drafts. The adapter's canonical `createSquireNoteEditor` name retains `createTiptapNoteEditor` as a deprecated compatibility alias; neither implies a storage migration.
 
-- Preserve saved notes in the existing HTML content field, not new Tiptap JSON. Do not rewrite stored notes automatically on first open.
-- Inventory all old HTML elements and attributes: nested lists, headings, quotes, pre/code, tables, external-image placeholders with data-remote-src, AI-summary blocks, links, color/font/size/alignment metadata, Persian/Chinese/RTL and pasted content.
-- Tiptap's strict schema silently loses unsupported HTML. Enable content checking and handle content errors: if a note is incompatible, retain original bytes and render a safe read-only legacy view instead of saving a partially parsed document. Source: https://tiptap.dev/docs/editor/core-concepts/schema and https://tiptap.dev/docs/guides/invalid-schema.
-- Preserve DOMPurify HTML-only sanitization and user-controlled remote image permission; do not allow SVG external image requests or imported script/event handlers.
-- Migrate toolbar and shortcuts to Tiptap commands, eliminating dual undo or execCommand histories. Prove dirty-draft sync, beforeUnload, import/export, mobile composition/IME, keyboard, screen readers, offline, and Windows behavior.
-- Keep strict bundle budgets: lazy-load the editor, tree-shake plugins, and measure against the 1 MiB total JavaScript gate. Do not override the budget merely to declare a new library installed.
+- Preserve the exact saved HTML field as the source of truth; never persist Squire-only state or silently rewrite untouched notes. Do not automatically switch users to the modern editor until the compatibility gates below pass.
+- Inventory real legacy content: mixed paragraphs and nested lists, Persian/Chinese/RTL, safe colors/fonts/sizes/alignment, links, block quotes, code/pre, tables, local and permission-gated remote images, and AI-summary metadata.
+- Use `assessNoteForSquire` on the **original saved HTML and the unsaved DOM draft** before replacing an editor. Route unsupported tables, images, code metadata, unknown styles/classes and other user-owned data to the classic editor; reject imports that change the note's text.
+- Preserve meaningful HTML formatting on the **first edit and save**, not only on an untouched mount. Round-trip tests must compare direction, alignment, font/color metadata, links, list structure, Unicode text and reopened content.
+- Keep DOMPurify HTML-only sanitization plus the narrow `safeNoteStyles` allowlist. Preserve explicit user consent for remote images and do not introduce executable tags, remote CSS, inline event handlers or SVG external-resource loads.
+- Flush pending MutationObserver edits before a mode switch or save, never save unfinished IME composition, and maintain note-epoch guards for asynchronous module load, remote refresh, backup and cross-tab synchronization.
+- Retire the classic editor only when representative legacy fixtures, browser/Windows acceptance, accessibility and bundle-size parity demonstrate a genuinely lossless replacement. The current preview has **not** met that retirement gate.
 
-Acceptance: new rich legacy HTML round-trip test in tests/notes.test.js, and existing Notes sync, import, sanitization and Unicode tests.
+Acceptance: `tests/notes-tiptap-adapter.test.js` (historical test filename for the current Squire adapter), `tests/notes-tiptap-compatibility.test.js`, `tests/notes.test.js`, real mixed-script browser tests and backup round trips, with the original note records unchanged on unsupported input.
 
 ## Studio canvas: Konva
 
