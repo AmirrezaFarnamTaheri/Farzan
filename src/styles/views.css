@@ -1169,6 +1169,24 @@
   margin-top: var(--space-3);
 }
 
+.materials-more-filters {
+  margin-top: var(--space-3);
+}
+.materials-more-filters > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: var(--text-sm, 0.875rem);
+  border-radius: var(--radius-sm, 4px);
+}
+.materials-more-filters > summary:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 3px;
+}
+.materials-more-filters[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
 .materials-select-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
