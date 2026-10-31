@@ -509,7 +509,7 @@ let studioKeyController = null;
         editingCardId = null;
         newForm.hidden = true;
         announce('Card creation cancelled.');
-        addBtn.focus();
+        (addBtn.hidden ? container.querySelector('#fc-empty-create') : addBtn)?.focus();
       });
       newForm.addEventListener('submit', async (event) => {
         event.preventDefault();
