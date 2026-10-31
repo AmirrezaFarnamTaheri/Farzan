@@ -1,3 +1,6 @@
+// A stale read must not replace a more recent successful retry or a new route.
+const renderVersions = new WeakMap();
+
 export function mountTagsView({ setView } = {}) {
   setView(`
     <section class="view view-tags">
@@ -54,18 +57,67 @@ async function renderTags() {
   const filtersRoot = document.querySelector('[data-tag-filters]');
   if (!metricsRoot || !listRoot || !searchEl || !filtersRoot) return;
 
-  const [notes, topics] = await Promise.all([
-    (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
+  const version = (renderVersions.get(listRoot) || 0) + 1;
+  renderVersions.set(listRoot, version);
+  listRoot.setAttribute('aria-busy', 'true');
+  const [notesResult, topicsResult] = await Promise.allSettled([
     (async () => {
-      try {
-        await window.DataStore?.init?.();
-        return window.DataStore?.allTopics?.() ?? [];
-      } catch {
-        return [];
-      }
+      if (typeof window.DB?.getAllNotes !== 'function') throw new Error('Notes reader is unavailable');
+      const notes = await window.DB.getAllNotes();
+      if (!Array.isArray(notes)) throw new TypeError('Notes returned invalid records');
+      return notes;
+    })(),
+    (async () => {
+      await window.DataStore?.init?.();
+      if (typeof window.DataStore?.allTopics !== 'function') throw new Error('Catalog reader is unavailable');
+      const topics = await window.DataStore.allTopics();
+      if (!Array.isArray(topics)) throw new TypeError('Catalog returned invalid records');
+      return topics;
     })(),
   ]);
-  if (!document.body.contains(listRoot)) return;
+  if (!document.body.contains(listRoot) || renderVersions.get(listRoot) !== version) return;
+  listRoot.setAttribute('aria-busy', 'false');
+
+  if (notesResult.status === 'rejected' || topicsResult.status === 'rejected') {
+    // Showing partial tag totals or a normal zero state after a canonical
+    // read failure misrepresents the user's stored Notes and catalog.
+    metricsRoot.replaceChildren();
+    listRoot.replaceChildren();
+    searchEl.disabled = true;
+    filtersRoot.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    const routeState = window.OpenCourseDeck = window.OpenCourseDeck || {};
+    routeState.rerenderVisibleTags = null;
+    const failed = [
+      notesResult.status === 'rejected' ? 'saved notes' : null,
+      topicsResult.status === 'rejected' ? 'catalog' : null,
+    ].filter(Boolean).join(' and ');
+    const error = document.createElement('div');
+    error.className = 'tag-load-error';
+    error.setAttribute('role', 'alert');
+    const message = document.createElement('p');
+    message.textContent = `Tags could not be loaded (${failed}). Your stored data was not changed.`;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn btn-primary';
+    retry.dataset.tagRetry = 'true';
+    retry.textContent = 'Retry loading tags';
+    retry.addEventListener('click', () => {
+      retry.disabled = true;
+      retry.textContent = 'Retrying tags...';
+      renderTags().catch(() => {
+        retry.disabled = false;
+        retry.textContent = 'Retry loading tags';
+      });
+    });
+    error.append(message, retry);
+    listRoot.appendChild(error);
+    return;
+  }
+
+  searchEl.disabled = false;
+  filtersRoot.querySelectorAll('button').forEach(button => { button.disabled = false; });
+  const notes = notesResult.value;
+  const topics = topicsResult.value;
 
   const tagsByKey = new Map();
   const ensureTag = (rawTag) => {
