@@ -164,12 +164,14 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <div>
               <h2>Experimental Konva draft editor</h2>
               <p>Changes are saved separately and are not applied to your Studio board.
-                Supported shapes can be dragged; rectangles and cards can be resized.
+                Select and move supported shapes, resize rectangles and cards, or use Pen to draw.
                 Other editing tools remain in the classic Studio canvas.</p>
             </div>
             <button type="button" class="btn btn-ghost" data-studio-konva-close>Close draft</button>
           </div>
           <div class="studio-konva-actions" role="group" aria-label="Konva draft editing controls">
+            <button type="button" class="btn btn-ghost btn-sm active" data-studio-konva-mode="select" aria-pressed="true">Select</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-mode="pen" aria-pressed="false">Pen</button>
             <label for="studio-konva-object">Object</label>
             <select id="studio-konva-object" class="select input-sm" data-studio-konva-object></select>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="left" title="Move left">Left</button>
@@ -677,8 +679,15 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   };
   const refreshKonvaControls = () => {
     const selected = konvaSelect?.value || '';
+    const mode = konvaWorkspace?.getMode?.() || 'select';
+    document.querySelectorAll('[data-studio-konva-mode]').forEach(button => {
+      const active = button.dataset.studioKonvaMode === mode;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      button.classList.toggle('active', active);
+    });
+    if (konvaSelect) konvaSelect.disabled = mode === 'pen';
     document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
-      button.disabled = !selected;
+      button.disabled = !selected || mode === 'pen';
     });
     const undo = document.querySelector('[data-studio-konva-undo]');
     const redo = document.querySelector('[data-studio-konva-redo]');
@@ -750,6 +759,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       },
       onStatus: message => {
         setKonvaStatus(message);
+        populateKonvaObjects();
         refreshKonvaControls();
       },
       onError: () => setKonvaStatus('Experimental draft save failed; earlier draft retained'),
@@ -795,6 +805,20 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   });
   on(konvaDialog, 'close', () => disposeKonva());
   on(konvaSelect, 'change', () => konvaWorkspace?.select?.(konvaSelect.value || null));
+  document.querySelectorAll('[data-studio-konva-mode]').forEach(button => {
+    on(button, 'click', () => {
+      if (!konvaWorkspace || konvaClosing || konvaResetting) return;
+      try {
+        const mode = konvaWorkspace.setMode(button.dataset.studioKonvaMode);
+        setKonvaStatus(mode === 'pen'
+          ? 'Pen active — draw with one pointer; changes save only to this draft'
+          : 'Select active — drag shapes or use resize handles');
+        refreshKonvaControls();
+      } catch {
+        setKonvaStatus('Experimental draft tool unavailable');
+      }
+    });
+  });
   const nudge = Object.freeze({
     left: [-10, 0], right: [10, 0], up: [0, -10], down: [0, 10],
   });
