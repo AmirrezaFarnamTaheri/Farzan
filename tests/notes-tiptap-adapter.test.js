@@ -90,6 +90,34 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('preserves RTL, alignment, color and font size on the first persisted edit', () => {
+    const original = '<p dir="rtl" style="text-align:right">'
+      + '<span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createTiptapNoteEditor({ element, html: original, onUpdate });
+    try {
+      // Simulate a real browser contenteditable mutation before Squire's
+      // queued observer fires. A first save must retain legacy rich formatting.
+      const paragraph = element.querySelector('.notes-modern-editor p');
+      expect(paragraph).not.toBeNull();
+      paragraph.append(document.createTextNode(' و یادداشت تازه'));
+      expect(instance.syncChanges()).toBe(true);
+      const html = instance.getHTML();
+      expect(onUpdate).toHaveBeenCalledWith(html);
+      const inert = document.createElement('template');
+      inert.innerHTML = html;
+      const block = inert.content.querySelector('p[dir="rtl"]');
+      expect(block).not.toBeNull();
+      expect(block.style.textAlign).toBe('right');
+      const styled = [...block.querySelectorAll('span')].find(node => node.textContent.includes('عنوان فارسی'));
+      expect(styled).toBeDefined();
+      expect(styled.style.fontSize).toBe('18px');
+      expect(styled.style.color).toBe('rgb(255, 0, 0)');
+      expect(block.textContent).toContain('یادداشت تازه');
+    } finally { instance.destroy(); }
+  });
+
   it('reopens supported direction and typography without silently losing styled text', () => {
     const html = '<p dir="rtl" style="text-align:right"><span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
     const parent = document.createElement('div');
