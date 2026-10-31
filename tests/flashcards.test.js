@@ -402,6 +402,9 @@ describe('flashcard first-use presentation', () => {
     const form = host.querySelector('#fc-new-form');
     expect(form.hidden).toBe(false);
     expect(document.activeElement).toBe(form.querySelector('#fc-new-front'));
+    form.querySelector('#fc-new-cancel').click();
+    expect(form.hidden).toBe(true);
+    expect(document.activeElement).toBe(firstUse);
   });
   it('shows useful statistics once cards exist without duplicating the first-use action', async () => {
     const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
