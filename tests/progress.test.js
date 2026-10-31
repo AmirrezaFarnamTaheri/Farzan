@@ -151,6 +151,87 @@ describe('progress backup exports', () => {
     }));
   });
 
+  it('rejects a corrupted FSRS backup before touching any canonical study data', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      progress: [{ topicId: 'fresh', courseId: 'course-new' }],
+      settings: { flashcards: [{
+        id: 'fsrs-bad', front: 'Q', back: 'A', scheduler: 'fsrs-v5',
+        fsrsState: { version: 1, packageVersion: '5.4.2', model: 'fsrs-6',
+          card: { due: 'not-a-date' }, reviewLog: [] },
+      }] },
+    })], 'broken-fsrs.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/flashcard|FSRS/i));
+  });
+
+  it('rejects duplicate flashcard IDs before import and does not alter existing records', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const original = { id: 'same', front: 'one', back: 'first', nextReviewDate: '2026-09-01' };
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { flashcards: [original, { ...original, front: 'different' }] },
+    })], 'duplicate-cards.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/duplicate.*flashcard/i));
+  });
+
+  it('rejects an FSRS backup with a forged rollback archive or unknown future scheduler', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    for (const invalid of [
+      {
+        id: 'fsrs-card', front: 'Q', back: 'A', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-01-02T00:00:00.000Z')),
+        fsrsMigration: { version: 1, legacyCard: { id: 'other-card' } },
+      },
+      { id: 'future', front: 'Q', back: 'A', scheduler: 'fsrs-v6' },
+    ]) {
+      window.DB.saveSetting.mockClear();
+      const file = new File([JSON.stringify({
+        version: '1.6', settings: { flashcards: [invalid] },
+      })], 'invalid-scheduler.json', { type: 'application/json' });
+      await window.ProgressStats.importJSONFile(file);
+      expect(window.DB.saveSetting).not.toHaveBeenCalled();
+      expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    }
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
+  it('round-trips valid legacy and FSRS-v5 backups without changing due dates or archives', async () => {
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const legacy = {
+      id: 'old-1', front: 'Legacy', back: 'Answer', interval: 21,
+      repetitions: 3, easeFactor: 2.6, nextReviewDate: '2027-02-01',
+      metadata: { language: 'fa-IR' },
+    };
+    const fsrs = {
+      id: 'new-1', front: 'FSRS', back: 'State', scheduler: 'fsrs-v5',
+      fsrsState: createFsrsV5State(new Date('2026-10-01T10:30:00.000Z')),
+      nextReviewDate: '2026-10-01',
+      fsrsMigration: { version: 1, consentedAt: '2026-10-01T10:30:00.000Z', legacyCard: {
+        ...legacy, id: 'new-1',
+      } },
+    };
+    const cards = [legacy, fsrs];
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { flashcards: cards },
+    })], 'valid-cards.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', cards);
+    expect(window.OpenCourseDeck.lastImportResult.settings).toBe(1);
+    expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([]);
+  });
+
   it('restores course outlines and media cues from version 1.6 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const outlines = [{ id: 'course-a', title: 'Saved course' }];
