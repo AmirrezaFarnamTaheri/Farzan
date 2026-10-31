@@ -257,6 +257,7 @@ export function createStudioKonvaDraftWorkspace({
     },
     move: (id, dx, dy) => run(() => session.commit(id, dx, dy)),
     resize: (id, bounds) => run(() => session.resize(id, bounds)),
+    updateText: (id, content) => run(() => session.updateText(id, content)),
     undo: () => run(() => session.undo()),
     redo: () => run(() => session.redo()),
     canUndo: () => session.canUndo(),
