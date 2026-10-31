@@ -65,6 +65,7 @@ export async function mountCoursesView(deps = {}) {
               <div class="course-session-actions">
                 <button class="btn btn-ghost btn-sm course-jump-lessons" type="button" data-course-jump-topics aria-controls="course-detail">Lessons</button>
                 <button class="btn btn-primary btn-sm" type="button" data-course-take-note aria-controls="course-timestamp-note">Take note</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-course-theater aria-controls="course-player" aria-pressed="false">Theater view</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-toggle-catalog aria-controls="courses-catalog" aria-expanded="false">Browse catalog</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-course-close-playback>Close player</button>
               </div>
@@ -152,6 +153,18 @@ export async function mountCoursesView(deps = {}) {
   const playbackSection = document.querySelector('[data-course-playback]');
   const coursesShellEl = document.querySelector('.courses-shell');
   const catalogToggleEl = document.querySelector('[data-course-toggle-catalog]');
+  const theaterToggleEl = document.querySelector('[data-course-theater]');
+  // Presentation state only. Never remount media, reset playback, or write
+  // the learner's canonical position when switching between the two layouts.
+  const setTheaterMode = enabled => {
+    const active = enabled === true;
+    if (coursesShellEl) coursesShellEl.dataset.theater = active ? 'true' : 'false';
+    if (theaterToggleEl) {
+      theaterToggleEl.setAttribute('aria-pressed', active ? 'true' : 'false');
+      theaterToggleEl.textContent = active ? 'Exit theater' : 'Theater view';
+    }
+  };
+  setTheaterMode(false);
   const setCatalogOpen = (open) => {
     if (coursesShellEl) coursesShellEl.dataset.catalogOpen = open ? 'true' : 'false';
     if (catalogToggleEl) {
@@ -168,6 +181,10 @@ export async function mountCoursesView(deps = {}) {
   };
   catalogToggleEl?.addEventListener('click', () => {
     setCatalogOpen(coursesShellEl?.dataset.catalogOpen !== 'true');
+  });
+  theaterToggleEl?.addEventListener('click', () => {
+    if (playbackSection?.hidden) return;
+    setTheaterMode(coursesShellEl?.dataset.theater !== 'true');
   });
   // The optional timestamp form follows the video before the topic outline.
   // Keep the next-lesson action one tap away on narrow screens, rather than
@@ -189,6 +206,7 @@ export async function mountCoursesView(deps = {}) {
     try { playerEl?._pdPlayer?.pause?.(); } catch {}
     if (playbackSection) playbackSection.hidden = true;
     coursesShellEl?.removeAttribute('data-playback-active');
+    setTheaterMode(false);
     setCatalogOpen(true);
   });
   const timestampStatusEl = document.querySelector('[data-timestamp-note-status]');
