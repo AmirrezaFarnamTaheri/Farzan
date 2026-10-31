@@ -31,6 +31,7 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
   window.DataStore = { init: vi.fn(async () => {}), allCourses: () => [], allTopics: () => [] };
   const factory = vi.fn(({ board: imported }) => ({
     getBoard: () => structuredClone(imported),
+    setMode: vi.fn(), getMode: vi.fn(() => 'select'),
     select: vi.fn(), move: vi.fn(async () => imported),
     undo: vi.fn(async () => false), redo: vi.fn(async () => false),
     canUndo: () => false, canRedo: () => false,
@@ -165,4 +166,26 @@ describe('Studio experimental Konva draft opt-in', () => {
     await vi.waitFor(() => expect(factory).not.toHaveBeenCalled());
     expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
   });
+
+  it('offers an explicit pen tool only inside the draft modal, without changing the main Studio tool', async () => {
+    const { controller, factory, canvasApi } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const workspace = factory.mock.results[0].value;
+    const pen = document.querySelector('[data-studio-konva-mode="pen"]');
+    const select = document.querySelector('[data-studio-konva-mode="select"]');
+    expect(pen).not.toBeNull();
+    expect(select).not.toBeNull();
+    expect(select.getAttribute('aria-pressed')).toBe('true');
+    pen.click();
+    expect(workspace.setMode).toHaveBeenCalledWith('pen');
+    expect(pen.getAttribute('aria-pressed')).toBe('true');
+    expect(select.getAttribute('aria-pressed')).toBe('false');
+    select.click();
+    expect(workspace.setMode).toHaveBeenCalledWith('select');
+    expect(select.getAttribute('aria-pressed')).toBe('true');
+    expect(canvasApi.getState().tool).toBe('select');
+    controller.unmount();
+  });
+
 });
