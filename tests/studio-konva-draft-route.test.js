@@ -40,6 +40,7 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
   const loader = loadKonvaDraft || vi.fn(async () => ({
     DRAFT_KEY: 'ocd_studio_konva_draft',
     createStudioKonvaDraftWorkspace: factory,
+    isKonvaDraftCompatible: () => true,
   }));
   const controller = mountStudioView({
     setView: html => { document.body.innerHTML = html; },
@@ -105,6 +106,50 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(saveSetting).not.toHaveBeenCalled();
     expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
     expect(document.querySelector('[data-studio-status]').textContent).toMatch(/Konva.*unavailable|incompatible/i);
+    controller.unmount();
+  });
+
+  it('requires confirmation before resetting a saved draft and preserves the live Studio board', async () => {
+    const savedDraft = v1Board();
+    savedDraft.layers[0].elements[0].x = 95;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { controller, factory, saveSetting, canvasApi } = makeFixture({ savedDraft });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+
+    document.querySelector('[data-studio-konva-reset]').click();
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(factory).toHaveBeenCalledTimes(1);
+
+    confirm.mockReturnValue(true);
+    document.querySelector('[data-studio-konva-reset]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
+    expect(saveSetting).toHaveBeenCalledTimes(1);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', v1Board());
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.serialize()).toEqual(v1Board());
+    controller.unmount();
+  });
+
+  it('keeps the current draft mounted if a confirmed reset write is refused', async () => {
+    const savedDraft = v1Board();
+    savedDraft.layers[0].elements[0].x = 95;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { controller, factory, saveSetting } = makeFixture({ savedDraft });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const current = factory.mock.results[0].value;
+    saveSetting.mockResolvedValue(false);
+
+    document.querySelector('[data-studio-konva-reset]').click();
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/reset failed/i));
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', v1Board());
+    expect(factory).toHaveBeenCalledOnce();
+    expect(current.destroy).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(true);
     controller.unmount();
   });
 
