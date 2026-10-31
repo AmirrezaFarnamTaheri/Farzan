@@ -232,6 +232,107 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([]);
   });
 
+  it('treats a false flashcard writer receipt as failure, preserving the old mirror and restoring the atomic snapshot', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      progress: [], notes: [], settings: [], folders: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.saveSetting.mockImplementation(async (key) => key === 'ocd_flashcards' ? false : true);
+    const previous = JSON.stringify([{ id: 'old-fsrs', scheduler: 'sm2-v1', front: 'Old', back: 'Safe' }]);
+    window.localStorage.setItem('ocd_flashcards', previous);
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { flashcards: [
+        { id: 'new-card', scheduler: 'sm2-v1', front: 'New', back: 'A' },
+      ] },
+    })], 'receipt-rejected.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', expect.any(Array));
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      settings: 0, rolledBack: true,
+      errors: [expect.objectContaining({ store: 'settings', id: 'ocd_flashcards', message: expect.stringMatching(/refus|acknowledg|reject/i) })],
+    });
+    expect(window.DB.importBackup).toHaveBeenCalledOnce();
+    expect(window.localStorage.getItem('ocd_flashcards')).toBe(previous);
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith(expect.stringMatching(/import complete/i));
+  });
+
+  it('does not count a false note/progress receipt as a persisted import', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      progress: [], notes: [], settings: [], folders: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.saveProgress.mockResolvedValue(false);
+    window.DB.saveNote.mockResolvedValue(false);
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      progress: [{ topicId: 'new-progress', courseId: 'a', updatedAt: 100 }],
+      notes: [{ id: 'new-note', title: 'New', content: '<p>Body</p>', updatedAt: 100 }],
+    })], 'false-record-receipts.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      progress: 0, notes: 0, rolledBack: true,
+      errors: expect.arrayContaining([
+        expect.objectContaining({ store: 'progress', id: 'new-progress' }),
+        expect.objectContaining({ store: 'notes', id: 'new-note' }),
+      ]),
+    });
+    expect(window.DB.importBackup).toHaveBeenCalledOnce();
+  });
+
+  it('does not count annotations or timestamps when their canonical writers refuse storage', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      progress: [], notes: [], annotations: [], timestamps: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.saveAnnotations.mockResolvedValue(false);
+    window.DB.saveTimestamp.mockResolvedValue(false);
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      annotations: [{ id: 'annot-new', docId: 'doc-1', page: 2, updatedAt: 123 }],
+      timestamps: [{ id: 'time-new', topicId: 'topic-1', position: 40 }],
+    })], 'rejected-media-receipts.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      annotations: 0, timestamps: 0, rolledBack: true,
+      errors: expect.arrayContaining([
+        expect.objectContaining({ store: 'annotations', id: 'doc-1' }),
+        expect.objectContaining({ store: 'timestamps', id: 'time-new' }),
+      ]),
+    });
+  });
+
+  it('does not claim a completed rollback if restoring a protected setting is explicitly refused', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.clearUserData = vi.fn(async () => true);
+    window.DB.saveSetting.mockImplementation(async key => key === 'ocd_playlists' ? false : true);
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { playlists: [{
+        id: 'new-queue', title: 'New Queue', topicIds: ['topic-1'],
+      }] },
+    })], 'false-rollback-receipt.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      rolledBack: false,
+      rollbackErrors: expect.arrayContaining([expect.stringMatching(/ocd_playlists|acknowledg|refus/i)]),
+    });
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
+  });
+
   it('restores course outlines and media cues from version 1.6 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const outlines = [{ id: 'course-a', title: 'Saved course' }];
