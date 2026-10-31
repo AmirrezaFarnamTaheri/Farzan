@@ -28,14 +28,7 @@ import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
 import { chartGauge as GaugePlugin } from './src/features/chartPlugins/gauge.js';
 import { chartHeatmap as HeatmapPlugin } from './src/features/chartPlugins/heatmap.js';
 import { chartSparkline as SparklinePlugin } from './src/features/chartPlugins/sparkline.js';
-import { CanvasAreaChart } from './src/features/canvasCharts/area.js';
-import { CanvasGauge } from './src/features/canvasCharts/gauge.js';
-import { CanvasHeatmap } from './src/features/canvasCharts/heatmap.js';
-import { CanvasTreemap } from './src/features/canvasCharts/treemap.js';
-import { CanvasZoom } from './src/features/canvasZoom.js';
 import './src/features/canvasTools/index.js';
-import { CourseGraph } from './src/features/courseGraph.js';
-import { KnowledgeGraph } from './src/features/knowledgeGraph.js';
 import { AudioEnhancer } from './src/features/audioEnhancer.js';
 import * as ContextMenu from './src/ui/contextMenu.js';
 import * as CanvasExport from './src/lib/canvasExport.js';
@@ -3854,11 +3847,9 @@ KeyboardShortcuts.register('ctrl+0', () => FontScale.reset(), 'Reset UI font siz
     OpenCourseDeck.KeyboardShortcuts = KeyboardShortcuts;
     OpenCourseDeck.Heatmap    = Heatmap;
     OpenCourseDeck.ChartPlugins = Charts.plugins;
-    OpenCourseDeck.CanvasCharts = { CanvasGauge, CanvasTreemap, CanvasAreaChart, CanvasHeatmap };
-    OpenCourseDeck.CanvasZoom = CanvasZoom;
-    OpenCourseDeck.CourseGraph = CourseGraph;
-    OpenCourseDeck.KnowledgeGraph = KnowledgeGraph;
-    OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph };
+    // Legacy graph, zoom and canvas-chart constructors remain importable as
+    // standalone modules, but have no live runtime consumers. Do not eagerly
+    // import or globally expose them during every application startup.
     OpenCourseDeck.ContextMenu = OpenCourseDeck.ContextMenu ?? ContextMenu;
     OpenCourseDeck.CanvasExport = OpenCourseDeck.CanvasExport ?? CanvasExport;
     OpenCourseDeck.Clipboard = OpenCourseDeck.Clipboard ?? ClipboardBridge;
