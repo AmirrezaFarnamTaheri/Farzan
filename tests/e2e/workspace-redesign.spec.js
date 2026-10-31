@@ -775,4 +775,113 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(dialog).toBeHidden();
   });
 
+
+  test('draws one canonical pen stroke in the opt-in Konva draft without changing the main board', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    await page.waitForFunction(() => typeof window.OpenCourseDeck?.Canvas?.loadState === 'function'
+      && typeof window.DB?.saveSetting === 'function');
+    await page.evaluate(async () => {
+      await window.DB.saveSetting('ocd_studio_konva_draft', null);
+      window.OpenCourseDeck.Canvas.loadState({
+        version: 1, tool: 'select',
+        viewport: { offsetX: 20, offsetY: 30, zoom: 2, rotation: 0 },
+        grid: { enabled: false, size: 24, snap: false },
+        style: { strokeColor: '#234abc', strokeWidth: 4, lineCap: 'round', lineJoin: 'round' },
+        layers: [{ id: 'draw', name: 'Pen', visible: true, locked: false, opacity: 1, elements: [] }],
+      });
+    });
+    await page.locator('[data-studio-more-tools] > summary').click();
+    await page.locator('[data-studio-konva-open]').click();
+    const dialog = page.locator('[data-studio-konva-dialog]');
+    await expect(dialog).toBeVisible();
+    await page.locator('[data-studio-konva-mode="pen"]').click();
+    await expect(page.locator('[data-studio-konva-mode="pen"]')).toHaveAttribute('aria-pressed', 'true');
+    const stage = page.locator('[data-studio-konva-stage] .konvajs-content');
+    await expect(stage).toBeVisible();
+    const box = await stage.boundingBox();
+    await page.mouse.move(box.x + 72, box.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 94, box.y + 96, { steps: 4 });
+    await page.mouse.move(box.x + 116, box.y + 110, { steps: 4 });
+    await page.mouse.up();
+    const draft = async () => page.evaluate(() => window.DB.getSetting('ocd_studio_konva_draft'));
+    await expect.poll(async () => (await draft())?.layers?.[0]?.elements?.length).toBe(1);
+    const saved = await draft();
+    const line = saved.layers[0].elements[0];
+    expect(line.type).toBe('polyline');
+    expect(line.stroke).toBe('#234abc');
+    expect(line.strokeWidth).toBe(4);
+    expect(line.points.length).toBeGreaterThan(2);
+    expect(line.points[0][0]).toBeCloseTo(26, 0);
+    expect(line.points[0][1]).toBeCloseTo(25, 0);
+    expect(await page.evaluate(() =>
+      window.OpenCourseDeck.Canvas.serialize().layers[0].elements)).toEqual([]);
+
+    await page.locator('[data-studio-konva-undo]').click();
+    await expect.poll(async () => (await draft())?.layers?.[0]?.elements?.length).toBe(0);
+    await page.locator('[data-studio-konva-redo]').click();
+    await expect.poll(async () => (await draft())?.layers?.[0]?.elements?.length).toBe(1);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+    await page.locator('[data-studio-konva-open]').click();
+    await expect(dialog).toBeVisible();
+    expect((await draft()).layers[0].elements[0].points).toEqual(line.points);
+    await page.locator('[data-studio-konva-close]').click();
+  });
+
+  test('cancels multi-pointer drawing in the phone-width Konva draft instead of saving a ghost stroke', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    await page.waitForFunction(() => typeof window.OpenCourseDeck?.Canvas?.loadState === 'function'
+      && typeof window.DB?.saveSetting === 'function');
+    await page.evaluate(async () => {
+      await window.DB.saveSetting('ocd_studio_konva_draft', null);
+      window.OpenCourseDeck.Canvas.loadState({
+        version: 1, tool: 'select',
+        viewport: { offsetX: 0, offsetY: 0, zoom: 1, rotation: 0 },
+        grid: { enabled: false, size: 24, snap: false },
+        layers: [{ id: 'draw', name: 'Pen', visible: true, locked: false, elements: [] }],
+      });
+    });
+    await page.locator('[data-studio-more-tools] > summary').click();
+    await page.locator('[data-studio-konva-open]').click();
+    await page.locator('[data-studio-konva-mode="pen"]').click();
+    await expect(page.locator('[data-studio-konva-stage] .konvajs-content')).toBeVisible();
+    await page.evaluate(() => {
+      const stage = document.querySelector('[data-studio-konva-stage] .konvajs-content');
+      const rect = stage.getBoundingClientRect();
+      const send = (type, pointerId, x, y) => stage.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId, pointerType: 'touch',
+        isPrimary: pointerId === 10,
+        clientX: rect.x + x, clientY: rect.y + y,
+      }));
+      send('pointerdown', 10, 30, 50);
+      send('pointermove', 10, 50, 65);
+      send('pointerdown', 11, 90, 90);
+      send('pointerup', 11, 92, 92);
+      send('pointerup', 10, 110, 100);
+    });
+    expect(await page.evaluate(() => window.DB.getSetting('ocd_studio_konva_draft'))).toBeNull();
+    await page.evaluate(() => {
+      const stage = document.querySelector('[data-studio-konva-stage] .konvajs-content');
+      const rect = stage.getBoundingClientRect();
+      const send = (type, x, y) => stage.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 20, pointerType: 'touch',
+        isPrimary: true, clientX: rect.x + x, clientY: rect.y + y,
+      }));
+      send('pointerdown', 40, 60);
+      send('pointermove', 55, 75);
+      send('pointerup', 75, 90);
+    });
+    await expect.poll(() => page.evaluate(async () =>
+      (await window.DB.getSetting('ocd_studio_konva_draft'))?.layers?.[0]?.elements?.length)).toBe(1);
+    expect(await page.evaluate(() =>
+      window.OpenCourseDeck.Canvas.serialize().layers[0].elements.length)).toBe(0);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(page.locator('[data-studio-konva-dialog]')).toBeHidden();
+  });
+
 });
