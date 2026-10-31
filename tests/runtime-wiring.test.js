@@ -36,8 +36,6 @@ describe('runtime wiring', () => {
     './core/themeBuilder.js',
     './core/locale.js',
     './lib/workerPool.js',
-    './lib/virtualScroll.js',
-    './lib/timeline.js',
     './lib/timeRange.js',
     './lib/stagger.js',
     './lib/rafLoop.js',
@@ -48,6 +46,25 @@ describe('runtime wiring', () => {
 
   it.each(requiredModules)('src/index.js imports %s', (specifier) => {
     expect(indexSource).toContain(specifier);
+  });
+
+  it('defers dormant list and animation engines without deleting their direct APIs', async () => {
+    // These sources still have unit/experimental uses, but no live route
+    // constructs either one. Do not pay for them on every application boot.
+    for (const [modulePath, globalName] of [
+      ['./lib/virtualScroll.js', 'VirtualList'],
+      ['./lib/timeline.js', 'Timeline'],
+    ]) {
+      expect(indexSource).not.toContain(modulePath);
+      expect(indexSource).not.toContain(`pd.${globalName} =`);
+    }
+
+    const [{ VirtualList }, { Timeline }] = await Promise.all([
+      import('../src/lib/virtualScroll.js'),
+      import('../src/lib/timeline.js'),
+    ]);
+    expect(typeof VirtualList).toBe('function');
+    expect(typeof Timeline).toBe('function');
   });
 
   it('defers translation and note-template utilities until the app shell resolves', () => {
