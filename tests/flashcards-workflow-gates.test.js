@@ -11,7 +11,7 @@ describe('Flashcards assurance workflow coverage', () => {
     ['Design Visual QA', '.github/workflows/farzan-design-visual.yml'],
   ])('runs %s when the root flashcards.js UI module changes', (_name, filename) => {
     const source = fs.readFileSync(path.join(root, filename), 'utf8');
-    const pathsBlock = source.split(/\n    paths:\s*\n/)[1]?.split(/\n\S/)[0] ?? '';
+    const pathsBlock = source.split(/\n[ ]{4}paths:\s*\n/)[1]?.split(/\n\S/)[0] ?? '';
     expect(pathsBlock).toMatch(/^\s*- 'flashcards\.js'\s*$/m);
   });
 });
