@@ -872,8 +872,17 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       const imported = loaded.importKonvaV1DraftJSON(contents);
       await previous.flush();
       if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
-      const receipt = await window.DB?.saveSetting?.(loaded.DRAFT_KEY, structuredClone(imported));
-      if (receipt !== true) throw new Error('Draft import not acknowledged');
+      const candidate = structuredClone(imported);
+      const receipt = await window.DB?.saveSetting?.(loaded.DRAFT_KEY, candidate);
+      // The canonical bridge resolves saveSetting with the saved value, not
+      // necessarily a literal true. Refuse false/null/undefined or unrelated
+      // acknowledgments; accept the exact returned board or its JSON clone.
+      let valueReceipt = false;
+      if (receipt && typeof receipt === 'object' && !Array.isArray(receipt)) {
+        try { valueReceipt = JSON.stringify(receipt) === JSON.stringify(candidate); }
+        catch { valueReceipt = false; }
+      }
+      if (receipt !== true && !valueReceipt) throw new Error('Draft import not acknowledged');
       saved = true;
       if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
       createKonvaWorkspace(imported, loaded);
