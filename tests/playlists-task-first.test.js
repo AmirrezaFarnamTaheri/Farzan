@@ -66,4 +66,24 @@ describe('Playlists task-first organization', () => {
     expect(saved[0].topicIds).toEqual(['a', 'b']);
     expect(discover.open).toBe(false);
   });
+
+  it('reports an unreadable saved queue and recovers on retry instead of showing a false empty state', async () => {
+    let unavailable = true;
+    window.DB.getSetting = vi.fn(async () => {
+      if (unavailable) throw new Error('Saved playlist database temporarily unavailable');
+      return saved;
+    });
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    expect(document.querySelector('[data-playlists-error]').getAttribute('role')).toBe('alert');
+    expect(document.querySelector('[data-playlists-discover]').hidden).toBe(true);
+    expect(document.querySelector('[data-playlist-list] [data-playlist-id]')).toBeNull();
+
+    saved = [{ id: 'restored', title: 'Restored queue', topicIds: ['b'], createdAt: 2 }];
+    unavailable = false;
+    document.querySelector('[data-playlists-retry]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlist-list] [data-playlist-id="restored"]')).not.toBeNull());
+    expect(document.querySelector('[data-playlists-error]')).toBeNull();
+  });
+
 });
