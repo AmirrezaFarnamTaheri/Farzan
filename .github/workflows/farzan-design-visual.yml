@@ -1,6 +1,19 @@
 name: Farzan Design Visual QA
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'app.js'
+      - 'canvas.js'
+      - 'flashcards.js'
+      - 'progress.js'
+      - 'src/styles/**'
+      - 'src/views/**'
+      - 'tests/e2e/workspace-visual-qa.spec.js'
+      - '.github/workflows/farzan-design-visual.yml'
   pull_request:
     branches:
       - main
