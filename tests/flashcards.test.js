@@ -383,6 +383,39 @@ describe('Flashcards vault persistence', () => {
   });
 });
 
+describe('flashcard first-use presentation', () => {
+  beforeEach(() => {
+    window.OpenCourseDeck?.Flashcards?.manager?.reset();
+    delete window.DB;
+    localStorage.removeItem('ocd_flashcards');
+    document.body.innerHTML = '<div id="aria-announcer"></div><div id="studio-host"></div>';
+  });
+  it('shows one primary create-card action instead of zero-only statistics', async () => {
+    const { renderStudio } = window.OpenCourseDeck.Flashcards;
+    const host = document.getElementById('studio-host');
+    await renderStudio(host);
+    expect(host.querySelector('.fc-stats')).toBeNull();
+    expect(host.querySelector('.fc-wrap')?.dataset.firstUse).toBe('true');
+    const firstUse = host.querySelector('#fc-empty-create');
+    expect(firstUse).not.toBeNull();
+    firstUse.click();
+    const form = host.querySelector('#fc-new-form');
+    expect(form.hidden).toBe(false);
+    expect(document.activeElement).toBe(form.querySelector('#fc-new-front'));
+    form.querySelector('#fc-new-cancel').click();
+    expect(form.hidden).toBe(true);
+    expect(document.activeElement).toBe(firstUse);
+  });
+  it('shows useful statistics once cards exist without duplicating the first-use action', async () => {
+    const { manager, renderStudio } = window.OpenCourseDeck.Flashcards;
+    await manager.addCard({ front: 'Question', back: 'Answer', deck: 'General' });
+    const host = document.getElementById('studio-host');
+    await renderStudio(host);
+    expect(host.querySelectorAll('.fc-stat')).toHaveLength(3);
+    expect(host.querySelector('#fc-empty-create')).toBeNull();
+  });
+});
+
 describe('flashcard editing and deletion', () => {
   beforeEach(() => {
     window.OpenCourseDeck.Flashcards.manager.reset();
