@@ -76,6 +76,7 @@ navigation during the load cannot paint a stale view.
 ### Performance notes
 
 - Startup timings are available through `?debug=1` and include bundle import, bundle-to-ready, and app init durations.
+- The generic `src/lib/workerPool.js` has no confirmed live caller and is not eagerly imported. A small `OpenCourseDeck.WorkerPool` facade keeps `runInWorker()` (Promise-returning), `getWorkerStatus()` and `terminateAll()` available synchronously; it imports the original pool only on an actual request. Direct exports remain available. The `OpenCourseDeck.workers` URLs and both shipped workers remain stable and precached for offline/browser verification.
 - High-impact lazy-init candidates are `notes.js`, `pdf.js`, `player.js`, `canvas.js`, and progress charts.
 - Known hotspots are tracked in `docs/roadmap.md`.
 

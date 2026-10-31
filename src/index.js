@@ -32,8 +32,8 @@ import { stagger } from './lib/stagger.js';
 import { Timeline } from './lib/timeline.js';
 import { normalizeTimeIntervals, updateTimeIntervals } from './lib/timeRange.js';
 import { VirtualList } from './lib/virtualScroll.js';
-import { runInWorker, terminateAll, getWorkerStatus } from './lib/workerPool.js';
 import { workerAssets } from './core/workerAssets.js';
+import { createLazyWorkerPool } from './core/lazyWorkerPool.js';
 import { buildUserThemeVars } from './core/themeBuilder.js';
 import * as locale from './core/locale.js';
 import enUS from './locales/en-US.js';
@@ -65,7 +65,18 @@ pd.stagger = stagger;
 pd.Timeline = Timeline;
 pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
 pd.VirtualList = VirtualList;
-pd.WorkerPool = { runInWorker, terminateAll, getWorkerStatus };
+// Preserve the public synchronous WorkerPool namespace, but defer the worker
+// pool's scheduling machinery until a feature makes a real worker request.
+const lazyWorkerPool = createLazyWorkerPool({
+  load: async () => {
+    const workerPool = await import('./lib/workerPool.js');
+    // Direct imports self-register. Restore the stable public facade after
+    // loading for callers who captured it before the dynamic import.
+    pd.WorkerPool = lazyWorkerPool;
+    return workerPool;
+  },
+});
+pd.WorkerPool = lazyWorkerPool;
 pd.ThemeBuilder = { buildUserThemeVars };
 pd.locale = { ...locale, messages: { 'en-US': enUS, 'fa-IR': faIR } };
 locale.locale('en-US', enUS);

@@ -35,7 +35,6 @@ describe('runtime wiring', () => {
     './core/productReadiness.js',
     './core/themeBuilder.js',
     './core/locale.js',
-    './lib/workerPool.js',
     './lib/virtualScroll.js',
     './lib/timeline.js',
     './lib/timeRange.js',
@@ -108,6 +107,7 @@ describe('runtime wiring', () => {
     const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'utf8');
     const assetSource = fs.readFileSync(path.join(root, 'src/core/workerAssets.js'), 'utf8');
 
+    expect(indexSource).not.toContain("from './lib/workerPool.js'");
     expect(indexSource).toContain("import { workerAssets } from './core/workerAssets.js'");
     expect(indexSource).toContain('pd.workers = workerAssets');
     expect(poolSource).toContain("import { workerAssets } from '../core/workerAssets.js'");
