@@ -573,6 +573,11 @@ let studioKeyController = null;
                 <span class="text-sm"><strong>${esc(card.front)}</strong> · ${esc(card.deck)}</span>
                 <span class="button-row">
                   <button class="btn btn-ghost btn-sm" type="button" data-fc-edit="${esc(card.id)}">Edit</button>
+                  ${(!card.scheduler || card.scheduler === 'sm2-v1')
+                    ? `<button class="btn btn-ghost btn-sm" type="button" data-fc-migrate="${esc(card.id)}">Try FSRS</button>`
+                    : card.scheduler === 'fsrs-v5' && card.fsrsMigration?.legacyCard
+                      ? `<button class="btn btn-ghost btn-sm" type="button" data-fc-rollback="${esc(card.id)}">Restore SM-2</button>`
+                      : ''}
                   <button class="btn btn-danger-ghost btn-sm" type="button" data-fc-delete="${esc(card.id)}">Delete</button>
                 </span>
               </div>`).join('') : '<p class="text-muted">No saved cards yet.</p>'}
@@ -660,6 +665,51 @@ let studioKeyController = null;
     container.querySelector('#fc-manage-cards')?.addEventListener('click', async (event) => {
       const edit = event.target.closest('[data-fc-edit]');
       const remove = event.target.closest('[data-fc-delete]');
+      const migrate = event.target.closest('[data-fc-migrate]');
+      const rollback = event.target.closest('[data-fc-rollback]');
+      if (migrate || rollback) {
+        const action = migrate || rollback;
+        const cardId = migrate ? migrate.dataset.fcMigrate : rollback.dataset.fcRollback;
+        if (action.disabled) return;
+        action.disabled = true;
+        let saved = false;
+        try {
+          const card = cards.find(record => record.id === cardId);
+          if (!card) throw new Error('Flashcard not found');
+          let title, message, confirmLabel;
+          if (migrate) {
+            const preview = await manager.previewCardFsrsMigration(cardId);
+            title = 'Start a new FSRS schedule?';
+            confirmLabel = 'Start FSRS';
+            message = 'Current SM-2 due date: ' + (preview.originalDue || 'Not scheduled')
+              + '.\nNew FSRS due time: ' + preview.proposedDue + '.\n'
+              + 'FSRS starts fresh without inferred review history. Your original SM-2 '
+              + 'card and date are archived for rollback.';
+          } else {
+            title = 'Restore original SM-2 schedule?';
+            confirmLabel = 'Restore SM-2';
+            message = 'Restore the exact card and due date recorded before switching to FSRS? '
+              + 'FSRS reviews and edits made after conversion will no longer be active.';
+          }
+          const confirmed = window.OpenCourseDeck?.UI?.confirm
+            ? await window.OpenCourseDeck.UI.confirm({
+              title, message, confirmLabel, cancelLabel: 'Keep current schedule',
+            })
+            : window.confirm(message);
+          if (!confirmed) return;
+          if (migrate) await manager.migrateCardToFsrs(cardId, { consent: true });
+          else await manager.rollbackCardToSm2(cardId, { consent: true });
+          saved = true;
+          await renderStudio(container);
+          announce(migrate ? 'FSRS started. Original SM-2 schedule archived.'
+            : 'Original SM-2 schedule restored.');
+        } catch (error) {
+          announce('Could not change scheduler: ' + (error?.message || 'Please try again.'));
+        } finally {
+          if (!saved) action.disabled = false;
+        }
+        return;
+      }
       if (edit) {
         const card = cards.find(record => record.id === edit.dataset.fcEdit);
         if (!card || !newForm) return;
@@ -751,6 +801,9 @@ let studioKeyController = null;
     addCard: (data) => manager.addCard(data),
     reviewCard: (id, grade) => manager.reviewCard(id, grade),
     updateCard: (id, fields) => manager.updateCard(id, fields),
+    previewCardFsrsMigration: (id) => manager.previewCardFsrsMigration(id),
+    migrateCardToFsrs: (id, options) => manager.migrateCardToFsrs(id, options),
+    rollbackCardToSm2: (id, options) => manager.rollbackCardToSm2(id, options),
     getDueCards: (deck) => manager.getDueCards(deck),
     deleteCard: (id) => manager.deleteCard(id),
     invalidateCache: () => manager.invalidateCache(),
