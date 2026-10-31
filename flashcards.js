@@ -55,6 +55,21 @@ let studioKeyController = null;
   class FlashcardDeckManager {
     constructor() {
       this.cards = [];
+      this._mutationTail = Promise.resolve();
+    }
+
+    /**
+     * Canonical deck writes must behave as one read-modify-write transaction
+     * from this manager. Reading before the previous storage receipt allows a
+     * second add/review/import to persist an obsolete snapshot over it.
+     *
+     * Keep the original rejection for its caller, but settle the internal
+     * tail so a failed IndexedDB write never poisons subsequent operations.
+     */
+    _enqueueMutation(operation) {
+      const result = this._mutationTail.then(operation);
+      this._mutationTail = result.then(() => {}, () => {});
+      return result;
     }
 
     getStorage() {
@@ -162,7 +177,11 @@ let studioKeyController = null;
       return this.getStorage();
     }
 
-    async addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
+    addCard(data) {
+      return this._enqueueMutation(() => this._addCard(data));
+    }
+
+    async _addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
       if (!front || !back) throw new Error('Front and back text are required');
       const cards = [...await this.getCards()];
       const newCard = {
@@ -182,7 +201,11 @@ let studioKeyController = null;
       return newCard;
     }
 
-    async reviewCard(cardId, grade) {
+    reviewCard(cardId, grade) {
+      return this._enqueueMutation(() => this._reviewCard(cardId, grade));
+    }
+
+    async _reviewCard(cardId, grade) {
       const cards = [...await this.getCards()];
       const index = cards.findIndex(c => c.id === cardId);
       if (index === -1) throw new Error('Flashcard not found');
@@ -201,7 +224,11 @@ let studioKeyController = null;
       return updatedCard;
     }
 
-    async updateCard(cardId, { front, back, deck } = {}) {
+    updateCard(cardId, changes) {
+      return this._enqueueMutation(() => this._updateCard(cardId, changes));
+    }
+
+    async _updateCard(cardId, { front, back, deck } = {}) {
       const cards = [...await this.getCards()];
       const index = cards.findIndex(card => card.id === cardId);
       if (index < 0) throw new Error('Flashcard not found');
@@ -230,14 +257,22 @@ let studioKeyController = null;
       });
     }
 
-    async deleteCard(cardId) {
+    deleteCard(cardId) {
+      return this._enqueueMutation(() => this._deleteCard(cardId));
+    }
+
+    async _deleteCard(cardId) {
       let cards = [...await this.getCards()];
       cards = cards.filter(c => c.id !== cardId);
       await this.saveStorage(cards);
       return true;
     }
 
-    async importAnkiDeck(ankiData) {
+    importAnkiDeck(ankiData) {
+      return this._enqueueMutation(() => this._importAnkiDeck(ankiData));
+    }
+
+    async _importAnkiDeck(ankiData) {
       if (!ankiData) throw new Error('Invalid Anki data');
       const deckName = String(ankiData.name || ankiData.deck || 'Imported Anki Deck').trim()
         || 'Imported Anki Deck';
