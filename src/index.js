@@ -43,6 +43,7 @@ import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
 import { initAddContent } from './features/addContent.js';
 import { runIndependentInitializers } from './core/deferredRuntime.js';
+import { createLazyTranslationTools } from './core/lazyTranslationTools.js';
 
 installBridgeHardening(window);
 installAuxiliaryDbLifecycle(window);
@@ -76,6 +77,12 @@ pd.workers = workerAssets;
 // transient IndexedDB failures through withMutationRetry; this namespace
 // exposes the same machinery (plus the quota-eviction hook) to features.
 pd.mutationRetry = { withMutationRetry, isRetryableMutationError, computeBackoffDelay, configureMutationRetry };
+
+pd.loadTranslationTools = createLazyTranslationTools({
+  target: pd,
+  loadTranslator: () => import('./features/translator.js'),
+  loadCache: () => import('./features/translationCache.js'),
+});
 
 const featureLoaders = {
   player: async () => {
@@ -203,39 +210,16 @@ function initServiceWorker() {
 initServiceWorker();
 pd.ProductReadiness = enforceProductReadiness(document);
 
-// The app shell is the only hard dependency. Optional utilities are isolated:
-// a broken translation provider must not prevent the command palette or
-// user-library actions from starting. Add Content runs first because the
-// palette exposes commands that call its namespace.
+// The app shell is the only hard dependency. Optional active utilities run
+// independently. Translation providers/cache are dormant until an explicit
+// loadTranslationTools() request, rather than importing alongside normal
+// navigation. Add Content runs first because the command palette needs it.
 import('../app.js').then(async () => {
   await runIndependentInitializers([
     { name: 'add-content', run: () => initAddContent(window) },
   ]);
 
   await runIndependentInitializers([
-    {
-      name: 'translator',
-      run: async () => {
-        const translator = await import('./features/translator.js');
-        Object.assign(pd, {
-          TranslatorRegistry: translator.TranslatorRegistry,
-          BaseTranslator: translator.BaseTranslator,
-          OpenAITranslator: translator.OpenAITranslator,
-          CustomAPITranslator: translator.CustomAPITranslator,
-          GoogleTranslator: translator.GoogleTranslator,
-          LANGUAGES: translator.LANGUAGES,
-          getLanguageName: translator.getLanguageName,
-        });
-      },
-    },
-    {
-      name: 'translation-cache',
-      run: async () => {
-        const translationCache = await import('./features/translationCache.js');
-        const cacheApi = translationCache.translationCache || translationCache;
-        Object.assign(pd, { TranslationCache: cacheApi });
-      },
-    },
     {
       name: 'note-templates',
       run: async () => {
