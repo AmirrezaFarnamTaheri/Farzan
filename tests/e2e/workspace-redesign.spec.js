@@ -707,4 +707,72 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
 
+
+  test('runs real Konva draft editing and undo in Chrome without touching the Studio board', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    await page.waitForFunction(() => typeof window.OpenCourseDeck?.Canvas?.loadState === 'function'
+      && typeof window.DB?.saveSetting === 'function');
+    await page.evaluate(async () => {
+      await window.DB.saveSetting('ocd_studio_konva_draft', null);
+      window.OpenCourseDeck.Canvas.loadState({
+        version: 1, tool: 'select',
+        viewport: { offsetX: 0, offsetY: 0, zoom: 1, rotation: 0 },
+        grid: { enabled: false, size: 24, snap: false },
+        layers: [{
+          id: 'layer-1', name: 'Test', visible: true, locked: false, opacity: 1,
+          elements: [{
+            id: 'shape-1', type: 'rect', x: 20, y: 30,
+            width: 120, height: 80, fill: '#e11d48', stroke: '#ffffff', strokeWidth: 2,
+          }],
+        }],
+      });
+    });
+    await page.locator('[data-studio-more-tools] > summary').click();
+    await page.locator('[data-studio-konva-open]').click();
+    const dialog = page.locator('[data-studio-konva-dialog]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('not applied to your Studio board');
+    await expect(page.locator('[data-studio-konva-stage] .konvajs-content canvas').first()).toBeVisible();
+
+    await page.locator('[data-studio-konva-object]').selectOption('shape-1');
+    await page.locator('[data-studio-konva-nudge="right"]').click();
+    const draftX = () => page.evaluate(async () =>
+      (await window.DB.getSetting('ocd_studio_konva_draft'))?.layers?.[0]?.elements?.[0]?.x);
+    await expect.poll(draftX).toBe(30);
+    expect(await page.evaluate(() =>
+      window.OpenCourseDeck.Canvas.serialize().layers[0].elements[0].x)).toBe(20);
+
+    await page.locator('[data-studio-konva-undo]').click();
+    await expect.poll(draftX).toBe(20);
+    await page.locator('[data-studio-konva-redo]').click();
+    await expect.poll(draftX).toBe(30);
+
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+    await page.locator('[data-studio-konva-open]').click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('Experimental Konva draft editor');
+    await expect.poll(draftX).toBe(30);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+  });
+
+  test('keeps the opt-in Konva draft modal operable at phone width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-studio')).toBeVisible();
+    await page.locator('[data-studio-more-tools] > summary').click();
+    await page.locator('[data-studio-konva-open]').click();
+    const dialog = page.locator('[data-studio-konva-dialog]');
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('[data-studio-konva-close]')).toBeVisible();
+    await expect(page.locator('[data-studio-konva-stage] .konvajs-content')).toBeVisible();
+    const bounds = await dialog.boundingBox();
+    expect(bounds.width).toBeLessThanOrEqual(390);
+    await page.locator('[data-studio-konva-close]').click();
+    await expect(dialog).toBeHidden();
+  });
+
 });
