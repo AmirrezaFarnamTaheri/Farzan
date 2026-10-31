@@ -146,11 +146,10 @@ describe('explicit and reversible SM-2 to FSRS scheduling migration', () => {
     action.click();
     await vi.waitFor(() => expect(canonical[0].scheduler).toBe('fsrs-v5'));
     expect(confirm.mock.calls[1][0].message).toContain('2027-03-09');
-    const rollback = root.querySelector('[data-fc-rollback]');
-    // The post-write re-render replaces all managed rows; refresh the query.
-    const activeRollback = rollback || root.querySelector('[data-fc-rollback]');
-    expect(activeRollback?.dataset.fcRollback).toBe(id);
-    activeRollback.click();
+    // Wait for the completed re-render rather than racing the storage receipt.
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-fc-rollback]')?.dataset.fcRollback).toBe(id));
+    root.querySelector('[data-fc-rollback]').click();
     await vi.waitFor(() => expect(canonical[0].scheduler).toBeUndefined());
     expect(confirm).toHaveBeenCalledTimes(3);
   });
