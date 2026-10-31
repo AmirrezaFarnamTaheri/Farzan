@@ -64,6 +64,80 @@ describe('Courses workbench progress and accessible row actions', () => {
     vi.restoreAllMocks();
   });
 
+  it('lets a playing lesson enter and leave theater without remounting media or writing progress', async () => {
+    const player = {
+      queue: [], trackIndex: 0, currentTime: 78, duration: 240,
+      loadPlaylist: vi.fn(), pause: vi.fn(), on: vi.fn(), off: vi.fn(),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    const theater = document.querySelector('[data-course-theater]');
+    expect(theater).not.toBeNull();
+    expect(theater.tagName).toBe('BUTTON');
+    expect(theater.getAttribute('aria-pressed')).toBe('false');
+    expect(theater.getAttribute('aria-controls')).toBe('course-player');
+    theater.click();
+    expect(document.querySelector('.courses-shell').dataset.theater).not.toBe('true');
+
+    const video = await vi.waitFor(() => {
+      const el = document.querySelector('[data-topic-id="anemia"] [data-action="play-video"]');
+      expect(el).not.toBeNull();
+      return el;
+    });
+    video.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-course-playback]').hidden).toBe(false));
+    await vi.waitFor(() => expect(player.loadPlaylist).toHaveBeenCalledOnce());
+
+    const mediaRoot = document.getElementById('course-player');
+    const timeBefore = player.currentTime;
+    const savesBefore = window.DB.saveProgress.mock.calls.length;
+    theater.click();
+    expect(document.querySelector('.courses-shell').dataset.theater).toBe('true');
+    expect(theater.getAttribute('aria-pressed')).toBe('true');
+    expect(theater.textContent).toMatch(/exit|leave|normal/i);
+    expect(document.getElementById('course-player')).toBe(mediaRoot);
+    expect(mediaRoot._pdPlayer).toBe(player);
+    expect(player.currentTime).toBe(timeBefore);
+    expect(window.DB.saveProgress.mock.calls.length).toBe(savesBefore);
+    theater.click();
+    expect(document.querySelector('.courses-shell').dataset.theater).toBe('false');
+    expect(theater.getAttribute('aria-pressed')).toBe('false');
+    expect(player.loadPlaylist).toHaveBeenCalledTimes(1);
+    controller.unmount();
+  });
+
+  it('resets theater state on closing playback and allows a normal reopen', async () => {
+    const player = {
+      queue: [], trackIndex: 0, currentTime: 15,
+      loadPlaylist: vi.fn(), pause: vi.fn(), on: vi.fn(), off: vi.fn(),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    const video = await vi.waitFor(() => {
+      const row = document.querySelector('[data-topic-id="anemia"] [data-action="play-video"]');
+      expect(row).not.toBeNull();
+      return row;
+    });
+    video.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-course-playback]').hidden).toBe(false));
+    const theater = document.querySelector('[data-course-theater]');
+    theater.click();
+    document.querySelector('[data-course-close-playback]').click();
+    expect(document.querySelector('[data-course-playback]').hidden).toBe(true);
+    expect(document.querySelector('.courses-shell').dataset.theater).toBe('false');
+    expect(theater.getAttribute('aria-pressed')).toBe('false');
+    expect(player.pause).toHaveBeenCalledOnce();
+
+    video.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-course-playback]').hidden).toBe(false));
+    expect(theater.getAttribute('aria-pressed')).toBe('false');
+    controller.unmount();
+  });
+
   it('loads one authoritative progress snapshot instead of a read per topic', async () => {
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
