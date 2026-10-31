@@ -55,6 +55,21 @@ let studioKeyController = null;
   class FlashcardDeckManager {
     constructor() {
       this.cards = [];
+      this._mutationTail = Promise.resolve();
+    }
+
+    /**
+     * Canonical deck writes must behave as one read-modify-write transaction
+     * from this manager. Reading before the previous storage receipt allows a
+     * second add/review/import to persist an obsolete snapshot over it.
+     *
+     * Keep the original rejection for its caller, but settle the internal
+     * tail so a failed IndexedDB write never poisons subsequent operations.
+     */
+    _enqueueMutation(operation) {
+      const result = this._mutationTail.then(operation);
+      this._mutationTail = result.then(() => {}, () => {});
+      return result;
     }
 
     getStorage() {
@@ -162,7 +177,11 @@ let studioKeyController = null;
       return this.getStorage();
     }
 
-    async addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
+    addCard(data) {
+      return this._enqueueMutation(() => this._addCard(data));
+    }
+
+    async _addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
       if (!front || !back) throw new Error('Front and back text are required');
       const cards = [...await this.getCards()];
       const newCard = {
@@ -182,7 +201,11 @@ let studioKeyController = null;
       return newCard;
     }
 
-    async reviewCard(cardId, grade) {
+    reviewCard(cardId, grade) {
+      return this._enqueueMutation(() => this._reviewCard(cardId, grade));
+    }
+
+    async _reviewCard(cardId, grade) {
       const cards = [...await this.getCards()];
       const index = cards.findIndex(c => c.id === cardId);
       if (index === -1) throw new Error('Flashcard not found');
@@ -201,7 +224,11 @@ let studioKeyController = null;
       return updatedCard;
     }
 
-    async updateCard(cardId, { front, back, deck } = {}) {
+    updateCard(cardId, changes) {
+      return this._enqueueMutation(() => this._updateCard(cardId, changes));
+    }
+
+    async _updateCard(cardId, { front, back, deck } = {}) {
       const cards = [...await this.getCards()];
       const index = cards.findIndex(card => card.id === cardId);
       if (index < 0) throw new Error('Flashcard not found');
@@ -230,14 +257,22 @@ let studioKeyController = null;
       });
     }
 
-    async deleteCard(cardId) {
+    deleteCard(cardId) {
+      return this._enqueueMutation(() => this._deleteCard(cardId));
+    }
+
+    async _deleteCard(cardId) {
       let cards = [...await this.getCards()];
       cards = cards.filter(c => c.id !== cardId);
       await this.saveStorage(cards);
       return true;
     }
 
-    async importAnkiDeck(ankiData) {
+    importAnkiDeck(ankiData) {
+      return this._enqueueMutation(() => this._importAnkiDeck(ankiData));
+    }
+
+    async _importAnkiDeck(ankiData) {
       if (!ankiData) throw new Error('Invalid Anki data');
       const deckName = String(ankiData.name || ankiData.deck || 'Imported Anki Deck').trim()
         || 'Imported Anki Deck';
@@ -328,7 +363,8 @@ let studioKeyController = null;
             <h2 class="fc-empty-title">${cards.length ? 'All due cards reviewed' : 'No cards yet'}</h2>
             <p class="fc-sub">${cards.length
               ? 'Nice work. Check back tomorrow for your next memory review cycle.'
-              : 'Create your first card and OpenCourseDeck will schedule reviews for you with SM-2.'}</p>
+              : 'Make a question-and-answer card to begin reviewing at your own pace.'}</p>
+            ${cards.length ? '' : '<button id="fc-empty-create" class="btn btn-primary" type="button">Create your first card</button>'}
           </div>
         ` : `
           <div class="fc-progress-line">Card 1 of ${dueCards.length} · ${esc(due.deck)}</div>
@@ -346,14 +382,14 @@ let studioKeyController = null;
         `;
 
     container.innerHTML = `
-      <section class="view view-flashcards fc-wrap">
+      <section class="view view-flashcards fc-wrap" data-first-use="${cards.length === 0}">
         <header class="page-header fc-header">
           <div>
             <span class="eyebrow">Spaced repetition</span>
             <h1 class="page-title fc-title">Flashcards</h1>
             <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
           </div>
-          <button id="fc-add-btn" class="btn btn-primary" type="button">
+          <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '': 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New card
           </button>
@@ -378,16 +414,16 @@ let studioKeyController = null;
           </div>
         </form>
 
-        <div class="fc-stats">
+        ${cards.length ? `<div class="fc-stats">
           <div class="fc-stat"><span class="fc-stat-label">Total cards</span><span class="fc-stat-value">${cards.length}</span></div>
           <div class="fc-stat fc-stat-accent"><span class="fc-stat-label">Due today</span><span class="fc-stat-value">${dueCards.length}</span></div>
           <div class="fc-stat"><span class="fc-stat-label">Decks</span><span class="fc-stat-value">${decks.length}</span></div>
-        </div>
+        </div>` : ''}
 
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
-        <details class="card card-filled" id="fc-manage-cards">
+        <details class="card card-filled" id="fc-manage-cards" ${cards.length ? '': 'hidden'}>
           <summary class="btn btn-ghost">Manage saved cards (${cards.length})</summary>
           <div class="card-body" style="display:grid;gap:10px;max-height:360px;overflow-y:auto;">
             ${cards.length ? cards.map(card => `
@@ -414,12 +450,33 @@ let studioKeyController = null;
         gradeRow.hidden = false;
       });
 
-      gradeRow.querySelectorAll('button[data-grade]').forEach((btn) => {
+      const gradeButtons = [...gradeRow.querySelectorAll('button[data-grade]')];
+      let ratingPending = false;
+      gradeButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
+          // A rapid second click must not grade the same visible card again.
+          // Only the canonical storage receipt can confirm a review.
+          if (ratingPending || !dueCards.length) return;
+          ratingPending = true;
+          gradeButtons.forEach(button => { button.disabled = true; });
           const grade = parseInt(btn.getAttribute('data-grade'), 10);
-          if (dueCards.length > 0) {
+          try {
             await manager.reviewCard(dueCards[0].id, grade);
-            renderStudio(container);
+          } catch (error) {
+            ratingPending = false;
+            gradeButtons.forEach(button => { button.disabled = false; });
+            announce('Could not save review: ' + (error?.message || 'Please try again.'));
+            return;
+          }
+
+          announce('Card rated: ' + (btn.firstChild?.textContent?.trim() || btn.textContent.trim()));
+          try {
+            await renderStudio(container);
+          } catch (error) {
+            // The rating is saved; do not re-enable stale buttons that could
+            // repeat it if a subsequent view refresh encounters a read error.
+            announce('Review saved, but the view could not refresh: '
+              + (error?.message || 'Open Flashcards again to reload.'));
           }
         });
       });
@@ -449,12 +506,13 @@ let studioKeyController = null;
         const btn = gradeRowLive.querySelector('button[data-grade="' + event.key + '"]');
         if (!btn) return;
         event.preventDefault();
-        announce('Card rated: ' + btn.textContent.replace(/\s*\(\d\)\s*/, ' ').trim());
+        // The click handler announces only after the canonical write settles.
         btn.click();
       }
     }, { signal: studioKeyController.signal });
 
     const addBtn = container.querySelector('#fc-add-btn');
+    container.querySelector('#fc-empty-create')?.addEventListener('click', () => addBtn?.click());
     const newForm = container.querySelector('#fc-new-form');
     let editingCardId = null;
     container.querySelector('#fc-manage-cards')?.addEventListener('click', async (event) => {
@@ -507,7 +565,7 @@ let studioKeyController = null;
         editingCardId = null;
         newForm.hidden = true;
         announce('Card creation cancelled.');
-        addBtn.focus();
+        (addBtn.hidden ? container.querySelector('#fc-empty-create') : addBtn)?.focus();
       });
       newForm.addEventListener('submit', async (event) => {
         event.preventDefault();
