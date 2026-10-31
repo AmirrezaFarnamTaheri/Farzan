@@ -92,6 +92,24 @@ describe('app topbar search rendering', () => {
     expect(search.resultsBox.textContent).not.toContain('Biology basics');
   });
 
+  it('does not render a completed request when the input changed during debounce', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let resolveSearch;
+    search._queryUniversal = vi.fn(() => new Promise(resolve => { resolveSearch = resolve; }));
+
+    input.value = 'chemistry';
+    const pending = search._onInput('chemistry');
+    // A new input event has been typed, but the 300ms debounce has not yet
+    // invoked _onInput for the new text. The old result must not appear.
+    input.value = 'chemistry notes';
+
+    resolveSearch([{ label: 'Chemistry course', category: 'Course' }]);
+    await pending;
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('Chemistry course');
+  });
+
   it('does not reopen stale search results after clearing the input', async () => {
     const search = window.OpenCourseDeck.TopbarSearch;
     const input = document.querySelector('[data-search-input]');
