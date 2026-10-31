@@ -114,20 +114,25 @@ describe('Squire HTML-canonical edit adapter', () => {
       paragraph.append(document.createTextNode(' و یادداشت تازه'));
       expect(instance.syncChanges()).toBe(true);
       const html = instance.getHTML();
-      // Temporary diagnostics for the confirmed legacy-format fidelity failure.
-      console.info('[Squire fidelity probe]', JSON.stringify({
-        source: original, liveDom: element.querySelector('.notes-modern-editor')?.innerHTML, serialized: html,
-      }));
       expect(onUpdate).toHaveBeenCalledWith(html);
       const inert = document.createElement('template');
       inert.innerHTML = html;
       const block = inert.content.querySelector('p[dir="rtl"]');
       expect(block).not.toBeNull();
       expect(block.style.textAlign).toBe('right');
-      const styled = [...block.querySelectorAll('span')].find(node => node.textContent.includes('عنوان فارسی'));
-      expect(styled).toBeDefined();
-      expect(styled.style.fontSize).toBe('18px');
-      expect(styled.style.color).toBe('rgb(255, 0, 0)');
+      // Squire may split one styled span into nested color/size wrappers.
+      // Check the effective inherited styling of the text, not wrapper shape.
+      const candidates = [...block.querySelectorAll('span')]
+        .filter(node => node.textContent.includes('عنوان فارسی'));
+      const leaf = candidates.find(node => !candidates.some(other => other !== node && node.contains(other)));
+      expect(leaf).toBeDefined();
+      const effective = { fontSize: '', color: '' };
+      for (let node = leaf; node; node = node.parentElement) {
+        effective.fontSize ||= node.style?.fontSize || '';
+        effective.color ||= node.style?.color || '';
+      }
+      expect(effective.fontSize).toBe('18px');
+      expect(effective.color).toBe('rgb(255, 0, 0)');
       expect(block.textContent).toContain('یادداشت تازه');
     } finally { instance.destroy(); }
   });
