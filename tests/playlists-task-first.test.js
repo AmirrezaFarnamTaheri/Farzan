@@ -86,4 +86,15 @@ describe('Playlists task-first organization', () => {
     expect(document.querySelector('[data-playlists-error]')).toBeNull();
   });
 
+
+  it('does not repeat a single active-queue count as a prominent metric', async () => {
+    const player = document.createElement('div');
+    player.dataset.player = '';
+    player._pdPlayer = { queue: [{ title: 'Current lecture', src: 'https://example.test/a.mp4' }] };
+    document.body.appendChild(player);
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlist-id="active-queue"]')).not.toBeNull());
+    expect(document.querySelector('[data-playlist-metrics]').hidden).toBe(true);
+  });
+
 });
