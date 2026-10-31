@@ -761,7 +761,7 @@ const ProgressStats = (() => {
             return;
           }
             try {
-              await DB.saveProgress(p.topicId, p.courseId, p);
+              _requireAcknowledgedWrite(await DB.saveProgress(p.topicId, p.courseId, p), 'progress');
               result.progress += 1;
             } catch (err) {
               _recordImportError(result, 'progress', p.topicId, err);
@@ -796,7 +796,8 @@ const ProgressStats = (() => {
               return;
             }
               try {
-                await DB.saveNote?.(note);
+                if (typeof DB.saveNote !== 'function') throw new Error('Notes storage is unavailable');
+                _requireAcknowledgedWrite(await DB.saveNote(note), 'notes');
                 result.notes += 1;
               } catch (err) {
                 _recordImportError(result, 'notes', note.id, err);
@@ -809,7 +810,7 @@ const ProgressStats = (() => {
         if (folderRecords.length && DB.saveFolder) {
           await _forEachChunk(folderRecords, async (folder) => {
             try {
-              await DB.saveFolder(folder);
+              _requireAcknowledgedWrite(await DB.saveFolder(folder), 'folders');
               result.folders += 1;
             } catch (err) {
               _recordImportError(result, 'folders', folder.id, err);
@@ -820,7 +821,7 @@ const ProgressStats = (() => {
         }
         if (payload.settings?.notes && DB.saveSetting) {
             try {
-              await DB.saveSetting('ocd_notes_settings', payload.settings.notes);
+              _requireAcknowledgedWrite(await DB.saveSetting('ocd_notes_settings', payload.settings.notes), 'ocd_notes_settings');
               result.settings += 1;
             } catch (err) {
               _recordImportError(result, 'settings', 'ocd_notes_settings', err);
@@ -830,7 +831,7 @@ const ProgressStats = (() => {
         }
         if (Array.isArray(payload.settings?.playlists) && DB.saveSetting) {
             try {
-              await DB.saveSetting('ocd_playlists', payload.settings.playlists);
+              _requireAcknowledgedWrite(await DB.saveSetting('ocd_playlists', payload.settings.playlists), 'ocd_playlists');
               result.settings += 1;
             } catch (err) {
               _recordImportError(result, 'settings', 'ocd_playlists', err);
@@ -840,7 +841,7 @@ const ProgressStats = (() => {
         }
         if (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) && DB.saveSetting) {
             try {
-              await DB.saveSetting('ocd_studio_board', payload.settings.studio);
+              _requireAcknowledgedWrite(await DB.saveSetting('ocd_studio_board', payload.settings.studio), 'ocd_studio_board');
               // The mounted canvas may be holding a stale in-memory board over
               // the one just written; reload it the way the flashcards cache is
               // dropped after a restore. restoreBoard() also cancels a pending
@@ -856,7 +857,7 @@ const ProgressStats = (() => {
         }
         if (Array.isArray(payload.settings?.flashcards) && DB.saveSetting) {
             try {
-              await DB.saveSetting('ocd_flashcards', payload.settings.flashcards);
+              _requireAcknowledgedWrite(await DB.saveSetting('ocd_flashcards', payload.settings.flashcards), 'ocd_flashcards');
               try { window.localStorage?.setItem?.('ocd_flashcards', JSON.stringify(payload.settings.flashcards)); } catch {}
               // The deck manager caches an already-hydrated deck in memory;
               // drop that cache so the restored deck is served next time.
@@ -870,7 +871,7 @@ const ProgressStats = (() => {
         }
         if (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) && DB.saveSetting) {
             try {
-              await DB.saveSetting('ocd_user_library', payload.settings.library);
+              _requireAcknowledgedWrite(await DB.saveSetting('ocd_user_library', payload.settings.library), 'ocd_user_library');
               try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
               result.settings += 1;
             } catch (err) {
@@ -881,7 +882,7 @@ const ProgressStats = (() => {
         }
         if (Array.isArray(payload.settings?.myCourses) && DB.saveSetting) {
           try {
-            await DB.saveSetting('ocd_my_courses', payload.settings.myCourses);
+            _requireAcknowledgedWrite(await DB.saveSetting('ocd_my_courses', payload.settings.myCourses), 'ocd_my_courses');
             result.settings += 1;
           } catch (err) {
             _recordImportError(result, 'settings', 'ocd_my_courses', err);
@@ -892,7 +893,7 @@ const ProgressStats = (() => {
         if (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object'
           && !Array.isArray(payload.settings.mediaCues) && DB.saveSetting) {
           try {
-            await DB.saveSetting('ocd_course_media_cues', payload.settings.mediaCues);
+            _requireAcknowledgedWrite(await DB.saveSetting('ocd_course_media_cues', payload.settings.mediaCues), 'ocd_course_media_cues');
             result.settings += 1;
           } catch (err) {
             _recordImportError(result, 'settings', 'ocd_course_media_cues', err);
@@ -918,6 +919,7 @@ const ProgressStats = (() => {
               acc[page].push(annotation);
               return acc;
             }, {});
+            let acceptedForDoc = 0;
             for (const [page, annotations] of Object.entries(annotationsByPage)) {
               for (const annotation of annotations) {
                 if (!_shouldImportRecord(existingById[annotation.id], annotation)) {
@@ -927,11 +929,12 @@ const ProgressStats = (() => {
                 const pageKey = String(page);
                 mergedByPage[pageKey] = (mergedByPage[pageKey] ?? []).filter((item) => item.id !== annotation.id);
                 mergedByPage[pageKey].push(annotation);
-                result.annotations += 1;
+                acceptedForDoc += 1;
               }
             }
             try {
-              await DB.saveAnnotations(docId, mergedByPage);
+              _requireAcknowledgedWrite(await DB.saveAnnotations(docId, mergedByPage), 'annotations');
+              result.annotations += acceptedForDoc;
             } catch (err) {
               _recordImportError(result, 'annotations', docId, err);
             }
@@ -942,7 +945,7 @@ const ProgressStats = (() => {
         if (timestampRecords.length) {
           await _forEachChunk(timestampRecords, async (ts) => {
             try {
-              await DB.saveTimestamp(ts);
+              _requireAcknowledgedWrite(await DB.saveTimestamp(ts), 'timestamps');
               result.timestamps += 1;
             } catch (err) {
               _recordImportError(result, 'timestamps', ts.id, err);
@@ -1200,6 +1203,15 @@ const ProgressStats = (() => {
     return !existing || _recordTime(incoming) >= _recordTime(existing);
   }
 
+  // Canonical writers may reject a mutation with an explicit false receipt.
+  // Promise fulfillment is NOT evidence of persistence in that case.
+  function _requireAcknowledgedWrite(receipt, domain) {
+    if (receipt === false) {
+      throw new Error(`${domain} write was not acknowledged by canonical storage`);
+    }
+    return receipt;
+  }
+
   function _recordImportError(result, store, id, err) {
     result.skipped += 1;
     result.errors.push({
@@ -1268,15 +1280,21 @@ const ProgressStats = (() => {
         // That scope also contains watched segments and PDF bookmarks, which
         // the legacy import snapshot does not include.
         if (typeof DB.clearUserData !== 'function') throw new Error('Safe rollback requires storage deletion support');
-        await DB.clearUserData('progress');
-        await DB.clearUserData('notes');
-        await DB.clearUserData('playlists');
-        await DB.clearUserData('studio');
-        await _forEachChunk(snapshot.progress, (record) => DB.saveProgress(record.topicId, record.courseId, record));
-        await _forEachChunk(snapshot.notes, (record) => DB.saveNote(record));
-        await _forEachChunk(snapshot.folders, (record) => DB.saveFolder(record));
+        _requireAcknowledgedWrite(await DB.clearUserData('progress'), 'rollback progress cleanup');
+        _requireAcknowledgedWrite(await DB.clearUserData('notes'), 'rollback notes cleanup');
+        _requireAcknowledgedWrite(await DB.clearUserData('playlists'), 'rollback playlists cleanup');
+        _requireAcknowledgedWrite(await DB.clearUserData('studio'), 'rollback Studio cleanup');
+        await _forEachChunk(snapshot.progress, async record => {
+          _requireAcknowledgedWrite(await DB.saveProgress(record.topicId, record.courseId, record), 'rollback progress');
+        });
+        await _forEachChunk(snapshot.notes, async record => {
+          _requireAcknowledgedWrite(await DB.saveNote(record), 'rollback notes');
+        });
+        await _forEachChunk(snapshot.folders, async record => {
+          _requireAcknowledgedWrite(await DB.saveFolder(record), 'rollback folders');
+        });
         for (const [key, value] of Object.entries(snapshot.settings)) {
-          if (value !== undefined) await DB.saveSetting(key, value);
+          if (value !== undefined) _requireAcknowledgedWrite(await DB.saveSetting(key, value), `rollback ${key}`);
         }
         const allDocs = new Set([...annotationDocIds, ...snapshot.annotations.map(a => String(a.docId ?? 'global'))]);
         for (const docId of allDocs) {
@@ -1286,18 +1304,18 @@ const ProgressStats = (() => {
             (pages[page] ??= []).push(ann);
           }
           if (typeof DB.saveAnnotations !== 'function') throw new Error('Cannot restore annotations');
-          await DB.saveAnnotations(docId, pages);
+          _requireAcknowledgedWrite(await DB.saveAnnotations(docId, pages), 'rollback annotations');
         }
         const existingTimestamps = new Map(snapshot.timestamps.map(item => [item.id, item]));
         for (const id of timestampIds) {
           if (!existingTimestamps.has(id)) {
             if (typeof DB.deleteTimestamp !== 'function') throw new Error('Cannot undo newly imported timestamp');
-            await DB.deleteTimestamp(id);
+            _requireAcknowledgedWrite(await DB.deleteTimestamp(id), 'rollback timestamp deletion');
           }
         }
         for (const item of snapshot.timestamps) {
           if (typeof DB.saveTimestamp !== 'function') throw new Error('Cannot restore original timestamps');
-          await DB.saveTimestamp(item);
+          _requireAcknowledgedWrite(await DB.saveTimestamp(item), 'rollback timestamps');
         }
       }
       // Restore local mirrors after primary storage so fallback reads never
