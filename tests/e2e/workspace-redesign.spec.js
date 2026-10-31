@@ -989,4 +989,57 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(page.locator('[data-studio-konva-dialog]')).toBeHidden();
   });
 
+
+  test('keeps topbar and command palette keyboard state accessible in production Chromium', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(
+      window.OpenCourseDeck?.TopbarSearch?.resultsBox
+      && typeof window.OpenCourseDeck?.CommandPalette?.open === 'function'));
+    await page.evaluate(() => {
+      window.__searchKeyboardPick = null;
+      window.OpenCourseDeck.TopbarSearch.setData([
+        { label: 'Biology', category: 'Course',
+          action: () => { window.__searchKeyboardPick = 'biology'; } },
+        { label: 'Biology practice', category: 'Topic',
+          action: () => { window.__searchKeyboardPick = 'practice'; } },
+      ]);
+    });
+    const topbar = page.locator('#sidebar-search');
+    await topbar.fill('biology');
+    const topbarRows = page.locator('.search-result-item');
+    await expect(topbarRows).toHaveCount(2);
+    await expect(topbar).toHaveAttribute('role', 'combobox');
+    await expect(topbar).toHaveAttribute('aria-expanded', 'true');
+    await expect(topbarRows.first()).toHaveAttribute('aria-selected', 'true');
+    expect(await topbar.getAttribute('aria-activedescendant'))
+      .toBe(await topbarRows.first().getAttribute('id'));
+
+    await topbar.press('ArrowDown');
+    await expect(topbarRows.nth(1)).toHaveAttribute('aria-selected', 'true');
+    expect(await topbar.getAttribute('aria-activedescendant'))
+      .toBe(await topbarRows.nth(1).getAttribute('id'));
+    await topbar.press('Enter');
+    await expect.poll(() => page.evaluate(() => window.__searchKeyboardPick)).toBe('practice');
+    await expect(topbar).toHaveAttribute('aria-expanded', 'false');
+    await expect(topbar).not.toHaveAttribute('aria-activedescendant', /.+/);
+
+    await page.evaluate(() => window.OpenCourseDeck.CommandPalette.open());
+    const palette = page.locator('#cp-input');
+    const dialog = page.locator('#command-palette-overlay');
+    await expect(dialog).toHaveClass(/open/);
+    await palette.fill('theme');
+    await expect(page.locator('#cp-results .cp-item[data-idx]').first()).toBeVisible();
+    const active = page.locator('#cp-results .cp-item[aria-selected="true"]');
+    await expect(palette).toHaveAttribute('role', 'combobox');
+    await expect(palette).toHaveAttribute('aria-expanded', 'true');
+    expect(await palette.getAttribute('aria-activedescendant')).toBe(await active.getAttribute('id'));
+    await palette.press('ArrowDown');
+    expect(await palette.getAttribute('aria-activedescendant')).toBe(await active.getAttribute('id'));
+    await palette.press('Escape');
+    await expect(palette).toHaveAttribute('aria-expanded', 'false');
+    await expect(palette).not.toHaveAttribute('aria-activedescendant', /.+/);
+    await expect(topbar).toBeFocused();
+  });
+
 });
