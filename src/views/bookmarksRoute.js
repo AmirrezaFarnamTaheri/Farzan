@@ -81,6 +81,8 @@ export function mountBookmarksView(deps = {}) {
       // Never present partial or fabricated zero totals after any canonical
       // read fails; the remaining records may be entirely correct.
       metricsRoot.replaceChildren();
+      metricsRoot.hidden = true;
+      if (filtersRoot) filtersRoot.hidden = true;
       listRoot.replaceChildren();
       const error = document.createElement('p');
       error.className = 'bookmarks-load-error';
@@ -136,32 +138,68 @@ export function mountBookmarksView(deps = {}) {
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
     ].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
-    const visibleItems = activeFilter === 'all'
+    // Category summaries and source filters only help when there is more than
+    // one kind of saved item. A one-type library is already fully in view.
+    const hasMultipleSources = new Set(bookmarkItems.map(item => item.type)).size > 1;
+    metricsRoot.hidden = !hasMultipleSources;
+    if (filtersRoot) {
+      filtersRoot.hidden = !hasMultipleSources;
+      if (!hasMultipleSources) {
+        // A removed bookmark may invalidate a previously selected facet.
+        // Reset it before computing the visible list so remaining items do
+        // not disappear behind an inaccessible, now-hidden filter.
+        filtersRoot.dataset.activeFilter = 'all';
+        filtersRoot.querySelectorAll('[data-bookmark-filter]').forEach(button => {
+          const selected = button.dataset.bookmarkFilter === 'all';
+          button.classList.toggle('active', selected);
+          button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+      }
+    }
+    const effectiveFilter = hasMultipleSources ? activeFilter : 'all';
+    const visibleItems = effectiveFilter === 'all'
       ? bookmarkItems
-      : bookmarkItems.filter(item => item.type.toLowerCase() === activeFilter);
+      : bookmarkItems.filter(item => item.type.toLowerCase() === effectiveFilter);
 
     metricsRoot.replaceChildren();
-    [
-      ['Video timestamps', timestamps.length],
-      ['Notes', notes.length],
-      ['PDF annotations', annotations.length],
-      ['Total bookmarks', bookmarkItems.length],
-    ].forEach(([label, value]) => {
-      const card = document.createElement('div');
-      card.className = 'stat-card';
-      const strong = document.createElement('strong');
-      strong.textContent = String(value);
-      const span = document.createElement('span');
-      span.textContent = label;
-      card.append(strong, span);
-      metricsRoot.appendChild(card);
-    });
+    if (hasMultipleSources) {
+      [
+        ['Video timestamps', timestamps.length],
+        ['Notes', notes.length],
+        ['PDF annotations', annotations.length],
+        ['Total bookmarks', bookmarkItems.length],
+      ].forEach(([label, value]) => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+        const strong = document.createElement('strong');
+        strong.textContent = String(value);
+        const span = document.createElement('span');
+        span.textContent = label;
+        card.append(strong, span);
+        metricsRoot.appendChild(card);
+      });
+    }
 
     listRoot.replaceChildren();
     if (!bookmarkItems.length) {
-      const empty = document.createElement('p');
-      empty.className = 'text-muted';
-      empty.textContent = 'No bookmarks yet. Notes, timestamps, and PDF annotations will appear here.';
+      const empty = document.createElement('div');
+      empty.className = 'bookmarks-empty-state';
+      const title = document.createElement('h2');
+      title.textContent = 'No saved items yet';
+      const message = document.createElement('p');
+      message.textContent = 'Notes, video timestamps and PDF annotations will appear here as you study.';
+      const actions = document.createElement('div');
+      actions.className = 'button-row';
+      const notesLink = document.createElement('a');
+      notesLink.href = '#/notes';
+      notesLink.className = 'btn btn-primary';
+      notesLink.textContent = 'Open Notes';
+      const coursesLink = document.createElement('a');
+      coursesLink.href = '#/courses';
+      coursesLink.className = 'btn btn-ghost';
+      coursesLink.textContent = 'Browse courses';
+      actions.append(notesLink, coursesLink);
+      empty.append(title, message, actions);
       listRoot.appendChild(empty);
       return;
     }
