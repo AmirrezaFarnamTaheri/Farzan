@@ -83,6 +83,7 @@ async function renderPlaylists(deps) {
   const discover = document.querySelector('[data-playlists-discover]');
   if (!metricsRoot || !listRoot || !catalogRoot || !discover) return;
 
+  let savedReadError = null;
   const [topics, timestamps, savedPlaylists] = await Promise.all([
     (async () => {
       try {
@@ -94,9 +95,39 @@ async function renderPlaylists(deps) {
       }
     })(),
     (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-    (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch { return []; } })(),
+    (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch (error) { savedReadError = error; return []; } })(),
   ]);
   if (!document.body.contains(listRoot)) return;
+  if (savedReadError) {
+    // An unreadable canonical deck is not an empty library. Hide all creation
+    // actions until a successful read, so a later write cannot overwrite history.
+    console.warn('[Playlists] Failed to load saved queues', savedReadError);
+    metricsRoot.replaceChildren();
+    metricsRoot.hidden = true;
+    discover.open = false;
+    discover.hidden = true;
+    catalogRoot.replaceChildren();
+    listRoot.replaceChildren();
+    listRoot.onclick = null;
+    const alert = document.createElement('div');
+    alert.className = 'playlists-load-error';
+    alert.dataset.playlistsError = '';
+    alert.setAttribute('role', 'alert');
+    const description = document.createElement('p');
+    description.textContent = 'Saved playlists could not be loaded. No data has been changed.';
+    const retry = document.createElement('button');
+    retry.className = 'btn btn-primary btn-sm';
+    retry.type = 'button';
+    retry.dataset.playlistsRetry = '';
+    retry.textContent = 'Retry loading playlists';
+    retry.addEventListener('click', () => {
+      retry.disabled = true;
+      void renderPlaylists(deps);
+    });
+    alert.append(description, retry);
+    listRoot.appendChild(alert);
+    return;
+  }
 
   const activeQueue = currentPlayerTracks();
   const videoTopics = catalogVideoTopics(topics, safeMediaUrl);
