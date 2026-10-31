@@ -10,7 +10,7 @@ import { planKonvaV1Board, buildKonvaNodes } from './studioKonvaAdapter.js';
 import { createKonvaV1MoveSession } from './studioKonvaEditing.js';
 import { installKonvaPenInput } from './studioKonvaPenInput.js';
 
-export { exportKonvaV1DraftJSON, importKonvaV1DraftJSON } from './studioKonvaPortability.js';
+export { MAX_KONVA_DRAFT_JSON_CHARS, exportKonvaV1DraftJSON, importKonvaV1DraftJSON } from './studioKonvaPortability.js';
 
 export const DRAFT_KEY = 'ocd_studio_konva_draft';
 
