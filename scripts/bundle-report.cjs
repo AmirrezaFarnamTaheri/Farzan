@@ -7,10 +7,11 @@ const dist = path.join(root, 'dist');
 const indexPath = path.join(root, 'index.html');
 
 const limits = {
-  // 1.25 MiB total JS budget: Squire 2.4.10 replaces a bespoke editor in stages.
-  // Raised from 1 MiB after 2026-10-28 measurement (1,115,700 B), retaining
-  // the strict largest-chunk, entry-raw, and entry-gzip limits below.
-  totalJsBytes: 1280 * 1024,
+  // Base 1.25 MiB was approved for Squire integration in October 2026.
+  // An additional 400 KiB is explicitly authorized for measured Studio/Notes
+  // editor parity work; it is headroom, not a target or a license for eager
+  // imports. Preserve the independent entry, chunk, and gzip caps below.
+  totalJsBytes: 1680 * 1024,
   largestJsBytes: 320 * 1024,  // 320 KiB largest generated chunk
   entryBytes: 240 * 1024,      // 240 KiB raw entry budget; measured 2026-09-18 is ~217 KiB
   entryGzipBytes: 80 * 1024,   // 80 KiB transfer budget; measured 2026-09-18 is ~65 KiB
