@@ -252,6 +252,26 @@ describe('Studio experimental Konva draft opt-in', () => {
     controller.unmount();
   });
 
+  it('accepts the canonical DB.saveSetting receipt which returns the saved board value, not a boolean', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { controller, factory, saveSetting } = makeFixture({ savedDraft: v1Board() });
+    saveSetting.mockImplementation(async (_key, value) => structuredClone(value));
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const imported = v1Board();
+    imported.layers[0].elements[0].x = 246;
+    const input = document.querySelector('[data-studio-konva-import]');
+    const text = JSON.stringify(imported);
+    Object.defineProperty(input, 'files', { configurable: true,
+      value: [{ name: 'saved-value-receipt.json', size: text.length, text: async () => text }] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
+    expect(factory.mock.calls[1][0].board).toEqual(imported);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', imported);
+    expect(document.querySelector('[data-studio-konva-status]').textContent).toMatch(/Imported isolated/i);
+    controller.unmount();
+  });
+
   it('refuses unsupported v1 imports and rejected save receipts without switching workspaces', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { controller, factory, saveSetting } = makeFixture();
