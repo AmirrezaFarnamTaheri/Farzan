@@ -208,6 +208,78 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(shell).not.toHaveAttribute('data-playback-active', 'true');
   });
 
+  test('expands the original playing-video DOM into theater and restores the split lesson workbench', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    await expect(page.locator('[data-course-playback]')).toBeVisible();
+    await page.waitForFunction(() => Boolean(document.querySelector('#course-player')?._pdPlayer));
+
+    const original = await page.evaluate(() => {
+      const player = document.querySelector('#course-player');
+      window.__theaterOriginalPlayer = player._pdPlayer;
+      const session = document.querySelector('.course-session').getBoundingClientRect();
+      const outline = document.querySelector('#course-detail').getBoundingClientRect();
+      return { sessionWidth: session.width, sideBySide: outline.left >= session.right - 3 };
+    });
+    expect(original.sideBySide).toBe(true);
+    const theater = page.locator('[data-course-theater]');
+    await expect(theater).toHaveAttribute('aria-controls', 'course-player');
+    await expect(theater).toHaveAttribute('aria-pressed', 'false');
+    await theater.click();
+    await expect(theater).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.courses-shell')).toHaveAttribute('data-theater', 'true');
+
+    const expanded = await page.evaluate(() => {
+      const session = document.querySelector('.course-session').getBoundingClientRect();
+      const outline = document.querySelector('#course-detail').getBoundingClientRect();
+      return {
+        sessionWidth: session.width, outlineBelow: outline.top >= session.bottom - 4,
+        mediaStable: document.querySelector('#course-player')._pdPlayer === window.__theaterOriginalPlayer,
+      };
+    });
+    expect(expanded.sessionWidth).toBeGreaterThan(original.sessionWidth + 100);
+    expect(expanded.outlineBelow).toBe(true);
+    expect(expanded.mediaStable).toBe(true);
+    await theater.click();
+    await expect(theater).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.courses-shell')).toHaveAttribute('data-theater', 'false');
+    await page.locator('[data-course-close-playback]').click();
+    await expect(page.locator('[data-course-playback]')).toBeHidden();
+    await expect(page.locator('.courses-shell')).toHaveAttribute('data-theater', 'false');
+  });
+
+  test('keeps the theater toggle keyboard-accessible and prevents phone-width horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const course = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(course).toBeVisible({ timeout: 20000 });
+    await course.click();
+    await page.locator('#course-detail button[data-action="play-video"]').first().click();
+    await expect(page.locator('[data-course-playback]')).toBeVisible();
+    const theater = page.locator('[data-course-theater]');
+    await theater.focus();
+    await theater.press('Enter');
+    await expect(theater).toHaveAttribute('aria-pressed', 'true');
+    const layout = await page.evaluate(() => {
+      const session = document.querySelector('.course-session').getBoundingClientRect();
+      const outline = document.querySelector('#course-detail').getBoundingClientRect();
+      return {
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        outlineBelow: outline.top >= session.bottom - 4,
+      };
+    });
+    expect(layout.overflow).toBeLessThanOrEqual(2);
+    expect(layout.outlineBelow).toBe(true);
+    await theater.press('Enter');
+    await expect(theater).toHaveAttribute('aria-pressed', 'false');
+    await page.locator('[data-course-close-playback]').click();
+    await expect(page.locator('.courses-sidebar')).toBeVisible();
+  });
+
   test('keeps study topics reachable below the player on a narrow screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });

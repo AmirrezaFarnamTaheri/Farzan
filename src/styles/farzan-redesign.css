@@ -1320,3 +1320,21 @@ input[type="file"][hidden] {
   .view-courses .course-session-head { flex-wrap: wrap; }
   .view-courses .course-session-actions { width: 100%; justify-content: flex-start; }
 }
+
+/* Course theater view: enlarge the *existing* media player and move the
+   lesson outline below it on desktop. Do not create a second media root,
+   canvas, transcript store, or sticky pane that traps keyboard scrolling.
+   The mobile workbench remains a single-column flex layout. */
+@media (min-width: 1024px) {
+  .view-courses .courses-shell[data-playback-active="true"][data-theater="true"] .courses-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .view-courses .courses-shell[data-playback-active="true"][data-theater="true"] .course-session,
+  .view-courses .courses-shell[data-playback-active="true"][data-theater="true"] .course-detail {
+    grid-column: 1;
+  }
+  .view-courses .courses-shell[data-playback-active="true"][data-theater="true"] .course-detail {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
