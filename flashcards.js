@@ -181,20 +181,39 @@ let studioKeyController = null;
       return this._enqueueMutation(() => this._addCard(data));
     }
 
-    async _addCard({ front, back, deck = 'Default', sourceNoteId = null }) {
+    async _addCard({ front, back, deck = 'Default', sourceNoteId = null, scheduler = 'sm2-v1' }) {
       if (!front || !back) throw new Error('Front and back text are required');
+      if (scheduler !== 'sm2-v1' && scheduler !== 'fsrs-v5') {
+        throw new RangeError('Unknown flashcard scheduling engine');
+      }
       const cards = [...await this.getCards()];
+      const created = new Date();
+      let scheduling;
+      if (scheduler === 'fsrs-v5') {
+        // Lazy-load the maintained FSRS library only for opt-in cards.
+        const { createFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
+        scheduling = {
+          scheduler,
+          fsrsState: createFsrsV5State(created),
+          nextReviewDate: created.toISOString().slice(0, 10),
+        };
+      } else {
+        // Preserve the original SM-2 field shape and date-only semantics.
+        scheduling = {
+          repetitions: 0,
+          interval: 0,
+          easeFactor: 2.5,
+          nextReviewDate: created.toISOString().slice(0, 10),
+        };
+      }
       const newCard = {
         id: 'fc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         deck: deck.trim() || 'Default',
         front: front.trim(),
         back: back.trim(),
         sourceNoteId,
-        repetitions: 0,
-        interval: 0,
-        easeFactor: 2.5,
-        nextReviewDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString(),
+        ...scheduling,
+        createdAt: created.toISOString(),
       };
       cards.push(newCard);
       await this.saveStorage(cards);
@@ -211,11 +230,21 @@ let studioKeyController = null;
       if (index === -1) throw new Error('Flashcard not found');
 
       const card = cards[index];
-      const sm2Result = calculateSM2(grade, card.repetitions, card.interval, card.easeFactor);
+      let scheduled;
+      if (card.scheduler === 'fsrs-v5') {
+        // A malformed FSRS snapshot must not overwrite canonical storage.
+        const { rateFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
+        const { state, nextReviewDate } = rateFsrsV5State(card.fsrsState, grade);
+        scheduled = { fsrsState: state, nextReviewDate };
+      } else if (!card.scheduler || card.scheduler === 'sm2-v1') {
+        scheduled = calculateSM2(grade, card.repetitions, card.interval, card.easeFactor);
+      } else {
+        throw new TypeError('Unknown saved flashcard scheduler');
+      }
 
       const updatedCard = {
         ...card,
-        ...sm2Result,
+        ...scheduled,
         lastReviewedAt: new Date().toISOString(),
       };
 
@@ -249,11 +278,23 @@ let studioKeyController = null;
 
     async getDueCards(deckName = null) {
       const cards = await this.getCards();
-      const todayStr = new Date().toISOString().split('T')[0];
+      const now = Date.now();
+      const todayStr = new Date(now).toISOString().split('T')[0];
       return cards.filter(c => {
-        const matchesDeck = !deckName || c.deck === deckName;
-        const isDue = !c.nextReviewDate || c.nextReviewDate <= todayStr;
-        return matchesDeck && isDue;
+        if (deckName && c.deck !== deckName) return false;
+        if (c.scheduler === 'fsrs-v5') {
+          // FSRS learning steps can be minutes apart, not calendar days.
+          const due = c.fsrsState?.card?.due;
+          if (typeof due !== 'string' || !due.endsWith('Z') ||
+              !Number.isFinite(Date.parse(due))) {
+            throw new TypeError('Saved FSRS card has an invalid UTC due time');
+          }
+          return Date.parse(due) <= now;
+        }
+        if (c.scheduler && c.scheduler !== 'sm2-v1') {
+          throw new TypeError('Unknown saved flashcard scheduler');
+        }
+        return !c.nextReviewDate || c.nextReviewDate <= todayStr;
       });
     }
 
@@ -387,7 +428,7 @@ let studioKeyController = null;
           <div>
             <span class="eyebrow">Spaced repetition</span>
             <h1 class="page-title fc-title">Flashcards</h1>
-            <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
+            <p class="page-subtitle fc-sub">Review cards with a predictable schedule; FSRS is available for new cards by choice.</p>
           </div>
           <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '': 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
@@ -407,6 +448,13 @@ let studioKeyController = null;
           <div class="fc-field fc-field-deck">
             <label for="fc-new-deck">Deck</label>
             <input id="fc-new-deck" name="deck" autocomplete="off" value="General" />
+          </div>
+          <div class="fc-field">
+            <label for="fc-new-scheduler">Review schedule</label>
+            <select id="fc-new-scheduler" name="scheduler" class="select">
+              <option value="sm2-v1">SM-2 (existing schedule)</option>
+              <option value="fsrs-v5">FSRS (new cards, experimental)</option>
+            </select>
           </div>
           <div class="fc-actions">
             <button id="fc-new-save" class="btn btn-primary" type="submit">Save card</button>
@@ -525,6 +573,9 @@ let studioKeyController = null;
         newForm.querySelector('#fc-new-front').value = card.front;
         newForm.querySelector('#fc-new-back').value = card.back;
         newForm.querySelector('#fc-new-deck').value = card.deck;
+        const schedulerSelect = newForm.querySelector('#fc-new-scheduler');
+        schedulerSelect.value = card.scheduler === 'fsrs-v5' ? 'fsrs-v5' : 'sm2-v1';
+        schedulerSelect.disabled = true; // Never migrate during editing.
         newForm.hidden = false;
         newForm.querySelector('#fc-new-save').textContent = 'Save changes';
         newForm.querySelector('#fc-new-front').focus();
@@ -552,11 +603,14 @@ let studioKeyController = null;
       const frontInput = newForm.querySelector('#fc-new-front');
       const backInput = newForm.querySelector('#fc-new-back');
       const deckInput = newForm.querySelector('#fc-new-deck');
+      const schedulerInput = newForm.querySelector('#fc-new-scheduler');
       addBtn.addEventListener('click', () => {
         editingCardId = null;
         frontInput.value = '';
         backInput.value = '';
         deckInput.value = 'General';
+        schedulerInput.disabled = false;
+        schedulerInput.value = 'sm2-v1';
         newForm.querySelector('#fc-new-save').textContent = 'Save card';
         newForm.hidden = !newForm.hidden;
         if (!newForm.hidden) frontInput.focus();
@@ -582,7 +636,7 @@ let studioKeyController = null;
             await manager.updateCard(editingCardId, { front, back, deck });
             announce('Flashcard updated.');
           } else {
-            await manager.addCard({ front, back, deck });
+            await manager.addCard({ front, back, deck, scheduler: schedulerInput.value });
             announce('Card added to deck ' + deck + '.');
           }
           await renderStudio(container);
