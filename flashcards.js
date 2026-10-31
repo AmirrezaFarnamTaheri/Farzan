@@ -389,7 +389,7 @@ let studioKeyController = null;
             <h1 class="page-title fc-title">Flashcards</h1>
             <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
           </div>
-          <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '' : 'hidden'}>
+          <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '': 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New card
           </button>
