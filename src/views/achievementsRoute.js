@@ -76,6 +76,8 @@ export function mountAchievementsView(deps = {}) {
       nextRoot.replaceChildren();
       nextRoot.hidden = true;
       lockedRoot.replaceChildren();
+      lockedDetails.hidden = true;
+      unlockedSection.hidden = true;
       listRoot.replaceChildren();
       reviewRoot?.replaceChildren();
       const notice = document.createElement('div');
@@ -162,9 +164,17 @@ export function mountAchievementsView(deps = {}) {
       { id: 'collector', title: 'Collector', current: Math.min(activeRecords.length, 10), target: 10, action: 'Study another topic' },
       { id: 'catalog-roamer', title: 'Catalog Roamer', current: Math.min(touchedCourses, 3), target: 3, action: 'Explore courses' },
     ];
-    const nextGoal = progressGoals
+    const pendingGoals = progressGoals
       .filter(goal => goal.current < goal.target)
-      .sort((a, b) => (b.current / b.target) - (a.current / a.target))[0];
+      .sort((a, b) => (b.current / b.target) - (a.current / a.target));
+    const closest = pendingGoals[0];
+    // After starting a first topic, a weak one-course fraction must not
+    // distract from the immediately actionable "finish this topic" goal.
+    // But honor genuine near-completion (e.g. Collector 9/10).
+    const nextGoal = activeRecords.length > 0 && doneRecords.length === 0
+      && closest && closest.current / closest.target < 0.5
+      ? pendingGoals.find(goal => goal.id === 'first-finish') || closest
+      : closest;
     nextRoot.replaceChildren();
     nextRoot.hidden = !nextGoal;
     if (nextGoal) {
