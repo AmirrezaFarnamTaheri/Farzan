@@ -1682,7 +1682,14 @@ describe('app shell resilience helpers', () => {
     expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-a.pdf');
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('9');
     expect(window.location.hash).toBe('#/pdf');
-    expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledWith(9);
+    // A bookmark for a different document may not move the still-mounted
+    // PDF reader before the requested document has loaded.
+    expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
+
+    document.querySelector('[data-bookmark-id="ann-pdf"] a').click();
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-b.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('4');
+    expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
   });
 
   it('renders a catalog health panel in Help from the active DataStore', async () => {
