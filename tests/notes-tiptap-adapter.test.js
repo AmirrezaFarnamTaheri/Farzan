@@ -114,6 +114,10 @@ describe('Squire HTML-canonical edit adapter', () => {
       paragraph.append(document.createTextNode(' و یادداشت تازه'));
       expect(instance.syncChanges()).toBe(true);
       const html = instance.getHTML();
+      // Temporary diagnostics for the confirmed legacy-format fidelity failure.
+      console.info('[Squire fidelity probe]', JSON.stringify({
+        source: original, liveDom: element.querySelector('.notes-modern-editor')?.innerHTML, serialized: html,
+      }));
       expect(onUpdate).toHaveBeenCalledWith(html);
       const inert = document.createElement('template');
       inert.innerHTML = html;
