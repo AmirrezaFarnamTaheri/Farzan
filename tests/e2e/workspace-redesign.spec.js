@@ -789,7 +789,7 @@ test.describe('Farzan desktop workspace redesign', () => {
       }]);
     });
     await page.goto('/#/playlists', { waitUntil: 'domcontentloaded' });
-    const card = page.locator('[data-playlist-id="e2e-order"]');
+    const card = page.locator('article.playlist-card[data-playlist-id="e2e-order"]');
     await expect(card).toBeVisible();
     await expect(card.locator('.playlist-preview li')).toHaveCount(4);
     await card.locator('.playlist-reorder > summary').click();
@@ -804,7 +804,7 @@ test.describe('Farzan desktop workspace redesign', () => {
       .toEqual(['saved-a', 'saved-b', 'saved-c', 'saved-e', 'saved-d']);
     expect((await savedOrder()).metadata).toEqual({ owner: 'local', language: 'fa-IR' });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-playlist-id="e2e-order"]')).toBeVisible();
+    await expect(page.locator('article.playlist-card[data-playlist-id="e2e-order"]')).toBeVisible();
     await expect.poll(async () => (await savedOrder())?.topicIds)
       .toEqual(['saved-a', 'saved-b', 'saved-c', 'saved-e', 'saved-d']);
   });
