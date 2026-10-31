@@ -29,15 +29,19 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     getAllAnnotations: vi.fn(async () => []),
   };
   window.DataStore = { init: vi.fn(async () => {}), allCourses: () => [], allTopics: () => [] };
-  const factory = vi.fn(({ board: imported }) => ({
+  const factory = vi.fn(({ board: imported }) => {
+    let draftMode = 'select';
+    return {
     getBoard: () => structuredClone(imported),
-    setMode: vi.fn(), getMode: vi.fn(() => 'select'),
+    setMode: vi.fn(mode => { draftMode = mode; return mode; }),
+    getMode: vi.fn(() => draftMode),
     select: vi.fn(), move: vi.fn(async () => imported),
     undo: vi.fn(async () => false), redo: vi.fn(async () => false),
     canUndo: () => false, canRedo: () => false,
     flush: vi.fn(async () => true),
     destroy: vi.fn(),
-  }));
+    };
+  });
   const loader = loadKonvaDraft || vi.fn(async () => ({
     DRAFT_KEY: 'ocd_studio_konva_draft',
     createStudioKonvaDraftWorkspace: factory,
