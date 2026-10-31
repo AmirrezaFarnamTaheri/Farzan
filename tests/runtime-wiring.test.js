@@ -94,14 +94,51 @@ describe('runtime wiring', () => {
     expect(hardeningCall).toBeGreaterThan(pdfImport);
   });
 
-  it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
+  it('keeps dormant graph, canvas-chart and zoom constructors out of the eager application', () => {
     const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 
-    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js', './src/features/canvasZoom.js']) {
-      expect(appSource).toContain(specifier);
-      expect(indexSource).not.toContain(specifier);
+    const dormantModules = [
+      './src/features/knowledgeGraph.js',
+      './src/features/courseGraph.js',
+      './src/features/canvasZoom.js',
+      './src/features/canvasCharts/area.js',
+      './src/features/canvasCharts/gauge.js',
+      './src/features/canvasCharts/heatmap.js',
+      './src/features/canvasCharts/treemap.js',
+    ];
+    for (const specifier of dormantModules) {
+      expect(appSource, specifier).not.toContain(`from '${specifier}'`);
+      expect(indexSource, specifier).not.toContain(specifier);
     }
-    expect(appSource).toContain('OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph }');
+    // These names had no live constructors/callers; remove their old globals.
+    for (const oldGlobal of [
+      'OpenCourseDeck.Graphs =',
+      'OpenCourseDeck.CanvasZoom =',
+      'OpenCourseDeck.CourseGraph =',
+      'OpenCourseDeck.KnowledgeGraph =',
+      'OpenCourseDeck.CanvasCharts =',
+    ]) {
+      expect(appSource).not.toContain(oldGlobal);
+    }
+    // The chart plugins are used by Charts.registerPlugins() and stay wired.
+    expect(appSource).toContain("import { chartGauge as GaugePlugin }");
+    expect(appSource).toContain('OpenCourseDeck.ChartPlugins = Charts.plugins');
+  });
+
+  it('preserves each optional visual module as a direct import without eager startup cost', async () => {
+    const [zoom, courses, knowledge, area, gauge, heatmap, treemap] = await Promise.all([
+      import('../src/features/canvasZoom.js'),
+      import('../src/features/courseGraph.js'),
+      import('../src/features/knowledgeGraph.js'),
+      import('../src/features/canvasCharts/area.js'),
+      import('../src/features/canvasCharts/gauge.js'),
+      import('../src/features/canvasCharts/heatmap.js'),
+      import('../src/features/canvasCharts/treemap.js'),
+    ]);
+    for (const ctor of [zoom.CanvasZoom, courses.CourseGraph, knowledge.KnowledgeGraph,
+      area.CanvasAreaChart, gauge.CanvasGauge, heatmap.CanvasHeatmap, treemap.CanvasTreemap]) {
+      expect(typeof ctor).toBe('function');
+    }
   });
 
   it('uses one document-relative resolver for public and pooled production workers', () => {
