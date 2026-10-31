@@ -1346,6 +1346,40 @@
   line-height: var(--leading-relaxed);
 }
 
+/* Achievements prioritize the next real learner action over locked trophies. */
+.view-achievements [data-next-achievement][hidden],
+.view-achievements [data-achievement-metrics][hidden],
+.view-achievements [data-unlocked-achievements][hidden],
+.view-achievements [data-locked-achievements][hidden] {
+  display: none !important;
+}
+.achievement-next-card .card-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+.achievement-next-card h2,
+.achievement-next-card p { margin: 0; }
+.achievement-next-card progress {
+  display: block;
+  width: min(100%, 480px);
+  height: 12px;
+  border-radius: var(--radius-md);
+  accent-color: var(--accent);
+}
+.achievement-next-card .btn { margin-top: var(--space-1); }
+.achievement-locked-section { overflow: hidden; }
+.achievement-locked-section > summary {
+  padding: var(--space-4);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.achievement-locked-section > summary:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+.achievement-locked-section[open] > summary { border-bottom: 1px solid var(--border); }
+
 /* Achievements & Bookmarks */
 .view-achievements,
 .view-bookmarks {
