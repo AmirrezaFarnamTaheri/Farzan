@@ -110,12 +110,7 @@ input[type="file"][hidden] {
   min-width: 0;
   animation-duration: 200ms;
 }
-:where(.view-home,.view-progress,.view-settings,.view-achievements,.view-my-courses,
-  .view-help,.view-materials,.view-bookmarks,.view-tags,.view-playlists) {
-  width: 100%;
-  max-width: 1440px;
-  margin-inline: auto;
-}
+/* Route max-width is owned by workspace.css; Home retains its 1350px exception below. */
 /* Sidebar is the fixed anchor: no blurry glass or floating mega-card. */
 .sidebar {
   height: 100%;

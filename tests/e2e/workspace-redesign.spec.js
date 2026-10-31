@@ -29,6 +29,28 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('keeps primary work surfaces within one readable width on ultrawide desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    // Home has an intentionally narrower editorial layout. Other primary
+    // work surfaces share the common readable max-width.
+    const expectedWidths = [
+      { route: 'home', maxWidth: '1350px' },
+      { route: 'materials', maxWidth: '1440px' },
+      { route: 'my-courses', maxWidth: '1440px' },
+    ];
+    for (const { route, maxWidth } of expectedWidths) {
+      await page.goto('/#/' + route, { waitUntil: 'domcontentloaded' });
+      const view = page.locator('.view-' + route);
+      await expect(view).toBeVisible();
+      const metrics = await view.evaluate(el => ({
+        maxWidth: getComputedStyle(el).maxWidth,
+        actualWidth: el.getBoundingClientRect().width,
+      }));
+      expect(metrics.maxWidth).toBe(maxWidth);
+      expect(metrics.actualWidth).toBeLessThanOrEqual(parseInt(maxWidth, 10) + 1);
+    }
+  });
+
   test('shows playable Materials results in the first viewport on desktop and mobile', async ({ page }) => {
     for (const viewport of [
       { width: 1440, height: 900, maxRowTop: 500 },
