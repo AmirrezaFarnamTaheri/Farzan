@@ -1548,3 +1548,57 @@
   .my-course-dialog { width: calc(100vw - 20px); }
   .playlist-card-actions .btn { flex: 1 1 100%; }
 }
+
+/* Studio's opt-in Konva draft lives in a native modal, not the live canvas.
+   Keep the scene responsive and avoid hiding the fallback editor's controls. */
+.studio-konva-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  width: min(96vw, 1060px);
+  max-width: 96vw;
+  max-height: 92vh;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--glass-border, #727783);
+  border-radius: var(--radius-xl, 14px);
+  background: var(--surface-2, #20232b);
+  color: var(--text-primary, #fff);
+  box-shadow: var(--shadow-xl, 0 16px 40px rgba(0,0,0,.25));
+}
+.studio-konva-dialog::backdrop {
+  background: rgba(5, 8, 18, 0.72);
+}
+.studio-konva-dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: clamp(14px, 3vw, 26px);
+}
+.studio-konva-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.studio-konva-heading h2 { margin: 0 0 8px; }
+.studio-konva-heading p { margin: 0; color: var(--text-secondary, #b0b4bd); }
+.studio-konva-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio-konva-stage {
+  width: 100%;
+  height: clamp(280px, 55vh, 620px);
+  border: 1px solid var(--glass-border, #727783);
+  border-radius: 10px;
+  background: var(--surface-1, #141720);
+  overflow: hidden;
+  touch-action: none;
+}
+@media (max-width: 680px) {
+  .studio-konva-heading { flex-direction: column; }
+  .studio-konva-stage { height: clamp(300px, 48vh, 500px); }
+}
