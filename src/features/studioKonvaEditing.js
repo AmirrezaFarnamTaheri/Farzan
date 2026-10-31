@@ -89,29 +89,70 @@ export function translateKonvaV1Element(board, id, dx, dy) {
  * A rejected commit restores the node and preserves the last accepted board.
  * No editing route is switched to this controller until interaction parity.
  */
-export function createKonvaV1MoveSession({ board, onChange, onSelect = () => {} } = {}) {
+export function createKonvaV1MoveSession({
+  board, onChange, onSelect = () => {}, historyLimit = 100,
+} = {}) {
   validBoard(board);
   if (typeof onChange !== 'function') {
     throw new TypeError('A confirmed canonical board writer is required');
   }
   if (typeof onSelect !== 'function') throw new TypeError('onSelect must be a function');
+  const limit = Number.isInteger(historyLimit) && historyLimit > 0
+    ? Math.min(historyLimit, 500) : 100;
   let current = structuredClone(board);
   let tail = Promise.resolve();
   let last = Promise.resolve();
+  const undoStack = [];
+  const redoStack = [];
 
-  const commit = (id, dx, dy) => {
-    const operation = tail.then(async () => {
-      if (dx === 0 && dy === 0) return structuredClone(current);
-      const next = translateKonvaV1Element(current, id, dx, dy);
-      const receipt = await onChange(structuredClone(next));
-      if (receipt === false) throw new Error('Studio board write was not acknowledged');
-      current = next;
-      return structuredClone(current);
-    });
-    // A failed write must not poison the next independent edit.
+  const push = (stack, snapshot) => {
+    stack.push(structuredClone(snapshot));
+    if (stack.length > limit) stack.shift();
+  };
+  const enqueue = action => {
+    const operation = tail.then(action);
+    // A rejected canonical write must not poison later independent actions.
     tail = operation.then(() => {}, () => {});
+    last = operation;
     return operation;
   };
+  const persist = async next => {
+    const receipt = await onChange(structuredClone(next));
+    // Require an affirmative durable-commit receipt. A missing return is not
+    // proof that a canonical database write succeeded.
+    if (receipt !== true) throw new Error('Studio board write was not acknowledged');
+  };
+  const commit = (id, dx, dy) => enqueue(async () => {
+    if (dx === 0 && dy === 0) return structuredClone(current);
+    const next = translateKonvaV1Element(current, id, dx, dy);
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  // Undo/redo replay whole canonical board snapshots, never Konva's own JSON.
+  // The route must redraw nodes from the returned document after replay; this
+  // data-only controller must not mutate a live scene before a durable write.
+  const undo = () => enqueue(async () => {
+    if (!undoStack.length) return false;
+    const next = structuredClone(undoStack[undoStack.length - 1]);
+    await persist(next);
+    undoStack.pop();
+    push(redoStack, current);
+    current = next;
+    return structuredClone(current);
+  });
+  const redo = () => enqueue(async () => {
+    if (!redoStack.length) return false;
+    const next = structuredClone(redoStack[redoStack.length - 1]);
+    await persist(next);
+    redoStack.pop();
+    push(undoStack, current);
+    current = next;
+    return structuredClone(current);
+  });
 
   function bind(node, id) {
     if (!node || typeof node.on !== 'function' || typeof node.off !== 'function') {
@@ -145,6 +186,10 @@ export function createKonvaV1MoveSession({ board, onChange, onSelect = () => {} 
   return {
     bind,
     commit,
+    undo,
+    redo,
+    canUndo: () => undoStack.length > 0,
+    canRedo: () => redoStack.length > 0,
     flush: () => last,
     getBoard: () => structuredClone(current),
   };

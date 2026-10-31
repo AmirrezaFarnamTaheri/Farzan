@@ -108,6 +108,91 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
     node.destroy();
   });
 
+  it('undoes and redoes canonical moves only after confirmed writes, preserving every saved field', async () => {
+    const records = [];
+    const start = fixture();
+    const session = createKonvaV1MoveSession({
+      board: start,
+      onChange: async next => { records.push(structuredClone(next)); return true; },
+    });
+    expect(session.canUndo()).toBe(false);
+    expect(await session.undo()).toBe(false);
+    expect(records).toHaveLength(0);
+    await session.commit('rect', 12, -4);
+    await session.commit('circle', 0, 8);
+    expect(session.canUndo()).toBe(true);
+    const moved = session.getBoard();
+    expect(moved.layers[0].elements[0].x).toBe(212);
+    expect(moved.layers[0].elements[1].y).toBe(68);
+    const undone = await session.undo();
+    expect(undone.layers[0].elements[0].x).toBe(212);
+    expect(undone.layers[0].elements[1].y).toBe(60);
+    expect(undone.metadata).toEqual(start.metadata);
+    expect(session.canRedo()).toBe(true);
+    const redone = await session.redo();
+    expect(redone).toEqual(moved);
+    expect(records.at(-1)).toEqual(moved);
+    expect(start).toEqual(fixture());
+  });
+
+  it('clears redo only after a newly confirmed move and caps stored undo snapshots', async () => {
+    const session = createKonvaV1MoveSession({
+      board: fixture(), historyLimit: 2,
+      onChange: async () => true,
+    });
+    await session.commit('circle', 1, 0);
+    await session.commit('circle', 1, 0);
+    await session.undo();
+    expect(session.canRedo()).toBe(true);
+    await session.commit('circle', 0, 3);
+    expect(session.canRedo()).toBe(false);
+    expect(await session.redo()).toBe(false);
+    await session.commit('circle', 1, 0);
+    await session.commit('circle', 1, 0);
+    expect(await session.undo()).toMatchObject({ version: 1 });
+    expect(await session.undo()).toMatchObject({ version: 1 });
+    expect(await session.undo()).toBe(false);
+  });
+
+  it('retains the current board and undo history if an undo/redo write is refused', async () => {
+    let canWrite = true;
+    const session = createKonvaV1MoveSession({
+      board: fixture(), onChange: async () => canWrite,
+    });
+    await session.commit('rect', 5, 7);
+    const moved = session.getBoard();
+    canWrite = false;
+    await expect(session.undo()).rejects.toThrow(/acknowledge/i);
+    expect(session.getBoard()).toEqual(moved);
+    expect(session.canUndo()).toBe(true);
+    expect(session.canRedo()).toBe(false);
+    canWrite = true;
+    await session.undo();
+    expect(session.getBoard()).toEqual(fixture());
+    canWrite = false;
+    await expect(session.redo()).rejects.toThrow(/acknowledge/i);
+    expect(session.getBoard()).toEqual(fixture());
+    canWrite = true;
+    expect(await session.redo()).toEqual(moved);
+  });
+
+  it('restores immutable snapshots after concurrent queued moves with a stable flush receipt', async () => {
+    const session = createKonvaV1MoveSession({
+      board: fixture(),
+      onChange: async () => true,
+    });
+    const left = session.commit('rect', 2, 0);
+    const right = session.commit('rect', 3, 0);
+    await Promise.all([left, right]);
+    expect(await session.flush()).toEqual(session.getBoard());
+    expect(session.getBoard().layers[0].elements[0].x).toBe(205);
+    const snapshot = session.getBoard();
+    snapshot.layers[0].elements[0].x = 0;
+    expect(session.getBoard().layers[0].elements[0].x).toBe(205);
+    await session.undo();
+    expect(session.getBoard().layers[0].elements[0].x).toBe(202);
+  });
+
   it('restores node position and saved board if a write rejects or refuses acknowledgement', async () => {
     const failure = vi.fn(async () => { throw new Error('storage full'); });
     const session = createKonvaV1MoveSession({ board: fixture(), onChange: failure });
