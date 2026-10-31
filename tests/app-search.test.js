@@ -65,6 +65,103 @@ describe('app topbar search rendering', () => {
     expect(window.location.href).not.toContain('javascript:');
   });
 
+  it('does not let a slow earlier topbar query replace newer search results', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let resolveEarlier;
+    let resolveNewer;
+    search._queryUniversal = vi.fn(value => new Promise(resolve => {
+      if (value === 'biology') resolveEarlier = resolve;
+      else if (value === 'biochemistry') resolveNewer = resolve;
+    }));
+
+    input.value = 'biology';
+    const earlier = search._onInput('biology');
+    input.value = 'biochemistry';
+    const newer = search._onInput('biochemistry');
+
+    resolveNewer([{ label: 'Biochemistry guide', category: 'Course' }]);
+    await newer;
+    expect(search.resultsBox.textContent).toContain('Biochemistry guide');
+
+    // An older IndexedDB/catalog query settles after the newer one. It must
+    // not replace the search the learner is currently reading.
+    resolveEarlier([{ label: 'Biology basics', category: 'Course' }]);
+    await earlier;
+    expect(search.resultsBox.textContent).toContain('Biochemistry guide');
+    expect(search.resultsBox.textContent).not.toContain('Biology basics');
+  });
+
+  it('does not render a completed request when the input changed during debounce', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let resolveSearch;
+    search._queryUniversal = vi.fn(() => new Promise(resolve => { resolveSearch = resolve; }));
+
+    input.value = 'chemistry';
+    const pending = search._onInput('chemistry');
+    // A new input event has been typed, but the 300ms debounce has not yet
+    // invoked _onInput for the new text. The old result must not appear.
+    input.value = 'chemistry notes';
+
+    resolveSearch([{ label: 'Chemistry course', category: 'Course' }]);
+    await pending;
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('Chemistry course');
+  });
+
+  it('does not reopen stale search results after clearing the input', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let resolveSearch;
+    search._queryUniversal = vi.fn(() => new Promise(resolve => { resolveSearch = resolve; }));
+
+    input.value = 'physiology';
+    const pending = search._onInput('physiology');
+    input.value = '';
+    await search._onInput('');
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+
+    resolveSearch([{ label: 'Physiology lesson', category: 'Course' }]);
+    await pending;
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('Physiology lesson');
+  });
+
+  it('does not execute a debounced search that Escape dismissed before it started', () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    search.setData([{ label: 'Anatomy handbook', category: 'Course' }]);
+
+    input.value = 'Anatomy';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    // Dismiss while the 300ms debounce is still waiting. No async request
+    // has started yet, so an in-flight response guard alone cannot help.
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+
+    vi.advanceTimersByTime(350);
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('Anatomy handbook');
+  });
+
+  it('does not reopen stale search results after Escape closes the dropdown', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let resolveSearch;
+    search._queryUniversal = vi.fn(() => new Promise(resolve => { resolveSearch = resolve; }));
+
+    input.value = 'history';
+    const pending = search._onInput('history');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+
+    resolveSearch([{ label: 'History lesson', category: 'Course' }]);
+    await pending;
+    expect(search.resultsBox.classList.contains('open')).toBe(false);
+    expect(search.resultsBox.textContent).not.toContain('History lesson');
+  });
+
   it('central URL helpers allow expected URLs and reject executable schemes', () => {
     expect(window.OpenCourseDeck.safeExternalUrl('https://media.example.com/course')).toBe('https://media.example.com/course');
     expect(window.OpenCourseDeck.safeExternalUrl('http://example.test/course')).toBe('http://example.test/course');
