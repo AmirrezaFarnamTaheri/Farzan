@@ -162,6 +162,19 @@ describe('app topbar search rendering', () => {
     expect(search.resultsBox.textContent).not.toContain('History lesson');
   });
 
+  it('keeps distinct results visible when repeated source records dominate ranking', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const same = { sourceType: 'course', sourceId: 'one', label: 'Physics', category: 'Course' };
+    const others = Array.from({ length: 12 }, (_, i) => ({
+      sourceType: 'course', sourceId: 'extra-' + i, label: 'Physics ' + i,
+      category: 'Course',
+    }));
+    search._loadUniversalData = vi.fn(async () => [...Array(24).fill(same), ...others]);
+    const results = await search._queryUniversal('physics');
+    expect(results.map(item => item.sourceId))
+      .toEqual(['one', ...others.slice(0, 11).map(item => item.sourceId)]);
+  });
+
   it('central URL helpers allow expected URLs and reject executable schemes', () => {
     expect(window.OpenCourseDeck.safeExternalUrl('https://media.example.com/course')).toBe('https://media.example.com/course');
     expect(window.OpenCourseDeck.safeExternalUrl('http://example.test/course')).toBe('http://example.test/course');
