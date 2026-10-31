@@ -48,6 +48,21 @@ function validateMappedElement(item, type) {
       return unsupported('invalid-element-number-' + name);
     }
   }
+  // Do not silently turn out-of-range appearance metadata into a different
+  // visual. The renderer can clamp internally, but the migration preflight
+  // must reject data it cannot display unchanged.
+  if (Object.hasOwn(item, 'opacity') && item.opacity != null
+      && (item.opacity < 0 || item.opacity > 1)) {
+    return unsupported('invalid-element-opacity-range');
+  }
+  for (const size of ['strokeWidth', 'radius', 'radiusX', 'radiusY', 'headSize']) {
+    if (item[size] != null && item[size] < 0) {
+      return unsupported('invalid-element-' + size + '-range');
+    }
+  }
+  if (item.fontSize != null && item.fontSize <= 0) {
+    return unsupported('invalid-element-fontSize-range');
+  }
   return { compatible: true };
 }
 
@@ -74,7 +89,7 @@ function planShape(item) {
     id,
     stroke: item.stroke || (['line', 'arrow', 'polyline'].includes(type) ? '#fff' : undefined),
     strokeWidth: finite(item.strokeWidth, type === 'arrow' ? 2 : 1),
-    opacity: Math.min(1, Math.max(0, finite(item.opacity, 1))),
+    opacity: finite(item.opacity, 1),
     fill: item.fill == null || item.fill === 'none' ? undefined : item.fill,
   };
   let kind, attrs;
@@ -90,7 +105,7 @@ function planShape(item) {
     }
     case 'circle':
       kind = 'Circle';
-      attrs = { ...common, x, y, radius: Math.max(0, finite(item.radius)) };
+      attrs = { ...common, x, y, radius: finite(item.radius) };
       break;
     case 'ellipse':
       // Native canvas stores ellipse radii directly; width/height do not
@@ -99,8 +114,8 @@ function planShape(item) {
         return unsupported('invalid-ellipse-radii');
       }
       kind = 'Ellipse';
-      attrs = { ...common, x, y, radiusX: Math.abs(finite(item.radiusX)),
-        radiusY: Math.abs(finite(item.radiusY)), rotation: finite(item.rotation) };
+      attrs = { ...common, x, y, radiusX: finite(item.radiusX),
+        radiusY: finite(item.radiusY), rotation: finite(item.rotation) };
       break;
     case 'line':
     case 'arrow':
@@ -125,8 +140,8 @@ function planShape(item) {
       break;
     case 'polygon':
       if (!Array.isArray(item.points) || item.points.length < 3
-        || !item.points.every(p => Array.isArray(p) && p.length >= 2
-          && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))) {
+        || !item.points.every(p => Array.isArray(p) && p.length === 2
+          && p.every(value => typeof value === 'number' && Number.isFinite(value)))) {
         return unsupported('invalid-polygon-points');
       }
       kind = 'Line';
@@ -157,6 +172,8 @@ export function planKonvaV1Board(board) {
     }
   }
   if (finite(board.viewport?.rotation) !== 0) return unsupported('unsupported-viewport-rotation');
+  const zoom = board.viewport?.zoom ?? 1;
+  if (zoom < 0.1 || zoom > 4) return unsupported('invalid-viewport-zoom-range');
   const layers = [];
   const seenLayers = new Set();
   const seenElements = new Set();
@@ -166,6 +183,11 @@ export function planKonvaV1Board(board) {
     if (!layerId.trim()) return unsupported('missing-layer-id');
     if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
     seenLayers.add(layerId);
+    if (Object.hasOwn(layer, 'opacity')
+      && (typeof layer.opacity !== 'number' || !Number.isFinite(layer.opacity)
+        || layer.opacity < 0 || layer.opacity > 1)) {
+      return unsupported('invalid-layer-opacity-range');
+    }
     const elements = [];
     for (const item of layer.elements) {
       const planned = planShape(item);
@@ -178,13 +200,13 @@ export function planKonvaV1Board(board) {
     layers.push({
       id: layerId, name: String(layer.name || ''),
       visible: layer.visible !== false, locked: layer.locked === true,
-      opacity: Math.min(1, Math.max(0, finite(layer.opacity, 1))),
+      opacity: finite(layer.opacity, 1),
       elements,
     });
   }
   return { compatible: true, reason: null, layers, viewport: {
     x: finite(board.viewport?.offsetX), y: finite(board.viewport?.offsetY),
-    zoom: Math.max(0.1, Math.min(4, finite(board.viewport?.zoom, 1))),
+    zoom: finite(board.viewport?.zoom, 1),
   } };
 }
 
