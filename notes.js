@@ -685,7 +685,7 @@ import { countWords } from './src/core/textMetrics.js';
       try {
         node.setAttribute('contenteditable', 'false');
         node.replaceChildren();
-        const instance = adapterModule.createTiptapNoteEditor({
+        const instance = adapterModule.createSquireNoteEditor({
           element: node,
           html: safe,
           onUpdate: () => {
