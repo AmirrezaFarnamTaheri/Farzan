@@ -21,6 +21,7 @@ import { createRouter } from './src/router/router.js';
 import { Modal as ModalOverlay } from './src/ui/overlays.js';
 import { EventEmitter } from './src/lib/eventEmitter.js';
 import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
+import { normalizeSearchQuery, rankLexicalMatches } from './src/core/searchRanking.js';
 const Modal = ModalOverlay;
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
 import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
@@ -1043,10 +1044,9 @@ import { Pointer } from './src/lib/pointer.js';
       let results;
       if (this._hasDataOverride) {
         // Client-side filter
-        const q = value.toLowerCase();
-        results = this._data.filter(item =>
-          item.label?.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q)
-        ).slice(0, 8);
+        results = rankLexicalMatches(this._data, value, {
+          keys: ['label', 'description'], limit: 8,
+        });
       } else {
         results = await this._queryUniversal(value);
       }
@@ -1055,17 +1055,14 @@ import { Pointer } from './src/lib/pointer.js';
     },
 
     async _queryUniversal(value) {
-      const q = String(value || '').trim().toLowerCase();
+      const q = normalizeSearchQuery(value);
       if (!q) return [];
       const data = await this._loadUniversalData();
       const eventPayload = { value, setResults: r => { if (Array.isArray(r)) data.push(...r); } };
       OpenCourseDeck.bus.emit('search:query', eventPayload);
-      const lexical = data
-        .filter((item) => {
-          const haystack = `${item.label || ''} ${item.description || ''} ${item.category || ''} ${item.searchText || ''}`.toLowerCase();
-          return haystack.includes(q);
-        })
-        .slice(0, 12);
+      const lexical = rankLexicalMatches(data, value, {
+        keys: ['label', 'description', 'category', 'searchText'], limit: 12,
+      });
       const semantic = await this._querySemanticNotes(value, data);
       const uniqueKey = item => item.sourceType === 'note' && item.sourceId
         ? `note:${item.sourceId}`
