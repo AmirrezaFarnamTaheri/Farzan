@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
+import { createSquireNoteEditor, createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 
 describe('Squire HTML-canonical edit adapter', () => {
+  it('exports a Squire-named entrypoint without breaking the legacy adapter API', () => {
+    expect(createSquireNoteEditor).toBe(createTiptapNoteEditor);
+    const instance = createSquireNoteEditor({
+      element: document.createElement('div'), html: '<p>Safe rich text</p>',
+    });
+    try {
+      expect(instance.getHTML()).toContain('Safe rich text');
+    } finally { instance.destroy(); }
+  });
+
   it('accepts ordinary browser root text but still rejects unsupported tables', () => {
     for (const value of ['فیزیولوژی قلب 你好世界', '<strong>Important</strong> plain text', '<p>Intro</p> trailing words']) {
       expect(assessNoteForSquire(value).compatible).toBe(true);
@@ -87,6 +97,43 @@ describe('Squire HTML-canonical edit adapter', () => {
       expect(instance.getHTML()).toContain('<h3>فیزیولوژی قلب</h3>');
       expect(instance.getHTML()).not.toMatch(/<(?:b|strong|i|em|u|span)>\s*<\/(?:b|strong|i|em|u|span)>/i);
       expect(instance.getHTML()).toContain('Heart');
+    } finally { instance.destroy(); }
+  });
+
+  it('preserves RTL, alignment, color and font size on the first persisted edit', () => {
+    const original = '<p dir="rtl" style="text-align:right">'
+      + '<span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createTiptapNoteEditor({ element, html: original, onUpdate });
+    try {
+      // Simulate a real browser contenteditable mutation before Squire's
+      // queued observer fires. A first save must retain legacy rich formatting.
+      const paragraph = element.querySelector('.notes-modern-editor p');
+      expect(paragraph).not.toBeNull();
+      paragraph.append(document.createTextNode(' و یادداشت تازه'));
+      expect(instance.syncChanges()).toBe(true);
+      const html = instance.getHTML();
+      expect(onUpdate).toHaveBeenCalledWith(html);
+      const inert = document.createElement('template');
+      inert.innerHTML = html;
+      const block = inert.content.querySelector('p[dir="rtl"]');
+      expect(block).not.toBeNull();
+      expect(block.style.textAlign).toBe('right');
+      // Squire may split one styled span into nested color/size wrappers.
+      // Check the effective inherited styling of the text, not wrapper shape.
+      const candidates = [...block.querySelectorAll('span')]
+        .filter(node => node.textContent.includes('عنوان فارسی'));
+      const leaf = candidates.find(node => !candidates.some(other => other !== node && node.contains(other)));
+      expect(leaf).toBeDefined();
+      const effective = { fontSize: '', color: '' };
+      for (let node = leaf; node; node = node.parentElement) {
+        effective.fontSize ||= node.style?.fontSize || '';
+        effective.color ||= node.style?.color || '';
+      }
+      expect(effective.fontSize).toBe('18px');
+      expect(effective.color).toBe('rgb(255, 0, 0)');
+      expect(block.textContent).toContain('یادداشت تازه');
     } finally { instance.destroy(); }
   });
 
