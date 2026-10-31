@@ -51,6 +51,19 @@ export function assessNoteForSquire(html) {
       }
     }
   }
+  // Squire represents an item with a nested list as
+  // <li><div>label</div><ul>...</ul></li>. The original strict gate supports
+  // inline text within <li>, so unwrap ONLY an attribute-free direct <div>
+  // containing inline text/marks in this inert validation copy. Never accept
+  // arbitrary divs, event attributes or nested custom blocks.
+  for (const wrapper of [...template.content.querySelectorAll('li > div')]) {
+    if (wrapper.attributes.length || [...wrapper.childNodes].some(child =>
+      child.nodeType !== Node.TEXT_NODE
+      && !(child.nodeType === Node.ELEMENT_NODE && MARKS.has(child.localName)))) {
+      return reject('unsupported-list-text-wrapper');
+    }
+    wrapper.replaceWith(...wrapper.childNodes);
+  }
   // A span with approved style/dir is a purely visual inline wrapper. Its
   // contents still need to pass the strict structural and link checks.
   for (const span of [...template.content.querySelectorAll('span')].reverse()) {
