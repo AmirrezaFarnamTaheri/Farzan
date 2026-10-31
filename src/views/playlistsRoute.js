@@ -20,11 +20,9 @@ export function mountPlaylistsView({
         </div>
       </div>
       <div class="stat-grid" data-playlist-metrics hidden></div>
-      <div class="card card-filled playlists-list-card">
-        <div class="card-body">
-          <div class="grid grid-3" data-playlist-list>
-            <p>Loading your playlists...</p>
-          </div>
+      <div class="playlists-list-card">
+        <div class="grid grid-3" data-playlist-list>
+          <p>Loading your playlists...</p>
         </div>
       </div>
       <details class="playlists-discover" data-playlists-discover hidden>
