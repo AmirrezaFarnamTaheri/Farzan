@@ -123,6 +123,61 @@ export function resizeKonvaV1Element(board, id, bounds) {
 }
 
 /**
+ * Create exactly one legacy Studio-v1 pen stroke. The application board
+ * remains canonical: never store Konva node or Stage JSON. A stroke is
+ * validated completely before a caller is allowed to write it.
+ */
+export function appendKonvaV1Stroke(board, id, points) {
+  validBoard(board);
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new TypeError('Studio stroke ID is required');
+  }
+  if (board.layers.some(layer => layer.elements.some(item => item.id === id))) {
+    throw new Error('Duplicate Studio stroke ID: ' + id);
+  }
+  if (!Array.isArray(points) || points.length < 2 || points.length > 4096
+    || !points.every(point => Array.isArray(point) && point.length === 2
+      && point.every(value => typeof value === 'number' && Number.isFinite(value)))) {
+    throw new TypeError('Studio pen path requires 2–4096 finite x/y pairs');
+  }
+  if (!points.some(([x, y]) => x !== points[0][0] || y !== points[0][1])) {
+    throw new RangeError('Studio pen path has no visible length');
+  }
+  const index = board.activeLayerIdx ?? 0;
+  if (!Number.isInteger(index) || index < 0 || index >= board.layers.length) {
+    throw new RangeError('Studio active drawing layer is invalid');
+  }
+  const layer = board.layers[index];
+  if (layer.locked === true) throw new Error('Cannot draw on a locked Studio layer');
+  if (layer.visible === false) throw new Error('Cannot draw on a hidden Studio layer');
+
+  const style = board.style || {};
+  const width = style.strokeWidth ?? 2;
+  if (typeof width !== 'number' || !Number.isFinite(width) || width < 1) {
+    throw new TypeError('Studio pen strokeWidth must be a finite positive number');
+  }
+  const stroke = style.strokeColor ?? '#6366f1';
+  if (typeof stroke !== 'string' || !stroke.trim()) {
+    throw new TypeError('Studio pen stroke color must be a nonempty string');
+  }
+  const lineCap = style.lineCap ?? 'round';
+  const lineJoin = style.lineJoin ?? 'round';
+  if (!['round', 'butt', 'square'].includes(lineCap)
+    || !['round', 'bevel', 'miter'].includes(lineJoin)) {
+    throw new TypeError('Studio pen line cap/join is unsupported');
+  }
+
+  const next = structuredClone(board);
+  next.layers[index].elements.push({
+    id, type: 'polyline',
+    points: structuredClone(points),
+    stroke, strokeWidth: width, fill: null, lineCap, lineJoin,
+  });
+  validBoard(next);
+  return next;
+}
+
+/**
  * Wires real Konva click/tap/drag lifecycle events to canonical board writes.
  * A rejected commit restores the node and preserves the last accepted board.
  * No editing route is switched to this controller until interaction parity.
@@ -163,6 +218,18 @@ export function createKonvaV1MoveSession({
   const commit = (id, dx, dy) => enqueue(async () => {
     if (dx === 0 && dy === 0) return structuredClone(current);
     const next = translateKonvaV1Element(current, id, dx, dy);
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  let strokeSequence = 0;
+  const addStroke = points => enqueue(async () => {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    const id = 'path-' + (uuid || Date.now().toString(36) + '-' + (++strokeSequence).toString(36));
+    const next = appendKonvaV1Stroke(current, id, points);
     await persist(next);
     push(undoStack, current);
     redoStack.length = 0;
@@ -303,6 +370,7 @@ export function createKonvaV1MoveSession({
     bind,
     commit,
     resize,
+    addStroke,
     undo,
     redo,
     canUndo: () => undoStack.length > 0,
