@@ -1682,7 +1682,37 @@ describe('app shell resilience helpers', () => {
     expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-a.pdf');
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('9');
     expect(window.location.hash).toBe('#/pdf');
-    expect(window.PlasmaPDFViewer.goTo).toHaveBeenCalledWith(9);
+    // A bookmark for a different document may not move the still-mounted
+    // PDF reader before the requested document has loaded.
+    expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
+
+    document.querySelector('[data-bookmark-id="ann-pdf"] a').click();
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-b.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('4');
+    expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale pending PDF target for page-only bookmarks without a stable document ID', async () => {
+    await loadApp();
+    window.DB = {
+      getAllTimestamps: vi.fn(async () => []),
+      getAllNotes: vi.fn(async () => [
+        { id: 'page-only', title: 'Legacy unanchored page note', sourceType: 'pdf', pdfPage: 2 },
+      ]),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.PlasmaPDFViewer = { goTo: vi.fn() };
+    sessionStorage.setItem('ocd_pending_pdf_doc', 'previous-document.pdf');
+    sessionStorage.setItem('ocd_pending_pdf_page', '8');
+
+    await window.OpenCourseDeck.Views.bookmarks();
+    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="page-only"] a')).toBeTruthy());
+    document.querySelector('[data-bookmark-id="page-only"] a').click();
+
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBeNull();
+    expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe('#/pdf');
   });
 
   it('renders a catalog health panel in Help from the active DataStore', async () => {
