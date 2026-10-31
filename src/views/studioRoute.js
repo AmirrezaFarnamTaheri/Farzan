@@ -15,6 +15,7 @@ Toast = window.OpenCourseDeck?.Toast ?? { success() {}, error() {}, info() {}, w
 downloadTextFile,
 downloadDataUrl,
 printStudioBoardPdf,
+loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   } = deps;
 
   setView(`
@@ -79,6 +80,10 @@ printStudioBoardPdf,
               <span>3D Graph</span>
             </button>
               </div>
+          <div class="studio-tool-group" role="group" aria-label="Experimental editor">
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-open
+              title="Try Konva in a separate saved draft; does not replace your Studio board">Konva draft lab</button>
+          </div>
           <div class="studio-tool-group" role="group" aria-label="Geometric shapes">
             <button class="btn btn-ghost btn-sm" data-studio-add-rect title="Rectangle">
               <svg class="icon" aria-hidden="true"><use href="#i-square"/></svg>
@@ -153,6 +158,32 @@ printStudioBoardPdf,
           </div>
         </aside>
       </div>
+      <dialog class="studio-konva-dialog" data-studio-konva-dialog aria-label="Experimental Konva draft editor">
+        <div class="studio-konva-dialog-body">
+          <div class="studio-konva-heading">
+            <div>
+              <h2>Experimental Konva draft editor</h2>
+              <p>Changes are saved separately and are not applied to your Studio board.
+                Supported shapes can be dragged; rectangles and cards can be resized.
+                Other editing tools remain in the classic Studio canvas.</p>
+            </div>
+            <button type="button" class="btn btn-ghost" data-studio-konva-close>Close draft</button>
+          </div>
+          <div class="studio-konva-actions" role="group" aria-label="Konva draft editing controls">
+            <label for="studio-konva-object">Object</label>
+            <select id="studio-konva-object" class="select input-sm" data-studio-konva-object></select>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="left" title="Move left">Left</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="up" title="Move up">Up</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="down" title="Move down">Down</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="right" title="Move right">Right</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-undo>Undo</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reset>Start fresh from Studio</button>
+          </div>
+          <div class="studio-konva-stage" data-studio-konva-stage aria-label="Interactive experimental Konva canvas"></div>
+          <p data-studio-konva-status role="status" aria-live="polite">Move or resize a supported shape; changes save only to this draft.</p>
+        </div>
+      </dialog>
     </section>
   `);
 
@@ -630,6 +661,194 @@ printStudioBoardPdf,
   // Set by unmount() so async work started while the route was alive (the 3D
   // graph's note fetch) can bail out instead of mounting into detached DOM.
   let unmounted = false;
+  const konvaDialog = document.querySelector('[data-studio-konva-dialog]');
+  const konvaOpen = document.querySelector('[data-studio-konva-open]');
+  const konvaSelect = document.querySelector('[data-studio-konva-object]');
+  const konvaStage = document.querySelector('[data-studio-konva-stage]');
+  const konvaStatus = document.querySelector('[data-studio-konva-status]');
+  let konvaWorkspace = null;
+  let konvaModule = null;
+  let konvaOpening = false;
+  let konvaClosing = false;
+  let konvaResetting = false;
+  let focusBeforeKonva = null;
+  const setKonvaStatus = message => {
+    if (konvaStatus) konvaStatus.textContent = message;
+  };
+  const refreshKonvaControls = () => {
+    const selected = konvaSelect?.value || '';
+    document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
+      button.disabled = !selected;
+    });
+    const undo = document.querySelector('[data-studio-konva-undo]');
+    const redo = document.querySelector('[data-studio-konva-redo]');
+    if (undo) undo.disabled = !konvaWorkspace?.canUndo?.();
+    if (redo) redo.disabled = !konvaWorkspace?.canRedo?.();
+  };
+  const populateKonvaObjects = () => {
+    if (!konvaSelect || !konvaWorkspace) return;
+    const board = konvaWorkspace.getBoard();
+    const options = [];
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select an object';
+    options.push(placeholder);
+    for (const layer of board.layers || []) {
+      if (layer.locked || layer.visible === false) continue;
+      for (const element of layer.elements || []) {
+        const option = document.createElement('option');
+        option.value = String(element.id);
+        option.textContent = String(element.type || 'Shape') + ': ' + String(element.id);
+        options.push(option);
+      }
+    }
+    const previous = konvaSelect.value;
+    konvaSelect.replaceChildren(...options);
+    konvaSelect.value = options.some(option => option.value === previous) ? previous : '';
+    refreshKonvaControls();
+  };
+  const disposeKonva = ({ restoreFocus = true } = {}) => {
+    konvaWorkspace?.destroy?.();
+    konvaWorkspace = null;
+    if (konvaDialog?.open) {
+      if (typeof konvaDialog.close === 'function') konvaDialog.close();
+      else konvaDialog.removeAttribute('open');
+    }
+    if (restoreFocus) focusBeforeKonva?.focus?.();
+  };
+  const closeKonvaDraft = async () => {
+    if (konvaClosing) return;
+    konvaClosing = true;
+    try {
+      // Never reopen a snapshot while the previous session still has an
+      // unresolved write to the same isolated draft key.
+      await konvaWorkspace?.flush?.();
+    } catch {
+      setKonvaStatus('An experimental draft edit did not save');
+    } finally {
+      disposeKonva();
+      konvaClosing = false;
+    }
+  };
+  const createKonvaWorkspace = (source, loaded) => {
+    const db = window.DB;
+    konvaWorkspace?.destroy?.();
+    konvaWorkspace = loaded.createStudioKonvaDraftWorkspace({
+      container: konvaStage,
+      board: source,
+      // Only this experimental key is writable here. The live canvas owns
+      // ocd_studio_board and its independent autosave/restore epoch.
+      saveDraft: async changed => {
+        if (typeof db?.saveSetting !== 'function') throw new Error('Draft storage unavailable');
+        const receipt = await db.saveSetting(loaded.DRAFT_KEY, changed);
+        if (receipt === false) throw new Error('Draft save refused');
+        return true;
+      },
+      onSelect: id => {
+        if (konvaSelect) konvaSelect.value = id || '';
+        refreshKonvaControls();
+      },
+      onStatus: message => {
+        setKonvaStatus(message);
+        refreshKonvaControls();
+      },
+      onError: () => setKonvaStatus('Experimental draft save failed; earlier draft retained'),
+    });
+    populateKonvaObjects();
+    return konvaWorkspace;
+  };
+  const openKonvaDraft = async () => {
+    if (unmounted || konvaOpening || konvaClosing || konvaWorkspace) return;
+    konvaOpening = true;
+    focusBeforeKonva = document.activeElement;
+    try {
+      const loaded = await loadKonvaDraft();
+      if (unmounted) return;
+      if (!window.DB?.getSetting || !window.DB?.saveSetting) {
+        throw new Error('Experimental draft storage unavailable');
+      }
+      const savedDraft = await window.DB.getSetting(loaded.DRAFT_KEY);
+      if (unmounted) return;
+      const source = savedDraft ?? window.OpenCourseDeck?.Canvas?.serialize?.();
+      if (!source) throw new Error('Studio board unavailable');
+      konvaModule = loaded;
+      if (typeof konvaDialog?.showModal === 'function') konvaDialog.showModal();
+      else konvaDialog?.setAttribute('open', '');
+      createKonvaWorkspace(source, loaded);
+      setKonvaStatus(savedDraft
+        ? 'Resumed separately saved Konva draft'
+        : 'Copied Studio board into an isolated draft; Studio remains unchanged');
+    } catch {
+      if (!unmounted) {
+        disposeKonva();
+        setStatus('Konva draft unavailable (incompatible board or storage)');
+      }
+    } finally {
+      konvaOpening = false;
+    }
+  };
+  on(konvaOpen, 'click', () => { openKonvaDraft().catch(() => {}); });
+  on(document.querySelector('[data-studio-konva-close]'), 'click', () => { closeKonvaDraft().catch(() => {}); });
+  on(konvaDialog, 'cancel', event => {
+    event.preventDefault();
+    closeKonvaDraft().catch(() => {});
+  });
+  on(konvaDialog, 'close', () => disposeKonva());
+  on(konvaSelect, 'change', () => konvaWorkspace?.select?.(konvaSelect.value || null));
+  const nudge = Object.freeze({
+    left: [-10, 0], right: [10, 0], up: [0, -10], down: [0, 10],
+  });
+  document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
+    on(button, 'click', async () => {
+      const id = konvaSelect?.value;
+      if (!id || !konvaWorkspace) return;
+      const [dx, dy] = nudge[button.dataset.studioKonvaNudge] || [0, 0];
+      try {
+        await konvaWorkspace.move(id, dx, dy);
+        refreshKonvaControls();
+      } catch { setKonvaStatus('Experimental draft edit not saved'); }
+    });
+  });
+  for (const action of ['undo', 'redo']) {
+    on(document.querySelector('[data-studio-konva-' + action + ']'), 'click', async () => {
+      if (!konvaWorkspace) return;
+      try {
+        await konvaWorkspace[action]();
+        populateKonvaObjects();
+        refreshKonvaControls();
+      } catch { setKonvaStatus('Experimental draft history change not saved'); }
+    });
+  }
+  on(document.querySelector('[data-studio-konva-reset]'), 'click', async () => {
+    if (!konvaWorkspace || !konvaModule || konvaResetting || konvaClosing) return;
+    const confirmReset = window.OpenCourseDeck?.UI?.confirm || window.confirm;
+    let approved;
+    try { approved = typeof confirmReset === 'function'
+      ? await confirmReset('Replace the experimental Konva draft with a new copy of the Studio board?') : false; }
+    catch { return; }
+    if (!approved) return;
+    const source = window.OpenCourseDeck?.Canvas?.serialize?.();
+    if (!source || !konvaModule.isKonvaDraftCompatible?.(source)) {
+      setKonvaStatus('Current Studio board is not supported by this experimental editor');
+      return;
+    }
+    konvaResetting = true;
+    if (konvaStage) konvaStage.inert = true;
+    try {
+      const previous = konvaWorkspace;
+      await previous.flush();
+      if (unmounted || konvaWorkspace !== previous) return;
+      const receipt = await window.DB.saveSetting(konvaModule.DRAFT_KEY, structuredClone(source));
+      if (receipt === false) throw new Error('Draft reset not acknowledged');
+      if (unmounted || konvaWorkspace !== previous) return;
+      createKonvaWorkspace(source, konvaModule);
+      setKonvaStatus('New isolated Konva draft copied from Studio');
+    } catch { setKonvaStatus('Draft reset failed; saved Studio board untouched'); }
+    finally {
+      konvaResetting = false;
+      if (konvaStage) konvaStage.inert = false;
+    }
+  });
   const toggle3DGraph = async () => {
     const shell = document.querySelector('.studio-shell');
     const btn3D = document.querySelector('[data-studio-mode="3d"]');
@@ -952,6 +1171,7 @@ printStudioBoardPdf,
     refreshFromSync,
     unmount() {
       unmounted = true;
+      disposeKonva({ restoreFocus: false });
       unbindSyncRefresh();
       clearTimeout(interactiveSaveTimer);
       routeListeners.forEach(({ target, type, handler, options }) => {
