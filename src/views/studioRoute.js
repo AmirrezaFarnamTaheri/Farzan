@@ -669,6 +669,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let konvaWorkspace = null;
   let konvaModule = null;
   let konvaOpening = false;
+  let konvaClosing = false;
+  let konvaResetting = false;
   let focusBeforeKonva = null;
   const setKonvaStatus = message => {
     if (konvaStatus) konvaStatus.textContent = message;
@@ -714,6 +716,20 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     }
     if (restoreFocus) focusBeforeKonva?.focus?.();
   };
+  const closeKonvaDraft = async () => {
+    if (konvaClosing) return;
+    konvaClosing = true;
+    try {
+      // Never reopen a snapshot while the previous session still has an
+      // unresolved write to the same isolated draft key.
+      await konvaWorkspace?.flush?.();
+    } catch {
+      setKonvaStatus('An experimental draft edit did not save');
+    } finally {
+      disposeKonva();
+      konvaClosing = false;
+    }
+  };
   const createKonvaWorkspace = (source, loaded) => {
     const db = window.DB;
     konvaWorkspace?.destroy?.();
@@ -742,7 +758,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     return konvaWorkspace;
   };
   const openKonvaDraft = async () => {
-    if (unmounted || konvaOpening || konvaWorkspace) return;
+    if (unmounted || konvaOpening || konvaClosing || konvaWorkspace) return;
     konvaOpening = true;
     focusBeforeKonva = document.activeElement;
     try {
@@ -762,7 +778,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       setKonvaStatus(savedDraft
         ? 'Resumed separately saved Konva draft'
         : 'Copied Studio board into an isolated draft; Studio remains unchanged');
-    } catch (error) {
+    } catch {
       if (!unmounted) {
         disposeKonva();
         setStatus('Konva draft unavailable (incompatible board or storage)');
@@ -772,10 +788,10 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     }
   };
   on(konvaOpen, 'click', () => { openKonvaDraft().catch(() => {}); });
-  on(document.querySelector('[data-studio-konva-close]'), 'click', () => disposeKonva());
+  on(document.querySelector('[data-studio-konva-close]'), 'click', () => { closeKonvaDraft().catch(() => {}); });
   on(konvaDialog, 'cancel', event => {
     event.preventDefault();
-    disposeKonva();
+    closeKonvaDraft().catch(() => {});
   });
   on(konvaDialog, 'close', () => disposeKonva());
   on(konvaSelect, 'change', () => konvaWorkspace?.select?.(konvaSelect.value || null));
@@ -804,9 +820,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     });
   }
   on(document.querySelector('[data-studio-konva-reset]'), 'click', async () => {
-    if (!konvaWorkspace || !konvaModule) return;
+    if (!konvaWorkspace || !konvaModule || konvaResetting || konvaClosing) return;
     const confirmReset = window.OpenCourseDeck?.UI?.confirm || window.confirm;
-    let approved = false;
+    let approved;
     try { approved = typeof confirmReset === 'function'
       ? await confirmReset('Replace the experimental Konva draft with a new copy of the Studio board?') : false; }
     catch { return; }
@@ -816,13 +832,22 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       setKonvaStatus('Current Studio board is not supported by this experimental editor');
       return;
     }
+    konvaResetting = true;
+    if (konvaStage) konvaStage.inert = true;
     try {
+      const previous = konvaWorkspace;
+      await previous.flush();
+      if (unmounted || konvaWorkspace !== previous) return;
       const receipt = await window.DB.saveSetting(konvaModule.DRAFT_KEY, structuredClone(source));
       if (receipt === false) throw new Error('Draft reset not acknowledged');
-      if (unmounted || !konvaWorkspace) return;
+      if (unmounted || konvaWorkspace !== previous) return;
       createKonvaWorkspace(source, konvaModule);
       setKonvaStatus('New isolated Konva draft copied from Studio');
     } catch { setKonvaStatus('Draft reset failed; saved Studio board untouched'); }
+    finally {
+      konvaResetting = false;
+      if (konvaStage) konvaStage.inert = false;
+    }
   });
   const toggle3DGraph = async () => {
     const shell = document.querySelector('.studio-shell');
