@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
+import { createSquireNoteEditor, createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 
 describe('Squire HTML-canonical edit adapter', () => {
+  it('exports a Squire-named entrypoint without breaking the legacy adapter API', () => {
+    expect(createSquireNoteEditor).toBe(createTiptapNoteEditor);
+    const instance = createSquireNoteEditor({
+      element: document.createElement('div'), html: '<p>Safe rich text</p>',
+    });
+    try {
+      expect(instance.getHTML()).toContain('Safe rich text');
+    } finally { instance.destroy(); }
+  });
+
   it('accepts ordinary browser root text but still rejects unsupported tables', () => {
     for (const value of ['فیزیولوژی قلب 你好世界', '<strong>Important</strong> plain text', '<p>Intro</p> trailing words']) {
       expect(assessNoteForSquire(value).compatible).toBe(true);
