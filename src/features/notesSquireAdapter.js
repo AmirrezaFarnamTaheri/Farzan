@@ -121,11 +121,22 @@ export function createSquireNoteEditor({
   root.setAttribute('aria-multiline', 'true');
   root.setAttribute('aria-label', 'Note content');
   root.setAttribute('spellcheck', 'true');
-  const editor = new Squire(root, {
-    blockTag: 'P',
-    addLinks: false,
-    sanitizeToDOMFragment: inertSanitize,
-  });
+  // Squire's DOM parser and selection initialization require the editable
+  // root to be mounted. Constructing it while detached could appear to pass
+  // the HTML facade check yet leave an empty visible editor after a reload.
+  // Preflight above completes before touching the caller's DOM.
+  element.appendChild(root);
+  let editor;
+  try {
+    editor = new Squire(root, {
+      blockTag: 'P',
+      addLinks: false,
+      sanitizeToDOMFragment: inertSanitize,
+    });
+  } catch (error) {
+    root.remove();
+    throw error;
+  }
   let dirty = false;
   let suppress = false;
   let composing = false;
@@ -191,7 +202,6 @@ export function createSquireNoteEditor({
         });
       }
     });
-    element.appendChild(root);
   } catch (error) {
     editor.destroy();
     root.remove();
