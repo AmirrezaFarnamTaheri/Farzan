@@ -92,6 +92,79 @@ describe('home dashboard', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/flashcards');
   });
 
+  it('prioritizes a real unfinished lesson over a newer completed lesson', async () => {
+    const now = Date.now();
+    const { Router, setPendingCourseMedia } = mountDashboard({
+      progress: [
+        { topicId: 'topic-1', percent: 48, position: 245, status: 'in-progress', updatedAt: now - 60000 },
+        { topicId: 'topic-2', percent: 100, position: 1200, status: 'done', updatedAt: now },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.getElementById('home-focus-title').textContent).toBe('Design Systems');
+    expect(document.querySelector('[data-home-focus-percent]').textContent).toBe('48% complete');
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 245);
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+  });
+
+  it('does not offer resuming an already completed or never-started topic', async () => {
+    const { Router, setPendingCourseMedia } = mountDashboard({
+      progress: [
+        { topicId: 'topic-2', percent: 100, status: 'done', position: 900, updatedAt: Date.now() },
+        { topicId: 'topic-1', percent: 0, status: 'not-started', position: 0, updatedAt: Date.now() - 1000 },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.getElementById('home-focus-title').textContent).toBe('Choose a course');
+    expect(document.querySelector('[data-home-focus-status]').textContent).toBe('Start');
+    expect(document.querySelector('[data-home-resume] span').textContent).toBe('Browse courses');
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).not.toHaveBeenCalled();
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+    expect(document.querySelector('[data-pulse-complete]').textContent).toBe('1');
+    expect(document.querySelector('[data-home-command-strip]').hidden).toBe(false);
+  });
+
+  it('resumes a newer timestamp from another unfinished topic rather than an older progress row', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      progress: [{ topicId: 'topic-1', percent: 33, position: 60, updatedAt: now - 90000 }],
+      timestamps: [{ topicId: 'topic-2', position: 345, updatedAt: now }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.getElementById('home-focus-title').textContent).toBe('Frontend Performance');
+    expect(document.querySelector('[data-home-focus-time]').textContent).toContain('5:45');
+    document.querySelector('[data-home-focus-action]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 345);
+  });
+
+  it('uses a newer same-topic progress position instead of an older bookmarked timestamp', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      progress: [{ topicId: 'topic-1', percent: 70, position: 310, status: 'in-progress', updatedAt: now }],
+      timestamps: [{ topicId: 'topic-1', position: 22, updatedAt: now - 180000 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 310);
+    expect(document.querySelector('[data-home-focus-time]').textContent).toContain('5:10');
+  });
+
+  it('does not resume a saved timestamp for a topic already completed', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      progress: [
+        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 60000 },
+        { topicId: 'topic-2', percent: 44, position: 72, status: 'in-progress', updatedAt: now - 100000 },
+      ],
+      timestamps: [{ topicId: 'topic-1', position: 200, updatedAt: now }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 72);
+  });
+
   it('resumes the latest topic from its saved position', async () => {
     const { Router, setPendingCourseMedia } = mountDashboard({
       progress: [{ topicId: 'topic-1', percent: 60, updatedAt: Date.now() }],
