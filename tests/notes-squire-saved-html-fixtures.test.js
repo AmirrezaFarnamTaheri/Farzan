@@ -94,6 +94,20 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     } finally { editor.destroy(); }
   });
 
+  it('admits only Squire list-text wrappers, never arbitrary divs or attached attributes', () => {
+    const safe = '<ul><li><div>Blood pressure</div><ul><li>Renal</li></ul></li></ul>';
+    expect(assessNoteForSquire(safe)).toEqual({ compatible: true, reason: null });
+    for (const unsafe of [
+      '<p>Intro</p><div>Arbitrary new block</div>',
+      '<ul><li><div class="handwritten">Hidden metadata</div></li></ul>',
+      '<ul><li><div onclick="alert(1)">Event metadata</div></li></ul>',
+      '<ul><li><div><p>Separate block</p></div></li></ul>',
+      '<ul><li><div><img src="https://example.org/x">External image</div></li></ul>',
+    ]) {
+      expect(assessNoteForSquire(unsafe).compatible).toBe(false);
+    }
+  });
+
   it.each([
     ['legacy table', '<p>Intro</p><table><tr><td>Preserve cells</td></tr></table>'],
     ['image with alt', '<p>Intro</p><img src="blob:original" alt="Anatomy">'],
