@@ -10,7 +10,7 @@ const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'ut
 describe('worker pool runtime cost and durable offline assets', () => {
   it('does not import the unused pool into the eager application startup', () => {
     expect(indexSource).not.toContain("from './lib/workerPool.js'");
-    expect(indexSource).not.toContain('pd.WorkerPool =');
+    expect(indexSource).toContain('pd.WorkerPool = lazyWorkerPool;');
     expect(indexSource).not.toContain("import('./lib/workerPool.js')");
   });
 
