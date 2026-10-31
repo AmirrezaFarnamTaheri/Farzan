@@ -836,7 +836,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         try { link.click(); } finally { link.remove(); }
       } finally {
         // Revoke after the browser has had an opportunity to start the save.
-        setTimeout(() => URL.revokeObjectURL(href), 1000);
+        const revoke = URL.revokeObjectURL?.bind(URL);
+        setTimeout(() => { try { revoke?.(href); } catch {} }, 1000);
       }
       setKonvaStatus('Experimental draft JSON download started; Studio board unchanged');
     } catch {
