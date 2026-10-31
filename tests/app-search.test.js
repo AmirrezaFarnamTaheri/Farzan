@@ -65,6 +65,58 @@ describe('app topbar search rendering', () => {
     expect(window.location.href).not.toContain('javascript:');
   });
 
+  it('uses an accessible selected option and consistent Arrow/Enter/Escape behavior', async () => {
+    const actionA = vi.fn();
+    const actionB = vi.fn();
+    const search = window.OpenCourseDeck.TopbarSearch;
+    search.setData([
+      { label: 'Biology', action: actionA, category: 'Course' },
+      { label: 'Biology practice', action: actionB, category: 'Topic' },
+    ]);
+    const input = document.querySelector('[data-search-input]');
+    input.focus();
+    input.value = 'biology';
+    await search._onInput('biology');
+
+    const rows = [...search.resultsBox.querySelectorAll('.search-result-item')];
+    expect(rows).toHaveLength(2);
+    expect(input.getAttribute('role')).toBe('combobox');
+    expect(input.getAttribute('aria-controls')).toBe(search.resultsBox.id);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(rows[0].getAttribute('aria-selected')).toBe('true');
+    expect(input.getAttribute('aria-activedescendant')).toBe(rows[0].id);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(rows[1].getAttribute('aria-selected')).toBe('true');
+    expect(input.getAttribute('aria-activedescendant')).toBe(rows[1].id);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(rows[0].getAttribute('aria-selected')).toBe('true');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(actionA).toHaveBeenCalledOnce();
+    expect(actionB).not.toHaveBeenCalled();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+
+    await search._onInput('biology');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(true);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('clears the old active option as soon as a new query begins debouncing', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    search.setData([{ label: 'Biology', category: 'Course' }]);
+    const input = document.querySelector('[data-search-input]');
+    input.value = 'biology';
+    await search._onInput('biology');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(true);
+    input.value = 'physics';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
   it('does not let a slow earlier topbar query replace newer search results', async () => {
     const search = window.OpenCourseDeck.TopbarSearch;
     const input = document.querySelector('[data-search-input]');
