@@ -363,7 +363,8 @@ let studioKeyController = null;
             <h2 class="fc-empty-title">${cards.length ? 'All due cards reviewed' : 'No cards yet'}</h2>
             <p class="fc-sub">${cards.length
               ? 'Nice work. Check back tomorrow for your next memory review cycle.'
-              : 'Create your first card and OpenCourseDeck will schedule reviews for you with SM-2.'}</p>
+              : 'Make a question-and-answer card to begin reviewing at your own pace.'}</p>
+            ${cards.length ? '' : '<button id="fc-empty-create" class="btn btn-primary" type="button">Create your first card</button>'}
           </div>
         ` : `
           <div class="fc-progress-line">Card 1 of ${dueCards.length} · ${esc(due.deck)}</div>
@@ -381,14 +382,14 @@ let studioKeyController = null;
         `;
 
     container.innerHTML = `
-      <section class="view view-flashcards fc-wrap">
+      <section class="view view-flashcards fc-wrap" data-first-use="${cards.length === 0}">
         <header class="page-header fc-header">
           <div>
             <span class="eyebrow">Spaced repetition</span>
             <h1 class="page-title fc-title">Flashcards</h1>
             <p class="page-subtitle fc-sub">SM-2 scheduling keeps every card coming back right before you would forget it.</p>
           </div>
-          <button id="fc-add-btn" class="btn btn-primary" type="button">
+          <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '' : 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
             New card
           </button>
@@ -413,16 +414,16 @@ let studioKeyController = null;
           </div>
         </form>
 
-        <div class="fc-stats">
+        ${cards.length ? `<div class="fc-stats">
           <div class="fc-stat"><span class="fc-stat-label">Total cards</span><span class="fc-stat-value">${cards.length}</span></div>
           <div class="fc-stat fc-stat-accent"><span class="fc-stat-label">Due today</span><span class="fc-stat-value">${dueCards.length}</span></div>
           <div class="fc-stat"><span class="fc-stat-label">Decks</span><span class="fc-stat-value">${decks.length}</span></div>
-        </div>
+        </div>` : ''}
 
         <div id="fc-review-area" class="fc-review">
           ${reviewArea}
         </div>
-        <details class="card card-filled" id="fc-manage-cards">
+        <details class="card card-filled" id="fc-manage-cards" ${cards.length ? '' : 'hidden'}>
           <summary class="btn btn-ghost">Manage saved cards (${cards.length})</summary>
           <div class="card-body" style="display:grid;gap:10px;max-height:360px;overflow-y:auto;">
             ${cards.length ? cards.map(card => `
@@ -511,6 +512,7 @@ let studioKeyController = null;
     }, { signal: studioKeyController.signal });
 
     const addBtn = container.querySelector('#fc-add-btn');
+    container.querySelector('#fc-empty-create')?.addEventListener('click', () => addBtn?.click());
     const newForm = container.querySelector('#fc-new-form');
     let editingCardId = null;
     container.querySelector('#fc-manage-cards')?.addEventListener('click', async (event) => {
@@ -563,7 +565,7 @@ let studioKeyController = null;
         editingCardId = null;
         newForm.hidden = true;
         announce('Card creation cancelled.');
-        addBtn.focus();
+        (addBtn.hidden ? container.querySelector('#fc-empty-create') : addBtn)?.focus();
       });
       newForm.addEventListener('submit', async (event) => {
         event.preventDefault();
