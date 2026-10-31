@@ -59,6 +59,29 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     for (const node of nodes) node.destroy();
   });
 
+  it.each([
+    ['missing layer identifier', board => { board.layers[0].id = ''; }],
+    ['duplicate layer identifiers', board => {
+      board.layers.push({ id: 'layer-1', name: 'Different layer', elements: [] });
+    }],
+    ['duplicate shape identifiers across layers', board => {
+      board.layers.push({ id: 'layer-2', name: 'Other layer',
+        elements: [{ id: 'card', type: 'circle', x: 4, y: 7, radius: 3 }] });
+    }],
+    ['nonfinite viewport offset', board => { board.viewport.offsetX = Number.NaN; }],
+    ['nonfinite zoom', board => { board.viewport.zoom = Infinity; }],
+    ['string coordinate in viewport', board => { board.viewport.offsetY = '24'; }],
+  ])('fails closed before rendering a board with %s', (_label, damage) => {
+    const board = fixture();
+    damage(board);
+    const original = structuredClone(board);
+    const result = planKonvaV1Board(board);
+    expect(result.compatible).toBe(false);
+    expect(result.reason).toMatch(/invalid|duplicate|missing/);
+    // Renderer preflight is strictly read-only, including invalid documents.
+    expect(board).toEqual(original);
+  });
+
   it('maps original ellipse radii, rotation and native line default strokes', () => {
     const board = fixture();
     board.layers[0].elements = [
