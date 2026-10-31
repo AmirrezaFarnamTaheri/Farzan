@@ -22,6 +22,19 @@ describe('bridge DB safety helpers', () => {
     else delete window.BroadcastChannel;
   });
 
+  it('acknowledges a successful timestamp deletion after removing its canonical record', async () => {
+    const saved = { id: 'ts-ack', topicId: 'topic-1', position: 30 };
+    await expect(window.DB.saveTimestamp(saved)).resolves.toBe(true);
+    expect(await window.DB.getAllTimestamps()).toEqual(
+      expect.arrayContaining([expect.objectContaining(saved)])
+    );
+
+    await expect(window.DB.deleteTimestamp(saved.id)).resolves.toBe(true);
+    expect(await window.DB.getAllTimestamps()).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: saved.id })])
+    );
+  });
+
   it.each([
     ['getProgress', ['topic-stale']],
     ['getAllProgress', []],
