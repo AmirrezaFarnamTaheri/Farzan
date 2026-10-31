@@ -27,20 +27,23 @@ export async function mountMaterialsView(deps = {}) {
             <button class="filter-chip" type="button" data-material-filter="pdf" aria-pressed="false">PDF</button>
             <button class="filter-chip" type="button" data-material-filter="none" aria-pressed="false">No media</button>
           </div>
-          <div class="grid grid-2 materials-select-row">
-            <label class="stack-xs">
-              <span class="text-sm text-muted">Course</span>
-              <select class="select" id="materials-course-filter" aria-label="Filter materials by course">
-                <option value="all">All courses</option>
-              </select>
-            </label>
-            <label class="stack-xs">
-              <span class="text-sm text-muted">Source</span>
-              <select class="select" id="materials-source-filter" aria-label="Filter materials by source">
-                <option value="all">All sources</option>
-              </select>
-            </label>
-          </div>
+          <details class="materials-more-filters">
+            <summary>More filters: course and source</summary>
+            <div class="grid grid-2 materials-select-row">
+              <label class="stack-xs">
+                <span class="text-sm text-muted">Course</span>
+                <select class="select" id="materials-course-filter" aria-label="Filter materials by course">
+                  <option value="all">All courses</option>
+                </select>
+              </label>
+              <label class="stack-xs">
+                <span class="text-sm text-muted">Source</span>
+                <select class="select" id="materials-source-filter" aria-label="Filter materials by source">
+                  <option value="all">All sources</option>
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
       </div>
       <div id="materials-pager" class="materials-pager"></div>
@@ -151,6 +154,14 @@ export async function mountMaterialsView(deps = {}) {
       return matchesQuery && passesFilter(t) && matchesCourse && matchesSource;
     });
     state.query = query;
+    // Prioritize actionable study resources, preserving catalog order within each group.
+    // "No media" remains reachable through the dedicated filter.
+    const priority = (topic) => {
+      const video = (topic.videos?.length ?? 0) > 0;
+      const pdf = (topic.pdfs?.length ?? 0) > 0;
+      return video && pdf ? 0 : video ? 1 : pdf ? 2 : 3;
+    };
+    filtered.sort((left, right) => priority(left) - priority(right));
     const { page, perPage, pages, total, slice } = Paginator.paginate(filtered, state);
     state.page = page;
     state.perPage = perPage;
