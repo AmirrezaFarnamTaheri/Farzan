@@ -50,27 +50,27 @@ describe('runtime wiring', () => {
     expect(indexSource).toContain(specifier);
   });
 
-  it('defers translation and note-template utilities until the app shell resolves', () => {
+  it('loads translation providers only after an explicit request, preserving lazy contracts', () => {
     const appImport = indexSource.indexOf("import('../app.js')");
-    for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
+    expect(indexSource).toContain("import { createLazyTranslationTools } from './core/lazyTranslationTools.js'");
+    expect(indexSource).toContain('pd.loadTranslationTools = createLazyTranslationTools({');
+    for (const specifier of ['./features/translator.js', './features/translationCache.js']) {
       expect(indexSource).toContain(`import('${specifier}')`);
-      expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\.')}["']`));
-      expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
+      expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\\\.')}["']`));
     }
-    expect(indexSource).toContain('const cacheApi = translationCache.translationCache || translationCache');
-    expect(indexSource).toContain('const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates');
-    expect(indexSource).toContain('TranslationCache: cacheApi');
+    expect(indexSource).not.toContain("name: 'translator'");
+    expect(indexSource).not.toContain("name: 'translation-cache'");
+    expect(indexSource).toContain("import('./features/noteTemplates.js')");
+    expect(indexSource.indexOf("import('./features/noteTemplates.js')")).toBeGreaterThan(appImport);
     expect(indexSource).toContain('NoteTemplates: templateApi');
-    expect(indexSource).not.toContain('TranslationCache: translationCache,');
   });
 
-  it('loads optional runtime utilities without an all-or-nothing dependency group', () => {
+  it('isolates active optional app initializers without loading dormant translator providers', () => {
     expect(indexSource).toContain("import { runIndependentInitializers } from './core/deferredRuntime.js'");
     expect(indexSource).not.toContain('const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all');
-    for (const name of ['add-content', 'translator', 'translation-cache', 'note-templates', 'command-palette']) {
+    for (const name of ['add-content', 'note-templates', 'command-palette']) {
       expect(indexSource).toContain(`name: '${name}'`);
     }
-    // User-library actions must exist before command-palette commands are registered.
     expect(indexSource.indexOf("name: 'add-content'")).toBeLessThan(indexSource.indexOf("name: 'command-palette'"));
   });
 
