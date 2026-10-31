@@ -284,6 +284,45 @@ async function renderPlaylists(deps) {
     body.append(badge, title, section, detail, preview, more, actions);
     actions.appendChild(link);
     if (playlist.saved) {
+      // Keep the four-row compact preview. The disclosure exposes the full
+      // saved order, including topics whose source is temporarily unavailable.
+      const persisted = savedPlaylists.find(item => item.id === playlist.id);
+      if (persisted?.topicIds?.length > 1) {
+        const reorder = document.createElement('details');
+        reorder.className = 'playlist-reorder';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Reorder saved topics';
+        const ordered = document.createElement('ol');
+        ordered.className = 'compact-list playlist-reorder-list';
+        persisted.topicIds.forEach((topicId, index) => {
+          const item = document.createElement('li');
+          item.className = 'playlist-reorder-item';
+          const title = document.createElement('span');
+          title.dir = 'auto';
+          title.textContent = playlistTopicTitle(topicsById.get(topicId))
+            || String(topicId);
+          // An unavailable source still needs a readable identity.
+          if (!topicsById.has(topicId)) title.textContent = String(topicId);
+          item.appendChild(title);
+          for (const direction of ['up', 'down']) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-ghost btn-sm';
+            button.dataset.playlistMove = direction;
+            button.dataset.playlistId = String(playlist.id);
+            button.dataset.topicIndex = String(index);
+            button.dataset.topicId = String(topicId);
+            button.setAttribute('aria-label', `Move ${title.textContent} ${direction}`);
+            button.textContent = direction === 'up' ? 'Up' : 'Down';
+            button.disabled = direction === 'up'
+              ? index === 0 : index === persisted.topicIds.length - 1;
+            item.appendChild(button);
+          }
+          ordered.appendChild(item);
+        });
+        reorder.append(summary, ordered);
+        body.appendChild(reorder);
+      }
       const openQueue = document.createElement('button');
       openQueue.className = 'btn btn-primary btn-sm';
       openQueue.type = 'button';
@@ -324,7 +363,53 @@ async function renderPlaylists(deps) {
     };
   }
 
+  let reorderBusy = false;
   listRoot.onclick = async (event) => {
+    const move = event.target?.closest?.('[data-playlist-move]');
+    if (move) {
+      if (reorderBusy || move.disabled) return;
+      if (typeof window.DB?.getSetting !== 'function'
+          || typeof window.DB?.saveSetting !== 'function') {
+        Toast.error?.('Saved playlist storage is unavailable');
+        return;
+      }
+      reorderBusy = true;
+      move.disabled = true;
+      try {
+        // Refetch the authoritative deck and refuse a stale UI action rather
+        // than overwriting a more recent queue update from another tab.
+        const records = await window.DB.getSetting('ocd_playlists');
+        if (!Array.isArray(records)) throw new TypeError('Saved playlists could not be read');
+        const selected = records.find(item => item?.id === move.dataset.playlistId);
+        const rendered = savedPlaylists.find(item => item.id === move.dataset.playlistId);
+        if (!selected || !Array.isArray(selected.topicIds) || !rendered
+            || selected.topicIds.length !== rendered.topicIds.length
+            || selected.topicIds.some((id, i) => String(id) !== String(rendered.topicIds[i]))) {
+          throw new Error('Saved playlist was changed elsewhere; reload before reordering');
+        }
+        const from = Number(move.dataset.topicIndex);
+        const to = from + (move.dataset.playlistMove === 'up' ? -1 : 1);
+        if (!Number.isSafeInteger(from) || from < 0 || to < 0
+            || to >= selected.topicIds.length
+            || String(selected.topicIds[from]) !== move.dataset.topicId) {
+          throw new Error('This playlist order is no longer current');
+        }
+        const ids = [...selected.topicIds];
+        [ids[from], ids[to]] = [ids[to], ids[from]];
+        const updated = records.map(record => record === selected
+          ? { ...record, topicIds: ids, updatedAt: Date.now() } : record);
+        const receipt = await window.DB.saveSetting('ocd_playlists', updated);
+        if (receipt === false) throw new Error('Saved playlist order was not acknowledged');
+        Toast.success?.('Playlist order saved');
+        void renderPlaylists(deps);
+      } catch (error) {
+        Toast.error?.('Could not change playlist order: ' + (error?.message || 'Storage unavailable'));
+      } finally {
+        reorderBusy = false;
+        move.disabled = false;
+      }
+      return;
+    }
     const open = event.target?.closest?.('[data-open-playlist]');
     if (open) {
       if (typeof setPendingCourseSession !== 'function' || typeof Router?.navigate !== 'function') {

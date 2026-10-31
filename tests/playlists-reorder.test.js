@@ -54,7 +54,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
       return button;
     });
     expect(move.getAttribute('aria-label')).toMatch(/move.*up/i);
-    expect(document.querySelectorAll('.playlist-preview li')).toHaveLength(4);
+    expect(document.querySelectorAll('[data-playlist-id="focus-queue"] .playlist-preview li')).toHaveLength(4);
     expect(document.querySelector('[data-playlist-move="up"][data-topic-index="0"]').disabled).toBe(true);
     move.click();
     await vi.waitFor(() => expect(saved[0].topicIds).toEqual(['a','b','c','e','d']));
