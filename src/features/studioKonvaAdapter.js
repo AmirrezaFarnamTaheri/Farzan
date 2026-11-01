@@ -188,6 +188,14 @@ export function planKonvaV1Board(board) {
     if (!layerId.trim()) return unsupported('missing-layer-id');
     if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
     seenLayers.add(layerId);
+    // Nonboolean imported lock/visibility values must not turn a protected
+    // layer into an editable one (or render a hidden layer). Refuse the Konva
+    // draft rather than coercing or rewriting historical Canvas-v1 data.
+    for (const flag of ['visible', 'locked']) {
+      if (layer[flag] != null && typeof layer[flag] !== 'boolean') {
+        return unsupported('invalid-layer-' + flag);
+      }
+    }
     if (Object.hasOwn(layer, 'opacity')
       && (typeof layer.opacity !== 'number' || !Number.isFinite(layer.opacity)
         || layer.opacity < 0 || layer.opacity > 1)) {
