@@ -152,7 +152,9 @@ describe('Studio Konva draft text controls and storage isolation', () => {
     expect(persisted.layers[1].locked).toBe(true);
     expect(persisted.layers[1].elements[0].text).toBe('Do not edit');
     expect(window.OpenCourseDeck.Canvas.serialize().layers[0].elements[0].id).toBe('text-1');
-    expect(backward.disabled).toBe(false);
+    // saveSetting begins before the async reorder finishes; controls stay
+    // disabled until the acknowledged write has settled and UI re-enables.
+    await vi.waitFor(() => expect(backward.disabled).toBe(false));
   });
 
   it('keeps unsaved Unicode input and reports a rejected draft write, without claiming success', async () => {
