@@ -316,7 +316,9 @@ export function mountSettingsView(deps = {}) {
     event.preventDefault();
     setCurrentSection(id);
     section.scrollIntoView?.({
-      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'instant' : 'smooth',
+      // Anchor navigation is immediate: a smooth scroll can re-select the
+      // previous section while motion is in flight and confuse aria-current.
+      behavior: 'auto',
       block: 'start',
     });
   }));
