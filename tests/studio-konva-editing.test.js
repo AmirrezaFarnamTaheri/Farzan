@@ -366,7 +366,7 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
     ]) {
       expect(() => resizeKonvaV1Element(board, 'rect', bounds)).toThrow();
     }
-    expect(() => resizeKonvaV1Element(board, 'circle', {
+    expect(() => resizeKonvaV1Element(board, 'line', {
       x: 4, y: 5, width: 25, height: 25,
     })).toThrow(/unsupported/i);
     board.layers[0].locked = true;
