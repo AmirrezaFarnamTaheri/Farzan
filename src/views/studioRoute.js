@@ -47,7 +47,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
 
           <div class="studio-tool-group" role="group" aria-label="Notes and cards">
             <input class="input input-sm w-40" data-studio-text placeholder="Board note..." aria-label="Board note text" />
-            <button class="btn btn-primary btn-sm" data-studio-add-text title="Add Note">
+            <button class="btn btn-ghost btn-sm" data-studio-add-text title="Add Note">
               <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
               <span>Note</span>
             </button>
