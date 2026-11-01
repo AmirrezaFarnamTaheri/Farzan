@@ -356,7 +356,7 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
       width: 720, height: 450, deviceScaleFactor: 2, mobile: false,
       screenWidth: 1440, screenHeight: 900,
     });
-    await expect.poll(() => page.evaluate(() => innerWidth)).toBe(720);
+    await expect.poll(() => page.evaluate(() => innerWidth), { timeout: 12000 }).toBe(720);
   };
   const folder = path.join(output, 'populated-200pct-rtl');
   fs.mkdirSync(folder, { recursive: true });
@@ -418,11 +418,14 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
       path: path.join(folder, 'notes-populated-library.png'),
       animations: 'disabled', caret: 'hide',
     });
-    await savedRow.click();
+    await savedRow.scrollIntoViewIfNeeded({ timeout: 10000 });
+    await savedRow.click({ timeout: 12000 });
     await expect(modern).toContainText('Heart rhythm 你好世界');
     if (mobilePane) await expect(library).toHaveAttribute('aria-expanded', 'false');
 
-    await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
+    // Bound SPA route navigation so a pending note persistence guard cannot
+    // consume the entire visual test timeout without a useful error.
+    await page.goto('/#/settings', { waitUntil: 'domcontentloaded', timeout: 15000 });
     await applyZoomProfile();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     await expect(page.locator('.view-settings')).toBeVisible();
@@ -442,6 +445,8 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
       animations: 'disabled', caret: 'hide',
     });
   } finally {
-    await session.detach();
+    // The page may already be gone on a Playwright timeout; do not mask the
+    // actionable error with a secondary CDP detach exception.
+    await session.detach().catch(() => {});
   }
 });
