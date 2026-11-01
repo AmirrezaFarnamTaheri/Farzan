@@ -34,7 +34,6 @@ import { CanvasAreaChart } from './src/features/canvasCharts/area.js';
 import { CanvasGauge } from './src/features/canvasCharts/gauge.js';
 import { CanvasHeatmap } from './src/features/canvasCharts/heatmap.js';
 import { CanvasTreemap } from './src/features/canvasCharts/treemap.js';
-import { CanvasZoom } from './src/features/canvasZoom.js';
 import './src/features/canvasTools/index.js';
 import { CourseGraph } from './src/features/courseGraph.js';
 import { KnowledgeGraph } from './src/features/knowledgeGraph.js';
@@ -3662,7 +3661,6 @@ KeyboardShortcuts.register('ctrl+0', () => FontScale.reset(), 'Reset UI font siz
     OpenCourseDeck.Heatmap    = Heatmap;
     OpenCourseDeck.ChartPlugins = Charts.plugins;
     OpenCourseDeck.CanvasCharts = { CanvasGauge, CanvasTreemap, CanvasAreaChart, CanvasHeatmap };
-    OpenCourseDeck.CanvasZoom = CanvasZoom;
     OpenCourseDeck.CourseGraph = CourseGraph;
     OpenCourseDeck.KnowledgeGraph = KnowledgeGraph;
     OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph };

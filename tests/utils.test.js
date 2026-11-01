@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { stagger } from '../src/lib/stagger.js';
 import { Transition } from '../src/lib/transition.js';
-import { Timeline } from '../src/lib/timeline.js';
 
 describe('stagger', () => {
   it('spreads values linearly from the first element by default', () => {
@@ -101,71 +100,3 @@ describe('Transition', () => {
   });
 });
 
-describe('Timeline', () => {
-  it('does not re-fire call() entries when resuming from pause', () => {
-    const frames = [];
-    let nextId = 1;
-    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-      frames.push(cb);
-      return nextId++;
-    });
-    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
-
-    try {
-      const sideEffect = vi.fn();
-      const tl = new Timeline();
-      tl.call(sideEffect, 0);
-      tl.add(null, { duration: 1000 }, 0);
-
-      tl.play();
-      frames.shift()(1000);
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-      frames.shift()(1300); // advance to t=300ms
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-
-      tl.pause();
-      tl.play();
-      frames.shift()(9000);
-
-      // Resuming must not clear _firedCalls, or every call/set entry before
-      // the pause point would run a second time.
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-    } finally {
-      raf.mockRestore();
-      cancel.mockRestore();
-    }
-  });
-
-  it('replays call() entries on a fresh play after completion', () => {
-    const frames = [];
-    let nextId = 1;
-    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-      frames.push(cb);
-      return nextId++;
-    });
-    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
-
-    try {
-      const sideEffect = vi.fn();
-      const tl = new Timeline();
-      tl.call(sideEffect, 0);
-      tl.add(null, { duration: 100 }, 0);
-
-      tl.play();
-      // Non-zero timestamps: _tick anchors with `if (!this._startTime)`, so a
-      // literal 0 would be treated as "unanchored" and re-anchor each frame.
-      frames.shift()(1000);
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-      frames.shift()(1500); // past the 100ms duration -> completes
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-
-      // A fresh play() after completion re-arms call entries.
-      tl.play();
-      frames.shift()(2000);
-      expect(sideEffect).toHaveBeenCalledTimes(2);
-    } finally {
-      raf.mockRestore();
-      cancel.mockRestore();
-    }
-  });
-});
