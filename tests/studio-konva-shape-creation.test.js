@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { appendKonvaV1Shape, createKonvaV1MoveSession } from '../src/features/studioKonvaEditing.js';
 import { createStudioKonvaDraftWorkspace } from '../src/features/studioKonvaDraftWorkspace.js';
@@ -15,6 +16,13 @@ const board = () => ({
 });
 
 describe('Konva v1 shape creation parity (#172)', () => {
+  it('has retired the never-consumed noninteractive preview renderer before first release', () => {
+    const adapter = fs.readFileSync('src/features/studioKonvaAdapter.js', 'utf8');
+    expect(adapter).not.toMatch(/mountKonvaV1Preview|listening: false/);
+    const editor = fs.readFileSync('src/features/studioKonvaDraftWorkspace.js', 'utf8');
+    expect(editor).toMatch(/listening: true/);
+  });
+
   it('appends an immutable canonical rectangle at world coordinates and preserves layer metadata', () => {
     const input = board();
     const before = structuredClone(input);
