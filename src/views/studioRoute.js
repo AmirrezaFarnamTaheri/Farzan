@@ -191,7 +191,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <input type="file" hidden accept=".json,application/json" data-studio-konva-import aria-label="Import isolated Konva draft JSON" />
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reset>Start fresh from Studio</button>
           </div>
-          <div class="studio-konva-stage" data-studio-konva-stage aria-label="Interactive experimental Konva canvas"></div>
+          <div class="studio-konva-stage" data-studio-konva-stage tabindex="0" role="group"
+            aria-label="Interactive experimental Konva draft canvas: arrow keys move selection; Shift adds ten-pixel steps"
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Control+z Control+Shift+z Escape"></div>
           <p data-studio-konva-status role="status" aria-live="polite">Move or resize a supported shape; changes save only to this draft.</p>
         </div>
       </dialog>
@@ -686,6 +688,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let konvaResetting = false;
   let konvaImporting = false;
   let konvaTextSaving = false;
+  let konvaKeyboardBusy = false;
   let konvaTextIdentity = '';
   let konvaTextBaseline = '';
   let focusBeforeKonva = null;
@@ -718,7 +721,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       }
       konvaTextIdentity = identity;
       konvaTextBaseline = canonicalText;
-      const writable = Boolean(textElement) && !konvaTextSaving && !konvaClosing
+      const writable = Boolean(textElement) && !konvaTextSaving && !konvaKeyboardBusy && !konvaClosing
         && !konvaResetting && !konvaImporting;
       konvaTextInput.disabled = !writable;
       if (konvaTextSave) konvaTextSave.disabled = !writable || konvaTextInput.value === canonicalText;
@@ -728,9 +731,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
       button.classList.toggle('active', active);
     });
-    if (konvaSelect) konvaSelect.disabled = mode === 'pen' || konvaTextSaving;
+    if (konvaSelect) konvaSelect.disabled = mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
     document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
-      button.disabled = !selected || mode === 'pen' || konvaTextSaving;
+      button.disabled = !selected || mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
     });
     const undo = document.querySelector('[data-studio-konva-undo]');
     const redo = document.querySelector('[data-studio-konva-redo]');
@@ -854,6 +857,63 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   on(konvaSelect, 'change', () => {
     konvaWorkspace?.select?.(konvaSelect.value || null);
     refreshKonvaControls();
+  });
+  const konvaArrowMoves = Object.freeze({
+    ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+    ArrowUp: [0, -1], ArrowDown: [0, 1],
+  });
+  // Only focused, accessible draft stage shortcuts are intercepted. Text
+  // inputs, selects and the main Canvas2D editor retain native keyboard use.
+  on(konvaStage, 'keydown', async event => {
+    if (event.target !== konvaStage || unmounted || !konvaWorkspace || konvaClosing
+        || konvaResetting || konvaImporting || konvaTextSaving) return;
+    const previous = konvaWorkspace;
+    const selected = konvaSelect?.value || '';
+    if (event.key === 'Escape' && selected) {
+      event.preventDefault();
+      konvaSelect.value = '';
+      previous.select(null);
+      refreshKonvaControls();
+      return;
+    }
+
+    const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
+    const key = String(event.key).toLowerCase();
+    const historyAction = shortcut
+      ? (key === 'z' ? (event.shiftKey ? 'redo' : 'undo')
+        : key === 'y' ? 'redo' : null)
+      : null;
+    const move = !event.altKey && !event.ctrlKey && !event.metaKey
+      && previous.getMode?.() === 'select' && selected
+      ? konvaArrowMoves[event.key] : null;
+    if (!historyAction && !move) return;
+    event.preventDefault();
+    if (konvaKeyboardBusy) return;
+    if (historyAction) {
+      const allowed = historyAction === 'undo' ? previous.canUndo?.() : previous.canRedo?.();
+      if (!allowed) return;
+    }
+    konvaKeyboardBusy = true;
+    refreshKonvaControls();
+    try {
+      if (historyAction) {
+        await previous[historyAction]();
+        if (!unmounted && konvaWorkspace === previous) populateKonvaObjects();
+      } else {
+        const pixels = event.shiftKey ? 10 : 1;
+        await previous.move(selected, move[0] * pixels, move[1] * pixels);
+      }
+      if (!unmounted && konvaWorkspace === previous) {
+        setKonvaStatus('Experimental draft keyboard edit saved; Studio board unchanged');
+      }
+    } catch {
+      if (!unmounted && konvaWorkspace === previous) {
+        setKonvaStatus('Experimental draft keyboard edit not saved');
+      }
+    } finally {
+      konvaKeyboardBusy = false;
+      if (!unmounted && konvaWorkspace === previous) refreshKonvaControls();
+    }
   });
   on(konvaTextInput, 'input', refreshKonvaControls);
   on(konvaTextSave, 'click', async () => {
