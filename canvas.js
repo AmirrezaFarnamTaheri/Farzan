@@ -149,7 +149,6 @@
     _autosaveTimer: null,
     _autosaveKey: 'ocd_studio_board',
     // Retired canvas-only autosave key; read once for adoption only.
-    _legacyAutosaveKey: 'ocd_canvas_board',
     _autosaveDebounceMs: 1500,
     // Monotonic board epoch. Every committed board change — a loadState
     // replacement, a programmatic element edit, or an interactive stroke —
@@ -1078,74 +1077,26 @@
     },
 
     async restoreBoard() {
-      // A restore supersedes whatever unsaved interactive change is still in
-      // the debounce window — flushing it would write the outgoing snapshot
-      // back over the board the caller is about to reload.
+      // The unreleased app uses exactly one canonical Studio board key. Never
+      // copy or silently adopt a retired canvas storage alias on first boot.
+      // An in-flight read must not replace a newer local edit or remote replay.
       this._cancelPendingAutosave();
-      // Captured before the read: if the board changes while the read is in
-      // flight (a newer load, a sync refresh, or a local edit), the snapshot
-      // this read returns is stale and must not be applied. Without this,
-      // two concurrent restores of the same key raced on resolve order.
       const epoch = this._boardEpoch;
-      const parseBoard = (raw) => {
-        if (typeof raw === 'string') {
-          try { raw = JSON.parse(raw); } catch { return null; }
-        }
-        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
-      };
-      const readSetting = (key) => window.DB?.getSetting
-        ? window.DB.getSetting(key)
-        : Promise.resolve(window.localStorage?.getItem?.(key) ?? null);
-      const persistBoard = async (board) => {
-        if (window.DB?.saveSetting) {
-          const saved = await window.DB.saveSetting(this._autosaveKey, board);
-          // A successful storage migration needs an affirmative receipt:
-          // the canonical DB returns the exact stored board value; test
-          // adapters may explicitly return true. Missing or mismatched
-          // values must not certify adoption of a retired canvas key.
-          const acknowledged = saved === true
-            || (saved != null && typeof saved === 'object' && !Array.isArray(saved)
-              && JSON.stringify(saved) === JSON.stringify(board));
-          if (!acknowledged) throw new Error('Board persistence was not acknowledged');
-          return true;
-        }
-        if (window.localStorage) {
-          window.localStorage.setItem(this._autosaveKey, JSON.stringify(board));
-          return true;
-        }
+      let raw;
+      try {
+        raw = window.DB?.getSetting
+          ? await window.DB.getSetting(this._autosaveKey)
+          : window.localStorage?.getItem?.(this._autosaveKey) ?? null;
+      } catch {
         return false;
-      };
-      const doRestore = async (raw, { persist = false } = {}) => {
-        const board = parseBoard(raw);
-        if (!board || this._boardEpoch !== epoch) return false;
-        // loadState() advances the epoch; only call it after the stale-read
-        // check. A canonical read is already persisted, while a legacy board
-        // must be adopted under the canonical key before it is acknowledged.
-        this.loadState(board, { preserveViewport: true });
-        if (!persist) return true;
-        try {
-          return await persistBoard(this.serialize());
-        } catch {
-          return false;
-        }
-      };
-      // Canvas and the studio view previously autosaved to different keys
-      // (`ocd_canvas_board` vs `ocd_studio_board`), so a board saved by one was
-      // missed by the other. Adopt the studio key as canonical and adopt a
-      // board found only under the retired key once, so nothing is stranded.
-      const legacyKey = this._legacyAutosaveKey;
-      const adoptLegacy = async () => {
-        if (!legacyKey || this._boardEpoch !== epoch) return false;
-        let raw;
-        try { raw = await readSetting(legacyKey); } catch { return false; }
-        return doRestore(raw, { persist: true });
-      };
-
-      let canonicalRaw;
-      try { canonicalRaw = await readSetting(this._autosaveKey); } catch { return false; }
-      const canonical = parseBoard(canonicalRaw);
-      if (canonical) return doRestore(canonical);
-      return adoptLegacy();
+      }
+      if (this._boardEpoch !== epoch || raw == null) return false;
+      if (typeof raw === 'string') {
+        try { raw = JSON.parse(raw); } catch { return false; }
+      }
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+      this.loadState(raw, { preserveViewport: true });
+      return true;
     },
 
     clearAutosave() {
