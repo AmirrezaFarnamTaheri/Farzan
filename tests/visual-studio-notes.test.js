@@ -4,8 +4,14 @@ import { mountNotesView } from '../src/views/notesRoute.js';
 
 const studioCss = fs.readFileSync('src/styles/farzan-redesign.css', 'utf8');
 const notesCss = fs.readFileSync('src/styles/notes-enhancements.css', 'utf8');
+const playerCss = fs.readFileSync('src/styles/player-theater.css', 'utf8');
 
 describe('Studio and Notes authoring affordances', () => {
+  it('removes the native course-player disclosure triangle alongside its custom chevron', () => {
+    expect(playerCss).toContain('.pd-player-video .pd-advanced-tools > summary::marker');
+    expect(playerCss).toMatch(/\.pd-player-video \.pd-advanced-tools > summary::marker\s*\{[^}]*content:\s*none;/s);
+  });
+
   it('opens the Studio menu on the opposite side of the inspector on desktop', () => {
     expect(studioCss).toMatch(/\.view-studio \.studio-more-tools-content\s*\{[^}]*inset-inline-end:\s*calc\(100% \+ 12px\)/s);
     expect(studioCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.view-studio \.studio-more-tools-content\s*\{[^}]*inset-inline-start:\s*0;/);
