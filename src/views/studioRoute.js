@@ -174,6 +174,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-mode="pen" aria-pressed="false">Pen</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="rect" aria-label="Add rectangle to Konva draft">Add rectangle</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="circle" aria-label="Add circle to Konva draft">Add circle</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="ellipse" aria-label="Add ellipse to Konva draft">Add ellipse</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="text" aria-label="Add editable text to Konva draft">Add text</button>
             <label for="studio-konva-layer">Active drawing layer</label>
             <select id="studio-konva-layer" class="select input-sm"
               data-studio-konva-layer aria-label="Active Konva drawing layer"></select>
@@ -1211,7 +1213,12 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         const shape = kind === 'rect'
           ? { type: 'rect', x: x - 60, y: y - 40, width: 120, height: 80 }
           : kind === 'circle'
-            ? { type: 'circle', x, y, radius: 40 } : null;
+            ? { type: 'circle', x, y, radius: 40 }
+            : kind === 'ellipse'
+              ? { type: 'ellipse', x, y, radiusX: 60, radiusY: 30, rotation: 0 }
+              : kind === 'text'
+                ? { type: 'text', x, y, text: 'Text', fontSize: 20 }
+                : null;
         if (!shape) throw new TypeError('Unsupported shape tool');
         workspace.setMode('select');
         const result = await workspace.addShape(shape);
@@ -1221,6 +1228,12 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         if (added?.id && konvaSelect) {
           konvaSelect.value = added.id;
           workspace.select(added.id);
+          // Focus the canonical text inspector so keyboard/IME users can
+          // replace the placeholder immediately without touching Canvas2D.
+          if (kind === 'text' && konvaTextInput && !konvaTextInput.disabled) {
+            konvaTextInput.focus();
+            konvaTextInput.select();
+          }
         }
         setKonvaStatus('New ' + shape.type + ' saved to isolated Konva draft');
       } catch {
