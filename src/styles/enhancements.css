@@ -47,8 +47,9 @@
 }
 
 .view-courses #courses-search {
-  /* Leave room for the leading search glyph (.courses-search-field > .icon). */
-  padding-inline: calc(var(--space-3) * 2 + 1em) var(--space-4);
+  /* dir="auto" can flip between Persian/English independently of the icon.
+     Reserve space on BOTH sides so the inline-start icon never overlaps text. */
+  padding-inline: calc(var(--space-3) * 2 + 1em);
   border-radius: var(--radius-lg);
 }
 
