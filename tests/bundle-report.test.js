@@ -126,6 +126,38 @@ describe('bundle and CSP reporting', () => {
     }
   });
 
+  it('fails a release report when the Workbox install manifest names a missing asset', async () => {
+    const { evaluateReport } = await import('../scripts/bundle-report.cjs');
+    const base = {
+      files: [{ path: 'dist/opencoursedeck.js' }],
+      totals: {
+        files: 1, totalJsBytes: 10, largestJsBytes: 10,
+        entryBytes: 10, entryGzipBytes: 5,
+      },
+      csp: {
+        'script-src': ["'self'"],
+        'media-src': ["'self'", 'http:', 'https:'],
+        'connect-src': ["'self'", 'http:', 'https:'],
+        'frame-src': ["'self'", 'http:', 'https:'],
+      },
+    };
+    expect(evaluateReport({ ...base, precache: { count: 3, missing: ['chunks/lazy.js'] } }))
+      .toContain('Workbox precache asset is missing: chunks/lazy.js');
+    expect(evaluateReport({ ...base, precache: { count: 3, missing: [] } })).toEqual([]);
+  });
+
+  it('reports actual release precache data and separately captures cold browser shell timing', async () => {
+    const { createBundleReport } = await import('../scripts/bundle-report.cjs');
+    const report = createBundleReport();
+    expect(report.precache.count).toBeGreaterThan(0);
+    expect(report.precache.totalBytes).toBeGreaterThan(report.totals.entryBytes);
+    expect(report.precache.missing).toEqual([]);
+    const smokeSource = fs.readFileSync(path.join(process.cwd(), 'scripts/dist-browser-smoke.cjs'), 'utf8');
+    expect(smokeSource).toContain("performance.getEntriesByType('resource')");
+    expect(smokeSource).toContain("coldShell");
+    expect(smokeSource).toContain('missingTransferSizes');
+  });
+
   it('keeps the bundle report gate wired into CI', async () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 
