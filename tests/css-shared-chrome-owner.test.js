@@ -30,8 +30,8 @@ describe('single final owner of shared navigation/topbar chrome', () => {
   });
 
   it('preserves the WebKit sidebar-nav mask fallback and workspace focus contrast tokens', () => {
-    expect(source).toMatch(/\\-webkit-mask-image:\s*none/);
-    expect(source).toMatch(/--workspace-focus:\s*var\\(--accent-dark\\)/);
+    expect(source).toContain('-webkit-mask-image: none;');
+    expect(source).toContain('--workspace-focus: var(--accent-dark);');
     expect(final).toContain('mask-image: none;');
   });
 });
