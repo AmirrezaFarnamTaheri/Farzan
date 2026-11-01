@@ -27,7 +27,6 @@ import { RAFLoop } from './lib/rafLoop.js';
 import { RequestQueue } from './lib/requestQueue.js';
 import { stagger } from './lib/stagger.js';
 import { normalizeTimeIntervals, updateTimeIntervals } from './lib/timeRange.js';
-import { VirtualList } from './lib/virtualScroll.js';
 import { workerAssets } from './core/workerAssets.js';
 import { createLazyWorkerPool } from './core/lazyWorkerPool.js';
 import { buildUserThemeVars } from './core/themeBuilder.js';
@@ -58,7 +57,6 @@ pd.RAFLoop = RAFLoop;
 pd.RequestQueue = RequestQueue;
 pd.stagger = stagger;
 pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
-pd.VirtualList = VirtualList;
 // Preserve the public synchronous WorkerPool namespace, but defer the worker
 // pool's scheduling machinery until a feature makes a real worker request.
 const lazyWorkerPool = createLazyWorkerPool({
