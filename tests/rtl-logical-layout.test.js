@@ -37,7 +37,7 @@ describe('RTL layout uses logical start/end in owning CSS rules', () => {
   it('mirrors Studio group separators and the tool popover anchoring', () => {
     expect(rule(views, '.studio-tool-group')).toMatch(/border-inline-end:\s*1px/);
     expect(rule(views, '.studio-tool-group')).toMatch(/padding-inline-end:/);
-    expect(rule(studio, '.view-studio .studio-more-tools-content')).toMatch(/inset-inline-end:\s*0/);
+    expect(rule(studio, '.view-studio .studio-more-tools-content')).toMatch(/inset-inline-end:\s*calc\(100% \+ 12px\)/);
     expect(rule(studio, '.view-studio .studio-more-tools-content')).not.toMatch(/(?:^|;)\s*right:\s*0/);
   });
 });
