@@ -703,8 +703,8 @@ describe('bridge DB safety helpers', () => {
         calls.push([store, indexName, value]);
         return stores[store].filter(record => record?.[indexName] === value);
       }
-      async queryIndex(store, indexName, range, limit, options = {}) {
-        calls.push([store, indexName, range, limit, options.direction]);
+      async queryIndex(store, indexName, range, { limit, direction = 'next' } = {}) {
+        calls.push([store, indexName, range, limit, direction]);
         return [...stores[store]]
           .sort((a, b) => Number(b[indexName] ?? 0) - Number(a[indexName] ?? 0))
           .slice(0, limit);
