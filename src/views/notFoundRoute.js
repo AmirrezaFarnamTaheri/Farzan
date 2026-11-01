@@ -3,7 +3,6 @@ export function mountNotFoundView({ setView, hash } = {}) {
     <section class="view view-notfound">
       <div class="page-header notfound-header">
         <h1 class="page-title">Page not found</h1>
-        <p class="page-subtitle">This page doesn't exist. Check the address or return home.</p>
         <p class="notfound-requested">Requested address: <code data-missing-route></code></p>
       </div>
       <div class="card card-filled notfound-card">

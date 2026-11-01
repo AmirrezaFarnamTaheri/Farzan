@@ -157,9 +157,9 @@
 }
 
 .progress-metric-featured {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--accent-muted) 58%, var(--surface-3)), color-mix(in srgb, var(--surface-2) 78%, transparent));
+  /* Completion is a number, not a selected filter. */
+  border-color: var(--glass-border);
+  background: var(--surface-2);
 }
 
 .progress-metric-icon {

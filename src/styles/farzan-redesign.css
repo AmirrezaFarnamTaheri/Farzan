@@ -266,6 +266,14 @@ input[type="file"][hidden] {
   padding-top: 10px;
   background: var(--fz-rail);
 }
+/* System links remain visible as the library navigation scrolls. */
+.sidebar-system-nav {
+  display: grid;
+  min-width: 0;
+}
+.sidebar-system-nav .nav-group { margin-block: 0 6px; }
+.sidebar-system-nav .nav-group-label { padding-block: 3px; }
+.sidebar-system-nav .nav-item { min-height: 44px; margin-block-end: 2px; }
 .storage-label { color: #a8c1d3; }
 .storage-bar-wrap { background: rgba(255,255,255,.13); }
 .sidebar-footer-actions { justify-content: space-between; }
@@ -687,6 +695,17 @@ input[type="file"][hidden] {
 .studio-toolbar-clusters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .studio-tool-group { border: 0; padding: 0 12px 0 0; gap: 7px; }
 .studio-tool-group .btn { min-height: 36px; }
+.view-studio [data-studio-tool][aria-pressed="true"] {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent-on-tint);
+  font-weight: 750;
+}
+.view-studio [data-studio-tool][aria-pressed="true"]:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
 .studio-more-tools { width: 100%; margin-top: 0; min-width: 0; }
 .studio-more-tools > summary {
   display: inline-flex;
@@ -703,6 +722,7 @@ input[type="file"][hidden] {
   list-style: none;
 }
 .studio-more-tools > summary::-webkit-details-marker { display: none; }
+.studio-more-tools > summary::marker { content: none; }
 .studio-more-tools > summary::after { content: "⌄"; font-size: 18px; line-height: .75; margin-inline-start: 10px; color: var(--fz-muted); }
 .studio-more-tools[open] > summary::after { transform: rotate(180deg); }
 .studio-more-tools-content {
