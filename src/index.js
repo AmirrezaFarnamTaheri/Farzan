@@ -1,6 +1,3 @@
-// Side-effect: migrate legacy UI keys before any other app module reads localStorage.
-import './core/storageMigrate.js';
-
 import { initBeforeUnloadGuard } from './core/beforeUnloadGuard.js';
 import { initEndpointApprovalGuard } from './core/endpointApprovalGuard.js';
 import { createOperationContext } from './core/operationContext.js';
