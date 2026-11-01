@@ -47,11 +47,11 @@ export function mountNotesView({ setView } = {}) {
               <input class="input" type="search" dir="auto" placeholder="Search notes…" data-notes-search autocomplete="off" />
             </label>
             <div class="notes-semantic-actions">
-              <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden>
+              <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-search hidden disabled>
                 <svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>
                 Related keywords
               </button>
-              <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-clear hidden>Clear</button>
+              <button class="btn btn-ghost btn-sm" type="button" data-notes-semantic-clear hidden disabled>Clear</button>
             </div>
             <div class="notes-semantic-status" data-notes-semantic-status aria-live="polite"></div>
           </div>
