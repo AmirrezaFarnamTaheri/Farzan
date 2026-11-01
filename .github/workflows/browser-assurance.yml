@@ -46,7 +46,7 @@ jobs:
       - name: Verify redesigned workspace at desktop and mobile sizes
         env:
           CHROME_BIN: /usr/bin/google-chrome
-        run: npm run test:e2e -- tests/e2e/workspace-redesign.spec.js tests/e2e/user-library-dexie-compat.spec.js
+        run: npm run test:e2e -- tests/e2e/workspace-redesign.spec.js tests/e2e/user-library-dexie-compat.spec.js tests/e2e/css-rtl-200pct.spec.js
 
       - name: Run production browser smoke tests
         env:
