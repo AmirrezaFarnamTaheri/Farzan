@@ -22,12 +22,7 @@ import { enforceProductReadiness } from './core/productReadiness.js';
 import { loadVendorScript } from './core/vendorLoader.js';
 
 import * as easing from './lib/easing.js';
-import { HElement, h } from './lib/hElement.js';
-import { RAFLoop } from './lib/rafLoop.js';
-import { RequestQueue } from './lib/requestQueue.js';
-import { stagger } from './lib/stagger.js';
 import { normalizeTimeIntervals, updateTimeIntervals } from './lib/timeRange.js';
-import { VirtualList } from './lib/virtualScroll.js';
 import { workerAssets } from './core/workerAssets.js';
 import { createLazyWorkerPool } from './core/lazyWorkerPool.js';
 import { buildUserThemeVars } from './core/themeBuilder.js';
@@ -51,14 +46,8 @@ const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
 
 pd.easing = easing;
 pd.loadVendorScript = loadVendorScript;
-pd.HElement = HElement;
-pd.h = h;
 pd.AuxiliaryDbLifecycle = window.OpenCourseDeck.AuxiliaryDbLifecycle;
-pd.RAFLoop = RAFLoop;
-pd.RequestQueue = RequestQueue;
-pd.stagger = stagger;
 pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
-pd.VirtualList = VirtualList;
 // Preserve the public synchronous WorkerPool namespace, but defer the worker
 // pool's scheduling machinery until a feature makes a real worker request.
 const lazyWorkerPool = createLazyWorkerPool({

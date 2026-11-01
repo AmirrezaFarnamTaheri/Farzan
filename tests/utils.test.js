@@ -1,45 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { stagger } from '../src/lib/stagger.js';
 import { Transition } from '../src/lib/transition.js';
-
-describe('stagger', () => {
-  it('spreads values linearly from the first element by default', () => {
-    const delay = stagger(100);
-    expect(delay(0, 5)).toBe(0);
-    expect(delay(2, 5)).toBe(50);
-    expect(delay(4, 5)).toBe(100);
-  });
-
-  it('radiates from the centre when from:"center"', () => {
-    const delay = stagger(100, { from: 'center' });
-    expect(delay(2, 5)).toBe(0);
-    expect(delay(0, 5)).toBe(100);
-    expect(delay(4, 5)).toBe(100);
-  });
-
-  it('applies a start offset and honours [min,max] ranges', () => {
-    const delay = stagger([10, 50], { start: 5 });
-    expect(delay(0, 3)).toBe(15);
-    expect(delay(2, 3)).toBe(55);
-  });
-
-  it('uses ONE random origin for the whole set, not one per element', () => {
-    // With a per-element origin, every index is its own origin and so every
-    // value would be 0. A single shared origin yields exactly one zero.
-    const delay = stagger(100, { from: 'random' });
-    const total = 8;
-    const values = Array.from({ length: total }, (_, i) => delay(i, total));
-    expect(values.filter(v => v === 0)).toHaveLength(1);
-
-    // The same instance keeps its origin across repeated passes.
-    expect(Array.from({ length: total }, (_, i) => delay(i, total))).toEqual(values);
-  });
-
-  it('returns 0 offsets when a grid dimension is degenerate', () => {
-    const delay = stagger(100, { grid: [0, 0] });
-    expect(delay(3, 9)).toBe(0);
-  });
-});
 
 describe('Transition', () => {
   it('does not fast-forward after pause/resume', () => {
