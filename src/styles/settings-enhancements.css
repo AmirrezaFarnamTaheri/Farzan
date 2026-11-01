@@ -251,6 +251,18 @@
 /* AI permission controls must retain their full values even when the
    application sidebar and Settings navigation consume much of the viewport.
    Fit against the actual card width, not the global window breakpoint. */
+/* The optional AI endpoint/model controls do not displace first-use storage
+   and appearance settings. Keep a native summary for keyboard and 200% zoom. */
+.settings-ai-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-ai-disclosure > summary::-webkit-details-marker { display: none; }
+.settings-ai-disclosure[open] > summary { margin-bottom: var(--space-4); }
+
 .settings-ai-mode-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr));
