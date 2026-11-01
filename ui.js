@@ -741,51 +741,79 @@
     // ════════════════════════════════════════════════════
     const Tooltip = {
       _tooltip: null,
+      _anchor: null,
+      _previousDescription: null,
+      _initialized: false,
 
       init() {
+        if (this._initialized) {
+          // Route replacements may remove this persistent overlay. Reattach
+          // without registering a second group of global event listeners.
+          if (this._tooltip && !this._tooltip.isConnected) document.body.appendChild(this._tooltip);
+          return;
+        }
+        this._initialized = true;
         this._tooltip = document.createElement('div');
         this._tooltip.className = 'tooltip';
+        this._tooltip.id = 'ocd-ui-tooltip';
+        this._tooltip.setAttribute('role', 'tooltip');
         document.body.appendChild(this._tooltip);
-        this._observer?.disconnect?.();
         this._observer = new MutationObserver(() => {
           if (this._anchor && !this._anchor.isConnected) this.hide();
         });
         this._observer.observe(document.body, { childList: true, subtree: true });
 
-        document.addEventListener('mouseover', e => {
-          const el = e.target.closest('[data-tooltip]');
-          if (!el) return;
-          this.show(el);
+        const anchorOf = target => target instanceof Element
+          ? target.closest('[data-tooltip]') : null;
+        document.addEventListener('mouseover', event => {
+          const el = anchorOf(event.target);
+          if (el) this.show(el);
         });
-
-        document.addEventListener('mouseout', e => {
-          const el = e.target.closest('[data-tooltip]');
-          if (!el) return;
-          this.hide();
+        document.addEventListener('mouseout', event => {
+          const el = anchorOf(event.target);
+          if (el && el === this._anchor) this.hide();
+        });
+        document.addEventListener('focusin', event => {
+          const el = anchorOf(event.target);
+          if (el) this.show(el);
+        });
+        document.addEventListener('focusout', event => {
+          if (this._anchor && event.target === this._anchor) this.hide();
+        });
+        document.addEventListener('keydown', event => {
+          if (event.key === 'Escape' && this._anchor) this.hide();
         });
       },
 
       show(el) {
-        const text = el.dataset.tooltip;
-        if (!text) return;
-        this._anchor = el;
-
+        const text = el?.dataset?.tooltip;
+        if (!text || !this._tooltip) return;
+        if (this._anchor && this._anchor !== el) this.hide();
+        if (this._anchor !== el) {
+          this._anchor = el;
+          this._previousDescription = el.getAttribute('aria-describedby');
+        }
         this._tooltip.textContent = text;
         this._tooltip.classList.add('visible');
+        const existing = this._previousDescription || '';
+        const ids = existing.split(/\s+/).filter(Boolean);
+        if (!ids.includes(this._tooltip.id)) ids.push(this._tooltip.id);
+        el.setAttribute('aria-describedby', ids.join(' '));
 
         const rect = el.getBoundingClientRect();
         const tip  = this._tooltip.getBoundingClientRect();
-
-        const x = rect.left + rect.width / 2 - tip.width / 2;
-        const y = rect.top - tip.height - 8;
-
-        this._tooltip.style.left = `${x}px`;
-        this._tooltip.style.top  = `${y}px`;
+        this._tooltip.style.left = `${rect.left + rect.width / 2 - tip.width / 2}px`;
+        this._tooltip.style.top = `${rect.top - tip.height - 8}px`;
       },
 
       hide() {
-        this._tooltip.classList.remove('visible');
+        this._tooltip?.classList.remove('visible');
+        if (this._anchor) {
+          if (this._previousDescription == null) this._anchor.removeAttribute('aria-describedby');
+          else this._anchor.setAttribute('aria-describedby', this._previousDescription);
+        }
         this._anchor = null;
+        this._previousDescription = null;
       }
     };
 
