@@ -1,3 +1,4 @@
+import { isStablePdfDocumentId } from '../core/pdfDocumentIdentity.js';
 export function mountBookmarksView(deps = {}) {
   const {
     setView,
@@ -46,10 +47,7 @@ export function mountBookmarksView(deps = {}) {
   // Older imported annotations may use a synthetic global bucket instead
   // of a real PDF document ID. A page number alone is never a safe document
   // navigation target: it could be applied to an unrelated open PDF.
-  const stablePdfDocId = value => {
-    const id = String(value ?? '').trim();
-    return id.length > 0 && id !== 'global';
-  };
+  const stablePdfDocId = isStablePdfDocumentId;
 
   function formatDuration(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
