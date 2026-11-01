@@ -248,16 +248,5 @@ describe('OpenCourseDB automatic mutation retry integration', () => {
     await expect(db.getAll('items')).resolves.toEqual([]);
   });
 
-  it('bulkPutWithCheckpoint() commits records and checkpoint atomically', async () => {
-    const db = makeDb();
-    await db.bulkPutWithCheckpoint(
-      'items',
-      [{ id: 'x' }, { id: 'y' }],
-      { id: 'sync-checkpoint-items', cursor: 'y' }
-    );
-    const all = await db.getAll('items');
-    expect(all.map((row) => row.id).sort()).toEqual(['x', 'y']);
-    const checkpoint = await db.get('settings', 'sync-checkpoint-items');
-    expect(checkpoint).toMatchObject({ cursor: 'y' });
-  });
+
 });

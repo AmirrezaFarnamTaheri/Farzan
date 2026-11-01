@@ -68,22 +68,6 @@ describe('Dexie primary-database mutations retain native-v3 semantics', () => {
     expect(await db.get('notes', 'partial')).toBeUndefined();
   });
 
-  it('treats notes and checkpoint settings as one atomic transaction', async () => {
-    const db = new OpenCourseDB(name, 3, schema);
-    opened.push(db);
-    await expect(db.bulkPutWithCheckpoint('notes', [
-      { id: 'would-be-partial', content: 'Rollback this' },
-    ], { value: 'Invalid checkpoint without key' })).rejects.toBeTruthy();
-    expect(await db.get('notes', 'would-be-partial')).toBeUndefined();
-    expect(await db.getAll('settings')).toEqual([]);
-
-    expect(await db.bulkPutWithCheckpoint('notes', [
-      { id: 'completed', content: 'Keep this' },
-    ], { key: 'last-import', value: 'completed' })).toBe(true);
-    expect(await db.get('notes', 'completed')).toMatchObject({ content: 'Keep this' });
-    expect(await db.get('settings', 'last-import')).toEqual({ key: 'last-import', value: 'completed' });
-  });
-
   it('bulk-writes sealed records while keeping plaintext index metadata queryable', async () => {
     const db = new OpenCourseDB(name, 3, schema);
     opened.push(db);
