@@ -1078,7 +1078,7 @@ import { Pointer } from './src/lib/pointer.js';
         if (this._hasDataOverride) {
           // Client-side filter
           results = rankLexicalMatches(this._data, value, {
-            keys: ['label', 'description'], limit: 8,
+            keys: ['label', 'title', 'description'], limit: 8,
           });
         } else {
           results = await this._queryUniversal(value);
@@ -1108,7 +1108,7 @@ import { Pointer } from './src/lib/pointer.js';
       // Rank the full collection first. A pre-dedup 12-item cap can fill the
       // dropdown with one repeated resource while hiding eleven useful hits.
       const lexical = rankLexicalMatches(data, value, {
-        keys: ['label', 'description', 'category', 'searchText', 'tags', 'keywords', 'labels'], limit: data.length,
+        keys: ['label', 'title', 'description', 'category', 'searchText', 'tags', 'keywords', 'labels'], limit: data.length,
       });
       const semantic = await this._querySemanticNotes(value, data);
       return dedupeSearchResults([...lexical, ...semantic], { limit: 12 });
@@ -1320,7 +1320,7 @@ import { Pointer } from './src/lib/pointer.js';
           const icon = createElement('span', { class: 'search-result-icon', 'aria-hidden': 'true' }, spriteIcon(iconId));
           const text = createElement('span', { class: 'search-result-text' });
           const label = createElement('span', { class: 'search-result-label' });
-          this._appendHighlighted(label, item.label ?? '', query);
+          this._appendHighlighted(label, String(item.label || item.title || ''), query);
           text.appendChild(label);
           if (item.description && item.description !== item.category) {
             text.appendChild(createElement('span', { class: 'search-result-desc' }, item.description));
