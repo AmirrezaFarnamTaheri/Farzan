@@ -172,7 +172,7 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
       expect(heading?.classList.contains('align-right')).toBe(true);
       expect(heading?.style.textAlign).toBe('right');
       expect(heading?.textContent).toContain('فیزیولوژی 你好 Heart');
-      expect(assessNoteForSquire(saved).compatible).toBe(true);
+      expect(assessNoteForSquire(saved)).toEqual({ compatible: true, reason: null });
     } finally { editor.destroy(); root.remove(); }
     const reopenHost = document.createElement('div');
     const reopened = createSquireNoteEditor({ element: reopenHost, html: saved });
