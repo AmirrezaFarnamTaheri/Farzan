@@ -139,6 +139,7 @@ export function mountBookmarksView(deps = {}) {
         href: '#/courses',
         id: item.id || item.topicId,
         topicId: item.topicId,
+        courseId: item.courseId,
         position: item.position,
         updatedAt: item.updatedAt || item.createdAt || 0,
         source: item,
@@ -292,7 +293,7 @@ export function mountBookmarksView(deps = {}) {
       if (item.type === 'Timestamp' && item.topicId) {
         link.addEventListener('click', (event) => {
           event.preventDefault();
-          setPendingCourseMedia(item.topicId, item.position);
+          setPendingCourseMedia(item.topicId, item.position, item.courseId);
           Router.navigate('#/courses');
         });
       } else if (pdfLink && stablePdfDocId(item.docId)) {
