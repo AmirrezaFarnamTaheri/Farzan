@@ -48,8 +48,7 @@ describe('bridge DB safety helpers', () => {
     ['getAllWatchedSegments', []],
     ['getPdfBookmarks', ['pdf-a']],
     ['getAllPdfBookmarks', []],
-  ])('rejects %s after migrated IndexedDB read failure instead of returning a stale snapshot', async (method, args) => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  ])('rejects %s after IndexedDB read failure instead of returning a stale snapshot', async (method, args) => {
     localStorage.setItem('ocd_user_library', JSON.stringify({
       version: 1, courses: { stale: { title: 'Must not overwrite canonical library' } },
     }));
@@ -70,47 +69,39 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
-  it('treats auxiliary stores as empty only in the pre-migration localStorage-only mode', async () => {
+  it('rejects incomplete backup sources when IndexedDB is unavailable', async () => {
     delete window.OpenCourseDeck.DB.PlasmaDB;
-    await expect(window.DB.getAllWatchedSegments()).resolves.toEqual([]);
-    await expect(window.DB.getAllPdfBookmarks()).resolves.toEqual([]);
-    localStorage.setItem('plasma_migrated_v2', 'true');
     await expect(window.DB.getAllWatchedSegments()).rejects.toThrow(/Canonical watched-segment/);
     await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow(/Canonical PDF bookmark/);
   });
 
-  it('merges localStorage and IndexedDB notes during compatibility migration', async () => {
+  it('never resurrects unpublished local Notes when canonical IndexedDB is available', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },
       { id: 'n2', title: 'Local only', updatedAt: 20 },
     ]));
-
     await window.DB.saveNote({ id: 'n1', title: 'IDB newer', updatedAt: 30 });
-    const notes = await window.DB.getAllNotes();
-    const byId = Object.fromEntries(notes.map((note) => [note.id, note]));
-
-    expect(byId.n1.title).toBe('IDB newer');
-    expect(byId.n2.title).toBe('Local only');
+    expect(await window.DB.getAllNotes()).toEqual([
+      expect.objectContaining({ id: 'n1', title: 'IDB newer' }),
+    ]);
   });
 
-  it('uses IndexedDB as canonical for notes after migration completes', async () => {
+  it('uses IndexedDB as canonical for notes from the first launch', async () => {
     await window.DB.saveNote({ id: 'n1', title: 'Canonical IDB', updatedAt: 30 });
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Stale local newer timestamp', updatedAt: 999 },
-      { id: 'local-only-after-migration', title: 'Should stay out', updatedAt: 1000 },
+      { id: 'local-only-when-idb-ready', title: 'Should stay out', updatedAt: 1000 },
     ]));
-    localStorage.setItem('plasma_migrated_v2', 'true');
 
     const notes = await window.DB.getAllNotes();
 
     expect(notes).toEqual([expect.objectContaining({ id: 'n1', title: 'Canonical IDB' })]);
     expect(notes).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'local-only-after-migration' }),
+      expect.objectContaining({ id: 'local-only-when-idb-ready' }),
     ]));
   });
 
-  it('saves notes to canonical IndexedDB without refreshing localStorage after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('saves notes to canonical IndexedDB without refreshing localStorage from the first launch', async () => {
 
     const note = await window.DB.saveNote({ id: 'canonical-note-save', title: 'IDB only' });
 
@@ -121,7 +112,7 @@ describe('bridge DB safety helpers', () => {
     ]);
   });
 
-  it('uses IndexedDB as canonical for folders and settings after migration completes', async () => {
+  it('uses IndexedDB as canonical for folders and settings from the first launch', async () => {
     await window.DB.saveFolder({ id: 'f1', name: 'Canonical folder', updatedAt: 30 });
     await window.DB.saveSetting('plasma-playlists', [{ id: 'idb-playlist' }]);
     localStorage.setItem('ocd_folders', JSON.stringify([
@@ -129,14 +120,12 @@ describe('bridge DB safety helpers', () => {
       { id: 'local-folder', name: 'Local only' },
     ]));
     localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'local-playlist' }]));
-    localStorage.setItem('plasma_migrated_v2', 'true');
 
     expect(await window.DB.getAllFolders()).toEqual([expect.objectContaining({ id: 'f1', name: 'Canonical folder' })]);
     expect(await window.DB.getSetting('plasma-playlists')).toEqual([{ id: 'idb-playlist' }]);
   });
 
-  it('saves folders and settings to canonical IndexedDB without refreshing localStorage after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('saves folders and settings to canonical IndexedDB without refreshing localStorage from the first launch', async () => {
 
     const folder = await window.DB.saveFolder({ id: 'canonical-folder-save', name: 'IDB folder' });
     const setting = await window.DB.saveSetting('ocd_notes_settings', { view: 'kanban' });
@@ -151,7 +140,7 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getSetting('ocd_notes_settings')).toEqual({ view: 'kanban' });
   });
 
-  it('uses IndexedDB as canonical for annotations after migration completes', async () => {
+  it('uses IndexedDB as canonical for annotations from the first launch', async () => {
     await window.DB.saveAnnotations('doc-a', {
       1: [{ id: 'idb-ann', type: 'highlight', updatedAt: 30 }],
     });
@@ -161,7 +150,6 @@ describe('bridge DB safety helpers', () => {
         { id: 'local-ann', docId: 'doc-a', type: 'local-only', updatedAt: 1000 },
       ],
     }));
-    localStorage.setItem('plasma_migrated_v2', 'true');
 
     const annotations = await window.DB.getAnnotations('doc-a');
     const all = await window.DB.getAllAnnotations();
@@ -170,8 +158,7 @@ describe('bridge DB safety helpers', () => {
     expect(all).toEqual([expect.objectContaining({ id: 'idb-ann', type: 'highlight' })]);
   });
 
-  it('saves annotations to canonical IndexedDB without refreshing localStorage after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('saves annotations to canonical IndexedDB without refreshing localStorage from the first launch', async () => {
 
     const records = await window.DB.saveAnnotations('doc-canonical-save', {
       3: [{ id: 'canonical-ann-save', type: 'highlight', updatedAt: 30 }],
@@ -257,7 +244,6 @@ describe('bridge DB safety helpers', () => {
 
 
   it('rejects a clear operation when any primary IndexedDB store fails', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     window.OpenCourseDeck.DB.PlasmaDB = class {
       async clear(store) {
         if (store === 'notes') throw new Error('notes clear failed');
@@ -276,7 +262,6 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('does not fall back to localStorage when progress save hits storage quota', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Quota exceeded'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
@@ -297,7 +282,6 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('rejects failed writes to canonical progress storage without a false fallback success', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = class {
@@ -315,7 +299,6 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('rejects failed canonical timestamp writes and does not broadcast success', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     window.OpenCourseDeck.bus = { emit: vi.fn() };
     window.OpenCourseDeck.DB.PlasmaDB = class {
       async put() { throw new Error('timestamp transaction aborted'); }
@@ -327,25 +310,17 @@ describe('bridge DB safety helpers', () => {
     expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
   });
 
-  it('retains readability for legacy timestamp fallbacks without overriding canonical records', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('uses only IndexedDB timestamps when it is available', async () => {
     localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
-      { id: 'legacy-only', topicId: 'a' },
-      { id: 'both', topicId: 'stale' },
+      { id: 'old-only', topicId: 'a' }, { id: 'both', topicId: 'stale' },
     ]));
     window.OpenCourseDeck.DB.PlasmaDB = class {
       async getAll() { return [{ id: 'both', topicId: 'canonical' }]; }
     };
-    const timestamps = await window.DB.getAllTimestamps();
-    expect(timestamps).toEqual(expect.arrayContaining([
-      { id: 'legacy-only', topicId: 'a' },
-      { id: 'both', topicId: 'canonical' },
-    ]));
-    expect(timestamps).toHaveLength(2);
+    expect(await window.DB.getAllTimestamps()).toEqual([{ id: 'both', topicId: 'canonical' }]);
   });
 
-  it('reads historical localStorage-fallback progress records but prefers IndexedDB', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('never overlays stale local progress onto canonical IndexedDB reads', async () => {
     localStorage.setItem('plasma_progress_v1', JSON.stringify({
       fallback: { topicId: 'fallback', status: 'done' },
       both: { topicId: 'both', status: 'stale' },
@@ -355,63 +330,12 @@ describe('bridge DB safety helpers', () => {
       async get(_store, key) { return rows.get(key) ?? null; }
       async getAll() { return [...rows.values()]; }
     };
-    await expect(window.DB.getProgress('fallback')).resolves.toMatchObject({ status: 'done' });
+    await expect(window.DB.getProgress('fallback')).resolves.toBeNull();
     await expect(window.DB.getProgress('both')).resolves.toMatchObject({ status: 'canonical' });
-    expect((await window.DB.getAllProgress())).toHaveLength(2);
-  });
-
-  it('does not mark migration complete when a compatibility section fails', async () => {
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'legacy-note', title: 'Legacy note', updatedAt: 10 },
-    ]));
-    const emit = vi.fn();
-    window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
-      async put(store) {
-        if (store === 'notes') throw new Error('notes migration failed');
-      }
-      async getAll() { return []; }
-    };
-
-    const notes = await window.DB.getAllNotes();
-
-    expect(notes).toEqual([expect.objectContaining({ id: 'legacy-note' })]);
-    expect(localStorage.getItem('plasma_migrated_v2')).toBeNull();
-    expect(emit).toHaveBeenCalledWith('storage:migration-error', expect.objectContaining({
-      kind: 'migration',
-      backend: 'indexedDB',
-      failures: [expect.objectContaining({
-        section: 'notes',
-        error: expect.objectContaining({ message: 'notes migration failed' }),
-      })],
-    }));
-  });
-
-  it('marks migration complete only after every compatibility section succeeds', async () => {
-    localStorage.setItem('plasma_progress_v1', JSON.stringify({
-      'topic-1': { topicId: 'topic-1', courseId: 'course-1', updatedAt: 1 },
-    }));
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
-      { id: 'ts-1', topicId: 'topic-1' },
-    ]));
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'note-1', title: 'Note' },
-    ]));
-    localStorage.setItem('ocd_folders', JSON.stringify([
-      { id: 'folder-1', name: 'Folder' },
-    ]));
-    localStorage.setItem('ocd_notes_settings', JSON.stringify({ view: 'list' }));
-    localStorage.setItem('plasma-pdf-annotations', JSON.stringify([
-      { id: 'ann-1', docId: 'doc-a', page: 1 },
-    ]));
-
-    await window.DB.getAllProgress();
-
-    expect(localStorage.getItem('plasma_migrated_v2')).toBe('true');
+    expect(await window.DB.getAllProgress()).toHaveLength(1);
   });
 
   it('does not fall back to localStorage when timestamp save hits storage quota', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Persistent storage full'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
@@ -450,8 +374,7 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
-  it('signals and rejects canonical IndexedDB folder failures after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('signals and rejects canonical IndexedDB folder failures from the first launch', async () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('canonical quota exceeded'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
@@ -470,8 +393,7 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
-  it('signals and rejects canonical IndexedDB setting failures after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('signals and rejects canonical IndexedDB setting failures from the first launch', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = class {
@@ -489,8 +411,7 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
-  it('signals and rejects canonical IndexedDB annotation failures after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('signals and rejects canonical IndexedDB annotation failures from the first launch', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.PlasmaDB = class {
@@ -609,16 +530,11 @@ describe('bridge DB safety helpers', () => {
     expect(all.map((annotation) => annotation.docId).sort()).toEqual(['doc-a', 'doc-b']);
   });
 
-  it('merges legacy localStorage annotations into backup export', async () => {
+  it('never merges prelaunch local annotations into canonical backup exports', async () => {
     localStorage.setItem('plasma-pdf-annotations', JSON.stringify({
-      4: [{ id: 'legacy-1', type: 'highlight', updatedAt: 10 }],
+      4: [{ id: 'orphan', docId: 'global', page: 4 }],
     }));
-
-    const all = await window.DB.getAllAnnotations();
-
-    expect(all).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'legacy-1', docId: 'global', page: 4 }),
-    ]));
+    await expect(window.DB.getAllAnnotations()).resolves.toEqual([]);
   });
 
   it('clearAll removes saved PDF annotations from IndexedDB and localStorage', async () => {
@@ -654,7 +570,6 @@ describe('bridge DB safety helpers', () => {
     ['folder', 'folders', 'deleteFolder', 'folder-delete'],
     ['timestamp', 'timestamps', 'deleteTimestamp', 'timestamp-delete'],
   ])('rejects an uncommitted %s deletion instead of broadcasting success', async (_kind, store, method, errorKind) => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     const persisted = new Map([['keep-me', { id: 'keep-me', title: 'Still stored' }]]);
@@ -676,7 +591,6 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('merges simultaneous progress updates to a topic instead of losing a field', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
     const persisted = new Map([['topic-concurrent', {
       topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
     }]]);
@@ -731,8 +645,7 @@ describe('bridge DB safety helpers', () => {
     ]));
   });
 
-  it('reads progress and timestamps through IndexedDB indexes after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('reads progress and timestamps through IndexedDB indexes from the first launch', async () => {
     const calls = [];
     const stores = {
       progress: [
@@ -767,8 +680,7 @@ describe('bridge DB safety helpers', () => {
     ]);
   });
 
-  it('reads notes and child folders through indexed helpers after migration completes', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
+  it('reads notes and child folders through indexed helpers from the first launch', async () => {
     const calls = [];
     const stores = {
       notes: [
@@ -871,60 +783,8 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ id: 'folder-b' }),
     ]);
   });
-  it('gives id-less legacy records deterministic ids so a retried migration cannot duplicate them', async () => {
-    // Records without an id previously got a fresh random id on every run,
-    // so the dedupe ledger never matched and each retry re-inserted them.
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
-      { topicId: 't1', time: 12 },
-      { topicId: 't2', time: 34 },
-    ]));
-
-    await window.DB.getAllTimestamps();
-    const first = await window.DB.getAllTimestamps();
-    expect(first).toHaveLength(2);
-    const ids = first.map((ts) => ts.id).sort();
-    expect(ids).toHaveLength(2);
-    expect(ids.every(id => /^timestamp-migrated-v3-/.test(id))).toBe(true);
-
-    // Reorder the legacy payload and force another migration pass. Identity
-    // must follow record content rather than array position.
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
-      { topicId: 't2', time: 34 },
-      { topicId: 't1', time: 12 },
-    ]));
-    localStorage.removeItem('plasma_migrated_v2');
-    await window.DB.getAllTimestamps();
-    const second = await window.DB.getAllTimestamps();
-
-    expect(second).toHaveLength(2);
-    expect(second.map((ts) => ts.id).sort()).toEqual(ids);
-    expect(JSON.parse(localStorage.getItem('plasma_migration_report_v3'))).toMatchObject({
-      version: 3,
-      status: 'completed',
-    });
-  });
-
-  it('shares one in-flight migration across concurrent DB calls', async () => {
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'concurrent-note', title: 'Legacy', updatedAt: 1 },
-    ]));
-
-    const [a, b, c] = await Promise.all([
-      window.DB.getAllNotes(),
-      window.DB.getAllNotes(),
-      window.DB.getAllNotes(),
-    ]);
-
-    // No duplicate inserts from parallel migration runs.
-    for (const result of [a, b, c]) {
-      expect(result.filter((n) => n.id === 'concurrent-note')).toHaveLength(1);
-    }
-  });
-
   it('keeps the localStorage note mirror intact when the IndexedDB delete cannot run', async () => {
-    // Post-migration but with IndexedDB unavailable, the mirror is the only
-    // live store -- removing the whole key would erase every note.
-    localStorage.setItem('plasma_migrated_v2', 'true');
+    // LocalStorage mode must delete only the selected record, not the whole deck.
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'keep-me', title: 'Survivor' },
       { id: 'drop-me', title: 'Doomed' },
@@ -958,12 +818,9 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ kind: 'note', action: 'save' }),
     ]));
   });
-  it('falls back to the pre-rename plasma twin for never-migrated ocd_* settings', async () => {
-    localStorage.setItem('plasma_migrated_v2', 'true');
-    localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'legacy-1' }]));
-    expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'legacy-1' }]);
-
-    // First save under the canonical key wins from then on.
+  it('never resolves a canonical setting from an obsolete alias', async () => {
+    localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'obsolete' }]));
+    expect(await window.DB.getSetting('ocd_playlists')).toBeNull();
     await window.DB.saveSetting('ocd_playlists', [{ id: 'new-1' }]);
     expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'new-1' }]);
   });
