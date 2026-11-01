@@ -22,6 +22,54 @@ const fixture = () => ({
   }],
 });
 
+describe('Konva draft z-order remains canonical, undoable and failure-safe', () => {
+  it('moves one element by one stacking slot within its editable layer, preserving every field', () => {
+    const original = fixture();
+    const snapshot = structuredClone(original);
+    const next = studioEditing.reorderKonvaV1Element(original, 'rect', 'forward');
+    expect(next.layers[0].elements.map(item => item.id))
+      .toEqual(['circle', 'rect', 'line', 'legacy-line', 'pen', 'polygon', 'text']);
+    expect(next.layers[0].elements.find(item => item.id === 'rect')).toEqual(original.layers[0].elements[0]);
+    expect(next.metadata).toEqual(original.metadata);
+    expect(next.viewport).toEqual(original.viewport);
+    expect(original).toEqual(snapshot);
+    expect(studioEditing.reorderKonvaV1Element(next, 'rect', 'backward')).toEqual(original);
+  });
+
+  it('refuses protected layers, unknown directions and invalid board content without source mutations', () => {
+    const board = fixture();
+    const before = structuredClone(board);
+    expect(() => studioEditing.reorderKonvaV1Element(board, 'rect', 'sideways')).toThrow();
+    expect(() => studioEditing.reorderKonvaV1Element(board, 'unknown', 'forward')).toThrow();
+    board.layers[0].locked = true;
+    expect(() => studioEditing.reorderKonvaV1Element(board, 'rect', 'forward')).toThrow(/locked/i);
+    board.layers[0].locked = false;
+    board.layers[0].visible = false;
+    expect(() => studioEditing.reorderKonvaV1Element(board, 'rect', 'forward')).toThrow(/hidden/i);
+    expect({ ...board, layers: [{ ...board.layers[0], locked: false, visible: true }] }).toEqual(before);
+  });
+
+  it('queues a committed z-order edit behind durable storage and allows undo/redo without a fake boundary write', async () => {
+    const writes = vi.fn(async () => true);
+    const session = createKonvaV1MoveSession({ board: fixture(), onChange: writes });
+    const first = await session.reorder('rect', 'backward');
+    expect(first).toEqual(fixture());
+    expect(writes).not.toHaveBeenCalled();
+    const changed = await session.reorder('rect', 'forward');
+    expect(changed.layers[0].elements.map(item => item.id).slice(0, 3)).toEqual(['circle', 'rect', 'line']);
+    expect(writes).toHaveBeenCalledWith(changed);
+    expect(session.canUndo()).toBe(true);
+    await session.undo();
+    expect(session.getBoard()).toEqual(fixture());
+    await session.redo();
+    expect(session.getBoard()).toEqual(changed);
+    writes.mockResolvedValue(false);
+    await expect(session.reorder('rect', 'forward')).rejects.toThrow(/acknowledg/i);
+    expect(session.getBoard()).toEqual(changed);
+    expect(session.canRedo()).toBe(false);
+  });
+});
+
 describe('Konva editing geometry to canonical board-v1 commands', () => {
   beforeEach(() => {
     vi.spyOn(Konva.Util, 'isCanvasFarblingActive').mockReturnValue(false);

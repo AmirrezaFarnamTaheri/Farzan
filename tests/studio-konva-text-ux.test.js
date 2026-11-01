@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountStudioView } from '../src/views/studioRoute.js';
 import { createStudioKonvaDraftWorkspace } from '../src/features/studioKonvaDraftWorkspace.js';
+import { reorderKonvaV1Element } from '../src/features/studioKonvaEditing.js';
 
 const source = () => ({
   version: 1,
@@ -55,6 +56,14 @@ describe('Studio Konva draft text controls and storage isolation', () => {
           const shape = next.layers[0].elements.find(element => element.id === id);
           if (!shape || shape.type !== 'text') throw new TypeError('Not a text object');
           shape.text = text;
+          await saveDraft(next);
+          current = next;
+          onStatus('Experimental draft saved');
+          return structuredClone(current);
+        }),
+        reorder: vi.fn(async (id, direction) => {
+          const next = reorderKonvaV1Element(current, id, direction);
+          if (JSON.stringify(next) === JSON.stringify(current)) return structuredClone(current);
           await saveDraft(next);
           current = next;
           onStatus('Experimental draft saved');
@@ -124,6 +133,28 @@ describe('Studio Konva draft text controls and storage isolation', () => {
     expect(stored.layers[0].elements[1].type).toBe('rect');
     expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
     await vi.waitFor(() => expect(save.disabled).toBe(true));
+  });
+
+  it('exposes accessible bring-forward/backward controls and preserves the canonical layer metadata', async () => {
+    await openAndSelect('text-1');
+    const forward = document.querySelector('[data-studio-konva-reorder="forward"]');
+    const backward = document.querySelector('[data-studio-konva-reorder="backward"]');
+    expect(forward).toBeTruthy();
+    expect(backward).toBeTruthy();
+    expect(forward.disabled).toBe(false);
+    expect(backward.disabled).toBe(true); // first shape is at layer back
+    forward.click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    const [key, persisted] = saveSetting.mock.calls[0];
+    expect(key).toBe('ocd_studio_konva_draft');
+    expect(persisted.layers[0].elements.map(shape => shape.id))
+      .toEqual(['rect-1', 'text-1']);
+    expect(persisted.layers[1].locked).toBe(true);
+    expect(persisted.layers[1].elements[0].text).toBe('Do not edit');
+    expect(window.OpenCourseDeck.Canvas.serialize().layers[0].elements[0].id).toBe('text-1');
+    // saveSetting begins before the async reorder finishes; controls stay
+    // disabled until the acknowledged write has settled and UI re-enables.
+    await vi.waitFor(() => expect(backward.disabled).toBe(false));
   });
 
   it('keeps unsaved Unicode input and reports a rejected draft write, without claiming success', async () => {
