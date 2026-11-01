@@ -342,6 +342,38 @@ describe('app topbar search rendering', () => {
     expect({ courses, topics }).toEqual(original);
   });
 
+  it('never republishes a stale Notes corpus when a save invalidates an in-flight canonical read', async () => {
+    let finishOld;
+    const oldRecord = { id: 'same', title: 'Stale renal note', content: 'old' };
+    const newRecord = { id: 'same', title: 'Updated renal note', content: 'new' };
+    const getAllNotes = vi.fn()
+      .mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }))
+      .mockResolvedValueOnce([newRecord]);
+    window.DB = {
+      getAllNotes,
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.DataStore = { init: vi.fn(async () => true), allCourses: () => [], allTopics: () => [] };
+    const search = window.OpenCourseDeck.TopbarSearch;
+
+    const inFlight = search._loadUniversalData();
+    expect(getAllNotes).toHaveBeenCalledTimes(1);
+    const subscriber = window.OpenCourseDeck.bus.on.mock.calls
+      .find(([event]) => event === 'note:save')?.[1];
+    expect(subscriber).toBeTypeOf('function');
+    subscriber(); // a cross-tab or same-tab save invalidates the older read
+    finishOld([oldRecord]);
+
+    const result = await inFlight;
+    expect(result.map(item => item.label)).toEqual(['Updated renal note']);
+    expect(search._universalData.map(item => item.label)).toEqual(['Updated renal note']);
+    expect(getAllNotes).toHaveBeenCalledTimes(2);
+    const again = await search._loadUniversalData();
+    expect(again.map(item => item.label)).toEqual(['Updated renal note']);
+    expect(getAllNotes).toHaveBeenCalledTimes(2);
+  });
+
   it('does not cache a fictitious empty Notes index when canonical storage is inaccessible', async () => {
     const readNotes = vi.fn()
       .mockRejectedValueOnce(new Error('Canonical Notes IndexedDB locked'))
