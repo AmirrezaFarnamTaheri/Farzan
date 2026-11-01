@@ -258,6 +258,44 @@ describe('app topbar search rendering', () => {
     expect(window.__emptySearchXss).toBeUndefined();
   });
 
+  it('indexes persisted Note tags and catalog keywords across Persian keyboard variants', async () => {
+    const notes = [{ id: 'renal-note', title: 'Saved physiology',
+      content: '<p>Unrelated body</p>', tags: ['كليه', 'Review'] }];
+    const topics = [{ topicId: 'physics-topic', courseId: 'course',
+      courseTitle: 'Biology', sourceLabel: 'Lecture', title: 'Chapter one',
+      keywords: ['فيزيك'], labels: ['Teaching'] }];
+    const original = structuredClone({ notes, topics });
+    window.DB = {
+      getAllNotes: vi.fn(async () => structuredClone(notes)),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allCourses: vi.fn(() => []),
+      allTopics: vi.fn(() => structuredClone(topics)),
+    };
+
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const savedNote = await search._queryUniversal('کلیه');
+    expect(savedNote.map(row => [row.sourceType, row.sourceId]))
+      .toContainEqual(['note', 'renal-note']);
+    expect(savedNote.find(row => row.sourceId === 'renal-note')?.tags).toEqual(['كليه', 'Review']);
+
+    const catalogTopic = await search._queryUniversal('فیزیک');
+    expect(catalogTopic.map(row => [row.sourceType, row.sourceId]))
+      .toContainEqual(['topic', 'course:physics-topic']);
+    expect(catalogTopic.find(row => row.sourceId === 'course:physics-topic')?.keywords)
+      .toEqual(['فيزيك']);
+    const teaching = await search._queryUniversal('teaching');
+    expect(teaching.map(row => [row.sourceType, row.sourceId]))
+      .toContainEqual(['topic', 'course:physics-topic']);
+    expect(teaching.find(row => row.sourceId === 'course:physics-topic')?.labels)
+      .toEqual(['Teaching']);
+    expect({ notes, topics }).toEqual(original);
+    expect(window.DB.saveSetting).toBeUndefined();
+  });
+
   it('finds related note words without indexing on each query or duplicating lexical hits', async () => {
     window.DB = {
       getAllNotes: vi.fn(async () => [
