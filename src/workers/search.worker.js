@@ -42,6 +42,7 @@ const CANCEL_TTL = 60000;
 const state = {
   data: [],
   fuse: null,
+  indexedFields: new Set(),
   revision: 0,
 };
 const cancelled = new Map();
@@ -130,7 +131,20 @@ function initFuse(data, options = {}) {
   // searches must continue to see the previous valid index and revision.
   state.data = data;
   state.fuse = nextFuse;
+  // Atomically publish the fields alongside the new Fuse offsets. A failed
+  // update must not change either the search corpus or its field boundary.
+  state.indexedFields = new Set(fieldNames);
   state.revision += 1;
+}
+
+// The display tier must use the same allowed fields as the committed Fuse
+// index. In particular a title-only corpus must not be promoted by excluded
+// label text, even when Fuse correctly found the document via its title.
+function indexedDisplayLabel(item) {
+  return normalizeWorkerQuery(
+    (state.indexedFields.has('label') && item?.label)
+    || (state.indexedFields.has('title') && item?.title),
+  );
 }
 
 function search(query, options = {}) {
@@ -155,7 +169,7 @@ function search(query, options = {}) {
     const index = match.item[ORIGINAL_INDEX];
     indexedMatches.add(index);
     const item = state.data[index];
-    const label = normalizeWorkerQuery(item?.label || item?.title);
+    const label = indexedDisplayLabel(item);
     const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1
       : label.includes(normalized) ? 2 : 3;
     rankedBuckets[tier].push(match);
@@ -170,7 +184,8 @@ function search(query, options = {}) {
       if (indexedMatches.has(index)) continue;
       const item = state.data[index];
       if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      const label = normalizeWorkerQuery(item.label || item.title);
+      // Honor the committed field scope, even for Fuse's short-query gaps.
+      const label = indexedDisplayLabel(item);
       if (!label.includes(normalized)) continue;
       const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1 : 2;
       rankedBuckets[tier].push({ item: { [ORIGINAL_INDEX]: index }, matches: [] });

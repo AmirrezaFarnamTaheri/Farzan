@@ -197,6 +197,32 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(narrowed.search('imported study guide', { limit: 10 }, 26).results).toEqual(rows);
   });
 
+  it('ranks allowed titles rather than excluded labels within a deliberately narrowed Fuse index', () => {
+    const rows = [
+      { label: 'Cardiology', title: 'Clinical cardiology introduction', sourceType: 'note', sourceId: 'substring' },
+      { label: 'A different heading', title: 'Cardiology basics', sourceType: 'note', sourceId: 'prefix' },
+    ];
+    const worker = workerWithData(rows, { keys: ['title'], threshold: 0.2, ignoreLocation: true });
+    expect(worker.search('cardiology', { limit: 5 }, 35).results.map(item => item.sourceId))
+      .toEqual(['prefix', 'substring']);
+  });
+
+  it('does not leak excluded label/title fields through the one-character Fuse fallback', () => {
+    const records = [{
+      label: 'ف', title: 'English biology lecture', sourceType: 'topic', sourceId: 'protected',
+    }];
+    const original = structuredClone(records);
+    const titleOnly = workerWithData(records, { keys: ['title'], threshold: 0, minMatchCharLength: 2 });
+    expect(titleOnly.search('ف', { limit: 5 }, 32).results).toEqual([]);
+    expect(titleOnly.search('english', { limit: 5 }, 33).results).toEqual(records);
+
+    const labelOnly = workerWithData([{
+      title: 'س', sourceType: 'topic', sourceId: 'title-only',
+    }], { keys: ['label'], threshold: 0, minMatchCharLength: 2 });
+    expect(labelOnly.search('س', { limit: 5 }, 34).results).toEqual([]);
+    expect(records).toEqual(original);
+  });
+
   it('honours explicitly narrowed indexing keys rather than leaking unrelated taxonomy fields', () => {
     const worker = workerWithData([
       { label: 'Physics', category: 'Secret category', tags: ['Secret tag'] },
