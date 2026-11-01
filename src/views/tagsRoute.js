@@ -1,4 +1,8 @@
 import { normalizeSearchQuery } from '../core/searchRanking.js';
+import {
+  TAG_TAXONOMY_KEY, parseTagTaxonomy, resolveTaxonomyKey,
+  createTaxonomyTag, mergeTaxonomyTags, persistTagTaxonomy,
+} from '../features/tagTaxonomy.js';
 
 // A stale read must not replace a more recent successful retry or a new route.
 const renderVersions = new WeakMap();
@@ -23,6 +27,23 @@ export function mountTagsView({ setView } = {}) {
             <button class="filter-chip" type="button" data-tag-filter="mixed" aria-pressed="false">Mixed</button>
             <button class="filter-chip" type="button" data-tag-filter="note" aria-pressed="false">Notes</button>
             <button class="filter-chip" type="button" data-tag-filter="catalog" aria-pressed="false">Catalog</button>
+          </div>
+          <div class="tags-taxonomy-controls" data-tag-taxonomy-controls>
+            <div data-tag-create-form class="filter-row" role="group" aria-label="Create a personal tag">
+              <label for="tag-new-label">New personal tag</label>
+              <input id="tag-new-label" class="input" data-tag-create-name maxlength="80"
+                placeholder="Name a tag..." disabled required />
+              <button class="btn btn-ghost" type="button" disabled>Create tag</button>
+            </div>
+            <div data-tag-merge-form class="filter-row" role="group" aria-label="Merge two tag facets without changing saved content">
+              <label for="tag-merge-from">Merge label</label>
+              <select class="select" id="tag-merge-from" data-tag-merge-from disabled></select>
+              <label for="tag-merge-to">Into</label>
+              <select class="select" id="tag-merge-to" data-tag-merge-to disabled></select>
+              <button class="btn btn-ghost" type="button" disabled>Merge labels</button>
+            </div>
+            <p class="text-muted">Merged labels stay in original Notes and courses; only the displayed taxonomy changes.</p>
+            <p role="status" aria-live="polite" data-tag-mutation-status></p>
           </div>
           <div class="grid grid-3 tags-grid" data-tag-list>
             <p>Loading tags...</p>
@@ -57,12 +78,13 @@ async function renderTags() {
   const listRoot = document.querySelector('[data-tag-list]');
   const searchEl = document.querySelector('[data-tag-search]');
   const filtersRoot = document.querySelector('[data-tag-filters]');
-  if (!metricsRoot || !listRoot || !searchEl || !filtersRoot) return;
+  const taxonomyControls = document.querySelector('[data-tag-taxonomy-controls]');
+  if (!metricsRoot || !listRoot || !searchEl || !filtersRoot || !taxonomyControls) return;
 
   const version = (renderVersions.get(listRoot) || 0) + 1;
   renderVersions.set(listRoot, version);
   listRoot.setAttribute('aria-busy', 'true');
-  const [notesResult, topicsResult] = await Promise.allSettled([
+  const [notesResult, topicsResult, taxonomyResult] = await Promise.allSettled([
     (async () => {
       if (typeof window.DB?.getAllNotes !== 'function') throw new Error('Notes reader is unavailable');
       const notes = await window.DB.getAllNotes();
@@ -76,22 +98,35 @@ async function renderTags() {
       if (!Array.isArray(topics)) throw new TypeError('Catalog returned invalid records');
       return topics;
     })(),
+    (async () => {
+      const db = window.DB;
+      if (typeof db?.getSetting !== 'function') {
+        // Legacy read-only integrations can still browse existing labels;
+        // only genuine canonical store support enables new mutations.
+        return { writable: false, taxonomy: parseTagTaxonomy(null) };
+      }
+      const saved = await db.getSetting(TAG_TAXONOMY_KEY);
+      return { writable: typeof db.saveSetting === 'function', taxonomy: parseTagTaxonomy(saved) };
+    })(),
   ]);
   if (!document.body.contains(listRoot) || renderVersions.get(listRoot) !== version) return;
   listRoot.setAttribute('aria-busy', 'false');
 
-  if (notesResult.status === 'rejected' || topicsResult.status === 'rejected') {
+  if (notesResult.status === 'rejected' || topicsResult.status === 'rejected'
+      || taxonomyResult.status === 'rejected') {
     // Showing partial tag totals or a normal zero state after a canonical
     // read failure misrepresents the user's stored Notes and catalog.
     metricsRoot.replaceChildren();
     listRoot.replaceChildren();
     searchEl.disabled = true;
     filtersRoot.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    taxonomyControls.querySelectorAll('input,select,button').forEach(control => { control.disabled = true; });
     const routeState = window.OpenCourseDeck = window.OpenCourseDeck || {};
     routeState.rerenderVisibleTags = null;
     const failed = [
       notesResult.status === 'rejected' ? 'saved notes' : null,
       topicsResult.status === 'rejected' ? 'catalog' : null,
+      taxonomyResult.status === 'rejected' ? 'tag taxonomy' : null,
     ].filter(Boolean).join(' and ');
     const error = document.createElement('div');
     error.className = 'tag-load-error';
@@ -120,6 +155,8 @@ async function renderTags() {
   filtersRoot.querySelectorAll('button').forEach(button => { button.disabled = false; });
   const notes = notesResult.value;
   const topics = topicsResult.value;
+  const { taxonomy, writable } = taxonomyResult.value;
+  const preferredLabels = new Map(taxonomy.labels.map(item => [item.key, item.label]));
 
   const tagsByKey = new Map();
   const ensureTag = (rawTag) => {
@@ -127,12 +164,12 @@ async function renderTags() {
     if (!label) return null;
     // Use the same multilingual matching key as topbar and command palette.
     // Display remains the first user-provided label; the stored fields are read-only.
-    const key = normalizeSearchQuery(label);
+    const key = resolveTaxonomyKey(taxonomy, label);
     if (!key) return null;
     if (!tagsByKey.has(key)) {
       tagsByKey.set(key, {
         key,
-        label,
+        label: preferredLabels.get(key) || label,
         noteCount: 0,
         topicCount: 0,
         notes: new Set(),
@@ -163,6 +200,10 @@ async function renderTags() {
       if (topic.topicId || topic.id) entry.topics.add(String(topic.topicId || topic.id));
     });
   });
+
+  // User-created labels with no linked record are useful empty taxonomy
+  // entries, not evidence of fabricated study activity.
+  taxonomy.labels.forEach(item => ensureTag(item.label));
 
   const tagEntries = [...tagsByKey.values()].sort((a, b) => (
     (b.noteCount + b.topicCount) - (a.noteCount + a.topicCount)
@@ -255,7 +296,8 @@ async function renderTags() {
       return;
     }
     visibleTags.slice(0, 48).forEach(tag => {
-    const source = tag.noteCount && tag.topicCount ? 'Mixed' : tag.noteCount ? 'Note' : 'Catalog';
+    const source = tag.noteCount && tag.topicCount ? 'Mixed'
+      : tag.noteCount ? 'Note' : tag.topicCount ? 'Catalog' : 'Personal';
     const card = document.createElement('article');
     card.className = 'card';
     card.dataset.tagName = tag.key;
@@ -306,6 +348,68 @@ async function renderTags() {
   // which re-reads the whole notes store and rebuilds the tag maps on every
   // keystroke (and races overlapping async renders against the DOM).
   routeState.rerenderVisibleTags = renderVisibleTags;
+
+  const createForm = taxonomyControls.querySelector('[data-tag-create-form]');
+  const createName = taxonomyControls.querySelector('[data-tag-create-name]');
+  const mergeForm = taxonomyControls.querySelector('[data-tag-merge-form]');
+  const mergeFrom = taxonomyControls.querySelector('[data-tag-merge-from]');
+  const mergeTo = taxonomyControls.querySelector('[data-tag-merge-to]');
+  const status = taxonomyControls.querySelector('[data-tag-mutation-status]');
+  const mutationEnabled = writable && typeof window.DB?.getSetting === 'function';
+  createName.disabled = !mutationEnabled;
+  createForm.querySelector('button').disabled = !mutationEnabled;
+  for (const field of [mergeFrom, mergeTo]) {
+    const previous = field.value;
+    field.replaceChildren();
+    tagEntries.forEach(tag => {
+      const option = document.createElement('option');
+      option.value = tag.key;
+      option.textContent = tag.label;
+      field.appendChild(option);
+    });
+    if (tagEntries.some(tag => tag.key === previous)) field.value = previous;
+    field.disabled = !mutationEnabled || tagEntries.length < 2;
+  }
+  mergeForm.querySelector('button').disabled = !mutationEnabled || tagEntries.length < 2;
+  let mutationPending = false;
+  const applyMutation = async transform => {
+    if (mutationPending || !mutationEnabled) return;
+    mutationPending = true;
+    taxonomyControls.querySelectorAll('input,select,button').forEach(control => { control.disabled = true; });
+    status.removeAttribute('data-tag-mutation-error');
+    status.textContent = 'Saving tag taxonomy...';
+    try {
+      await persistTagTaxonomy(window.DB, transform);
+      status.textContent = 'Tag taxonomy saved.';
+      // Keep search/filter state and re-read durable data; never claim a
+      // completed edit by modifying only the client-side facet map.
+      if (document.body.contains(listRoot)) await renderTags();
+    } catch (error) {
+      if (document.body.contains(listRoot)) {
+        status.dataset.tagMutationError = 'true';
+        status.textContent = 'Tag taxonomy was not saved or verified. ' + (error?.message || String(error));
+        createName.disabled = false;
+        createForm.querySelector('button').disabled = false;
+        const canMerge = tagEntries.length > 1;
+        mergeFrom.disabled = !canMerge;
+        mergeTo.disabled = !canMerge;
+        mergeForm.querySelector('button').disabled = !canMerge;
+      }
+    } finally {
+      mutationPending = false;
+    }
+  };
+  // Rebind to the current render state: leaving an old listener in place
+  // retains stale controls, counts and write permissions after reload.
+  const submitCreate = () => void applyMutation(current => createTaxonomyTag(current, createName.value));
+  const submitMerge = () => void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
+  createForm.querySelector('button').onclick = submitCreate;
+  mergeForm.querySelector('button').onclick = submitMerge;
+  createName.onkeydown = event => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    if (!createForm.querySelector('button').disabled) submitCreate();
+  };
 
   if (!searchEl.dataset.pdBound) {
     searchEl.dataset.pdBound = 'true';
