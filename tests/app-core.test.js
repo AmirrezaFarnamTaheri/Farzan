@@ -1692,7 +1692,7 @@ describe('app shell resilience helpers', () => {
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
   });
 
-  it('clears a stale pending PDF target for page-only bookmarks without a stable document ID', async () => {
+  it('routes page-only bookmarks to Materials and clears an unrelated pending PDF handoff', async () => {
     await loadApp();
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
@@ -1707,12 +1707,19 @@ describe('app shell resilience helpers', () => {
 
     await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="page-only"] a')).toBeTruthy());
-    document.querySelector('[data-bookmark-id="page-only"] a').click();
+    const link = document.querySelector('[data-bookmark-id="page-only"] a');
+    expect(link.getAttribute('href')).toBe('#/materials');
+    expect(link.textContent).toMatch(/find pdf/i);
+    link.click();
 
     expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBeNull();
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBeNull();
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
-    expect(window.location.hash).toBe('#/pdf');
+    expect(window.location.hash).toBe('#/materials');
+    // Wait for the actual hashchange route to settle; otherwise its delayed
+    // mount can overwrite the next test's manually mounted Help view.
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Router._current).toBe('#/materials'));
+    await window.OpenCourseDeck.Router.ready();
   });
 
   it('renders a catalog health panel in Help from the active DataStore', async () => {
