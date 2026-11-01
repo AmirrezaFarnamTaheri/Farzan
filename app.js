@@ -1155,8 +1155,13 @@ import { Pointer } from './src/lib/pointer.js';
           // An existing canonical loader that rejects is not an empty corpus:
           // propagate the read error to the accessible search retry state.
           await window.DataStore?.init?.();
-          const courses = window.DataStore?.allCourses?.() ?? [];
-          const topics = window.DataStore?.allTopics?.() ?? [];
+          // Different editions may expose promise-backed catalog readers.
+          // Validate only the fully resolved canonical corpus, never a
+          // Promise masquerading as an invalid/empty collection.
+          const [courses, topics] = await Promise.all([
+            window.DataStore?.allCourses?.() ?? [],
+            window.DataStore?.allTopics?.() ?? [],
+          ]);
           if (!Array.isArray(courses) || !Array.isArray(topics)) {
             throw new TypeError('Invalid canonical search catalog data');
           }
