@@ -137,6 +137,16 @@ function initFuse(data, options = {}) {
   state.revision += 1;
 }
 
+// The display tier must use the same allowed fields as the committed Fuse
+// index. In particular a title-only corpus must not be promoted by excluded
+// label text, even when Fuse correctly found the document via its title.
+function indexedDisplayLabel(item) {
+  return normalizeWorkerQuery(
+    (state.indexedFields.has('label') && item?.label)
+    || (state.indexedFields.has('title') && item?.title),
+  );
+}
+
 function search(query, options = {}) {
   if (!state.fuse) throw Object.assign(new Error('Search worker is not initialized'), { code: 'SEARCH_WORKER_NOT_READY' });
   const originalQuery = String(query ?? '');
@@ -159,7 +169,7 @@ function search(query, options = {}) {
     const index = match.item[ORIGINAL_INDEX];
     indexedMatches.add(index);
     const item = state.data[index];
-    const label = normalizeWorkerQuery(item?.label || item?.title);
+    const label = indexedDisplayLabel(item);
     const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1
       : label.includes(normalized) ? 2 : 3;
     rankedBuckets[tier].push(match);
@@ -174,13 +184,8 @@ function search(query, options = {}) {
       if (indexedMatches.has(index)) continue;
       const item = state.data[index];
       if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      // This additional one-character scan must honor the exact field scope
-      // used when the currently active Fuse index was successfully built.
-      // Otherwise excluded labels can leak into a narrowed title-only index.
-      const label = normalizeWorkerQuery(
-        (state.indexedFields.has('label') && item.label)
-        || (state.indexedFields.has('title') && item.title),
-      );
+      // Honor the committed field scope, even for Fuse's short-query gaps.
+      const label = indexedDisplayLabel(item);
       if (!label.includes(normalized)) continue;
       const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1 : 2;
       rankedBuckets[tier].push({ item: { [ORIGINAL_INDEX]: index }, matches: [] });
