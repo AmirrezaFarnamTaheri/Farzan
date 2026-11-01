@@ -1078,10 +1078,6 @@
   pointer-events: none;
 }
 
-.courses-search-field .input {
-  padding-inline: calc(var(--space-3) * 2 + 1em);
-}
-
 .catalog-empty {
   display: grid;
   justify-items: center;
