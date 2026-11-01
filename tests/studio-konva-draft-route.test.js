@@ -27,8 +27,17 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
   const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft'
     ? structuredClone(canonicalDraft) : null);
   window.OpenCourseDeck = { Canvas: canvasApi, bus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } };
+  const compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+    // Fake a serialized canonical transaction and its durable readback.
+    const current = await getSetting(key);
+    if (JSON.stringify(current) !== JSON.stringify(expected)) return false;
+    const receipt = await saveSetting(key, next);
+    if (receipt === false || receipt == null) return false;
+    const stored = await getSetting(key);
+    return JSON.stringify(stored) === JSON.stringify(next);
+  });
   window.DB = {
-    saveSetting, getSetting,
+    saveSetting, getSetting, compareAndSwapSetting,
     getAllNotes: vi.fn(async () => []),
     getAllTimestamps: vi.fn(async () => []),
     getAllAnnotations: vi.fn(async () => []),
@@ -436,7 +445,11 @@ describe('Studio experimental Konva draft opt-in', () => {
   it('accepts the canonical DB.saveSetting receipt which returns the saved board value, not a boolean', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { controller, factory, saveSetting } = makeFixture({ savedDraft: v1Board() });
-    saveSetting.mockImplementation(async (_key, value) => structuredClone(value));
+    const realSave = saveSetting.getMockImplementation();
+    saveSetting.mockImplementation(async (key, value) => {
+      await realSave(key, value);
+      return structuredClone(value);
+    });
     document.querySelector('[data-studio-konva-open]').click();
     await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
     const imported = v1Board();
