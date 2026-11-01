@@ -190,7 +190,9 @@ export function createStudioKonvaDraftWorkspace({
       if (disposed) throw new Error('Konva draft workspace closed');
       const receipt = await saveDraft(structuredClone(next));
       if (receipt !== true) throw new Error('Konva draft write was not acknowledged');
-      if (disposed) throw new Error('Konva draft workspace closed');
+      // A close after the durable writer's true receipt must not turn an
+      // already-committed board-v1 change into a false "save failed". The
+      // caller's run() already skips redraw/status for disposed surfaces.
       return true;
     },
     onSelect: id => {
