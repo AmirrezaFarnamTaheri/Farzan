@@ -512,7 +512,6 @@ src/
 │
 ├── features/
 │   ├── aiClient.js          ← existing
-│   ├── pluginHost.js        ← existing
 │   ├── commandPalette.js    ← existing
 │   ├── topbarSearch.js      ← existing (restored)
 │   ├── mediaStorage.js      ← Vidstack (throttled, per-mediaId, IndexedDB)
