@@ -136,7 +136,7 @@ export function mountHelpView(deps = {}) {
     catch { Toast.error('Export failed'); }
   });
   document.getElementById('help-shortcuts-btn')?.addEventListener('click', () => {
-    window.OpenCourseDeck?.KeyboardShortcuts?._showHelp?.();
+    window.OpenCourseDeck?.KeyboardShortcuts?.showHelp?.();
   });
 
 
