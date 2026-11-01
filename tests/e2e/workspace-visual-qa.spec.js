@@ -23,6 +23,7 @@ const setups = [
   { name: 'desktop-dark', width: 1440, height: 900, dark: true },
   { name: 'mobile-light', width: 390, height: 844 },
   { name: 'mobile-rtl', width: 390, height: 844, rtl: true },
+  { name: 'desktop-rtl', width: 1440, height: 900, rtl: true },
 ];
 test.use({ channel: 'chrome' });
 test.setTimeout(240000);
@@ -52,11 +53,56 @@ for (const setup of setups) {
         expect(bounds.y + bounds.height, setup.name + '/' + route + ' System link clipped')
           .toBeLessThanOrEqual(setup.height - 2);
       }
-      if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'home') {
+        await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+        await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
+        await expect(page.locator('[data-focus-clock]')).toHaveText(/^\d\d:\d\d$/);
+      }
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
-        await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
-          el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(setup.width);
+        if (setup.width <= 1023) {
+          await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+            el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(setup.width);
+        } else {
+          // Desktop navigation must move to the inline-start (right) side.
+          await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+            Math.round(el.getBoundingClientRect().right))).toBeGreaterThanOrEqual(setup.width - 2);
+        }
+        if (route === 'notes' || route === 'courses') {
+          // Mobile Notes intentionally shows the editor first. Open the
+          // accessible library pane before inspecting its search control.
+          if (route === 'notes' && setup.width <= 1023) {
+            await page.locator('[data-notes-toggle-library]').click();
+            await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'true');
+          }
+          const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
+          const field = page.locator(fieldSelector).first();
+          await expect(field).toBeVisible();
+          const position = await field.evaluate((el) => {
+            const icon = el.querySelector('.icon')?.getBoundingClientRect();
+            const input = el.querySelector('input')?.getBoundingClientRect();
+            return icon && input ? { iconX: icon.left + icon.width / 2, inputMid: input.left + input.width / 2 } : null;
+          });
+          expect(position, setup.name + '/' + route + ' search control missing').not.toBeNull();
+          expect(position.iconX, setup.name + '/' + route + ' search icon should be at inline-start')
+            .toBeGreaterThan(position.inputMid);
+          // The input itself has dir="auto": English and Persian values can
+          // change its inline-start independently of the surrounding icon.
+          // Symmetric clearance prevents collisions in either script.
+          const clearance = await field.locator('input').evaluate((input) => {
+            const style = getComputedStyle(input);
+            return Math.min(parseFloat(style.paddingLeft), parseFloat(style.paddingRight));
+          });
+          expect(clearance, setup.name + '/' + route + ' mixed-script search clearance')
+            .toBeGreaterThanOrEqual(24);
+          if (route === 'notes' && setup.width <= 1023) {
+            await page.locator('[data-notes-toggle-library]').click();
+            await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'false');
+          }
+        }
+        if (route === 'home') {
+          await expect(page.locator('.home-widget').first()).toHaveCSS('text-align', 'start');
+        }
       }
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const dimensions = await page.evaluate(() => ({
@@ -70,6 +116,26 @@ for (const setup of setups) {
       const name = path.join(folder, route + '.png');
       const shot = await page.screenshot({ path: name, animations: 'disabled', caret: 'hide' });
       expect(shot.byteLength, `${setup.name}/${route} blank screenshot`).toBeGreaterThan(11000);
+      if (route === 'home') {
+        // The Focus card sits below the first fold on some screens. Capture
+        // the actual hydrated widget instead of declaring a passing top-only
+        // screenshot to be evidence of its readability.
+        const focusCard = page.locator('[data-focus-widget]');
+        await focusCard.scrollIntoViewIfNeeded();
+        await expect(page.locator('[data-focus-start]')).toBeEnabled();
+        await expect(page.locator('[data-focus-preset]')).toBeEnabled();
+        await page.screenshot({
+          path: path.join(folder, 'home-focus-widget.png'),
+          animations: 'disabled', caret: 'hide',
+        });
+        await page.locator('[data-focus-start]').click();
+        await expect(page.locator('[data-focus-start]')).toHaveText('Pause');
+        await page.locator('[data-focus-start]').click();
+        await expect(page.locator('[data-focus-start]')).toHaveText('Resume');
+        await page.locator('[data-focus-reset]').click();
+        await expect(page.locator('[data-focus-clock]')).toHaveText('25:00');
+        await page.locator('#view-container').evaluate(el => { el.scrollTop = 0; });
+      }
 
       // Record real opened overlays as separate visual states; close them
       // before subsequent routes to avoid accidentally obscuring screenshots.
