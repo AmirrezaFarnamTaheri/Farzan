@@ -61,6 +61,12 @@
   color: var(--text-primary);
   text-decoration: none;
 }
+.settings-nav a[aria-current="location"] {
+  background: var(--accent-muted);
+  color: var(--accent-on-tint);
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: calc(var(--space-3) - 3px);
+}
 
 .settings-nav .icon {
   color: var(--accent-light);
@@ -679,6 +685,14 @@
 }
 .view-settings #settings-appearance .settings-control-card > .select {
   width: min(100%, 260px);
+}
+/* Restore the platform disclosure glyph: these are real dropdown controls. */
+.view-settings #select-density,
+.view-settings #select-language {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  background-image: none;
+  padding-inline-end: var(--space-3);
 }
 .view-settings #settings-appearance .settings-inline-controls {
   flex-wrap: nowrap;
