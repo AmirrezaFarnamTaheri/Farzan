@@ -8,9 +8,8 @@ import { withExistingIndexedDBStore } from './src/core/mainDbDexieRead.js';
 const DBExports = (() => {
 'use strict';
 
-// KDF parameters. v2 envelopes carry a random per-database salt and the
-// hardened iteration count; legacy envelopes keep the original values.
-const LEGACY_KDF = { salt: 'opencoursedeck-salt', iterations: 10000 };
+// The prelaunch-only v2 envelope uses a random per-record salt and a
+// bounded PBKDF2 iteration count; no unversioned ciphertext reader ships.
 const KDF_ITERATIONS = 600000;
 
 class OpenCourseDB {
@@ -40,7 +39,7 @@ _getCrypto() {
   return null;
 }
 
-async _deriveKey(passphrase, salt = LEGACY_KDF.salt, iterations = LEGACY_KDF.iterations) {
+async _deriveKey(passphrase, salt, iterations) {
   const cryptoObj = this._getCrypto();
   if (!cryptoObj || !cryptoObj.subtle) return null;
   const encoder = new TextEncoder();
@@ -101,22 +100,18 @@ async decryptPayload(data) {
   if (!Array.isArray(data.iv) || data.iv.length !== 12 || !Array.isArray(data.ciphertext) || !data.ciphertext.length) {
     throw new Error('Invalid encrypted record envelope');
   }
-  if (data.v === 2 && (
-    !Array.isArray(data.salt) || data.salt.length !== 16 ||
-    !Number.isInteger(data.iterations) || data.iterations < 10000 || data.iterations > 1000000
-  )) {
-    throw new Error('Invalid encrypted record parameters');
-  }
-  if (data.v != null && data.v !== 2) {
+  if (data.v !== 2) {
     throw new Error('Unsupported encrypted record version');
   }
-  // Legacy envelopes (no v field) used the static app-wide salt and the
-  // original 10,000-iteration KDF; keep decrypting them transparently.
-  const isLegacy = data.v !== 2;
+  if (!Array.isArray(data.salt) || data.salt.length !== 16 ||
+      !Number.isInteger(data.iterations) ||
+      data.iterations < 10000 || data.iterations > 1000000) {
+    throw new Error('Invalid encrypted record parameters');
+  }
   const key = await this._deriveKey(
     this.encryptionPassphrase,
-    isLegacy ? LEGACY_KDF.salt : Uint8Array.from(data.salt ?? []),
-    isLegacy ? LEGACY_KDF.iterations : (data.iterations ?? KDF_ITERATIONS)
+    Uint8Array.from(data.salt),
+    data.iterations
   );
   if (!key) return data;
   const iv = new Uint8Array(data.iv);
