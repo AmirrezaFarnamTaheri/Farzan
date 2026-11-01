@@ -377,7 +377,8 @@ describe('settings route', () => {
     expect(links[0].getAttribute('aria-current')).toBe('location');
     const before = window.location.hash;
     const section = document.getElementById('settings-storage');
-    const scroll = vi.spyOn(section, 'scrollIntoView').mockImplementation(() => {});
+    const scroll = vi.fn();
+    section.scrollIntoView = scroll;
     const click = new MouseEvent('click', { bubbles: true, cancelable: true });
     links[2].dispatchEvent(click);
     expect(click.defaultPrevented).toBe(true);
