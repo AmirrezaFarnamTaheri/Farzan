@@ -831,9 +831,14 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         if (typeof db?.getSetting !== 'function' || typeof db?.saveSetting !== 'function') {
           throw new Error('Canonical draft storage unavailable');
         }
-        // Detect newer writes from another tab before replacing them. This
-        // read/write pair is not an atomic compare-and-swap; a simultaneous
-        // overwrite between the two operations still requires DB-level locks.
+        if (typeof db.compareAndSwapSetting === 'function') {
+          const accepted = await db.compareAndSwapSetting(loaded.DRAFT_KEY, lastSavedDraft, changed);
+          if (!accepted) throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
+          lastSavedDraft = structuredClone(changed);
+          return true;
+        }
+        // Compatibility path for test facades without transactional support.
+        // Production uses the canonical CAS above, never this unlocked path.
         const before = await db.getSetting(loaded.DRAFT_KEY);
         if (!sameBoard(before, lastSavedDraft)) {
           throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
