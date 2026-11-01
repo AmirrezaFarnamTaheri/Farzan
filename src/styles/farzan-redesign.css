@@ -802,6 +802,7 @@ input[type="file"][hidden] {
   .home-focus-panel { padding: 22px; }
   .home-grid > .home-card-wide { grid-column: 1 / -1; }
   .home-grid > .home-card { grid-column: span 6; }
+  .home-grid > .home-card-activity { grid-column: 1 / -1; }
   .courses-shell { grid-template-columns: minmax(235px, 290px) minmax(0,1fr); }
   .topic-row { grid-template-columns: minmax(0,1fr); }
   .topic-actions { justify-content: flex-start; }
