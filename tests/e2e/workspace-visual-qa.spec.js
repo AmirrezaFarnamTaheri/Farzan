@@ -43,7 +43,11 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
-      if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'home') {
+        await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+        await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
+        await expect(page.locator('[data-focus-clock]')).toHaveText(/^\\d\\d:\\d\\d$/);
+      }
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
         await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
