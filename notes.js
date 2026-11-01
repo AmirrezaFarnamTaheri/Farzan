@@ -631,12 +631,12 @@ import { countWords } from './src/core/textMetrics.js';
   // ──────────────────────────────────────────────────────────
 
   const Editor = {
-    _tiptap: null,
-    _tiptapChanged: false,
-    _tiptapOriginal: null,
+    _squire: null,
+    _squireChanged: false,
+    _squireOriginal: null,
 
     async enableModern() {
-      if (this._tiptap) return { ok: true, alreadyEnabled: true };
+      if (this._squire) return { ok: true, alreadyEnabled: true };
       if (!this._el || !this._currentId) return { ok: false, reason: 'no-note' };
       // Never replace the native editing surface mid-IME. Composition DOM is
       // provisional, and Squire would discard the browser's active composition.
@@ -651,7 +651,7 @@ import { countWords } from './src/core/textMetrics.js';
       if (!preflight.compatible) return { ok: false, reason: 'incompatible', detail: preflight.reason };
       // A compatible persisted record does not imply the current, unsaved
       // draft is compatible. Reject tables/images/styles in the live editor
-      // BEFORE flushing a debounced save or replacing the DOM with ProseMirror.
+      // BEFORE flushing a debounced save or replacing the DOM with Squire.
       const draftCheck = assessNoteForSquire(this._el.innerHTML);
       if (!draftCheck.compatible) {
         return { ok: false, reason: 'incompatible', detail: draftCheck.reason };
@@ -692,13 +692,13 @@ import { countWords } from './src/core/textMetrics.js';
             // The current ID may be rebound to a recovered copy after remote
             // deletion; the mount epoch, not the old note ID, owns the editor.
             if (this._el !== node || this._loadEpoch !== mountEpoch || !this._currentId) return;
-            this._tiptapChanged = true;
+            this._squireChanged = true;
             this._onInput();
           },
         });
-        this._tiptap = instance;
-        this._tiptapOriginal = safe;
-        this._tiptapChanged = false;
+        this._squire = instance;
+        this._squireOriginal = safe;
+        this._squireChanged = false;
         // Squire owns the accessible textbox while mounted; avoid two nested
         // textbox roles announcing the same note content to screen readers.
         node.removeAttribute('role');
@@ -715,17 +715,17 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     disableModern({ preserveContent = true } = {}) {
-      if (!this._tiptap) return false;
+      if (!this._squire) return false;
       // Squire batches DOM input notifications via MutationObserver. Capture
       // any unobserved final keystroke before asking getContent() whether the
       // document changed; otherwise an immediate fallback can restore the
       // previous HTML and silently discard the latest edit.
-      if (preserveContent && this._tiptap.syncChanges() === false) return false;
+      if (preserveContent && this._squire.syncChanges() === false) return false;
       const preserved = preserveContent ? this.getContent() : '';
-      try { this._tiptap.destroy(); } catch {}
-      this._tiptap = null;
-      this._tiptapOriginal = null;
-      this._tiptapChanged = false;
+      try { this._squire.destroy(); } catch {}
+      this._squire = null;
+      this._squireOriginal = null;
+      this._squireChanged = false;
       if (this._el) {
         this._el.replaceChildren();
         this._el.setAttribute('contenteditable', 'true');
@@ -800,7 +800,7 @@ import { countWords } from './src/core/textMetrics.js';
       RouteListeners.on(this._el, 'input', e => {
         // Squire owns its edit/IME notifications; a bubbled input must not
         // schedule a separate save with an unfinished composition string.
-        if (this._tiptap || e.isComposing) return;
+        if (this._squire || e.isComposing) return;
         this._onInput();
         this._scheduleSnapshot();
       });
@@ -811,7 +811,7 @@ import { countWords } from './src/core/textMetrics.js';
         this._compositionActive = false;
         // Some browsers do not issue a second input after completing IME.
         // Squire owns the modern editor's final-composition notification.
-        if (!this._tiptap) this._onInput();
+        if (!this._squire) this._onInput();
       });
 
       // Keyboard shortcuts
@@ -858,8 +858,8 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Get current HTML ──────────────────────────────────
     getContent() {
-      const html = this._tiptap
-        ? (this._tiptapChanged ? this._tiptap.getHTML() : this._tiptapOriginal)
+      const html = this._squire
+        ? (this._squireChanged ? this._squire.getHTML() : this._squireOriginal)
         : this._el?.innerHTML;
       return this._sanitize(html ?? '');
     },
@@ -890,12 +890,12 @@ import { countWords } from './src/core/textMetrics.js';
           this._saveTimer = setTimeout(doSave, 150);
           return false;
         }
-        if (this._tiptap) {
+        if (this._squire) {
           // A final Squire mutation may predate its queued input event. Read
           // the live editor synchronously before saving or leaving the route.
           // syncChanges can schedule its own debounce through onUpdate, so
           // clear that redundant timer before performing the current write.
-          if (this._tiptap.syncChanges() === false) {
+          if (this._squire.syncChanges() === false) {
             this._saveTimer = setTimeout(doSave, 150);
             return false;
           }
@@ -903,7 +903,7 @@ import { countWords } from './src/core/textMetrics.js';
           this._saveTimer = null;
         }
         const content  = this.getContent();
-        const text     = this._tiptap ? this._tiptap.editor.getText() : (this._el.innerText ?? '');
+        const text     = this._squire ? this._squire.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
         const chars    = text.length;
         // `?? ` does not catch the empty string, so clearing the title field
@@ -932,7 +932,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Undo / Redo ───────────────────────────────────────
     _snapshot() {
-      if (this._tiptap) return;
+      if (this._squire) return;
       const html = this._el?.innerHTML ?? '';
       // Trim future history if we branched
       this._history = this._history.slice(0, this._historyIdx + 1);
@@ -944,7 +944,7 @@ import { countWords } from './src/core/textMetrics.js';
     _scheduleSnapshot: debounce(function() { Editor._snapshot(); }, 500),
 
     undo() {
-      if (this._tiptap) { this._tiptap.run('undo'); return; }
+      if (this._squire) { this._squire.run('undo'); return; }
       if (this._historyIdx <= 0) return;
       this._historyIdx--;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -952,7 +952,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     redo() {
-      if (this._tiptap) { this._tiptap.run('redo'); return; }
+      if (this._squire) { this._squire.run('redo'); return; }
       if (this._historyIdx >= this._history.length - 1) return;
       this._historyIdx++;
       this._setRichHTML(this._history[this._historyIdx]);
@@ -961,7 +961,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     _setRichHTML(html) {
       if (!this._el) return;
-      if (this._tiptap) this._tiptap.setContent(this._sanitize(html));
+      if (this._squire) this._squire.setContent(this._sanitize(html));
       else this._el.innerHTML = this._sanitize(html);
     },
 
@@ -975,7 +975,7 @@ import { countWords } from './src/core/textMetrics.js';
       if (!e.isComposing && e.key === '/' && this._isEmptyBlock()) {
         this._showSlashMenu();
       }
-      if (this._tiptap) return;
+      if (this._squire) return;
       if (ctrl && e.key === 'z') { e.preventDefault(); this.undo(); return; }
       if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); this.redo(); return; }
       if (ctrl && e.key === 'b') { e.preventDefault(); this.COMMANDS.bold(); return; }
@@ -994,7 +994,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Paste handler ─────────────────────────────────────
     _onPaste(e) {
-      if (this._tiptap) return; // ProseMirror owns paste parsing and history.
+      if (this._squire) return; // ProseMirror owns paste parsing and history.
       e.preventDefault();
       const text = e.clipboardData.getData('text/html')
         || e.clipboardData.getData('text/plain');
@@ -1017,8 +1017,8 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Toolbar state sync ────────────────────────────────
     _updateToolbar() {
-      if (this._tiptap) {
-        $$('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._tiptap.isActive(btn.dataset.cmd)));
+      if (this._squire) {
+        $$('[data-cmd]').forEach(btn => btn.classList.toggle('active', this._squire.isActive(btn.dataset.cmd)));
         return;
       }
       const commands = ['bold', 'italic', 'underline', 'strikeThrough',
@@ -1103,7 +1103,7 @@ import { countWords } from './src/core/textMetrics.js';
     appendAISummary(summary) {
       // Never insert outside an active Squire root if an IME composition makes
       // it unsafe to switch editing engines yet.
-      if (this._tiptap && !this.disableModern()) return false;
+      if (this._squire && !this.disableModern()) return false;
       if (!this._el || !this._currentId) return false;
       const lines = String(summary || '')
         .split(/\r?\n/)
@@ -1196,15 +1196,15 @@ import { countWords } from './src/core/textMetrics.js';
         item.textContent = label;
         const apply = () => {
           // Focus restores Squire's saved selection after keyboard navigation.
-          if (this._tiptap) this._tiptap.editor.commands.focus();
+          if (this._squire) this._squire.editor.commands.focus();
           else this._el?.focus();
           // Delete only the literal slash if one was actually typed, never an
           // arbitrary preceding character via document.execCommand('delete').
           this._removeSlashPrefix();
-          if (this._tiptap?.supports(cmd)) {
-            this._tiptap.run(cmd);
+          if (this._squire?.supports(cmd)) {
+            this._squire.run(cmd);
           } else {
-            if (this._tiptap) {
+            if (this._squire) {
               // Tables and other unsupported structures remain available in
               // the classic editor without losing a compatible existing note.
               this.disableModern();
@@ -1284,7 +1284,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _placeCursorAtEnd() {
-      if (this._tiptap) { this._tiptap.editor.commands.focus('end'); return; }
+      if (this._squire) { this._squire.editor.commands.focus('end'); return; }
       const range = document.createRange();
       const sel   = window.getSelection();
       range.selectNodeContents(this._el);
@@ -1960,9 +1960,9 @@ import { countWords } from './src/core/textMetrics.js';
       if (!toolbarEl) return;
       const runCommand = btn => {
         const command = btn.dataset.cmdBlock || btn.dataset.cmd;
-        if (Editor._tiptap) {
-          if (Editor._tiptap.supports(command)) {
-            Editor._tiptap.run(command);
+        if (Editor._squire) {
+          if (Editor._squire.supports(command)) {
+            Editor._squire.run(command);
             return;
           }
           // Unsupported advanced formatting requires the legacy schema.
@@ -1996,7 +1996,7 @@ import { countWords } from './src/core/textMetrics.js';
         // Focus must go back to the editable before execCommand: it acts on
         // the focused editable, and focus is currently on the button. A
         // contenteditable restores its previous selection when refocused.
-        if (Editor._tiptap) Editor._tiptap.editor.commands.focus();
+        if (Editor._squire) Editor._squire.editor.commands.focus();
         else Editor._el?.focus();
         runCommand(btn);
       });
@@ -2005,8 +2005,8 @@ import { countWords } from './src/core/textMetrics.js';
       const sizeSelect = toolbarEl.querySelector('[data-font-size]');
       if (sizeSelect) {
         RouteListeners.on(sizeSelect, 'change', () => {
-          if (Editor._tiptap?.supports('fontSize')) { Editor._tiptap.run('fontSize', sizeSelect.value); return; }
-          if (Editor._tiptap) Editor.disableModern();
+          if (Editor._squire?.supports('fontSize')) { Editor._squire.run('fontSize', sizeSelect.value); return; }
+          if (Editor._squire) Editor.disableModern();
           document.execCommand('fontSize', false, sizeSelect.value);
         });
       }
@@ -2015,8 +2015,8 @@ import { countWords } from './src/core/textMetrics.js';
       const fontSelect = toolbarEl.querySelector('[data-font-family]');
       if (fontSelect) {
         RouteListeners.on(fontSelect, 'change', () => {
-          if (Editor._tiptap?.supports('fontFamily')) { Editor._tiptap.run('fontFamily', fontSelect.value); return; }
-          if (Editor._tiptap) Editor.disableModern();
+          if (Editor._squire?.supports('fontFamily')) { Editor._squire.run('fontFamily', fontSelect.value); return; }
+          if (Editor._squire) Editor.disableModern();
           document.execCommand('fontName', false, fontSelect.value);
         });
       }
@@ -2025,8 +2025,8 @@ import { countWords } from './src/core/textMetrics.js';
       const colorInput = toolbarEl.querySelector('[data-text-color]');
       if (colorInput) {
         RouteListeners.on(colorInput, 'input', () => {
-          if (Editor._tiptap?.supports('textColor')) { Editor._tiptap.run('textColor', colorInput.value); return; }
-          if (Editor._tiptap) Editor.disableModern();
+          if (Editor._squire?.supports('textColor')) { Editor._squire.run('textColor', colorInput.value); return; }
+          if (Editor._squire) Editor.disableModern();
           document.execCommand('foreColor', false, colorInput.value);
         });
       }
@@ -2035,8 +2035,8 @@ import { countWords } from './src/core/textMetrics.js';
       const hlInput = toolbarEl.querySelector('[data-highlight-color]');
       if (hlInput) {
         RouteListeners.on(hlInput, 'input', () => {
-          if (Editor._tiptap?.supports('highlightColor')) { Editor._tiptap.run('highlightColor', hlInput.value); return; }
-          if (Editor._tiptap) Editor.disableModern();
+          if (Editor._squire?.supports('highlightColor')) { Editor._squire.run('highlightColor', hlInput.value); return; }
+          if (Editor._squire) Editor.disableModern();
           document.execCommand('hiliteColor', false, hlInput.value);
         });
       }
@@ -2101,7 +2101,7 @@ import { countWords } from './src/core/textMetrics.js';
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
           const modernToggle = $('[data-notes-modern-toggle]');
-          if (modernToggle && !Editor._tiptap) modernToggle.textContent = 'Try Squire editor';
+          if (modernToggle && !Editor._squire) modernToggle.textContent = 'Try Squire editor';
         });
       }
 
@@ -2112,7 +2112,7 @@ import { countWords } from './src/core/textMetrics.js';
       if (modernToggle) {
         modernToggle.hidden = false;
         RouteListeners.on(modernToggle, 'click', async () => {
-          if (Editor._tiptap) {
+          if (Editor._squire) {
             // Do not end an in-progress IME composition or discard an unsaved
             // last mutation merely to switch editing engines.
             if (!Editor.disableModern()) return;
@@ -2126,7 +2126,7 @@ import { countWords } from './src/core/textMetrics.js';
               );
             }
           }
-          modernToggle.textContent = Editor._tiptap
+          modernToggle.textContent = Editor._squire
             ? 'Use classic editor' : 'Try Squire editor';
         });
       }
@@ -2257,7 +2257,7 @@ import { countWords } from './src/core/textMetrics.js';
       const sourceEpoch = Editor._loadEpoch;
       // Flush any pending Squire MutationObserver notification before the
       // canonical read. An unfinished IME composition stays in the live editor.
-      if (Editor._tiptap && !Editor._compositionActive) Editor._tiptap.syncChanges();
+      if (Editor._squire && !Editor._compositionActive) Editor._squire.syncChanges();
       const previousNote = editedNoteId && Store.getNote(editedNoteId);
       const dirtyBeforeSync = this._hasPendingLocalEdit();
       Editor._syncReadInProgress += 1;
@@ -2345,7 +2345,7 @@ import { countWords } from './src/core/textMetrics.js';
       if (!Editor._currentId) return true;
       // Squire may still have a DOM mutation awaiting its observer. Resolve
       // that before deciding an editor has no pending local work.
-      if (Editor._tiptap && Editor._tiptap.syncChanges() === false) return false;
+      if (Editor._squire && Editor._squire.syncChanges() === false) return false;
       // A canonical refresh can delete the previous (clean) note. In that
       // case there is nothing to save: allow opening the newly loaded record.
       // An edited missing note must stay mounted for recovery instead.
