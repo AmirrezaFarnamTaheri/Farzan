@@ -133,14 +133,23 @@ function search(query, options = {}) {
   const normalized = normalizeWorkerQuery(originalQuery);
   if (!normalized) return { results: [], query: originalQuery, matches: [], indexRevision: state.revision };
   const limit = Math.max(1, Math.min(250, Number(options.limit) || 25));
-  // Deduplicate after Fuse ranks the full collection, not before fuzzy ranking
-  // or after the final cap. Otherwise repeated source records can monopolize
-  // every visible row and hide the next relevant source.
-  const fuseResults = state.fuse.search(normalized);
+  // Keep Fuse's fuzzy recall and score order *within* each lexical tier,
+  // but make exact/prefix/substring visible labels deterministic across the
+  // topbar, command-palette fallback and worker catalog search. These are
+  // lightweight buckets over the already-ranked Fuse result set, not a new
+  // index or protocol. Dedupe only after sorting, before applying the cap.
+  const rankedBuckets = [[], [], [], []];
+  for (const match of state.fuse.search(normalized)) {
+    const item = state.data[match.item[ORIGINAL_INDEX]];
+    const label = normalizeWorkerQuery(item?.label || item?.title);
+    const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1
+      : label.includes(normalized) ? 2 : 3;
+    rankedBuckets[tier].push(match);
+  }
   const results = [];
   const matches = [];
   const seen = new Set();
-  for (const result of fuseResults) {
+  for (const result of rankedBuckets.flat()) {
     const item = state.data[result.item[ORIGINAL_INDEX]];
     const id = canonicalWorkerIdentity(item);
     if (id && seen.has(id)) continue;
