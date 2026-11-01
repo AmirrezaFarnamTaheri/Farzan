@@ -11,6 +11,7 @@ describe('unreleased canonical database constructor', () => {
     const db = await import('../db.js');
     expect(typeof db.OpenCourseDB).toBe('function');
     expect(db.PlasmaDB).toBeUndefined();
-    expect(globalThis.window.OpenCourseDeck.DB.OpenCourseDB).toBe(db.OpenCourseDB);
+    expect(db.default.OpenCourseDB).toBe(db.OpenCourseDB);
+    expect(db.default).not.toHaveProperty('PlasmaDB');
   });
 });
