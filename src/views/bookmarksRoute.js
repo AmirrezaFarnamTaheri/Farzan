@@ -40,6 +40,7 @@ export function mountBookmarksView(deps = {}) {
     </section>
   `);
   let visibleLimit = 24;
+  let renderVersion = 0;
   renderBookmarks();
 
   function formatDuration(seconds) {
@@ -57,6 +58,8 @@ export function mountBookmarksView(deps = {}) {
     const listRoot = document.querySelector('[data-bookmark-list]');
     const filtersRoot = document.querySelector('[data-bookmark-filters]');
     if (!metricsRoot || !listRoot) return;
+    const version = ++renderVersion;
+    listRoot.setAttribute('aria-busy', 'true');
     const activeFilter = filtersRoot?.dataset.activeFilter || 'all';
 
     let readError = null;
@@ -76,7 +79,10 @@ export function mountBookmarksView(deps = {}) {
       readCollection(window.DB?.getAllNotes, 'Notes'),
       readCollection(window.DB?.getAllAnnotations, 'PDF annotations'),
     ]);
-    if (!document.body.contains(listRoot)) return;
+    // A slower earlier filter request must never overwrite a newer result,
+    // error or active filter. DOM replacement also invalidates old requests.
+    if (!document.body.contains(listRoot) || renderVersion !== version) return;
+    listRoot.removeAttribute('aria-busy');
     if (readError) {
       // Never present partial or fabricated zero totals after any canonical
       // read fails; the remaining records may be entirely correct.
@@ -88,7 +94,17 @@ export function mountBookmarksView(deps = {}) {
       error.className = 'bookmarks-load-error';
       error.setAttribute('role', 'alert');
       error.textContent = 'Bookmarks could not be loaded. Your stored data was not changed.';
-      listRoot.appendChild(error);
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-primary';
+      retry.dataset.bookmarkRetry = 'true';
+      retry.textContent = 'Retry loading bookmarks';
+      retry.addEventListener('click', () => {
+        retry.disabled = true;
+        retry.textContent = 'Retrying bookmarks...';
+        void renderBookmarks();
+      });
+      listRoot.append(error, retry);
       return;
     }
     const notesById = new Map(notes.map(note => [note.id, note]));
