@@ -169,6 +169,10 @@ export async function mountCoursesView(deps = {}) {
     if (action) {
       if (active) action.setAttribute('aria-current', 'true');
       else action.removeAttribute('aria-current');
+      // Mobile hides the meta column; keep "Playing" visible in the
+      // primary action hint without requiring a second side panel.
+      const hint = action.querySelector('.topic-primary-hint');
+      if (hint) hint.textContent = active ? 'Playing' : 'Play';
     }
     const existing = row.querySelector('[data-current-lesson]');
     if (active && !existing) {
