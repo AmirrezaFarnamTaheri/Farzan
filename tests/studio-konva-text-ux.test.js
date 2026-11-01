@@ -37,9 +37,14 @@ describe('Studio Konva draft text controls and storage isolation', () => {
       },
       bus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
     };
-    saveSetting = vi.fn(async () => true);
+    let canonicalDraft = null;
+    saveSetting = vi.fn(async (key, value) => {
+      if (key === 'ocd_studio_konva_draft') canonicalDraft = structuredClone(value);
+      return true;
+    });
     window.DB = {
-      getSetting: vi.fn(async () => null), saveSetting,
+      getSetting: vi.fn(async key => key === 'ocd_studio_konva_draft'
+        ? structuredClone(canonicalDraft) : null), saveSetting,
       getAllNotes: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),

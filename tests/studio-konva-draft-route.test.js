@@ -19,8 +19,13 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     getState: vi.fn(() => ({ tool: 'select', selectedIds: [] })),
     boardEpoch: vi.fn(() => 0), hasPendingAutosave: vi.fn(() => false),
   };
-  const saveSetting = vi.fn(async () => true);
-  const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft' ? savedDraft : null);
+  let canonicalDraft = savedDraft == null ? null : structuredClone(savedDraft);
+  const saveSetting = vi.fn(async (key, value) => {
+    if (key === 'ocd_studio_konva_draft') canonicalDraft = structuredClone(value);
+    return true;
+  });
+  const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft'
+    ? structuredClone(canonicalDraft) : null);
   window.OpenCourseDeck = { Canvas: canvasApi, bus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } };
   window.DB = {
     saveSetting, getSetting,
@@ -106,6 +111,51 @@ describe('Studio experimental Konva draft opt-in', () => {
     document.querySelector('[data-studio-konva-close]').click();
     await vi.waitFor(() => expect(instance.destroy).toHaveBeenCalledOnce());
     expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
+    controller.unmount();
+  });
+
+  it('refuses an unpersisted draft mutation even if the storage promise resolves true', async () => {
+    const savedDraft = v1Board();
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const writer = factory.mock.calls[0][0].saveDraft;
+    // Simulate a resolved acknowledgement with no actual persistent write.
+    saveSetting.mockImplementation(async () => true);
+    const next = v1Board();
+    next.layers[0].elements[0].x = 277;
+    // A test double that acknowledges a write but leaves the canonical
+    // record unchanged reproduces a loss of edits on next reload.
+    await expect(writer(next)).rejects.toThrow(/not saved|readback|verified/i);
+    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', next);
+    expect(await getSetting('ocd_studio_konva_draft')).toEqual(savedDraft);
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    controller.unmount();
+  });
+
+  it('refuses to overwrite another tab\'s newer isolated draft before issuing a write', async () => {
+    const savedDraft = v1Board();
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const newer = v1Board();
+    newer.layers[0].elements[0].x = 612;
+    getSetting.mockResolvedValueOnce(newer);
+    const next = v1Board();
+    next.layers[0].elements[0].x = 244;
+    await expect(factory.mock.calls[0][0].saveDraft(next))
+      .rejects.toThrow(/changed|newer|conflict|another tab/i);
+    expect(saveSetting).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('does not count an undefined write receipt as an accepted draft save', async () => {
+    const { controller, factory, saveSetting } = makeFixture({ savedDraft: v1Board() });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    saveSetting.mockResolvedValue(undefined);
+    await expect(factory.mock.calls[0][0].saveDraft(v1Board()))
+      .rejects.toThrow(/acknowledg|write|receipt/i);
     controller.unmount();
   });
 

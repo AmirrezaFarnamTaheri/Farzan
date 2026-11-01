@@ -815,18 +815,38 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       konvaClosing = false;
     }
   };
-  const createKonvaWorkspace = (source, loaded) => {
+  const createKonvaWorkspace = (source, loaded, { persistedDraft = source } = {}) => {
     const db = window.DB;
     const previousWorkspace = konvaWorkspace;
+    // Null means the user opted into a fresh lab copy of the live Canvas2D
+    // board. This does not yet exist under the isolated draft storage key.
+    let lastSavedDraft = persistedDraft == null ? null : structuredClone(persistedDraft);
+    const sameBoard = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     const candidate = loaded.createStudioKonvaDraftWorkspace({
       container: konvaStage,
       board: source,
       // Only this experimental key is writable here. The live canvas owns
       // ocd_studio_board and its independent autosave/restore epoch.
       saveDraft: async changed => {
-        if (typeof db?.saveSetting !== 'function') throw new Error('Draft storage unavailable');
+        if (typeof db?.getSetting !== 'function' || typeof db?.saveSetting !== 'function') {
+          throw new Error('Canonical draft storage unavailable');
+        }
+        // Detect newer writes from another tab before replacing them. This
+        // read/write pair is not an atomic compare-and-swap; a simultaneous
+        // overwrite between the two operations still requires DB-level locks.
+        const before = await db.getSetting(loaded.DRAFT_KEY);
+        if (!sameBoard(before, lastSavedDraft)) {
+          throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
+        }
         const receipt = await db.saveSetting(loaded.DRAFT_KEY, changed);
-        if (receipt === false) throw new Error('Draft save refused');
+        if (!acknowledgedStudioWrite(receipt, changed)) {
+          throw new Error('Konva draft write was not acknowledged');
+        }
+        const verified = await db.getSetting(loaded.DRAFT_KEY);
+        if (!sameBoard(verified, changed)) {
+          throw new Error('Konva draft was not saved durably: canonical readback differed');
+        }
+        lastSavedDraft = structuredClone(verified);
         return true;
       },
       onSelect: id => {
@@ -864,7 +884,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       konvaModule = loaded;
       if (typeof konvaDialog?.showModal === 'function') konvaDialog.showModal();
       else konvaDialog?.setAttribute('open', '');
-      createKonvaWorkspace(source, loaded);
+      createKonvaWorkspace(source, loaded, { persistedDraft: savedDraft });
       setKonvaStatus(savedDraft
         ? 'Resumed separately saved Konva draft'
         : 'Copied Studio board into an isolated draft; Studio remains unchanged');
