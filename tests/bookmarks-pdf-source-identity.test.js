@@ -65,7 +65,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     // Discovery must clear a stale session handoff, not queue a page under
     // an unrelated PDF document.
     expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
-    expect(Router.navigate).not.toHaveBeenCalledWith('#/pdf');
+    expect(Router.navigate).toHaveBeenCalledWith('#/materials');
     expect(card.textContent).toContain('Imported legacy page');
   });
 
@@ -83,6 +83,6 @@ describe('saved PDF bookmark stable-source navigation', () => {
     // Discovery must clear a stale session handoff, not queue a page under
     // an unrelated PDF document.
     expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
-    expect(Router.navigate).not.toHaveBeenCalledWith('#/pdf');
+    expect(Router.navigate).toHaveBeenCalledWith('#/materials');
   });
 });
