@@ -139,12 +139,9 @@
   transform: none;
 }
 .btn.btn-primary {
-  background: var(--accent);
-  color: var(--accent-contrast);
   border-color: var(--accent);
 }
 .btn.btn-primary:hover {
-  background: var(--accent-dark);
   border-color: var(--accent-dark);
   box-shadow: none;
   transform: none;
