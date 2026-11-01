@@ -154,6 +154,42 @@ export async function mountCoursesView(deps = {}) {
   const coursesShellEl = document.querySelector('.courses-shell');
   const catalogToggleEl = document.querySelector('[data-course-toggle-catalog]');
   const theaterToggleEl = document.querySelector('[data-course-theater]');
+  // A playing lesson is identified by stable course+topic IDs, not by its
+  // mutable title or source URL. Reflect that identity on both existing rows
+  // and rows created by an asynchronous catalog/progress rerender.
+  let currentLesson = null;
+  const markCurrentLesson = row => {
+    if (!row) return;
+    const active = Boolean(currentLesson
+      && row.dataset.topicId === currentLesson.topicId
+      && row.dataset.courseId === currentLesson.courseId);
+    if (active) row.dataset.playing = 'true';
+    else delete row.dataset.playing;
+    const action = row.querySelector('[data-action="play-video"]');
+    if (action) {
+      if (active) action.setAttribute('aria-current', 'true');
+      else action.removeAttribute('aria-current');
+    }
+    const existing = row.querySelector('[data-current-lesson]');
+    if (active && !existing) {
+      row.querySelector('.topic-meta')?.appendChild(
+        createElement('span', {
+          class: 'topic-playing-pill',
+          'data-current-lesson': '',
+          role: 'status',
+        }, 'Playing'),
+      );
+    } else if (!active) {
+      existing?.remove();
+    }
+  };
+  const setCurrentLesson = track => {
+    const topicId = typeof track?.topicId === 'string' ? track.topicId : '';
+    const courseId = typeof track?.courseId === 'string' ? track.courseId : '';
+    currentLesson = topicId && courseId ? { topicId, courseId } : null;
+    detailEl?.querySelectorAll?.('.topic-row').forEach(markCurrentLesson);
+  };
+
   // Presentation state only. Never remount media, reset playback, or write
   // the learner's canonical position when switching between the two layouts.
   const setTheaterMode = enabled => {
@@ -203,6 +239,7 @@ export async function mountCoursesView(deps = {}) {
     field?.focus?.({ preventScroll: true });
   });
   document.querySelector('[data-course-close-playback]')?.addEventListener('click', () => {
+    setCurrentLesson(null);
     try { playerEl?._pdPlayer?.pause?.(); } catch {}
     if (playbackSection) playbackSection.hidden = true;
     coursesShellEl?.removeAttribute('data-playback-active');
@@ -866,6 +903,7 @@ export async function mountCoursesView(deps = {}) {
       actions.appendChild(completion);
     }
     row.append(copy, meta, actions);
+    markCurrentLesson(row);
     return row;
   };
 
@@ -1219,6 +1257,7 @@ export async function mountCoursesView(deps = {}) {
     const inst = playerEl._pdPlayer;
     if (!inst) return;
     playerEl.dataset.pdProgressBound = 'true';
+    setCurrentLesson(inst.queue?.[inst.trackIndex ?? 0] ?? null);
     const throttleMs = 2500;
     let lastSave = 0;
 
@@ -1275,6 +1314,7 @@ export async function mountCoursesView(deps = {}) {
       await save(track);
     };
     const onTrackChange = async (track) => {
+      setCurrentLesson(track);
       // Record activity without erasing completion or the persisted resume
       // point. Track changes can fire while HTMLMediaElement resets to zero.
       await save(track, { activityOnly: true });
