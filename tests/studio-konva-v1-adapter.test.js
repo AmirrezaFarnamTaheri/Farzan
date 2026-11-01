@@ -60,6 +60,22 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
   });
 
   it.each([
+    ['numeric layer id', board => { board.layers[0].id = 42; }, 'invalid-layer-id'],
+    ['numeric shape id', board => { board.layers[0].elements[0].id = 42; }, 'invalid-element-id'],
+    ['numeric text', board => { board.layers[0].elements.find(el => el.type === 'text').text = 10; }, 'invalid-element-text'],
+    ['negative active layer', board => { board.activeLayerIdx = -1; }, 'invalid-active-layer'],
+    ['fractional active layer', board => { board.activeLayerIdx = 0.5; }, 'invalid-active-layer'],
+    ['missing active layer', board => { board.activeLayerIdx = 2; }, 'invalid-active-layer'],
+    ['string active layer', board => { board.activeLayerIdx = '0'; }, 'invalid-active-layer'],
+  ])('rejects coerced %s before opening the Konva draft', (_label, mutate, reason) => {
+    const board = fixture();
+    mutate(board);
+    const original = structuredClone(board);
+    expect(planKonvaV1Board(board)).toEqual({ compatible: false, reason });
+    expect(board).toEqual(original);
+  });
+
+  it.each([
     ['missing layer identifier', board => { board.layers[0].id = ''; }],
     ['duplicate layer identifiers', board => {
       board.layers.push({ id: 'layer-1', name: 'Different layer', elements: [] });
