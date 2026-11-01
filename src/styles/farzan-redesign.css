@@ -266,6 +266,14 @@ input[type="file"][hidden] {
   padding-top: 10px;
   background: var(--fz-rail);
 }
+/* System links remain visible as the library navigation scrolls. */
+.sidebar-system-nav {
+  display: grid;
+  min-width: 0;
+}
+.sidebar-system-nav .nav-group { margin-block: 0 6px; }
+.sidebar-system-nav .nav-group-label { padding-block: 3px; }
+.sidebar-system-nav .nav-item { min-height: 44px; margin-block-end: 2px; }
 .storage-label { color: #a8c1d3; }
 .storage-bar-wrap { background: rgba(255,255,255,.13); }
 .sidebar-footer-actions { justify-content: space-between; }
@@ -733,6 +741,7 @@ input[type="file"][hidden] {
   list-style: none;
 }
 .studio-more-tools > summary::-webkit-details-marker { display: none; }
+.studio-more-tools > summary::marker { content: none; }
 .studio-more-tools > summary::after { content: "⌄"; font-size: 18px; line-height: .75; margin-inline-start: 10px; color: var(--fz-muted); }
 .studio-more-tools[open] > summary::after { transform: rotate(180deg); }
 .studio-more-tools-content {

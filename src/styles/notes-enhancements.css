@@ -817,6 +817,7 @@
   cursor: pointer;
 }
 .notes-format-more > summary::-webkit-details-marker { display: none; }
+.notes-format-more > summary::marker { content: none; }
 .notes-format-more > summary:hover {
   color: var(--text-primary);
   background: var(--surface-hover);

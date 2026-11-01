@@ -62,6 +62,15 @@ for (const setup of setups) {
         await expect(page.locator('[data-tag-advanced]')).toBeHidden();
         await expect(page.locator('[data-tag-create-form]')).toBeVisible();
       }
+      if ((route === 'help' || route === 'settings') && setup.width >= 1024) {
+        const systemLink = page.locator('.sidebar-system-nav [data-route="/' + route + '"]');
+        await expect(systemLink).toHaveAttribute('aria-current', 'page');
+        await expect(systemLink).toBeVisible();
+        const bounds = await systemLink.boundingBox();
+        expect(bounds, setup.name + ' / ' + route + ' missing visible System link').not.toBeNull();
+        expect(bounds.y + bounds.height, setup.name + '/' + route + ' System link clipped')
+          .toBeLessThanOrEqual(setup.height - 2);
+      }
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
@@ -164,6 +173,20 @@ for (const setup of setups) {
         });
         await page.locator('[data-notifications-toggle]').click();
         await expect(page.locator('#notifications-panel')).toBeVisible();
+        // Badge center must sit above and outside the bell arch, not cover it.
+        const badgeGeometry = await page.locator('#topbar-notifications-btn').evaluate((button) => {
+          const bell = button.querySelector('svg')?.getBoundingClientRect();
+          const badge = button.querySelector('#topbar-notif-dot')?.getBoundingClientRect();
+          if (!bell || !badge) return null;
+          return { offsetX: badge.x + badge.width / 2 - (bell.x + bell.width / 2),
+            offsetY: badge.y + badge.height / 2 - (bell.y + bell.height / 2) };
+        });
+        expect(badgeGeometry, 'notification badge must have geometry').not.toBeNull();
+        expect(badgeGeometry.offsetX, 'notification badge belongs on the outside of the bell').toBeGreaterThan(4);
+        expect(badgeGeometry.offsetY, 'notification badge belongs above the bell').toBeLessThan(-2);
+        for (const id of ['#notif-mark-read', '#notif-clear-all']) {
+          await expect(page.locator(id)).toHaveCSS('white-space', 'nowrap');
+        }
         await page.screenshot({
           path: path.join(folder, 'notifications-open.png'),
           animations: 'disabled', caret: 'hide',
