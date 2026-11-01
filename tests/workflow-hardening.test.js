@@ -81,6 +81,11 @@ describe('GitHub Actions hardening', () => {
     }
   });
 
+  it('verifies portable restore comparator changes on native Windows before release acceptance', () => {
+    const native = workflows['native-windows.yml'];
+    expect(native.split("'scripts/verify-portable-backup.cjs'").length - 1).toBe(2);
+  });
+
   it('runs native Windows checks when release service worker and sizing instrumentation change', () => {
     const native = workflows['native-windows.yml'];
     for (const script of [
