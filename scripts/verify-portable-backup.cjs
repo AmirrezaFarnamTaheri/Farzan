@@ -86,17 +86,24 @@ function summarizePortableBackup(input) {
   const cards = input.settings.flashcards == null ? []
     : sortedRecords(input.settings.flashcards, 'flashcards');
   for (const card of cards) {
-    if (card.scheduler != null && !['sm2-v1', 'fsrs-v5'].includes(card.scheduler)) {
-      throw new TypeError('Unknown portable backup flashcards scheduler');
+    if (card.scheduler !== 'fsrs-v5' || !card.fsrsState
+        || typeof card.fsrsState !== 'object' || Array.isArray(card.fsrsState)) {
+      throw new TypeError('Unsupported portable backup flashcard scheduler');
     }
-    if (card.scheduler === 'fsrs-v5' && (!card.fsrsState || typeof card.fsrsState !== 'object')) {
+    if (card.fsrsMigration != null || 'repetitions' in card
+        || 'interval' in card || 'easeFactor' in card) {
+      throw new TypeError('Unsupported portable backup flashcard history');
+    }
+    const state = card.fsrsState;
+    if (state.version !== 1 || state.packageVersion !== '5.4.2' || state.model !== 'fsrs-6'
+        || !Array.isArray(state.reviewLog) || typeof state.card?.due !== 'string'
+        || !Number.isFinite(Date.parse(state.card.due))
+        || new Date(state.card.due).toISOString() !== state.card.due) {
       throw new TypeError('Invalid portable backup FSRS state');
     }
   }
   counts.flashcards = cards.length;
-  counts.fsrsV5 = cards.filter(card => card.scheduler === 'fsrs-v5').length;
-  counts.sm2Legacy = cards.length - counts.fsrsV5;
-  counts.migrationArchives = cards.filter(card => card.fsrsMigration != null).length;
+  counts.fsrsV5 = cards.length;
   digests.flashcards = digest(cards);
   // Compare settings other than flashcards independently, so recovery
   // reports only a section name and never prints private record content.
