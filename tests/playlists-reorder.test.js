@@ -75,6 +75,30 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
       .toEqual(['a','b','c','e','d']);
   });
 
+  it('keeps the disclosure and keyboard focus on the moved item after an acknowledged reorder', async () => {
+    mount();
+    const originalButton = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll('[data-playlist-move="up"]')]
+        .find(row => row.dataset.playlistId === 'focus-queue' && row.dataset.topicId === 'e');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    originalButton.closest('details').open = true;
+    originalButton.focus();
+    expect(document.activeElement).toBe(originalButton);
+
+    originalButton.click();
+    await vi.waitFor(() => expect(saved[0].topicIds).toEqual(['a', 'b', 'c', 'e', 'd']));
+    await vi.waitFor(() => {
+      const next = [...document.querySelectorAll('[data-playlist-move="up"]')]
+        .find(row => row.dataset.playlistId === 'focus-queue'
+          && row.dataset.topicId === 'e' && row.dataset.topicIndex === '3');
+      expect(next).not.toBeNull();
+      expect(next.closest('details').open).toBe(true);
+      expect(document.activeElement).toBe(next);
+    });
+  });
+
   it('preserves the previous canonical order when a durable writer rejects the update', async () => {
     window.DB.saveSetting = vi.fn(async () => false);
     mount();
