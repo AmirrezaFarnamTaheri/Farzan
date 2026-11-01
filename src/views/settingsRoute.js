@@ -299,8 +299,9 @@ export function mountSettingsView(deps = {}) {
     routeListeners.push({ target, type, handler, options });
   };
 
-  // Settings section links are in-page navigation, not SPA routes.
-  // Keep the real viewport's active section visible and announce it to AT.
+  // Only the route content pane scrolls. Native scrollIntoView also scrolls
+  // the outer document and physically displaces the entire app shell.
+  const settingsScrollContainer = document.getElementById('view-container');
   const sectionLinks = [...document.querySelectorAll('.settings-nav a[href^="#settings-"]')];
   const setCurrentSection = (id) => {
     sectionLinks.forEach((link) => {
@@ -312,26 +313,18 @@ export function mountSettingsView(deps = {}) {
   sectionLinks.forEach((link) => on(link, 'click', (event) => {
     const id = link.getAttribute('href')?.slice(1);
     const section = id && document.getElementById(id);
-    if (!section) return;
+    if (!section || !settingsScrollContainer) return;
     event.preventDefault();
     setCurrentSection(id);
-    section.scrollIntoView?.({
-      // Anchor navigation is immediate: a smooth scroll can re-select the
-      // previous section while motion is in flight and confuse aria-current.
-      behavior: 'auto',
-      block: 'start',
-    });
-  }));
-  const settingsScrollContainer = document.getElementById('view-container');
-  on(settingsScrollContainer, 'scroll', () => {
-    const threshold = (settingsScrollContainer?.getBoundingClientRect?.().top || 0) + 96;
-    let closest = 'settings-appearance';
-    for (const link of sectionLinks) {
-      const id = link.getAttribute('href').slice(1);
-      if (document.getElementById(id)?.getBoundingClientRect?.().top <= threshold) closest = id;
+    const sectionTop = section.getBoundingClientRect().top;
+    const containerTop = settingsScrollContainer.getBoundingClientRect().top;
+    const targetTop = Math.max(0, settingsScrollContainer.scrollTop + sectionTop - containerTop - 16);
+    if (typeof settingsScrollContainer.scrollTo === 'function') {
+      settingsScrollContainer.scrollTo({ top: targetTop, behavior: 'auto' });
+    } else {
+      settingsScrollContainer.scrollTop = targetTop;
     }
-    setCurrentSection(closest);
-  }, { passive: true });
+  }));
 
   // #btn-theme-toggle carries data-theme-toggle, so ThemeManager's delegated
   // click handler drives it (and keeps its icon/label in sync). Only sync the
