@@ -482,6 +482,50 @@ describe('notes route filters', () => {
     expect(editor.querySelector('img[src^="https://tracker.example"]')).not.toBeNull();
   });
 
+  it('does not lose a provisional Squire IME draft or change external-image consent mid-composition', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const control = document.querySelector('[data-notes-remote-images]');
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+
+    root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = '未確定 Persian در حال نوشتن';
+    root.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    control.click();
+
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBe(root);
+    expect(root.textContent).toContain('未確定');
+    expect(store.getNote('regular-note').content).not.toContain('未確定');
+    expect(sessionStorage.getItem('ocd_note_external_images_session')).toBeNull();
+
+    root.querySelector('p').textContent = '確定 完了 فارسی';
+    root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    control.click();
+    expect(control.getAttribute('aria-pressed')).toBe('true');
+    expect(store.getNote('regular-note').content).toContain('確定 完了 فارسی');
+  });
+
+  it('does not reset unfinished classic IME text when external-image consent is clicked', () => {
+    const app = window.PlasmaNotesApp;
+    app.openNote('regular-note');
+    const editor = document.querySelector('[data-notes-editor]');
+    const control = document.querySelector('[data-notes-remote-images]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.innerHTML = '<p>نیمه‌تمام IME input</p>';
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    control.click();
+    expect(editor.textContent).toContain('نیمه‌تمام IME input');
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    control.click();
+    expect(control.getAttribute('aria-pressed')).toBe('true');
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toContain('نیمه‌تمام IME input');
+  });
+
   it('shows only pinned notes when the pinned folder is selected', () => {
     document.querySelector('[data-folder-id="__pinned__"]').click();
 
