@@ -5,9 +5,10 @@
  * Era 2: snake_case plasma_* keys.
  * Era 3 (current): neutral ocd_* keys.
  *
- * Copies each legacy value forward (oldest era first) without overwriting a
- * value that already exists under a newer name, then removes the old key.
- * Safe to call multiple times (idempotent).
+ * Prefer newer UI preferences and remove old aliases only after read-back.
+ * For saved Notes and folders, merge only unambiguous records and retain the
+ * original legacy bytes until an independent IndexedDB recovery check proves
+ * they are safe to retire. The startup pass is idempotent.
  */
 const KEY_MIGRATIONS = [
   { from: 'plasma-theme', via: 'plasma_theme', to: 'ocd_theme' },
