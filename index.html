@@ -103,12 +103,12 @@
     }
     .splash-logo {
       width: 72px; height: 72px;
-      background: #2563a8;
+      background: transparent;
       border-radius: 20px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; color: white;
       box-shadow: none;
     }
+    .splash-logo img { display: block; width: 100%; height: 100%; }
     .splash-label {
       font-size: 1.5rem; font-weight: 750;
       background: transparent;
@@ -277,7 +277,7 @@
        LOADING SPLASH SCREEN
   ════════════════════════════════════════════ -->
   <div id="app-loading" role="status" aria-label="Loading Farzan Plasmato">
-    <div class="splash-logo" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
+    <div class="splash-logo" aria-hidden="true"><img src="./assets/favicon.svg" alt="" width="72" height="72" decoding="async" /></div>
     <div class="splash-label">Farzan Plasmato</div>
     <div class="splash-bar-wrap">
       <div class="splash-bar"></div>
@@ -323,7 +323,7 @@
 
       <!-- Logo -->
       <div class="sidebar-logo" aria-label="Farzan home">
-        <div class="sidebar-logo-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg></div>
+        <div class="sidebar-logo-icon" aria-hidden="true"><img src="./assets/favicon.svg" alt="" width="42" height="42" decoding="async" /></div>
         <span class="sidebar-logo-text">Farzan <small>PLASMATO EDITION</small></span>
         <button class="sidebar-collapse-btn" id="sidebar-collapse-btn"
           aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+B)">

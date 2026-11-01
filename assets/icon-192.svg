@@ -1,16 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" shape-rendering="geometricPrecision">
-  <defs>
-    <linearGradient id="icon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1E40AF"/>
-      <stop offset="50%" stop-color="#2563EB"/>
-      <stop offset="100%" stop-color="#1D4ED8"/>
-    </linearGradient>
-    <filter id="icon-glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#2563EB" flood-opacity="0.5"/>
-    </filter>
-  </defs>
-  <rect width="192" height="192" rx="44" fill="#0B132B"/>
-  <rect x="12" y="12" width="168" height="168" rx="36" fill="url(#icon-grad)" filter="url(#icon-glow)"/>
-  <!-- Central Lightning Knowledge Spark -->
-  <polygon points="96,36 58,106 88,106 72,156 134,86 104,86" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 96 96" shape-rendering="geometricPrecision">
+  <rect width="96" height="96" rx="23" fill="#132F4B"/>
+  <rect x="1.5" y="1.5" width="93" height="93" rx="21.5" fill="none" stroke="#8CC9F4" stroke-width="2" stroke-opacity=".28"/>
+  <!-- Farzan: the initial F unfolds into a page of learning. -->
+  <path data-brand-mark="farzan-fold" d="M27 20H72L65 33H42V46H63L56 58H42V76H27V20Z" fill="#F7FBFF"/>
+  <path d="M56 58L73 47V61L46 79V65Z" fill="#83BCEB"/>
+  <path d="M42 75C52 68 63 65 75 68V80C62 76 51 79 42 85V75Z" fill="#7BD3CD"/>
 </svg>

@@ -1,10 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="geometricPrecision">
-  <defs>
-    <linearGradient id="fav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2563EB"/>
-      <stop offset="100%" stop-color="#1D4ED8"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="url(#fav-grad)"/>
-  <polygon points="16,6 9,18 14,18 11,26 23,14 18,14" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 96 96" shape-rendering="geometricPrecision">
+  <rect width="96" height="96" rx="23" fill="#132F4B"/>
+  <rect x="1.5" y="1.5" width="93" height="93" rx="21.5" fill="none" stroke="#8CC9F4" stroke-width="2" stroke-opacity=".28"/>
+  <!-- Farzan: the initial F unfolds into a page of learning. -->
+  <path data-brand-mark="farzan-fold" d="M27 20H72L65 33H42V46H63L56 58H42V76H27V20Z" fill="#F7FBFF"/>
+  <path d="M56 58L73 47V61L46 79V65Z" fill="#83BCEB"/>
+  <path d="M42 75C52 68 63 65 75 68V80C62 76 51 79 42 85V75Z" fill="#7BD3CD"/>
 </svg>
