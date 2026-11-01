@@ -174,6 +174,12 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-mode="pen" aria-pressed="false">Pen</button>
             <label for="studio-konva-object">Object</label>
             <select id="studio-konva-object" class="select input-sm" data-studio-konva-object></select>
+            <div class="studio-konva-text-edit">
+              <label for="studio-konva-text">Text</label>
+              <textarea id="studio-konva-text" class="input input-sm" rows="2" data-studio-konva-text
+                aria-label="Selected draft text" dir="auto" disabled></textarea>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-text-save disabled>Save text</button>
+            </div>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="left" title="Move left">Left</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="up" title="Move up">Up</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="down" title="Move down">Down</button>
@@ -669,6 +675,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const konvaDialog = document.querySelector('[data-studio-konva-dialog]');
   const konvaOpen = document.querySelector('[data-studio-konva-open]');
   const konvaSelect = document.querySelector('[data-studio-konva-object]');
+  const konvaTextInput = document.querySelector('[data-studio-konva-text]');
+  const konvaTextSave = document.querySelector('[data-studio-konva-text-save]');
   const konvaStage = document.querySelector('[data-studio-konva-stage]');
   const konvaStatus = document.querySelector('[data-studio-konva-status]');
   let konvaWorkspace = null;
@@ -677,21 +685,52 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let konvaClosing = false;
   let konvaResetting = false;
   let konvaImporting = false;
+  let konvaTextSaving = false;
+  let konvaTextIdentity = '';
+  let konvaTextBaseline = '';
   let focusBeforeKonva = null;
   const setKonvaStatus = message => {
     if (konvaStatus) konvaStatus.textContent = message;
   };
+  const selectedKonvaText = () => {
+    const id = konvaSelect?.value;
+    if (!id || !konvaWorkspace || konvaWorkspace.getMode?.() === 'pen') return null;
+    const board = konvaWorkspace.getBoard();
+    for (const layer of board.layers || []) {
+      if (layer.locked || layer.visible === false) continue;
+      const element = (layer.elements || []).find(item => String(item.id) === id);
+      if (element) return element.type === 'text' ? element : null;
+    }
+    return null;
+  };
   const refreshKonvaControls = () => {
     const selected = konvaSelect?.value || '';
     const mode = konvaWorkspace?.getMode?.() || 'select';
+    const textElement = selectedKonvaText();
+    const identity = textElement ? selected : '';
+    const canonicalText = textElement ? String(textElement.text ?? '') : '';
+    if (konvaTextInput) {
+      // Preserve unsaved input across a redraw of the same object; sync
+      // canonical text after undo/redo when the input is not dirty.
+      if (identity !== konvaTextIdentity
+        || (konvaTextInput.value === konvaTextBaseline && konvaTextBaseline !== canonicalText)) {
+        konvaTextInput.value = canonicalText;
+      }
+      konvaTextIdentity = identity;
+      konvaTextBaseline = canonicalText;
+      const writable = Boolean(textElement) && !konvaTextSaving && !konvaClosing
+        && !konvaResetting && !konvaImporting;
+      konvaTextInput.disabled = !writable;
+      if (konvaTextSave) konvaTextSave.disabled = !writable || konvaTextInput.value === canonicalText;
+    }
     document.querySelectorAll('[data-studio-konva-mode]').forEach(button => {
       const active = button.dataset.studioKonvaMode === mode;
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
       button.classList.toggle('active', active);
     });
-    if (konvaSelect) konvaSelect.disabled = mode === 'pen';
+    if (konvaSelect) konvaSelect.disabled = mode === 'pen' || konvaTextSaving;
     document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
-      button.disabled = !selected || mode === 'pen';
+      button.disabled = !selected || mode === 'pen' || konvaTextSaving;
     });
     const undo = document.querySelector('[data-studio-konva-undo]');
     const redo = document.querySelector('[data-studio-konva-redo]');
@@ -812,7 +851,35 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     closeKonvaDraft().catch(() => {});
   });
   on(konvaDialog, 'close', () => disposeKonva());
-  on(konvaSelect, 'change', () => konvaWorkspace?.select?.(konvaSelect.value || null));
+  on(konvaSelect, 'change', () => {
+    konvaWorkspace?.select?.(konvaSelect.value || null);
+    refreshKonvaControls();
+  });
+  on(konvaTextInput, 'input', refreshKonvaControls);
+  on(konvaTextSave, 'click', async () => {
+    const textElement = selectedKonvaText();
+    if (!textElement || !konvaWorkspace?.updateText || konvaTextSaving
+      || konvaClosing || konvaResetting || konvaImporting) return;
+    const currentWorkspace = konvaWorkspace;
+    const id = konvaSelect?.value;
+    const content = konvaTextInput.value;
+    if (content === String(textElement.text ?? '')) return;
+    konvaTextSaving = true;
+    refreshKonvaControls();
+    try {
+      await currentWorkspace.updateText(id, content);
+      if (unmounted || konvaWorkspace !== currentWorkspace) return;
+      populateKonvaObjects();
+      setKonvaStatus('Experimental draft text saved; Studio board unchanged');
+    } catch {
+      if (!unmounted && konvaWorkspace === currentWorkspace) {
+        setKonvaStatus('Experimental draft text not saved; unsaved edits retained');
+      }
+    } finally {
+      konvaTextSaving = false;
+      if (!unmounted) refreshKonvaControls();
+    }
+  });
   const konvaImportInput = document.querySelector('[data-studio-konva-import]');
   on(document.querySelector('[data-studio-konva-import-trigger]'), 'click', () => {
     if (!unmounted && konvaWorkspace && !konvaClosing && !konvaResetting && !konvaImporting) {

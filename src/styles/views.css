@@ -1589,6 +1589,19 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+.studio-konva-text-edit {
+  display: flex;
+  flex: 1 1 290px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.studio-konva-text-edit textarea {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+  resize: vertical;
+}
 .studio-konva-stage {
   width: 100%;
   height: clamp(280px, 55vh, 620px);

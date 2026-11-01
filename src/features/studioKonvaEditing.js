@@ -123,6 +123,27 @@ export function resizeKonvaV1Element(board, id, bounds) {
 }
 
 /**
+ * Edit the literal Unicode content of one supported text shape in a complete
+ * canonical Studio-v1 document. Preserve its geometry, paint, font, layer,
+ * viewport and application metadata. Konva never owns the stored HTML/JSON.
+ */
+export function setKonvaV1Text(board, id, content) {
+  if (typeof content !== 'string' || content.length > 32768) {
+    throw new TypeError('Studio text content must be a string no longer than 32768 code units');
+  }
+  validBoard(board);
+  const target = findUnlockedElement(board, id);
+  if (target.layer.elements[target.index].type !== 'text') {
+    throw new TypeError('Unsupported Studio element for Konva text editing');
+  }
+  const next = structuredClone(board);
+  const { layer, index } = findUnlockedElement(next, id);
+  layer.elements[index].text = content;
+  validBoard(next);
+  return next;
+}
+
+/**
  * Create exactly one legacy Studio-v1 pen stroke. The application board
  * remains canonical: never store Konva node or Stage JSON. A stroke is
  * validated completely before a caller is allowed to write it.
@@ -218,6 +239,19 @@ export function createKonvaV1MoveSession({
   const commit = (id, dx, dy) => enqueue(async () => {
     if (dx === 0 && dy === 0) return structuredClone(current);
     const next = translateKonvaV1Element(current, id, dx, dy);
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  const updateText = (id, content) => enqueue(async () => {
+    const next = setKonvaV1Text(current, id, content);
+    const before = findUnlockedElement(current, id);
+    if (before.layer.elements[before.index].text === content) {
+      return structuredClone(current);
+    }
     await persist(next);
     push(undoStack, current);
     redoStack.length = 0;
@@ -371,6 +405,7 @@ export function createKonvaV1MoveSession({
     commit,
     resize,
     addStroke,
+    updateText,
     undo,
     redo,
     canUndo: () => undoStack.length > 0,
