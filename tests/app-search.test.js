@@ -313,6 +313,35 @@ describe('app topbar search rendering', () => {
     expect(window.DB.saveSetting).toBeUndefined();
   });
 
+  it('awaits promise-backed course and topic readers before indexing canonical catalog results', async () => {
+    const courses = [{ id: 'renal-course', title: 'Renal Medicine' }];
+    const topics = [{
+      topicId: 'renal-topic', courseId: 'renal-course',
+      title: 'Renal physiology', sourceLabel: 'Lecture',
+      keywords: ['کلیه'],
+    }];
+    const original = structuredClone({ courses, topics });
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allCourses: vi.fn(async () => structuredClone(courses)),
+      allTopics: vi.fn(async () => structuredClone(topics)),
+    };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const matches = await search._queryUniversal('renal');
+    expect(matches.map(item => [item.sourceType, item.sourceId]))
+      .toEqual(expect.arrayContaining([
+        ['course', 'renal-course'],
+        ['topic', 'renal-course:renal-topic'],
+      ]));
+    expect(search._universalData).toHaveLength(2);
+    expect({ courses, topics }).toEqual(original);
+  });
+
   it('does not cache a fictitious empty Notes index when canonical storage is inaccessible', async () => {
     const readNotes = vi.fn()
       .mockRejectedValueOnce(new Error('Canonical Notes IndexedDB locked'))
