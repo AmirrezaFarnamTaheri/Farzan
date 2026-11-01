@@ -448,6 +448,13 @@ const ProgressStats = (() => {
     const librarySettings= await DB.getSetting?.('ocd_user_library') ?? null;
     const myCoursesSettings = await DB.getSetting?.('ocd_my_courses') ?? null;
     const mediaCuesSettings = await DB.getSetting?.('ocd_course_media_cues') ?? null;
+    const tagTaxonomySettings = await DB.getSetting?.('ocd_tag_taxonomy') ?? null;
+    if (tagTaxonomySettings != null) {
+      const { parseTagTaxonomy } = await import('./src/features/tagTaxonomy.js');
+      // Never promise a complete portable backup while the saved taxonomy is
+      // structurally incompatible or corrupt.
+      parseTagTaxonomy(tagTaxonomySettings);
+    }
     const attachmentRefs = await window.OpenCourseDeck?.UserLibrary?.listFileReferences?.(librarySettings) ?? [];
 
     const payload = {
@@ -472,6 +479,7 @@ const ProgressStats = (() => {
         library: librarySettings,
         myCourses: myCoursesSettings,
         mediaCues: mediaCuesSettings,
+        tagTaxonomy: tagTaxonomySettings,
       },
       annotations : allAnnotations,
       timestamps  : allTimestamps,
@@ -671,6 +679,13 @@ const ProgressStats = (() => {
             && payload.settings.flashcards != null) {
           await assertFlashcardBackupImportable(payload.settings.flashcards);
         }
+        let importedTagTaxonomy = null;
+        if (payload.settings?.tagTaxonomy != null) {
+          const { parseTagTaxonomy } = await import('./src/features/tagTaxonomy.js');
+          // Preflight before confirmation or writes; reject unsupported
+          // versions/cycles instead of corrupting existing tag ownership.
+          importedTagTaxonomy = parseTagTaxonomy(payload.settings.tagTaxonomy);
+        }
         const invalidCount =
           rawProgress.length - progressRecords.length +
           _asArray(payload.notes).length - noteRecords.length +
@@ -686,7 +701,8 @@ const ProgressStats = (() => {
           (Array.isArray(payload.settings?.flashcards) ? 1 : 0) +
           (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) ? 1 : 0) +
           (Array.isArray(payload.settings?.myCourses) ? 1 : 0) +
-          (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object' && !Array.isArray(payload.settings.mediaCues) ? 1 : 0);
+          (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object' && !Array.isArray(payload.settings.mediaCues) ? 1 : 0) +
+          (importedTagTaxonomy ? 1 : 0);
         const preview = {
           version: payload.version ?? 'legacy',
           fileName: file.name ?? 'backup.json',
@@ -900,6 +916,26 @@ const ProgressStats = (() => {
           }
         } else if (payload.settings?.mediaCues) {
           result.skipped += 1;
+        }
+        if (importedTagTaxonomy) {
+          try {
+            if (typeof DB.saveSetting !== 'function' || typeof DB.getSetting !== 'function') {
+              throw new Error('Canonical tag taxonomy storage is unavailable');
+            }
+            const receipt = await DB.saveSetting('ocd_tag_taxonomy', importedTagTaxonomy);
+            if (receipt == null || receipt === false
+                || receipt?.committed === false || receipt?.status === 'failed') {
+              throw new Error('Tag taxonomy import write was not acknowledged');
+            }
+            const { parseTagTaxonomy } = await import('./src/features/tagTaxonomy.js');
+            const readBack = parseTagTaxonomy(await DB.getSetting('ocd_tag_taxonomy'));
+            if (JSON.stringify(readBack) !== JSON.stringify(importedTagTaxonomy)) {
+              throw new Error('Tag taxonomy import readback did not match the backup');
+            }
+            result.settings += 1;
+          } catch (error) {
+            _recordImportError(result, 'settings', 'ocd_tag_taxonomy', error);
+          }
         }
         if (annotationRecords.length && DB.saveAnnotations) {
           const byDoc = annotationRecords.reduce((acc, annotation) => {
@@ -1225,7 +1261,7 @@ const ProgressStats = (() => {
   // NEVER substitute an empty collection when reading the rollback snapshot:
   // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy'];
     const readList = async (name) => {
       if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
       const records = await DB[name]();
@@ -1242,7 +1278,7 @@ const ProgressStats = (() => {
       'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
       'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
-      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'plasma-pdf-annotations',
+      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy', 'plasma-pdf-annotations',
     ];
     const storage = window.localStorage;
     if (!storage || typeof storage.getItem !== 'function') {

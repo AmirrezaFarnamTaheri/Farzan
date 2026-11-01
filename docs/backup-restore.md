@@ -4,9 +4,9 @@ OpenCourseDeck stores study data in the browser profile and origin you use. Expo
 
 ## What a JSON backup includes
 
-The current **Progress and Settings** export uses portable JSON format **1.6**. It includes saved progress, notes, folders, timestamps, PDF annotations, watched segments, PDF bookmarks, flashcards, saved playlists, Studio board metadata, personal course outlines (`ocd_my_courses`), course media cues (`ocd_course_media_cues`), and user-owned library metadata (`ocd_user_library`), when present.
+The current **Progress and Settings** export uses portable JSON format **1.6**. It includes saved progress, notes, folders, timestamps, PDF annotations, watched segments, PDF bookmarks, flashcards, saved playlists, Studio board metadata, personal course outlines (`ocd_my_courses`), course media cues (`ocd_course_media_cues`), user-owned library metadata (`ocd_user_library`), and personal Tags taxonomy/merge aliases (`ocd_tag_taxonomy`), when present.
 
-Version 1.6 imports remain compatible with supported portable versions 1.0–1.5. The internal database snapshot used to protect an import during rollback is a **different format (version 3)**, not a portable 1.6 file.
+The optional tag taxonomy field requires a compatible versioned value; malformed or future schemas are rejected before import writes. Tag merges do not rewrite the underlying Notes or catalog labels. Version 1.6 imports remain compatible with supported portable versions 1.0–1.5. The internal database snapshot used to protect an import during rollback is a **different format (version 3)**, not a portable 1.6 file.
 
 **Binary attachment policy: metadata-only.** The export includes a `meta.attachments` manifest containing local-file references and explicitly sets `mode: "metadata-only"` and `binaryIncluded: false`. It does **not** include imported PDF/video bytes from the separate `opencoursedeck-library-files` IndexedDB database. External media links also remain links and may require a network connection. Keep the original local media and any manually edited catalog JSON files when moving devices.
 

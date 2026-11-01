@@ -347,6 +347,69 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
   });
 
+  it('includes canonical personal tag taxonomy aliases in a version 1.6 portable export', async () => {
+    const taxonomy = {
+      version: 1,
+      labels: [{ key: 'کلیه', label: 'کلیه' }],
+      aliases: { nephrology: 'کلیه' },
+    };
+    const getSetting = window.DB.getSetting;
+    window.DB.getSetting = vi.fn(async key =>
+      key === 'ocd_tag_taxonomy' ? structuredClone(taxonomy) : getSetting(key));
+
+    await window.ProgressStats.exportJSON();
+    const payload = JSON.parse(await downloadedBlob.text());
+    expect(payload.version).toBe('1.6');
+    expect(payload.settings.tagTaxonomy).toEqual(taxonomy);
+    expect(payload.notes[0].content).toBe('<p>Current body</p>');
+  });
+
+  it('imports valid tag taxonomy as a verified canonical setting without rewriting Notes', async () => {
+    const taxonomy = {
+      version: 1,
+      labels: [{ key: 'کلیه', label: 'کلیه' }],
+      aliases: { nephrology: 'کلیه' },
+    };
+    let registry = null;
+    const getSetting = window.DB.getSetting;
+    const saveSetting = window.DB.saveSetting;
+    window.DB.getSetting = vi.fn(async key =>
+      key === 'ocd_tag_taxonomy' ? structuredClone(registry) : getSetting(key));
+    window.DB.saveSetting = vi.fn(async (key, value) => {
+      if (key === 'ocd_tag_taxonomy') {
+        registry = structuredClone(value);
+        return true;
+      }
+      return saveSetting(key, value);
+    });
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.6', settings: { tagTaxonomy: taxonomy },
+    })], 'tag-library.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_tag_taxonomy', taxonomy);
+    expect(registry).toEqual(taxonomy);
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ settings: 1, errors: [] });
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown taxonomy revisions before confirmation or any import mutation', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.6',
+      progress: [{ topicId: 'would-overwrite', courseId: 'biology' }],
+      settings: { tagTaxonomy: { version: 100, labels: [], aliases: {} } },
+    })], 'future-taxonomy.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/tag taxonomy|unsupported.*version/i));
+  });
+
   it('never exports an incomplete backup when an auxiliary store read fails', async () => {
     window.DB.getAllPdfBookmarks.mockRejectedValueOnce(new Error('bookmark storage failed'));
     await expect(window.ProgressStats.exportJSON()).rejects.toThrow('bookmark storage failed');
