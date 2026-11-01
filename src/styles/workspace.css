@@ -119,10 +119,6 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.card::before,
-.card.card-glow::before {
-  content: none;
-}
 .card:hover,
 .card.card-interactive:hover {
   box-shadow: none;
