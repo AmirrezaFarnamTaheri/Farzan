@@ -800,6 +800,7 @@
       const list = _read(KEY_TIMESTAMPS, []);
       _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
       _broadcast('timestamp', 'delete', { id });
+      return true;
     }
 
     // Notes in this codebase live in localStorage via notes.js.
