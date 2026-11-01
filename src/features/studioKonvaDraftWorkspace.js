@@ -14,6 +14,16 @@ export { MAX_KONVA_DRAFT_JSON_CHARS, exportKonvaV1DraftJSON, importKonvaV1DraftJ
 
 export const DRAFT_KEY = 'ocd_studio_konva_draft';
 
+/**
+ * The canonical resize command supports rectangles, circles and ellipses.
+ * Keep the stage selection handles in sync with that supported subset.
+ */
+export function isKonvaV1TransformableNode(node) {
+  return Boolean(node && typeof node.getClassName === 'function'
+    && ['Rect', 'Circle', 'Ellipse'].includes(node.getClassName()));
+}
+
+
 export function isKonvaDraftCompatible(board) {
   return planKonvaV1Board(board).compatible;
 }
@@ -132,7 +142,7 @@ function mountDraftScene({
       select(id) {
         for (const transformer of transformers) transformer.nodes([]);
         const target = map.get(id);
-        if (target && ['Rect', 'Circle'].includes(target.node.getClassName())) {
+        if (target && isKonvaV1TransformableNode(target.node)) {
           target.transformer.nodes([target.node]);
         }
         stage.batchDraw();
