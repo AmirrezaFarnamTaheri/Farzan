@@ -1099,7 +1099,14 @@
       const persistBoard = async (board) => {
         if (window.DB?.saveSetting) {
           const saved = await window.DB.saveSetting(this._autosaveKey, board);
-          if (saved === false) throw new Error('Board persistence was not acknowledged');
+          // A successful storage migration needs an affirmative receipt:
+          // the canonical DB returns the exact stored board value; test
+          // adapters may explicitly return true. Missing or mismatched
+          // values must not certify adoption of a retired canvas key.
+          const acknowledged = saved === true
+            || (saved != null && typeof saved === 'object' && !Array.isArray(saved)
+              && JSON.stringify(saved) === JSON.stringify(board));
+          if (!acknowledged) throw new Error('Board persistence was not acknowledged');
           return true;
         }
         if (window.localStorage) {
