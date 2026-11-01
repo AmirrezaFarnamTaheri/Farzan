@@ -1,5 +1,5 @@
 /**
- * Konva 10 preview renderer for a strict subset of canonical Studio v1 boards.
+ * Konva 10 board-v1 shape mapper for the interactive Studio draft.
  *
  * Deliberately never calls Stage.toJSON(): the application-owned v1 board
  * remains the only persistence/export format. Unsupported imported shapes
@@ -13,9 +13,9 @@ const unsupported = reason => ({ compatible: false, reason });
 
 /*
  * The canonical Canvas v1 format allows caller-defined element properties.
- * A renderer migration must not ignore one of them silently: some fields
+ * The interactive renderer must not ignore one of them silently: some fields
  * affect appearance, while others (links, shadows, metadata) affect exports.
- * Admit only the fields this preview maps or deliberately preserves.
+ * Admit only the fields the current Konva stage maps or deliberately preserves.
  */
 const COMMON_KEYS = ['id', 'type', 'x', 'y', 'stroke', 'strokeWidth', 'fill', 'opacity'];
 const TYPE_KEYS = Object.freeze({
@@ -83,7 +83,7 @@ function planShape(item) {
     || (type === 'text' && (item.wrap || item.maxWidth != null || item.font
       || (item.align && item.align !== 'left')
       || (item.baseline && item.baseline !== 'alphabetic')))) {
-    // Explicitly refuse previews that would silently lose labels, dashes,
+    // Explicitly refuse documents that would silently lose labels, dashes,
     // advanced text layout, or links from canonical saved board elements.
     return unsupported('unsupported-element-metadata');
   }
@@ -202,7 +202,7 @@ export function planKonvaV1Board(board) {
     }
     // Nonboolean imported lock/visibility values must not turn a protected
     // layer into an editable one (or render a hidden layer). Refuse the Konva
-    // draft rather than coercing or rewriting historical Canvas-v1 data.
+    // stage rather than coercing or rewriting canonical Canvas-v1 data.
     for (const flag of ['visible', 'locked']) {
       if (layer[flag] != null && typeof layer[flag] !== 'boolean') {
         return unsupported('invalid-layer-' + flag);
@@ -237,35 +237,4 @@ export function planKonvaV1Board(board) {
 
 export function buildKonvaNodes(layerPlan) {
   return layerPlan.elements.map(({ kind, attrs }) => new Konva[kind](attrs));
-}
-
-export function mountKonvaV1Preview({ container, board, width, height }) {
-  const plan = planKonvaV1Board(board);
-  if (!plan.compatible) throw new Error('Incompatible Studio v1 board: ' + plan.reason);
-  if (!container) throw new TypeError('A preview container is required');
-  const stage = new Konva.Stage({ container, width, height, listening: false });
-  const created = [];
-  try {
-    for (const layerPlan of plan.layers) {
-      const layer = new Konva.Layer({
-        id: layerPlan.id,
-        visible: layerPlan.visible,
-        opacity: layerPlan.opacity,
-        listening: false,
-      });
-      const world = new Konva.Group({
-        x: plan.viewport.x, y: plan.viewport.y,
-        scaleX: plan.viewport.zoom, scaleY: plan.viewport.zoom,
-      });
-      for (const node of buildKonvaNodes(layerPlan)) world.add(node);
-      layer.add(world);
-      stage.add(layer);
-      created.push(layer);
-    }
-    stage.batchDraw();
-    return { stage, destroy: () => stage.destroy() };
-  } catch (error) {
-    stage.destroy();
-    throw error;
-  }
 }
