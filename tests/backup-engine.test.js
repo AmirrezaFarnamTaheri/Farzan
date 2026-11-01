@@ -240,35 +240,35 @@ describe('atomic backup engine', () => {
     expect(snapshot.notes).toEqual([]);
   });
 
-  it('removes stale progress and timestamps mirrors only after an overwrite commits', async () => {
+  it('removes canonical PDF local fallback copies only after overwrite commits', async () => {
     const root = rootWithFacade();
-    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
-    root.localStorage.setItem('plasma_timestamps_v1', '[{"id":"old"}]');
+    root.localStorage.setItem('ocd_pdf_annotations_by_document', '{"doc-a":[{"id":"one"}]}');
+    root.localStorage.setItem('ocd_pdf_annotations_by_page', '{"1":[{"id":"one","docId":"doc-a"}]}');
     installBackupEngine(root);
     const receipt = await root.DB.importBackup({
-      progress: [], timestamps: [],
+      annotations: [],
     }, { mode: 'overwrite' });
     expect(receipt).toMatchObject({ committed: true, degraded: false });
-    expect(root.localStorage.getItem('plasma_progress_v1')).toBeNull();
-    expect(root.localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(root.localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
+    expect(root.localStorage.getItem('ocd_pdf_annotations_by_page')).toBeNull();
   });
 
-  it('does not clear compatibility mirrors if the overwrite transaction aborts', async () => {
+  it('does not delete PDF local copies if an overwrite transaction aborts', async () => {
     const root = rootWithFacade();
-    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
+    root.localStorage.setItem('ocd_pdf_annotations_by_document', '{"doc-a":[{"id":"one"}]}');
     installBackupEngine(root);
     await expect(root.DB.importBackup({
-      progress: [{ missingTopicId: true }],
+      annotations: [], progress: [{ missingTopicId: true }],
     }, { mode: 'overwrite' })).rejects.toThrow();
-    expect(root.localStorage.getItem('plasma_progress_v1')).toBe('{"old":true}');
+    expect(root.localStorage.getItem('ocd_pdf_annotations_by_document')).toContain('one');
   });
 
-  it('reports a degraded commit instead of hiding failed mirror removal', async () => {
+  it('reports degraded committed annotation recovery when fallback removal fails', async () => {
     const root = rootWithFacade();
-    root.localStorage.setItem('plasma_progress_v1', '{"old":true}');
+    root.localStorage.setItem('ocd_pdf_annotations_by_document', '{"doc-a":[{"id":"one"}]}');
     root.localStorage.removeItem = () => { throw new Error('storage blocked'); };
     installBackupEngine(root);
-    const receipt = await root.DB.importBackup({ progress: [] }, { mode: 'overwrite' });
+    const receipt = await root.DB.importBackup({ annotations: [] }, { mode: 'overwrite' });
     expect(receipt).toMatchObject({ committed: true, degraded: true, aiAuthorityInvalidated: true });
     expect(receipt.warnings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'MIRROR_CLEANUP_INCOMPLETE' }),

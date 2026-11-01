@@ -207,16 +207,13 @@ export function installBackupEngine(root = window) {
         throw error;
       }
       await completion;
-      // Delete compatibility mirrors only AFTER the authoritative transaction
+      // Delete local fallback copies only AFTER the authoritative transaction
       // commits. Empty overwrite collections also invalidate stale mirrors.
       const mirrorFailures = [];
       if (mode === 'overwrite') {
         for (const [store, key] of [
-          ['progress', 'plasma_progress_v1'],
-          ['timestamps', 'plasma_timestamps_v1'],
-          ['annotations', 'plasma-pdf-annotations'],
-          ['annotations', 'plasma-pdf-annotations-by-document'],
-          ['annotations', 'plasma-pdf-annotations-by-page'],
+          ['annotations', 'ocd_pdf_annotations_by_document'],
+          ['annotations', 'ocd_pdf_annotations_by_page'],
         ]) {
           if (!Object.prototype.hasOwnProperty.call(portable, store)) continue;
           try {
@@ -226,7 +223,7 @@ export function installBackupEngine(root = window) {
             }
             root.localStorage.removeItem(key);
             if (root.localStorage.getItem(key) != null) {
-              throw new Error(`Compatibility mirror ${key} remained after deletion`);
+              throw new Error(`Local fallback copy ${key} remained after deletion`);
             }
           } catch (error) {
             mirrorFailures.push({ key, message: error?.message || String(error) });
