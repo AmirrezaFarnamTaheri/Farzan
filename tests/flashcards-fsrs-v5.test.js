@@ -76,6 +76,21 @@ describe('opt-in FSRS-6 scheduling through pinned ts-fsrs v5', () => {
     expect(() => rateFsrsV5State(v7, 4, new Date())).toThrow();
   });
 
+  it('refuses noncanonical UTC review-log times before accepting a restored FSRS snapshot', () => {
+    const initial = createFsrsV5State(new Date());
+    const reviewed = rateFsrsV5State(initial, 4, new Date()).state;
+    const before = structuredClone(reviewed);
+    expect(assertFsrsV5State(reviewed)).toEqual(before);
+    for (const unsafe of ['2026-01-01', '2026-01-01T18:59:00.000-05:00', '2026-01-01T23:59:00Z']) {
+      const imported = structuredClone(reviewed);
+      imported.reviewLog[0].review = unsafe;
+      const untouched = structuredClone(imported);
+      expect(() => assertFsrsV5State(imported)).toThrow(/review|history|UTC/i);
+      expect(imported).toEqual(untouched);
+    }
+    expect(reviewed).toEqual(before);
+  });
+
   it('preserves old SM-2 defaults and exact date-only due behavior', async () => {
     const card = await fs().addCard({ front: 'Legacy', back: 'SM-2' });
     expect(card.scheduler).toBeUndefined();

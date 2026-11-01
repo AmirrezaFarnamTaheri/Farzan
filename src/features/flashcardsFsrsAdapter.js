@@ -82,8 +82,13 @@ export function assertFsrsV5State(state) {
   }
   serializeCard(state.card);
   for (const log of state.reviewLog) {
-    if (!log || ![1, 2, 3, 4].includes(log.rating) ||
-        typeof log.review !== 'string' || !Number.isFinite(Date.parse(log.review))) {
+    const review = log?.review;
+    const instant = typeof review === 'string' ? Date.parse(review) : NaN;
+    // The pinned FSRS adapter serializes review instants with toISOString().
+    // An offset or date-only value can parse but must not be silently treated
+    // as a canonical UTC review-history record during a backup restore.
+    if (!log || ![1, 2, 3, 4].includes(log.rating)
+        || !Number.isFinite(instant) || new Date(instant).toISOString() !== review) {
       throw new TypeError('Corrupt FSRS review history');
     }
   }
