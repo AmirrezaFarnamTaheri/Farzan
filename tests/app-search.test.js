@@ -65,6 +65,23 @@ describe('app topbar search rendering', () => {
     expect(window.location.href).not.toContain('javascript:');
   });
 
+  it('renders a title-only imported search suggestion and exposes it to keyboard navigation', async () => {
+    const select = vi.fn();
+    const search = window.OpenCourseDeck.TopbarSearch;
+    search.setData([
+      { id: 'imported-lecture', title: 'Renal physiology 你好', category: 'Imported media', action: select },
+    ]);
+    const input = document.querySelector('[data-search-input]');
+    input.value = 'renal';
+    await search._onInput('renal');
+    const row = search.resultsBox.querySelector('[role="option"]');
+    expect(row).not.toBeNull();
+    expect(row.querySelector('.search-result-label').textContent).toBe('Renal physiology 你好');
+    expect(input.getAttribute('aria-activedescendant')).toBe(row.id);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(select).toHaveBeenCalledOnce();
+  });
+
   it('uses an accessible selected option and consistent Arrow/Enter/Escape behavior', async () => {
     const actionA = vi.fn();
     const actionB = vi.fn();
