@@ -39,6 +39,37 @@ When no missing-file section appears, there are no missing imported file referen
 
 The importer prepares a snapshot of existing data for recovery, including course outlines and media cues. Imports containing watch history or PDF bookmarks require an atomic version-3 recovery snapshot; unsupported storage environments should reject those imports rather than risk a partial restore. If a recoverable write fails, the importer attempts to restore original settings and records; if rollback fails it reports that explicitly. An interrupted browser process is not guaranteed to recover an older multi-step import automatically.
 
+## Read-only before/after restore verification (local files only)
+
+After exporting a portable v1.6 app-data JSON file from the original profile, import that
+backup into a **different, initially empty** browser profile at the correct origin.
+Before deleting or overwriting any original profile, export the restored profile to a
+second portable JSON file. With this repository and its Node dependencies available,
+run the comparator on your own computer:
+
+```bash
+npm run verify:portable-restore -- /path/to/original.json /path/to/restored.json
+```
+
+The command reads those two files only; it does **not** access live IndexedDB,
+write either backup, transmit data, infer FSRS history, or change an existing
+SM-2 schedule. It ignores the export timestamp and calculated JSON file size,
+and tolerates record ordering differences for top-level ID-keyed collections.
+It compares exact canonical content within each record (including FSRS due
+instants and unchanged SM-2 migration archives), per-section counts and
+SHA-256 hashes. It prints only generic section names, counts and digests,
+never raw saved notes, note identifiers, media paths or flashcard content.
+A mismatch exits nonzero and identifies affected *sections*, not record values.
+
+A matching report is **not a certificate of successful recovery**: independently
+verify sampled saved notes, PDF annotations, tagged bookmarks, SM-2 and FSRS due
+dates, archived original cards, linked media playback and the actual Windows
+profile. The portable JSON deliberately excludes imported PDF/video binary
+bytes: separately export and restore the media folder, then inspect the missing
+local-file list. Keep the original backup and the populated source profile
+until these checks are complete. If any section or media file is missing,
+**stop** before deleting or upgrading the source profile.
+
 ## Clear local data
 
 Clearing all records may involve more than one IndexedDB database. These deletions are **not one transaction across databases**. If clearing one database succeeds but a later operation fails, some data may already be gone. Check the error, preserve your backups, and inspect storage before trying again.
