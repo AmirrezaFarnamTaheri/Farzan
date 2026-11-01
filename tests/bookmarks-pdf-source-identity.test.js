@@ -62,7 +62,9 @@ describe('saved PDF bookmark stable-source navigation', () => {
     expect(link.getAttribute('href')).toBe('#/materials');
     expect(link.textContent).toMatch(/find|locate|browse/i);
     link.click();
-    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    // Discovery must clear a stale session handoff, not queue a page under
+    // an unrelated PDF document.
+    expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
     expect(Router.navigate).not.toHaveBeenCalledWith('#/pdf');
     expect(card.textContent).toContain('Imported legacy page');
   });
@@ -78,7 +80,9 @@ describe('saved PDF bookmark stable-source navigation', () => {
     const link = card.querySelector('a');
     expect(link.getAttribute('href')).toBe('#/materials');
     link.click();
-    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    // Discovery must clear a stale session handoff, not queue a page under
+    // an unrelated PDF document.
+    expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
     expect(Router.navigate).not.toHaveBeenCalledWith('#/pdf');
   });
 });
