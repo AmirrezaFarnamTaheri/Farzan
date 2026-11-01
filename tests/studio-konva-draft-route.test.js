@@ -457,4 +457,87 @@ describe('Studio experimental Konva draft opt-in', () => {
   });
 
 
+
+  it('uses canonical atomic compare-and-swap for draft saves when supported by the DB facade', async () => {
+    const original = v1Board();
+    const { controller, factory, saveSetting } = makeFixture({ savedDraft: original });
+    const cas = vi.fn(async (key, expected, changed) => {
+      expect(key).toBe('ocd_studio_konva_draft');
+      expect(expected).toEqual(original);
+      await saveSetting(key, changed);
+      return true;
+    });
+    window.DB.compareAndSwapSetting = cas;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const changed = v1Board();
+    changed.layers[0].elements[0].x = 144;
+    await expect(factory.mock.calls[0][0].saveDraft(changed)).resolves.toBe(true);
+    expect(cas).toHaveBeenCalledOnce();
+    controller.unmount();
+  });
+
+  it('fails closed without a non-atomic fallback when the canonical CAS rejects a cross-tab overwrite', async () => {
+    const { controller, factory, saveSetting } = makeFixture({ savedDraft: v1Board() });
+    const cas = vi.fn(async () => false);
+    window.DB.compareAndSwapSetting = cas;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const changed = v1Board();
+    changed.layers[0].elements[0].x = 700;
+    await expect(factory.mock.calls[0][0].saveDraft(changed))
+      .rejects.toThrow(/changed|another tab|conflict/i);
+    expect(cas).toHaveBeenCalledOnce();
+    expect(saveSetting).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+
+  it('refuses to import over an unseen cross-tab draft even after the user confirmed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const original = v1Board();
+    const imported = v1Board();
+    imported.layers[0].elements[0].x = 888;
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft: original });
+    const cas = vi.fn(async () => false);
+    window.DB.compareAndSwapSetting = cas;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const newer = v1Board();
+    newer.layers[0].elements[0].x = 999;
+    getSetting.mockResolvedValueOnce(newer);
+    const input = document.querySelector('[data-studio-konva-import]');
+    const contents = JSON.stringify(imported);
+    Object.defineProperty(input, 'files', { configurable: true, value: [{
+      name: 'approved.json', size: contents.length, text: async () => contents,
+    }] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(cas).toHaveBeenCalledOnce());
+    expect(cas).toHaveBeenCalledWith('ocd_studio_konva_draft', original, imported);
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(factory).toHaveBeenCalledOnce();
+    expect(document.querySelector('[data-studio-konva-status]').textContent).toMatch(/import failed/i);
+    controller.unmount();
+  });
+
+  it('refuses to reset over an unseen cross-tab draft, preserving the open workspace', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const original = v1Board();
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft: original });
+    const cas = vi.fn(async () => false);
+    window.DB.compareAndSwapSetting = cas;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const newer = v1Board();
+    newer.layers[0].elements[0].x = 999;
+    getSetting.mockResolvedValueOnce(newer);
+    document.querySelector('[data-studio-konva-reset]').click();
+    await vi.waitFor(() => expect(cas).toHaveBeenCalledOnce());
+    expect(cas).toHaveBeenCalledWith('ocd_studio_konva_draft', original, v1Board());
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(factory).toHaveBeenCalledOnce();
+    expect(document.querySelector('[data-studio-konva-status]').textContent).toMatch(/reset failed/i);
+    controller.unmount();
+  });
+
 });

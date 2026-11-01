@@ -695,6 +695,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const konvaStage = document.querySelector('[data-studio-konva-stage]');
   const konvaStatus = document.querySelector('[data-studio-konva-status]');
   let konvaWorkspace = null;
+  // Durable snapshot last observed by this editor. Reset and import must use
+  // this exact opened revision, not freshly read another tab's newer board.
+  let persistedKonvaDraft = null;
   let konvaModule = null;
   let konvaOpening = false;
   let konvaClosing = false;
@@ -795,6 +798,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const disposeKonva = ({ restoreFocus = true } = {}) => {
     konvaWorkspace?.destroy?.();
     konvaWorkspace = null;
+    persistedKonvaDraft = null;
     if (konvaDialog?.open) {
       if (typeof konvaDialog.close === 'function') konvaDialog.close();
       else konvaDialog.removeAttribute('open');
@@ -831,9 +835,15 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         if (typeof db?.getSetting !== 'function' || typeof db?.saveSetting !== 'function') {
           throw new Error('Canonical draft storage unavailable');
         }
-        // Detect newer writes from another tab before replacing them. This
-        // read/write pair is not an atomic compare-and-swap; a simultaneous
-        // overwrite between the two operations still requires DB-level locks.
+        if (typeof db.compareAndSwapSetting === 'function') {
+          const accepted = await db.compareAndSwapSetting(loaded.DRAFT_KEY, lastSavedDraft, changed);
+          if (!accepted) throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
+          lastSavedDraft = structuredClone(changed);
+          persistedKonvaDraft = structuredClone(changed);
+          return true;
+        }
+        // Compatibility path for test facades without transactional support.
+        // Production uses the canonical CAS above, never this unlocked path.
         const before = await db.getSetting(loaded.DRAFT_KEY);
         if (!sameBoard(before, lastSavedDraft)) {
           throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
@@ -847,6 +857,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
           throw new Error('Konva draft was not saved durably: canonical readback differed');
         }
         lastSavedDraft = structuredClone(verified);
+        persistedKonvaDraft = structuredClone(verified);
         return true;
       },
       onSelect: id => {
@@ -864,6 +875,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     // passed its own validation and mounted successfully.
     previousWorkspace?.destroy?.();
     konvaWorkspace = candidate;
+    persistedKonvaDraft = lastSavedDraft == null ? null : structuredClone(lastSavedDraft);
     populateKonvaObjects();
     return konvaWorkspace;
   };
@@ -1067,7 +1079,11 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       await previous.flush();
       if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
       const candidate = structuredClone(imported);
-      const receipt = await window.DB?.saveSetting?.(loaded.DRAFT_KEY, candidate);
+      const expected = persistedKonvaDraft;
+      // Imported drafts must not overwrite a concurrent edit after confirmation.
+      const receipt = typeof window.DB.compareAndSwapSetting === 'function'
+        ? await window.DB.compareAndSwapSetting(loaded.DRAFT_KEY, expected, candidate)
+        : await window.DB?.saveSetting?.(loaded.DRAFT_KEY, candidate);
       // The canonical bridge resolves saveSetting with the saved value, not
       // necessarily a literal true. Refuse false/null/undefined or unrelated
       // acknowledgments; accept the exact returned board or its JSON clone.
@@ -1176,8 +1192,11 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       const previous = konvaWorkspace;
       await previous.flush();
       if (unmounted || konvaWorkspace !== previous) return;
-      const receipt = await window.DB.saveSetting(konvaModule.DRAFT_KEY, structuredClone(source));
-      if (receipt === false) throw new Error('Draft reset not acknowledged');
+      const expected = persistedKonvaDraft;
+      const receipt = typeof window.DB.compareAndSwapSetting === 'function'
+        ? await window.DB.compareAndSwapSetting(konvaModule.DRAFT_KEY, expected, structuredClone(source))
+        : await window.DB.saveSetting(konvaModule.DRAFT_KEY, structuredClone(source));
+      if (!receipt) throw new Error('Draft reset not acknowledged');
       if (unmounted || konvaWorkspace !== previous) return;
       createKonvaWorkspace(source, konvaModule);
       setKonvaStatus('New isolated Konva draft copied from Studio');
