@@ -253,6 +253,18 @@ export function appendKonvaV1Stroke(board, id, points) {
   return next;
 }
 
+/** Change drawing layer, retaining every canonical element and metadata field. */
+export function selectKonvaV1ActiveLayer(board, layerIndex) {
+  validBoard(board);
+  if (!Number.isInteger(layerIndex) || layerIndex < 0 || layerIndex >= board.layers.length) {
+    throw new RangeError('Invalid Studio active layer');
+  }
+  const next = structuredClone(board);
+  next.activeLayerIdx = layerIndex;
+  validBoard(next);
+  return next;
+}
+
 /**
  * Create only geometries whose exact canonical v1 representation is known.
  * Placement happens in the caller's inverse-viewport world coordinates.
@@ -376,6 +388,16 @@ export function createKonvaV1MoveSession({
     if (before.layer.elements[before.index].text === content) {
       return structuredClone(current);
     }
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  const selectLayer = layerIndex => enqueue(async () => {
+    const next = selectKonvaV1ActiveLayer(current, layerIndex);
+    if ((current.activeLayerIdx ?? 0) === layerIndex) return structuredClone(current);
     await persist(next);
     push(undoStack, current);
     redoStack.length = 0;
@@ -561,6 +583,7 @@ export function createKonvaV1MoveSession({
     resize,
     addStroke,
     addShape,
+    selectLayer,
     updateText,
     undo,
     redo,

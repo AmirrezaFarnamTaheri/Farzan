@@ -42,6 +42,7 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     getMode: vi.fn(() => draftMode),
     select: vi.fn(), move: vi.fn(async () => imported),
     addShape: vi.fn(async () => imported),
+    selectLayer: vi.fn(async index => ({ ...imported, activeLayerIdx: index })),
     undo: vi.fn(async () => false), redo: vi.fn(async () => false),
     canUndo: () => false, canRedo: () => false,
     flush: vi.fn(async () => true),
@@ -76,6 +77,31 @@ describe('Studio experimental Konva draft opt-in', () => {
     window.matchMedia = vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   });
   afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
+
+  it('shows canonical layer names and exposes a keyboard-accessible active layer chooser', async () => {
+    const source = v1Board();
+    source.layers.push({ id: 'layer-2', name: 'Locked annotations', visible: true,
+      locked: true, elements: [] });
+    source.layers.push({ id: 'layer-3', name: 'فارسی diagrams', visible: true,
+      locked: false, elements: [] });
+    const { controller, factory, saveSetting } = makeFixture({ board: source });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const chooser = document.querySelector('[data-studio-konva-layer]');
+    expect(chooser.tagName).toBe('SELECT');
+    expect(chooser.getAttribute('aria-label')).toMatch(/active.*layer/i);
+    expect([...chooser.options].map(opt => opt.textContent)).toEqual([
+      'Editable', 'Locked annotations (locked)', 'فارسی diagrams',
+    ]);
+    expect(chooser.value).toBe('0');
+    chooser.value = '2';
+    chooser.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(factory.mock.results[0].value.selectLayer).toHaveBeenCalledWith(2);
+    });
+    expect(saveSetting).not.toHaveBeenCalled();
+    controller.unmount();
+  });
 
   it('offers keyboard-accessible shape creation with inverse viewport coordinates only in the draft', async () => {
     const board = v1Board();
