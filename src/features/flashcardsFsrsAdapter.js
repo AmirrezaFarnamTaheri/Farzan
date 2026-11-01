@@ -1,10 +1,9 @@
 /**
- * Opt-in FSRS-6 model adapter using the pinned ts-fsrs 5.4.2 package.
+ * Canonical FSRS-6 scheduler using pinned ts-fsrs 5.4.2.
  *
  * fsrs-v5 names the *package API generation*; fsrs-6 names its scheduling
- * model. Never infer this state from legacy SM-2 counters or review dates.
- * All Date instances are converted to ISO strings before canonical storage.
- * This module is dynamically imported only by an explicitly FSRS card.
+ * model. Date instances become UTC ISO strings before storage.
+ * This module is loaded lazily only for flashcard creation/reviews.
  */
 import { createEmptyCard, fsrs, Rating } from 'ts-fsrs';
 
@@ -23,7 +22,7 @@ const RATING_MAP = Object.freeze({
 
 // Deterministic outcomes are essential for replay, test fixtures, backup and
 // comparing schedules. Keep explicit short learning steps: they must use exact
-// timestamps, not the legacy midnight/date-only due checks.
+// timestamps, never calendar-day approximations.
 const scheduler = fsrs({
   enable_fuzz: false,
   enable_short_term: true,
@@ -41,7 +40,7 @@ function iso(value, label) {
   return validDate(value, label).toISOString();
 }
 
-export function ratingFromLegacyGrade(grade) {
+export function ratingFromUiGrade(grade) {
   if (!Number.isInteger(grade) || !Object.hasOwn(RATING_MAP, grade)) {
     throw new RangeError('FSRS expects one of Farzan grades 1, 2, 4, 5');
   }
@@ -70,7 +69,7 @@ function serializeCard(card) {
 /** Validate the exact persisted envelope without changing it. */
 export function assertFsrsV5State(state) {
   if (!state || state.version !== 1 || state.packageVersion !== PACKAGE_VERSION || state.model !== MODEL) {
-    throw new TypeError('Unsupported FSRS scheduler snapshot; legacy data was not changed');
+    throw new TypeError('Unsupported FSRS scheduler snapshot');
   }
   if (!Array.isArray(state.reviewLog)) throw new TypeError('Invalid FSRS review log');
   if (typeof state.card?.due !== 'string' || !state.card.due.endsWith('Z')) {
@@ -119,7 +118,7 @@ export function createFsrsV5State(now = new Date()) {
 export function rateFsrsV5State(state, farzanGrade, now = new Date()) {
   // Validate everything before allowing the upstream scheduling operation.
   const card = deserializeCard(state);
-  const grade = ratingFromLegacyGrade(farzanGrade);
+  const grade = ratingFromUiGrade(farzanGrade);
   const instant = validDate(now, 'review time');
   const result = scheduler.next(card, instant, grade);
   const updatedCard = serializeCard(result.card);
