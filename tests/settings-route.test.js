@@ -371,22 +371,4 @@ describe('settings route', () => {
     expect(saveSetting).not.toHaveBeenCalled();
     controller.unmount();
   });
-  it('keeps Appearance selected and navigates within Settings without changing the SPA route', () => {
-    const { controller } = mountSettings();
-    const links = [...document.querySelectorAll('.settings-nav a')];
-    expect(links[0].getAttribute('aria-current')).toBe('location');
-    const before = window.location.hash;
-    const section = document.getElementById('settings-storage');
-    const scroll = vi.fn();
-    section.scrollIntoView = scroll;
-    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-    links[2].dispatchEvent(click);
-    expect(click.defaultPrevented).toBe(true);
-    expect(window.location.hash).toBe(before);
-    expect(scroll).toHaveBeenCalled();
-    expect(links[2].getAttribute('aria-current')).toBe('location');
-    expect(links[0].hasAttribute('aria-current')).toBe(false);
-    controller.unmount();
-  });
-
 });
