@@ -149,7 +149,9 @@ async function renderPlaylists(deps) {
       try {
         await window.DataStore?.init?.();
         try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
-        const catalogTopics = window.DataStore?.allTopics?.() ?? [];
+        // Support synchronous catalog readers and promise-backed adapters
+        // before validating the complete result as a canonical collection.
+        const catalogTopics = (await window.DataStore?.allTopics?.()) ?? [];
         if (!Array.isArray(catalogTopics)) throw new TypeError('Invalid canonical playlist catalog topics');
         return catalogTopics;
       } catch (error) {
