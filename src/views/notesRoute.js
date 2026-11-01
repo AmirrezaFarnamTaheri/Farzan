@@ -166,7 +166,7 @@ export function mountNotesView({ setView } = {}) {
             <div class="notes-tags" data-tags-cloud aria-label="Note tags"></div>
             <div class="button-row" style="gap:8px;align-items:center;flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" type="button" data-notes-remote-images aria-pressed="false" title="May contact third-party servers and share your IP address">Load external images</button>
-              <button class="btn btn-ghost btn-sm" type="button" data-notes-modern-toggle hidden>Try modern editor (preview)</button>
+              <button class="btn btn-ghost btn-sm" type="button" data-notes-modern-toggle hidden>Use Squire editor</button>
               <span class="notes-privacy-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Stored locally; external images blocked by default</span>
             </div>
           </footer>
