@@ -264,10 +264,12 @@ export function mountBookmarksView(deps = {}) {
         link.href = '#/materials';
         link.textContent = 'Find PDF';
         link.title = 'This saved page has no stable document ID; choose the PDF manually';
-        link.addEventListener('click', () => {
+        link.addEventListener('click', event => {
+          event.preventDefault();
           // A previous PDF page handoff must not remain queued after the
           // learner chooses source discovery instead of opening that PDF.
           setPendingPdfPage?.(null, null);
+          Router.navigate('#/materials');
         });
       }
       if (item.type === 'Timestamp' && item.topicId) {
