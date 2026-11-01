@@ -119,6 +119,38 @@ describe('opt-in Konva editing draft workspace', () => {
     instance.destroy();
   });
 
+  it('reports an acknowledged in-flight draft save as committed even when the dialog closes', async () => {
+    let acknowledge;
+    const saveDraft = vi.fn(() => new Promise(resolve => { acknowledge = resolve; }));
+    const onStatus = vi.fn();
+    const onError = vi.fn();
+    const scenes = [];
+    const sceneFactory = args => {
+      const scene = { select: vi.fn(), destroy: vi.fn(), args };
+      scenes.push(scene);
+      return scene;
+    };
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'), board: board(), saveDraft,
+      sceneFactory, onStatus, onError,
+    });
+    const pending = instance.move('rect-1', 5, -3);
+    await vi.waitFor(() => expect(acknowledge).toBeTypeOf('function'));
+    instance.destroy();
+    acknowledge(true);
+    const committed = await pending;
+    expect(committed.layers[0].elements[0]).toMatchObject({
+      x: 105, y: 57, width: -80, height: -40,
+    });
+    expect(saveDraft).toHaveBeenCalledOnce();
+    expect(instance.getBoard()).toEqual(committed);
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].destroy).toHaveBeenCalledOnce();
+    expect(onStatus).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    await expect(instance.move('rect-1', 2, 2)).rejects.toThrow(/closed/i);
+  });
+
   it('disposes scenes and prevents further writes after leaving the experiment', async () => {
     const { instance, scenes, saveDraft } = workspace();
     instance.destroy();
