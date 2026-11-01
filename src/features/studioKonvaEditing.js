@@ -106,6 +106,24 @@ export function resizeKonvaV1Element(board, id, bounds) {
   const next = structuredClone(board);
   const { layer, index } = findUnlockedElement(next, id);
   const item = layer.elements[index];
+  if (item.type === 'circle') {
+    // Circle geometry is a center and a radius in board-v1. A nonuniform
+    // Konva Transformer must not be flattened into a different saved shape.
+    if (Math.abs(bounds.width - bounds.height) >
+      Math.max(1e-7, Math.max(bounds.width, bounds.height) * 1e-7)) {
+      throw new RangeError('Konva circle resize requires uniform width and height');
+    }
+    const radius = bounds.width / 2;
+    const x = bounds.x + radius, y = bounds.y + radius;
+    if (![x, y, radius].every(Number.isFinite) || radius <= 0) {
+      throw new RangeError('Konva circle resize produced invalid geometry');
+    }
+    item.x = x;
+    item.y = y;
+    item.radius = radius;
+    validBoard(next);
+    return next;
+  }
   if (item.type !== 'rect' && item.type !== 'roundRect') {
     throw new TypeError('Unsupported Studio element for Konva resizing: ' + item.type);
   }
@@ -314,7 +332,7 @@ export function createKonvaV1MoveSession({
     const oldShape = before.layer.elements[before.index];
     const newShape = after.layer.elements[after.index];
     // A stationary Transformer must not create a fake edit or storage write.
-    if (['x', 'y', 'width', 'height'].every(key => oldShape[key] === newShape[key])) {
+    if (['x', 'y', 'width', 'height', 'radius'].every(key => oldShape[key] === newShape[key])) {
       return structuredClone(current);
     }
     await persist(next);
@@ -370,15 +388,17 @@ export function createKonvaV1MoveSession({
       last.catch(() => {});
     });
 
-    // A Konva Transformer scales the visual node; the canonical v1 document
-    // stores rectangle bounds rather than node scales. Reconcile only mapped
-    // Rect/roundRect types, never image/ink/text or rotated/flipped geometry.
-    const canResize = ['rect', 'roundRect'].includes(target.layer.elements[target.index].type)
-      && node.getClassName?.() === 'Rect';
+    // Transform only geometries that board-v1 can represent losslessly:
+    // signed rectangles and uniformly scaled circles. Never store Konva JSON.
+    const shapeType = target.layer.elements[target.index].type;
+    const isCircle = shapeType === 'circle' && node.getClassName?.() === 'Circle';
+    const canResize = (['rect', 'roundRect'].includes(shapeType)
+      && node.getClassName?.() === 'Rect') || isCircle;
     if (canResize) {
       let transformOrigin = null;
       const snapshotNode = () => ({
-        x: node.x(), y: node.y(), width: node.width(), height: node.height(),
+        x: node.x(), y: node.y(),
+        ...(isCircle ? { radius: node.radius() } : { width: node.width(), height: node.height() }),
         scaleX: node.scaleX(), scaleY: node.scaleY(), rotation: node.rotation(),
       });
       const applyNode = attrs => {
@@ -402,10 +422,10 @@ export function createKonvaV1MoveSession({
           if (node.rotation() !== 0 || before.rotation !== 0) {
             throw new RangeError('Konva transform rotation is unsupported by canonical v1 resize');
           }
-          bounds = {
-            x: node.x(), y: node.y(),
-            width: node.width() * scaleX, height: node.height() * scaleY,
-          };
+          const width = node.width() * scaleX, height = node.height() * scaleY;
+          bounds = isCircle
+            ? { x: node.x() - width / 2, y: node.y() - height / 2, width, height }
+            : { x: node.x(), y: node.y(), width, height };
           // This synchronous validation also guards against infinity from
           // multiplying finite dimensions and scales.
           if (!Object.values(bounds).every(Number.isFinite)
@@ -419,9 +439,14 @@ export function createKonvaV1MoveSession({
           return;
         }
         last = resize(id, bounds).then(result => {
-          // Clear the transient Konva scale only *after* canonical persistence
-          // acknowledges the resized v1 rectangle.
-          applyNode({ ...bounds, scaleX: 1, scaleY: 1 });
+          // Clear transient scaling only after board-v1 persistence confirms
+          // the edit. Circle positions are centers, unlike rectangle corners.
+          applyNode(isCircle
+            ? {
+              x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2,
+              radius: bounds.width / 2, scaleX: 1, scaleY: 1,
+            }
+            : { ...bounds, scaleX: 1, scaleY: 1 });
           return result;
         }).catch(error => {
           applyNode(before);
