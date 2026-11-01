@@ -1424,6 +1424,7 @@ export async function mountCoursesView(deps = {}) {
   const requestedTopicId = deepLink.get('topic') || '';
   const requestedCourseId = deepLink.get('id') || '';
   const pendingTopicId = requestedTopicId || sessionStorage.getItem('ocd_pending_topic');
+  const pendingCourseId = sessionStorage.getItem('ocd_pending_course') || '';
   const pendingPosition = Number(sessionStorage.getItem('ocd_pending_position') || 0);
   let pendingLibraryCourse = '';
   try {
@@ -1431,7 +1432,10 @@ export async function mountCoursesView(deps = {}) {
     if (pendingLibraryCourse) sessionStorage.removeItem('ocd_pending_library_course');
   } catch {}
   if (pendingTopicId) sessionStorage.removeItem('ocd_pending_topic');
-  if (pendingPosition) sessionStorage.removeItem('ocd_pending_position');
+  if (pendingCourseId) sessionStorage.removeItem('ocd_pending_course');
+  // Also clear zero and malformed positions; a stale seek must never be used
+  // for a subsequent unrelated topic handoff.
+  sessionStorage.removeItem('ocd_pending_position');
 
   const selectCourse = (courseId) => {
     const btn = listEl.querySelector(`[data-course-id="${courseId}"]`);
@@ -1510,7 +1514,13 @@ export async function mountCoursesView(deps = {}) {
   }
 
   if (pendingTopicId) {
-    const t = allTopics.find(x => x.topicId === pendingTopicId);
+    const candidates = allTopics.filter(topic => topic.topicId === pendingTopicId);
+    // A legacy one-field handoff is safe only for a globally unique topic.
+    // When courseId was saved with a bookmark, never play a similarly named
+    // topic from another course after a catalog refresh or import.
+    const t = pendingCourseId
+      ? candidates.find(topic => topic.courseId === pendingCourseId)
+      : candidates.length === 1 ? candidates[0] : null;
     if (t && selectCourse(t.courseId)) {
       // Autoplay after detail is rendered
       setTimeout(async () => {
