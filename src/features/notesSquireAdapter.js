@@ -34,12 +34,29 @@ function inertSanitize(html) {
 
 function replaceSelectedBlocks(editor, tag) {
   editor.modifyBlocks(fragment => {
-    for (const child of [...fragment.childNodes]) {
-      if (child.nodeType !== Node.ELEMENT_NODE || !/^(P|DIV|H[1-6])$/.test(child.tagName)) continue;
+    const blocks = [...fragment.childNodes].filter(child =>
+      child.nodeType === Node.ELEMENT_NODE && /^(P|DIV|H[1-6])$/.test(child.tagName));
+    // Plan/validate every replacement before moving any live content. A
+    // heading toolbar click must not erase the saved block's RTL direction
+    // or approved alignment paint, nor propagate unsupported attributes.
+    const replacements = blocks.map(child => {
       const replacement = document.createElement(tag);
+      for (const attr of child.attributes) {
+        if (!['dir', 'style', 'class'].includes(attr.name.toLowerCase())) {
+          throw new Error('Unsupported block attribute in Squire formatting');
+        }
+        replacement.setAttribute(attr.name, attr.value);
+      }
+      if (!assessNoteForSquire(replacement.outerHTML).compatible) {
+        throw new Error('Unsupported block formatting in Squire conversion');
+      }
+      return replacement;
+    });
+    blocks.forEach((child, index) => {
+      const replacement = replacements[index];
       while (child.firstChild) replacement.appendChild(child.firstChild);
       child.replaceWith(replacement);
-    }
+    });
     return fragment;
   });
   return true;
