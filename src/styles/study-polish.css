@@ -20,18 +20,12 @@
  * A solid surface also works on platforms lacking backdrop-filter. */
 .sidebar {
   background: var(--surface);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
   border-inline-end: 1px solid var(--border);
   border-right: none;
   gap: var(--space-3);
 }
 .topbar {
   background: var(--bg-secondary);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
   border-bottom: 1px solid var(--border);
 }
 .sidebar-logo {

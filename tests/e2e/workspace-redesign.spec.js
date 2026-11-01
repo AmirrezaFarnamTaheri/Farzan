@@ -74,19 +74,20 @@ test.describe('Farzan desktop workspace redesign', () => {
     await medicine.click();
     const group = page.locator('#course-detail .source-group[dir="rtl"]').first();
     await expect(group).toBeVisible({ timeout: 20000 });
-    const header = await group.evaluate(section => {
+    // The Courses workbench refreshes its source section after selection.
+    // A detached old node returns empty computed styles mid-render; retry
+    // against the currently attached section instead of recording a false
+    // RTL failure during the normal asynchronous re-render.
+    await expect.poll(() => group.evaluate(section => {
+      if (!section.isConnected) return false;
       const title = section.querySelector('.source-group-title');
       const count = section.querySelector('.source-group-count');
-      return {
-        titleLeft: title.getBoundingClientRect().left,
-        countRight: count.getBoundingClientRect().right,
-        headerDirection: getComputedStyle(section.querySelector('.source-group-header')).direction,
-        countDirection: getComputedStyle(count).direction,
-      };
-    });
-    expect(header.headerDirection).toBe('rtl');
-    expect(header.countDirection).toBe('ltr');
-    expect(header.titleLeft).toBeGreaterThan(header.countRight);
+      const header = section.querySelector('.source-group-header');
+      return Boolean(title && count && header)
+        && getComputedStyle(header).direction === 'rtl'
+        && getComputedStyle(count).direction === 'ltr'
+        && title.getBoundingClientRect().left > count.getBoundingClientRect().right;
+    }), { timeout: 20000 }).toBe(true);
 
     await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
     // The course selector is deliberately behind a closed disclosure.
@@ -96,23 +97,17 @@ test.describe('Farzan desktop workspace redesign', () => {
       .selectOption('comprehensive-internal-medicine-course');
     const material = page.locator('#materials-list .topic-row[dir="rtl"]').first();
     await expect(material).toBeVisible({ timeout: 12000 });
-    const layout = await material.evaluate(row => {
+    await expect.poll(() => material.evaluate(row => {
+      if (!row.isConnected) return false;
       const title = row.querySelector('.topic-title');
       const actions = row.querySelector('.topic-actions');
-      return {
-        direction: getComputedStyle(row).direction,
-        titleAlign: getComputedStyle(title).textAlign,
-        titleLeft: title.getBoundingClientRect().left,
-        actionsRight: actions.getBoundingClientRect().right,
-        actionsDirection: getComputedStyle(actions).direction,
-        titleDir: title.getAttribute('dir'),
-      };
-    });
-    expect(layout.direction).toBe('rtl');
-    expect(layout.titleAlign).toBe('right');
-    expect(layout.titleDir).toBe('auto');
-    expect(layout.actionsDirection).toBe('ltr');
-    expect(layout.titleLeft).toBeGreaterThan(layout.actionsRight);
+      return Boolean(title && actions)
+        && getComputedStyle(row).direction === 'rtl'
+        && getComputedStyle(title).textAlign === 'right'
+        && title.getAttribute('dir') === 'auto'
+        && getComputedStyle(actions).direction === 'ltr'
+        && title.getBoundingClientRect().left > actions.getBoundingClientRect().right;
+    }), { timeout: 20000 }).toBe(true);
   });
 
   test('keeps the selected Materials page size when moving to the next page', async ({ page }) => {
