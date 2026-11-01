@@ -1121,4 +1121,33 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(page.locator('#breadcrumb-list a[href="#/home"]')).toHaveCount(0);
   });
 
+  test('lets each notification be dismissed without losing unread-count accuracy or blurring navigation', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+    await page.waitForFunction(() => typeof window.OpenCourseDeck?.bus?.emit === 'function');
+    await page.evaluate(() => {
+      window.OpenCourseDeck.bus.emit('notification:new', { title: 'First lesson note', message: 'Saved to Notes' });
+      window.OpenCourseDeck.bus.emit('notification:new', { title: 'Second reminder', message: 'Ready for review' });
+    });
+    await page.locator('[data-notifications-toggle]').click();
+    const drawer = page.locator('#notifications-panel');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('.notif-item')).toHaveCount(2);
+    await expect(page.locator('.drawer-backdrop')).toHaveCSS('backdrop-filter', 'none');
+    const first = drawer.locator('.notif-item').first();
+    await expect(first.locator('[data-notif-dismiss]')).toHaveAttribute('aria-label', /dismiss/i);
+    await first.locator('[data-notif-dismiss]').focus();
+    await first.locator('[data-notif-dismiss]').click();
+    await expect(drawer.locator('.notif-item')).toHaveCount(1);
+    await expect(page.locator('#topbar-notif-dot')).toHaveText('1');
+    await expect(drawer.locator('[data-notif-dismiss]').first()).toBeFocused();
+    await drawer.locator('[data-notif-dismiss]').click();
+    await expect(drawer.locator('.notif-item')).toHaveCount(0);
+    await expect(page.locator('#topbar-notif-dot')).toBeHidden();
+    await expect(page.locator('[data-notifications-toggle]')).toHaveAttribute('aria-label', 'Notifications');
+    await page.locator('#notif-close').click();
+    await expect(drawer).toBeHidden();
+  });
+
 });

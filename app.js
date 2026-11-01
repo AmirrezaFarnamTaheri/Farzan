@@ -2950,8 +2950,15 @@ import { Pointer } from './src/lib/pointer.js';
         const item = dismiss?.closest?.('.notif-item');
         if (!item) return;
         const wasUnread = item.classList.contains('unread');
+        const hadFocus = item.contains(document.activeElement);
+        // Keep keyboard focus in the dialog after the active dismiss button
+        // disappears. Prefer the next item, then the previous, then Close.
+        const nextFocus = item.nextElementSibling?.querySelector('[data-notif-dismiss]')
+          ?? item.previousElementSibling?.querySelector('[data-notif-dismiss]')
+          ?? document.querySelector('#notifications-panel [data-drawer-close]');
         item.remove();
         if (wasUnread) this.setCount(this._count - 1);
+        if (hadFocus) nextFocus?.focus();
       });
 
       document.addEventListener('click', e => {
