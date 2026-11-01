@@ -121,8 +121,10 @@ function main(argv = process.argv) {
 }
 
 if (require.main === module) {
-  try { main(); } catch (error) {
-    console.error('[backup-verify] Failed without reading/writing live study storage:', error?.message || String(error));
+  try { main(); } catch {
+    // JSON.parse errors may quote a fragment of a private note or card.
+    // Never echo exception messages, input paths or user content.
+    console.error('[backup-verify] Invalid or incompatible backup input; no data was modified.');
     process.exitCode = 1;
   }
 }
