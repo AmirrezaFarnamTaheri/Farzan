@@ -86,6 +86,52 @@ for (const setup of setups) {
         await page.locator('.settings-nav [href="#settings-appearance"]').click();
         await expect(current).toHaveAttribute('aria-current', 'location');
       }
+      if (route === 'notes') {
+        const keywordAction = page.locator('[data-notes-semantic-search]');
+        const clearAction = page.locator('[data-notes-semantic-clear]');
+        await expect(keywordAction).toBeDisabled();
+        await expect(clearAction).toBeDisabled();
+        if (setup.name === 'desktop-light') {
+          const search = page.locator('[data-notes-search]');
+          await search.fill('renal');
+          await expect(keywordAction).toBeEnabled();
+          await keywordAction.click();
+          await expect(page.locator('[data-notes-semantic-status]')).toContainText('Related notes:');
+          await expect(clearAction).toBeEnabled();
+          await clearAction.click();
+          await expect(clearAction).toBeDisabled();
+          await search.fill('');
+          await expect(keywordAction).toBeDisabled();
+        }
+        if (setup.width >= 1200) {
+          const toolbarY = await page.locator('.notes-toolbar-scroll').evaluate(el => {
+            const r = el.getBoundingClientRect();
+            return r.y + r.height / 2;
+          });
+          const stylesY = await page.locator('.notes-format-more > summary').evaluate(el => {
+            const r = el.getBoundingClientRect();
+            return r.y + r.height / 2;
+          });
+          expect(Math.abs(toolbarY - stylesY), 'Text styles should share the desktop toolbar row')
+            .toBeLessThan(28);
+          await expect(page.locator('.notes-quick-add')).toBeHidden();
+        }
+      }
+      if (route === 'studio' && setup.width >= 1200) {
+        const inspector = page.locator('[data-studio-inspector]');
+        await expect(inspector).toBeVisible();
+        const more = page.locator('[data-studio-more-tools] > summary');
+        await more.click();
+        const popup = page.locator('.studio-more-tools-content');
+        await expect(popup).toBeVisible();
+        const a = await popup.boundingBox();
+        const b = await inspector.boundingBox();
+        expect(a && b, 'Studio tools/inspector should be measurable').toBeTruthy();
+        const overlaps = a.x < b.x + b.width && a.x + a.width > b.x
+          && a.y < b.y + b.height && a.y + a.height > b.y;
+        expect(overlaps, 'Studio More tools should not obscure Layers controls').toBe(false);
+        await more.click();
+      }
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');

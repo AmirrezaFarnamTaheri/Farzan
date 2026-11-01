@@ -1786,6 +1786,9 @@ describe('notes route filters', () => {
     window.PlasmaNotesApp.init();
     const input = document.querySelector('[data-notes-search]');
     input.value = 'regular';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('[data-notes-semantic-search]').disabled).toBe(false);
+    expect(document.querySelector('[data-notes-semantic-clear]').disabled).toBe(true);
     document.querySelector('[data-notes-semantic-search]').click();
     const list = document.querySelector('[data-notes-list]');
     await vi.waitFor(() => expect(document.querySelector('[data-notes-semantic-status]').textContent)
@@ -1796,6 +1799,7 @@ describe('notes route filters', () => {
     expect(window.OpenCourseDeck.AI.searchEmbeddings).not.toHaveBeenCalled();
 
     document.querySelector('[data-notes-semantic-clear]').click();
+    expect(document.querySelector('[data-notes-semantic-clear]').disabled).toBe(true);
     expect(list.textContent).toContain('Regular note');
     expect(list.textContent).toContain('Pinned note');
   });

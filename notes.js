@@ -2563,12 +2563,33 @@ import { countWords } from './src/core/textMetrics.js';
     async _initSemanticSearch() {
       const searchButton = $('[data-notes-semantic-search]');
       const clearButton = $('[data-notes-semantic-clear]');
-      if (!searchButton || !clearButton) return;
+      const searchInput = $('[data-notes-search]');
+      if (!searchButton || !clearButton || !searchInput) return;
       // Related-keyword search requires no model, index or API credentials.
       searchButton.hidden = false;
       clearButton.hidden = false;
-      RouteListeners.on(searchButton, 'click', () => this.semanticSearchNotes());
-      RouteListeners.on(clearButton, 'click', () => this.clearSemanticSearch());
+      const syncAvailability = () => {
+        searchButton.disabled = !searchInput.value.trim();
+      };
+      searchButton.disabled = true;
+      clearButton.disabled = true;
+      syncAvailability();
+      RouteListeners.on(searchInput, 'input', () => {
+        // Editing the query invalidates the old related-keyword result set.
+        if (!clearButton.disabled) this.clearSemanticSearch();
+        clearButton.disabled = true;
+        syncAvailability();
+      });
+      RouteListeners.on(searchButton, 'click', async () => {
+        if (searchButton.disabled) return;
+        const result = await this.semanticSearchNotes();
+        clearButton.disabled = !result?.ok;
+      });
+      RouteListeners.on(clearButton, 'click', () => {
+        if (clearButton.disabled) return;
+        this.clearSemanticSearch();
+        clearButton.disabled = true;
+      });
     },
 
     destroy() {
