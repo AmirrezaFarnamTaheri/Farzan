@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
 const zlib = require('node:zlib');
 const { performance } = require('node:perf_hooks');
@@ -91,7 +92,7 @@ async function measureSearchIndex(items, { iterations = 3,
   if (!Array.isArray(queries) || !queries.length || queries.some(query => typeof query !== 'string')) {
     throw new TypeError('Search benchmark needs literal test queries');
   }
-  const { rankLexicalMatches } = await import('../src/core/searchRanking.js');
+  const { rankLexicalMatches } = await import(pathToFileURL(path.join(ROOT, 'src/core/searchRanking.js')).href);
   const script = fs.readFileSync(path.join(ROOT, 'src/workers/search.worker.js'), 'utf8');
   const buildSamples = [];
   const workerQueries = [];
