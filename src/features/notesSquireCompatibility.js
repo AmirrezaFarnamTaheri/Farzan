@@ -5,7 +5,7 @@
  * Squire uses HTML as canonical content and supports safe inline typography.
  * Unknown metadata is routed to the classic editor instead of being dropped.
  */
-import { assessNoteForTiptap } from './notesEditorCompatibility.js';
+import { assessSupportedNoteStructure } from './notesHtmlStructuralGate.js';
 import { filterNoteStyle } from './safeNoteStyles.js';
 
 const SAFE_CLASSES = new Set(['color', 'font', 'size', 'highlight']);
@@ -20,7 +20,7 @@ export function assessNoteForSquire(html) {
   const template = document.createElement('template');
   template.innerHTML = html;
   // Check every element, including root nodes, before removing approved
-  // Squire-only metadata for validation against the existing lossless gate.
+  // Squire-only metadata for validation against the strict HTML structural gate.
   for (const element of [...template.content.querySelectorAll('*')]) {
     const tag = element.localName;
     if (tag === 'span' || BLOCKS.has(tag) || MARKS.has(tag) || tag === 'hr' || tag === 'br') {
@@ -89,5 +89,5 @@ export function assessNoteForSquire(html) {
       paragraph = null;
     }
   }
-  return assessNoteForTiptap(template.innerHTML);
+  return assessSupportedNoteStructure(template.innerHTML);
 }
