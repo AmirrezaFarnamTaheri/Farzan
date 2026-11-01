@@ -316,13 +316,10 @@ async getAllByIndex(store, indexName, value){
   return this._openAll(records);
 }
 
-async queryIndex(store, indexName, range, limitOrOptions, legacyOptions = {}){
-const options = typeof limitOrOptions === 'object' && limitOrOptions !== null
-? limitOrOptions
-: { ...legacyOptions, limit: limitOrOptions };
-const limit = Number(options.limit) > 0 ? Number(options.limit) : null;
+async queryIndex(store, indexName, range, { limit, direction = 'next' } = {}) {
+const normalizedLimit = Number(limit) > 0 ? Number(limit) : null;
 const allowedDirections = new Set(['next', 'nextunique', 'prev', 'prevunique']);
-const direction = allowedDirections.has(options.direction) ? options.direction : 'next';
+if (!allowedDirections.has(direction)) throw new TypeError('Invalid IndexedDB cursor direction');
 const { objectStore } = await this._transaction(store);
 return new Promise((res,rej)=>{
 const out = [];
@@ -335,7 +332,7 @@ return;
 }
 req.onsuccess=()=>{
 const cursor = req.result;
-if (!cursor || (limit && out.length >= limit)) {
+if (!cursor || (normalizedLimit && out.length >= normalizedLimit)) {
 res(this._openAll(out));
 return;
 }
