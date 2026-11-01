@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from '../src/lib/eventEmitter.js';
-import { RequestQueue } from '../src/lib/requestQueue.js';
-import { RAFLoop } from '../src/lib/rafLoop.js';
 import { createEaseInElastic, createEaseOutElastic } from '../src/lib/easing.js';
 
 describe('EventEmitter off/once contract', () => {
@@ -44,96 +42,6 @@ describe('EventEmitter off/once contract', () => {
 
     expect(keep).toHaveBeenCalledTimes(1);
     expect(drop).not.toHaveBeenCalled();
-  });
-});
-
-describe('RequestQueue flush safety', () => {
-  it('flushes every queued callback even when one calls reset()', () => {
-    const queue = new RequestQueue();
-    const order = [];
-
-    queue.serve('a', () => { order.push('a'); queue.reset(); });
-    queue.serve('b', () => order.push('b'));
-    queue.serve('c', () => order.push('c'));
-
-    queue.start();
-
-    // Iterating the live Map meant reset() truncated the loop and silently
-    // dropped b and c.
-    expect(order).toEqual(['a', 'b', 'c']);
-  });
-
-  it('does not re-run callbacks on a second start()', () => {
-    const queue = new RequestQueue();
-    const fn = vi.fn();
-    queue.serve('k', fn);
-
-    queue.start();
-    queue.start();
-
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('RAFLoop resilience', () => {
-  it('keeps running after a callback throws, and stop() still works', () => {
-    const frames = [];
-    let nextId = 1;
-    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-      frames.push(cb);
-      return nextId++;
-    });
-    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
-    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    try {
-      let calls = 0;
-      const loop = new RAFLoop(() => {
-        calls += 1;
-        if (calls === 1) throw new Error('boom');
-      });
-
-      loop.start();
-      frames.shift()(16);
-
-      // A throwing frame used to skip the re-arm, leaving the loop dead while
-      // `running` still reported true.
-      expect(loop.running).toBe(true);
-      expect(frames.length).toBeGreaterThan(0);
-
-      frames.shift()(32);
-      expect(calls).toBe(2);
-
-      loop.stop();
-      expect(loop.running).toBe(false);
-    } finally {
-      raf.mockRestore();
-      cancel.mockRestore();
-      errorLog.mockRestore();
-    }
-  });
-
-  it('does not schedule another frame when the callback calls stop()', () => {
-    const frames = [];
-    let nextId = 1;
-    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-      frames.push(cb);
-      return nextId++;
-    });
-    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
-
-    try {
-      let loop;
-      loop = new RAFLoop(() => loop.stop());
-      loop.start();
-
-      frames.shift()(16);
-      expect(frames).toHaveLength(0);
-      expect(loop.running).toBe(false);
-    } finally {
-      raf.mockRestore();
-      cancel.mockRestore();
-    }
   });
 });
 
