@@ -558,7 +558,7 @@ describe('app shell resilience helpers', () => {
         { id: 'ts-1', topicId: 'topic-current', title: 'Checkpoint', position: 125, updatedAt: recentActivity },
       ]),
       getSetting: vi.fn(async key => key === 'ocd_flashcards'
-        ? [{ id: 'card-old', front: 'Old physiology', deck: 'Physiology', nextReviewDate: '2026-05-04' }]
+        ? [{ id: 'card-old', front: 'Old physiology', deck: 'Physiology', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-05-04T00:00:00.000Z' } } }]
         : null),
     };
     window.DataStore = {
@@ -1901,8 +1901,8 @@ describe('app shell resilience helpers', () => {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async key => key === 'ocd_flashcards'
         ? [
-          { id: 'card-due', front: 'Old physiology', deck: 'Physiology', nextReviewDate: '2026-03-01' },
-          { id: 'card-later', front: 'Recent physiology', nextReviewDate: '2026-08-01' },
+          { id: 'card-due', front: 'Old physiology', deck: 'Physiology', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-03-01T00:00:00.000Z' } } },
+          { id: 'card-later', front: 'Recent physiology', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-08-01T00:00:00.000Z' } } },
         ] : null),
     };
     window.DataStore = {
