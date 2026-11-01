@@ -132,7 +132,7 @@ function mountDraftScene({
       select(id) {
         for (const transformer of transformers) transformer.nodes([]);
         const target = map.get(id);
-        if (target && target.node.getClassName() === 'Rect') {
+        if (target && ['Rect', 'Circle'].includes(target.node.getClassName())) {
           target.transformer.nodes([target.node]);
         }
         stage.batchDraw();
