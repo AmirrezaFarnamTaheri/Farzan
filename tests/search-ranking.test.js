@@ -40,6 +40,19 @@ describe('shared topbar and command-palette lexical ranking', () => {
     expect(rankLexicalMatches(corpus, 'nephrology', { keys: ['label'] })).toEqual([]);
   });
 
+  it('matches each catalog metadata token independently rather than inventing cross-tag substrings', () => {
+    const items = [
+      { id: 'a', title: 'Renal physiology', tags: ['Kidney', 'Cardiology'] },
+      { id: 'b', title: 'Lesson two', labels: ['فيزيك', 'قلب'] },
+    ];
+    expect(rankLexicalMatches(items, 'cardiology').map(item => item.id)).toEqual(['a']);
+    expect(rankLexicalMatches(items, 'فیزیک').map(item => item.id)).toEqual(['b']);
+    // The worker indexes independent tokens; an array separator is not data.
+    expect(rankLexicalMatches(items, 'kidney,cardiology')).toEqual([]);
+    expect(rankLexicalMatches(items, 'فیزیک,قلب')).toEqual([]);
+    expect(rankLexicalMatches(items, '[object object]')).toEqual([]);
+  });
+
   it('ranks title-only saved and imported documents without leaking title text into command-only searches', () => {
     const records = [
       { id: 'metadata', label: 'Abstract', description: 'Renal autoregulation' },
