@@ -91,7 +91,10 @@ function assertNotCancelled(meta) {
 function initFuse(data, options = {}) {
   if (typeof Fuse !== 'function') throw Object.assign(new Error('Vendored Fuse.js is unavailable'), { code: 'SEARCH_ENGINE_UNAVAILABLE' });
   if (!Array.isArray(data)) throw new TypeError('Search index items must be an array');
-  const defaultKeys = ['title', 'label', 'description', 'searchText'];
+  // Keep the same offline content vocabulary as the topbar's lightweight
+  // lexical fallback. Commands may still explicitly narrow options.keys.
+  const defaultKeys = ['title', 'label', 'description', 'searchText',
+    'category', 'tags', 'keywords'];
   const keys = Array.isArray(options.keys) && options.keys.length
     ? options.keys : defaultKeys;
   const fieldNames = keys.map(key => typeof key === 'string' ? key : key?.name)
