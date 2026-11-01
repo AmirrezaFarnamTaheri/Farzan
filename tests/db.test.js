@@ -44,6 +44,12 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     db.db?.close();
   });
 
+  it('does not expose abandoned migration-specific checkpoint writes', () => {
+    const { OpenCourseDB } = DBExports;
+    const db = new OpenCourseDB('ocd-test-no-migration-writer', 3, []);
+    expect(db).not.toHaveProperty('bulkPutWithCheckpoint');
+  });
+
   it('can read records by an IndexedDB index', async () => {
     const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
