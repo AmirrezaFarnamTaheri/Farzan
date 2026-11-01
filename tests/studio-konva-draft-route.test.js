@@ -41,6 +41,7 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     setMode: vi.fn(mode => { draftMode = mode; return mode; }),
     getMode: vi.fn(() => draftMode),
     select: vi.fn(), move: vi.fn(async () => imported),
+    addShape: vi.fn(async () => imported),
     undo: vi.fn(async () => false), redo: vi.fn(async () => false),
     canUndo: () => false, canRedo: () => false,
     flush: vi.fn(async () => true),
@@ -84,7 +85,6 @@ describe('Studio experimental Konva draft opt-in', () => {
     document.querySelector('[data-studio-konva-open]').click();
     await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
     const instance = factory.mock.results[0].value;
-    instance.addShape = vi.fn(async geometry => ({ ...board, layers: board.layers }));
     document.querySelector('[data-studio-konva-add="rect"]').click();
     await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledExactlyOnceWith({
       type: 'rect', x: 80, y: 80, width: 120, height: 80,
