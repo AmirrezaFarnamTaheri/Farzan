@@ -83,6 +83,25 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
   });
 
   it.each([
+    ['blendMode', 'multiply'],
+    ['compositeOperation', 'screen'],
+    ['clipPath', 'M0,0 L12,14'],
+    ['transform', { rotation: 25 }],
+    ['filters', ['blur']],
+    ['shadow', { blur: 10 }],
+  ])('refuses unmapped layer-level %s rather than previewing with silently changed paint', (field, value) => {
+    const board = fixture();
+    board.layers[0][field] = value;
+    const original = structuredClone(board);
+    const plan = planKonvaV1Board(board);
+    expect(plan).toMatchObject({
+      compatible: false,
+      reason: 'unsupported-layer-attribute-' + field,
+    });
+    expect(board).toEqual(original);
+  });
+
+  it.each([
     ['locked', 'true'],
     ['locked', 1],
     ['visible', 'false'],
