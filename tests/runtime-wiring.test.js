@@ -34,7 +34,6 @@ describe('runtime wiring', () => {
     './core/productReadiness.js',
     './core/themeBuilder.js',
     './core/locale.js',
-    './lib/virtualScroll.js',
     './lib/timeRange.js',
     './lib/stagger.js',
     './lib/rafLoop.js',
