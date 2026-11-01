@@ -134,7 +134,7 @@ export function mountFocusTimerWidget() {
     next.disabled = blocked;
     reset.disabled = blocked;
     preset.disabled = blocked || state.status === 'running';
-    ring.style.setProperty('--focus-progress', String(1 - remaining / DURATIONS[state.preset][state.phase]));
+    ring.style.setProperty('--focus-progress', String(Math.round(100 * (1 - remaining / DURATIONS[state.preset][state.phase]))).concat('%'));
     const base = state.status === 'complete'
       ? (state.phase === 'focus' ? 'Focus complete. Choose your break.' : 'Break finished. Ready for focus.')
       : state.status === 'running' ? 'Timer running' : state.status === 'paused' ? 'Timer paused' : 'Ready when you are';
