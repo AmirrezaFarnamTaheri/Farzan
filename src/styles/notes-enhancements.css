@@ -310,6 +310,7 @@
 
 .notes-toolbar {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
@@ -319,6 +320,7 @@
 .notes-toolbar-scroll {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: var(--space-2);
   overflow-x: auto;
   padding: 2px;
@@ -828,6 +830,17 @@
 .notes-format-more[open] > summary {
   color: var(--text-primary);
   border-color: var(--accent);
+}
+.notes-format-more[open] {
+  grid-column: 1 / -1;
+}
+/* On small panes, keep scrollable authoring controls reachable. */
+@media (max-width: 800px) {
+  .notes-toolbar { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 901px) {
+  /* Header New note is visible on desktop; retain this quick add on mobile. */
+  .notes-quick-add { display: none; }
 }
 .notes-format-more[open] .notes-format-row {
   padding-top: var(--space-2);
