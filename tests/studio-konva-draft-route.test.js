@@ -19,8 +19,13 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     getState: vi.fn(() => ({ tool: 'select', selectedIds: [] })),
     boardEpoch: vi.fn(() => 0), hasPendingAutosave: vi.fn(() => false),
   };
-  const saveSetting = vi.fn(async () => true);
-  const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft' ? savedDraft : null);
+  let canonicalDraft = savedDraft == null ? null : structuredClone(savedDraft);
+  const saveSetting = vi.fn(async (key, value) => {
+    if (key === 'ocd_studio_konva_draft') canonicalDraft = structuredClone(value);
+    return true;
+  });
+  const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft'
+    ? structuredClone(canonicalDraft) : null);
   window.OpenCourseDeck = { Canvas: canvasApi, bus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } };
   window.DB = {
     saveSetting, getSetting,
@@ -115,6 +120,8 @@ describe('Studio experimental Konva draft opt-in', () => {
     document.querySelector('[data-studio-konva-open]').click();
     await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
     const writer = factory.mock.calls[0][0].saveDraft;
+    // Simulate a resolved acknowledgement with no actual persistent write.
+    saveSetting.mockImplementation(async () => true);
     const next = v1Board();
     next.layers[0].elements[0].x = 277;
     // A test double that acknowledges a write but leaves the canonical
