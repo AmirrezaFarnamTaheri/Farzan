@@ -16,7 +16,10 @@ function normalizeLabel(value) {
   if (typeof value !== 'string') throw new TypeError('A tag label must be text');
   const label = value.trim().replace(/\s+/g, ' ');
   if (!label || label.length > MAX_LABEL_LENGTH) throw new RangeError('A tag label must be 1–80 characters');
-  if (/[\u0000-\u001f\u007f-\u009f]/.test(label)) throw new TypeError('Tag labels cannot contain control characters');
+  if (Array.from(label).some(char => {
+    const code = char.codePointAt(0);
+    return code <= 31 || (code >= 127 && code <= 159);
+  })) throw new TypeError('Tag labels cannot contain control characters');
   const key = normalizeSearchQuery(label);
   if (!key || UNSAFE_KEYS.has(key)) throw new TypeError('Invalid tag identity');
   return { key, label };
