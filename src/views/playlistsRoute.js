@@ -396,6 +396,8 @@ async function renderPlaylists(deps) {
     const move = event.target?.closest?.('[data-playlist-move]');
     if (move) {
       if (reorderBusy || move.disabled) return;
+      const wasExpanded = move.closest('details')?.open === true;
+      const hadKeyboardFocus = document.activeElement === move;
       if (typeof window.DB?.getSetting !== 'function'
           || typeof window.DB?.saveSetting !== 'function') {
         Toast.error?.('Saved playlist storage is unavailable');
@@ -429,7 +431,24 @@ async function renderPlaylists(deps) {
         const receipt = await window.DB.saveSetting('ocd_playlists', updated);
         assertSavedPlaylistReceipt(receipt, updated);
         Toast.success?.('Playlist order saved');
-        void renderPlaylists(deps);
+        await renderPlaylists(deps);
+        if (document.body.contains(listRoot)) {
+          // The reorder controls are replaced on each canonical refresh.
+          // Reopen the previous disclosure and put focus on the moved topic
+          // rather than leaving keyboard users on a detached disabled button.
+          const controls = [...listRoot.querySelectorAll('[data-playlist-move]')]
+            .filter(button => button.dataset.playlistId === move.dataset.playlistId
+              && button.dataset.topicId === move.dataset.topicId
+              && Number(button.dataset.topicIndex) === to);
+          const focusTarget = controls.find(button =>
+            button.dataset.playlistMove === move.dataset.playlistMove && !button.disabled)
+            || controls.find(button => !button.disabled);
+          const disclosure = focusTarget?.closest('details');
+          if (wasExpanded && disclosure) disclosure.open = true;
+          if (hadKeyboardFocus && focusTarget && (!disclosure || disclosure.open)) {
+            focusTarget.focus({ preventScroll: true });
+          }
+        }
       } catch (error) {
         Toast.error?.('Could not change playlist order: ' + (error?.message || 'Storage unavailable'));
       } finally {
