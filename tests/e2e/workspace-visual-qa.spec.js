@@ -44,6 +44,17 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'pdf') {
+        const state = page.locator('.pdf-shell');
+        if (await state.getAttribute('data-document-state') === 'empty') {
+          await expect(page.locator('.pdf-shell .pdf-toolbar')).toBeHidden();
+          await expect(page.locator('[data-pdf-empty-open]')).toBeVisible();
+        }
+      }
+      if (route === 'tags' && await page.locator('[data-tag-first-use]').isVisible()) {
+        await expect(page.locator('[data-tag-advanced]')).toBeHidden();
+        await expect(page.locator('[data-tag-create-form]')).toBeVisible();
+      }
       if ((route === 'help' || route === 'settings') && setup.width >= 1024) {
         const systemLink = page.locator('.sidebar-system-nav [data-route="/' + route + '"]');
         await expect(systemLink).toHaveAttribute('aria-current', 'page');
@@ -74,6 +85,10 @@ for (const setup of setups) {
           if (route === 'notes' && setup.width <= 1023) {
             await page.locator('[data-notes-toggle-library]').click();
             await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'true');
+          }
+          if (route === 'notes' && setup.width <= 1023) {
+            // Page-level scroll would move the entire app and crop the header.
+            expect(await page.evaluate(() => window.scrollY), 'mobile RTL Notes root scroll').toBe(0);
           }
           const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
           const field = page.locator(fieldSelector).first();
@@ -215,6 +230,8 @@ for (const setup of setups) {
     const missingView = page.locator('#view-container .view-notfound');
     await expect(missingView).toBeVisible();
     await expect(missingView.locator('h1')).toHaveText('Page not found');
+    await expect(missingView.locator('.notfound-header')).toHaveCSS('text-align', 'center');
+    await expect(missingView.locator('.page-subtitle')).toHaveCount(0);
     // The shell must describe this route, not leak the old internal product name.
     await expect(page.locator('#breadcrumb-list')).toContainText('Page not found');
     await expect(page.locator('#breadcrumb-list')).not.toContainText('OpenCourseDeck');
