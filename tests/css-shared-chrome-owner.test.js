@@ -31,7 +31,7 @@ describe('single final owner of shared navigation/topbar chrome', () => {
 
   it('delegates medium-width main-content paint to the late redesign owner only', () => {
     const earlyLayout = fs.readFileSync('src/styles/layout.css', 'utf8');
-    const redundant = /\\.main-content\\s*\\{\\s*width:\\s*100%;\\s*\\}/g;
+    const redundant = /\.main-content\s*\{\s*width:\s*100%;\s*\}/g;
     // Both declarations are inside the same max-width:1023px condition.
     // An earlier identical declaration adds selector-ownership debt without
     // changing computed style; retain only the final themed owner.
