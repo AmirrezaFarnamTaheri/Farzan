@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 import Fuse from 'fuse.js';
 import { normalizeSearchQuery } from '../src/core/searchRanking.js';
 
-function workerWithData(items, options = {}) {
+function workerWithData(items, options = {}, { FuseCtor = Fuse } = {}) {
   const sent = [];
   const worker = { postMessage: response => sent.push(JSON.parse(JSON.stringify(response))) };
-  const sandbox = { self: worker, Fuse, console, importScripts: () => {}, Date };
+  const sandbox = { self: worker, Fuse: FuseCtor, console, importScripts: () => {}, Date };
   vm.runInNewContext(fs.readFileSync('src/workers/search.worker.js', 'utf8'), sandbox, {
     filename: 'search.worker.js',
   });
@@ -19,7 +19,8 @@ function workerWithData(items, options = {}) {
   };
   const init = request('init', { items, options }, 1);
   expect(init.type).toBe('init:done');
-  return { search: (query, opts = {}, id = 2) => request('search', { query, options: opts }, id), init, items };
+  return { search: (query, opts = {}, id = 2) => request('search', { query, options: opts }, id),
+    update: (items, opts = {}, id = 3) => request('update', { items, options: opts }, id), init, items };
 }
 
 describe('search worker Unicode identity and stable protocol', () => {
@@ -65,6 +66,45 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(result.results.map(item => item.sourceType)).toEqual(
       ['note', 'course', 'timestamp', 'timestamp']);
     expect(result.matches).toHaveLength(4);
+  });
+
+  it('keeps the prior index and revision intact when a reindex fails halfway', () => {
+    let failNext = false;
+    function FaultyFuse(items, options) {
+      if (failNext) throw new Error('new Fuse index failed');
+      return new Fuse(items, options);
+    }
+    const old = { label: 'Physics textbook', sourceType: 'note', sourceId: 'original' };
+    const worker = workerWithData([old], { threshold: 0 }, { FuseCtor: FaultyFuse });
+    const before = worker.search('physics', {}, 2);
+    expect(before.results).toEqual([old]);
+
+    failNext = true;
+    const rejected = worker.update([
+      { label: 'Physics secret newer', sourceType: 'note', sourceId: 'replacement' },
+    ], {}, 3);
+    expect(rejected).toMatchObject({
+      type: 'error', requestId: 3, error: 'new Fuse index failed',
+    });
+
+    // Old Fuse offsets must never point at unrelated new records.
+    const after = worker.search('physics', {}, 4);
+    expect(after.results).toEqual([old]);
+    expect(after.indexRevision).toBe(before.indexRevision);
+    expect(after.matches[0].item).toEqual(old);
+  });
+
+  it('publishes a new index and revision only after a successful update', () => {
+    const old = { label: 'Biology old', sourceType: 'note', sourceId: 'old' };
+    const next = { label: 'Biology new', sourceType: 'note', sourceId: 'new' };
+    const worker = workerWithData([old], { threshold: 0 });
+    const receipt = worker.update([next], { threshold: 0 }, 3);
+    expect(receipt).toMatchObject({
+      type: 'update:done', success: true, itemCount: 1, indexRevision: 2,
+    });
+    const result = worker.search('biology', {}, 4);
+    expect(result.results).toEqual([next]);
+    expect(result.indexRevision).toBe(2);
   });
 
   it('keeps cancellation and identity protocol unchanged after Unicode normalization', () => {
