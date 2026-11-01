@@ -104,6 +104,26 @@ describe('Canvas board restore races', () => {
     expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects a missing or mismatched legacy-adoption receipt without deleting the source', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    const legacy = boardWith(['legacy-archived-study-diagram']);
+    window.DB = {
+      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? structuredClone(legacy) : null),
+      saveSetting: vi.fn(async () => undefined),
+    };
+    expect(await canvas.restoreBoard()).toBe(false);
+    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
+    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_canvas_board');
+
+    window.DB.saveSetting.mockResolvedValueOnce({ version: 1, layers: [] });
+    expect(await canvas.restoreBoard()).toBe(false);
+    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
+
+    window.DB.saveSetting.mockImplementationOnce(async (_key, value) => structuredClone(value));
+    expect(await canvas.restoreBoard()).toBe(true);
+    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
+  });
+
   it('does not load a stale legacy board after edits arrive during a pending read', async () => {
     const canvas = window.OpenCourseDeck.Canvas;
     let finishLegacyRead;
