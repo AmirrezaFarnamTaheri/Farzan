@@ -89,10 +89,13 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect(header.titleLeft).toBeGreaterThan(header.countRight);
 
     await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
+    // The course selector is deliberately behind a closed disclosure.
+    // Open it through its normal accessible control before selecting.
+    await page.locator('details.materials-more-filters > summary').click();
     await page.locator('#materials-course-filter')
       .selectOption('comprehensive-internal-medicine-course');
     const material = page.locator('#materials-list .topic-row[dir="rtl"]').first();
-    await expect(material).toBeVisible({ timeout: 20000 });
+    await expect(material).toBeVisible({ timeout: 12000 });
     const layout = await material.evaluate(row => {
       const title = row.querySelector('.topic-title');
       const actions = row.querySelector('.topic-actions');
