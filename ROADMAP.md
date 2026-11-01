@@ -345,7 +345,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 |------|--------|-------------|
 | Each canvas tool as separate definition file | `src/features/canvasTools/` | x-spreadsheet `src/component/toolbar/` |
 | Common base: `{name, icon, cursor, onActivate, onDeactivate, onMouseDown/Move/Up}` | `src/features/canvasTools/` | x-spreadsheet |
-| Dynamic tool registration (plugins can add tools) | `pluginHost.js` extension point | — |
+| Dynamic tool registration (plugins can add tools) | a future plugin host (not shipped) extension point | — |
 
 > **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/features/canvasTools/` (13 files). Individual tool files with dynamic registration via `registry.js`.
 
@@ -455,7 +455,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 ### 6.3 Command Palette Enhancements
 | Item | Target | Ported From |
 |------|--------|-------------|
-| Plugin-contributed commands | `commandPalette.js` + `pluginHost.js` | — |
+| Plugin-contributed commands | `commandPalette.js` + a future plugin host (not shipped) | — |
 | Recent commands history (localStorage) | `commandPalette.js` | — |
 | Command arguments/parameters | `commandPalette.js` | — |
 | Fuzzy match highlighting in results | `commandPalette.js` | — |
@@ -507,7 +507,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Item | Target | Ported From |
 |------|--------|-------------|
 | More slash commands: /date, /time, /template, /code, /math, /diagram | `notes.js` | — |
-| Plugin-contributed slash commands | `pluginHost.js` | — |
+| Plugin-contributed slash commands | a future plugin host (not shipped) | — |
 | Fuzzy search in slash menu | `notes.js` | — |
 
 **Status: PARTIAL** — the slash menu offers formatting blocks (paragraph, h1-h3, lists, quote, code, table, rule); `/date`, `/time`, `/template`, `/math`, `/diagram`, fuzzy search, and plugin commands are not implemented.
@@ -786,18 +786,18 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 ### 14.1 Plugin Sandboxing
 | Item | Target | Ported From |
 |------|--------|-------------|
-| Web Worker sandbox for untrusted plugins | `pluginHost.js` | — |
-| Message-passing API (postMessage) | `pluginHost.js` | — |
-| Permission enforcement at sandbox boundary | `pluginHost.js` | — |
+| Web Worker sandbox for untrusted plugins | a future plugin host (not shipped) | — |
+| Message-passing API (postMessage) | a future plugin host (not shipped) | — |
+| Permission enforcement at sandbox boundary | a future plugin host (not shipped) | — |
 
-**Status: NOT STARTED** — `src/features/pluginHost.js` validates manifests only; there is no Worker sandbox and the module is not loaded into the runtime.
+**Status: NOT STARTED** — `the former, nonshipping plugin-host prototype` validates manifests only; there is no Worker sandbox and the module is not loaded into the runtime.
 
 ### 14.2 Plugin Lifecycle Hooks
 | Item | Target | Ported From |
 |------|--------|-------------|
-| `onInstall`, `onActivate`, `onDeactivate`, `onUninstall` | `pluginHost.js` | — |
-| State persistence across sessions | `pluginHost.js` | — |
-| Error boundary per plugin | `pluginHost.js` | — |
+| `onInstall`, `onActivate`, `onDeactivate`, `onUninstall` | a future plugin host (not shipped) | — |
+| State persistence across sessions | a future plugin host (not shipped) | — |
+| Error boundary per plugin | a future plugin host (not shipped) | — |
 
 **Status: NOT STARTED** — no lifecycle state machine exists.
 
@@ -813,10 +813,10 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 ### 14.4 Plugin API Surface
 | Item | Target | Ported From |
 |------|--------|-------------|
-| `OpenCourseDeck.plugin.registerUI(panel)` — add custom UI panels | `pluginHost.js` | — |
-| `OpenCourseDeck.plugin.registerRoute(path, handler)` — add routes | `pluginHost.js` | — |
-| `OpenCourseDeck.plugin.registerCanvasTool(tool)` — add canvas tools | `pluginHost.js` | — |
-| `OpenCourseDeck.plugin.registerNoteAction(action)` — add note actions | `pluginHost.js` | — |
+| `OpenCourseDeck.plugin.registerUI(panel)` — add custom UI panels | a future plugin host (not shipped) | — |
+| `OpenCourseDeck.plugin.registerRoute(path, handler)` — add routes | a future plugin host (not shipped) | — |
+| `OpenCourseDeck.plugin.registerCanvasTool(tool)` — add canvas tools | a future plugin host (not shipped) | — |
+| `OpenCourseDeck.plugin.registerNoteAction(action)` — add note actions | a future plugin host (not shipped) | — |
 
 **Status: NOT STARTED** — no `OpenCourseDeck.plugin.*` registration API exists.
 
