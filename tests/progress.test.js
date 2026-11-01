@@ -172,7 +172,9 @@ describe('progress backup exports', () => {
 
   it('rejects duplicate flashcard IDs before import and does not alter existing records', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
-    const original = { id: 'same', front: 'one', back: 'first', nextReviewDate: '2026-09-01' };
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    const original = { id: 'same', front: 'one', back: 'first', scheduler: 'fsrs-v5',
+      fsrsState: createFsrsV5State(new Date('2026-09-01T00:00:00.000Z')) };
     const file = new File([JSON.stringify({
       version: '1.6', settings: { flashcards: [original, { ...original, front: 'different' }] },
     })], 'duplicate-cards.json', { type: 'application/json' });
@@ -206,23 +208,17 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
   });
 
-  it('round-trips valid legacy and FSRS-v5 backups without changing due dates or archives', async () => {
+  it('round-trips valid FSRS-v5 backups without changing UTC due instants', async () => {
     const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
-    const legacy = {
-      id: 'old-1', front: 'Legacy', back: 'Answer', interval: 21,
-      repetitions: 3, easeFactor: 2.6, nextReviewDate: '2027-02-01',
-      metadata: { language: 'fa-IR' },
-    };
-    const fsrs = {
-      id: 'new-1', front: 'FSRS', back: 'State', scheduler: 'fsrs-v5',
-      fsrsState: createFsrsV5State(new Date('2026-10-01T10:30:00.000Z')),
-      nextReviewDate: '2026-10-01',
-      fsrsMigration: { version: 1, consentedAt: '2026-10-01T10:30:00.000Z', legacyCard: {
-        ...legacy, id: 'new-1',
-      } },
-    };
-    const cards = [legacy, fsrs];
+    const cards = [
+      { id: 'first', front: 'اول', back: 'Answer', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-10-01T10:30:00.000Z')),
+        nextReviewDate: '2026-10-01', metadata: { language: 'fa-IR' } },
+      { id: 'second', front: 'FSRS', back: 'State', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-11-01T05:00:00.000Z')),
+        nextReviewDate: '2026-11-01' },
+    ];
     const file = new File([JSON.stringify({
       version: '1.6', settings: { flashcards: cards },
     })], 'valid-cards.json', { type: 'application/json' });
@@ -240,11 +236,14 @@ describe('progress backup exports', () => {
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     window.DB.saveSetting.mockImplementation(async (key) => key === 'ocd_flashcards' ? false : true);
-    const previous = JSON.stringify([{ id: 'old-fsrs', scheduler: 'sm2-v1', front: 'Old', back: 'Safe' }]);
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    const previous = JSON.stringify([{ id: 'old-fsrs', scheduler: 'fsrs-v5',
+      fsrsState: createFsrsV5State(new Date('2026-10-01T00:00:00.000Z')), front: 'Old', back: 'Safe' }]);
     window.localStorage.setItem('ocd_flashcards', previous);
     const file = new File([JSON.stringify({
       version: '1.6', settings: { flashcards: [
-        { id: 'new-card', scheduler: 'sm2-v1', front: 'New', back: 'A' },
+        { id: 'new-card', scheduler: 'fsrs-v5',
+          fsrsState: createFsrsV5State(new Date('2026-11-01T00:00:00.000Z')), front: 'New', back: 'A' },
       ] },
     })], 'receipt-rejected.json', { type: 'application/json' });
 
@@ -806,6 +805,10 @@ describe('progress backup exports', () => {
   });
 
   it('records import preview counts and per-record errors', async () => {
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
+    const importedFsrs = { id: 'fc_import', front: 'Imported Q', back: 'Imported A',
+      scheduler: 'fsrs-v5',
+      fsrsState: createFsrsV5State(new Date('2026-10-01T00:00:00.000Z')) };
     const payload = {
       version: '1.4',
       progress: [
@@ -817,7 +820,7 @@ describe('progress backup exports', () => {
       settings: {
         playlists: [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }],
         studio: { version: 1, layers: [{ id: 'layer-1', elements: [] }] },
-        flashcards: [{ id: 'fc_import', front: 'Imported Q', back: 'Imported A' }],
+        flashcards: [importedFsrs],
         library: { version: 1, courses: { 'user-library': { title: 'Imported Library', sources: [] } } },
       },
       annotations: [],
@@ -868,7 +871,7 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(4);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_playlists', [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }]);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', { version: 1, layers: [{ id: 'layer-1', elements: [] }] });
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', [{ id: 'fc_import', front: 'Imported Q', back: 'Imported A' }]);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', [importedFsrs]);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'Imported Library', sources: [] } } });
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'progress', id: 'bad-topic', message: 'write failed' }),
