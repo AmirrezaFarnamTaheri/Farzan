@@ -73,6 +73,15 @@ for (const setup of setups) {
           expect(position, setup.name + '/' + route + ' search control missing').not.toBeNull();
           expect(position.iconX, setup.name + '/' + route + ' search icon should be at inline-start')
             .toBeGreaterThan(position.inputMid);
+          // The input itself has dir="auto": English and Persian values can
+          // change its inline-start independently of the surrounding icon.
+          // Symmetric clearance prevents collisions in either script.
+          const clearance = await field.locator('input').evaluate((input) => {
+            const style = getComputedStyle(input);
+            return Math.min(parseFloat(style.paddingLeft), parseFloat(style.paddingRight));
+          });
+          expect(clearance, setup.name + '/' + route + ' mixed-script search clearance')
+            .toBeGreaterThanOrEqual(24);
           if (route === 'notes' && setup.width <= 1023) {
             await page.locator('[data-notes-toggle-library]').click();
             await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'false');
