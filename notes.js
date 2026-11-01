@@ -994,7 +994,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     // ── Paste handler ─────────────────────────────────────
     _onPaste(e) {
-      if (this._squire) return; // ProseMirror owns paste parsing and history.
+      if (this._squire) return; // Squire owns paste parsing and history.
       e.preventDefault();
       const text = e.clipboardData.getData('text/html')
         || e.clipboardData.getData('text/plain');
