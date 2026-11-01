@@ -31,7 +31,6 @@
   box-shadow: none;
 }
 .sidebar-nav {
-  mask-image: none;
   -webkit-mask-image: none;
 }
 .sidebar-logo {
@@ -196,7 +195,6 @@ input::placeholder {
 .home-hero-copy {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   max-width: 67ch;
 }
 .home-title {
