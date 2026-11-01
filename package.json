@@ -40,6 +40,7 @@
     "audit": "node scripts/audit.cjs",
     "report:bundle": "node scripts/bundle-report.cjs",
     "report:search-index": "node scripts/search-index-acceptance.cjs",
+    "report:css-owners": "node scripts/css-owner-inventory.cjs",
     "smoke": "node scripts/smoke-test.cjs",
     "smoke:browser": "node scripts/browser-smoke.cjs",
     "smoke:dist-browser": "node scripts/dist-browser-smoke.cjs",
