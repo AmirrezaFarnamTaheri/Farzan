@@ -31,6 +31,31 @@ function summarizeBundleConsumers(metafile) {
   }
 
   const entry = details(entryPair);
+  // Trace the emitted JS output graph, not the source import graph:
+  // static shared chunks are fetched with the bootstrap entry even though
+  // they have no independent entryPoint. Dynamic edges are deferred.
+  // This is a lower bound for startup: a script can schedule a dynamic
+  // import immediately after evaluation, outside the static import closure.
+  const emitted = new Map(js);
+  const bootstrapPaths = new Set();
+  const dynamicPaths = new Set();
+  function includeStatic(file) {
+    if (bootstrapPaths.has(file)) return;
+    const output = emitted.get(file);
+    if (!output) throw new Error('Missing emitted static JS import: ' + file);
+    bootstrapPaths.add(file);
+    for (const imported of output.imports || []) {
+      if (imported.external || !imported.path?.endsWith('.js')) continue;
+      if (imported.kind === 'dynamic-import') dynamicPaths.add(imported.path);
+      else includeStatic(imported.path);
+    }
+  }
+  includeStatic(entryPair[0]);
+  const bootstrapStatic = {
+    path: [...bootstrapPaths].sort(),
+    bytes: [...bootstrapPaths].reduce((sum, file) => sum + (emitted.get(file).bytes || 0), 0),
+    dynamicImports: [...dynamicPaths].sort(),
+  };
   const otherChunks = js.filter(([name]) => name !== entryPair[0]).map(details)
     .sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path));
   const inputConsumers = {};
@@ -46,6 +71,10 @@ function summarizeBundleConsumers(metafile) {
   return {
     totalJsBytes: js.reduce((sum, [, output]) => sum + (output.bytes || 0), 0),
     entry,
+    bootstrapStatic,
+    // Remaining bytes include dynamic chunks and unrelated outputs. They
+    // are not necessarily all requested by this application at runtime.
+    deferredJsBytes: js.reduce((sum, [, output]) => sum + (output.bytes || 0), 0) - bootstrapStatic.bytes,
     lazyChunks: otherChunks.filter(chunk => chunk.entryPoint),
     sharedChunks: otherChunks.filter(chunk => !chunk.entryPoint),
     inputConsumers: Object.fromEntries(Object.entries(inputConsumers).sort(([a], [b]) => a.localeCompare(b))),
