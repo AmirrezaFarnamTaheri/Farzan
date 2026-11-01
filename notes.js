@@ -2081,6 +2081,12 @@ import { countWords } from './src/core/textMetrics.js';
         remoteToggle.setAttribute('aria-pressed', remoteImagesAllowed() ? 'true' : 'false');
         remoteToggle.textContent = remoteImagesAllowed() ? 'Block external images' : 'Load external images';
         RouteListeners.on(remoteToggle, 'click', () => {
+          // Changing image permissions remounts the editor. An active IME
+          // composition or unresolved storage sync must stay in the original
+          // live DOM; never overwrite it with the last saved HTML.
+          // Commit the current draft *before* changing session-only consent:
+          // a rejected save must neither lose the draft nor flip permission.
+          if (!this._commitCurrentBeforeSwitch()) return;
           const next = !remoteImagesAllowed();
           try {
             if (next) sessionStorage.setItem(REMOTE_IMAGE_PERMISSION, 'true');
@@ -2091,11 +2097,11 @@ import { countWords } from './src/core/textMetrics.js';
           }
           remoteToggle.setAttribute('aria-pressed', next ? 'true' : 'false');
           remoteToggle.textContent = next ? 'Block external images' : 'Load external images';
-          // Save the current draft before remounting; leave remote loading off
-          // again on restart because this permission is session-only.
-          Editor.save(true);
+          // Leave remote loading off again on restart; it is session-only.
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
+          const modernToggle = $('[data-notes-modern-toggle]');
+          if (modernToggle && !Editor._tiptap) modernToggle.textContent = 'Try modern editor (preview)';
         });
       }
 
