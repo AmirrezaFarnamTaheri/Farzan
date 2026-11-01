@@ -27,7 +27,9 @@ const TYPE_KEYS = Object.freeze({
   arrow: ['x1', 'y1', 'x2', 'y2', 'width', 'height', 'headSize'],
   polyline: ['points', 'lineCap', 'lineJoin', 'dash'],
   polygon: ['points'],
-  text: ['text', 'fontSize', 'fontFamily', 'align', 'baseline'],
+  // Canonical Canvas-v1 text may carry a finite wrap width; planShape
+  // already maps that width to Konva.Text, so the preflight must admit it.
+  text: ['text', 'fontSize', 'fontFamily', 'align', 'baseline', 'width'],
 });
 
 function validateMappedElement(item, type) {
@@ -62,6 +64,9 @@ function validateMappedElement(item, type) {
   }
   if (item.fontSize != null && item.fontSize <= 0) {
     return unsupported('invalid-element-fontSize-range');
+  }
+  if (type === 'text' && item.width != null && item.width <= 0) {
+    return unsupported('invalid-element-text-width-range');
   }
   return { compatible: true };
 }
