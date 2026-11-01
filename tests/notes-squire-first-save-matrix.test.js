@@ -38,7 +38,7 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
       if (original.includes('<ul>')) expect(html).toContain('<li');
       if (original.includes('<blockquote>')) expect(html).toContain('<blockquote');
       if (original.includes('href=')) expect(html).toContain('https://example.org/reading');
-      if (original.includes('dir="rtl"')) expect(html).toContain('dir="rtl"');
+      if (original.includes('dir="rtl"')) expect(html).toMatch(/dir=["']rtl["']/);
     } finally { reopened.destroy(); }
   });
 
