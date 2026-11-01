@@ -78,6 +78,86 @@ describe('bundle and CSP reporting', () => {
     })).toContain(`total JS ${limits.totalJsBytes + 1} exceeds ${limits.totalJsBytes}`);
   });
 
+  it('measures actual Workbox precache source bytes without treating deferred chunks as absent', async () => {
+    const os = await import('node:os');
+    const { measurePrecacheArtifacts } = await import('../scripts/bundle-report.cjs');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farzan-precache-'));
+    try {
+      fs.mkdirSync(path.join(root, 'chunks'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'index.html'), 'abc');
+      fs.writeFileSync(path.join(root, 'opencoursedeck.js'), 'entry');
+      fs.writeFileSync(path.join(root, 'chunks', 'lazy.js'), '1234567');
+      fs.writeFileSync(path.join(root, 'sw.js'), [
+        'precacheAndRoute([{url:"index.html",revision:"a"},',
+        '{url:"opencoursedeck.js",revision:"b"},',
+        '{url:"chunks/lazy.js",revision:"c"}]);',
+      ].join(''));
+      const data = measurePrecacheArtifacts(root);
+      expect(data.count).toBe(3);
+      expect(data.totalBytes).toBe(3 + 5 + 7);
+      expect(data.jsBytes).toBe(5 + 7);
+      expect(data.files.map(item => item.path)).toEqual([
+        'chunks/lazy.js', 'index.html', 'opencoursedeck.js',
+      ]);
+      expect(data.missing).toEqual([]);
+      expect(data.files.find(item => item.path === 'chunks/lazy.js')?.bytes).toBe(7);
+      fs.unlinkSync(path.join(root, 'chunks/lazy.js'));
+      const missing = measurePrecacheArtifacts(root);
+      expect(missing.missing).toEqual(['chunks/lazy.js']);
+      expect(missing.count).toBe(3);
+      expect(missing.totalBytes).toBe(8);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid or absent service worker precache evidence rather than claiming an empty install', async () => {
+    const os = await import('node:os');
+    const { measurePrecacheArtifacts } = await import('../scripts/bundle-report.cjs');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farzan-invalid-precache-'));
+    try {
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/service worker|precache/i);
+      fs.writeFileSync(path.join(root, 'sw.js'), 'this is not a Workbox manifest');
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/precache|manifest/i);
+      fs.writeFileSync(path.join(root, 'sw.js'), 'precacheAndRoute([{url:"../outside.js",revision:"x"}]);');
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/unsafe|outside|path/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails a release report when the Workbox install manifest names a missing asset', async () => {
+    const { evaluateReport } = await import('../scripts/bundle-report.cjs');
+    const base = {
+      files: [{ path: 'dist/opencoursedeck.js' }],
+      totals: {
+        files: 1, totalJsBytes: 10, largestJsBytes: 10,
+        entryBytes: 10, entryGzipBytes: 5,
+      },
+      csp: {
+        'script-src': ["'self'"],
+        'media-src': ["'self'", 'http:', 'https:'],
+        'connect-src': ["'self'", 'http:', 'https:'],
+        'frame-src': ["'self'", 'http:', 'https:'],
+      },
+    };
+    expect(evaluateReport({ ...base, precache: { count: 3, missing: ['chunks/lazy.js'] } }))
+      .toContain('Workbox precache asset is missing: chunks/lazy.js');
+    expect(evaluateReport({ ...base, precache: { count: 3, missing: [] } })).toEqual([]);
+  });
+
+  it('reports actual release precache data and separately captures cold browser shell timing', async () => {
+    const { createBundleReport } = await import('../scripts/bundle-report.cjs');
+    const report = createBundleReport();
+    expect(report.precache.count).toBeGreaterThan(0);
+    expect(report.precache.totalBytes).toBeGreaterThan(report.totals.entryBytes);
+    expect(report.precache.missing).toEqual([]);
+    const smokeSource = fs.readFileSync(path.join(process.cwd(), 'scripts/dist-browser-smoke.cjs'), 'utf8');
+    expect(smokeSource).toContain("performance.getEntriesByType('resource')");
+    expect(smokeSource).toContain("coldShell");
+    expect(smokeSource).toContain('missingTransferSizes');
+  });
+
   it('keeps the bundle report gate wired into CI', async () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 

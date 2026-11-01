@@ -81,6 +81,20 @@ describe('GitHub Actions hardening', () => {
     }
   });
 
+  it('runs native Windows checks when release service worker and sizing instrumentation change', () => {
+    const native = workflows['native-windows.yml'];
+    for (const script of [
+      "'scripts/build.cjs'",
+      "'scripts/build-sw-dist.cjs'",
+      "'scripts/bundle-report.cjs'",
+      "'scripts/dist-browser-smoke.cjs'",
+      "'scripts/workbox-dist.config.cjs'",
+    ]) {
+      // Changes to offline package inputs need both PR and exact-main gates.
+      expect(native.split(script).length - 1).toBe(2);
+    }
+  });
+
   it('validates every active YAML workflow, including native and optional edition channels', () => {
     const files = readAllWorkflowFiles();
     const diskNames = fs.readdirSync(path.join(repositoryRoot, '.github', 'workflows'))
