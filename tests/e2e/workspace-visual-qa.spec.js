@@ -46,7 +46,7 @@ for (const setup of setups) {
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
-        await expect(page.locator('[data-focus-clock]')).toHaveText(/^\\d\\d:\\d\\d$/);
+        await expect(page.locator('[data-focus-clock]')).toHaveText(/^\d\d:\d\d$/);
       }
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
