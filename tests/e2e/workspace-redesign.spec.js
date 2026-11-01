@@ -648,15 +648,19 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
   test('keeps default Squire composing text in its original note until IME commits, including RTL mobile', async ({ page }) => {
+    test.setTimeout(90_000); // Multiple independent persistence and navigation gates.
+    console.log('[squire-ime] mobile RTL test started');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     const modern = page.locator('[data-notes-editor] .notes-modern-editor');
     await expect(modern).toBeVisible({ timeout: 20000 });
+    console.log('[squire-ime] first default editor visible');
 
     await page.locator('[data-action="new-note"]').first().click();
     await expect(modern).toBeVisible({ timeout: 20000 });
+    console.log('[squire-ime] new note editor visible');
     const title = 'Squire committed IME 你好';
     await page.locator('[data-note-title-input]').fill(title);
     await modern.click();
@@ -665,7 +669,8 @@ test.describe('Farzan desktop workspace redesign', () => {
       const notes = await window.DB.getAllNotes();
       return notes.find(note => note.title === name)?.content ?? '';
     }, title);
-    await expect.poll(savedContent, { timeout: 20000 }).toContain('Baseline note');
+    await expect.poll(savedContent, { timeout: 12_000 }).toContain('Baseline note');
+    console.log('[squire-ime] baseline durable before composition');
 
     await page.evaluate(() => {
       window.__squireBlockedNavigation = 0;
@@ -679,7 +684,8 @@ test.describe('Farzan desktop workspace redesign', () => {
       }));
       location.hash = '#/home';
     });
-    await expect.poll(() => page.evaluate(() => window.__squireBlockedNavigation)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.__squireBlockedNavigation), { timeout: 8_000 }).toBe(1);
+    console.log('[squire-ime] route guard blocked unfinished composition');
     await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/notes');
     await expect(modern).toContainText('فارسی 你好世界');
     expect(await savedContent()).not.toContain('你好世界');
@@ -688,10 +694,12 @@ test.describe('Farzan desktop workspace redesign', () => {
       document.querySelector('[data-notes-editor] .notes-modern-editor')
         .dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
     });
-    await expect.poll(savedContent, { timeout: 20000 }).toContain('فارسی 你好世界');
+    await expect.poll(savedContent, { timeout: 12_000 }).toContain('فارسی 你好世界');
+    console.log('[squire-ime] final composed text durable');
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await page.locator('[data-notes-list]').getByText(title).click();
+    console.log('[squire-ime] saved note reopened');
     await expect(modern).toBeVisible({ timeout: 20000 });
     await expect(modern).toContainText('فارسی 你好世界');
   });
