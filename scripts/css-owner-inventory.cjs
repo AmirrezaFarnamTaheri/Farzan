@@ -87,6 +87,70 @@ function parseRules(css, file, layer) {
   return result;
 }
 
+/**
+ * Declaration-level source provenance only. This is deliberately NOT a CSS
+ * cascade simulator: browser-computed styles remain release evidence.
+ * Keep quoted and functional semicolons intact for accurate measurements.
+ */
+function parseDeclarations(body) {
+  const chunks = [];
+  let quote = '', parentheses = 0, start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quote) {
+      if (ch === '\\') { i++; continue; }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '(') parentheses++;
+    if (ch === ')') parentheses--;
+    if (ch === ';' && parentheses === 0) {
+      chunks.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+  chunks.push(body.slice(start));
+  return chunks.flatMap(chunk => {
+    const colon = chunk.indexOf(':');
+    if (colon < 1) return [];
+    const property = chunk.slice(0, colon).trim().toLowerCase();
+    const value = chunk.slice(colon + 1).trim();
+    return property && value ? [{ property, value }] : [];
+  });
+}
+
+function propertyOwnership(rules) {
+  const grouped = new Map();
+  for (const rule of rules) {
+    for (const { property, value } of parseDeclarations(rule.body)) {
+      const key = [rule.selector, rule.context, property].join('\u0000');
+      const list = grouped.get(key) || [];
+      list.push({
+        file: rule.file, line: rule.line, layer: rule.layer,
+        value,
+      });
+      grouped.set(key, list);
+    }
+  }
+  const finalDeclarations = [], overlaps = [];
+  for (const [key, declarations] of grouped) {
+    const [selector, context, property] = key.split('\u0000');
+    finalDeclarations.push({
+      selector, context, property, owner: declarations[declarations.length - 1],
+    });
+    const files = [...new Set(declarations.map(item => item.file))];
+    if (files.length > 1) {
+      overlaps.push({
+        selector, context, property, files,
+        sameValue: declarations.every(item => item.value === declarations[0].value),
+        declarations,
+      });
+    }
+  }
+  return { finalDeclarations, overlaps };
+}
+
 function inventoryCss(rootDir = path.resolve(__dirname, '..')) {
   const directory = path.join(rootDir, 'src/styles');
   const manifest = fs.readFileSync(path.join(directory, 'index.css'), 'utf8');
@@ -126,10 +190,11 @@ function inventoryCss(rootDir = path.resolve(__dirname, '..')) {
     rules,
     owners: [...owners.values()],
     exactDuplicates,
+    propertyOwnership: propertyOwnership(rules),
   };
 }
 
-module.exports = { inventoryCss, parseRules };
+module.exports = { inventoryCss, parseRules, parseDeclarations, propertyOwnership };
 
 if (require.main === module) {
   const report = inventoryCss();
@@ -140,5 +205,12 @@ if (require.main === module) {
     ruleCount: report.rules.length,
     ownerCount: report.owners.length,
     exactDuplicates: report.exactDuplicates,
+    propertyCount: report.propertyOwnership.finalDeclarations.length,
+    multiSourcePropertyCount: report.propertyOwnership.overlaps.length,
+    identicalPropertyOverlaps: report.propertyOwnership.overlaps.filter(x => x.sameValue).length,
+    conflictingPropertyOverlaps: report.propertyOwnership.overlaps.filter(x => !x.sameValue).length,
+    // A compact evidence sample; browser computed style still decides if an
+    // overlapping declaration is obsolete or a deliberate override.
+    propertyOverlapSamples: report.propertyOwnership.overlaps.slice(0, 40),
   }, null, 2) + '\n');
 }
