@@ -181,10 +181,14 @@ describe('UI component safe rendering', () => {
 
     const anchor = document.getElementById('tip-anchor');
     anchor.focus();
-    expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(true);
-    expect(document.querySelector('.tooltip').textContent).toBe('Course status');
+    const tip = document.querySelector('.tooltip');
+    expect(tip.classList.contains('visible')).toBe(true);
+    expect(tip.getAttribute('role')).toBe('tooltip');
+    expect(anchor.getAttribute('aria-describedby')).toBe(tip.id);
+    expect(tip.textContent).toBe('Course status');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(false);
+    expect(anchor.hasAttribute('aria-describedby')).toBe(false);
     expect(document.activeElement).toBe(anchor);
 
     anchor.blur();
