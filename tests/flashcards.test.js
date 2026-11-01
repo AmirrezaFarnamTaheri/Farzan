@@ -486,7 +486,7 @@ describe('flashcard canonical read and due query safety', () => {
     window.DB = {
       getSetting: vi.fn(async () => [{
         id: 'due-from-db', front: 'Review', back: 'Due', deck: 'Science',
-        nextReviewDate: '2020-01-01',
+        scheduler: 'fsrs-v5', fsrsState: { card: { due: '2020-01-01T00:00:00.000Z' } },
       }]),
       saveSetting: vi.fn(async () => true),
     };
