@@ -113,10 +113,12 @@ describe('Studio Konva draft text controls and storage isolation', () => {
 
     await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledOnce());
     expect(draft.updateText).toHaveBeenCalledWith('text-1', content);
-    expect(saveSetting).toHaveBeenCalledWith('ocd_studio_konva_draft', expect.objectContaining({
-      version: 1, layers: expect.any(Array),
-    }));
+    expect(saveSetting.mock.calls[0][0]).toBe('ocd_studio_konva_draft');
     const stored = saveSetting.mock.calls[0][1];
+    // Vitest vmThreads may supply a different Array prototype across the
+    // route's browser realm. Check structure, not constructor identity.
+    expect(stored.version).toBe(1);
+    expect(Array.isArray(stored.layers)).toBe(true);
     expect(stored.layers[0].elements[0].text).toBe(content);
     expect(stored.layers[0].elements[0].fontSize).toBe(24);
     expect(stored.layers[0].elements[1].type).toBe('rect');
