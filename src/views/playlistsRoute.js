@@ -72,7 +72,7 @@ function currentPlayerPosition() {
       const current = title(queue[index]);
       if (!current) continue;
       const next = snapshot?.shuffle === true ? null : title(queue[index + 1]);
-      return { current: String(current), next: next ? String(next) : null };
+      return { current: String(current), next: next ? String(next) : null, index };
     } catch { /* A destroyed player must not block saved playlists. */ }
   }
   return null;
@@ -293,7 +293,13 @@ async function renderPlaylists(deps) {
     detail.textContent = playlist.detail;
     const preview = document.createElement('ol');
     preview.className = 'compact-list playlist-preview';
-    playlist.items.slice(0, 4).forEach(item => {
+    // The currently playing row is already identified above with its real
+    // player index. Do not repeat it as a second unlabeled preview line.
+    const previewItems = playlist.id === 'active-queue'
+      && activePosition && playlist.items[activePosition.index] === activePosition.current
+      ? playlist.items.filter((_, index) => index !== activePosition.index)
+      : playlist.items;
+    previewItems.slice(0, 4).forEach(item => {
       const li = document.createElement('li');
       li.className = 'playlist-preview-item';
       li.dir = 'auto';
@@ -303,7 +309,7 @@ async function renderPlaylists(deps) {
     });
     const more = document.createElement('p');
     more.className = 'playlist-more';
-    const remaining = Math.max(0, playlist.items.length - 4);
+    const remaining = Math.max(0, previewItems.length - 4);
     more.textContent = `${remaining.toLocaleString()} more topic${remaining === 1 ? '' : 's'}`;
     more.hidden = remaining === 0;
     const actions = document.createElement('div');
@@ -311,7 +317,8 @@ async function renderPlaylists(deps) {
     const link = document.createElement('a');
     link.className = 'btn btn-ghost';
     link.href = playlist.href;
-    link.textContent = playlist.label === 'Resume' ? 'Open bookmarks' : 'Open courses';
+    link.textContent = playlist.label === 'Resume' ? 'Open bookmarks'
+      : playlist.label === 'Live' ? 'Open player' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
     if (playlist.id === 'active-queue' && activePosition) {
       const position = document.createElement('div');

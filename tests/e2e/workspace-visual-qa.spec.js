@@ -71,6 +71,21 @@ for (const setup of setups) {
         expect(bounds.y + bounds.height, setup.name + '/' + route + ' System link clipped')
           .toBeLessThanOrEqual(setup.height - 2);
       }
+      if (route === 'settings') {
+        const current = page.locator('.settings-nav [href="#settings-appearance"]');
+        await expect(current).toHaveAttribute('aria-current', 'location');
+        for (const selector of ['#select-density', '#select-language']) {
+          // Chrome serializes native select appearance as "menulist" even when
+          // authored with appearance:auto; either native value draws the caret.
+          await expect(page.locator(selector)).toHaveCSS('appearance', /^(auto|menulist)$/);
+        }
+        const storageLink = page.locator('.settings-nav [href="#settings-storage"]');
+        await storageLink.click();
+        await expect(storageLink).toHaveAttribute('aria-current', 'location');
+        await expect(page).toHaveURL(/#\/settings$/);
+        await page.locator('.settings-nav [href="#settings-appearance"]').click();
+        await expect(current).toHaveAttribute('aria-current', 'location');
+      }
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');

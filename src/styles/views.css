@@ -1508,6 +1508,14 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
   align-items: stretch;
 }
+/* Give a single active queue room to breathe; retain the multi-card grid. */
+.view-playlists [data-playlist-list]:has(> .playlist-card:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.view-playlists [data-playlist-list] > .playlist-card:only-child {
+  width: 100%;
+  max-width: 780px;
+}
 
 .playlist-card { min-width: 0; }
 .playlist-card-body {
@@ -1517,6 +1525,11 @@
   gap: 9px;
   height: 100%;
   min-width: 0;
+}
+.playlist-card-body .badge {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
 }
 .playlist-card-title {
   min-width: 0;

@@ -299,6 +299,33 @@ export function mountSettingsView(deps = {}) {
     routeListeners.push({ target, type, handler, options });
   };
 
+  // Only the route content pane scrolls. Native scrollIntoView also scrolls
+  // the outer document and physically displaces the entire app shell.
+  const settingsScrollContainer = document.getElementById('view-container');
+  const sectionLinks = [...document.querySelectorAll('.settings-nav a[href^="#settings-"]')];
+  const setCurrentSection = (id) => {
+    sectionLinks.forEach((link) => {
+      if (link.getAttribute('href') === '#' + id) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  };
+  setCurrentSection('settings-appearance');
+  sectionLinks.forEach((link) => on(link, 'click', (event) => {
+    const id = link.getAttribute('href')?.slice(1);
+    const section = id && document.getElementById(id);
+    if (!section || !settingsScrollContainer) return;
+    event.preventDefault();
+    setCurrentSection(id);
+    const sectionTop = section.getBoundingClientRect().top;
+    const containerTop = settingsScrollContainer.getBoundingClientRect().top;
+    const targetTop = Math.max(0, settingsScrollContainer.scrollTop + sectionTop - containerTop - 16);
+    if (typeof settingsScrollContainer.scrollTo === 'function') {
+      settingsScrollContainer.scrollTo({ top: targetTop, behavior: 'auto' });
+    } else {
+      settingsScrollContainer.scrollTop = targetTop;
+    }
+  }));
+
   // #btn-theme-toggle carries data-theme-toggle, so ThemeManager's delegated
   // click handler drives it (and keeps its icon/label in sync). Only sync the
   // label now in case the route rendered after the last theme change.
