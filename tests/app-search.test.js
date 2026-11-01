@@ -287,6 +287,11 @@ describe('app topbar search rendering', () => {
       .toContainEqual(['topic', 'course:physics-topic']);
     expect(catalogTopic.find(row => row.sourceId === 'course:physics-topic')?.keywords)
       .toEqual(['فيزيك']);
+    const teaching = await search._queryUniversal('teaching');
+    expect(teaching.map(row => [row.sourceType, row.sourceId]))
+      .toContainEqual(['topic', 'course:physics-topic']);
+    expect(teaching.find(row => row.sourceId === 'course:physics-topic')?.labels)
+      .toEqual(['Teaching']);
     expect({ notes, topics }).toEqual(original);
     expect(window.DB.saveSetting).toBeUndefined();
   });
