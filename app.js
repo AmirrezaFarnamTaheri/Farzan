@@ -18,7 +18,7 @@ import {
   uid,
 } from './src/lib/dom.js';
 import { createRouter } from './src/router/router.js';
-import { Modal as ModalOverlay } from './src/ui/overlays.js';
+import { Modal as ModalOverlay, Drawer as DrawerOverlay } from './src/ui/overlays.js';
 import { EventEmitter } from './src/lib/eventEmitter.js';
 import { KeyboardShortcuts } from './src/core/keyboardShortcuts.js';
 import { dedupeSearchResults, normalizeSearchQuery, rankLexicalMatches, searchResultIdentity } from './src/core/searchRanking.js';
@@ -1479,95 +1479,7 @@ import { Pointer } from './src/lib/pointer.js';
   // 7. DRAWERS
   // ──────────────────────────────────────────────────────────
 
-  const Drawer = {
-    _cleanupFns: new WeakMap(),
-    _previousFocus: new WeakMap(),
-
-    open(target) {
-      const drawer = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!drawer) return;
-      if (drawer.classList.contains('open')) return;
-
-      let backdrop = $('.drawer-backdrop');
-      if (!backdrop) {
-        backdrop = createElement('div', { class: 'drawer-backdrop' });
-        document.body.appendChild(backdrop);
-        backdrop.addEventListener('click', () => this.closeAll());
-      }
-
-      drawer.removeAttribute('hidden');
-      drawer.setAttribute('aria-hidden', 'false');
-      drawer.setAttribute('aria-modal', 'true');
-      drawer.setAttribute('role', 'dialog');
-      drawer.setAttribute('tabindex', '-1');
-      requestAnimationFrame(() => {
-        backdrop.classList.add('open');
-        drawer.classList.add('open');
-      });
-
-      document.body.style.overflow = 'hidden';
-      this._previousFocus.set(drawer, document.activeElement);
-      setAppInert(true);
-      this._cleanupFns.set(drawer, trapFocus(drawer));
-
-      OpenCourseDeck.bus.emit('drawer:open', { drawer });
-    },
-
-    close(target) {
-      const drawer = typeof target === 'string'
-        ? document.getElementById(target)
-        : target;
-      if (!drawer) return;
-      if (!drawer.classList.contains('open')) return;
-
-      drawer.classList.remove('open');
-      setTimeout(() => {
-        drawer.setAttribute('hidden', '');
-        drawer.setAttribute('aria-hidden', 'true');
-        drawer.removeAttribute('aria-modal');
-      }, OpenCourseDeck.config.animationDuration);
-
-      const backdrop = $('.drawer-backdrop');
-      if (backdrop) {
-        backdrop.classList.remove('open');
-        setTimeout(() => backdrop.remove(), OpenCourseDeck.config.animationDuration);
-      }
-
-      document.body.style.overflow = '';
-      this._cleanupFns.get(drawer)?.();
-      this._cleanupFns.delete(drawer);
-      setAppInert(false);
-      restoreFocus(this._previousFocus.get(drawer));
-      this._previousFocus.delete(drawer);
-      OpenCourseDeck.bus.emit('drawer:close', { drawer });
-    },
-
-    closeAll() {
-      $$('.drawer.open').forEach(d => this.close(d));
-    },
-
-    init() {
-      document.addEventListener('click', e => {
-        const target = eventTargetEl(e);
-        if (!target) return;
-        const trigger = target.closest('[data-drawer-open]');
-        if (trigger) { e.preventDefault(); this.open(trigger.dataset.drawerOpen); }
-
-        const closeBtn = target.closest('[data-drawer-close]');
-        if (closeBtn) {
-          const drawer = closeBtn.closest('.drawer');
-          if (drawer) this.close(drawer);
-        }
-      });
-
-      // Close on Escape
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') this.closeAll();
-      });
-    },
-  };
+  const Drawer = DrawerOverlay;
 
 
   // ──────────────────────────────────────────────────────────

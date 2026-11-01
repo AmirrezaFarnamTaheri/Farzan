@@ -296,6 +296,21 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.Modal.confirm).toBeUndefined();
   });
 
+  it('does not remove a created modal after it is reopened before delayed cleanup', async () => {
+    await loadApp('<div id="ocd-app"><main id="view-container"></main></div>');
+    const modal = window.OpenCourseDeck.Modal.create({ title: 'Recovery dialog', body: 'Keep editing' });
+    window.OpenCourseDeck.Modal.close(modal);
+    window.OpenCourseDeck.Modal.open(modal);
+    vi.advanceTimersByTime(450);
+    expect(modal.isConnected).toBe(true);
+    expect(modal.classList.contains('open')).toBe(true);
+    expect(modal.hasAttribute('hidden')).toBe(false);
+
+    window.OpenCourseDeck.Modal.close(modal);
+    vi.advanceTimersByTime(450);
+    expect(modal.isConnected).toBe(false);
+  });
+
   it('opens drawers as modal dialogs and restores focus on close', async () => {
     await loadApp(`
       <button id="drawer-opener">Open drawer</button>
@@ -325,6 +340,64 @@ describe('app shell resilience helpers', () => {
     expect(drawer.hasAttribute('aria-modal')).toBe(false);
     expect(app.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(opener);
+  });
+
+  it('uses the shared Drawer overlay owner and preserves a quickly reopened drawer', async () => {
+    await loadApp(`
+      <button id="drawer-opener">Show notifications</button>
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <aside id="reopened-drawer" class="drawer" hidden aria-hidden="true">
+        <button data-drawer-close>Close</button>
+      </aside>
+    `);
+    const { Drawer } = await import('../src/ui/overlays.js');
+    const api = window.OpenCourseDeck.Drawer;
+    expect(api).toBe(Drawer);
+    const opener = document.getElementById('drawer-opener');
+    const drawer = document.getElementById('reopened-drawer');
+    const root = document.getElementById('ocd-app');
+
+    opener.focus();
+    api.open(drawer);
+    api.close(drawer);
+    api.open(drawer);
+    vi.runOnlyPendingTimers();
+
+    expect(drawer.hasAttribute('hidden')).toBe(false);
+    expect(drawer.classList.contains('open')).toBe(true);
+    expect(drawer.getAttribute('aria-modal')).toBe('true');
+    expect(root.hasAttribute('inert')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.querySelector('.drawer-backdrop')?.isConnected).toBe(true);
+
+    api.close(drawer);
+    vi.runOnlyPendingTimers();
+    expect(drawer.hasAttribute('hidden')).toBe(true);
+    expect(root.hasAttribute('inert')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(opener);
+    expect(document.querySelector('.drawer-backdrop')).toBeNull();
+  });
+
+  it('keeps body scroll locked while another dialog drawer remains open', async () => {
+    await loadApp(`
+      <button id="drawer-origin">Open</button>
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <aside class="drawer" id="first-drawer" hidden><button>First</button></aside>
+      <aside class="drawer" id="second-drawer" hidden><button>Second</button></aside>
+    `);
+    const { Drawer } = await import('../src/ui/overlays.js');
+    Drawer.open('first-drawer');
+    Drawer.open('second-drawer');
+    expect(document.body.style.overflow).toBe('hidden');
+    Drawer.close('first-drawer');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+    expect(document.querySelector('.drawer-backdrop')).not.toBeNull();
+    Drawer.close('second-drawer');
+    vi.runOnlyPendingTimers();
+    expect(document.body.style.overflow).toBe('');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
   });
 
   it('removes app tooltips when their anchor leaves the DOM', async () => {
