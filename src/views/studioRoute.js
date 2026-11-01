@@ -184,6 +184,10 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="up" title="Move up">Up</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="down" title="Move down">Down</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="right" title="Move right">Right</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reorder="backward"
+              aria-label="Send selected draft shape one layer step backward" disabled>Send backward</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reorder="forward"
+              aria-label="Bring selected draft shape one layer step forward" disabled>Bring forward</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-undo>Undo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export>Download draft JSON</button>
@@ -744,6 +748,23 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
       button.disabled = !selected || mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
     });
+    document.querySelectorAll('[data-studio-konva-reorder]').forEach(button => {
+      let allowed = false;
+      if (selected && mode !== 'pen' && !konvaTextSaving && !konvaKeyboardBusy
+          && !konvaClosing && !konvaResetting && !konvaImporting
+          && typeof konvaWorkspace?.reorder === 'function') {
+        const board = konvaWorkspace.getBoard();
+        for (const layer of board.layers || []) {
+          if (layer.locked || layer.visible === false) continue;
+          const index = (layer.elements || []).findIndex(element => String(element.id) === selected);
+          if (index < 0) continue;
+          allowed = button.dataset.studioKonvaReorder === 'forward'
+            ? index < layer.elements.length - 1 : index > 0;
+          break;
+        }
+      }
+      button.disabled = !allowed;
+    });
     const undo = document.querySelector('[data-studio-konva-undo]');
     const redo = document.querySelector('[data-studio-konva-redo]');
     if (undo) undo.disabled = !konvaWorkspace?.canUndo?.();
@@ -1082,6 +1103,28 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         await konvaWorkspace.move(id, dx, dy);
         refreshKonvaControls();
       } catch { setKonvaStatus('Experimental draft edit not saved'); }
+    });
+  });
+  document.querySelectorAll('[data-studio-konva-reorder]').forEach(button => {
+    on(button, 'click', async () => {
+      const id = konvaSelect?.value;
+      const workspace = konvaWorkspace;
+      if (!id || !workspace?.reorder || button.disabled || konvaImporting
+          || konvaClosing || konvaResetting || konvaKeyboardBusy || konvaTextSaving) return;
+      konvaKeyboardBusy = true;
+      refreshKonvaControls();
+      try {
+        await workspace.reorder(id, button.dataset.studioKonvaReorder);
+        if (!unmounted && workspace === konvaWorkspace) {
+          populateKonvaObjects();
+          refreshKonvaControls();
+        }
+      } catch {
+        setKonvaStatus('Experimental draft stacking change not saved');
+      } finally {
+        konvaKeyboardBusy = false;
+        if (!unmounted && workspace === konvaWorkspace) refreshKonvaControls();
+      }
     });
   });
   for (const action of ['undo', 'redo']) {
