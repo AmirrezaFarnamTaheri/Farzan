@@ -56,6 +56,28 @@ function currentPlayerTracks() {
     .filter(track => track && (track.src || track.url || track.title));
 }
 
+// Read only an actual player position. The Playlists page cannot know the
+// private randomized shuffle order, so it never guesses the next track.
+function currentPlayerPosition() {
+  for (const element of document.querySelectorAll('[data-player]')) {
+    try {
+      const player = element._pdPlayer;
+      if (!player) continue;
+      const snapshot = typeof player.snapshot === 'function' ? player.snapshot() : null;
+      const queue = Array.isArray(snapshot?.queue) ? snapshot.queue : player.queue;
+      if (!Array.isArray(queue) || !queue.length) continue;
+      const index = snapshot?.queueIndex ?? player.trackIndex;
+      if (!Number.isInteger(index) || index < 0 || index >= queue.length) continue;
+      const title = track => track && (track.title || track.topicTitle || track.topicId);
+      const current = title(queue[index]);
+      if (!current) continue;
+      const next = snapshot?.shuffle === true ? null : title(queue[index + 1]);
+      return { current: String(current), next: next ? String(next) : null };
+    } catch { /* A destroyed player must not block saved playlists. */ }
+  }
+  return null;
+}
+
 function catalogVideoTopics(topics, safeMediaUrl) {
   return topics.filter(topic => {
     const firstVideo = topic.videos?.[0] ?? topic.url;
@@ -136,6 +158,7 @@ async function renderPlaylists(deps) {
   }
 
   const activeQueue = currentPlayerTracks();
+  const activePosition = activeQueue.length ? currentPlayerPosition() : null;
   const videoTopics = catalogVideoTopics(topics, safeMediaUrl);
   const topicsById = new Map(topics.map(topic => [topic.topicId, topic]));
   const timestampTopics = timestamps
@@ -290,6 +313,25 @@ async function renderPlaylists(deps) {
     link.href = playlist.href;
     link.textContent = playlist.label === 'Resume' ? 'Open bookmarks' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
+    if (playlist.id === 'active-queue' && activePosition) {
+      const position = document.createElement('div');
+      position.className = 'playlist-live-position';
+      const addPosition = (label, value, key) => {
+        const paragraph = document.createElement('p');
+        paragraph.className = 'playlist-card-detail';
+        paragraph.dataset[key] = '';
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = label + ': ';
+        const isolator = document.createElement('bdi');
+        isolator.dir = 'auto';
+        isolator.textContent = value;
+        paragraph.append(labelSpan, isolator);
+        position.appendChild(paragraph);
+      };
+      addPosition('Current', activePosition.current, 'playlistCurrent');
+      if (activePosition.next) addPosition('Up next', activePosition.next, 'playlistNext');
+      body.insertBefore(position, preview);
+    }
     actions.appendChild(link);
     if (playlist.saved) {
       // Keep the four-row compact preview. The disclosure exposes the full
