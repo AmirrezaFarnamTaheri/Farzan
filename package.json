@@ -50,7 +50,8 @@
     "tauri:bundle:locked": "npm run native:prepare && tauri build --config src-tauri/tauri.conf.json -- --locked",
     "native:package:locked": "npm run tauri:bundle:locked && node scripts/stage-native-exe.cjs",
     "test:e2e": "node node_modules/@playwright/test/cli.js test --config playwright.config.cjs",
-    "report:consumers": "node scripts/bundle-consumers.cjs"
+    "report:consumers": "node scripts/bundle-consumers.cjs",
+    "verify:portable-restore": "node scripts/verify-portable-backup.cjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
