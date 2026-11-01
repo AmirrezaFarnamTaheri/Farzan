@@ -575,7 +575,7 @@ test.describe('Farzan desktop workspace redesign', () => {
     }, tableHTML);
     await expect(page.locator('[data-notes-editor] table td')).toHaveText('70 mL');
     await expect(modern).toHaveCount(0);
-    await expect(toggle).toContainText('classic editor');
+    await expect(toggle).toContainText(/classic editor/i);
     const stored = await page.evaluate(id => window.PlasmaNotesStore.getNote(id)?.content, savedId);
     expect(stored).toContain('<table');
     expect(stored).toContain('70 mL');
@@ -587,6 +587,7 @@ test.describe('Farzan desktop workspace redesign', () => {
       window.OpenCourseDeck.featureFlags = {
         ...(window.OpenCourseDeck.featureFlags || {}),
         notesTiptapPreview: true,
+        notesSquireDefault: false,
       };
     });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
@@ -625,6 +626,13 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
   test('refuses unsupported unsaved table content without replacing the classic Notes DOM', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.OpenCourseDeck = window.OpenCourseDeck || {};
+      window.OpenCourseDeck.featureFlags = {
+        ...(window.OpenCourseDeck.featureFlags || {}),
+        notesSquireDefault: false,
+      };
+    });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.locator('[data-action="new-note"]').first().click();
@@ -645,6 +653,13 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
   test('preserves an IME Notes draft when route navigation is vetoed', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.OpenCourseDeck = window.OpenCourseDeck || {};
+      window.OpenCourseDeck.featureFlags = {
+        ...(window.OpenCourseDeck.featureFlags || {}),
+        notesSquireDefault: false,
+      };
+    });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.locator('[data-action="new-note"]').first().click();
