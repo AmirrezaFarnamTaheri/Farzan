@@ -1993,8 +1993,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--glass-border);
     background: color-mix(in srgb, var(--glass-bg) 35%, transparent);
     flex-shrink: 0;
@@ -2009,9 +2010,12 @@
   .notif-panel-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    margin-inline-start: auto;
   }
   .notif-clear-btn {
+    white-space: nowrap;
     border: 1px solid var(--glass-border);
     background: transparent;
     color: var(--text-tertiary);
@@ -2019,7 +2023,7 @@
     font-weight: 600;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
-    padding: 6px 10px;
+    padding: 6px 8px;
     border-radius: var(--radius-full);
     cursor: pointer;
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
@@ -2094,8 +2098,9 @@
   .topbar-notif-badge,
   .topbar-notif-dot {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 0;
+    inset-inline-end: -3px;
+    transform: translate(0, -25%);
     min-width: 10px;
     height: 10px;
     padding: 0 3px;
@@ -3781,6 +3786,12 @@
 .view-pdf .pdf-shell:not([data-document-state="ready"]) .pdf-toolbar {
   padding-block: var(--space-3);
   margin-bottom: var(--space-3);
+}
+
+/* The empty reader already provides a prominent Choose PDF action. Keep
+   the hidden input in the DOM for that button; show the toolbar once loading. */
+.view-pdf .pdf-shell[data-document-state="empty"] .pdf-toolbar {
+  display: none;
 }
 
 .view-pdf .pdf-reader-open-actions {

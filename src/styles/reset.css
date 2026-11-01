@@ -6,7 +6,10 @@
 
 html {
   height: 100%;
+  /* The SPA has its own view/sidebar scrollers. A wheel/keyboard action in
+     a mobile Notes overlay must never shift the entire app offscreen. */
   overflow-x: clip;
+  overflow-y: hidden;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   tab-size: 2;

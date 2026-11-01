@@ -44,6 +44,41 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'pdf') {
+        const state = page.locator('.pdf-shell');
+        if (await state.getAttribute('data-document-state') === 'empty') {
+          await expect(page.locator('.pdf-shell .pdf-toolbar')).toBeHidden();
+          await expect(page.locator('[data-pdf-empty-open]')).toBeVisible();
+        }
+      }
+      if (route === 'tags' && await page.locator('[data-tag-first-use]').isVisible()) {
+        await expect(page.locator('[data-tag-advanced]')).toBeHidden();
+        await expect(page.locator('[data-tag-create-form]')).toBeVisible();
+      }
+      if ((route === 'help' || route === 'settings') && setup.width >= 1024) {
+        const systemLink = page.locator('.sidebar-system-nav [data-route="/' + route + '"]');
+        await expect(systemLink).toHaveAttribute('aria-current', 'page');
+        await expect(systemLink).toBeVisible();
+        const bounds = await systemLink.boundingBox();
+        expect(bounds, setup.name + ' / ' + route + ' missing visible System link').not.toBeNull();
+        expect(bounds.y + bounds.height, setup.name + '/' + route + ' System link clipped')
+          .toBeLessThanOrEqual(setup.height - 2);
+      }
+      if (route === 'settings') {
+        const current = page.locator('.settings-nav [href="#settings-appearance"]');
+        await expect(current).toHaveAttribute('aria-current', 'location');
+        for (const selector of ['#select-density', '#select-language']) {
+          // Chrome serializes native select appearance as "menulist" even when
+          // authored with appearance:auto; either native value draws the caret.
+          await expect(page.locator(selector)).toHaveCSS('appearance', /^(auto|menulist)$/);
+        }
+        const storageLink = page.locator('.settings-nav [href="#settings-storage"]');
+        await storageLink.click();
+        await expect(storageLink).toHaveAttribute('aria-current', 'location');
+        await expect(page).toHaveURL(/#\/settings$/);
+        await page.locator('.settings-nav [href="#settings-appearance"]').click();
+        await expect(current).toHaveAttribute('aria-current', 'location');
+      }
       if (route === 'notes') {
         const keywordAction = page.locator('[data-notes-semantic-search]');
         const clearAction = page.locator('[data-notes-semantic-clear]');
@@ -112,6 +147,10 @@ for (const setup of setups) {
             await page.locator('[data-notes-toggle-library]').click();
             await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'true');
           }
+          if (route === 'notes' && setup.width <= 1023) {
+            // Page-level scroll would move the entire app and crop the header.
+            expect(await page.evaluate(() => window.scrollY), 'mobile RTL Notes root scroll').toBe(0);
+          }
           const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
           const field = page.locator(fieldSelector).first();
           await expect(field).toBeVisible();
@@ -141,6 +180,10 @@ for (const setup of setups) {
           await expect(page.locator('.home-widget').first()).toHaveCSS('text-align', 'start');
         }
       }
+      // Restoring a mobile Notes pane can move focus into a previously
+      // offscreen element. That may legitimately scroll the document without
+      // displacing the app shell: reset scroll before layout measurements.
+      await page.evaluate(() => { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const dimensions = await page.evaluate(() => ({
         body: document.body.scrollWidth,
@@ -184,6 +227,20 @@ for (const setup of setups) {
         });
         await page.locator('[data-notifications-toggle]').click();
         await expect(page.locator('#notifications-panel')).toBeVisible();
+        // Badge center must sit above and outside the bell arch, not cover it.
+        const badgeGeometry = await page.locator('#topbar-notifications-btn').evaluate((button) => {
+          const bell = button.querySelector('svg')?.getBoundingClientRect();
+          const badge = button.querySelector('#topbar-notif-dot')?.getBoundingClientRect();
+          if (!bell || !badge) return null;
+          return { offsetX: badge.x + badge.width / 2 - (bell.x + bell.width / 2),
+            offsetY: badge.y + badge.height / 2 - (bell.y + bell.height / 2) };
+        });
+        expect(badgeGeometry, 'notification badge must have geometry').not.toBeNull();
+        expect(badgeGeometry.offsetX, 'notification badge belongs on the outside of the bell').toBeGreaterThan(4);
+        expect(badgeGeometry.offsetY, 'notification badge belongs above the bell').toBeLessThan(-2);
+        for (const id of ['#notif-mark-read', '#notif-clear-all']) {
+          await expect(page.locator(id)).toHaveCSS('white-space', 'nowrap');
+        }
         await page.screenshot({
           path: path.join(folder, 'notifications-open.png'),
           animations: 'disabled', caret: 'hide',
@@ -234,6 +291,8 @@ for (const setup of setups) {
     const missingView = page.locator('#view-container .view-notfound');
     await expect(missingView).toBeVisible();
     await expect(missingView.locator('h1')).toHaveText('Page not found');
+    await expect(missingView.locator('.notfound-header')).toHaveCSS('text-align', 'center');
+    await expect(missingView.locator('.page-subtitle')).toHaveCount(0);
     // The shell must describe this route, not leak the old internal product name.
     await expect(page.locator('#breadcrumb-list')).toContainText('Page not found');
     await expect(page.locator('#breadcrumb-list')).not.toContainText('OpenCourseDeck');

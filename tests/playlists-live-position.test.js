@@ -42,7 +42,8 @@ describe('visible current and next live-playlist positions', () => {
     expect(card.querySelector('[data-playlist-next]')?.textContent).toContain('Renal review 你好');
     expect(card.querySelector('[data-playlist-current] bdi')?.getAttribute('dir')).toBe('auto');
     expect(card.querySelector('[data-playlist-next] bdi')?.getAttribute('dir')).toBe('auto');
-    expect(card.querySelectorAll('.playlist-preview-item')).toHaveLength(3);
+    // The trusted current track is shown in Current, not repeated in the list.
+    expect(card.querySelectorAll('.playlist-preview-item')).toHaveLength(2);
   });
 
   it('does not invent a current or next track without a trustworthy player index', async () => {

@@ -35,6 +35,8 @@ export function mountTagsView({ setView } = {}) {
                 placeholder="Name a tag..." disabled required />
               <button class="btn btn-ghost" type="button" disabled>Create tag</button>
             </div>
+            <details class="tags-taxonomy-advanced" data-tag-advanced hidden>
+              <summary>Manage labels</summary>
             <div data-tag-merge-form class="filter-row" role="group" aria-label="Merge two tag facets without changing saved content">
               <label for="tag-merge-from">Merge label</label>
               <select class="select" id="tag-merge-from" data-tag-merge-from disabled></select>
@@ -49,6 +51,7 @@ export function mountTagsView({ setView } = {}) {
               <button class="btn btn-ghost" type="button" disabled>Unmerge label</button>
             </div>
             <p class="text-muted">Merged labels stay in original Notes and courses; only the displayed taxonomy changes. Unmerge restores their original categories.</p>
+            </details>
             <p role="status" aria-live="polite" data-tag-mutation-status></p>
           </div>
           <div class="grid grid-3 tags-grid" data-tag-list>
@@ -228,6 +231,8 @@ async function renderTags() {
   });
 
   const hasTags = tagEntries.length > 0;
+  const advanced = taxonomyControls.querySelector('[data-tag-advanced]');
+  if (advanced) advanced.hidden = tagEntries.length < 2 && Object.keys(taxonomy.aliases).length === 0;
   metricsRoot.hidden = !hasTags;
   searchEl.hidden = !hasTags;
   filtersRoot.hidden = !hasTags;

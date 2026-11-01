@@ -860,6 +860,14 @@
    ────────────────────────────────────────────────────────── */
 
 /* 404 Not Found */
+.view-notfound .page-header.notfound-header {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--space-2);
+}
+.notfound-requested { max-width: 100%; overflow-wrap: anywhere; }
+
 .view-notfound {
   display: grid;
   gap: var(--space-6);
@@ -1269,6 +1277,19 @@
 .materials-pager .paginator-label { white-space: nowrap; }
 
 /* Tags */
+/* Keep primary tag creation compact; advanced taxonomy controls are
+   deliberate disclosures rather than full-viewport first-run forms. */
+.tags-taxonomy-controls { display: grid; gap: var(--space-3); padding-block: var(--space-4); }
+.tags-taxonomy-controls .input { width: min(100%, 360px); max-width: 360px; }
+.tags-taxonomy-controls .select { max-width: 360px; min-width: 0; }
+.tags-taxonomy-controls > [data-tag-create-form] { align-items: center; gap: var(--space-2); }
+.tags-taxonomy-advanced { border-top: 1px solid var(--border); padding-top: var(--space-3); }
+.tags-taxonomy-advanced > summary { cursor: pointer; width: fit-content; font-weight: 650; color: var(--text-secondary); }
+.tags-taxonomy-advanced[open] > summary { margin-bottom: var(--space-3); }
+.tags-taxonomy-advanced [data-tag-merge-form],
+.tags-taxonomy-advanced [data-tag-unmerge-form] { flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.view-tags [data-tag-advanced][hidden] { display: none !important; }
+
 .view-tags {
   display: grid;
   gap: var(--space-4);
@@ -1473,6 +1494,14 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
   align-items: stretch;
 }
+/* Give a single active queue room to breathe; retain the multi-card grid. */
+.view-playlists [data-playlist-list]:has(> .playlist-card:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.view-playlists [data-playlist-list] > .playlist-card:only-child {
+  width: 100%;
+  max-width: 780px;
+}
 
 .playlist-card { min-width: 0; }
 .playlist-card-body {
@@ -1482,6 +1511,11 @@
   gap: 9px;
   height: 100%;
   min-width: 0;
+}
+.playlist-card-body .badge {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
 }
 .playlist-card-title {
   min-width: 0;
