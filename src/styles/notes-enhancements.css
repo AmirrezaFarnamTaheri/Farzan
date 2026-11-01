@@ -152,7 +152,7 @@
 .notes-search-field .input {
   width: 100%;
   min-height: 42px;
-  padding-inline-start: var(--space-9);
+  padding-inline: var(--space-9);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 78%, transparent);
 }
