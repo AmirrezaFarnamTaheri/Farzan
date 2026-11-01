@@ -1098,7 +1098,7 @@ import { Pointer } from './src/lib/pointer.js';
       // Rank the full collection first. A pre-dedup 12-item cap can fill the
       // dropdown with one repeated resource while hiding eleven useful hits.
       const lexical = rankLexicalMatches(data, value, {
-        keys: ['label', 'description', 'category', 'searchText', 'tags', 'keywords'], limit: data.length,
+        keys: ['label', 'description', 'category', 'searchText', 'tags', 'keywords', 'labels'], limit: data.length,
       });
       const semantic = await this._querySemanticNotes(value, data);
       return dedupeSearchResults([...lexical, ...semantic], { limit: 12 });
@@ -1178,10 +1178,8 @@ import { Pointer } from './src/lib/pointer.js';
           // Retain original saved catalog metadata as searchable fields;
           // these records are a read-only index and never write source topics.
           tags: Array.isArray(topic.tags) ? [...topic.tags] : (topic.tags || []),
-          keywords: [
-            ...(Array.isArray(topic.keywords) ? topic.keywords : (topic.keywords ? [topic.keywords] : [])),
-            ...(Array.isArray(topic.labels) ? topic.labels : (topic.labels ? [topic.labels] : [])),
-          ],
+          keywords: Array.isArray(topic.keywords) ? [...topic.keywords] : (topic.keywords || []),
+          labels: Array.isArray(topic.labels) ? [...topic.labels] : (topic.labels || []),
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
           href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {
