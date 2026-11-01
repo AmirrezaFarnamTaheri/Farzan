@@ -203,6 +203,59 @@ if (!Array.isArray(list)) return list;
 return Promise.all(list.map(item => this._open(item)));
 }
 
+/**
+ * Atomic canonical Studio draft commit. Two open tabs must not both commit
+ * against an identical old board: the native IndexedDB read and put happen
+ * in the same readwrite transaction and queue behind each other. Never use a
+ * preceding get() + put() pair to simulate compare-and-swap.
+ *
+ * Settings protected by a passphrase need an encrypted transactional writer;
+ * this API fails closed instead of writing plaintext over protected records.
+ */
+async compareAndSwapSetting(key, expected, next) {
+  if (typeof key !== 'string' || !key.trim()) throw new TypeError('Invalid canonical setting key');
+  if (this.encryptionPassphrase) {
+    throw new Error('Atomic Studio draft saving is unavailable for encrypted settings');
+  }
+  const stringify = value => JSON.stringify(value ?? null);
+  const expectedText = stringify(expected);
+  if (typeof expectedText !== 'string' || typeof stringify(next) !== 'string') {
+    throw new TypeError('Canonical setting compare-and-swap requires JSON-safe values');
+  }
+  const connection = await this.open();
+  return new Promise((resolve, reject) => {
+    let transaction;
+    let accepted = false;
+    try {
+      transaction = connection.transaction('settings', 'readwrite');
+      const store = transaction.objectStore('settings');
+      const read = store.get(key);
+      read.onsuccess = () => {
+        const record = read.result;
+        if (record?.__encrypted) {
+          transaction.abort();
+          return;
+        }
+        if (stringify(record?.value ?? null) !== expectedText) return;
+        try {
+          store.put({ key, value: structuredClone(next) });
+          accepted = true;
+        } catch (error) {
+          try { transaction.abort(); } catch {}
+          reject(error);
+        }
+      };
+      transaction.oncomplete = () => resolve(accepted);
+      transaction.onerror = () => reject(transaction.error || new Error('Atomic setting write failed'));
+      transaction.onabort = () => reject(transaction.error
+        || new Error('Atomic setting compare-and-swap was aborted or protected'));
+    } catch (error) {
+      try { transaction?.abort(); } catch {}
+      reject(error);
+    }
+  });
+}
+
 async add(store, data) {
   return withMutationRetry(async () => {
     const payload = await this._seal(store, data);
