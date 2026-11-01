@@ -1104,4 +1104,21 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(dialog).toBeHidden();
   });
 
+  test('unknown route has a Home recovery breadcrumb on desktop without crowding narrow phones', async ({ page }) => {
+    const missing = '/#/this-route-does-not-exist';
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(missing, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notfound')).toBeVisible();
+    await expect(page.locator('#breadcrumb-list a[href="#/home"]')).toBeVisible();
+    await expect(page.locator('#breadcrumb-list .breadcrumb-current')).toHaveText('Page not found');
+    await expect(page.locator('#breadcrumb-list .breadcrumb-item')).toHaveCount(2);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notfound')).toBeVisible();
+    await expect(page.locator('#breadcrumb-list .breadcrumb-current')).toHaveText('Page not found');
+    await expect(page.locator('#breadcrumb-list .breadcrumb-item')).toHaveCount(1);
+    await expect(page.locator('#breadcrumb-list a[href="#/home"]')).toHaveCount(0);
+  });
+
 });
