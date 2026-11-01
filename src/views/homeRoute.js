@@ -424,7 +424,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     ...active.map(record => ({ record, source: 'progress' })),
     ...timestamps.filter(item => item?.topicId
       && Number.isFinite(Number(item.position)) && Number(item.position) >= 0
-      && !isFinished(progressByTopic.get(sourceKey(item)))
+      && !isFinished(progressByTopic.get(sourceKey(item))))
       .map(record => ({ record, source: 'timestamp' })),
   ];
   const focusCandidate = focusCandidates.sort((a, b) =>
