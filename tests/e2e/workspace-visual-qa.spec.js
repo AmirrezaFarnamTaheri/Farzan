@@ -43,6 +43,15 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if ((route === 'help' || route === 'settings') && setup.width >= 1024) {
+        const systemLink = page.locator('.sidebar-system-nav [data-route="/' + route + '"]');
+        await expect(systemLink).toHaveAttribute('aria-current', 'page');
+        await expect(systemLink).toBeVisible();
+        const bounds = await systemLink.boundingBox();
+        expect(bounds, setup.name + ' / ' + route + ' missing visible System link').not.toBeNull();
+        expect(bounds.y + bounds.height, setup.name + '/' + route + ' System link clipped')
+          .toBeLessThanOrEqual(setup.height - 2);
+      }
       if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
@@ -72,6 +81,9 @@ for (const setup of setups) {
         });
         await page.locator('[data-notifications-toggle]').click();
         await expect(page.locator('#notifications-panel')).toBeVisible();
+        for (const id of ['#notif-mark-read', '#notif-clear-all']) {
+          await expect(page.locator(id)).toHaveCSS('white-space', 'nowrap');
+        }
         await page.screenshot({
           path: path.join(folder, 'notifications-open.png'),
           animations: 'disabled', caret: 'hide',
