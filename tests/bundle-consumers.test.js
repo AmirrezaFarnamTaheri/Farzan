@@ -50,6 +50,53 @@ describe('bundle consumer provenance', () => {
     ]);
   });
 
+  it('attributes actual emitted bytes on the static bootstrap chunk graph without charging lazy chunks', () => {
+    const report = summarizeBundleConsumers({
+      inputs: { 'src/index.js': { imports: [] } },
+      outputs: {
+        'dist/opencoursedeck.js': {
+          entryPoint: 'src/index.js', bytes: 110,
+          imports: [
+            { path: 'dist/chunks/shared-ONE.js', kind: 'import-statement' },
+            { path: 'dist/chunks/feature-LAZY.js', kind: 'dynamic-import' },
+          ],
+        },
+        'dist/chunks/shared-ONE.js': {
+          bytes: 90,
+          imports: [{ path: 'dist/chunks/shared-TWO.js', kind: 'import-statement' }],
+        },
+        'dist/chunks/shared-TWO.js': {
+          bytes: 40,
+          imports: [{ path: 'dist/chunks/shared-ONE.js', kind: 'import-statement' }],
+        },
+        'dist/chunks/feature-LAZY.js': {
+          bytes: 600,
+          entryPoint: 'src/features/optional.js',
+          imports: [{ path: 'dist/chunks/shared-TWO.js', kind: 'import-statement' }],
+        },
+        'dist/chunks/unused.js': { bytes: 12, imports: [] },
+      },
+    });
+    expect(report.totalJsBytes).toBe(852);
+    expect(report.bootstrapStatic.path).toEqual([
+      'dist/chunks/shared-ONE.js',
+      'dist/chunks/shared-TWO.js',
+      'dist/opencoursedeck.js',
+    ]);
+    expect(report.bootstrapStatic.bytes).toBe(240);
+    expect(report.bootstrapStatic.dynamicImports).toEqual(['dist/chunks/feature-LAZY.js']);
+    expect(report.deferredJsBytes).toBe(612);
+    expect(report.entry.bytes).toBe(110);
+  });
+
+  it('fails when an emitted static import is missing instead of inventing a zero-byte startup graph', () => {
+    const invalid = structuredClone(fixture);
+    invalid.outputs['dist/opencoursedeck.js'].imports = [
+      { path: 'dist/chunks/missing.js', kind: 'import-statement' },
+    ];
+    expect(() => summarizeBundleConsumers(invalid)).toThrow(/missing|unresolved/i);
+  });
+
   it('rejects malformed or empty emitted graphs rather than reporting imaginary savings', () => {
     expect(() => summarizeBundleConsumers(null)).toThrow();
     expect(() => summarizeBundleConsumers({ inputs: {}, outputs: {} })).toThrow();
