@@ -2101,30 +2101,33 @@ import { countWords } from './src/core/textMetrics.js';
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
           const modernToggle = $('[data-notes-modern-toggle]');
-          if (modernToggle && !Editor._tiptap) modernToggle.textContent = 'Try modern editor (preview)';
+          if (modernToggle && !Editor._tiptap) modernToggle.textContent = 'Try Squire editor';
         });
       }
 
-      // Quality-assurance preview is deliberately opt-in while rich legacy
-      // tables/images/style extensions and the full bundle gate are unfinished.
+      // Squire owns ordinary HTML-canonical Notes by default in this
+      // prelaunch release. A visible classic toggle remains an explicit
+      // fallback, and complex saved HTML is never converted automatically.
       const modernToggle = $('[data-notes-modern-toggle]');
       if (modernToggle) {
-        modernToggle.hidden = window.OpenCourseDeck?.featureFlags?.notesTiptapPreview !== true;
+        modernToggle.hidden = false;
         RouteListeners.on(modernToggle, 'click', async () => {
           if (Editor._tiptap) {
-            Editor.disableModern();
+            // Do not end an in-progress IME composition or discard an unsaved
+            // last mutation merely to switch editing engines.
+            if (!Editor.disableModern()) return;
           } else {
             const result = await this.enableModernEditor();
             if (!result.ok) {
               window.OpenCourseDeck?.Toast?.info?.(
                 result.reason === 'incompatible'
                   ? 'This note needs the classic editor to preserve its formatting.'
-                  : 'The preview editor is unavailable.',
+                  : 'The Squire editor is unavailable; continue in classic mode.',
               );
             }
           }
           modernToggle.textContent = Editor._tiptap
-            ? 'Use classic editor' : 'Try modern editor (preview)';
+            ? 'Use classic editor' : 'Try Squire editor';
         });
       }
 
@@ -2367,6 +2370,42 @@ import { countWords } from './src/core/textMetrics.js';
       NotesList.setActive(id);
       const pane = $('[data-notes-main-pane]');
       if (pane) pane.classList.add('has-note');
+
+      const toggle = $('[data-notes-modern-toggle]');
+      if (toggle) {
+        toggle.hidden = false;
+        toggle.disabled = false;
+        toggle.removeAttribute('title');
+        toggle.textContent = 'Try Squire editor';
+        // Test-only opt-out retains characterization of the classic editor.
+        // Normal first-launch users never see a migration/consent dialog.
+        if (window.OpenCourseDeck?.featureFlags?.notesSquireDefault !== false) {
+          const sessionEpoch = Editor._loadEpoch;
+          toggle.disabled = true;
+          toggle.textContent = 'Opening Squire editor…';
+          void this.enableModernEditor().then(result => {
+            // Reopening another note while the chunk loads must not publish
+            // stale mode labels or replace its authoritative editor.
+            if (!this._inited || Editor._loadEpoch !== sessionEpoch
+              || Editor._currentId !== id || !toggle.isConnected) return;
+            toggle.disabled = result.reason === 'incompatible';
+            toggle.textContent = result.ok
+              ? 'Use classic editor'
+              : result.reason === 'incompatible'
+                ? 'Classic editor (advanced formatting)'
+                : 'Try Squire editor';
+            if (result.reason === 'incompatible') {
+              toggle.title = 'This note keeps its original advanced formatting in the classic editor.';
+            }
+          }).catch(error => {
+            if (!this._inited || Editor._loadEpoch !== sessionEpoch
+              || Editor._currentId !== id || !toggle.isConnected) return;
+            toggle.disabled = false;
+            toggle.textContent = 'Try Squire editor';
+            console.warn('[Notes] Squire failed to initialize; classic editor preserved', error);
+          });
+        }
+      }
       return true;
     },
 
