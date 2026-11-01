@@ -119,7 +119,20 @@ function initFuse(data, options = {}) {
       return tokens.filter(token => typeof token === 'string' || typeof token === 'number')
         .map(normalizeWorkerQuery);
     }).filter(Boolean);
-    return { ...item, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
+    // Fuse also indexes its original keys, not just our normalized alias.
+    // Sanitize those fields on this private indexing copy as well: otherwise
+    // Fuse's own getter can stringify a taxonomy object to "[object Object]"
+    // and revive the very phantom match excluded above. Array positions stay
+    // stable for native Fuse match metadata; source/response records are intact.
+    const indexedItem = { ...item };
+    for (const key of fieldNames) {
+      if (!Object.hasOwn(item, key)) continue;
+      const value = item[key];
+      const safe = token => typeof token === 'string' || typeof token === 'number'
+        ? token : '';
+      indexedItem[key] = Array.isArray(value) ? value.map(safe) : safe(value);
+    }
+    return { ...indexedItem, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
   });
   const nextFuse = new Fuse(indexed, {
     threshold: 0.3,
