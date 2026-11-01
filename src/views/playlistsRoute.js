@@ -73,6 +73,14 @@ function sanitizeSavedPlaylists(value) {
     : [];
 }
 
+// Canonical saveSetting may acknowledge with true or the exact saved value.
+// False, null, missing or unrelated receipts cannot establish a durable write.
+function assertSavedPlaylistReceipt(receipt, expected) {
+  if (receipt === true) return;
+  if (Array.isArray(receipt) && JSON.stringify(receipt) === JSON.stringify(expected)) return;
+  throw new Error('Saved playlist write was not acknowledged');
+}
+
 async function renderPlaylists(deps) {
   const { safeMediaUrl, Router, setPendingCourseSession, Toast = window.OpenCourseDeck?.Toast } = deps;
   const metricsRoot = document.querySelector('[data-playlist-metrics]');
@@ -345,21 +353,41 @@ async function renderPlaylists(deps) {
   const firstCatalog = catalogGroups[0];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
-    saveBtn.disabled = !firstCatalog?.topicIds?.length || !window.DB?.saveSetting;
+    let creating = false;
+    saveBtn.disabled = !firstCatalog?.topicIds?.length
+      || typeof window.DB?.saveSetting !== 'function'
+      || typeof window.DB?.getSetting !== 'function';
     saveBtn.onclick = async () => {
-      if (!firstCatalog?.topicIds?.length || !window.DB?.saveSetting) return;
+      if (creating || !firstCatalog?.topicIds?.length
+        || typeof window.DB?.saveSetting !== 'function'
+        || typeof window.DB?.getSetting !== 'function') return;
       const input = document.querySelector('[data-playlist-name]');
       const title = String(input?.value || firstCatalog.title || 'Saved playlist').trim() || 'Saved playlist';
-      const now = Date.now();
-      const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists'));
-      const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      await window.DB.saveSetting('ocd_playlists', [
-        { id, title, topicIds: [...new Set(firstCatalog.topicIds)], createdAt: now, updatedAt: now },
-        ...current,
-      ].slice(0, 50));
-      if (input) input.value = '';
-      Toast.success('Playlist saved');
-      renderPlaylists(deps);
+      creating = true;
+      saveBtn.disabled = true;
+      try {
+        // Preserve unknown future-version rows verbatim. Silently sanitizing
+        // the complete collection before a write can erase user data.
+        const raw = await window.DB.getSetting('ocd_playlists');
+        if (raw != null && !Array.isArray(raw)) throw new TypeError('Saved playlists could not be read');
+        const current = raw ?? [];
+        if (current.length >= 50) throw new Error('Saved playlist limit reached; remove one before creating another');
+        const now = Date.now();
+        const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        const next = [
+          { id, title, topicIds: [...new Set(firstCatalog.topicIds)], createdAt: now, updatedAt: now },
+          ...current,
+        ];
+        assertSavedPlaylistReceipt(await window.DB.saveSetting('ocd_playlists', next), next);
+        if (input) input.value = '';
+        Toast.success?.('Playlist saved');
+        void renderPlaylists(deps);
+      } catch (error) {
+        Toast.error?.('Could not save playlist: ' + (error?.message || 'Storage unavailable'));
+      } finally {
+        creating = false;
+        saveBtn.disabled = false;
+      }
     };
   }
 
@@ -399,7 +427,7 @@ async function renderPlaylists(deps) {
         const updated = records.map(record => record === selected
           ? { ...record, topicIds: ids, updatedAt: Date.now() } : record);
         const receipt = await window.DB.saveSetting('ocd_playlists', updated);
-        if (receipt === false) throw new Error('Saved playlist order was not acknowledged');
+        assertSavedPlaylistReceipt(receipt, updated);
         Toast.success?.('Playlist order saved');
         void renderPlaylists(deps);
       } catch (error) {
@@ -449,10 +477,33 @@ async function renderPlaylists(deps) {
       return;
     }
     const btn = event.target?.closest?.('[data-delete-playlist]');
-    if (!btn || !window.DB?.saveSetting) return;
-    const current = sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists'));
-    await window.DB.saveSetting('ocd_playlists', current.filter(item => item.id !== btn.dataset.deletePlaylist));
-    Toast.success('Playlist deleted');
-    renderPlaylists(deps);
+    if (!btn || btn.disabled) return;
+    if (typeof window.DB?.getSetting !== 'function' || typeof window.DB?.saveSetting !== 'function') {
+      Toast.error?.('Could not delete playlist: storage is unavailable');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const raw = await window.DB.getSetting('ocd_playlists');
+      if (!Array.isArray(raw)) throw new TypeError('Saved playlists could not be read');
+      const id = btn.dataset.deletePlaylist;
+      const current = raw.find(item => String(item?.id) === id);
+      const rendered = savedPlaylists.find(item => String(item.id) === id);
+      if (!current || !rendered || !Array.isArray(current.topicIds)
+        || current.topicIds.length !== rendered.topicIds.length
+        || current.topicIds.some((value, i) => String(value) !== String(rendered.topicIds[i]))) {
+        throw new Error('Saved playlist changed elsewhere; reload before deleting');
+      }
+      // Only remove the selected row. Unknown records and metadata remain byte
+      // for byte unchanged; they may be needed by another app version.
+      const next = raw.filter(item => String(item?.id) !== id);
+      assertSavedPlaylistReceipt(await window.DB.saveSetting('ocd_playlists', next), next);
+      Toast.success?.('Playlist deleted');
+      void renderPlaylists(deps);
+    } catch (error) {
+      Toast.error?.('Could not delete playlist: ' + (error?.message || 'Storage unavailable'));
+    } finally {
+      btn.disabled = false;
+    }
   };
 }
