@@ -56,6 +56,12 @@ for (const setup of setups) {
             Math.round(el.getBoundingClientRect().right))).toBeGreaterThanOrEqual(setup.width - 2);
         }
         if (route === 'notes' || route === 'courses') {
+          // Mobile Notes intentionally shows the editor first. Open the
+          // accessible library pane before inspecting its search control.
+          if (route === 'notes' && setup.width <= 1023) {
+            await page.locator('[data-notes-toggle-library]').click();
+            await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'true');
+          }
           const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
           const field = page.locator(fieldSelector).first();
           await expect(field).toBeVisible();
@@ -67,6 +73,10 @@ for (const setup of setups) {
           expect(position, setup.name + '/' + route + ' search control missing').not.toBeNull();
           expect(position.iconX, setup.name + '/' + route + ' search icon should be at inline-start')
             .toBeGreaterThan(position.inputMid);
+          if (route === 'notes' && setup.width <= 1023) {
+            await page.locator('[data-notes-toggle-library]').click();
+            await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'false');
+          }
         }
         if (route === 'home') {
           await expect(page.locator('.home-widget').first()).toHaveCSS('text-align', 'start');
