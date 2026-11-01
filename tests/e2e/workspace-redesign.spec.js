@@ -647,6 +647,64 @@ test.describe('Farzan desktop workspace redesign', () => {
     })).toBe(true);
   });
 
+  test('keeps default Squire composing text in its original note until IME commits, including RTL mobile', async ({ page }) => {
+    test.setTimeout(45_000); // Multiple independent persistence and navigation gates.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notes')).toBeVisible();
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+
+    await page.locator('[data-action="new-note"]').first().click();
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    const title = 'Squire committed IME 你好';
+    await page.locator('[data-note-title-input]').fill(title);
+    await modern.click();
+    await page.keyboard.insertText('Baseline note');
+    const savedContent = () => page.evaluate(async name => {
+      const notes = await window.DB.getAllNotes();
+      return notes.find(note => note.title === name)?.content ?? '';
+    }, title);
+    await expect.poll(savedContent, { timeout: 12_000 }).toContain('Baseline note');
+
+    await page.evaluate(() => {
+      window.__squireBlockedNavigation = 0;
+      window.OpenCourseDeck.bus.on('route:blocked', () => { window.__squireBlockedNavigation += 1; });
+      const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+      root.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      const paragraph = root.querySelector('p');
+      paragraph.textContent = 'Baseline note فارسی 你好世界';
+      root.dispatchEvent(new InputEvent('input', {
+        bubbles: true, inputType: 'insertCompositionText', data: '你好世界', isComposing: true,
+      }));
+      location.hash = '#/home';
+    });
+    await expect.poll(() => page.evaluate(() => window.__squireBlockedNavigation), { timeout: 8_000 }).toBe(1);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/notes');
+    await expect(modern).toContainText('فارسی 你好世界');
+    expect(await savedContent()).not.toContain('你好世界');
+
+    await page.evaluate(() => {
+      document.querySelector('[data-notes-editor] .notes-modern-editor')
+        .dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    });
+    await expect.poll(savedContent, { timeout: 12_000 }).toContain('فارسی 你好世界');
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    // Notes uses an editor-first mobile pane; open the visible library with
+    // its accessible toggle before clicking a saved note.
+    const libraryToggle = page.locator('[data-notes-toggle-library]');
+    await expect(libraryToggle).toBeVisible();
+    await libraryToggle.click();
+    const savedRow = page.locator('[data-notes-list]').getByText(title);
+    await expect(savedRow).toBeVisible();
+    await savedRow.click();
+    await expect(libraryToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await expect(modern).toContainText('فارسی 你好世界');
+  });
+
   test('preserves an IME Notes draft when route navigation is vetoed', async ({ page }) => {
     await page.addInitScript(() => {
       window.OpenCourseDeck = window.OpenCourseDeck || {};
