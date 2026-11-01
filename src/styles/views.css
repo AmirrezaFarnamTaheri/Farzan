@@ -376,7 +376,7 @@
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface-3) 68%, transparent);
   color: var(--text-primary);
-  text-align: left;
+  text-align: start;
   line-height: 1.25;
   transition: transform var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast), box-shadow var(--duration-fast);
 }
@@ -632,13 +632,13 @@
   gap: var(--space-2);
   max-height: calc(100vh - 220px);
   overflow: auto;
-  padding-right: var(--space-2);
+  padding-inline-end: var(--space-2);
 }
 
 .course-item {
   position: relative;
   width: 100%;
-  text-align: left;
+  text-align: start;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-primary);
@@ -797,14 +797,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding-right: var(--space-3);
-  border-right: 1px solid var(--glass-border);
+  padding-inline-end: var(--space-3);
+  border-inline-end: 1px solid var(--glass-border);
   flex-wrap: wrap;
 }
 
 .studio-tool-group:last-child {
-  border-right: none;
-  padding-right: 0;
+  border-inline-end: none;
+  padding-inline-end: 0;
 }
 
 .studio-workspace-grid {
@@ -1071,15 +1071,11 @@
 
 .courses-search-field > .icon {
   position: absolute;
-  left: var(--space-3);
+  inset-inline-start: var(--space-3);
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-tertiary);
   pointer-events: none;
-}
-
-.courses-search-field .input {
-  padding-left: calc(var(--space-3) * 2 + 1em);
 }
 
 .catalog-empty {
