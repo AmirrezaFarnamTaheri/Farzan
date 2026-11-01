@@ -112,9 +112,12 @@ function initFuse(data, options = {}) {
     // exact metadata match outside Fuse's distance window (even at threshold 0).
     const normalized = fieldNames.flatMap(key => {
       const value = item[key];
-      return Array.isArray(value)
-        ? value.map(normalizeWorkerQuery)
-        : [normalizeWorkerQuery(value)];
+      const tokens = Array.isArray(value) ? value : [value];
+      // The shared lexical ranker indexes only real text/numeric tokens.
+      // Converting imported object metadata to "[object Object]" invents
+      // searchable words that do not exist in the user's source document.
+      return tokens.filter(token => typeof token === 'string' || typeof token === 'number')
+        .map(normalizeWorkerQuery);
     }).filter(Boolean);
     return { ...item, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
   });
