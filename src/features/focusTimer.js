@@ -190,8 +190,10 @@ export function mountFocusTimerWidget() {
     if (tick !== undefined) window.clearInterval(tick);
     window.removeEventListener('storage', onStorage);
   };
-  if (!hydrate()) return;
+  const ready = hydrate();
+  root.dataset.focusInitialized = 'true';
   render();
+  if (!ready) return;
   window.addEventListener('storage', onStorage);
   tick = window.setInterval(() => {
     if (!root.isConnected) { cleanup(); return; }
