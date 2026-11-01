@@ -42,6 +42,9 @@ describe('Saved playlists acknowledged mutations', () => {
   async function create() {
     mount();
     const button = await vi.waitFor(() => {
+      // The markup contains an enabled save button before the async catalog
+      // and saved-queue read attaches its handler. Wait for real hydration.
+      expect(document.querySelector('[data-playlist-list] [data-playlist-id="old"]')).not.toBeNull();
       const save = document.querySelector('[data-save-playlist]');
       expect(save).not.toBeNull();
       expect(save.disabled).toBe(false);
