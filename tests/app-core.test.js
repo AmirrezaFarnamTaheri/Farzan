@@ -296,6 +296,21 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.Modal.confirm).toBeUndefined();
   });
 
+  it('does not remove a created modal after it is reopened before delayed cleanup', async () => {
+    await loadApp('<div id="ocd-app"><main id="view-container"></main></div>');
+    const modal = window.OpenCourseDeck.Modal.create({ title: 'Recovery dialog', body: 'Keep editing' });
+    window.OpenCourseDeck.Modal.close(modal);
+    window.OpenCourseDeck.Modal.open(modal);
+    vi.advanceTimersByTime(450);
+    expect(modal.isConnected).toBe(true);
+    expect(modal.classList.contains('open')).toBe(true);
+    expect(modal.hasAttribute('hidden')).toBe(false);
+
+    window.OpenCourseDeck.Modal.close(modal);
+    vi.advanceTimersByTime(450);
+    expect(modal.isConnected).toBe(false);
+  });
+
   it('opens drawers as modal dialogs and restores focus on close', async () => {
     await loadApp(`
       <button id="drawer-opener">Open drawer</button>
