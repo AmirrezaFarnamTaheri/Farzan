@@ -94,7 +94,7 @@ function showHome() {
 describe('Home focus timer widget', () => {
   it('renders native keyboard controls and persists only its isolated timer key', async () => {
     showHome();
-    await vi.waitFor(() => expect(document.querySelector('[data-focus-start]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-focus-widget]')?.dataset.focusInitialized).toBe('true'));
     const widget = document.querySelector('[data-focus-widget]');
     expect(widget.querySelector('[data-focus-clock]').textContent).toBe('25:00');
     expect(widget.querySelector('[data-focus-clock]').getAttribute('aria-live')).toBe('off');
@@ -112,7 +112,7 @@ describe('Home focus timer widget', () => {
 
   it('will not overwrite a newer timer written by another tab', async () => {
     showHome();
-    await vi.waitFor(() => expect(document.querySelector('[data-focus-start]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-focus-widget]')?.dataset.focusInitialized).toBe('true'));
     const widget = document.querySelector('[data-focus-widget]');
     const newer = { ...createFocusTimer('deep'), focusCount: 3 };
     localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(newer));
