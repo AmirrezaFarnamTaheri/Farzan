@@ -93,9 +93,26 @@ let studioKeyController = null;
       return memoryStore;
     }
 
-    async saveStorage(cards) {
+    async saveStorage(cards, { verifyAgainst } = {}) {
       const snapshot = cards.map(card => ({ ...card }));
       const hasCanonicalWriter = typeof window.DB?.saveSetting === 'function';
+      const strictTransition = verifyAgainst !== undefined;
+      const sameDeck = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+      // Conversion/rollback can replace a learner's original due dates.
+      // Require the authoritative snapshot we actually previewed, not a
+      // stale cached deck or a local mirror left over from a previous tab.
+      // Reads and writes are not an atomic compare-and-swap: concurrent tabs
+      // still require storage-level revision locks to close this narrow race.
+      if (strictTransition) {
+        if (!hasCanonicalWriter || typeof window.DB?.getSetting !== 'function') {
+          throw new Error('Canonical FSRS migration storage is unavailable');
+        }
+        const current = await window.DB.getSetting(STORE_NAME);
+        if (!Array.isArray(current) || !sameDeck(current, verifyAgainst)) {
+          throw new Error('Flashcard deck changed in another tab; reload before changing scheduler');
+        }
+      }
 
       // A local mirror is not an acceptable fallback when the canonical IDB
       // writer rejects: the next hydration would prefer the old IDB deck and
@@ -103,6 +120,18 @@ let studioKeyController = null;
       if (hasCanonicalWriter) {
         const receipt = await window.DB.saveSetting(STORE_NAME, snapshot);
         if (receipt === false) throw new Error('Flashcard write was not acknowledged by canonical storage');
+        if (strictTransition) {
+          // The DB bridge returns the committed array; some explicit test
+          // stores return true or { committed:true }. No acknowledgement is
+          // not proof that the archive or restored schedule exists.
+          const accepted = receipt === true || receipt?.committed === true
+            || (Array.isArray(receipt) && sameDeck(receipt, snapshot));
+          if (!accepted) throw new Error('FSRS migration write was not acknowledged');
+          const saved = await window.DB.getSetting(STORE_NAME);
+          if (!Array.isArray(saved) || !sameDeck(saved, snapshot)) {
+            throw new Error('FSRS migration was not saved durably: canonical readback differed');
+          }
+        }
       }
       let localSaved = false;
       let localError;
@@ -306,6 +335,7 @@ let studioKeyController = null;
 
     async _migrateCardToFsrs(cardId) {
       const cards = [...await this.getCards()];
+      const expectedDeck = structuredClone(cards);
       const index = cards.findIndex(card => card.id === cardId);
       if (index < 0) throw new Error('Flashcard not found');
       const card = cards[index];
@@ -337,7 +367,7 @@ let studioKeyController = null;
       delete migrated.easeFactor;
       delete migrated.lastReviewedAt;
       cards[index] = migrated;
-      await this.saveStorage(cards);
+      await this.saveStorage(cards, { verifyAgainst: expectedDeck });
       return migrated;
     }
 
@@ -350,6 +380,7 @@ let studioKeyController = null;
 
     async _rollbackCardToSm2(cardId) {
       const cards = [...await this.getCards()];
+      const expectedDeck = structuredClone(cards);
       const index = cards.findIndex(card => card.id === cardId);
       if (index < 0) throw new Error('Flashcard not found');
       const current = cards[index];
@@ -366,7 +397,7 @@ let studioKeyController = null;
       }
       const restored = structuredClone(original);
       cards[index] = restored;
-      await this.saveStorage(cards);
+      await this.saveStorage(cards, { verifyAgainst: expectedDeck });
       return restored;
     }
 

@@ -110,6 +110,64 @@ describe('explicit and reversible SM-2 to FSRS scheduling migration', () => {
     await expect(flash().rollbackCardToSm2(nativeFsrs.id, { consent: true })).rejects.toThrow(/archive|history|snapshot/i);
   });
 
+  it('refuses to report an FSRS migration when canonical storage acknowledges but does not persist it', async () => {
+    const { id, legacy } = await seed();
+    window.DB.saveSetting.mockImplementationOnce(async () => true);
+    await expect(flash().migrateCardToFsrs(id, { consent: true }))
+      .rejects.toThrow(/persist|saved|readback|durab|verify/i);
+    expect(canonical[0]).toEqual(legacy);
+    expect((await flash().getCards())[0]).toEqual(legacy);
+    expect(JSON.parse(localStorage.getItem('ocd_flashcards'))[0].scheduler).not.toBe('fsrs-v5');
+  });
+
+  it('rejects an absent FSRS migration acknowledgement even if the storage promise resolves', async () => {
+    const { id, legacy } = await seed();
+    window.DB.saveSetting.mockImplementationOnce(async () => undefined);
+    await expect(flash().migrateCardToFsrs(id, { consent: true }))
+      .rejects.toThrow(/acknowledg|receipt|confirm/i);
+    expect(canonical[0]).toEqual(legacy);
+    expect((await flash().getCards())[0]).toEqual(legacy);
+  });
+
+  it('does not overwrite a newer cross-tab canonical flashcard record with a stale opt-in migration', async () => {
+    const { id } = await seed();
+    const before = structuredClone(await flash().getCards());
+    canonical = structuredClone(canonical);
+    canonical[0].front = 'Newer user note from another tab';
+    const newer = structuredClone(canonical);
+    const writes = window.DB.saveSetting.mock.calls.length;
+    await expect(flash().migrateCardToFsrs(id, { consent: true }))
+      .rejects.toThrow(/changed|stale|conflict|another tab/i);
+    expect(window.DB.saveSetting).toHaveBeenCalledTimes(writes);
+    expect(canonical).toEqual(newer);
+    expect(before[0].front).not.toBe(newer[0].front);
+  });
+
+  it('does not falsely finish SM-2 rollback when the archived snapshot was not actually written', async () => {
+    const { id } = await seed();
+    await flash().migrateCardToFsrs(id, { consent: true });
+    const activeFsrs = structuredClone(canonical[0]);
+    window.DB.saveSetting.mockImplementationOnce(async () => true);
+    await expect(flash().rollbackCardToSm2(id, { consent: true }))
+      .rejects.toThrow(/persist|saved|readback|durab|verify/i);
+    expect(canonical[0]).toEqual(activeFsrs);
+    expect((await flash().getCards())[0]).toEqual(activeFsrs);
+  });
+
+  it('refuses stale rollback if another tab reviewed the active FSRS card', async () => {
+    const { id } = await seed();
+    await flash().migrateCardToFsrs(id, { consent: true });
+    await flash().getCards();
+    canonical = structuredClone(canonical);
+    canonical[0].front = 'Newer FSRS edit from another tab';
+    const newer = structuredClone(canonical);
+    const writes = window.DB.saveSetting.mock.calls.length;
+    await expect(flash().rollbackCardToSm2(id, { consent: true }))
+      .rejects.toThrow(/changed|stale|conflict|another tab/i);
+    expect(window.DB.saveSetting).toHaveBeenCalledTimes(writes);
+    expect(canonical).toEqual(newer);
+  });
+
   it('does not change the cached or canonical card on a rejected IndexedDB write', async () => {
     const { id, legacy } = await seed();
     window.DB.saveSetting.mockRejectedValueOnce(new Error('IndexedDB full'));
