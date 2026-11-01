@@ -1030,6 +1030,24 @@ input[type="file"][hidden] {
   border-radius: 0;
   gap: 10px;
 }
+.view-courses .topic-row[data-playing="true"] {
+  background: var(--surface-active);
+  border-inline-start: 3px solid var(--accent);
+}
+.view-courses .topic-row[data-playing="true"] .topic-primary-hint {
+  border-color: var(--accent);
+  font-weight: 750;
+}
+.view-courses .topic-playing-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-active);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
 .view-courses .topic-primary-action {
   display: inline-flex;
   align-items: center;
