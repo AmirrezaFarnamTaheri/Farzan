@@ -41,7 +41,6 @@ import faIR from './locales/fa-IR.js';
 import { initAIClient } from './features/aiClient.js';
 import { initErrorBoundary } from './features/errorBoundary.js';
 import { initOfflineBanner } from './features/offlineBanner.js';
-import { initAddContent } from './features/addContent.js';
 import { runIndependentInitializers } from './core/deferredRuntime.js';
 
 installBridgeHardening(window);
@@ -220,7 +219,17 @@ pd.ProductReadiness = enforceProductReadiness(document);
 // palette exposes commands that call its namespace.
 import('../app.js').then(async () => {
   await runIndependentInitializers([
-    { name: 'add-content', run: () => initAddContent(window) },
+    {
+      name: 'add-content',
+      run: async () => {
+        // Add Content owns the local-library UI, but it is not initialized
+        // until after the app shell. Keep its substantial userLibrary helper
+        // graph out of the synchronous entry without changing the order of
+        // Add Content and command-palette registrations.
+        const { initAddContent } = await import('./features/addContent.js');
+        initAddContent(window);
+      },
+    },
   ]);
 
   await runIndependentInitializers([
