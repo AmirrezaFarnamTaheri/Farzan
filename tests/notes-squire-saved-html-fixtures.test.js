@@ -94,6 +94,48 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     } finally { editor.destroy(); }
   });
 
+  it('retains approved RTL, alignment, font and color metadata on the first edit and reopen', () => {
+    const html = '<h2 dir="rtl">فیزیولوژی قلب 你好</h2>'
+      + '<p dir="rtl" style="text-align:right">'
+      + '<span style="font-size:18px;color:#123456">انقباض Heart</span></p>'
+      + '<p><strong>Review</strong> 72 bpm</p>';
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createSquireNoteEditor({ element: host, html });
+    let saved;
+    try {
+      const paragraph = host.querySelectorAll('.notes-modern-editor p')[1];
+      paragraph.append(document.createTextNode(' next review'));
+      expect(editor.syncChanges()).toBe(true);
+      saved = editor.getHTML();
+      expect(assessNoteForSquire(saved).compatible).toBe(true);
+    } finally { editor.destroy(); host.remove(); }
+
+    const original = document.createElement('template');
+    const result = document.createElement('template');
+    original.innerHTML = html;
+    result.innerHTML = saved;
+    expect(result.content.querySelector('h2').getAttribute('dir'))
+      .toBe(original.content.querySelector('h2').getAttribute('dir'));
+    const first = original.content.querySelector('p[dir="rtl"]');
+    const after = result.content.querySelector('p[dir="rtl"]');
+    expect(after).not.toBeNull();
+    expect(after.style.textAlign).toBe(first.style.textAlign);
+    const marked = result.content.querySelector('span');
+    expect(marked).not.toBeNull();
+    expect(marked.style.fontSize).toBe('18px');
+    expect(marked.style.color).toBe(first.querySelector('span').style.color);
+    expect(result.content.textContent).toContain('next review');
+
+    const reopenedHost = document.createElement('div');
+    const reopened = createSquireNoteEditor({ element: reopenedHost, html: saved });
+    try {
+      expect(reopened.getHTML()).toBe(saved);
+      expect(reopenedHost.querySelector('h2').getAttribute('dir')).toBe('rtl');
+      expect(reopenedHost.querySelector('span').style.fontSize).toBe('18px');
+    } finally { reopened.destroy(); }
+  });
+
   it('admits only Squire list-text wrappers, never arbitrary divs or attached attributes', () => {
     const safe = '<ul><li><div>Blood pressure</div><ul><li>Renal</li></ul></li></ul>';
     expect(assessNoteForSquire(safe)).toEqual({ compatible: true, reason: null });
