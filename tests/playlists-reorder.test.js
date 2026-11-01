@@ -80,7 +80,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
     const originalButton = await vi.waitFor(() => {
       const button = [...document.querySelectorAll('[data-playlist-move="up"]')]
         .find(row => row.dataset.playlistId === 'focus-queue' && row.dataset.topicId === 'e');
-      expect(button).not.toBeNull();
+      expect(button).toBeTruthy();
       return button;
     });
     originalButton.closest('details').open = true;
@@ -93,7 +93,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
       const next = [...document.querySelectorAll('[data-playlist-move="up"]')]
         .find(row => row.dataset.playlistId === 'focus-queue'
           && row.dataset.topicId === 'e' && row.dataset.topicIndex === '3');
-      expect(next).not.toBeNull();
+      expect(next).toBeTruthy();
       expect(next.closest('details').open).toBe(true);
       expect(document.activeElement).toBe(next);
     });
