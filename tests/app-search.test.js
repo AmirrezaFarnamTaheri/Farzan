@@ -296,6 +296,70 @@ describe('app topbar search rendering', () => {
     expect(window.DB.saveSetting).toBeUndefined();
   });
 
+  it('does not cache a fictitious empty Notes index when canonical storage is inaccessible', async () => {
+    const readNotes = vi.fn()
+      .mockRejectedValueOnce(new Error('Canonical Notes IndexedDB locked'))
+      .mockResolvedValueOnce([{ id: 'renal-1', title: 'Renal practice', content: '<p>Kidney</p>' }]);
+    window.DB = {
+      getAllNotes: readNotes,
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.DataStore = { init: vi.fn(async () => true), allCourses: () => [], allTopics: () => [] };
+    const search = window.OpenCourseDeck.TopbarSearch;
+
+    await expect(search._queryUniversal('renal')).rejects.toThrow(/IndexedDB locked/i);
+    expect(search._universalData).toBeNull();
+
+    const recovered = await search._queryUniversal('renal');
+    expect(recovered.map(item => item.sourceId)).toContain('renal-1');
+    expect(readNotes).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders a non-actionable accessible read-failure status, then retries recovered Notes', async () => {
+    const readNotes = vi.fn()
+      .mockRejectedValueOnce(new Error('Canonical store unavailable'))
+      .mockResolvedValueOnce([{ id: 'saved-note', title: 'Saved nephrology', content: 'Patient details' }]);
+    window.DB = { getAllNotes: readNotes, getAllTimestamps: async () => [], getAllAnnotations: async () => [] };
+    window.DataStore = { init: async () => true, allCourses: () => [], allTopics: () => [] };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    input.value = 'nephrology';
+
+    await expect(search._onInput('nephrology')).resolves.toBeUndefined();
+    const message = search.resultsBox.querySelector('[role="alert"]');
+    expect(message?.textContent).toMatch(/search.*unavailable|could not.*search/i);
+    expect(message.textContent).toMatch(/saved.*not changed|data.*not changed/i);
+    expect(search.resultsBox.querySelectorAll('[role="option"]')).toHaveLength(0);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+
+    await search._onInput('nephrology');
+    expect(search.resultsBox.querySelector('[role="alert"]')).toBeNull();
+    expect(search.resultsBox.textContent).toContain('Saved nephrology');
+    expect(readNotes).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not replace newer results with a stale failure from an earlier canonical search', async () => {
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const input = document.querySelector('[data-search-input]');
+    let rejectOld, resolveNew;
+    search._queryUniversal = vi.fn(value => new Promise((resolve, reject) => {
+      if (value === 'renal') rejectOld = reject;
+      else resolveNew = resolve;
+    }));
+    input.value = 'renal';
+    const old = search._onInput('renal');
+    input.value = 'renal medicine';
+    const newer = search._onInput('renal medicine');
+    resolveNew([{ label: 'Renal medicine notes', sourceType: 'note', sourceId: 'note-1' }]);
+    await newer;
+    rejectOld(new Error('Locked earlier Notes query'));
+    await expect(old).resolves.toBeUndefined();
+    expect(search.resultsBox.textContent).toContain('Renal medicine notes');
+    expect(search.resultsBox.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('finds related note words without indexing on each query or duplicating lexical hits', async () => {
     window.DB = {
       getAllNotes: vi.fn(async () => [
