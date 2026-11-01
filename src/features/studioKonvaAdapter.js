@@ -188,6 +188,18 @@ export function planKonvaV1Board(board) {
     if (!layerId.trim()) return unsupported('missing-layer-id');
     if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
     seenLayers.add(layerId);
+    // The isolated Konva draft only maps opacity, visibility, lock and
+    // ordinary board-v1 layer order. Appearance-altering layer metadata
+    // must retain the classic Canvas2D engine rather than render a misleading
+    // scene. Harmless unknown custom data stays intact in canonical v1.
+    for (const key of [
+      'blendMode', 'compositeOperation', 'clipPath',
+      'transform', 'filters', 'shadow',
+    ]) {
+      if (Object.hasOwn(layer, key)) {
+        return unsupported('unsupported-layer-attribute-' + key);
+      }
+    }
     // Nonboolean imported lock/visibility values must not turn a protected
     // layer into an editable one (or render a hidden layer). Refuse the Konva
     // draft rather than coercing or rewriting historical Canvas-v1 data.
