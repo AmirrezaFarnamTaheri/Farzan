@@ -221,6 +221,11 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     if (status) status.textContent = message;
   };
   const boardKey = 'ocd_studio_board';
+  // Canonical DB.saveSetting returns either the stored value or an explicit
+  // true receipt. Anything else cannot establish durable Studio persistence.
+  const acknowledgedStudioWrite = (receipt, expected) => receipt === true
+    || (receipt != null && typeof receipt === 'object'
+      && !Array.isArray(receipt) && JSON.stringify(receipt) === JSON.stringify(expected));
   let inspectedElementId = null;
   let interactiveSaveTimer = null;
   let studioLinkOptions = [];
@@ -543,8 +548,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const saveBoard = async () => {
     try {
       const board = window.OpenCourseDeck?.Canvas?.serialize?.();
-      if (!board || !window.DB?.saveSetting) throw new Error('Studio storage unavailable');
-      await window.DB.saveSetting(boardKey, board);
+      if (!board || typeof window.DB?.saveSetting !== 'function') throw new Error('Studio storage unavailable');
+      const receipt = await window.DB.saveSetting(boardKey, board);
+      if (!acknowledgedStudioWrite(receipt, board)) throw new Error('Studio save was not acknowledged');
       setStatus(`Saved ${new Date().toLocaleTimeString()}`);
       Toast.success('Studio board saved');
     } catch {
@@ -555,7 +561,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const persistBoardChange = async (statusText) => {
     try {
       const board = window.OpenCourseDeck?.Canvas?.serialize?.();
-      if (board && window.DB?.saveSetting) await window.DB.saveSetting(boardKey, board);
+      if (!board || typeof window.DB?.saveSetting !== 'function') throw new Error('Studio storage unavailable');
+      const receipt = await window.DB.saveSetting(boardKey, board);
+      if (!acknowledgedStudioWrite(receipt, board)) throw new Error('Studio autosave was not acknowledged');
       setStatus(statusText);
       renderInspector();
     } catch {
@@ -1292,17 +1300,42 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   on(importInput, 'change', async () => {
     const file = importInput?.files?.[0];
     if (!file) return;
+    const canvasApi = window.OpenCourseDeck?.Canvas;
+    let previous = null;
+    let importedEpoch = null;
+    let importApplied = false;
     try {
+      if (!canvasApi?.loadState || !canvasApi?.serialize
+        || typeof window.DB?.saveSetting !== 'function') {
+        throw new Error('Studio import storage is unavailable');
+      }
       const text = await file.text();
       const board = JSON.parse(text);
       if (!board || typeof board !== 'object' || Array.isArray(board)) throw new Error('Invalid Studio board');
-      const loaded = window.OpenCourseDeck?.Canvas?.loadState?.(board);
+      previous = canvasApi.serialize();
+      if (!previous) throw new Error('Studio rollback snapshot unavailable');
+      // Restore the current display if durable import fails, but never
+      // overwrite a newer local edit that arrived during the async write.
+      const loaded = canvasApi.loadState(board);
       if (!loaded) throw new Error('Studio import unavailable');
-      if (window.DB?.saveSetting) await window.DB.saveSetting(boardKey, loaded);
+      importApplied = true;
+      importedEpoch = canvasApi.boardEpoch?.() ?? null;
+      const receipt = await window.DB.saveSetting(boardKey, loaded);
+      if (!acknowledgedStudioWrite(receipt, loaded)) {
+        throw new Error('Studio import was not acknowledged');
+      }
+      if (importedEpoch != null && canvasApi.boardEpoch?.() !== importedEpoch) {
+        setStatus('Studio changed during import; verify current board');
+        return;
+      }
       setStatus('JSON imported');
       renderInspector();
       Toast.success('Studio board imported');
     } catch {
+      if (importApplied && previous &&
+        (importedEpoch == null || canvasApi?.boardEpoch?.() === importedEpoch)) {
+        try { canvasApi.loadState(previous); } catch { /* Keep original error feedback. */ }
+      }
       setStatus('JSON import failed');
       Toast.error('Studio JSON import failed');
     } finally {
