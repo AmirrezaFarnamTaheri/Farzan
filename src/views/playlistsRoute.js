@@ -144,6 +144,7 @@ async function renderPlaylists(deps) {
 
   let savedReadError = null;
   let catalogReadError = null;
+  let timestampReadError = null;
   const [topics, timestamps, savedPlaylists] = await Promise.all([
     (async () => {
       try {
@@ -161,17 +162,28 @@ async function renderPlaylists(deps) {
         return [];
       }
     })(),
-    (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
+    (async () => {
+      try {
+        const values = await window.DB?.getAllTimestamps?.() ?? [];
+        if (!Array.isArray(values)) throw new TypeError('Invalid canonical timestamp collection');
+        return values;
+      } catch (error) {
+        // A known canonical failure is not proof of zero saved moments.
+        timestampReadError = error;
+        return [];
+      }
+    })(),
     (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch (error) { savedReadError = error; return []; } })(),
   ]);
   if (!document.body.contains(listRoot)) return;
-  if (savedReadError || catalogReadError) {
+  if (savedReadError || catalogReadError || timestampReadError) {
     // Neither an unreadable saved deck nor an inaccessible canonical catalog
     // is proof that the user's collection is empty. Hide all creation and
     // reordering controls until the required readers are healthy.
-    console.warn(savedReadError
-      ? '[Playlists] Failed to load saved queues'
-      : '[Playlists] Failed to load course catalog', savedReadError || catalogReadError);
+    console.warn(savedReadError ? '[Playlists] Failed to load saved queues'
+      : catalogReadError ? '[Playlists] Failed to load course catalog'
+        : '[Playlists] Failed to load saved timestamps',
+    savedReadError || catalogReadError || timestampReadError);
     metricsRoot.replaceChildren();
     metricsRoot.hidden = true;
     discover.open = false;
@@ -186,7 +198,9 @@ async function renderPlaylists(deps) {
     const description = document.createElement('p');
     description.textContent = savedReadError
       ? 'Saved playlists could not be loaded. No data has been changed.'
-      : 'Course catalog could not be loaded. Your saved playlists have not been changed.';
+      : catalogReadError
+        ? 'Course catalog could not be loaded. Your saved playlists have not been changed.'
+        : 'Saved timestamps could not be loaded. Your resume moments and playlists have not been changed.';
     const retry = document.createElement('button');
     retry.className = 'btn btn-primary btn-sm';
     retry.type = 'button';
