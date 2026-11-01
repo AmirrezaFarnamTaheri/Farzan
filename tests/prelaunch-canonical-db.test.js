@@ -34,7 +34,7 @@ describe('prelaunch canonical IndexedDB baseline', () => {
   it('fails closed on an IndexedDB write error without any migration marker', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get() { return null; }
       async put() { throw new Error('canonical write failed'); }
     };
