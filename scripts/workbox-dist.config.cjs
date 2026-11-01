@@ -26,7 +26,6 @@ module.exports = {
     'assets/**',
     'vendor/**',
     'data/**',
-    'editions/plasmato-emergency/**',
     'docs/**',
   ],
   swDest: 'dist/sw.js',
