@@ -1147,7 +1147,7 @@ input[type="file"][hidden] {
   position: absolute;
   z-index: 12;
   top: calc(100% + 10px);
-  right: 0;
+  inset-inline-end: 0;
   width: min(620px, calc(100vw - 100px));
   max-height: min(65dvh, 520px);
   overflow-y: auto;
@@ -1209,8 +1209,8 @@ input[type="file"][hidden] {
     padding-inline-end: 0;
   }
   .view-studio .studio-more-tools-content {
-    right: auto;
-    left: 0;
+    inset-inline-end: auto;
+    inset-inline-start: 0;
     width: min(620px, calc(100vw - 48px));
   }
   .view-studio .studio-canvas-card {
