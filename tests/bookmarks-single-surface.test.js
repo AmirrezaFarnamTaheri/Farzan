@@ -25,6 +25,7 @@ describe('Bookmarks does not nest a card inside another card for focused views',
     mount();
     await vi.waitFor(() => expect(list().querySelector('.bookmarks-empty-state')).not.toBeNull());
     expect(section().dataset.bookmarkLayout).toBe('empty');
+    expect(section().classList.contains('card')).toBe(false);
     expect(styles).toMatch(/\.view-bookmarks \.bookmarks-section-card\[data-bookmark-layout="empty"\]/);
   });
 
@@ -33,6 +34,7 @@ describe('Bookmarks does not nest a card inside another card for focused views',
     mount();
     await vi.waitFor(() => expect(list().querySelectorAll('[data-bookmark-type]')).toHaveLength(1));
     expect(section().dataset.bookmarkLayout).toBe('single');
+    expect(section().classList.contains('card')).toBe(false);
     expect(styles).toMatch(/\.view-bookmarks \.bookmarks-section-card\[data-bookmark-layout="single"\]/);
   });
 
@@ -42,6 +44,7 @@ describe('Bookmarks does not nest a card inside another card for focused views',
     mount();
     await vi.waitFor(() => expect(list().querySelectorAll('[data-bookmark-type]')).toHaveLength(2));
     expect(section().dataset.bookmarkLayout).toBe('collection');
+    expect(section().classList.contains('card')).toBe(true);
     expect(document.querySelector('[data-bookmark-filters]').hidden).toBe(false);
   });
 
