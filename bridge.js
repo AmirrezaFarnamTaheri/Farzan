@@ -377,11 +377,11 @@
       // stale content (then clobbered the other tab's edits on its first
       // write). Every read path goes through here.
       _ensureSyncChannel();
-      const PlasmaDB = window.OpenCourseDeck?.DB?.PlasmaDB;
-      if (typeof PlasmaDB !== 'function') return null;
-      if (_idb && _idbCtor === PlasmaDB) return _idb;
-      _idbCtor = PlasmaDB;
-      _idb = new PlasmaDB(IDB_NAME, IDB_VERSION, [
+      const OpenCourseDB = window.OpenCourseDeck?.DB?.OpenCourseDB;
+      if (typeof OpenCourseDB !== 'function') return null;
+      if (_idb && _idbCtor === OpenCourseDB) return _idb;
+      _idbCtor = OpenCourseDB;
+      _idb = new OpenCourseDB(IDB_NAME, IDB_VERSION, [
         { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
         { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },

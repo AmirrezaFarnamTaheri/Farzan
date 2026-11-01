@@ -56,7 +56,7 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_progress_v1', JSON.stringify({ 'topic-stale': { topicId: 'topic-stale' } }));
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get() { throw new Error('canonical storage read failed'); }
       async getAll() { throw new Error('canonical storage read failed'); }
       async getAllByIndex() { throw new Error('canonical storage read failed'); }
@@ -70,7 +70,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('rejects incomplete backup sources when IndexedDB is unavailable', async () => {
-    delete window.OpenCourseDeck.DB.PlasmaDB;
+    delete window.OpenCourseDeck.DB.OpenCourseDB;
     await expect(window.DB.getAllWatchedSegments()).rejects.toThrow(/Canonical watched-segment/);
     await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow(/Canonical PDF bookmark/);
   });
@@ -244,7 +244,7 @@ describe('bridge DB safety helpers', () => {
 
 
   it('rejects a clear operation when any primary IndexedDB store fails', async () => {
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async clear(store) {
         if (store === 'notes') throw new Error('notes clear failed');
         return true;
@@ -265,7 +265,7 @@ describe('bridge DB safety helpers', () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Quota exceeded'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get() { return null; }
       async put() { throw quotaError; }
     };
@@ -284,7 +284,7 @@ describe('bridge DB safety helpers', () => {
   it('rejects failed writes to canonical progress storage without a false fallback success', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get() { return { topicId: 'topic-canonical', courseId: 'course-a', watched: 100 }; }
       async put() { throw new Error('IDB transaction aborted'); }
     };
@@ -300,7 +300,7 @@ describe('bridge DB safety helpers', () => {
 
   it('rejects failed canonical timestamp writes and does not broadcast success', async () => {
     window.OpenCourseDeck.bus = { emit: vi.fn() };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async put() { throw new Error('timestamp transaction aborted'); }
     };
 
@@ -314,7 +314,7 @@ describe('bridge DB safety helpers', () => {
     localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
       { id: 'old-only', topicId: 'a' }, { id: 'both', topicId: 'stale' },
     ]));
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async getAll() { return [{ id: 'both', topicId: 'canonical' }]; }
     };
     expect(await window.DB.getAllTimestamps()).toEqual([{ id: 'both', topicId: 'canonical' }]);
@@ -326,7 +326,7 @@ describe('bridge DB safety helpers', () => {
       both: { topicId: 'both', status: 'stale' },
     }));
     const rows = new Map([['both', { topicId: 'both', status: 'canonical' }]]);
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get(_store, key) { return rows.get(key) ?? null; }
       async getAll() { return [...rows.values()]; }
     };
@@ -339,7 +339,7 @@ describe('bridge DB safety helpers', () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('Persistent storage full'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async put() { throw quotaError; }
     };
 
@@ -358,7 +358,7 @@ describe('bridge DB safety helpers', () => {
     const quotaError = Object.assign(new Error('localStorage quota exceeded'), { name: 'QuotaExceededError' });
     const originalSetItem = Storage.prototype.setItem;
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = null;
+    window.OpenCourseDeck.DB.OpenCourseDB = null;
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
       if (key === 'ocd_notes') throw quotaError;
       return originalSetItem.call(this, key, value);
@@ -378,7 +378,7 @@ describe('bridge DB safety helpers', () => {
     const emit = vi.fn();
     const quotaError = Object.assign(new Error('canonical quota exceeded'), { name: 'QuotaExceededError' });
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async put() { throw quotaError; }
     };
 
@@ -396,7 +396,7 @@ describe('bridge DB safety helpers', () => {
   it('signals and rejects canonical IndexedDB setting failures from the first launch', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async put() { throw new Error('settings canonical failed'); }
     };
 
@@ -414,7 +414,7 @@ describe('bridge DB safety helpers', () => {
   it('signals and rejects canonical IndexedDB annotation failures from the first launch', async () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async getAllByIndex() { return []; }
       async put() { throw new Error('annotation canonical failed'); }
       async delete() {}
@@ -573,7 +573,7 @@ describe('bridge DB safety helpers', () => {
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     const persisted = new Map([['keep-me', { id: 'keep-me', title: 'Still stored' }]]);
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async delete(_store, id) {
         expect(_store).toBe(store);
         expect(id).toBe('keep-me');
@@ -595,7 +595,7 @@ describe('bridge DB safety helpers', () => {
       topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
     }]]);
     let activeReads = 0;
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get(_store, id) {
         activeReads++;
         // Let a second independent reader overtake this one if the caller
@@ -617,7 +617,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('does not claim PDF bookmarks were persisted when IndexedDB is unavailable', async () => {
-    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+    window.OpenCourseDeck.DB.OpenCourseDB = undefined;
     await expect(window.DB.addPdfBookmark({ id: 'bm-unsaved', docId: 'doc-x' }))
       .rejects.toThrow(/IndexedDB unavailable/);
     await expect(window.DB.deletePdfBookmark('bm-unsaved')).resolves.toBe(false);
@@ -657,7 +657,7 @@ describe('bridge DB safety helpers', () => {
         { id: 'ts-b', topicId: 'topic-b', courseId: 'course-b', position: 30 },
       ],
     };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async getAllByIndex(store, indexName, value) {
         calls.push([store, indexName, value]);
         return stores[store].filter(record => record?.[indexName] === value);
@@ -694,7 +694,7 @@ describe('bridge DB safety helpers', () => {
         { id: 'folder-c', name: 'Top level' },
       ],
     };
-    window.OpenCourseDeck.DB.PlasmaDB = class {
+    window.OpenCourseDeck.DB.OpenCourseDB = class {
       async getAll(store) {
         calls.push([store, 'getAll']);
         return stores[store] ?? [];
@@ -739,7 +739,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('falls back to localStorage for indexed helpers when IndexedDB is unavailable', async () => {
-    window.OpenCourseDeck.DB.PlasmaDB = null;
+    window.OpenCourseDeck.DB.OpenCourseDB = null;
     localStorage.setItem('plasma_progress_v1', JSON.stringify({
       'topic-a': { topicId: 'topic-a', courseId: 'course-a' },
       'topic-b': { topicId: 'topic-b', courseId: 'course-b' },
@@ -789,7 +789,7 @@ describe('bridge DB safety helpers', () => {
       { id: 'keep-me', title: 'Survivor' },
       { id: 'drop-me', title: 'Doomed' },
     ]));
-    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+    window.OpenCourseDeck.DB.OpenCourseDB = undefined;
 
     await window.DB.deleteNote('drop-me');
 
@@ -808,7 +808,7 @@ describe('bridge DB safety helpers', () => {
       }
     }
     window.BroadcastChannel = BroadcastChannelMock;
-    window.OpenCourseDeck.DB.PlasmaDB = undefined;
+    window.OpenCourseDeck.DB.OpenCourseDB = undefined;
 
     await window.DB.saveNote({ id: 'fallback-note', title: 'No IDB' });
 
