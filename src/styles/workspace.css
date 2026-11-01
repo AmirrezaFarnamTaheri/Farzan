@@ -20,48 +20,11 @@
   --workspace-focus: var(--accent-dark);
 }
 
-/* An even canvas and visible navigation; avoid layered blur over text. */
-.main-content {
-  background: var(--bg);
-}
-.sidebar {
-  background: var(--surface);
-  border-right: 0;
-  border-inline-end: 1px solid var(--workspace-rule);
-}
+/* Shared sidebar/navigation/topbar chrome is owned by the later
+   farzan-redesign.css stylesheet. Keep the WebKit-only compatibility fallback
+   here: standard mask-image is owned by the final redesign rule. */
 .sidebar-nav {
   -webkit-mask-image: none;
-}
-.sidebar-logo {
-  border-color: transparent;
-}
-.nav-group-label {
-  letter-spacing: 0.085em;
-  color: var(--text-tertiary);
-  font-weight: 650;
-}
-.nav-item {
-  border-radius: var(--radius-md);
-  transition: background-color var(--duration-fast), color var(--duration-fast);
-}
-.nav-item:hover:not(.active) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-.nav-item.active,
-.nav-item[aria-current="page"] {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--text-primary);
-  border-color: var(--workspace-rule);
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-[dir="rtl"] .nav-item.active,
-[dir="rtl"] .nav-item[aria-current="page"] {
-  box-shadow: inset -3px 0 0 var(--accent);
-}
-.topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--workspace-rule);
 }
 
 /* Typography belongs to content, not to decorative effects. */
