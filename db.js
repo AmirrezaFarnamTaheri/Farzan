@@ -326,23 +326,6 @@ async bulkPut(store, list) {
   });
 }
 
-async bulkPutWithCheckpoint(store, list, checkpoint) {
-  return withMutationRetry(async () => {
-    const sealed = await Promise.all((list || []).map(item => this._seal(store, item)));
-    const sealedCheckpoint = checkpoint ? await this._seal('settings', checkpoint) : null;
-    const connection = await this.open();
-    return withExistingIndexedDBStore(connection, store, async (table, db) => {
-      const settings = db.table('settings');
-      const transactionStores = store === 'settings' ? [table] : [table, settings];
-      await db.transaction('rw', ...transactionStores, async () => {
-        if (sealed.length) await table.bulkPut(sealed);
-        if (sealedCheckpoint) await settings.put(sealedCheckpoint);
-      });
-      return true;
-    });
-  });
-}
-
 async export(){
 const db = await this.open();
 const result={};
