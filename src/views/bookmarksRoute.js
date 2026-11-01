@@ -43,6 +43,14 @@ export function mountBookmarksView(deps = {}) {
   let renderVersion = 0;
   renderBookmarks();
 
+  // Older imported annotations may use a synthetic global bucket instead
+  // of a real PDF document ID. A page number alone is never a safe document
+  // navigation target: it could be applied to an unrelated open PDF.
+  const stablePdfDocId = value => {
+    const id = String(value ?? '').trim();
+    return id.length > 0 && id !== 'global';
+  };
+
   function formatDuration(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
     const hours = Math.floor(total / 3600);
@@ -248,19 +256,28 @@ export function mountBookmarksView(deps = {}) {
       link.className = 'btn btn-ghost';
       link.href = item.href;
       link.textContent = 'Open';
+      const pdfLink = item.href === '#/pdf';
+      if (pdfLink && !stablePdfDocId(item.docId)) {
+        // Preserve the saved card and its original page metadata, but guide
+        // the learner to find the document manually. Never claim that an
+        // unanchored page belongs to the previously mounted PDF.
+        link.href = '#/materials';
+        link.textContent = 'Find PDF';
+        link.title = 'This saved page has no stable document ID; choose the PDF manually';
+      }
       if (item.type === 'Timestamp' && item.topicId) {
         link.addEventListener('click', (event) => {
           event.preventDefault();
           setPendingCourseMedia(item.topicId, item.position);
           Router.navigate('#/courses');
         });
-      } else if (item.href === '#/pdf' && (item.docId || item.page)) {
+      } else if (pdfLink && stablePdfDocId(item.docId)) {
         link.addEventListener('click', (event) => {
           event.preventDefault();
-          // Only queue a page tied to a stable PDF identity. The PDF viewer
-          // itself consumes that handoff after the matching document loads;
-          // an immediate goTo() could seek an unrelated still-mounted PDF.
-          setPendingPdfPage(item.docId, item.docId ? item.page : null);
+          // Only queue a page tied to a real stable PDF identity. The viewer
+          // consumes the handoff after that document loads; do not seek a
+          // previously mounted, unrelated PDF.
+          setPendingPdfPage(item.docId, item.page ?? null);
           Router.navigate('#/pdf');
         });
       }
