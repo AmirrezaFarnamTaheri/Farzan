@@ -106,12 +106,15 @@ function initFuse(data, options = {}) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       return { [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalizeWorkerQuery(item) };
     }
-    const normalized = fieldNames.map(key => {
+    // Normalize each source value into its own Fuse array element. Joining
+    // unrelated titles, tags and keywords into one long string can place an
+    // exact metadata match outside Fuse's distance window (even at threshold 0).
+    const normalized = fieldNames.flatMap(key => {
       const value = item[key];
       return Array.isArray(value)
-        ? value.map(normalizeWorkerQuery).join(' ')
-        : normalizeWorkerQuery(value);
-    }).join(' ').trim();
+        ? value.map(normalizeWorkerQuery)
+        : [normalizeWorkerQuery(value)];
+    }).filter(Boolean);
     return { ...item, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
   });
   const nextFuse = new Fuse(indexed, {
