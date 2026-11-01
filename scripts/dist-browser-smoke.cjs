@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const DIST = path.join(ROOT, 'dist');
+const DIST = process.env.FARZAN_DIST_ROOT ? path.resolve(process.env.FARZAN_DIST_ROOT) : path.join(ROOT, 'dist');
 const RESULT_ID = 'opencoursedeck-dist-smoke-result';
 const RESULT_PATH = '/__smoke_result__';
 
@@ -54,6 +54,7 @@ function makePdf() {
 
 function smokeModule() {
   return `
+const coldOnly = ${JSON.stringify(process.env.FARZAN_COLD_ONLY === '1')};
 const result = document.createElement('pre');
 const resultEndpoint = ${JSON.stringify(RESULT_PATH)};
 result.id = ${JSON.stringify(RESULT_ID)};
@@ -179,6 +180,14 @@ async function run() {
     missingTransferSizes: shellResources.filter(entry => !entry.transferSize).length,
     scope: 'first-visit same-origin JavaScript/CSS resource timing at app-shell readiness (excludes later precache/worker network)',
   };
+
+  if (coldOnly) {
+    const detail = { coldShell };
+    result.dataset.status = 'passed';
+    result.textContent = JSON.stringify(detail);
+    await report('passed', detail);
+    return;
+  }
 
   invariant('serviceWorker' in navigator, 'service workers are unavailable');
   const registration = await timeout(navigator.serviceWorker.register('/sw.js'), 'service worker registration');
