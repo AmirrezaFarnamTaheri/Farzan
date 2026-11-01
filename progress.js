@@ -657,6 +657,11 @@ const ProgressStats = (() => {
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new Error('Invalid file format');
         }
+        // Only the current, never-yet-shipped portable export is importable.
+        // Reject obsolete/unversioned payloads before prompting or writing.
+        if (payload.version !== '1.6') {
+          throw new Error('Unsupported backup version: ' + String(payload.version));
+        }
         const storage = await _storageEstimate();
         if (storage?.available != null && file.size > storage.available) {
           throw new Error('Insufficient storage to import this file');
@@ -671,10 +676,8 @@ const ProgressStats = (() => {
         const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
         const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
         const pdfBookmarkRecords = rawPdfBookmarks.filter(_isPdfBookmarkRecord);
-        const versionSupported = !payload.version || ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6'].includes(String(payload.version));
-        if (!versionSupported) throw new Error(`Unsupported backup version: ${payload.version}`);
-        // Validate the entire imported deck before any user confirmation or
-        // canonical write. A malformed FSRS state cannot be repaired from SM-2.
+        // Validate the current FSRS deck before any user confirmation or
+        // canonical write. Never invent missing review history.
         if (payload.settings && Object.prototype.hasOwnProperty.call(payload.settings, 'flashcards')
             && payload.settings.flashcards != null) {
           await assertFlashcardBackupImportable(payload.settings.flashcards);
@@ -704,7 +707,7 @@ const ProgressStats = (() => {
           (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object' && !Array.isArray(payload.settings.mediaCues) ? 1 : 0) +
           (importedTagTaxonomy ? 1 : 0);
         const preview = {
-          version: payload.version ?? 'legacy',
+          version: payload.version,
           fileName: file.name ?? 'backup.json',
           sizeBytes: file.size ?? text.length,
           storageAvailable: storage?.available ?? null,
@@ -783,8 +786,7 @@ const ProgressStats = (() => {
               _recordImportError(result, 'progress', p.topicId, err);
             }
           });
-        // Notes are stored by notes.js in localStorage under "ocd_notes" (migrated from the legacy key).
-        // Older backups may have {topicId, courseId, html, text}; keep whatever fields exist.
+        // Preserve the full metadata of the current portable Notes records.
         if (noteRecords.length) {
           const imported = noteRecords.map((n) => ({
             id: n.id ?? `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
