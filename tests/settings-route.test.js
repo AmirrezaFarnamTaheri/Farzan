@@ -54,6 +54,29 @@ describe('settings route', () => {
     vi.restoreAllMocks();
   });
 
+  it('keeps optional AI connections behind an accessible first-run disclosure, without hiding active custom configuration', async () => {
+    const first = mountSettings();
+    const panel = document.querySelector('[data-ai-disclosure]');
+    expect(panel).not.toBeNull();
+    expect(panel?.tagName).toBe('DETAILS');
+    expect(panel?.open).toBe(false);
+    expect(panel.querySelector('summary')?.textContent).toMatch(/configure|advanced/i);
+    expect(panel.querySelector('[data-ai-save]')).not.toBeNull();
+    expect(document.querySelector('#settings-appearance')).not.toBeNull();
+    expect(document.querySelector('#settings-storage')).not.toBeNull();
+    panel.querySelector('summary').click();
+    expect(panel.open).toBe(true);
+    first.controller.unmount();
+
+    const active = mountSettings({ mode: 'custom-api',
+      model: 'preserved', endpoint: 'https://api.example.test/v1/chat/completions',
+      approvedEndpointOrigin: 'https://api.example.test' });
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-disclosure]').open).toBe(true));
+    expect(document.querySelector('[data-ai-mode]').value).toBe('custom-api');
+    expect(document.querySelector('[data-ai-model]').value).toBe('preserved');
+    active.controller.unmount();
+  });
+
   it('preserves appearance, storage, portability, data, and AI controls', () => {
     const { controller } = mountSettings();
     const required = [
