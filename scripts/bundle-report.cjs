@@ -57,7 +57,7 @@ function measurePrecacheArtifacts(rootDir = dist) {
   const sw = path.join(rootDir, 'sw.js');
   if (!fs.existsSync(sw)) throw new Error('Release service worker is missing; build:release first');
   const text = fs.readFileSync(sw, 'utf8');
-  const urls = [...text.matchAll(/\\{url:"([^"]+)",revision:(?:"[^"]*"|null)\\}/g)]
+  const urls = [...text.matchAll(/[{]url:"([^"]+)",revision:(?:"[^"]*"|null)[}]/g)]
     .map(match => match[1]);
   if (!urls.length) throw new Error('Workbox precache manifest is missing or unrecognised');
 
@@ -66,8 +66,9 @@ function measurePrecacheArtifacts(rootDir = dist) {
   const missing = [];
   for (const url of unique) {
     // The generated manifest must never address a file outside dist.
-    const relative = decodeURIComponent(url.split(/[?#]/)[0]).replace(/^\\.\\//, '');
-    if (!relative || path.isAbsolute(relative) || relative.includes('\\\\')
+    const decoded = decodeURIComponent(url.split(/[?#]/)[0]);
+    const relative = decoded.startsWith('./') ? decoded.slice(2) : decoded;
+    if (!relative || path.isAbsolute(relative) || relative.includes(String.fromCharCode(92))
       || relative.split('/').includes('..')) {
       throw new Error('Unsafe Workbox precache asset path: ' + url);
     }
