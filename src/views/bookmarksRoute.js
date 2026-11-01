@@ -264,6 +264,11 @@ export function mountBookmarksView(deps = {}) {
         link.href = '#/materials';
         link.textContent = 'Find PDF';
         link.title = 'This saved page has no stable document ID; choose the PDF manually';
+        link.addEventListener('click', () => {
+          // A previous PDF page handoff must not remain queued after the
+          // learner chooses source discovery instead of opening that PDF.
+          setPendingPdfPage?.(null, null);
+        });
       }
       if (item.type === 'Timestamp' && item.topicId) {
         link.addEventListener('click', (event) => {
