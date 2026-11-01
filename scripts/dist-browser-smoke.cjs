@@ -158,6 +158,28 @@ async function run() {
   await waitFor(() => window.OpenCourseDeck?.workers && window.OpenCourseDeck?.loadFeature && window.DB, 'application bundle');
   const pd = window.OpenCourseDeck;
 
+  // Each smoke run uses a unique Chromium profile, so this is an observable
+  // first-visit browser-resource snapshot. ResourceTiming does not include
+  // all worker-thread fetches or cache installation, and transferSize may be
+  // zero when the browser does not expose body transfer bytes; report those
+  // limitations instead of calling the emitted bundle a network measurement.
+  const shellResources = performance.getEntriesByType('resource')
+    .filter(entry => {
+      try {
+        const url = new URL(entry.name);
+        return url.origin === location.origin && /[.](?:js|css)$/.test(url.pathname);
+      } catch { return false; }
+    });
+  const coldShell = {
+    observedAtMs: Math.round(performance.now()),
+    resourceCount: shellResources.length,
+    resourcePaths: shellResources.map(entry => new URL(entry.name).pathname).sort(),
+    transferSizeBytes: shellResources.reduce((sum, entry) => sum + (entry.transferSize || 0), 0),
+    encodedBodyBytes: shellResources.reduce((sum, entry) => sum + (entry.encodedBodySize || 0), 0),
+    missingTransferSizes: shellResources.filter(entry => !entry.transferSize).length,
+    scope: 'first-visit same-origin JavaScript/CSS resource timing at app-shell readiness (excludes later precache/worker network)',
+  };
+
   invariant('serviceWorker' in navigator, 'service workers are unavailable');
   const registration = await timeout(navigator.serviceWorker.register('/sw.js'), 'service worker registration');
   await timeout(navigator.serviceWorker.ready, 'service worker activation');
@@ -292,6 +314,7 @@ async function run() {
     pdf: true,
     media: true,
     fullWipe: true,
+    coldShell,
     ...(plasmatoEdition ? { plasmatoEdition } : {}),
   };
   result.dataset.status = 'passed';
@@ -543,6 +566,7 @@ async function main() {
       const output = `${execution.stdout || ''}\n${execution.stderr || ''}`.slice(-12000);
       throw new Error(`Production browser smoke reported failure.\n${detail}\n${output}`);
     }
+    console.log('[dist-browser-smoke] cold-shell resource timing', JSON.stringify(execution.result.detail?.coldShell || {}));
     console.log('[dist-browser-smoke] OK — served dist validated service worker, workers, IndexedDB, PDF, media, and full wipe lifecycle.');
   } finally {
     await new Promise(resolve => server.close(resolve));
