@@ -49,6 +49,20 @@ describe('runtime wiring', () => {
     expect(indexSource).toContain(specifier);
   });
 
+  it('initializes Add Content from a lazy chunk after the app shell, before command palette commands', () => {
+    // Add Content and userLibrary have no synchronous exported namespace
+    // until initAddContent() runs. Keep them outside the initial entry while
+    // preserving the interactive menu and palette action registration order.
+    const appShellImport = indexSource.indexOf("import('../app.js').then");
+    const addContentImport = indexSource.indexOf("await import('./features/addContent.js')");
+    const addContentInitializer = indexSource.indexOf("name: 'add-content'");
+    const paletteInitializer = indexSource.indexOf("name: 'command-palette'");
+    expect(addContentImport).toBeGreaterThan(appShellImport);
+    expect(addContentInitializer).toBeLessThan(paletteInitializer);
+    expect(indexSource).not.toMatch(/import\s*\{\s*initAddContent\s*\}\s*from\s*['"]\.\/features\/addContent\.js['"]/);
+    expect(indexSource.slice(addContentInitializer, paletteInitializer)).toContain('initAddContent(window)');
+  });
+
   it('defers translation and note-template utilities until the app shell resolves', () => {
     const appImport = indexSource.indexOf("import('../app.js')");
     for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
