@@ -325,17 +325,6 @@ export function createCourse() {
     ],
     onSubmit: async ({ title, description }) => {
       const result = await upsertCourse({ title, description });
-      try {
-        const existing = await window.DB?.getSetting?.('ocd_my_courses');
-        const list = Array.isArray(existing) ? existing : [];
-        await window.DB?.saveSetting?.('ocd_my_courses', [{
-          id: result.id,
-          title: result.title,
-          description: description || '',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        }, ...list.filter((item) => item?.id !== result.id)]);
-      } catch { /* my-courses list is a convenience mirror */ }
       setImportCourse(result.id);
       await afterAdd(result, `Course “${result.title}” created`, { route: '#/my-courses' });
     },
