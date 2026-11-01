@@ -1079,7 +1079,7 @@
 }
 
 .courses-search-field .input {
-  padding-inline-start: calc(var(--space-3) * 2 + 1em);
+  padding-inline: calc(var(--space-3) * 2 + 1em);
 }
 
 .catalog-empty {
