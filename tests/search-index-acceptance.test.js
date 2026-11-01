@@ -10,6 +10,14 @@ const {
 } = require('../scripts/search-index-acceptance.cjs');
 
 describe('search source and index-cost acceptance evidence', () => {
+  it('enforces and archives the actual search benchmark in the shared CI workflow', () => {
+    const workflow = fs.readFileSync('.github/workflows/verify.yml', 'utf8');
+    expect(workflow).toMatch(/id: search_index_report/);
+    expect(workflow).toMatch(/npm run report:search-index/);
+    expect(workflow).toMatch(/SEARCH_INDEX_REPORT:.*steps\.search_index_report\.outcome/);
+    expect(workflow.match(/search-index-report=\$SEARCH_INDEX_REPORT/g)).toHaveLength(2);
+  });
+
   it('reads the real offline course archive with stable source-aware identities', () => {
     const records = readCatalogDocuments();
     const topics = records.filter(row => row.sourceType === 'topic');
