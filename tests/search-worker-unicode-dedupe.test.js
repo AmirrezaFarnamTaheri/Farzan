@@ -174,7 +174,9 @@ describe('search worker Unicode identity and stable protocol', () => {
       { sourceType: 'note', sourceId: 'n1', label: 'Cardiology overview', keywords: ['Heart'] },
     ];
     const snapshot = structuredClone(rows);
-    const worker = workerWithData(rows, { threshold: 0 });
+    const worker = workerWithData(rows);
+    // The normal fuzzy threshold makes a manufactured [object Object]
+    // normalized token searchable even though none of the real text says it.
     expect(worker.search('object', { limit: 10 }, 40).results).toEqual([]);
     expect(worker.search('heart', { limit: 10 }, 41).results).toEqual([rows[1]]);
     expect(rows).toEqual(snapshot);
