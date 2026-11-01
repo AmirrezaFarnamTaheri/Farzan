@@ -254,6 +254,61 @@ export function appendKonvaV1Stroke(board, id, points) {
 }
 
 /**
+ * Create only geometries whose exact canonical v1 representation is known.
+ * Placement happens in the caller's inverse-viewport world coordinates.
+ * This command never copies Konva properties or touches protected layers.
+ */
+export function appendKonvaV1Shape(board, id, geometry) {
+  validBoard(board);
+  if (typeof id !== 'string' || !id.trim()) throw new TypeError('Studio shape ID is required');
+  if (board.layers.some(layer => layer.elements.some(element => element.id === id))) {
+    throw new Error('Duplicate Studio shape ID: ' + id);
+  }
+  if (!geometry || typeof geometry !== 'object' || Array.isArray(geometry)
+    || !['rect', 'circle'].includes(geometry.type)) {
+    throw new TypeError('Unsupported Studio shape geometry');
+  }
+  const allowed = geometry.type === 'rect'
+    ? new Set(['type', 'x', 'y', 'width', 'height'])
+    : new Set(['type', 'x', 'y', 'radius']);
+  if (Object.keys(geometry).some(key => !allowed.has(key))) {
+    throw new TypeError('Unsupported Studio shape metadata');
+  }
+  const numeric = geometry.type === 'rect'
+    ? ['x', 'y', 'width', 'height'] : ['x', 'y', 'radius'];
+  for (const key of numeric) {
+    if (typeof geometry[key] !== 'number' || !Number.isFinite(geometry[key])) {
+      throw new TypeError('Studio shape requires finite ' + key);
+    }
+  }
+  for (const key of numeric.slice(2)) {
+    if (geometry[key] <= 0) throw new RangeError('Studio shape size must be positive');
+  }
+  const index = board.activeLayerIdx ?? 0;
+  if (!Number.isInteger(index) || index < 0 || index >= board.layers.length) {
+    throw new RangeError('Studio active drawing layer is invalid');
+  }
+  const layer = board.layers[index];
+  if (layer.locked === true) throw new Error('Cannot create on a locked Studio layer');
+  if (layer.visible === false) throw new Error('Cannot create on a hidden Studio layer');
+  const style = board.style || {};
+  const stroke = style.strokeColor ?? '#6366f1';
+  const fill = style.fillColor ?? 'transparent';
+  const strokeWidth = style.strokeWidth ?? 2;
+  if (typeof stroke !== 'string' || !stroke.trim()
+    || typeof fill !== 'string' || !fill.trim()
+    || typeof strokeWidth !== 'number' || !Number.isFinite(strokeWidth) || strokeWidth < 0) {
+    throw new TypeError('Invalid Studio shape paint');
+  }
+  const next = structuredClone(board);
+  next.layers[index].elements.push({
+    id, ...structuredClone(geometry), stroke, strokeWidth, fill,
+  });
+  validBoard(next);
+  return next;
+}
+
+/**
  * Wires real Konva click/tap/drag lifecycle events to canonical board writes.
  * A rejected commit restores the node and preserves the last accepted board.
  * No editing route is switched to this controller until interaction parity.
@@ -321,6 +376,18 @@ export function createKonvaV1MoveSession({
     if (before.layer.elements[before.index].text === content) {
       return structuredClone(current);
     }
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  let shapeSequence = 0;
+  const addShape = geometry => enqueue(async () => {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    const id = 'shape-' + (uuid || Date.now().toString(36) + '-' + (++shapeSequence).toString(36));
+    const next = appendKonvaV1Shape(current, id, geometry);
     await persist(next);
     push(undoStack, current);
     redoStack.length = 0;
@@ -493,6 +560,7 @@ export function createKonvaV1MoveSession({
     reorder,
     resize,
     addStroke,
+    addShape,
     updateText,
     undo,
     redo,
