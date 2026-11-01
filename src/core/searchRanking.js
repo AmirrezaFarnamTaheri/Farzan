@@ -17,7 +17,7 @@ export function normalizeSearchQuery(value) {
 }
 
 export function rankLexicalMatches(items, query, {
-  keys = ['label', 'description', 'searchText', 'category', 'tags', 'keywords'],
+  keys = ['label', 'title', 'description', 'searchText', 'category', 'tags', 'keywords', 'labels'],
   limit = 12,
 } = {}) {
   if (!Array.isArray(items)) return [];
@@ -26,14 +26,21 @@ export function rankLexicalMatches(items, query, {
   if (!needle) return items.filter(item => item && typeof item === 'object').slice(0, cap);
   return items.map((item, index) => {
     if (!item || typeof item !== 'object') return null;
-    const label = normalizeSearchQuery(item.label);
+    // Canonical catalog/worker documents may supply "title" instead of
+    // "label". Treat that as the displayed heading only when the caller has
+    // explicitly indexed the title field; a label-only command search must
+    // not admit unrelated title fields.
+    const label = keys.includes('label') ? normalizeSearchQuery(item.label) : '';
+    const title = keys.includes('title') ? normalizeSearchQuery(item.title) : '';
+    const displayKey = label ? 'label' : title ? 'title' : null;
+    const displayLabel = label || title;
     let score = Infinity;
-    if (label === needle) score = 0;
-    else if (label.startsWith(needle)) score = 1;
-    else if (label.includes(needle)) score = 2;
+    if (displayLabel && displayLabel === needle) score = 0;
+    else if (displayLabel && displayLabel.startsWith(needle)) score = 1;
+    else if (displayLabel && displayLabel.includes(needle)) score = 2;
     if (!Number.isFinite(score)) {
       for (let i = 0; i < keys.length; i += 1) {
-        if (keys[i] === 'label') continue;
+        if (keys[i] === displayKey) continue;
         if (normalizeSearchQuery(item[keys[i]]).includes(needle)) {
           score = 3 + i;
           break;

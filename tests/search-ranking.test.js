@@ -40,6 +40,20 @@ describe('shared topbar and command-palette lexical ranking', () => {
     expect(rankLexicalMatches(corpus, 'nephrology', { keys: ['label'] })).toEqual([]);
   });
 
+  it('ranks title-only saved and imported documents without leaking title text into command-only searches', () => {
+    const records = [
+      { id: 'metadata', label: 'Abstract', description: 'Renal autoregulation' },
+      { id: 'substring', title: 'Understanding renal autoregulation' },
+      { id: 'prefix', title: 'Renal autoregulation lecture' },
+      { id: 'exact', title: 'Renal autoregulation' },
+      { id: 'other', title: 'General physiology' },
+    ];
+    expect(rankLexicalMatches(records, 'renal autoregulation').map(item => item.id))
+      .toEqual(['exact', 'prefix', 'substring', 'metadata']);
+    expect(rankLexicalMatches(records, 'renal autoregulation', { keys: ['label'] }))
+      .toEqual([]);
+  });
+
   it('filters unsafe record types and supports labels-only command searching', () => {
     const items = [null, { label:'Other',description:'plasma' }, { label:'Plasma theme', cat:'theme' }];
     expect(rankLexicalMatches(items,'plasma',{keys:['label']}).map(x=>x.label)).toEqual(['Plasma theme']);
