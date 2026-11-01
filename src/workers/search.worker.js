@@ -138,7 +138,12 @@ function search(query, options = {}) {
   const originalQuery = String(query ?? '');
   const normalized = normalizeWorkerQuery(originalQuery);
   if (!normalized) return { results: [], query: originalQuery, matches: [], indexRevision: state.revision };
-  const limit = Math.max(1, Math.min(250, Number(options.limit) || 25));
+  // Match the catalog worker and shared lexical ranker's explicit cap:
+  // zero disables results, fractions floor, and invalid numbers use default.
+  const requestedLimit = options.limit == null ? 25 : Number(options.limit);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(0, Math.min(250, Math.floor(requestedLimit))) : 25;
+  if (!limit) return { results: [], query: originalQuery, matches: [], indexRevision: state.revision };
   // Keep Fuse's fuzzy recall and score order *within* each lexical tier,
   // but make exact/prefix/substring visible labels deterministic across the
   // topbar, command-palette fallback and worker catalog search. These are

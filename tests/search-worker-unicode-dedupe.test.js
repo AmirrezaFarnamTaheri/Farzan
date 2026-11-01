@@ -189,6 +189,21 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(worker.search('physics', {}, 15).results).toHaveLength(1);
   });
 
+  it('honours zero, negative and fractional search result caps without emitting phantom matches', () => {
+    const worker = workerWithData([
+      { label: 'Physics A', sourceType: 'note', sourceId: 'one' },
+      { label: 'Physics B', sourceType: 'note', sourceId: 'two' },
+      { label: 'Physics C', sourceType: 'note', sourceId: 'three' },
+    ], { threshold: 0 });
+    for (const cap of [0, '0', -1, 0.4]) {
+      const response = worker.search('physics', { limit: cap }, 20);
+      expect(response).toMatchObject({ type: 'search:done', query: 'physics', results: [], matches: [] });
+    }
+    const capped = worker.search('physics', { limit: 2.9 }, 21);
+    expect(capped.results.map(item => item.sourceId)).toEqual(['one', 'two']);
+    expect(capped.matches).toHaveLength(2);
+  });
+
   it('keeps cancellation and identity protocol unchanged after Unicode normalization', () => {
     const worker = workerWithData([{ id: 'n', label: 'فیزیک' }]);
     const response = worker.search('فيزيك', { limit: 8 }, 7);
