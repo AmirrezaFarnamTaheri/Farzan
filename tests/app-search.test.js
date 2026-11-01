@@ -316,6 +316,27 @@ describe('app topbar search rendering', () => {
     expect(readNotes).toHaveBeenCalledTimes(2);
   });
 
+  it('does not fabricate an empty catalog when canonical catalog hydration fails and can retry', async () => {
+    const init = vi.fn().mockRejectedValueOnce(new Error('Catalog data unavailable'))
+      .mockResolvedValueOnce(true);
+    window.DataStore = {
+      init,
+      allCourses: () => [{ id: 'medicine', title: 'Renal Medicine' }],
+      allTopics: () => [],
+    };
+    window.DB = {
+      getAllNotes: async () => [],
+      getAllTimestamps: async () => [],
+      getAllAnnotations: async () => [],
+    };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    await expect(search._queryUniversal('renal')).rejects.toThrow(/catalog data unavailable/i);
+    expect(search._universalData).toBeNull();
+    const recovered = await search._queryUniversal('renal');
+    expect(recovered.some(item => item.sourceType === 'course' && item.sourceId === 'medicine')).toBe(true);
+    expect(init).toHaveBeenCalledTimes(2);
+  });
+
   it('renders a non-actionable accessible read-failure status, then retries recovered Notes', async () => {
     const readNotes = vi.fn()
       .mockRejectedValueOnce(new Error('Canonical store unavailable'))
