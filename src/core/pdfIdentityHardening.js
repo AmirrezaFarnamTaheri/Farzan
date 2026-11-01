@@ -1,5 +1,4 @@
-const LEGACY_ANNOTATION_KEY = 'plasma-pdf-annotations';
-const PAGE_ANNOTATION_KEY = 'plasma-pdf-annotations-by-page';
+const PAGE_ANNOTATION_KEY = 'ocd_pdf_annotations_by_page';
 
 function copyView(source) {
   if (source instanceof ArrayBuffer) return new Uint8Array(source.slice(0));
@@ -33,21 +32,12 @@ function parsePageMap(raw) {
 }
 
 function readPageFallback(root, docId) {
-  const storage = root.localStorage;
-  const current = storage?.getItem?.(PAGE_ANNOTATION_KEY);
-  if (current) return scopedPageMap(parsePageMap(current), docId);
-
-  const legacyRaw = storage?.getItem?.(LEGACY_ANNOTATION_KEY);
-  const legacyPages = parsePageMap(legacyRaw);
-  if (!legacyPages) return {};
-  storage.setItem(PAGE_ANNOTATION_KEY, JSON.stringify(legacyPages));
-  storage.removeItem(LEGACY_ANNOTATION_KEY);
-  return scopedPageMap(legacyPages, docId);
+  const raw = root.localStorage?.getItem?.(PAGE_ANNOTATION_KEY);
+  return scopedPageMap(parsePageMap(raw), docId);
 }
 
 function scopedPageMap(pages, docId) {
-  // Historical page-only entries have no identity: only accept explicitly
-  // scoped records, never silently attach another document's annotations.
+  // Only explicitly document-scoped records may appear in this PDF.
   if (!pages || !docId) return {};
   const scoped = {};
   for (const [page, records] of Object.entries(pages)) {
@@ -57,66 +47,31 @@ function scopedPageMap(pages, docId) {
   return scoped;
 }
 
-function emitMigrationFailure(root, error, canonicalId, aliases) {
-  root.OpenCourseDeck?.bus?.emit?.('pdf:identity-migration-failed', {
-    docId: canonicalId,
-    aliases,
-    error: {
-      name: error?.name || 'Error',
-      message: error?.message || String(error),
-    },
-  });
-}
-
 function installPageFallbackHardening(root, viewer) {
   const state = root.PlasmaPDFState;
   if (!state) return;
 
   viewer._loadAnnotations = async () => {
+    const docId = state.annotationDocId;
     if (root.DB?.getAnnotations) {
       try {
-        const canonicalId = state.annotationDocId;
-        const aliases = Array.from(new Set(state.annotationAliases || []));
-        const results = await Promise.all([
-          root.DB.getAnnotations(canonicalId),
-          ...aliases.map(alias => root.DB.getAnnotations(alias)),
-        ]);
-        const merged = new Map();
-        results.flat().forEach((annotation) => {
-          const next = { ...annotation, docId: canonicalId };
-          const current = merged.get(next.id);
-          if (!current || Number(next.updatedAt || 0) >= Number(current.updatedAt || 0)) {
-            merged.set(next.id, next);
-          }
-        });
-        const records = [...merged.values()];
-        state.annotations = records.reduce((pages, annotation) => {
-          const page = annotation.page ?? 1;
-          (pages[page] = pages[page] || []).push(annotation);
-          return pages;
-        }, {});
-        const migratedAliases = aliases.filter((_, index) => (results[index + 1] || []).length > 0);
-        if (migratedAliases.length && root.DB?.saveAnnotations) {
-          try {
-            await root.DB.saveAnnotations(canonicalId, state.annotations);
-            await Promise.all(migratedAliases.map(alias => root.DB.saveAnnotations(alias, {})));
-            root.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
-              docId: canonicalId,
-              aliases: migratedAliases,
-              annotations: records.length,
-            });
-          } catch (error) {
-            // The read succeeded, so retain the merged annotations. Alias
-            // cleanup is optional maintenance and must not hide user data.
-            emitMigrationFailure(root, error, canonicalId, migratedAliases);
-          }
-        }
+        const records = await root.DB.getAnnotations(docId);
+        if (!Array.isArray(records)) throw new TypeError('Invalid annotation records');
+        // Never merge URL, filename, byte-length or other document identities.
+        state.annotations = records
+          .filter(row => row && row.docId === docId
+            && Number.isInteger(Number(row.page ?? 1)) && Number(row.page ?? 1) > 0)
+          .reduce((pages, annotation) => {
+            const page = annotation.page ?? 1;
+            (pages[page] = pages[page] || []).push(annotation);
+            return pages;
+          }, {});
         return;
       } catch {
-        // Only read failures fall back to the page-local store below.
+        // A rejected canonical read may only use a local document-scoped copy.
       }
     }
-    state.annotations = readPageFallback(root, state.annotationDocId);
+    state.annotations = readPageFallback(root, docId);
   };
 
   viewer._saveAnnotations = () => {
@@ -150,15 +105,6 @@ export function installPdfIdentityHardening(root = window) {
 
   let preservedBytes = null;
 
-  viewer._deriveLegacyDocIds = (source) => {
-    if (typeof source === 'string') return [source, `url:${source}`];
-    if (typeof File === 'function' && source instanceof File) {
-      return [`file:${source.name}:${source.size}:${source.lastModified || 0}`];
-    }
-    // ArrayBuffer and typed-array aliases based on a constant or byte length
-    // are shared by unrelated documents and are therefore not safe to migrate.
-    return [];
-  };
 
   viewer._deriveCanonicalDocId = (source, pdfDocument, sourceData) => (
     originalDeriveCanonical(source, pdfDocument, preservedBytes || copyView(sourceData) || sourceData)
