@@ -875,4 +875,50 @@ describe('app topbar search rendering', () => {
     expect(fakePlayer.off).toHaveBeenCalledWith('seeked', handlers.seeked);
     expect(fakePlayer.off).toHaveBeenCalledWith('beforeTrackChange', handlers.beforeTrackChange);
   });
+
+  it('indexes durable PDF bookmarks with stable document identity and never seeks an unrelated PDF', async () => {
+    const bookmarks = [
+      { id: 'renal-bm', docId: 'my-renamed.pdf', title: 'Renal bookmarked page', page: 12 },
+      { id: 'unanchored-bm', docId: 'global', title: 'Unanchored chemical page', page: 5 },
+    ];
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+      getAllPdfBookmarks: vi.fn(async () => structuredClone(bookmarks)),
+    };
+    window.DataStore = { init: vi.fn(async () => true), allCourses: () => [], allTopics: () => [] };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const stable = await search._queryUniversal('renal bookmarked');
+    expect(stable).toEqual([expect.objectContaining({
+      sourceType: 'pdfBookmark', sourceId: 'my-renamed.pdf:12:renal-bm',
+      href: '#/pdf', category: 'PDF bookmark',
+    })]);
+    stable[0].action();
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('my-renamed.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('12');
+
+    const unanchored = await search._queryUniversal('unanchored chemical');
+    expect(unanchored[0]).toMatchObject({ sourceType: 'pdfBookmark', href: '#/materials' });
+    unanchored[0].action();
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBeNull();
+  });
+
+  it('does not cache a partial universal search corpus after a PDF bookmark read error', async () => {
+    window.DB = {
+      getAllNotes: vi.fn(async () => [{ id: 'saved', title: 'Renal note' }]),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+      getAllPdfBookmarks: vi.fn().mockRejectedValueOnce(new Error('bookmark IDB failed'))
+        .mockResolvedValueOnce([{ id: 'bm', docId: 'renal.pdf', title: 'Renal marked', page: 5 }]),
+    };
+    window.DataStore = { init: vi.fn(async () => true), allCourses: () => [], allTopics: () => [] };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    await expect(search._loadUniversalData()).rejects.toThrow('bookmark IDB failed');
+    expect(search._universalData).toBeNull();
+    const recovered = await search._queryUniversal('renal');
+    expect(recovered.map(row => row.sourceType)).toContain('pdfBookmark');
+  });
+
 });

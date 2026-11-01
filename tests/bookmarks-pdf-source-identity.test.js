@@ -85,4 +85,49 @@ describe('saved PDF bookmark stable-source navigation', () => {
     expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
     expect(Router.navigate).toHaveBeenCalledWith('#/materials');
   });
+
+  it('shows canonical saved PDF bookmarks and navigates only when their document identity is stable', async () => {
+    const stored = [
+      { id: 'bm-renal', docId: 'renamed-renal.pdf', docTitle: 'Renal physiology', page: 7, updatedAt: 100 },
+      { id: 'bm-unanchored', docId: 'global', docTitle: 'Unanchored PDF', page: 12, updatedAt: 90 },
+    ];
+    window.DB.getAllPdfBookmarks = vi.fn(async () => structuredClone(stored));
+    route = mount();
+    const first = await vi.waitFor(() => {
+      const card = document.querySelector('[data-bookmark-id="bm-renal"]');
+      expect(card).not.toBeNull();
+      return card;
+    });
+    expect(first.textContent).toContain('Renal physiology');
+    expect(first.textContent).toContain('Page 7');
+    first.querySelector('a').click();
+    expect(setPendingPdfPage).toHaveBeenCalledWith('renamed-renal.pdf', 7);
+    expect(Router.navigate).toHaveBeenCalledWith('#/pdf');
+
+    const unsafe = document.querySelector('[data-bookmark-id="bm-unanchored"]');
+    expect(unsafe).not.toBeNull();
+    expect(unsafe.querySelector('a').getAttribute('href')).toBe('#/materials');
+    unsafe.querySelector('a').click();
+    expect(setPendingPdfPage).toHaveBeenCalledWith(null, null);
+    expect(Router.navigate).toHaveBeenCalledWith('#/materials');
+    expect(stored).toHaveLength(2);
+  });
+
+  it('fails closed when canonical PDF bookmarks cannot be read and offers retry without modifying records', async () => {
+    const getAllPdfBookmarks = vi.fn().mockRejectedValueOnce(new Error('IDB unavailable'))
+      .mockResolvedValueOnce([{ id: 'bm-recovered', docId: 'renal.pdf', page: 3, title: 'Renal bookmark' }]);
+    window.DB.getAllPdfBookmarks = getAllPdfBookmarks;
+    route = mount();
+    const retry = await vi.waitFor(() => {
+      const button = document.querySelector('[data-bookmark-retry]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Bookmarks could not be loaded');
+    expect(document.querySelector('[data-bookmark-id="bm-recovered"]')).toBeNull();
+    retry.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="bm-recovered"]')).not.toBeNull());
+    expect(getAllPdfBookmarks).toHaveBeenCalledTimes(2);
+  });
+
 });

@@ -1157,7 +1157,7 @@ import { Pointer } from './src/lib/pointer.js';
         if (!Array.isArray(records)) throw new TypeError('Invalid canonical search records from ' + method);
         return records;
       };
-      const [catalog, notes, timestamps, annotations] = await Promise.all([
+      const [catalog, notes, timestamps, annotations, pdfBookmarks] = await Promise.all([
         (async () => {
           // Optional catalog API absence is a legitimate first-run condition.
           // An existing canonical loader that rejects is not an empty corpus:
@@ -1178,6 +1178,7 @@ import { Pointer } from './src/lib/pointer.js';
         readSaved('getAllNotes'),
         readSaved('getAllTimestamps'),
         readSaved('getAllAnnotations'),
+        readSaved('getAllPdfBookmarks'),
       ]);
       const results = [];
       (catalog.courses || []).forEach((course) => {
@@ -1262,6 +1263,27 @@ import { Pointer } from './src/lib/pointer.js';
           description: `PDF annotation${annotation.page ? ` · page ${annotation.page}` : ''}`,
           category: 'PDF annotation',
           href: '#/pdf',
+        });
+      });
+      // User-saved PDF pages occupy their own canonical IndexedDB store.
+      // Search them independently from annotations and Notes, and require a
+      // stable document identity before queuing a PDF page handoff. An
+      // unanchored saved page is discoverable but never seeks an old document.
+      (pdfBookmarks || []).forEach((bookmark) => {
+        if (!bookmark?.id) return;
+        const docId = String(bookmark.docId ?? '').trim();
+        const stable = Boolean(docId && docId !== 'global');
+        const page = Number.isFinite(Number(bookmark.page)) && Number(bookmark.page) > 0
+          ? Math.max(1, Math.floor(Number(bookmark.page))) : null;
+        results.push({
+          icon: 'file-pdf',
+          sourceType: 'pdfBookmark',
+          sourceId: `${docId || 'unanchored'}:${page ?? 'unspecified'}:${String(bookmark.id)}`,
+          label: String(bookmark.title || bookmark.docTitle || docId || 'Saved PDF page'),
+          description: page ? `PDF bookmark · page ${page}` : 'Saved PDF bookmark',
+          category: 'PDF bookmark',
+          href: stable ? '#/pdf' : '#/materials',
+          action: () => setPendingPdfPage(stable ? docId : null, stable ? page : null),
         });
       });
       // A save/import/cross-tab update may arrive while Notes or the catalog

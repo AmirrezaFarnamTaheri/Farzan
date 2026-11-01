@@ -82,10 +82,15 @@ export function mountBookmarksView(deps = {}) {
         return [];
       }
     };
-    const [timestamps, notes, annotations] = await Promise.all([
+    const [timestamps, notes, annotations, pdfBookmarks] = await Promise.all([
       readCollection(window.DB?.getAllTimestamps, 'Timestamps'),
       readCollection(window.DB?.getAllNotes, 'Notes'),
       readCollection(window.DB?.getAllAnnotations, 'PDF annotations'),
+      // The canonical PDF bookmark store is optional on older/partial app
+      // facades, but a present reader that throws cannot mean "no bookmarks".
+      typeof window.DB?.getAllPdfBookmarks === 'function'
+        ? readCollection(window.DB.getAllPdfBookmarks, 'PDF bookmarks')
+        : Promise.resolve([]),
     ]);
     // A slower earlier filter request must never overwrite a newer result,
     // error or active filter. DOM replacement also invalidates old requests.
@@ -167,6 +172,16 @@ export function mountBookmarksView(deps = {}) {
         page: item.page || 1,
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
+      ...pdfBookmarks.filter(item => item && item.id != null).map(item => ({
+        type: 'PDF',
+        title: item.docTitle || item.title || item.docId || 'Saved PDF page',
+        detail: `Page ${item.page || 1}`,
+        href: '#/pdf',
+        id: item.id,
+        docId: item.docId,
+        page: item.page || 1,
+        updatedAt: item.updatedAt || item.createdAt || 0,
+      })),
     ].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
     // The outer card is useful for a true collection, but a single saved
     // item already owns a card. Do not double-wrap it (or first-use).
@@ -207,7 +222,7 @@ export function mountBookmarksView(deps = {}) {
       [
         ['Video timestamps', timestamps.length],
         ['Notes', notes.length],
-        ['PDF annotations', annotations.length],
+        ['PDF annotations and saved pages', annotations.length + pdfBookmarks.length],
         ['Total bookmarks', bookmarkItems.length],
       ].forEach(([label, value]) => {
         const card = document.createElement('div');
@@ -228,7 +243,7 @@ export function mountBookmarksView(deps = {}) {
       const title = document.createElement('h2');
       title.textContent = 'No saved items yet';
       const message = document.createElement('p');
-      message.textContent = 'Notes, video timestamps and PDF annotations will appear here as you study.';
+      message.textContent = 'Notes, video timestamps, PDF annotations and saved PDF pages will appear here as you study.';
       const actions = document.createElement('div');
       actions.className = 'button-row';
       const notesLink = document.createElement('a');
