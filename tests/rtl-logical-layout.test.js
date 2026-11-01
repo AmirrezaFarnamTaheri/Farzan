@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 const notes = fs.readFileSync('src/styles/notes-enhancements.css', 'utf8');
 const views = fs.readFileSync('src/styles/views.css', 'utf8');
 const studio = fs.readFileSync('src/styles/farzan-redesign.css', 'utf8');
+const enhancements = fs.readFileSync('src/styles/enhancements.css', 'utf8');
 
 function rule(source, selector) {
   const at = source.indexOf(selector + ' {');
@@ -27,7 +28,8 @@ describe('RTL layout uses logical start/end in owning CSS rules', () => {
   });
   it('mirrors course filter search and avoids fixed left-aligned titles', () => {
     expect(rule(views, '.courses-search-field > .icon')).toMatch(/inset-inline-start:\s*var\(--space-3\)/);
-    expect(rule(views, '.courses-search-field .input')).toMatch(/padding-inline:/);
+    expect(rule(enhancements, '.view-courses #courses-search')).toMatch(/padding-inline:\\s*calc\\([^)]*\\);/);
+    expect(views).not.toContain('.courses-search-field .input {');
     expect(rule(views, '.courses-list')).toMatch(/padding-inline-end:/);
     expect(rule(views, '.course-item')).toMatch(/text-align:\s*start/);
     expect(rule(views, '.home-widget')).toMatch(/text-align:\s*start/);
