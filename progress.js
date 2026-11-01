@@ -676,8 +676,8 @@ const ProgressStats = (() => {
         const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
         const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
         const pdfBookmarkRecords = rawPdfBookmarks.filter(_isPdfBookmarkRecord);
-        // Validate the entire imported deck before any user confirmation or
-        // canonical write. A malformed FSRS state cannot be repaired from SM-2.
+        // Validate the current FSRS deck before any user confirmation or
+        // canonical write. Never invent missing review history.
         if (payload.settings && Object.prototype.hasOwnProperty.call(payload.settings, 'flashcards')
             && payload.settings.flashcards != null) {
           await assertFlashcardBackupImportable(payload.settings.flashcards);
