@@ -92,6 +92,38 @@ describe('home dashboard', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/flashcards');
   });
 
+  it('does not double count duplicate canonical topic progress rows or obsolete completions', async () => {
+    const now = Date.now();
+    mountDashboard({
+      progress: [
+        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 100000 },
+        { topicId: 'topic-1', percent: 30, status: 'in-progress', position: 120, updatedAt: now },
+        { topicId: 'topic-2', percent: 80, status: 'in-progress', position: 240, updatedAt: now - 50000 },
+        { topicId: 'topic-2', percent: 20, status: 'in-progress', position: 10, updatedAt: now - 150000 },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('2');
+    expect(document.querySelector('[data-pulse-complete]').textContent).toBe('0');
+    expect(document.querySelector('[data-pulse-average]').textContent).toBe('55%');
+    expect(document.getElementById('home-focus-title').textContent).toBe('Design Systems');
+    expect(document.querySelector('[data-home-focus-percent]').textContent).toBe('30% complete');
+  });
+
+  it('counts a topic as completed exactly once when duplicate saved records report completion', async () => {
+    const now = Date.now();
+    mountDashboard({
+      progress: [
+        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now },
+        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 7000 },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('0');
+    expect(document.querySelector('[data-pulse-complete]').textContent).toBe('1');
+    expect(document.querySelector('[data-pulse-average]').textContent).toBe('100%');
+  });
+
   it('prioritizes a real unfinished lesson over a newer completed lesson', async () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({
