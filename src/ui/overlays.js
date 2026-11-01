@@ -214,15 +214,17 @@ export const Modal = {
 
       document.body.appendChild(modal);
 
-      // Auto-remove from DOM after closing. Self-removing listener: a
-      // permanent bus subscription per created modal would retain every
-      // closed modal element for the page lifetime.
-      const onModalClose = ({ modal: m }) => {
-        if (m !== modal) return;
-        (window.OpenCourseDeck?.bus)?.off('modal:close', onModalClose);
-        setTimeout(() => modal.remove(), 400);
-      };
-      (window.OpenCourseDeck?.bus)?.on('modal:close', onModalClose);
+      // A created modal owns its cleanup listener, not a permanent app bus
+      // subscriber. It may close, reopen during the animation, and close
+      // again: only the final closed state may remove its DOM.
+      let removeTimer = null;
+      modal.addEventListener('modal:close', () => {
+        if (removeTimer !== null) clearTimeout(removeTimer);
+        removeTimer = setTimeout(() => {
+          removeTimer = null;
+          if (!modal.classList.contains('open')) modal.remove();
+        }, 400);
+      });
 
       this.open(modal);
       return modal;
