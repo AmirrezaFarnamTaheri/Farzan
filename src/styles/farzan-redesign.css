@@ -349,6 +349,25 @@ input[type="file"][hidden] {
 .card:hover,
 .card.card-interactive:hover { box-shadow: var(--fz-shadow); transform: none; }
 .card .card-body { padding: clamp(18px, 1.7vw, 27px); }
+/* One meaningful surface per empty/single-source collection. These rules
+ * belong after the final theme card layer so the global .card paint cannot
+ * reintroduce the extra frame seen in screenshot QA. */
+.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) > .card-body {
+  padding: 0;
+}
+.view-my-courses[data-empty="true"] .my-courses-list-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.view-my-courses[data-empty="true"] .my-courses-list-card > .card-body {
+  padding: 0;
+}
 .btn,
 .btn.btn-primary,
 .btn.btn-ghost,

@@ -985,14 +985,6 @@
 
 /* First-use course library: one action instead of layered empty panels. */
 .view-my-courses [hidden] { display: none !important; }
-.view-my-courses[data-empty="true"] .my-courses-list-card {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.view-my-courses[data-empty="true"] .my-courses-list-card > .card-body {
-  padding: 0;
-}
 .view-my-courses[data-empty="true"] .my-courses-empty {
   min-height: 320px;
   padding: clamp(24px, 4vw, 48px);

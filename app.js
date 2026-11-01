@@ -2945,6 +2945,14 @@ import { Pointer } from './src/lib/pointer.js';
           this.markAllRead();
         });
       }
+      document.getElementById('notif-list')?.addEventListener('click', (event) => {
+        const dismiss = eventTargetEl(event)?.closest?.('[data-notif-dismiss]');
+        const item = dismiss?.closest?.('.notif-item');
+        if (!item) return;
+        const wasUnread = item.classList.contains('unread');
+        item.remove();
+        if (wasUnread) this.setCount(this._count - 1);
+      });
 
       document.addEventListener('click', e => {
         const target = eventTargetEl(e);
@@ -2994,7 +3002,12 @@ import { Pointer } from './src/lib/pointer.js';
       const item = createElement('li', { class: 'notif-item unread' },
         createElement('div', { class: 'notif-title' }, title),
         createElement('div', { class: 'notif-message' }, message),
-        createElement('div', { class: 'notif-time' }, 'Just now'));
+        createElement('div', { class: 'notif-time' }, 'Just now'),
+        createElement('button', {
+          type: 'button', class: 'notif-dismiss-btn',
+          'data-notif-dismiss': 'true', 'aria-label': 'Dismiss notification',
+          title: 'Dismiss notification',
+        }, '×'));
       list.prepend(item);
     },
   };
