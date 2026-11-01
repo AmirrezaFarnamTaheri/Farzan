@@ -7,6 +7,7 @@ const state = {
   catalog: null,
   courses: [],
   topics: [],
+  topicSearch: [],
 };
 const cancelled = new Map();
 
@@ -76,6 +77,21 @@ function assertCatalogReady() {
   error.code = failed ? 'CATALOG_LOAD_FAILED' : 'WORKER_NOT_READY';
   error.catalogState = state.status;
   throw error;
+}
+
+// The classic worker is shipped without module imports. Keep this pure
+// normalizer in step with src/core/searchRanking.js so offline title,
+// course, and source discovery matches Persian and mixed-script input.
+function normalizeCatalogQuery(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\u064a\u0649]/g, '\u06cc')
+    .replace(/\u0643/g, '\u06a9')
+    .replace(/[\u064b-\u065f\u0670\u0640]/g, '')
+    .replace(/\u200c/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function stableTopicId({ courseId, sourceId, lineage, topic, index }) {
@@ -180,10 +196,16 @@ self.onmessage = function onMessage(event) {
         state.status = 'loading';
         state.failure = null;
         const result = parseCatalog(data.catalogJson);
+        // Build the index before publishing a new authoritative catalog.
+        // A failed parse must never mix old topic offsets with new matches.
+        const topicSearch = result.topics.map(topic => [
+          topic.title, topic.courseTitle, topic.sourceLabel,
+        ].map(normalizeCatalogQuery).filter(Boolean).join(' '));
         assertNotCancelled(meta);
         state.catalog = data.catalogJson;
         state.courses = result.courses;
         state.topics = result.topics;
+        state.topicSearch = topicSearch;
         state.status = 'ready';
         post('parse:done', meta, {
           ...result,
@@ -206,9 +228,13 @@ self.onmessage = function onMessage(event) {
       }
       case 'search': {
         assertCatalogReady();
-        const query = String(data.query ?? '').toLowerCase();
-        const results = query
-          ? state.topics.filter(t => t.title.toLowerCase().includes(query)).slice(0, data.limit ?? 25)
+        const query = normalizeCatalogQuery(data.query);
+        const requestedLimit = Number(data.limit ?? 25);
+        const limit = Number.isFinite(requestedLimit)
+          ? Math.max(0, Math.min(250, Math.floor(requestedLimit))) : 25;
+        const results = query && limit
+          ? state.topics.filter((_topic, index) => state.topicSearch[index].includes(query))
+            .slice(0, limit)
           : [];
         assertNotCancelled(meta);
         post('search:done', meta, { results, catalogState: state.status, empty: results.length === 0 });
@@ -227,6 +253,7 @@ self.onmessage = function onMessage(event) {
       state.catalog = null;
       state.courses = [];
       state.topics = [];
+      state.topicSearch = [];
     }
     post('error', meta || {
       id: payload?.id ?? null,
