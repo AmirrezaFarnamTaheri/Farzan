@@ -346,11 +346,18 @@ for (const setup of setups) {
  * left and reopened through the real mobile library view before capture.
  */
 test('keeps populated multilingual Notes and Settings usable at 200%-equivalent RTL desktop reflow', async ({ page }) => {
+  // Playwright's default 1280px viewport is restored on full page.goto
+  // navigations, overriding an earlier CDP emulation command. Apply the
+  // actual 720 CSS-pixel / 2x bitmap profile after each navigation.
+  await page.setViewportSize({ width: 720, height: 450 });
   const session = await page.context().newCDPSession(page);
-  await session.send('Emulation.setDeviceMetricsOverride', {
-    width: 720, height: 450, deviceScaleFactor: 2, mobile: false,
-    screenWidth: 1440, screenHeight: 900,
-  });
+  const applyZoomProfile = async () => {
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: 720, height: 450, deviceScaleFactor: 2, mobile: false,
+      screenWidth: 1440, screenHeight: 900,
+    });
+    await expect.poll(() => page.evaluate(() => innerWidth)).toBe(720);
+  };
   const folder = path.join(output, 'populated-200pct-rtl');
   fs.mkdirSync(folder, { recursive: true });
   const assertNoOverflow = async (route) => {
@@ -368,6 +375,7 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
   };
   try {
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await applyZoomProfile();
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     const modern = page.locator('[data-notes-editor] .notes-modern-editor');
@@ -389,6 +397,7 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
 
     await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await applyZoomProfile();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     const library = page.locator('[data-notes-toggle-library]');
     // Responsive layouts legitimately expose the notes list either in the
@@ -414,6 +423,7 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
     if (mobilePane) await expect(library).toHaveAttribute('aria-expanded', 'false');
 
     await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
+    await applyZoomProfile();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     await expect(page.locator('.view-settings')).toBeVisible();
     await expect(page.locator('#settings-appearance')).toBeVisible();
