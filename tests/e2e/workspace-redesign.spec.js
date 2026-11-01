@@ -680,104 +680,35 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
 
-  test('persists explicitly consented FSRS migration and exact SM-2 rollback across page reloads', async ({ page }) => {
+  test('persists canonical FSRS ratings across reload without migration controls', async ({ page }) => {
     await page.goto('/#/flashcards', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-flashcards')).toBeVisible({ timeout: 20000 });
-
-    const legacy = await page.evaluate(async () => {
+    const saved = await page.evaluate(async () => {
       const api = window.OpenCourseDeck.Flashcards;
-      const card = await api.addCard({
-        front: 'E2E renal recall original question',
-        back: 'Nephron',
-        deck: 'Migration acceptance',
+      const created = await api.addCard({
+        front: 'E2E renal recall question', back: 'Nephron', deck: 'FSRS acceptance',
       });
-      const cards = await window.DB.getSetting('ocd_flashcards');
-      const original = {
-        ...cards.find(item => item.id === card.id),
-        repetitions: 6,
-        interval: 17,
-        easeFactor: 2.17,
-        nextReviewDate: '2027-03-09',
-        lastReviewedAt: '2026-10-12T10:00:00.000Z',
-        userMetadata: { tags: ['renal', 'فارسی'], source: 'saved-note' },
-      };
-      await window.DB.saveSetting('ocd_flashcards',
-        cards.map(item => item.id === card.id ? original : item));
-      api.invalidateCache();
-      return original;
+      if (created.scheduler !== 'fsrs-v5') throw new Error('FSRS was not the default');
+      await api.reviewCard(created.id, 4);
+      const records = await window.DB.getSetting('ocd_flashcards');
+      return records.find(card => card.id === created.id);
     });
-
+    expect(saved.scheduler).toBe('fsrs-v5');
+    expect(saved.fsrsState.reviewLog).toHaveLength(1);
+    expect(saved.fsrsState.card.due).toMatch(/Z$/);
+    expect(saved).not.toHaveProperty('repetitions');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-flashcards')).toBeVisible({ timeout: 20000 });
-    await page.locator('#fc-manage-cards > summary').click();
-    const migrate = page.locator('[data-fc-migrate="' + legacy.id + '"]');
-    await expect(migrate).toBeVisible();
-
-    await page.evaluate(() => {
-      window.__fsrsMigrationPrompts = [];
-      window.OpenCourseDeck.UI.confirm = async options => {
-        window.__fsrsMigrationPrompts.push(options);
-        return false;
-      };
-    });
-    await migrate.click();
-    await expect.poll(async () => page.evaluate(() => window.__fsrsMigrationPrompts.length)).toBe(1);
-    await expect.poll(() => page.evaluate(async id => {
-      const cards = await window.DB.getSetting('ocd_flashcards');
-      return cards.find(card => card.id === id)?.scheduler ?? 'sm2-v1';
-    }, legacy.id)).toBe('sm2-v1');
-
-    await page.evaluate(() => {
-      window.OpenCourseDeck.UI.confirm = async options => {
-        window.__fsrsMigrationPrompts.push(options);
-        return true;
-      };
-    });
-    await migrate.click();
-    await expect.poll(() => page.evaluate(async id => {
-      const cards = await window.DB.getSetting('ocd_flashcards');
-      return cards.find(card => card.id === id)?.scheduler;
-    }, legacy.id)).toBe('fsrs-v5');
-    const confirmation = await page.evaluate(() => window.__fsrsMigrationPrompts.at(-1));
-    expect(confirmation.message).toContain('2027-03-09');
-    expect(confirmation.message).toContain('New FSRS due time');
-
-    // Exercise the real scheduler after migration: rollback must recover
-    // the exact pre-migration saved card even after the FSRS log grows.
-    await page.evaluate(async id => {
-      await window.OpenCourseDeck.Flashcards.reviewCard(id, 4);
-    }, legacy.id);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.view-flashcards')).toBeVisible({ timeout: 20000 });
-    await page.locator('#fc-manage-cards > summary').click();
-    const rollback = page.locator('[data-fc-rollback="' + legacy.id + '"]');
-    await expect(rollback).toBeVisible();
-    const archived = await page.evaluate(async id => {
-      const cards = await window.DB.getSetting('ocd_flashcards');
-      const migrated = cards.find(card => card.id === id);
-      return {
-        migration: migrated.fsrsMigration,
-        ratings: migrated.fsrsState.reviewLog.length,
-      };
-    }, legacy.id);
-    expect(archived.migration.legacyCard).toEqual(legacy);
-    expect(archived.ratings).toBe(1);
-
-    await page.evaluate(() => {
-      window.OpenCourseDeck.UI.confirm = async () => true;
-    });
-    await rollback.click();
-    await expect.poll(() => page.evaluate(async id => {
-      const cards = await window.DB.getSetting('ocd_flashcards');
-      return cards.find(card => card.id === id)?.scheduler ?? 'sm2-v1';
-    }, legacy.id)).toBe('sm2-v1');
     const restored = await page.evaluate(async id => {
-      const cards = await window.DB.getSetting('ocd_flashcards');
+      window.OpenCourseDeck.Flashcards.invalidateCache();
+      const cards = await window.OpenCourseDeck.Flashcards.getCards();
       return cards.find(card => card.id === id);
-    }, legacy.id);
-    expect(restored).toEqual(legacy);
+    }, saved.id);
+    expect(restored).toEqual(saved);
+    await page.locator('#fc-manage-cards > summary').click();
+    await expect(page.locator('[data-fc-edit="' + saved.id + '"]')).toBeVisible();
+    await expect(page.locator('[data-fc-migrate], [data-fc-rollback], #fc-new-scheduler')).toHaveCount(0);
   });
-
 
 
   test('runs real Konva draft editing and undo in Chrome without touching the Studio board', async ({ page }) => {
