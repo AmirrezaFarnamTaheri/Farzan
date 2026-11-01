@@ -287,3 +287,114 @@ export const Modal = {
       });
     },
 };
+
+// The app-shell and standalone route consumers share the same Drawer instance.
+export const Drawer = {
+    _cleanupFns: new WeakMap(),
+    _previousFocus: new WeakMap(),
+    // A close animation must never hide a subsequently reopened drawer.
+    _teardownTimers: new WeakMap(),
+
+    open(target) {
+      const drawer = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!drawer) return;
+      if (drawer.classList.contains('open')) return;
+      const pending = this._teardownTimers.get(drawer);
+      if (pending) {
+        clearTimeout(pending.drawer);
+        if (pending.backdrop != null) clearTimeout(pending.backdrop);
+        this._teardownTimers.delete(drawer);
+      }
+
+      let backdrop = $('.drawer-backdrop');
+      if (!backdrop) {
+        backdrop = createElement('div', { class: 'drawer-backdrop' });
+        document.body.appendChild(backdrop);
+        backdrop.addEventListener('click', () => this.closeAll());
+      }
+
+      drawer.removeAttribute('hidden');
+      drawer.setAttribute('aria-hidden', 'false');
+      drawer.setAttribute('aria-modal', 'true');
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('tabindex', '-1');
+      requestAnimationFrame(() => {
+        backdrop.classList.add('open');
+        drawer.classList.add('open');
+      });
+
+      document.body.style.overflow = 'hidden';
+      this._previousFocus.set(drawer, document.activeElement);
+      setAppInert(true);
+      this._cleanupFns.set(drawer, trapFocus(drawer));
+
+      shell().bus?.emit('drawer:open', { drawer });
+    },
+
+    close(target) {
+      const drawer = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+      if (!drawer) return;
+      if (!drawer.classList.contains('open')) return;
+
+      drawer.classList.remove('open');
+      const stillOpen = $('.drawer.open').length > 0;
+      const backdrop = $('.drawer-backdrop');
+      if (!stillOpen) backdrop?.classList.remove('open');
+      const duration = shell().config?.animationDuration ?? 0;
+      const pending = {
+        drawer: setTimeout(() => {
+          this._teardownTimers.delete(drawer);
+          if (drawer.classList.contains('open')) return;
+          drawer.setAttribute('hidden', '');
+          drawer.setAttribute('aria-hidden', 'true');
+          drawer.removeAttribute('aria-modal');
+        }, duration),
+        backdrop: !stillOpen && backdrop ? setTimeout(() => {
+          // A different drawer might have opened before the animation ends.
+          if (!$('.drawer.open').length) backdrop.remove();
+        }, duration) : null,
+      };
+      this._teardownTimers.set(drawer, pending);
+
+      // Other overlays still own the body scroll lock and focus trap.
+      if (!stillOpen && !(shell().state?.openModals?.length)) {
+        document.body.style.overflow = '';
+      }
+      this._cleanupFns.get(drawer)?.();
+      this._cleanupFns.delete(drawer);
+      setAppInert(false);
+      if (!stillOpen && !(shell().state?.openModals?.length)) {
+        restoreFocus(this._previousFocus.get(drawer));
+      }
+      this._previousFocus.delete(drawer);
+      shell().bus?.emit('drawer:close', { drawer });
+    },
+
+    closeAll() {
+      $$('.drawer.open').forEach(d => this.close(d));
+    },
+
+    init() {
+      document.addEventListener('click', e => {
+        const target = eventTargetEl(e);
+        if (!target) return;
+        const trigger = target.closest('[data-drawer-open]');
+        if (trigger) { e.preventDefault(); this.open(trigger.dataset.drawerOpen); }
+
+        const closeBtn = target.closest('[data-drawer-close]');
+        if (closeBtn) {
+          const drawer = closeBtn.closest('.drawer');
+          if (drawer) this.close(drawer);
+        }
+      });
+
+      // Close on Escape
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') this.closeAll();
+      });
+    },
+  };
