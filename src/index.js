@@ -198,7 +198,7 @@ initServiceWorker();
 pd.ProductReadiness = enforceProductReadiness(document);
 
 // The app shell is the only hard dependency. Optional utilities are isolated:
-// a broken translation provider must not prevent the command palette or
+// an unused optional feature must not prevent the command palette or
 // user-library actions from starting. Add Content runs first because the
 // palette exposes commands that call its namespace.
 import('../app.js').then(async () => {
@@ -217,29 +217,6 @@ import('../app.js').then(async () => {
   ]);
 
   await runIndependentInitializers([
-    {
-      name: 'translator',
-      run: async () => {
-        const translator = await import('./features/translator.js');
-        Object.assign(pd, {
-          TranslatorRegistry: translator.TranslatorRegistry,
-          BaseTranslator: translator.BaseTranslator,
-          OpenAITranslator: translator.OpenAITranslator,
-          CustomAPITranslator: translator.CustomAPITranslator,
-          GoogleTranslator: translator.GoogleTranslator,
-          LANGUAGES: translator.LANGUAGES,
-          getLanguageName: translator.getLanguageName,
-        });
-      },
-    },
-    {
-      name: 'translation-cache',
-      run: async () => {
-        const translationCache = await import('./features/translationCache.js');
-        const cacheApi = translationCache.translationCache || translationCache;
-        Object.assign(pd, { TranslationCache: cacheApi });
-      },
-    },
     {
       name: 'note-templates',
       run: async () => {

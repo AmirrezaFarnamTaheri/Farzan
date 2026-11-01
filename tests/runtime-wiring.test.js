@@ -19,8 +19,6 @@ describe('runtime wiring', () => {
   const requiredModules = [
     './features/mediaStorage.js',
     './features/aiClient.js',
-    './features/translator.js',
-    './features/translationCache.js',
     './features/errorBoundary.js',
     './features/offlineBanner.js',
     './features/commandPalette.js',
@@ -56,24 +54,20 @@ describe('runtime wiring', () => {
     expect(indexSource.slice(addContentInitializer, paletteInitializer)).toContain('initAddContent(window)');
   });
 
-  it('defers translation and note-template utilities until the app shell resolves', () => {
+  it('defers note-template utilities until the app shell resolves', () => {
     const appImport = indexSource.indexOf("import('../app.js')");
-    for (const specifier of ['./features/translator.js', './features/translationCache.js', './features/noteTemplates.js']) {
+    for (const specifier of ['./features/noteTemplates.js']) {
       expect(indexSource).toContain(`import('${specifier}')`);
       expect(indexSource).not.toMatch(new RegExp(`from ["']${specifier.replaceAll('.', '\\.')}["']`));
       expect(indexSource.indexOf(`import('${specifier}')`)).toBeGreaterThan(appImport);
     }
-    expect(indexSource).toContain('const cacheApi = translationCache.translationCache || translationCache');
     expect(indexSource).toContain('const templateApi = noteTemplates.NoteTemplates || window.OpenCourseDeck.NoteTemplates');
-    expect(indexSource).toContain('TranslationCache: cacheApi');
     expect(indexSource).toContain('NoteTemplates: templateApi');
-    expect(indexSource).not.toContain('TranslationCache: translationCache,');
   });
 
   it('loads optional runtime utilities without an all-or-nothing dependency group', () => {
     expect(indexSource).toContain("import { runIndependentInitializers } from './core/deferredRuntime.js'");
-    expect(indexSource).not.toContain('const [translator, translationCache, noteTemplates, { initCommandPalette }] = await Promise.all');
-    for (const name of ['add-content', 'translator', 'translation-cache', 'note-templates', 'command-palette']) {
+    for (const name of ['add-content', 'note-templates', 'command-palette']) {
       expect(indexSource).toContain(`name: '${name}'`);
     }
     // User-library actions must exist before command-palette commands are registered.
@@ -81,12 +75,8 @@ describe('runtime wiring', () => {
   });
 
   it('exports stable deferred utility contracts', async () => {
-    const translationCache = await import('../src/features/translationCache.js');
     const noteTemplates = await import('../src/features/noteTemplates.js');
 
-    for (const method of ['init', 'get', 'set', 'clear', 'size', 'prune', 'clearEngine', 'hashParams']) {
-      expect(typeof translationCache.translationCache[method]).toBe('function');
-    }
     for (const method of ['getAllTemplates', 'getTemplate', 'saveAsTemplate', 'updateTemplate', 'deleteTemplate', 'getTemplatePickerItems']) {
       expect(typeof noteTemplates.NoteTemplates[method]).toBe('function');
     }
