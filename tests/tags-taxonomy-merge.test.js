@@ -15,8 +15,7 @@ const fill = (selector, value) => {
   element.value = value;
   return element;
 };
-const submit = selector => document.querySelector(selector).dispatchEvent(
-  new Event('submit', { bubbles: true, cancelable: true }));
+const submit = selector => document.querySelector(selector + ' button').click();
 
 describe('persistent, non-destructive tag taxonomy', () => {
   let saved;
@@ -106,7 +105,7 @@ describe('tag taxonomy validation and aliases', () => {
   it('rejects unknown revisions, cycles, malformed labels, and unsafe control text', () => {
     expect(() => parseTagTaxonomy({version:2,labels:[],aliases:{}})).toThrow(/version/i);
     expect(() => parseTagTaxonomy({version:1,labels:[],aliases:{a:'b',b:'a'}})).toThrow(/cycle/i);
-    expect(() => createTaxonomyTag(parseTagTaxonomy(null),'x\\u0000tag')).toThrow(/control/i);
+    expect(() => createTaxonomyTag(parseTagTaxonomy(null),'x' + String.fromCharCode(0) + 'tag')).toThrow(/control/i);
   });
   it('reassigns transitive aliases when merging without losing a pre-existing destination', () => {
     const original=parseTagTaxonomy({version:1,labels:[{key:'renal',label:'Renal'}],aliases:{kidney:'renal'}});
