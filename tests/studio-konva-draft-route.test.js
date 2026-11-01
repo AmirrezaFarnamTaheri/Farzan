@@ -76,6 +76,25 @@ describe('Studio experimental Konva draft opt-in', () => {
   });
   afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
 
+  it('offers keyboard-accessible shape creation with inverse viewport coordinates only in the draft', async () => {
+    const board = v1Board();
+    board.viewport = { offsetX: 40, offsetY: -20, zoom: 2, rotation: 0 };
+    const { controller, factory, canvasApi, saveSetting } = makeFixture({ board });
+    expect(document.querySelectorAll('[data-studio-konva-add]')).toHaveLength(2);
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const instance = factory.mock.results[0].value;
+    instance.addShape = vi.fn(async geometry => ({ ...board, layers: board.layers }));
+    document.querySelector('[data-studio-konva-add="rect"]').click();
+    await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledExactlyOnceWith({
+      type: 'rect', x: 80, y: 80, width: 120, height: 80,
+    }));
+    expect(instance.setMode).toHaveBeenCalledWith('select');
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(canvasApi.serialize()).toEqual(board);
+    controller.unmount();
+  });
+
   it('does not load Konva on normal Studio mount; exposes an explicit isolated-draft opt-in', async () => {
     const { controller, loader } = makeFixture();
     expect(document.querySelector('[data-studio-konva-open]')).not.toBeNull();
