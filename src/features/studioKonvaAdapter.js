@@ -62,6 +62,29 @@ function validateMappedElement(item, type) {
       return unsupported('invalid-element-' + size + '-range');
     }
   }
+  if (type === 'text' && item.fontFamily != null
+      && (typeof item.fontFamily !== 'string' || !item.fontFamily.trim())) {
+    return unsupported('invalid-element-fontFamily');
+  }
+  for (const name of ['lineCap', 'lineJoin']) {
+    if (item[name] == null) continue;
+    const allowed = name === 'lineCap'
+      ? ['butt', 'round', 'square']
+      : ['round', 'bevel', 'miter'];
+    if (typeof item[name] !== 'string' || !allowed.includes(item[name])) {
+      return unsupported('invalid-element-' + name);
+    }
+  }
+  if (item.dash != null && (!Array.isArray(item.dash) || item.dash.length > 0)) {
+    return unsupported('unsupported-element-dash');
+  }
+  if (type === 'text') {
+    for (const [name, expected] of [['align', 'left'], ['baseline', 'alphabetic']]) {
+      if (item[name] != null && item[name] !== expected) {
+        return unsupported('unsupported-element-' + name);
+      }
+    }
+  }
   if (item.fontSize != null && item.fontSize <= 0) {
     return unsupported('invalid-element-fontSize-range');
   }
