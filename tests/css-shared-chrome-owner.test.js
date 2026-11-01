@@ -64,9 +64,9 @@ describe('superseded chrome declarations removed from earlier layers', () => {
     for (const selector of ['.sidebar', '.topbar']) {
       const early = getBlock(study, selector);
       const owner = getBlock(late, selector);
-      expect(early).not.toMatch(/(?:^|;)\\s*(?:backdrop-filter|-webkit-backdrop-filter|box-shadow)\\s*:/);
-      expect(owner).toMatch(/backdrop-filter:\\s*none/);
-      expect(owner).toMatch(/box-shadow:\\s*none/);
+      expect(early).not.toMatch(/(?:^|;)\s*(?:backdrop-filter|-webkit-backdrop-filter|box-shadow)\s*:/);
+      expect(owner).toMatch(/backdrop-filter:\s*none/);
+      expect(owner).toMatch(/box-shadow:\s*none/);
     }
     expect(getBlock(study, '.sidebar')).toMatch(/border-inline-end:/);
     expect(getBlock(study, '.topbar')).toMatch(/border-bottom:/);
@@ -75,18 +75,18 @@ describe('superseded chrome declarations removed from earlier layers', () => {
   it('leaves navigation scroll-mask behavior but retires duplicate sizing', () => {
     const early = getBlock(enhancements, '.sidebar-nav');
     const owner = getBlock(late, '.sidebar-nav');
-    expect(early).not.toMatch(/(?:^|;)\\s*(?:min-height|flex)\\s*:/);
+    expect(early).not.toMatch(/(?:^|;)\s*(?:min-height|flex)\s*:/);
     expect(early).toMatch(/-webkit-mask-image:/);
-    expect(early).toMatch(/overscroll-behavior:\\s*contain/);
-    expect(owner).toMatch(/min-height:\\s*0/);
-    expect(owner).toMatch(/flex:\\s*1 1 auto/);
+    expect(early).toMatch(/overscroll-behavior:\s*contain/);
+    expect(owner).toMatch(/min-height:\s*0/);
+    expect(owner).toMatch(/flex:\s*1 1 auto/);
   });
 
   it('has one later owner of the desktop Courses row columns', () => {
     const early = getBlock(enhancements, '.view-courses .topic-row');
     const owner = getBlock(late, '.view-courses .topic-row');
     expect(early).not.toMatch(/grid-template-columns:/);
-    expect(owner).toMatch(/grid-template-columns:\\s*minmax\\(0, 1fr\\) auto auto/);
-    expect(early).toMatch(/min-height:\\s*72px/);
+    expect(owner).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) auto auto/);
+    expect(early).toMatch(/min-height:\s*72px/);
   });
 });
