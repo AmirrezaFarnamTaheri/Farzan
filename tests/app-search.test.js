@@ -359,10 +359,8 @@ describe('app topbar search rendering', () => {
 
     const inFlight = search._loadUniversalData();
     expect(getAllNotes).toHaveBeenCalledTimes(1);
-    const subscriber = window.OpenCourseDeck.bus.on.mock.calls
-      .find(([event]) => event === 'note:save')?.[1];
-    expect(subscriber).toBeTypeOf('function');
-    subscriber(); // a cross-tab or same-tab save invalidates the older read
+    window.OpenCourseDeck.bus.emit('note:save', { noteId: 'same' });
+    // A same-tab or cross-tab mutation must invalidate the older read.
     finishOld([oldRecord]);
 
     const result = await inFlight;
