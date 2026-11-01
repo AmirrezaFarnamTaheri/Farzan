@@ -1170,6 +1170,21 @@ import { Pointer } from './src/lib/pointer.js';
           // An existing canonical loader that rejects is not an empty corpus:
           // propagate the read error to the accessible search retry state.
           await window.DataStore?.init?.();
+          // Initial data:loaded broadcasts start an asynchronous personal
+          // library overlay without waiting for IndexedDB. A first search
+          // can otherwise cache the base catalog before renamed/imported
+          // personal courses become visible and never invalidate that cache.
+          // Explicitly await the same canonical read and overlay before
+          // freezing the searchable course/topic snapshot. This is read-only
+          // (no migration or write), and a rejected canonical read must
+          // surface as a search load error, never as a partial success.
+          const personalLibrary = window.OpenCourseDeck?.UserLibrary;
+          if (typeof personalLibrary?.load === 'function') {
+            if (typeof personalLibrary.overlay !== 'function') {
+              throw new Error('Personal course library overlay is unavailable');
+            }
+            personalLibrary.overlay(await personalLibrary.load());
+          }
           // Different editions may expose promise-backed catalog readers.
           // Validate only the fully resolved canonical corpus, never a
           // Promise masquerading as an invalid/empty collection.
