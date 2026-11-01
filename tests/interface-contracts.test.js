@@ -43,9 +43,13 @@ describe('interface contracts', () => {
   it('loads shared styles without dropping user theme and focus support', () => {
     const entry = source('src/styles/index.css');
     const workspace = source('src/styles/workspace.css');
+    const chrome = source('src/styles/farzan-redesign.css');
     expect(entry).toContain("@import './workspace.css' layer(enhancements);");
+    expect(entry).toContain("@import './farzan-redesign.css' layer(enhancements);");
     expect(workspace).toContain(':focus-visible');
-    expect(workspace).toContain('[dir="rtl"]');
+    // Navigation-specific RTL chrome now belongs to the final stylesheet.
+    // Preserving it there is stronger than retaining a losing early override.
+    expect(chrome).toContain('[dir="rtl"]');
     expect(workspace).toContain('prefers-contrast: more');
     expect(entry).toContain('prefers-reduced-motion: reduce');
   });
