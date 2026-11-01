@@ -1,6 +1,6 @@
 /**
- * Squire-specific compatibility preflight. Keep the stricter Tiptap gate in
- * notesEditorCompatibility.js for its historical compatibility contract.
+ * Squire compatibility preflight built on a strict HTML structural gate.
+ * The stored HTML is never converted as part of selecting an editor.
  *
  * Squire uses HTML as canonical content and supports safe inline typography.
  * Unknown metadata is routed to the classic editor instead of being dropped.
