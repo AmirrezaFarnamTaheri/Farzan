@@ -81,6 +81,11 @@ describe('GitHub Actions hardening', () => {
     }
   });
 
+  it('checks legacy public UI primitives on Windows when ui.js changes', () => {
+    const native = workflows['native-windows.yml'];
+    expect(native.split("'ui.js'").length - 1).toBe(2);
+  });
+
   it('runs native Windows checks when release service worker and sizing instrumentation change', () => {
     const native = workflows['native-windows.yml'];
     for (const script of [
