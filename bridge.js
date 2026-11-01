@@ -884,7 +884,7 @@
           if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex(store, indexName, value) ?? [];
           const all = await idb.getAll(store) ?? [];
           return all.filter(record => record?.[indexName] === value);
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getByIndex', error); }
       }
       return fallback().filter(record => record?.[indexName] === value);
     }
@@ -901,7 +901,7 @@
       if (idb) {
         try {
           if (typeof idb.queryIndex === 'function') return await idb.queryIndex('notes', 'updatedAt', null, limit, { direction: 'prev' }) ?? [];
-        } catch {}
+        } catch (error) { _canonicalReadFailed('getRecentNotes', error); }
       }
       return (await getAllNotes()).sort((a, b) => Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0)).slice(0, limit);
     }
@@ -927,7 +927,7 @@
             };
             req.onerror = () => reject(req.error);
           });
-        } catch {}
+        } catch (error) { _canonicalReadFailed('queryByRange', error); }
       }
       const all = store === 'progress'
         ? Object.values(_read(KEY_PROGRESS, {}))
@@ -948,7 +948,7 @@
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
           });
-        } catch {}
+        } catch (error) { _canonicalReadFailed('countByIndex', error); }
       }
       const all = store === 'progress'
         ? Object.values(_read(KEY_PROGRESS, {}))
