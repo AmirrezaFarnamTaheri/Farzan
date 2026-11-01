@@ -334,3 +334,119 @@ for (const setup of setups) {
     expect(notfound.byteLength, `${setup.name} blank notfound screenshot`).toBeGreaterThan(2000);
   });
 }
+
+
+/**
+ * 1440 x 900 physical pixels at 200% desktop zoom leave approximately
+ * 720 x 450 CSS pixels for reflow. CDP's 2x device scale captures a
+ * 1440 x 900 bitmap; this is a deterministic zoom-equivalent reflow test,
+ * not a claim that Chromium's browser zoom UI has been exercised.
+ *
+ * Unlike the empty-profile route matrix above, the Notes state is saved,
+ * left and reopened through the real mobile library view before capture.
+ */
+test('keeps populated multilingual Notes and Settings usable at 200%-equivalent RTL desktop reflow', async ({ page }) => {
+  // Playwright's default 1280px viewport is restored on full page.goto
+  // navigations, overriding an earlier CDP emulation command. Apply the
+  // actual 720 CSS-pixel / 2x bitmap profile after each navigation.
+  await page.setViewportSize({ width: 720, height: 450 });
+  const session = await page.context().newCDPSession(page);
+  const applyZoomProfile = async () => {
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: 720, height: 450, deviceScaleFactor: 2, mobile: false,
+      screenWidth: 1440, screenHeight: 900,
+    });
+    await expect.poll(() => page.evaluate(() => innerWidth), { timeout: 12000 }).toBe(720);
+  };
+  const folder = path.join(output, 'populated-200pct-rtl');
+  fs.mkdirSync(folder, { recursive: true });
+  const assertNoOverflow = async (route) => {
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const actual = await page.evaluate(() => ({
+      body: document.body.scrollWidth,
+      document: document.documentElement.scrollWidth,
+      window: window.innerWidth,
+      appTop: document.querySelector('#ocd-app')?.getBoundingClientRect().top,
+    }));
+    expect(actual.window, route + ': CSS viewport').toBe(720);
+    expect(Math.max(actual.body, actual.document) - actual.window,
+      route + ': horizontal overflow at 200% zoom-equivalent').toBeLessThanOrEqual(3);
+    expect(actual.appTop, route + ': shell displaced').toBeGreaterThanOrEqual(-1);
+  };
+  try {
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await applyZoomProfile();
+    await expect(page.locator('.view-notes')).toBeVisible();
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await page.locator('[data-action="new-note"]').first().click();
+    const title = 'RTL zoom محفوظ Heart 你好';
+    await page.locator('[data-note-title-input]').fill(title);
+    await modern.click();
+    await page.keyboard.insertText('درس پزشکی و Heart rhythm 你好世界 — restored after save');
+    await expect.poll(() => page.evaluate(async name => {
+      const notes = await window.DB.getAllNotes();
+      return notes.find(note => note.title === name)?.content || '';
+    }, title), { timeout: 20000 }).toContain('Heart rhythm 你好世界');
+    await assertNoOverflow('notes-new');
+    await page.screenshot({
+      path: path.join(folder, 'notes-populated-editor.png'),
+      animations: 'disabled', caret: 'hide',
+    });
+
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await applyZoomProfile();
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    const library = page.locator('[data-notes-toggle-library]');
+    // Responsive layouts legitimately expose the notes list either in the
+    // permanently visible desktop sidebar or behind the mobile pane button.
+    // Require the correct route for the rendered viewport, never force a
+    // hidden control and mistake the resulting timeout for an RTL failure.
+    const mobilePane = await library.isVisible();
+    if (mobilePane) {
+      await library.click();
+      await expect(library).toHaveAttribute('aria-expanded', 'true');
+    } else {
+      await expect(page.locator('#notes-library-panel')).toBeVisible();
+    }
+    const savedRow = page.locator('[data-notes-list]').getByText(title);
+    await expect(savedRow).toBeVisible();
+    await assertNoOverflow('notes-populated-library');
+    await page.screenshot({
+      path: path.join(folder, 'notes-populated-library.png'),
+      animations: 'disabled', caret: 'hide',
+    });
+    await savedRow.scrollIntoViewIfNeeded({ timeout: 10000 });
+    await savedRow.click({ timeout: 12000 });
+    await expect(modern).toContainText('Heart rhythm 你好世界');
+    if (mobilePane) await expect(library).toHaveAttribute('aria-expanded', 'false');
+
+    // Bound SPA route navigation so a pending note persistence guard cannot
+    // consume the entire visual test timeout without a useful error.
+    await page.goto('/#/settings', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await applyZoomProfile();
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await expect(page.locator('.view-settings')).toBeVisible();
+    await expect(page.locator('#settings-appearance')).toBeVisible();
+    await expect(page.locator('[data-ai-disclosure]')).not.toHaveAttribute('open', '');
+    await assertNoOverflow('settings');
+    await page.screenshot({
+      path: path.join(folder, 'settings-first-use-advanced-collapsed.png'),
+      animations: 'disabled', caret: 'hide',
+    });
+    const summary = page.locator('[data-ai-disclosure] > summary');
+    await summary.click();
+    await expect(page.locator('[data-ai-disclosure]')).toHaveAttribute('open', '');
+    await assertNoOverflow('settings-advanced');
+    await page.screenshot({
+      path: path.join(folder, 'settings-advanced-expanded.png'),
+      animations: 'disabled', caret: 'hide',
+    });
+  } finally {
+    // The page may already be gone on a Playwright timeout; do not mask the
+    // actionable error with a secondary CDP detach exception.
+    await session.detach().catch(() => {});
+  }
+});
