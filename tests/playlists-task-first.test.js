@@ -88,6 +88,34 @@ describe('Playlists task-first organization', () => {
   });
 
 
+  it('shows a retryable catalog failure without editing saved playlists or claiming the catalog is empty', async () => {
+    saved = [{ id: 'saved-renal', title: 'Renal review queue', topicIds: ['a'], createdAt: 3 }];
+    const before = structuredClone(saved);
+    let offline = true;
+    window.DataStore.init = vi.fn(async () => {
+      if (offline) throw new Error('Course catalog storage unavailable');
+      return true;
+    });
+    const writer = vi.spyOn(window.DB, 'saveSetting');
+    mount();
+
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    const alert = document.querySelector('[data-playlists-error]');
+    expect(alert.getAttribute('role')).toBe('alert');
+    expect(alert.textContent).toMatch(/catalog|courses/i);
+    expect(document.querySelector('[data-playlists-discover]').hidden).toBe(true);
+    expect(document.querySelector('[data-playlist-list] [data-playlist-id]')).toBeNull();
+    expect(writer).not.toHaveBeenCalled();
+    expect(saved).toEqual(before);
+
+    offline = false;
+    document.querySelector('[data-playlists-retry]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlist-id="saved-renal"]')).not.toBeNull());
+    expect(document.querySelector('[data-playlists-error]')).toBeNull();
+    expect(writer).not.toHaveBeenCalled();
+    expect(saved).toEqual(before);
+  });
+
   it('does not repeat a single active-queue count as a prominent metric', async () => {
     const player = document.createElement('div');
     player.dataset.player = '';
