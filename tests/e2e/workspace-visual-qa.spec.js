@@ -151,6 +151,17 @@ for (const setup of setups) {
         });
         await page.locator('[data-notifications-toggle]').click();
         await expect(page.locator('#notifications-panel')).toBeVisible();
+        // Badge center must sit above and outside the bell arch, not cover it.
+        const badgeGeometry = await page.locator('#topbar-notifications-btn').evaluate((button) => {
+          const bell = button.querySelector('svg')?.getBoundingClientRect();
+          const badge = button.querySelector('#topbar-notif-dot')?.getBoundingClientRect();
+          if (!bell || !badge) return null;
+          return { offsetX: badge.x + badge.width / 2 - (bell.x + bell.width / 2),
+            offsetY: badge.y + badge.height / 2 - (bell.y + bell.height / 2) };
+        });
+        expect(badgeGeometry, 'notification badge must have geometry').not.toBeNull();
+        expect(badgeGeometry.offsetX, 'notification badge belongs on the outside of the bell').toBeGreaterThan(4);
+        expect(badgeGeometry.offsetY, 'notification badge belongs above the bell').toBeLessThan(-2);
         for (const id of ['#notif-mark-read', '#notif-clear-all']) {
           await expect(page.locator(id)).toHaveCSS('white-space', 'nowrap');
         }
