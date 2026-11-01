@@ -539,6 +539,48 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
 
+  test('opens new and compatible saved Notes in Squire by default, but retains advanced HTML in classic', async ({ page }) => {
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-notes')).toBeVisible();
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    const toggle = page.locator('[data-notes-modern-toggle]');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toContainText('Use classic editor');
+
+    await page.locator('[data-action="new-note"]').first().click();
+    await expect(modern).toBeVisible();
+    const title = 'Default Squire persisted Persian 你好';
+    await page.locator('[data-note-title-input]').fill(title);
+    await modern.click();
+    await page.keyboard.insertText('پزشکی 你好 World from Squire');
+    await expect.poll(async () => page.evaluate(async name => {
+      const notes = await window.DB.getAllNotes();
+      return notes.find(note => note.title === name)?.content ?? '';
+    }, title)).toContain('پزشکی 你好');
+
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+    const savedNote = page.locator('[data-notes-list]').getByText(title);
+    await expect(savedNote).toBeVisible();
+    await savedNote.click();
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await expect(modern).toContainText('پزشکی 你好');
+
+    const tableHTML = '<p>Approved diagnosis</p><table><tbody><tr><td>70 mL</td></tr></tbody></table>';
+    const savedId = await page.evaluate(html => {
+      const note = window.PlasmaNotesStore.createNote({ title: 'Advanced saved table', content: html });
+      window.PlasmaNotesApp.openNote(note.id);
+      return note.id;
+    }, tableHTML);
+    await expect(page.locator('[data-notes-editor] table td')).toHaveText('70 mL');
+    await expect(modern).toHaveCount(0);
+    await expect(toggle).toContainText('classic editor');
+    const stored = await page.evaluate(id => window.PlasmaNotesStore.getNote(id)?.content, savedId);
+    expect(stored).toContain('<table');
+    expect(stored).toContain('70 mL');
+  });
+
   test('round-trips a multilingual note through the opt-in Squire editor in Chromium', async ({ page }) => {
     await page.addInitScript(() => {
       window.OpenCourseDeck = window.OpenCourseDeck || {};
