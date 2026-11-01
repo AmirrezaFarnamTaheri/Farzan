@@ -13,28 +13,30 @@ function rule(css, selector) {
 }
 
 describe('single authoritative shared chrome CSS property ownership', () => {
-  it('keeps the late redesign after workspace so deleting older duplicate values is visually inert', () => {
+  it('keeps the late redesign after workspace in the release entry', () => {
     expect(imports.indexOf("./workspace.css")).toBeLessThan(imports.indexOf("./farzan-redesign.css"));
   });
 
-  it('owns the navigation transparent baseline border only in the final redesign rule', () => {
-    expect(rule(source, '.nav-item')).not.toMatch(/(?:^|;)\s*border\s*:/);
+  it('owns navigation baseline border and interaction paint only in final redesign', () => {
+    expect(source).not.toContain('.nav-item {');
+    expect(source).not.toContain('.nav-item:hover:not(.active) {');
     expect(rule(owner, '.nav-item')).toMatch(/border:\s*1px solid transparent/);
+    expect(rule(owner, '.nav-item:hover:not(.active)')).toMatch(/background:/);
   });
 
-  it('leaves the legacy sidebar-logo geometry but delegates identical background/shadow to redesign', () => {
-    const original = rule(source, '.sidebar-logo');
-    expect(original).toMatch(/border-color:\s*transparent/);
-    expect(original).not.toMatch(/(?:^|;)\s*(?:background|box-shadow)\s*:/);
+  it('owns sidebar-logo geometry, background and shadow in redesign', () => {
+    expect(source).not.toContain('.sidebar-logo {');
     const final = rule(owner, '.sidebar-logo');
     expect(final).toMatch(/background:\s*transparent/);
     expect(final).toMatch(/box-shadow:\s*none/);
+    expect(final).toMatch(/border-bottom:/);
   });
 
-  it('keeps only one winning shadow reset for the topbar and sidebar', () => {
+  it('removes the earlier topbar and sidebar paint blocks and retains the winning owners', () => {
     for (const selector of ['.topbar', '.sidebar']) {
-      expect(rule(source, selector)).not.toMatch(/(?:^|;)\s*box-shadow\s*:/);
+      expect(source).not.toContain(selector + ' {');
       expect(rule(owner, selector)).toMatch(/box-shadow:\s*none/);
     }
+    expect(rule(owner, '.topbar')).toMatch(/background:\s*var\(--surface\)/);
   });
 });
