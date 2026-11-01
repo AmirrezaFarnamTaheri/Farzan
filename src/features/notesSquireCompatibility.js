@@ -28,11 +28,17 @@ export function assessNoteForSquire(html) {
         const name = attr.name.toLowerCase();
         if (tag === 'a' && name === 'href') continue;
         if (name === 'dir') {
+          // Squire only promises block-level and inline-span direction.
+          // A direction on <br>, <a> or <hr> could be silently dropped.
+          if (tag !== 'span' && !BLOCKS.has(tag)) return reject('unsupported-direction-owner');
           if (!/^(?:ltr|rtl|auto)$/i.test(attr.value)) return reject('unsupported-direction');
           element.removeAttribute(name);
           continue;
         }
         if (name === 'style') {
+          // Do not approve style metadata for void elements or links that
+          // the editor does not guarantee to round-trip on the first save.
+          if (tag !== 'span' && !BLOCKS.has(tag)) return reject('unsupported-style-owner');
           if (!filterNoteStyle(attr.value).valid) return reject('unsupported-style');
           element.removeAttribute(name);
           continue;
