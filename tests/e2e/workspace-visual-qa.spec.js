@@ -95,6 +95,10 @@ for (const setup of setups) {
           await expect(page.locator('.home-widget').first()).toHaveCSS('text-align', 'start');
         }
       }
+      // Restoring a mobile Notes pane can move focus into a previously
+      // offscreen element. That may legitimately scroll the document without
+      // displacing the app shell: reset scroll before layout measurements.
+      await page.evaluate(() => { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const dimensions = await page.evaluate(() => ({
         body: document.body.scrollWidth,
