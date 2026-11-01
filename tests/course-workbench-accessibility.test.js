@@ -321,4 +321,28 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+
+  it('places a Persian source heading and English lesson rows in RTL order with an isolated Latin count', async () => {
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelectorAll('.source-group .topic-row')).toHaveLength(2));
+    const group = document.querySelector('.course-detail .source-group');
+    expect(group.getAttribute('dir')).toBe('rtl');
+    expect(group.querySelector('.source-group-title')?.getAttribute('dir')).toBe('auto');
+    expect(group.querySelector('.source-group-title')?.textContent).toBe('شروع این دوره');
+    expect(group.querySelector('.source-group-count')?.getAttribute('dir')).toBe('ltr');
+    expect(group.querySelector('.source-group-count')?.textContent).toBe('2 topics');
+    expect(group.querySelector('[data-topic-id="anemia"] .topic-title')?.getAttribute('dir')).toBe('auto');
+    expect(group.querySelector('[data-topic-id="anemia"] .topic-actions')?.getAttribute('dir')).toBe('ltr');
+    controller.unmount();
+  });
+
+  it('retains LTR layout for an English course with an English source label', async () => {
+    window.DataStore.allCourses = () => [{ id: COURSE_ID, title: 'English course' }];
+    window.DataStore.allTopics = () => topics.map(t => ({ ...t, sourceLabel: 'Introduction' }));
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelector('.source-group .topic-row')).not.toBeNull());
+    expect(document.querySelector('.source-group')?.getAttribute('dir')).toBe('ltr');
+    controller.unmount();
+  });
+
 });
