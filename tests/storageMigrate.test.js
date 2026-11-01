@@ -83,6 +83,15 @@ describe('storageMigrate (legacy UI keys)', () => {
     expect(JSON.parse(localStorage.getItem('ocd_folders'))).toEqual([...newFolders, ...oldFolders]);
   });
 
+  it('does not recreate a stale localStorage Notes mirror after IndexedDB migration', async () => {
+    localStorage.setItem('plasma_migrated_v2', 'true');
+    const old = '[{"id":"historical-note","content":"Recovery only"}]';
+    localStorage.setItem('plasma-notes', old);
+    await import('../src/core/storageMigrate.js');
+    expect(localStorage.getItem('ocd_notes')).toBeNull();
+    expect(localStorage.getItem('plasma-notes')).toBe(old);
+  });
+
   it('preserves malformed historical records and does not replace a valid canonical collection', async () => {
     const canonical = '[{"id":"current","content":"Keep me"}]';
     const broken = '[{"id":"partially-exported"';
