@@ -78,7 +78,9 @@ describe('read-only portable recovery digests', () => {
     expect(() => summarizePortableBackup({ ...before, version: '9.0' })).toThrow(/version/i);
     expect(() => summarizePortableBackup({ ...before, notes: undefined })).toThrow(/notes/i);
     expect(() => summarizePortableBackup({ ...before, notes: [before.notes[0], before.notes[0]] })).toThrow(/duplicate/i);
-    expect(() => summarizePortableBackup({ ...before, settings: { flashcards: 'invalid' } })).toThrow(/flashcards/i);
+    expect(() => summarizePortableBackup({
+      ...before, settings: { ...before.settings, flashcards: 'invalid' },
+    })).toThrow(/flashcards/i);
     expect(() => summarizePortableBackup({ ...before, meta: {
       attachments: { mode: 'metadata-only', binaryIncluded: true, references: [] },
     } })).toThrow(/attachments|binary/i);
