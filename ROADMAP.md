@@ -790,7 +790,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Message-passing API (postMessage) | a future plugin host (not shipped) | — |
 | Permission enforcement at sandbox boundary | a future plugin host (not shipped) | — |
 
-**Status: NOT STARTED** — `the former, nonshipping plugin-host prototype` validates manifests only; there is no Worker sandbox and the module is not loaded into the runtime.
+**Status: NOT STARTED** — The unshipped manifest-only prototype was retired; no Worker sandbox, permission broker or plugin runtime exists. Historical registry data is not deleted.
 
 ### 14.2 Plugin Lifecycle Hooks
 | Item | Target | Ported From |
