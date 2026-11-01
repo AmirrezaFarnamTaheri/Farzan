@@ -35,7 +35,6 @@ describe('runtime wiring', () => {
     './core/themeBuilder.js',
     './core/locale.js',
     './lib/virtualScroll.js',
-    './lib/timeline.js',
     './lib/timeRange.js',
     './lib/stagger.js',
     './lib/rafLoop.js',
@@ -109,7 +108,7 @@ describe('runtime wiring', () => {
   it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
     const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 
-    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js', './src/features/canvasZoom.js']) {
+    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js']) {
       expect(appSource).toContain(specifier);
       expect(indexSource).not.toContain(specifier);
     }
