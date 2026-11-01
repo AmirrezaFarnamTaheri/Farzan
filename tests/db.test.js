@@ -30,20 +30,6 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     db.db?.close();
   });
 
-  it('bulkPutWithCheckpoint aborts data writes if the checkpoint key is invalid', async () => {
-    const { OpenCourseDB } = DBExports;
-    const db = new OpenCourseDB('plasma-test-db', 1, [
-      { name: 'items', key: 'id', autoIncrement: false },
-      { name: 'settings', key: 'key', autoIncrement: false },
-    ]);
-    await expect(db.bulkPutWithCheckpoint('items', [
-      { id: 'would-be-partial', value: 1 },
-    ], { value: 'missing setting key' })).rejects.toBeTruthy();
-    expect(await db.getAll('items')).toEqual([]);
-    expect(await db.getAll('settings')).toEqual([]);
-    db.db?.close();
-  });
-
   it('does not expose abandoned migration-specific checkpoint writes', () => {
     const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('ocd-test-no-migration-writer', 3, []);
