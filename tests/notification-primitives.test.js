@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement, eventTargetEl } from '../src/lib/dom.js';
-import { createToast, createTooltips } from '../src/ui/notificationPrimitives.js';
+import { createToast, createTooltips, createUiTooltip } from '../src/ui/notificationPrimitives.js';
 
 const icon = name => createElement('span', { 'data-icon': name });
 
@@ -60,10 +60,28 @@ describe('shared toast and tooltip owners (#175)', () => {
     expect(document.querySelector('[role="tooltip"]')).toBeNull();
   });
 
+  it('preserves accessible UI.tooltip overlays and restores prior descriptions', () => {
+    const tooltip = createUiTooltip();
+    const anchor = createElement('button', { type: 'button', 'data-tooltip': 'شرح فارسی' });
+    anchor.setAttribute('aria-describedby', 'existing-note');
+    document.body.appendChild(anchor);
+    tooltip.init();
+    anchor.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(document.getElementById('ocd-ui-tooltip')?.textContent).toBe('شرح فارسی');
+    expect(anchor.getAttribute('aria-describedby')).toBe('existing-note ocd-ui-tooltip');
+    anchor.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    expect(anchor.getAttribute('aria-describedby')).toBe('existing-note');
+    tooltip.destroy();
+    expect(document.getElementById('ocd-ui-tooltip')).toBeNull();
+  });
+
   it('keeps app.js a consumer, not a duplicate owner of notifications', () => {
     const app = fs.readFileSync('app.js', 'utf8');
     expect(app).toMatch(/import \{ createToast, createTooltips \} from '\.\/src\/ui\/notificationPrimitives\.js'/);
     expect(app).not.toMatch(/const Toast = \{/);
     expect(app).not.toMatch(/const Tooltips = \{/);
+    const ui = fs.readFileSync('ui.js', 'utf8');
+    expect(ui).toMatch(/import \{ createUiTooltip \} from '\.\/src\/ui\/notificationPrimitives\.js'/);
+    expect(ui).not.toMatch(/const Tooltip = \{/);
   });
 });
