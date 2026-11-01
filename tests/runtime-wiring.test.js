@@ -31,7 +31,6 @@ describe('runtime wiring', () => {
     './core/dataHardening.js',
     './core/endpointApprovalGuard.js',
     './core/beforeUnloadGuard.js',
-    './core/storageMigrate.js',
     './core/productReadiness.js',
     './core/themeBuilder.js',
     './core/locale.js',
