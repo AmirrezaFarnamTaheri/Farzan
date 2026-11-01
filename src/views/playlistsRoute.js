@@ -143,13 +143,21 @@ async function renderPlaylists(deps) {
   if (!metricsRoot || !listRoot || !catalogRoot || !discover) return;
 
   let savedReadError = null;
+  let catalogReadError = null;
   const [topics, timestamps, savedPlaylists] = await Promise.all([
     (async () => {
       try {
         await window.DataStore?.init?.();
         try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
-        return window.DataStore?.allTopics?.() ?? [];
-      } catch {
+        // Support synchronous catalog readers and promise-backed adapters
+        // before validating the complete result as a canonical collection.
+        const catalogTopics = (await window.DataStore?.allTopics?.()) ?? [];
+        if (!Array.isArray(catalogTopics)) throw new TypeError('Invalid canonical playlist catalog topics');
+        return catalogTopics;
+      } catch (error) {
+        // A known catalog reader failure is not an empty course library.
+        // Do not expose mutation controls with a partial canonical corpus.
+        catalogReadError = error;
         return [];
       }
     })(),
@@ -157,10 +165,13 @@ async function renderPlaylists(deps) {
     (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch (error) { savedReadError = error; return []; } })(),
   ]);
   if (!document.body.contains(listRoot)) return;
-  if (savedReadError) {
-    // An unreadable canonical deck is not an empty library. Hide all creation
-    // actions until a successful read, so a later write cannot overwrite history.
-    console.warn('[Playlists] Failed to load saved queues', savedReadError);
+  if (savedReadError || catalogReadError) {
+    // Neither an unreadable saved deck nor an inaccessible canonical catalog
+    // is proof that the user's collection is empty. Hide all creation and
+    // reordering controls until the required readers are healthy.
+    console.warn(savedReadError
+      ? '[Playlists] Failed to load saved queues'
+      : '[Playlists] Failed to load course catalog', savedReadError || catalogReadError);
     metricsRoot.replaceChildren();
     metricsRoot.hidden = true;
     discover.open = false;
@@ -173,7 +184,9 @@ async function renderPlaylists(deps) {
     alert.dataset.playlistsError = '';
     alert.setAttribute('role', 'alert');
     const description = document.createElement('p');
-    description.textContent = 'Saved playlists could not be loaded. No data has been changed.';
+    description.textContent = savedReadError
+      ? 'Saved playlists could not be loaded. No data has been changed.'
+      : 'Course catalog could not be loaded. Your saved playlists have not been changed.';
     const retry = document.createElement('button');
     retry.className = 'btn btn-primary btn-sm';
     retry.type = 'button';
