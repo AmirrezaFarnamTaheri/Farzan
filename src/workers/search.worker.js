@@ -42,6 +42,7 @@ const CANCEL_TTL = 60000;
 const state = {
   data: [],
   fuse: null,
+  indexedFields: new Set(),
   revision: 0,
 };
 const cancelled = new Map();
@@ -130,6 +131,9 @@ function initFuse(data, options = {}) {
   // searches must continue to see the previous valid index and revision.
   state.data = data;
   state.fuse = nextFuse;
+  // Atomically publish the fields alongside the new Fuse offsets. A failed
+  // update must not change either the search corpus or its field boundary.
+  state.indexedFields = new Set(fieldNames);
   state.revision += 1;
 }
 
@@ -170,7 +174,13 @@ function search(query, options = {}) {
       if (indexedMatches.has(index)) continue;
       const item = state.data[index];
       if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      const label = normalizeWorkerQuery(item.label || item.title);
+      // This additional one-character scan must honor the exact field scope
+      // used when the currently active Fuse index was successfully built.
+      // Otherwise excluded labels can leak into a narrowed title-only index.
+      const label = normalizeWorkerQuery(
+        (state.indexedFields.has('label') && item.label)
+        || (state.indexedFields.has('title') && item.title),
+      );
       if (!label.includes(normalized)) continue;
       const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1 : 2;
       rankedBuckets[tier].push({ item: { [ORIGINAL_INDEX]: index }, matches: [] });
