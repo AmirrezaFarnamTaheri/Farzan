@@ -47,6 +47,36 @@ function scopedPageMap(pages, docId) {
   return scoped;
 }
 
+export function writeScopedPdfAnnotationFallback(storage, docId, annotations) {
+  if (!docId || typeof storage?.setItem !== 'function' || typeof storage?.getItem !== 'function') {
+    throw new Error('Document-scoped PDF annotation storage is unavailable');
+  }
+  const existingRaw = storage.getItem(PAGE_ANNOTATION_KEY);
+  const existing = existingRaw ? parsePageMap(existingRaw) : {};
+  if (existingRaw && !existing) throw new Error('Existing PDF annotations are malformed');
+  const combined = {};
+  for (const [page, records] of Object.entries(existing)) {
+    const retained = records.filter(record => record?.docId !== docId);
+    if (retained.length) combined[page] = retained;
+  }
+  for (const [page, records] of Object.entries(annotations || {})) {
+    const index = Number(page);
+    if (!Number.isInteger(index) || index <= 0 || !Array.isArray(records)) {
+      throw new TypeError('Invalid PDF annotation page');
+    }
+    const copy = records.map(record => {
+      if (!record || typeof record !== 'object' || (record.docId && record.docId !== docId)
+        || (record.page != null && Number(record.page) !== index)) {
+        throw new Error('Annotation belongs to another document or page');
+      }
+      return { ...record, docId, page: index };
+    });
+    if (copy.length) (combined[page] ||= []).push(...copy);
+  }
+  storage.setItem(PAGE_ANNOTATION_KEY, JSON.stringify(combined));
+  return true;
+}
+
 function installPageFallbackHardening(root, viewer) {
   const state = root.PlasmaPDFState;
   if (!state) return;
@@ -75,9 +105,8 @@ function installPageFallbackHardening(root, viewer) {
   };
 
   viewer._saveAnnotations = () => {
-    const saveFallback = () => root.localStorage?.setItem?.(
-      PAGE_ANNOTATION_KEY,
-      JSON.stringify(state.annotations || {}),
+    const saveFallback = () => writeScopedPdfAnnotationFallback(
+      root.localStorage, state.annotationDocId, state.annotations,
     );
     if (root.DB?.saveAnnotations) {
       try {
