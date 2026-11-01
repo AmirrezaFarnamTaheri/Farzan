@@ -141,6 +141,27 @@ describe('PDF viewer safe messages', () => {
     }));
   });
 
+  it('refuses a transport-only PDF identity if no fingerprint or document bytes can be verified', async () => {
+    const source = 'https://cdn.example.test/lecture.pdf?session=one';
+    const pdfDoc = { fingerprints: [], getData: vi.fn(async () => {
+      throw new Error('document bytes inaccessible');
+    }) };
+    await expect(window.PlasmaPDFViewer._deriveCanonicalDocId(source, pdfDoc))
+      .rejects.toThrow(/stable content identity/i);
+    // A broken identity must fail before reading another document's saved
+    // annotations. Rendering an unrelated page is never recovery.
+    const spy = vi.fn();
+    window.DB = { getAnnotations: spy };
+    globalThis.pdfjsLib = { getDocument: vi.fn(() => ({
+      promise: Promise.resolve({ ...pdfDoc, numPages: 1 }),
+    })) };
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(window.PlasmaPDFViewer.load(source)).resolves.toBe(false);
+      expect(spy).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
+
   it('uses a fingerprint identity without loading transport-keyed PDF annotations', async () => {
     const sourceUrl = 'https://cdn.example.test/course.pdf?token=one';
     const makePage = () => ({
