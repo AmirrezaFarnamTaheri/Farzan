@@ -82,6 +82,37 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     expect(board).toEqual(original);
   });
 
+  it('accepts supported explicit text layout width without rewriting canonical board-v1 JSON', () => {
+    const board = fixture();
+    board.layers[0].elements = [{
+      id: 'sized-label', type: 'text', x: 20, y: 70,
+      text: 'فیزیولوژی Heart 你好', width: 184, fontSize: 18,
+      fontFamily: 'Inter', fill: '#ffffff',
+    }];
+    const untouched = structuredClone(board);
+    const plan = planKonvaV1Board(board);
+    expect(plan.compatible).toBe(true);
+    const [node] = buildKonvaNodes(plan.layers[0]);
+    try {
+      expect(node.getClassName()).toBe('Text');
+      expect(node.width()).toBe(184);
+      expect(node.text()).toBe('فیزیولوژی Heart 你好');
+      expect(board).toEqual(untouched);
+    } finally { node.destroy(); }
+  });
+
+  it.each([0, -20, Infinity, NaN])('fails closed on unsupported explicit text width %s', width => {
+    const board = fixture();
+    board.layers[0].elements = [{
+      id: 'invalid-label', type: 'text', x: 10, y: 10, text: 'Old saved note',
+      fontSize: 18, width,
+    }];
+    const untouched = structuredClone(board);
+    const plan = planKonvaV1Board(board);
+    expect(plan).toMatchObject({ compatible: false });
+    expect(board).toEqual(untouched);
+  });
+
   it('maps original ellipse radii, rotation and native line default strokes', () => {
     const board = fixture();
     board.layers[0].elements = [
