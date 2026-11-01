@@ -322,7 +322,7 @@ let studioKeyController = null;
             <div class="fc-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-verified"/></svg></div>
             <h2 class="fc-empty-title">${cards.length ? 'All due cards reviewed' : 'No cards yet'}</h2>
             <p class="fc-sub">${cards.length
-              ? 'You're up to date. Check back when the next review is due.'
+              ? 'You are up to date. Check back when the next review is due.'
               : 'Make a question-and-answer card to begin reviewing at your own pace.'}</p>
             ${cards.length ? '' : '<button id="fc-empty-create" class="btn btn-primary" type="button">Create your first card</button>'}
           </div>
