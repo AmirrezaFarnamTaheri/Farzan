@@ -55,6 +55,48 @@ describe('Konva v1 shape creation parity (#172)', () => {
       .toThrow(/locked/i);
     expect(input.layers[0].elements).toHaveLength(1);
   });
+  it('creates a lossless rotated ellipse with finite positive radii and refuses unsupported metadata', () => {
+    const original = board();
+    const untouched = structuredClone(original);
+    const next = appendKonvaV1Shape(original, 'ellipse-new', {
+      type: 'ellipse', x: -50, y: 20, radiusX: 60, radiusY: 25, rotation: 18,
+    });
+    expect(next.layers[0].elements.at(-1)).toMatchObject({
+      id: 'ellipse-new', type: 'ellipse', x: -50, y: 20, radiusX: 60, radiusY: 25, rotation: 18,
+      fill: '#c8d8ee',
+    });
+    for (const radiusX of [0, -1, Infinity, '20']) {
+      expect(() => appendKonvaV1Shape(original, 'bad', {
+        type: 'ellipse', x: 0, y: 0, radiusX, radiusY: 5,
+      })).toThrow();
+    }
+    expect(() => appendKonvaV1Shape(original, 'bad', {
+      type: 'ellipse', x: 0, y: 0, radiusX: 20, radiusY: 12, linkTarget: 'note-1',
+    })).toThrow();
+    expect(original).toEqual(untouched);
+  });
+
+  it('creates readable multilingual text with no invisible background-fill or unpersisted metadata', () => {
+    const original = board();
+    const next = appendKonvaV1Shape(original, 'label-new', {
+      type: 'text', x: 120, y: 200, text: 'فیزیولوژی Heart 你好', fontSize: 20,
+    });
+    expect(next.layers[0].elements.at(-1)).toEqual({
+      id: 'label-new', type: 'text', x: 120, y: 200,
+      text: 'فیزیولوژی Heart 你好', fontSize: 20,
+      stroke: '#345678', strokeWidth: 0, fill: '#345678',
+    });
+    for (const text of [0, null, {}, '']) {
+      expect(() => appendKonvaV1Shape(original, 'bad', {
+        type: 'text', x: 0, y: 0, text, fontSize: 20,
+      })).toThrow();
+    }
+    expect(() => appendKonvaV1Shape(original, 'bad', {
+      type: 'text', x: 0, y: 0, text: 'Hello', fontSize: 0,
+    })).toThrow();
+    expect(original.layers[0].elements).toHaveLength(1);
+  });
+
   it('serializes a new shape behind the real write receipt, with undo/redo and rejected-write rollback', async () => {
     const receipt = vi.fn(async () => false);
     const session = createKonvaV1MoveSession({ board: board(), onChange: receipt });
