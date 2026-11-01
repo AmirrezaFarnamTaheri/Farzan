@@ -57,6 +57,9 @@ describe('Courses workbench progress and accessible row actions', () => {
   });
 
   afterEach(() => {
+    sessionStorage.removeItem('ocd_pending_topic');
+    sessionStorage.removeItem('ocd_pending_position');
+    sessionStorage.removeItem('ocd_pending_course');
     document.body.innerHTML = '';
     delete window.DB;
     delete window.DataStore;
@@ -342,6 +345,48 @@ describe('Courses workbench progress and accessible row actions', () => {
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelector('.source-group .topic-row')).not.toBeNull());
     expect(document.querySelector('.source-group')?.getAttribute('dir')).toBe('ltr');
+    controller.unmount();
+  });
+
+
+  it('routes same-ID timestamp lessons to their exact saved course instead of the first catalog match', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Anatomy A' },
+      { id: 'course-b', title: 'Anatomy B' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], courseId: 'course-a', topicId: 'shared',
+        title: 'Wrong video A', videos: ['https://example.test/a.mp4'] },
+      { ...topics[0], courseId: 'course-b', topicId: 'shared',
+        title: 'Saved video B', videos: ['https://example.test/b.mp4'] },
+    ];
+    sessionStorage.setItem('ocd_pending_topic', 'shared');
+    sessionStorage.setItem('ocd_pending_course', 'course-b');
+    sessionStorage.setItem('ocd_pending_position', '78');
+
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelector('.course-item.active')?.dataset.courseId).toBe('course-b'));
+    expect(document.querySelector('.course-detail h2')?.textContent).toBe('Anatomy B');
+    expect(sessionStorage.getItem('ocd_pending_course')).toBeNull();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBeNull();
+    controller.unmount();
+  });
+
+  it('never chooses the first of duplicate topic IDs when a bookmark has no course identity', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Anatomy A' },
+      { id: 'course-b', title: 'Anatomy B' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], courseId: 'course-a', topicId: 'shared' },
+      { ...topics[0], courseId: 'course-b', topicId: 'shared' },
+    ];
+    sessionStorage.setItem('ocd_pending_topic', 'shared');
+    sessionStorage.setItem('ocd_pending_position', '80');
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelector('.course-item.active')).not.toBeNull());
+    expect(window.OpenCourseDeck.Player.init).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ocd_pending_position')).toBeNull();
     controller.unmount();
   });
 
