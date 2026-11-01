@@ -68,7 +68,7 @@ describe('offline Pomodoro session model', () => {
     expect(() => parseFocusTimer('{bad json')).toThrow();
     expect(() => parseFocusTimer(JSON.stringify({ version: 2 }))).toThrow();
     expect(() => parseFocusTimer(JSON.stringify({ ...createFocusTimer(), focusCount: -1 }))).toThrow();
-    expect(() => parseFocusTimer(JSON.stringify({ ...createFocusTimer(), deadline: Infinity }))).toThrow();
+    expect(() => parseFocusTimer({ ...createFocusTimer(), deadline: Infinity })).toThrow();
   });
 });
 
