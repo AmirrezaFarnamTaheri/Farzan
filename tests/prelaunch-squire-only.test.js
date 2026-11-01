@@ -9,6 +9,7 @@ describe('greenfield Squire-only editor ownership', () => {
       'tests/notes-tiptap-adapter.test.js',
       'tests/notes-tiptap-compatibility.test.js',
       'tests/notes-migration-audit.test.js',
+      'tests/help-notes-audit.test.js',
     ]) expect(fs.existsSync(removed), removed).toBe(false);
     for (const required of [
       'src/features/notesHtmlStructuralGate.js',
@@ -20,6 +21,8 @@ describe('greenfield Squire-only editor ownership', () => {
     expect(notes).toContain('_squire');
     const adapter = fs.readFileSync('src/features/notesSquireAdapter.js', 'utf8');
     expect(adapter).not.toContain('createTiptapNoteEditor');
+    const help = fs.readFileSync('src/views/helpRoute.js', 'utf8');
+    expect(help).not.toMatch(/notesMigrationAudit|data-help-notes-audit|loadNotesAudit/);
     const browser = fs.readFileSync('tests/e2e/workspace-redesign.spec.js', 'utf8');
     expect(browser).not.toContain('notesTiptapPreview');
   });
