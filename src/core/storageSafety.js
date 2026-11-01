@@ -93,7 +93,6 @@ const FRIENDLY_FAILURE_LABELS = new Map([
   ['plasma-studio-board', 'Studio data'],
   ['plasma-canvas-board', 'Studio data'],
   ['ocd_studio_board', 'Studio data'],
-  ['ocd_canvas_board', 'Studio data'],
   ['ocd_user_library', 'Library'],
   ['ocd_flashcards', 'Flashcards'],
   ['opencoursedeck-library-files', 'Library files'],
