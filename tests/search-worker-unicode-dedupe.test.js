@@ -107,6 +107,45 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(result.indexRevision).toBe(2);
   });
 
+  it('promotes canonical exact/prefix/substring labels above fuzzies without changing within-tier Fuse order', () => {
+    // A deterministic alternative Fuse ranking proves that lexically exact
+    // source labels win even if the engine initially places fuzzy hits first.
+    function InvertedFuse(rows) {
+      this.search = () => rows.map((item, index) => ({ item, score: index / 10, matches: [] }));
+    }
+    const rows = [
+      { label: 'Cardiology-ish', sourceType: 'note', sourceId: 'fuzzy' },
+      { label: 'Learning cardiology today', sourceType: 'note', sourceId: 'substring' },
+      { label: 'Cardiology introduction', sourceType: 'note', sourceId: 'prefix' },
+      { label: 'CARDIOLOGY', sourceType: 'note', sourceId: 'exact' },
+      { label: 'Cardiology second chapter', sourceType: 'note', sourceId: 'prefix2' },
+      { label: 'Cardiology chapter clone', sourceType: 'note', sourceId: 'prefix2' },
+    ];
+    const worker = workerWithData(rows, {}, { FuseCtor: InvertedFuse });
+    const response = worker.search('cardiology', { limit: 4 }, 8);
+    expect(response.results.map(row => row.sourceId))
+      .toEqual(['exact', 'prefix', 'prefix2', 'substring']);
+    expect(response.matches.map(row => row.item.sourceId))
+      .toEqual(['exact', 'prefix', 'prefix2', 'substring']);
+    expect(response.indexRevision).toBe(worker.init.indexRevision);
+    expect(response.type).toBe('search:done');
+  });
+
+  it('promotes Persian/Arabic keyboard-equivalent exact labels while leaving unrelated fuzzy matches reachable', () => {
+    function InvertedFuse(rows) {
+      this.search = () => rows.map((item, index) => ({ item, score: index / 10, matches: [] }));
+    }
+    const rows = [
+      { title: 'فیزیک کلیه - topic', sourceType: 'topic', sourceId: 'topic-1' },
+      { title: 'فيزيك كليه', sourceType: 'note', sourceId: 'exact-1' },
+      { title: 'فیزیک کلیه', sourceType: 'note', sourceId: 'exact-2' },
+    ];
+    const worker = workerWithData(rows, {}, { FuseCtor: InvertedFuse });
+    const response = worker.search('فیزیک کلیه', { limit: 3 }, 9);
+    expect(response.results.map(row => row.sourceId))
+      .toEqual(['exact-1', 'exact-2', 'topic-1']);
+  });
+
   it('keeps cancellation and identity protocol unchanged after Unicode normalization', () => {
     const worker = workerWithData([{ id: 'n', label: 'فیزیک' }]);
     const response = worker.search('فيزيك', { limit: 8 }, 7);
