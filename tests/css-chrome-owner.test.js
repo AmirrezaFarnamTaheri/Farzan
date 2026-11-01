@@ -32,13 +32,21 @@ describe('single authoritative shared chrome CSS property ownership', () => {
     expect(final).toMatch(/border-bottom:/);
   });
 
-  it('keeps one winning rule for static topbar context and full-span activity across widths', () => {
-    // The final global rules already apply at every breakpoint, so earlier
-    // identical media overrides only obscure which declaration owns paint.
+  it('keeps one global topbar hide while protecting the necessary medium-width Home activity override', () => {
+    // The final global hide makes a separate @max-1120 hide redundant.
+    // At medium widths, however, .home-card span-6 competes with the
+    // full-width .home-card-activity rule at equal specificity. Keep the
+    // later media override or the activity card collapses to half-width.
     const chromeHides = owner.match(/\.topbar-context\s*\{\s*display:\s*none;\s*\}/g) || [];
     const activityColumns = owner.match(/\.home-grid\s*>\s*\.home-card-activity\s*\{\s*grid-column:\s*1\s*\/\s*-1;\s*\}/g) || [];
     expect(chromeHides).toHaveLength(1);
-    expect(activityColumns).toHaveLength(1);
+    expect(activityColumns).toHaveLength(2);
+    const breakpoint = owner.indexOf('@media (max-width: 1120px) {');
+    const generic = owner.indexOf('  .home-grid > .home-card { grid-column: span 6; }', breakpoint);
+    const activity = owner.indexOf('  .home-grid > .home-card-activity { grid-column: 1 / -1; }', breakpoint);
+    expect(breakpoint).toBeGreaterThanOrEqual(0);
+    expect(generic).toBeGreaterThan(breakpoint);
+    expect(activity).toBeGreaterThan(generic);
   });
 
   it('removes the earlier topbar and sidebar paint blocks and retains the winning owners', () => {
