@@ -985,14 +985,6 @@
 
 /* First-use course library: one action instead of layered empty panels. */
 .view-my-courses [hidden] { display: none !important; }
-.view-my-courses[data-empty="true"] .my-courses-list-card {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.view-my-courses[data-empty="true"] .my-courses-list-card > .card-body {
-  padding: 0;
-}
 .view-my-courses[data-empty="true"] .my-courses-empty {
   min-height: 320px;
   padding: clamp(24px, 4vw, 48px);
@@ -1412,15 +1404,6 @@
 
 .bookmarks-filter-row {
   margin-bottom: var(--space-3);
-}
-/* Single-source bookmarks need one card per item, not two card frames. */
-.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) > .card-body {
-  padding: 0;
 }
 
 /* Saved items lead the page; zero-only dashboards and one-type facets do not. */
