@@ -77,6 +77,10 @@ for (const setup of setups) {
             await page.locator('[data-notes-toggle-library]').click();
             await expect(page.locator('[data-notes-toggle-library]')).toHaveAttribute('aria-expanded', 'true');
           }
+          if (route === 'notes' && setup.width <= 1023) {
+            // Page-level scroll would move the entire app and crop the header.
+            expect(await page.evaluate(() => window.scrollY), 'mobile RTL Notes root scroll').toBe(0);
+          }
           const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
           const field = page.locator(fieldSelector).first();
           await expect(field).toBeVisible();
