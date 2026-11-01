@@ -144,7 +144,7 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveAnnotations('doc-a', {
       1: [{ id: 'idb-ann', type: 'highlight', updatedAt: 30 }],
     });
-    localStorage.setItem('plasma-pdf-annotations', JSON.stringify({
+    localStorage.setItem('ocd_pdf_annotations_by_document', JSON.stringify({
       1: [
         { id: 'idb-ann', docId: 'doc-a', type: 'stale-local', updatedAt: 999 },
         { id: 'local-ann', docId: 'doc-a', type: 'local-only', updatedAt: 1000 },
@@ -167,7 +167,7 @@ describe('bridge DB safety helpers', () => {
     expect(records).toEqual([
       expect.objectContaining({ id: 'canonical-ann-save', docId: 'doc-canonical-save', page: 3 }),
     ]);
-    expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
+    expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
     expect(await window.DB.getAnnotations('doc-canonical-save')).toEqual([
       expect.objectContaining({ id: 'canonical-ann-save', type: 'highlight', page: 3 }),
     ]);
@@ -182,7 +182,7 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
     await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
     await window.DB.saveSetting('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'My Library' } } });
-    localStorage.setItem('plasma-pdf-annotations', JSON.stringify([{ id: 'ann-1' }]));
+    localStorage.setItem('ocd_pdf_annotations_by_document', JSON.stringify([{ id: 'ann-1' }]));
     localStorage.setItem('ocd_user_library', JSON.stringify({ version: 1, courses: { leftover: true } }));
 
     await window.DB.clearAll();
@@ -196,7 +196,7 @@ describe('bridge DB safety helpers', () => {
     expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
     expect(localStorage.getItem('plasma-playlists')).toBeNull();
     expect(localStorage.getItem('plasma-studio-board')).toBeNull();
-    expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
+    expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
     expect(localStorage.getItem('ocd_user_library')).toBeNull();
     expect(await window.DB.getSetting('ocd_user_library')).toBeNull();
   });
@@ -424,7 +424,7 @@ describe('bridge DB safety helpers', () => {
       2: [{ id: 'ann-mirror', type: 'highlight', updatedAt: 10 }],
     })).rejects.toThrow('annotation canonical failed');
 
-    expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
+    expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'annotation',
       backend: 'indexedDB',
@@ -531,7 +531,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('never merges prelaunch local annotations into canonical backup exports', async () => {
-    localStorage.setItem('plasma-pdf-annotations', JSON.stringify({
+    localStorage.setItem('ocd_pdf_annotations_by_document', JSON.stringify({
       4: [{ id: 'orphan', docId: 'global', page: 4 }],
     }));
     await expect(window.DB.getAllAnnotations()).resolves.toEqual([]);
@@ -545,7 +545,7 @@ describe('bridge DB safety helpers', () => {
     await window.DB.clearAll();
 
     expect(await window.DB.getAnnotations('doc-a')).toEqual([]);
-    expect(localStorage.getItem('plasma-pdf-annotations')).toBeNull();
+    expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
   });
 
   it('deletes notes and folders from local mirrors and IndexedDB stores', async () => {
