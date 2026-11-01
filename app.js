@@ -248,7 +248,7 @@ import { Pointer } from './src/lib/pointer.js';
     return `${mins}:${String(secs).padStart(2, '0')}`;
   }
 
-  function setPendingCourseMedia(topicId, position = null) {
+  function setPendingCourseMedia(topicId, position = null, courseId = null) {
     if (!topicId) return;
     try {
       sessionStorage.setItem('ocd_pending_topic', String(topicId));
@@ -256,6 +256,13 @@ import { Pointer } from './src/lib/pointer.js';
         sessionStorage.setItem('ocd_pending_position', String(Math.max(0, Number(position))));
       } else {
         sessionStorage.removeItem('ocd_pending_position');
+      }
+      // Tie bookmark handoffs to the original source course. All other
+      // callsites remain compatible and explicitly clear any older course.
+      if (courseId != null && String(courseId).trim()) {
+        sessionStorage.setItem('ocd_pending_course', String(courseId).trim());
+      } else {
+        sessionStorage.removeItem('ocd_pending_course');
       }
     } catch {}
   }
@@ -1217,7 +1224,7 @@ import { Pointer } from './src/lib/pointer.js';
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
           href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {
-            setPendingCourseMedia(topic.topicId);
+            setPendingCourseMedia(topic.topicId, null, topic.courseId);
           },
         });
       });
@@ -1248,7 +1255,7 @@ import { Pointer } from './src/lib/pointer.js';
           category: 'Timestamp',
           href: '#/courses',
           action: () => {
-            setPendingCourseMedia(target, timestamp.position);
+            setPendingCourseMedia(target, timestamp.position, timestamp.courseId);
           },
         });
       });
