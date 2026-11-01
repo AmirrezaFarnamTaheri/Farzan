@@ -69,9 +69,9 @@ OpenCourseDeck stores data locally in the browser profile for the origin you ope
 
 For details, see [backup-restore.md](docs/backup-restore.md).
 
-### Plasmato edition screenshots and visual QA
+### Historical visual reference
 
-The branch retains a [107-image historical application gallery](screenshots/current/README.md) and its [SHA-256 manifest](screenshots/current/manifest.json). The dedicated Plasmato Edition has separate [visual acceptance evidence](editions/plasmato-emergency/VISUAL-QA.md) and its own Windows packaging/release workflow. This is **edition-specific evidence**, not proof that every external Plasmato media host is reachable or that a new standard OpenCourseDeck release has been published.
+The [screen gallery](screenshots/current/README.md) and its [SHA-256 manifest](screenshots/current/manifest.json) are reference material. The current pre-release build packages only the canonical study application. The compressed offline catalog remains in `data/` and is not dependent on the retired standalone viewer.
 
 ### Guides
 
