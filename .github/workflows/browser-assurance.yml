@@ -48,6 +48,11 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
         run: npm run test:e2e -- tests/e2e/workspace-redesign.spec.js tests/e2e/user-library-dexie-compat.spec.js tests/e2e/css-rtl-200pct.spec.js
 
+      - name: Verify saved Konva draft editing and export in real Chromium
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: npm run test:e2e -- tests/e2e/studio-konva-durable-roundtrip.spec.js
+
       - name: Run production browser smoke tests
         env:
           CHROME_BIN: /usr/bin/google-chrome
