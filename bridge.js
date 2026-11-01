@@ -711,7 +711,7 @@
       if (idb) {
         try { return (await idb.getAll('annotations')) ?? []; } catch (error) { _canonicalReadFailed('getAllAnnotations', error); }
       }
-      const dict = _read('plasma-pdf-annotations', {});
+      const dict = _read('ocd_pdf_annotations_by_document', {});
       if (Array.isArray(dict)) return dict;
       return Object.entries(dict).flatMap(([key, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? key), docId: a.docId ?? (Number.isFinite(Number(key)) ? 'global' : key) })));
     }
@@ -748,10 +748,10 @@
         } catch (e) { _signalSaveError('annotation', 'indexedDB', e, { canonical: true }); throw e; }
       }
 
-      const dict = _read('plasma-pdf-annotations', {});
+      const dict = _read('ocd_pdf_annotations_by_document', {});
       if (nextArr.length) dict[docId] = nextArr;
       else delete dict[docId];
-      _write('plasma-pdf-annotations', dict);
+      _write('ocd_pdf_annotations_by_document', dict);
       return nextArr;
     }
 
@@ -838,7 +838,7 @@
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
       if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_ai_settings');
-      if (includeAnnotations) localKeys.push('plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page');
+      if (includeAnnotations) localKeys.push('ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page');
       if (includePrefs) localKeys.push(
         'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
         'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
@@ -875,7 +875,7 @@
       if (scope === 'media') {
         return _deletionOutcome('clear-media', scope, [
           await _clearIdbStores(idb, ['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']),
-          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'plasma-pdf-annotations', 'plasma-pdf-annotations-by-document', 'plasma-pdf-annotations-by-page'], 'localStorage'),
+          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page'], 'localStorage'),
         ]);
       }
       if (scope === 'playlists') {
