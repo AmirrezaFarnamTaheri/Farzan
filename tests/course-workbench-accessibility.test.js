@@ -138,6 +138,42 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('highlights only the current player topic and clears the announcement when playback closes', async () => {
+    const listeners = new Map();
+    const firstTrack = { id: 'lecture-a', topicId: 'anemia', courseId: COURSE_ID };
+    const player = {
+      queue: [firstTrack], trackIndex: 0, currentTime: 10, duration: 120,
+      loadPlaylist: vi.fn(), pause: vi.fn(),
+      on: vi.fn((event, cb) => listeners.set(event, cb)),
+      off: vi.fn((event) => listeners.delete(event)),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
+    const anemia = document.querySelector('[data-topic-id="anemia"]');
+    const heart = document.querySelector('[data-topic-id="heart"]');
+    expect(listeners.has('trackChange')).toBe(true);
+    await listeners.get('trackChange')(firstTrack);
+    expect(anemia.dataset.playing).toBe('true');
+    expect(anemia.querySelector('[data-action="play-video"]')?.getAttribute('aria-current')).toBe('true');
+    expect(anemia.querySelector('[data-current-lesson]')?.textContent).toMatch(/playing/i);
+    expect(heart.dataset.playing).toBeUndefined();
+    expect(heart.querySelector('[data-current-lesson]')).toBeNull();
+
+    await listeners.get('trackChange')({ id: 'elsewhere', topicId: 'different', courseId: 'other' });
+    expect(anemia.dataset.playing).toBeUndefined();
+    expect(anemia.querySelector('[data-current-lesson]')).toBeNull();
+
+    await listeners.get('trackChange')(firstTrack);
+    document.querySelector('[data-course-close-playback]').click();
+    expect(anemia.dataset.playing).toBeUndefined();
+    expect(anemia.querySelector('[data-current-lesson]')).toBeNull();
+    expect(window.DB.saveProgress).toHaveBeenCalled();
+    controller.unmount();
+  });
+
   it('loads one authoritative progress snapshot instead of a read per topic', async () => {
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
