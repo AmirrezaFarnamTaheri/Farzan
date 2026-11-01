@@ -60,8 +60,9 @@ describe('Bookmarks retryable canonical reads and newest-render wins', () => {
     filters.querySelector('[data-bookmark-filter="timestamp"]').click();
     await vi.waitFor(() => expect(cards()).toEqual(['timestamp']));
     resolveSlow([{ id: 'note-a', title: 'Saved idea' }]);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush the earlier Promise.all and its UI callback before asserting
+    // that the newer filter remains authoritative.
+    await new Promise(resolve => setTimeout(resolve, 20));
     expect(cards()).toEqual(['timestamp']);
     expect(filters.dataset.activeFilter).toBe('timestamp');
   });
