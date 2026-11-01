@@ -9,7 +9,6 @@ describe('pre-release virtualized list footprint', () => {
     const app = fs.readFileSync('app.js', 'utf8');
     expect(app).not.toMatch(/VirtualList|virtualScroll/);
     // The actual materials routes retain their own pagination and item caps.
-    const materials = fs.readFileSync('src/views/materialsRoute.js', 'utf8');
-    expect(materials).toContain('data-per-page');
+    expect(app).toContain('data-per-page');
   });
 });
