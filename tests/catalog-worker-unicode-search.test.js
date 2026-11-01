@@ -54,7 +54,7 @@ describe('offline catalog worker shared Unicode search semantics', () => {
 
   it('keeps protocol and cancellation unchanged and caps invalid result limits', () => {
     const worker = workerWithCatalog(catalog());
-    const result = worker.search('medicine', 0, 7);
+    const result = worker.search('BIOLOGY', 0, 7);
     expect(result.type).toBe('search:done');
     expect(result.results).toHaveLength(0);
     expect(result.id).toBe(7);
