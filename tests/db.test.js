@@ -65,7 +65,7 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     await expect(db.get('items', 'saved')).resolves.toEqual({ id: 'saved', value: 42 });
   });
 
-  it('honors descending cursor direction through both supported call shapes', async () => {
+  it('honors descending cursor direction through the canonical options object', async () => {
     const { OpenCourseDB: PlasmaDB } = DBExports;
     const db = new PlasmaDB('plasma-test-db', 1, [
       { name: 'items', key: 'id', autoIncrement: false, indexes: [{ field: 'updatedAt' }] },
@@ -77,10 +77,9 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     ]);
 
     const objectShape = await db.queryIndex('items', 'updatedAt', null, { limit: 2, direction: 'prev' });
-    const legacyShape = await db.queryIndex('items', 'updatedAt', null, 2, { direction: 'prev' });
-
     expect(objectShape.map(item => item.id)).toEqual(['new', 'middle']);
-    expect(legacyShape.map(item => item.id)).toEqual(['new', 'middle']);
+    await expect(db.queryIndex('items', 'updatedAt', null, { limit: 1, direction: 'wrong' }))
+      .rejects.toThrow(/direction/i);
   });
 
   it('encrypts and decrypts payloads using AES-256-GCM passphrase derivation', async () => {
