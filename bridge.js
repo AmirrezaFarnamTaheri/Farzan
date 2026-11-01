@@ -670,6 +670,23 @@
       _broadcast('folder', 'delete', { id });
     }
 
+    // Atomic settings writes must use the canonical native transaction; never
+    // downgrade this operation to localStorage or an unlocked read/write pair.
+    async function compareAndSwapSetting(key, expected, next) {
+      const idb = _getIdb();
+      if (!idb || typeof idb.compareAndSwapSetting !== 'function') {
+        throw new Error('Atomic canonical settings storage unavailable');
+      }
+      try {
+        const accepted = await idb.compareAndSwapSetting(key, expected, next);
+        if (accepted) _broadcast('setting', 'save', { key, value: next });
+        return accepted;
+      } catch (error) {
+        _signalSaveError('setting-cas', 'indexedDB', error, { canonical: true });
+        throw error;
+      }
+    }
+
     async function getSetting(key) {
       const idb = _getIdb();
       if (idb) {
@@ -1178,6 +1195,7 @@
       getFoldersByParent,
       getSetting,
       saveSetting,
+      compareAndSwapSetting,
       getAllAnnotations,
       getAnnotations,
       saveAnnotations,
