@@ -220,7 +220,6 @@
 }
 
 .view-courses .topic-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
   min-height: 72px;
   padding: var(--space-3) var(--space-4);
   border-color: var(--glass-border);
@@ -773,8 +772,6 @@ article:has(#btn-theme-toggle) { min-width: 0; }
    were clipping behind the storage widget). */
 .sidebar { min-height: 0; }
 .sidebar-nav {
-  min-height: 0;
-  flex: 1 1 auto;
   /* Soft fade at both ends signals that the list scrolls. */
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
