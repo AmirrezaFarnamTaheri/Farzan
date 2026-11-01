@@ -92,6 +92,12 @@ export function mountBookmarksView(deps = {}) {
     if (!document.body.contains(listRoot) || renderVersion !== version) return;
     listRoot.removeAttribute('aria-busy');
     if (readError) {
+      // A failed read must not inherit any earlier empty/single surface.
+      const section = document.querySelector('.bookmarks-section-card');
+      if (section) {
+        section.dataset.bookmarkLayout = 'unavailable';
+        section.classList.add('card', 'card-filled');
+      }
       // Never present partial or fabricated zero totals after any canonical
       // read fails; the remaining records may be entirely correct.
       metricsRoot.replaceChildren();
@@ -162,6 +168,17 @@ export function mountBookmarksView(deps = {}) {
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
     ].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
+    // The outer card is useful for a true collection, but a single saved
+    // item already owns a card. Do not double-wrap it (or first-use).
+    // This is presentation-only: canonical records and filters are unchanged.
+    const section = document.querySelector('.bookmarks-section-card');
+    if (section) {
+      const layout = bookmarkItems.length === 0 ? 'empty'
+        : bookmarkItems.length === 1 ? 'single' : 'collection';
+      section.dataset.bookmarkLayout = layout;
+      section.classList.toggle('card', layout === 'collection');
+      section.classList.toggle('card-filled', layout === 'collection');
+    }
     // Category summaries and source filters only help when there is more than
     // one kind of saved item. A one-type library is already fully in view.
     const hasMultipleSources = new Set(bookmarkItems.map(item => item.type)).size > 1;

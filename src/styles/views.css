@@ -1413,6 +1413,28 @@
 .bookmarks-filter-row {
   margin-bottom: var(--space-3);
 }
+/* An empty or lone saved item is already its own surface. Keep the outer
+   collection frame only where filters/collections benefit from grouping. */
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="empty"],
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="single"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="empty"] > .card-body,
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="single"] > .card-body {
+  padding: 0;
+}
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="single"] .bookmarks-grid {
+  grid-template-columns: minmax(0, min(100%, 480px));
+}
+.view-bookmarks .bookmarks-section-card[data-bookmark-layout="empty"] .bookmarks-empty-state {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  min-height: 290px;
+}
+
 
 /* Saved items lead the page; zero-only dashboards and one-type facets do not. */
 .view-bookmarks [data-bookmark-metrics][hidden],
