@@ -106,6 +106,23 @@ export function mergeTaxonomyTags(current, sourceLabel, destinationLabel) {
 }
 
 /**
+ * Undo one direct alias link. Never resolve the source before deleting:
+ * resolving a->b->c would remove c instead of b, corrupting the intended
+ * independent facets. Transitive aliases that point at the source remain
+ * intact and resolve back to it after the unlink.
+ */
+export function unmergeTaxonomyTag(current, sourceLabel) {
+  const taxonomy = parseTagTaxonomy(current);
+  const { key } = normalizeLabel(sourceLabel);
+  if (!Object.prototype.hasOwnProperty.call(taxonomy.aliases, key)) {
+    throw new Error('This label is not a merged taxonomy alias');
+  }
+  const aliases = { ...taxonomy.aliases };
+  delete aliases[key];
+  return parseTagTaxonomy({ ...taxonomy, aliases });
+}
+
+/**
  * The app's settings DB normally returns a full value. We still verify the
  * canonical read-after-write, because a resolved Promise or a localStorage
  * mirror alone does not prove that a requested mutation was persisted.
