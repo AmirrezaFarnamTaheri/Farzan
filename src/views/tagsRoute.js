@@ -399,20 +399,16 @@ async function renderTags() {
       mutationPending = false;
     }
   };
-  if (!createForm.dataset.pdBound) {
-    createForm.dataset.pdBound = 'true';
-    createForm.addEventListener('submit', event => {
-      event.preventDefault();
-      void applyMutation(current => createTaxonomyTag(current, createName.value));
-    });
-  }
-  if (!mergeForm.dataset.pdBound) {
-    mergeForm.dataset.pdBound = 'true';
-    mergeForm.addEventListener('submit', event => {
-      event.preventDefault();
-      void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
-    });
-  }
+  // Rebind to the current render state: leaving an old listener in place
+  // retains stale controls, counts and write permissions after reload.
+  createForm.onsubmit = event => {
+    event.preventDefault();
+    void applyMutation(current => createTaxonomyTag(current, createName.value));
+  };
+  mergeForm.onsubmit = event => {
+    event.preventDefault();
+    void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
+  };
 
   if (!searchEl.dataset.pdBound) {
     searchEl.dataset.pdBound = 'true';
