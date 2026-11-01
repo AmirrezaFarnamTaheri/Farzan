@@ -1,5 +1,5 @@
 /** Shared notification primitives used by the app shell and route modules. */
-import { $, uid, eventTargetEl } from '../lib/dom.js';
+import { uid, eventTargetEl } from '../lib/dom.js';
 
 const escapeHtmlText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -36,7 +36,7 @@ export function createToast({ OpenCourseDeck, createElement, spriteIcon }) {
       const container = this._getContainer(position);
 
       // Enforce max stack
-      const stack = $$('.toast', container);
+      const stack = [...container.querySelectorAll('.toast')];
       if (stack.length >= OpenCourseDeck.config.toastMaxStack) {
         const oldest = stack[0];
         oldest.remove();
