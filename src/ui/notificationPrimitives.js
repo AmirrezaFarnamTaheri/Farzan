@@ -1,5 +1,9 @@
 /** Shared notification primitives used by the app shell and route modules. */
-import { $$, uid, eventTargetEl, esc as escapeHtmlText } from '../lib/dom.js';
+import { $, uid, eventTargetEl } from '../lib/dom.js';
+
+const escapeHtmlText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character]));
 
 export function createToast({ OpenCourseDeck, createElement, spriteIcon }) {
   if (!OpenCourseDeck || typeof createElement !== 'function' || typeof spriteIcon !== 'function') {
