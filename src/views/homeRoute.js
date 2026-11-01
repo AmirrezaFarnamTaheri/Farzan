@@ -355,8 +355,12 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
 
-  const completed = progress.filter(isFinished);
-  const active = [...progressByTopic.values()].filter(canResume);
+  // One latest record per canonical topic already owns resume selection.
+  // Use that same view for summary metrics: import/recovery histories may
+  // contain earlier copies that must not inflate completed totals or means.
+  const currentProgress = [...progressByTopic.values()];
+  const completed = currentProgress.filter(isFinished);
+  const active = currentProgress.filter(canResume);
   // Resume the most recently saved *unfinished* work, regardless of whether
   // its latest position came from video progress or a timestamp. A completed
   // topic must never displace the next active lesson.
@@ -374,7 +378,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const dueReviews = dueReviewCards(flashcards);
   const weekCutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
   const weeklyActivity = [...progress, ...notes, ...timestamps].filter(item => getRecordTime(item) >= weekCutoff).length;
-  const measuredProgress = progress.map(item => Math.max(0, Math.min(100, Number(item?.percent) || 0)));
+  const measuredProgress = currentProgress.map(item => Math.max(0, Math.min(100, Number(item?.percent) || 0)));
   const averageProgress = measuredProgress.length
     ? Math.round(measuredProgress.reduce((sum, value) => sum + value, 0) / measuredProgress.length)
     : 0;
