@@ -108,6 +108,20 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     }
   });
 
+  it('rejects ambiguous HTTP link syntax that would be rebased and silently change saved note destinations', () => {
+    const before = '<p>Stay with the original editor</p>';
+    for (const href of ['https:chapter-one', 'http:lesson-two']) {
+      const html = '<p><a href="' + href + '">Clinical reference</a></p>';
+      expect(assessNoteForSquire(html)).toEqual({ compatible: false, reason: 'unsupported-link' });
+      const holder = document.createElement('div');
+      holder.innerHTML = before;
+      expect(() => createSquireNoteEditor({ element: holder, html })).toThrow();
+      expect(holder.innerHTML).toBe(before);
+    }
+    expect(assessNoteForSquire('<p><a href="https://example.org/clinical">Valid</a></p>').compatible)
+      .toBe(true);
+  });
+
   it.each([
     ['legacy table', '<p>Intro</p><table><tr><td>Preserve cells</td></tr></table>'],
     ['image with alt', '<p>Intro</p><img src="blob:original" alt="Anatomy">'],
