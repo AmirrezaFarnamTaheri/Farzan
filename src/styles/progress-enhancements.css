@@ -235,11 +235,6 @@
   gap: var(--grid-gap);
 }
 
-.progress-chart-card,
-.progress-table-card {
-  min-width: 0;
-}
-
 .progress-chart-card-wide {
   grid-column: span 1;
 }
