@@ -44,6 +44,13 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'bookmarks') {
+        const list = page.locator('[data-bookmark-list]');
+        await expect(list).not.toHaveAttribute('aria-busy', 'true');
+        if (await page.locator('[data-bookmark-filters][hidden]').count()) {
+          await expect(page.locator('.bookmarks-section-card')).toHaveCSS('border-top-width', '0px');
+        }
+      }
       if (route === 'pdf') {
         const state = page.locator('.pdf-shell');
         if (await state.getAttribute('data-document-state') === 'empty') {
@@ -153,6 +160,12 @@ for (const setup of setups) {
           path: path.join(folder, 'notifications-open.png'),
           animations: 'disabled', caret: 'hide',
         });
+        const dismiss = page.locator('#notif-list [data-notif-dismiss]');
+        await expect(dismiss).toBeVisible();
+        await expect(page.locator('#topbar-notif-dot')).not.toHaveAttribute('hidden', '');
+        await dismiss.click();
+        await expect(page.locator('#notif-list .notif-item')).toHaveCount(0);
+        await expect(page.locator('#topbar-notif-dot')).toHaveAttribute('hidden', '');
         await page.locator('#notif-close').click();
         await expect(page.locator('#notifications-panel')).toBeHidden();
 
