@@ -276,25 +276,38 @@ export function appendKonvaV1Shape(board, id, geometry) {
   if (board.layers.some(layer => layer.elements.some(element => element.id === id))) {
     throw new Error('Duplicate Studio shape ID: ' + id);
   }
+  const dimensions = {
+    rect: ['width', 'height'],
+    circle: ['radius'],
+    ellipse: ['radiusX', 'radiusY'],
+    text: ['fontSize'],
+  };
   if (!geometry || typeof geometry !== 'object' || Array.isArray(geometry)
-    || !['rect', 'circle'].includes(geometry.type)) {
+    || !Object.hasOwn(dimensions, geometry.type)) {
     throw new TypeError('Unsupported Studio shape geometry');
   }
-  const allowed = geometry.type === 'rect'
-    ? new Set(['type', 'x', 'y', 'width', 'height'])
-    : new Set(['type', 'x', 'y', 'radius']);
+  const allowed = new Set(['type', 'x', 'y', ...dimensions[geometry.type]]);
+  if (geometry.type === 'ellipse') allowed.add('rotation');
+  if (geometry.type === 'text') allowed.add('text');
   if (Object.keys(geometry).some(key => !allowed.has(key))) {
     throw new TypeError('Unsupported Studio shape metadata');
   }
-  const numeric = geometry.type === 'rect'
-    ? ['x', 'y', 'width', 'height'] : ['x', 'y', 'radius'];
+  const numeric = ['x', 'y', ...dimensions[geometry.type]];
   for (const key of numeric) {
     if (typeof geometry[key] !== 'number' || !Number.isFinite(geometry[key])) {
       throw new TypeError('Studio shape requires finite ' + key);
     }
   }
-  for (const key of numeric.slice(2)) {
+  for (const key of dimensions[geometry.type]) {
     if (geometry[key] <= 0) throw new RangeError('Studio shape size must be positive');
+  }
+  if (geometry.type === 'ellipse' && geometry.rotation !== undefined
+    && (typeof geometry.rotation !== 'number' || !Number.isFinite(geometry.rotation))) {
+    throw new TypeError('Studio ellipse rotation must be finite');
+  }
+  if (geometry.type === 'text'
+    && (typeof geometry.text !== 'string' || !geometry.text.trim())) {
+    throw new TypeError('Studio text shape needs nonempty text');
   }
   const index = board.activeLayerIdx ?? 0;
   if (!Number.isInteger(index) || index < 0 || index >= board.layers.length) {
@@ -313,8 +326,12 @@ export function appendKonvaV1Shape(board, id, geometry) {
     throw new TypeError('Invalid Studio shape paint');
   }
   const next = structuredClone(board);
+  // Text uses readable paint, not the background-fill setting (which may
+  // be transparent); strokeWidth zero avoids outlining each glyph.
   next.layers[index].elements.push({
-    id, ...structuredClone(geometry), stroke, strokeWidth, fill,
+    id, ...structuredClone(geometry), stroke,
+    strokeWidth: geometry.type === 'text' ? 0 : strokeWidth,
+    fill: geometry.type === 'text' ? stroke : fill,
   });
   validBoard(next);
   return next;
