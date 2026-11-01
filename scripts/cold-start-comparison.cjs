@@ -9,8 +9,10 @@ const MARKER = '[dist-browser-smoke] cold-shell resource timing ';
 const REQUIRED_SCOPE = 'first-visit same-origin JavaScript/CSS resource timing at app-shell readiness (excludes later precache/worker network)';
 
 function assertSnapshot(value) {
+  if (value?.scope !== REQUIRED_SCOPE) {
+    throw new TypeError('Mismatched cold-shell resource timing scope');
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)
-      || value.scope !== REQUIRED_SCOPE
       || !Number.isFinite(value.observedAtMs) || value.observedAtMs <= 0
       || !Number.isInteger(value.resourceCount) || value.resourceCount < 1
       || !Array.isArray(value.resourcePaths)
