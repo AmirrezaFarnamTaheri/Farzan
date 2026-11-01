@@ -250,7 +250,10 @@ export async function mountMaterialsView(deps = {}) {
       if (!btn) return;
       const row = target.closest('[data-topic-id]');
       if (!row) return;
-      const t = topics.find(x => x.topicId === row.dataset.topicId);
+      // Topic IDs may repeat across imported courses. The rendered row's
+      // course ID is part of the source identity, not an optional hint.
+      const t = topics.find(x => String(x.topicId) === row.dataset.topicId
+        && String(x.courseId ?? '') === String(row.dataset.courseId ?? ''));
       if (!t) return;
       if (btn.dataset.action === 'open-pdf') {
         const url = await playableMediaUrl(t.pdfs?.[0]);
@@ -261,7 +264,7 @@ export async function mountMaterialsView(deps = {}) {
         const url = await playableMediaUrl(t.videos?.[0]);
         if (!url) return;
         // Jump to courses and autoplay the exact topic
-        setPendingCourseMedia(t.topicId);
+        setPendingCourseMedia(t.topicId, null, t.courseId || null);
         Router.navigate('#/courses');
       }
   });

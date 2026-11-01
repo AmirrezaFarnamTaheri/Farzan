@@ -125,6 +125,34 @@ describe('home dashboard', () => {
     expect(document.querySelector('[data-pulse-average]').textContent).toBe('100%');
   });
 
+  it('resumes only the correct course when progress and timestamps share a topic ID', async () => {
+    const now = Date.now();
+    const { setPendingCourseMedia } = mountDashboard({
+      catalogTopics: [
+        { topicId: 'shared', courseId: 'course-b', title: 'Current renal lesson' },
+        { topicId: 'shared', courseId: 'course-a', title: 'Older cardiac lesson' },
+      ],
+      progress: [
+        { topicId: 'shared', courseId: 'course-a', percent: 20, position: 50,
+          status: 'in-progress', updatedAt: now - 10000 },
+        { topicId: 'shared', courseId: 'course-b', percent: 40, position: 0,
+          status: 'in-progress', updatedAt: now },
+      ],
+      timestamps: [
+        { topicId: 'shared', courseId: 'course-a', position: 999, updatedAt: now - 5000 },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('2');
+    expect(document.getElementById('home-focus-title').textContent).toBe('Current renal lesson');
+    expect(document.querySelector('[data-home-focus-time]').textContent).toBe('No saved position');
+    document.querySelector('[data-home-focus-action]').click();
+    expect(setPendingCourseMedia).toHaveBeenLastCalledWith('shared', undefined, 'course-b');
+
+    document.querySelector('[data-home-widget="recent"]').click();
+    expect(setPendingCourseMedia).toHaveBeenLastCalledWith('shared', 999, 'course-a');
+  });
+
   it('prioritizes a real unfinished lesson over a newer completed lesson', async () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({

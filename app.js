@@ -386,7 +386,7 @@ import { Pointer } from './src/lib/pointer.js';
     const resume = () => {
       const track = currentSnapshot?.track;
       setPendingCourseSession(currentSnapshot);
-      if (track?.topicId) setPendingCourseMedia(track.topicId, currentSnapshot?.currentTime);
+      if (track?.topicId) setPendingCourseMedia(track.topicId, currentSnapshot?.currentTime, track.courseId);
       Router.navigate('#/courses');
       if (!livePlayerEl) hide();
     };

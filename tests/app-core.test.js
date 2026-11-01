@@ -2056,6 +2056,8 @@ describe('app shell resilience helpers', () => {
 
     expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-2');
     expect(sessionStorage.getItem('ocd_pending_position')).toBe('30');
+    // Preserve source identity even when multiple courses reuse a topic ID.
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-a');
     expect(JSON.parse(sessionStorage.getItem('ocd_pending_course_session'))).toEqual(expect.objectContaining({
       queueIndex: 1,
       currentTime: 30,
@@ -2064,6 +2066,24 @@ describe('app shell resilience helpers', () => {
     }));
     expect(window.location.hash).toBe('#/courses');
     expect(document.querySelector('[data-mini-player]')).toBeNull();
+  });
+
+  it('resumes the correct course when two queued lectures share the same topic ID', async () => {
+    await loadApp();
+    sessionStorage.removeItem('ocd_pending_course');
+    window.OpenCourseDeck.MiniPlayer.show({
+      queue: [
+        { title: 'First curriculum', topicId: 'shared-lesson', courseId: 'course-a' },
+        { title: 'Second curriculum', topicId: 'shared-lesson', courseId: 'course-b' },
+      ],
+      queueIndex: 1, currentTime: 85, duration: 240, playing: false,
+    });
+    const button = document.querySelector('[data-mini-resume]');
+    expect(button).not.toBeNull();
+    button.click();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('shared-lesson');
+    expect(sessionStorage.getItem('ocd_pending_position')).toBe('85');
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-b');
   });
 
   it('opens saved timestamp bookmarks at their recorded playback position', async () => {
@@ -2480,6 +2500,42 @@ describe('app shell resilience helpers', () => {
       noteId: 'note-ts-1',
     }));
     expect(document.querySelector('[data-timestamp-note-status]').textContent).toContain('1:35');
+  });
+
+  it('refuses to attribute a timestamp to another lesson when the playback snapshot is stale', async () => {
+    await loadApp();
+    const saveTimestamp = vi.fn(async () => true);
+    const saveNote = vi.fn(async () => ({ id: 'incorrect-note' }));
+    window.DB = { getProgress: vi.fn(async () => null), saveTimestamp, saveNote };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: vi.fn(() => [{ id: 'course-a', title: 'Cardiology' }]),
+      allTopics: vi.fn(() => [
+        { topicId: 'topic-1', courseId: 'course-a', title: 'Known lecture',
+          videos: ['https://example.test/video.mp4'] },
+      ]),
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const actual = { topicId: 'topic-1', courseId: 'course-a', title: 'Known lecture' };
+    const other = { topicId: 'topic-1', courseId: 'course-b', title: 'Wrong course' };
+    const player = document.getElementById('course-player');
+    let snapshot = { queueIndex: -1, track: actual, currentTime: 95, duration: 300 };
+    player._pdPlayer = {
+      snapshot: vi.fn(() => snapshot), queue: [actual], trackIndex: 0,
+      on: vi.fn(), off: vi.fn(),
+    };
+    document.querySelector('[data-save-timestamp-note]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-timestamp-note-status]').textContent)
+      .toMatch(/play a course topic/i));
+    expect(saveTimestamp).not.toHaveBeenCalled();
+    expect(saveNote).not.toHaveBeenCalled();
+
+    snapshot = { queueIndex: 0, track: other, currentTime: 95, duration: 300 };
+    document.querySelector('[data-save-timestamp]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-timestamp-note-status]').textContent)
+      .toMatch(/play a course topic/i));
+    expect(saveTimestamp).not.toHaveBeenCalled();
+    expect(saveNote).not.toHaveBeenCalled();
   });
 
   it('authors chapter and transcript cues from the course player', async () => {

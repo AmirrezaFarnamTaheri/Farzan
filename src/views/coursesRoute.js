@@ -1,4 +1,5 @@
 import { openPdfSource } from '../core/pdfNavigation.js';
+import { resolveActiveCoursePlayback } from '../core/coursePlaybackIdentity.js';
 import { catalogReadingDirection } from '../lib/catalogDirection.js';
 export async function mountCoursesView(deps = {}) {
   const {
@@ -424,28 +425,7 @@ export async function mountCoursesView(deps = {}) {
     learningMarkerStatusEl.textContent = message;
     learningMarkerStatusEl.dataset.tone = tone;
   };
-  const currentPlayerContext = () => {
-    const inst = playerEl?._pdPlayer;
-    const snapshot = inst?.snapshot?.();
-    const queueIndex = Number(snapshot?.queueIndex ?? inst?.trackIndex ?? 0);
-    const activeTrack = inst?.queue?.[Number.isFinite(queueIndex) ? queueIndex : 0]
-      || snapshot?.queue?.[Number.isFinite(queueIndex) ? queueIndex : 0]
-      || snapshot?.track
-      || null;
-    const track = snapshot?.track || activeTrack;
-    if (!track) return null;
-    const currentTime = snapshot?.currentTime ?? inst?.currentTime ?? 0;
-    const duration = snapshot?.duration ?? inst?.duration ?? 0;
-    return {
-      inst,
-      track,
-      activeTrack,
-      topicId: track.topicId,
-      courseId: track.courseId,
-      currentTime: Math.max(0, Number(currentTime) || 0),
-      duration: Math.max(0, Number(duration) || 0),
-    };
-  };
+  const currentPlayerContext = () => resolveActiveCoursePlayback(playerEl?._pdPlayer);
   const cueList = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
   const cueTime = (cue) => Math.max(0, Number(cue?.time ?? cue?.start ?? 0) || 0);
   const cueLabel = (cue) => String(cue?.title ?? cue?.text ?? '').trim();
