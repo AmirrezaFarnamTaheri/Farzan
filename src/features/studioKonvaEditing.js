@@ -139,23 +139,6 @@ export function resizeKonvaV1Element(board, id, bounds) {
     validBoard(next);
     return next;
   }
-  if (item.type === 'ellipse') {
-    // Bounds describe the *unrotated local axes* of the ellipse, not its
-    // axis-aligned screen box. Keep the original rotation and all metadata.
-    const radiusX = bounds.width / 2;
-    const radiusY = bounds.height / 2;
-    const x = bounds.x + radiusX;
-    const y = bounds.y + radiusY;
-    if (![x, y, radiusX, radiusY].every(Number.isFinite)) {
-      throw new RangeError('Konva ellipse resize produced invalid geometry');
-    }
-    item.x = x;
-    item.y = y;
-    item.radiusX = radiusX;
-    item.radiusY = radiusY;
-    validBoard(next);
-    return next;
-  }
   if (item.type !== 'rect' && item.type !== 'roundRect') {
     throw new TypeError('Unsupported Studio element for Konva resizing: ' + item.type);
   }
