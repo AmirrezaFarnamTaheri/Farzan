@@ -581,7 +581,6 @@ test.describe('Farzan desktop workspace redesign', () => {
       window.OpenCourseDeck = window.OpenCourseDeck || {};
       window.OpenCourseDeck.featureFlags = {
         ...(window.OpenCourseDeck.featureFlags || {}),
-        notesTiptapPreview: true,
         notesSquireDefault: false,
       };
     });
