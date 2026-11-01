@@ -427,9 +427,7 @@
     transform: translateX(calc(100% + 24px));
   }
 
-  .sidebar.sidebar-mobile-open {
-    transform: translateX(0);
-  }
+  /* The final redesign layer owns the identical mobile-open transform. */
 
   .sidebar.sidebar-collapsed {
     width: min(320px, calc(100vw - 44px));
