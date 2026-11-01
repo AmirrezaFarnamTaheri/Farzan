@@ -94,7 +94,7 @@ function initFuse(data, options = {}) {
   // Keep the same offline content vocabulary as the topbar's lightweight
   // lexical fallback. Commands may still explicitly narrow options.keys.
   const defaultKeys = ['title', 'label', 'description', 'searchText',
-    'category', 'tags', 'keywords'];
+    'category', 'tags', 'keywords', 'labels'];
   const keys = Array.isArray(options.keys) && options.keys.length
     ? options.keys : defaultKeys;
   const fieldNames = keys.map(key => typeof key === 'string' ? key : key?.name)
