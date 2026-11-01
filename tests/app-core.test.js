@@ -2056,6 +2056,8 @@ describe('app shell resilience helpers', () => {
 
     expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-2');
     expect(sessionStorage.getItem('ocd_pending_position')).toBe('30');
+    // Preserve source identity even when multiple courses reuse a topic ID.
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-a');
     expect(JSON.parse(sessionStorage.getItem('ocd_pending_course_session'))).toEqual(expect.objectContaining({
       queueIndex: 1,
       currentTime: 30,
@@ -2064,6 +2066,24 @@ describe('app shell resilience helpers', () => {
     }));
     expect(window.location.hash).toBe('#/courses');
     expect(document.querySelector('[data-mini-player]')).toBeNull();
+  });
+
+  it('resumes the correct course when two queued lectures share the same topic ID', async () => {
+    await loadApp();
+    sessionStorage.removeItem('ocd_pending_course');
+    window.OpenCourseDeck.MiniPlayer.show({
+      queue: [
+        { title: 'First curriculum', topicId: 'shared-lesson', courseId: 'course-a' },
+        { title: 'Second curriculum', topicId: 'shared-lesson', courseId: 'course-b' },
+      ],
+      queueIndex: 1, currentTime: 85, duration: 240, playing: false,
+    });
+    const button = document.querySelector('[data-mini-resume]');
+    expect(button).not.toBeNull();
+    button.click();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('shared-lesson');
+    expect(sessionStorage.getItem('ocd_pending_position')).toBe('85');
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-b');
   });
 
   it('opens saved timestamp bookmarks at their recorded playback position', async () => {
