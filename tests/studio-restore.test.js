@@ -72,73 +72,45 @@ describe('Canvas board restore races', () => {
     window.OpenCourseDeck.Canvas.serialize().layers
       .flatMap((layer) => layer.elements.map((element) => element.id));
 
-  it('restores a retired canvas key and persists it as the canonical Studio board', async () => {
+  it('reads only the canonical board and never adopts a retired setting alias', async () => {
     const canvas = window.OpenCourseDeck.Canvas;
-    const legacy = boardWith(['legacy-research-diagram']);
+    const old = boardWith(['must-not-import']);
     window.DB = {
-      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? legacy : null),
+      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? old : null),
       saveSetting: vi.fn(async () => true),
     };
-
-    expect(await canvas.restoreBoard()).toBe(true);
-    expect(elementIds()).toEqual(['legacy-research-diagram']);
-    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_studio_board');
-    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_canvas_board');
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_studio_board', expect.objectContaining({
-      layers: expect.arrayContaining([expect.objectContaining({
-        elements: expect.arrayContaining([expect.objectContaining({ id: 'legacy-research-diagram' })]),
-      })]),
-    }));
+    expect(await canvas.restoreBoard()).toBe(false);
+    expect(elementIds()).not.toContain('must-not-import');
+    expect(window.DB.getSetting).toHaveBeenCalledExactlyOnceWith('ocd_studio_board');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
   });
 
-  it('does not claim legacy Studio adoption succeeded when the canonical write failed', async () => {
+  it('replays a canonical board directly without redundant migration writes', async () => {
     const canvas = window.OpenCourseDeck.Canvas;
-    const legacy = boardWith(['legacy-still-recoverable']);
+    const canonical = boardWith(['canonical-persisted']);
     window.DB = {
-      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? legacy : null),
-      saveSetting: vi.fn(async () => { throw new Error('Storage quota exceeded'); }),
-    };
-
-    expect(await canvas.restoreBoard()).toBe(false);
-    expect(elementIds()).toEqual(['legacy-still-recoverable']);
-    expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
-  });
-
-  it('rejects a missing or mismatched legacy-adoption receipt without deleting the source', async () => {
-    const canvas = window.OpenCourseDeck.Canvas;
-    const legacy = boardWith(['legacy-archived-study-diagram']);
-    window.DB = {
-      getSetting: vi.fn(async key => key === 'ocd_canvas_board' ? structuredClone(legacy) : null),
-      saveSetting: vi.fn(async () => undefined),
-    };
-    expect(await canvas.restoreBoard()).toBe(false);
-    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
-    expect(window.DB.getSetting).toHaveBeenCalledWith('ocd_canvas_board');
-
-    window.DB.saveSetting.mockResolvedValueOnce({ version: 1, layers: [] });
-    expect(await canvas.restoreBoard()).toBe(false);
-    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
-
-    window.DB.saveSetting.mockImplementationOnce(async (_key, value) => structuredClone(value));
-    expect(await canvas.restoreBoard()).toBe(true);
-    expect(elementIds()).toEqual(['legacy-archived-study-diagram']);
-  });
-
-  it('does not load a stale legacy board after edits arrive during a pending read', async () => {
-    const canvas = window.OpenCourseDeck.Canvas;
-    let finishLegacyRead;
-    window.DB = {
-      getSetting: vi.fn(async key => key === 'ocd_studio_board' ? null : new Promise(resolve => { finishLegacyRead = resolve; })),
+      getSetting: vi.fn(async () => structuredClone(canonical)),
       saveSetting: vi.fn(async () => true),
     };
-    const restore = canvas.restoreBoard();
-    await vi.waitFor(() => expect(finishLegacyRead).toBeTypeOf('function'));
+    expect(await canvas.restoreBoard()).toBe(true);
+    expect(elementIds()).toEqual(['canonical-persisted']);
+    expect(window.DB.getSetting).toHaveBeenCalledExactlyOnceWith('ocd_studio_board');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('drops a stale canonical empty read when an edit is made in flight', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    let resolveCanonical;
+    window.DB = {
+      getSetting: vi.fn(() => new Promise(resolve => { resolveCanonical = resolve; })),
+      saveSetting: vi.fn(async () => true),
+    };
+    const pending = canvas.restoreBoard();
+    await vi.waitFor(() => expect(resolveCanonical).toBeTypeOf('function'));
     canvas.addElement({ id: 'new-local-edit', type: 'rect' });
-    finishLegacyRead(boardWith(['stale-legacy']));
-
-    expect(await restore).toBe(false);
+    resolveCanonical(null);
+    expect(await pending).toBe(false);
     expect(elementIds()).toContain('new-local-edit');
-    expect(elementIds()).not.toContain('stale-legacy');
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
   });
 

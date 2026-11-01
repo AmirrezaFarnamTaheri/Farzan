@@ -1,12 +1,7 @@
 /**
- * Strict, lossless legacy-HTML gate for the StarterKit editor migration.
- *
- * Tiptap/ProseMirror discards unknown HTML elements and marks. Unlike JSON
- * content validation, checking HTML through the editor is not enough to
- * guarantee round-trip preservation. Reject anything StarterKit cannot
- * represent before creating an editable document. Rejected notes stay in the
- * existing sanitized HTML editor; their saved bytes are never overwritten by
- * a partially parsed ProseMirror document.
+ * Inert, fail-closed structural gate for safe HTML-canonical Squire Notes.
+ * Unknown elements/metadata are never converted or discarded. The caller
+ * retains the original saved HTML and opens the classic editor instead.
  */
 const ALLOWED_BLOCKS = new Set([
   'p', 'h1', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li', 'pre', 'hr',
@@ -17,12 +12,12 @@ const ALLOWED_INLINE = new Set([
 
 function invalid(reason) { return { compatible: false, reason }; }
 
-export function assessNoteForTiptap(html) {
+export function assessSupportedNoteStructure(html) {
   if (html == null || html === '') return { compatible: true, reason: null };
   if (typeof html !== 'string') return invalid('invalid-content-type');
   const template = document.createElement('template');
   template.innerHTML = html;
-  // ProseMirror's doc accepts block nodes at root, not loose inline nodes.
+  // Reject loose root inline text to preserve the canonical block structure.
   for (const node of template.content.childNodes) {
     if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) return invalid('root-text');
     if (node.nodeType === Node.ELEMENT_NODE && (!ALLOWED_BLOCKS.has(node.localName) || node.localName === 'li')) {

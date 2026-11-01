@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { assessNoteForTiptap } from '../src/features/notesEditorCompatibility.js';
+import { assessSupportedNoteStructure } from '../src/features/notesHtmlStructuralGate.js';
 
-describe('Tiptap migration preflight (HTML remains the source of truth)', () => {
-  it('accepts the simple rich text supported by StarterKit, including Persian and Chinese', () => {
-    expect(assessNoteForTiptap(
+describe('Safe HTML structural gate (Squire remains HTML-canonical)', () => {
+  it('accepts the simple rich text supported by the strict safe-HTML subset, including Persian and Chinese', () => {
+    expect(assessSupportedNoteStructure(
       '<h2>فیزیولوژی قلب</h2><p><strong>Cardiology</strong> <em>标题</em></p>'
       + '<ul><li>Alpha</li><li>Beta</li></ul>',
     )).toEqual({ compatible: true, reason: null });
@@ -23,18 +23,18 @@ describe('Tiptap migration preflight (HTML remains the source of truth)', () => 
     ['event handler', '<p onclick="alert(1)">Unsafe</p>'],
     ['SVG external reference', '<svg><image href="https://tracker.example/x.svg"></image></svg>'],
   ])('rejects %s without attempting a lossy conversion', (_name, html) => {
-    const result = assessNoteForTiptap(html);
+    const result = assessSupportedNoteStructure(html);
     expect(result.compatible).toBe(false);
     expect(result.reason).toBeTruthy();
   });
 
-  it('rejects root-level list items and code tags that a ProseMirror document cannot represent', () => {
+  it('rejects root-level list items and code tags that are not canonical blocks', () => {
     for (const html of [
       '<li>Detached list item</li>',
       '<code>Loose code mark</code>',
       '<ul><li>Valid</li></ul><li>Stray item</li>',
     ]) {
-      const result = assessNoteForTiptap(html);
+      const result = assessSupportedNoteStructure(html);
       expect(result).toMatchObject({ compatible: false });
     }
   });
@@ -42,14 +42,14 @@ describe('Tiptap migration preflight (HTML remains the source of truth)', () => 
   it('does not rewrite or execute input while performing compatibility checks', () => {
     const original = '<p>منبع &amp; 你好世界</p><a href="https://example.org">Source</a>';
     const before = original;
-    expect(assessNoteForTiptap(original).compatible).toBe(false); // root-level inline is not a StarterKit block
+    expect(assessSupportedNoteStructure(original).compatible).toBe(false); // root-level inline is not a canonical block
     expect(original).toBe(before);
     expect(window.__notesMigrationXss).toBeUndefined();
   });
 
   it('treats missing or non-string content as safely empty', () => {
-    expect(assessNoteForTiptap(null)).toEqual({ compatible: true, reason: null });
-    expect(assessNoteForTiptap('')).toEqual({ compatible: true, reason: null });
+    expect(assessSupportedNoteStructure(null)).toEqual({ compatible: true, reason: null });
+    expect(assessSupportedNoteStructure('')).toEqual({ compatible: true, reason: null });
   });
   it.each([
     ['discarded HTML comment', '<p>Before<!-- preserve me -->After</p>'],
@@ -57,7 +57,7 @@ describe('Tiptap migration preflight (HTML remains the source of truth)', () => 
     ['unsupported list child block', '<ul><p>Orphan paragraph</p><li>Valid</li></ul>'],
     ['orphan text in ordered list', '<ol><li>Valid</li>tail</ol>'],
   ])('refuses lossy DOM structures: %s', (_label, html) => {
-    expect(assessNoteForTiptap(html).compatible).toBe(false);
+    expect(assessSupportedNoteStructure(html).compatible).toBe(false);
   });
 
 });

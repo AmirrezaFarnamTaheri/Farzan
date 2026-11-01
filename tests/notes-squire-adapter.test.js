@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSquireNoteEditor, createTiptapNoteEditor } from '../src/features/notesSquireAdapter.js';
+import { createSquireNoteEditor } from '../src/features/notesSquireAdapter.js';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 
 describe('Squire HTML-canonical edit adapter', () => {
-  it('exports a Squire-named entrypoint without breaking the legacy adapter API', () => {
-    expect(createSquireNoteEditor).toBe(createTiptapNoteEditor);
+  it('exports only the Squire editor entrypoint', () => {
     const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Safe rich text</p>',
     });
@@ -23,7 +22,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('does not rewrite a saved root-text note when switching editors without edits', () => {
     const original = 'فیزیولوژی قلب 你好世界';
     const listener = vi.fn();
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: original, onUpdate: listener,
     });
     try {
@@ -36,7 +35,7 @@ describe('Squire HTML-canonical edit adapter', () => {
     const element = document.createElement('div');
     document.body.appendChild(element);
     const onUpdate = vi.fn();
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element,
       html: '<h2>فیزیولوژی قلب</h2><p><strong>Heart</strong> 你好世界</p>',
       onUpdate,
@@ -61,7 +60,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('inserts all blocks in a compatible multi-paragraph paste without silently truncating content', () => {
     const element = document.createElement('div');
     const updates = vi.fn();
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element, html: '<p>Original note</p>', onUpdate: updates,
     });
     try {
@@ -75,7 +74,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('supports native rich text direction and typography commands without discarding HTML', () => {
     const element = document.createElement('div');
-    const instance = createTiptapNoteEditor({ element, html: '<p>عنوان فارسی</p>' });
+    const instance = createSquireNoteEditor({ element, html: '<p>عنوان فارسی</p>' });
     try {
       for (const command of ['rtl', 'ltr', 'fontSize', 'fontFamily', 'textColor', 'highlightColor', 'alignRight']) {
         expect(instance.supports(command)).toBe(true);
@@ -88,7 +87,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('does not save empty formatting marks as user content', () => {
     const element = document.createElement('div');
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element, html: '<h2>فیزیولوژی قلب</h2><p><strong>Heart</strong></p>',
     });
     try {
@@ -105,7 +104,7 @@ describe('Squire HTML-canonical edit adapter', () => {
       + '<span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
     const element = document.createElement('div');
     const onUpdate = vi.fn();
-    const instance = createTiptapNoteEditor({ element, html: original, onUpdate });
+    const instance = createSquireNoteEditor({ element, html: original, onUpdate });
     try {
       // Simulate a real browser contenteditable mutation before Squire's
       // queued observer fires. A first save must retain legacy rich formatting.
@@ -140,12 +139,12 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('reopens supported direction and typography without silently losing styled text', () => {
     const html = '<p dir="rtl" style="text-align:right"><span style="font-size:18px;color:#ff0000">عنوان فارسی</span></p>';
     const parent = document.createElement('div');
-    const first = createTiptapNoteEditor({ element: parent, html });
+    const first = createSquireNoteEditor({ element: parent, html });
     try {
       expect(first.getHTML()).toContain('عنوان فارسی');
       expect(first.run('alignRight')).toBe(true);
       const edited = first.getHTML();
-      const second = createTiptapNoteEditor({ element: document.createElement('div'), html: edited });
+      const second = createSquireNoteEditor({ element: document.createElement('div'), html: edited });
       try {
         expect(second.getHTML()).toContain('عنوان فارسی');
         expect(second.getHTML()).toMatch(/dir=["']rtl["']/);
@@ -155,7 +154,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('rejects unsafe link destinations rather than inserting executable URLs', () => {
     const element = document.createElement('div');
-    const instance = createTiptapNoteEditor({ element, html: '<p>Reference</p>' });
+    const instance = createSquireNoteEditor({ element, html: '<p>Reference</p>' });
     try {
       expect(instance.supports('link')).toBe(true);
       expect(instance.run('link', 'javascript:alert(1)')).toBe(false);
@@ -169,7 +168,7 @@ describe('Squire HTML-canonical edit adapter', () => {
     document.body.appendChild(element);
     const onUpdate = vi.fn();
     const onPasteFallback = vi.fn();
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element, html: '<p>Before</p>', onUpdate, onPasteFallback,
     });
     try {
@@ -193,7 +192,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   });
 
   it('round-trips inserted text through native undo and redo without losing content', () => {
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Before editing</p>',
     });
     try {
@@ -209,7 +208,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('notifies only once composition is complete, never for unfinished IME text', () => {
     const updates = vi.fn();
     const element = document.createElement('div');
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element, html: '<p>Original</p>', onUpdate: updates,
     });
     try {
@@ -229,7 +228,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('does not notify about Squire normalization of untouched initial HTML', () => {
     for (const html of ['', '<p></p>', '<p><br></p>']) {
       const updates = vi.fn();
-      const instance = createTiptapNoteEditor({
+      const instance = createSquireNoteEditor({
         element: document.createElement('div'), html, onUpdate: updates,
       });
       try {
@@ -242,7 +241,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('uses the rendered baseline after setContent without treating normalization as editing', () => {
     const updates = vi.fn();
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Before</p>', onUpdate: updates,
     });
     try {
@@ -256,7 +255,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('flushes an unobserved native edit before an editor handoff', () => {
     const updates = vi.fn();
     const el = document.createElement('div');
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element: el, html: '<p>Previous text</p>', onUpdate: updates,
     });
     try {
@@ -269,7 +268,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('refuses an editor handoff during unfinished IME composition', () => {
     const el = document.createElement('div');
-    const instance = createTiptapNoteEditor({
+    const instance = createSquireNoteEditor({
       element: el, html: '<p>Previous text</p>',
     });
     try {
@@ -286,7 +285,7 @@ describe('Squire HTML-canonical edit adapter', () => {
   it('refuses lossy HTML before touching the provided DOM or mounting an editor', () => {
     const element = document.createElement('div');
     element.innerHTML = '<p>Existing untouched draft</p>';
-    expect(() => createTiptapNoteEditor({
+    expect(() => createSquireNoteEditor({
       element,
       html: '<p>Important</p><table><tr><td>Saved value</td></tr></table>',
     })).toThrow(/incompatible/i);
@@ -295,7 +294,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('supports core formatting commands and reuses ProseMirror undo/redo', () => {
     const element = document.createElement('div');
-    const instance = createTiptapNoteEditor({ element, html: '<p>Initial</p>' });
+    const instance = createSquireNoteEditor({ element, html: '<p>Initial</p>' });
     try {
       for (const name of ['bold','italic','underline','strikethrough','h1','h2','h3','paragraph',
         'ul','ol','blockquote','code','codeblock','hr','undo','redo','clearFormat']) {
@@ -371,7 +370,7 @@ describe('Squire HTML-canonical edit adapter', () => {
 
   it('silences content-change notifications when initializing or restoring content', () => {
     const listener = vi.fn();
-    const instance = createTiptapNoteEditor({ element: document.createElement('div'), html: '<p>A</p>', onUpdate: listener });
+    const instance = createSquireNoteEditor({ element: document.createElement('div'), html: '<p>A</p>', onUpdate: listener });
     try {
       instance.setContent('<p>B</p>');
       expect(instance.getHTML()).toContain('<p>B</p>');

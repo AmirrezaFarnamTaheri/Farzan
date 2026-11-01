@@ -1,6 +1,3 @@
-const LEGACY_COURSES_KEY = 'ocd_my_courses';
-const CANONICAL_LIBRARY_KEY = 'ocd_user_library';
-
 export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toast } = {}) {
   setView(`
     <section class="view view-my-courses">
@@ -168,8 +165,7 @@ export function mountMyCoursesView({ setView, Toast = window.OpenCourseDeck?.Toa
     savingCourse = true;
     button.disabled = true;
     try {
-      // The canonical UserLibrary setting is the single writable authority.
-      // Legacy outlines are only imported when that setting never existed.
+      // The canonical UserLibrary setting is the only writable authority.
       const api = window.OpenCourseDeck?.UserLibrary;
       if (typeof api?.upsertCourse !== 'function') throw new Error('Course storage is unavailable');
       const record = await api.upsertCourse({
@@ -546,23 +542,12 @@ function metric(label, value) {
   return card;
 }
 
-/**
- * The user-owned library is authoritative. Only migrate the legacy outline
- * array when the canonical setting was never created. A canonical `courses: {}`
- * is an intentional empty state and must never resurrect deleted outlines.
- */
+/** Read only the canonical User Library. The unreleased app has no legacy
+ * outline format to adopt, and an absent/empty library is a normal state. */
 async function loadCourses() {
   const api = window.OpenCourseDeck?.UserLibrary;
   if (typeof api?.load !== 'function') throw new Error('User Library storage is unavailable');
   if (typeof window.DB?.getSetting !== 'function') throw new Error('Course storage is unavailable');
-  const raw = await window.DB.getSetting(CANONICAL_LIBRARY_KEY);
-  if (raw == null) {
-    const legacy = await window.DB.getSetting(LEGACY_COURSES_KEY);
-    if (Array.isArray(legacy) && legacy.length) {
-      if (typeof api.migrateLegacyCourses !== 'function') throw new Error('Legacy course recovery is unavailable');
-      await api.migrateLegacyCourses(legacy);
-    }
-  }
   const library = await api.load();
   return Object.entries(library.courses || {})
     .filter(([id]) => id !== 'user-library')

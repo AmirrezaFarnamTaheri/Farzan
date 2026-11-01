@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountMyCoursesView } from '../src/views/myCoursesRoute.js';
 import { initUserLibrary, addTopic, loadLibrary, upsertCourse } from '../src/features/userLibrary.js';
 
-describe('My Courses canonical ownership and legacy recovery', () => {
+describe('My Courses canonical ownership without historical migrations', () => {
   let settings;
   let toast;
   const mount = () => mountMyCoursesView({
@@ -88,27 +88,25 @@ describe('My Courses canonical ownership and legacy recovery', () => {
     expect(document.querySelector('[data-my-course-id="'+course.id+'"]')).not.toBeNull();
   });
 
-  it('migrates only orphaned legacy outlines when the canonical library has never been initialized', async () => {
-    settings.ocd_my_courses = [{ id: 'course-legacy', title: 'Legacy saved course', description: 'Historical' }];
+  it('never adopts a retired outlines setting on a new profile', async () => {
+    settings.ocd_my_courses = [{ id: 'course-old', title: 'Retired outline' }];
     mount();
-    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('Legacy saved course'));
-    expect(settings.ocd_user_library.courses['course-legacy'].description).toBe('Historical');
-    expect(settings.ocd_my_courses).toHaveLength(1);
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('No custom courses'));
+    expect(window.DB.getSetting).not.toHaveBeenCalledWith('ocd_my_courses');
+    expect(settings.ocd_user_library?.courses?.['course-old']).toBeUndefined();
   });
 
-  it('never resurrects a deleted canonical course from its stale legacy outline', async () => {
-    settings.ocd_my_courses = [{ id: 'course-old', title: 'Old course' }];
-    const c = await upsertCourse({ id: 'course-old', title: 'Old course' });
+  it('keeps a deleted canonical course absent after reopening My Courses', async () => {
+    const c = await upsertCourse({ title: 'Remove me' });
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-my-course-id="'+c.id+'"]')).not.toBeNull());
-    const deleteButton = document.querySelector('[data-my-course-id="'+c.id+'"] [data-my-course-delete]');
-    expect(deleteButton).not.toBeNull();
-    deleteButton.click();
+    document.querySelector('[data-my-course-id="'+c.id+'"] [data-my-course-delete]').click();
     await vi.waitFor(async () => {
       expect((await loadLibrary()).courses[c.id]).toBeUndefined();
       expect(document.querySelector('[data-my-course-list]').textContent).toContain('No custom courses');
     });
-    expect(settings.ocd_my_courses).toHaveLength(1);
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-my-course-list]').textContent).toContain('No custom courses'));
   });
 
   it('creates a course through one canonical write instead of two disagreeing settings', async () => {
