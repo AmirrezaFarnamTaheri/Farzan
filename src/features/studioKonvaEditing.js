@@ -106,6 +106,24 @@ export function resizeKonvaV1Element(board, id, bounds) {
   const next = structuredClone(board);
   const { layer, index } = findUnlockedElement(next, id);
   const item = layer.elements[index];
+  if (item.type === 'circle') {
+    // Circle geometry is a center and a radius in board-v1. A nonuniform
+    // Konva Transformer must not be flattened into a different saved shape.
+    if (Math.abs(bounds.width - bounds.height) >
+      Math.max(1e-7, Math.max(bounds.width, bounds.height) * 1e-7)) {
+      throw new RangeError('Konva circle resize requires uniform width and height');
+    }
+    const radius = bounds.width / 2;
+    const x = bounds.x + radius, y = bounds.y + radius;
+    if (![x, y, radius].every(Number.isFinite) || radius <= 0) {
+      throw new RangeError('Konva circle resize produced invalid geometry');
+    }
+    item.x = x;
+    item.y = y;
+    item.radius = radius;
+    validBoard(next);
+    return next;
+  }
   if (item.type !== 'rect' && item.type !== 'roundRect') {
     throw new TypeError('Unsupported Studio element for Konva resizing: ' + item.type);
   }
@@ -314,7 +332,7 @@ export function createKonvaV1MoveSession({
     const oldShape = before.layer.elements[before.index];
     const newShape = after.layer.elements[after.index];
     // A stationary Transformer must not create a fake edit or storage write.
-    if (['x', 'y', 'width', 'height'].every(key => oldShape[key] === newShape[key])) {
+    if (['x', 'y', 'width', 'height', 'radius'].every(key => oldShape[key] === newShape[key])) {
       return structuredClone(current);
     }
     await persist(next);
