@@ -14,7 +14,11 @@ describe('CSS authoritative selector ownership', () => {
   });
 
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
-    const { inventoryCss } = require('../scripts/css-owner-inventory.cjs');
+    const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
+    const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
+    expect(conditional).toHaveLength(2);
+    expect(conditional[0].context).toBe('@media (max-width: 640px)');
+    expect(conditional[1].context).toBe('');
     const report = inventoryCss();
     expect(report.stylesheets).toHaveLength(22);
     expect(report.stylesheets.map(x => x.file)).toContain('farzan-redesign.css');
