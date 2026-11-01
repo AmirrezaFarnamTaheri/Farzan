@@ -42,9 +42,20 @@ describe('Studio Konva draft text controls and storage isolation', () => {
       if (key === 'ocd_studio_konva_draft') canonicalDraft = structuredClone(value);
       return true;
     });
+    const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft'
+      ? structuredClone(canonicalDraft) : null);
+    // Route integration uses the canonical atomic writer, not a stale
+    // getSetting/saveSetting fallback. Model its committed readback.
+    const compareAndSwapSetting = vi.fn(async (key, expected, value) => {
+      const previous = await getSetting(key);
+      if (JSON.stringify(previous) !== JSON.stringify(expected)) return false;
+      const receipt = await saveSetting(key, value);
+      if (receipt === false || receipt == null) return false;
+      const verified = await getSetting(key);
+      return JSON.stringify(verified) === JSON.stringify(value);
+    });
     window.DB = {
-      getSetting: vi.fn(async key => key === 'ocd_studio_konva_draft'
-        ? structuredClone(canonicalDraft) : null), saveSetting,
+      getSetting, saveSetting, compareAndSwapSetting,
       getAllNotes: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),

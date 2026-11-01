@@ -27,8 +27,17 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
   const getSetting = vi.fn(async key => key === 'ocd_studio_konva_draft'
     ? structuredClone(canonicalDraft) : null);
   window.OpenCourseDeck = { Canvas: canvasApi, bus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } };
+  const compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+    // Fake a serialized canonical transaction and its durable readback.
+    const current = await getSetting(key);
+    if (JSON.stringify(current) !== JSON.stringify(expected)) return false;
+    const receipt = await saveSetting(key, next);
+    if (receipt === false || receipt == null) return false;
+    const stored = await getSetting(key);
+    return JSON.stringify(stored) === JSON.stringify(next);
+  });
   window.DB = {
-    saveSetting, getSetting,
+    saveSetting, getSetting, compareAndSwapSetting,
     getAllNotes: vi.fn(async () => []),
     getAllTimestamps: vi.fn(async () => []),
     getAllAnnotations: vi.fn(async () => []),
@@ -461,7 +470,11 @@ describe('Studio experimental Konva draft opt-in', () => {
   it('accepts the canonical DB.saveSetting receipt which returns the saved board value, not a boolean', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { controller, factory, saveSetting } = makeFixture({ savedDraft: v1Board() });
-    saveSetting.mockImplementation(async (_key, value) => structuredClone(value));
+    const realSave = saveSetting.getMockImplementation();
+    saveSetting.mockImplementation(async (key, value) => {
+      await realSave(key, value);
+      return structuredClone(value);
+    });
     document.querySelector('[data-studio-konva-open]').click();
     await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
     const imported = v1Board();
@@ -607,6 +620,60 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(saveSetting).not.toHaveBeenCalled();
     expect(factory).toHaveBeenCalledOnce();
     expect(document.querySelector('[data-studio-konva-status]').textContent).toMatch(/reset failed/i);
+    controller.unmount();
+  });
+
+  it('refuses draft mutations if the canonical database cannot guarantee atomic compare-and-swap', async () => {
+    const saved = v1Board();
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft: saved });
+    delete window.DB.compareAndSwapSetting;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const changed = v1Board();
+    changed.layers[0].elements[0].x = 450;
+    await expect(factory.mock.calls[0][0].saveDraft(changed))
+      .rejects.toThrow(/atomic|compare.and.swap|transaction/i);
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(await getSetting('ocd_studio_konva_draft')).toEqual(saved);
+    controller.unmount();
+  });
+
+  it('refuses confirmed draft imports without atomic compare-and-swap rather than falling back to saveSetting', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const saved = v1Board();
+    const imported = v1Board();
+    imported.layers[0].elements[0].x = 840;
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft: saved });
+    delete window.DB.compareAndSwapSetting;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const input = document.querySelector('[data-studio-konva-import]');
+    const contents = JSON.stringify(imported);
+    Object.defineProperty(input, 'files', { configurable: true,
+      value: [{ name: 'safe.json', size: contents.length, text: async () => contents }] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/import failed/i));
+    expect(factory).toHaveBeenCalledOnce();
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(await getSetting('ocd_studio_konva_draft')).toEqual(saved);
+    controller.unmount();
+  });
+
+  it('refuses confirmed draft resets without atomic compare-and-swap', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const saved = v1Board();
+    saved.layers[0].elements[0].x = 640;
+    const { controller, factory, saveSetting, getSetting } = makeFixture({ savedDraft: saved });
+    delete window.DB.compareAndSwapSetting;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    document.querySelector('[data-studio-konva-reset]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/reset failed/i));
+    expect(factory).toHaveBeenCalledOnce();
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(await getSetting('ocd_studio_konva_draft')).toEqual(saved);
     controller.unmount();
   });
 
