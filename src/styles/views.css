@@ -1413,6 +1413,15 @@
 .bookmarks-filter-row {
   margin-bottom: var(--space-3);
 }
+/* Single-source bookmarks need one card per item, not two card frames. */
+.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.view-bookmarks .bookmarks-section-card:has([data-bookmark-filters][hidden]) > .card-body {
+  padding: 0;
+}
 
 /* Saved items lead the page; zero-only dashboards and one-type facets do not. */
 .view-bookmarks [data-bookmark-metrics][hidden],
