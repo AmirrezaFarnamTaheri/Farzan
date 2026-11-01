@@ -121,10 +121,25 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     const after = result.content.querySelector('p[dir="rtl"]');
     expect(after).not.toBeNull();
     expect(after.style.textAlign).toBe(first.style.textAlign);
-    const marked = result.content.querySelector('span');
-    expect(marked).not.toBeNull();
-    expect(marked.style.fontSize).toBe('18px');
-    expect(marked.style.color).toBe(first.querySelector('span').style.color);
+    // Squire may split a styled span into nested font-size and color marks.
+    // Compare effective inherited styling on the actual saved text leaf.
+    const effectiveStyle = (root) => {
+      const matches = [...root.querySelectorAll('span')]
+        .filter(node => node.textContent.includes('انقباض Heart'));
+      const leaf = matches.find(node =>
+        !matches.some(other => other !== node && node.contains(other)));
+      expect(leaf).toBeDefined();
+      const found = { fontSize: '', color: '' };
+      for (let node = leaf; node; node = node.parentElement) {
+        found.fontSize ||= node.style?.fontSize || '';
+        found.color ||= node.style?.color || '';
+      }
+      return found;
+    };
+    expect(effectiveStyle(result.content.querySelector('p[dir="rtl"]'))).toEqual({
+      fontSize: '18px',
+      color: first.querySelector('span').style.color,
+    });
     expect(result.content.textContent).toContain('next review');
 
     const reopenedHost = document.createElement('div');
@@ -132,7 +147,10 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     try {
       expect(reopened.getHTML()).toBe(saved);
       expect(reopenedHost.querySelector('h2').getAttribute('dir')).toBe('rtl');
-      expect(reopenedHost.querySelector('span').style.fontSize).toBe('18px');
+      expect(effectiveStyle(reopenedHost)).toEqual({
+        fontSize: '18px',
+        color: first.querySelector('span').style.color,
+      });
     } finally { reopened.destroy(); }
   });
 
