@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountStudioView } from '../src/views/studioRoute.js';
 import { createStudioKonvaDraftWorkspace } from '../src/features/studioKonvaDraftWorkspace.js';
+import { reorderKonvaV1Element } from '../src/features/studioKonvaEditing.js';
 
 const source = () => ({
   version: 1,
@@ -55,6 +56,14 @@ describe('Studio Konva draft text controls and storage isolation', () => {
           const shape = next.layers[0].elements.find(element => element.id === id);
           if (!shape || shape.type !== 'text') throw new TypeError('Not a text object');
           shape.text = text;
+          await saveDraft(next);
+          current = next;
+          onStatus('Experimental draft saved');
+          return structuredClone(current);
+        }),
+        reorder: vi.fn(async (id, direction) => {
+          const next = reorderKonvaV1Element(current, id, direction);
+          if (JSON.stringify(next) === JSON.stringify(current)) return structuredClone(current);
           await saveDraft(next);
           current = next;
           onStatus('Experimental draft saved');
