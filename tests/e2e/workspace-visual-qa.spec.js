@@ -391,9 +391,17 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     const library = page.locator('[data-notes-toggle-library]');
-    await expect(library).toBeVisible();
-    await library.click();
-    await expect(library).toHaveAttribute('aria-expanded', 'true');
+    // Responsive layouts legitimately expose the notes list either in the
+    // permanently visible desktop sidebar or behind the mobile pane button.
+    // Require the correct route for the rendered viewport, never force a
+    // hidden control and mistake the resulting timeout for an RTL failure.
+    const mobilePane = await library.isVisible();
+    if (mobilePane) {
+      await library.click();
+      await expect(library).toHaveAttribute('aria-expanded', 'true');
+    } else {
+      await expect(page.locator('#notes-library-panel')).toBeVisible();
+    }
     const savedRow = page.locator('[data-notes-list]').getByText(title);
     await expect(savedRow).toBeVisible();
     await assertNoOverflow('notes-populated-library');
@@ -403,7 +411,7 @@ test('keeps populated multilingual Notes and Settings usable at 200%-equivalent 
     });
     await savedRow.click();
     await expect(modern).toContainText('Heart rhythm 你好世界');
-    await expect(library).toHaveAttribute('aria-expanded', 'false');
+    if (mobilePane) await expect(library).toHaveAttribute('aria-expanded', 'false');
 
     await page.goto('/#/settings', { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
