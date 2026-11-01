@@ -48,7 +48,9 @@ for (const setup of setups) {
         const current = page.locator('.settings-nav [href="#settings-appearance"]');
         await expect(current).toHaveAttribute('aria-current', 'location');
         for (const selector of ['#select-density', '#select-language']) {
-          await expect(page.locator(selector)).toHaveCSS('appearance', 'auto');
+          // Chrome serializes native select appearance as "menulist" even when
+          // authored with appearance:auto; either native value draws the caret.
+          await expect(page.locator(selector)).toHaveCSS('appearance', /^(auto|menulist)$/);
         }
         const storageLink = page.locator('.settings-nav [href="#settings-storage"]');
         await storageLink.click();
