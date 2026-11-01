@@ -48,6 +48,51 @@ function parseCsp(html) {
     }));
 }
 
+/**
+ * Workbox's generated manifest describes the *offline install* payload,
+ * including deferred route chunks. It is not the same as the cold page's
+ * requested startup graph, and its on-disk bytes are not HTTP transfer bytes.
+ */
+function measurePrecacheArtifacts(rootDir = dist) {
+  const sw = path.join(rootDir, 'sw.js');
+  if (!fs.existsSync(sw)) throw new Error('Release service worker is missing; build:release first');
+  const text = fs.readFileSync(sw, 'utf8');
+  const urls = [...text.matchAll(/\\{url:"([^"]+)",revision:(?:"[^"]*"|null)\\}/g)]
+    .map(match => match[1]);
+  if (!urls.length) throw new Error('Workbox precache manifest is missing or unrecognised');
+
+  const unique = [...new Set(urls)].sort();
+  const files = [];
+  const missing = [];
+  for (const url of unique) {
+    // The generated manifest must never address a file outside dist.
+    const relative = decodeURIComponent(url.split(/[?#]/)[0]).replace(/^\\.\\//, '');
+    if (!relative || path.isAbsolute(relative) || relative.includes('\\\\')
+      || relative.split('/').includes('..')) {
+      throw new Error('Unsafe Workbox precache asset path: ' + url);
+    }
+    const full = path.resolve(rootDir, relative);
+    const boundary = path.relative(rootDir, full);
+    if (boundary === '..' || boundary.startsWith('..' + path.sep) || path.isAbsolute(boundary)) {
+      throw new Error('Unsafe Workbox precache path outside release: ' + url);
+    }
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+      missing.push(relative);
+      continue;
+    }
+    files.push({ path: relative, bytes: fs.statSync(full).size });
+  }
+  return {
+    count: unique.length,
+    included: files.length,
+    totalBytes: files.reduce((sum, item) => sum + item.bytes, 0),
+    jsBytes: files.filter(item => item.path.endsWith('.js'))
+      .reduce((sum, item) => sum + item.bytes, 0),
+    missing,
+    files,
+  };
+}
+
 function createBundleReport() {
   const files = walkFiles(dist)
     .filter(file => file.endsWith('.js') && isAppBundleJs(file))
@@ -77,6 +122,7 @@ function createBundleReport() {
       entryGzipBytes: entry?.gzipBytes ?? 0,
     },
     files,
+    precache: measurePrecacheArtifacts(),
     csp,
   };
 }
@@ -100,6 +146,14 @@ function evaluateReport(report) {
   }
   if (report.totals.entryGzipBytes > limits.entryGzipBytes) {
     failures.push(`entry gzip JS ${report.totals.entryGzipBytes} exceeds ${limits.entryGzipBytes}`);
+  }
+  // Synthetic unit reports may deliberately omit precache, but production
+  // createBundleReport always supplies it from the generated release SW.
+  if (report.precache) {
+    if (!report.precache.count) failures.push('Workbox precache manifest is empty');
+    for (const file of report.precache.missing || []) {
+      failures.push('Workbox precache asset is missing: ' + file);
+    }
   }
   const csp = report.csp || {};
   if (!csp['script-src']?.includes("'self'")) failures.push("CSP script-src must include 'self'");
@@ -138,6 +192,7 @@ if (require.main === module) {
 
 module.exports = {
   createBundleReport,
+  measurePrecacheArtifacts,
   evaluateReport,
   isAppBundleJs,
   parseCsp,
