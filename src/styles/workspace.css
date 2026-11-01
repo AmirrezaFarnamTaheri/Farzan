@@ -28,15 +28,12 @@
   background: var(--surface);
   border-right: 0;
   border-inline-end: 1px solid var(--workspace-rule);
-  box-shadow: none;
 }
 .sidebar-nav {
   -webkit-mask-image: none;
 }
 .sidebar-logo {
-  background: transparent;
   border-color: transparent;
-  box-shadow: none;
 }
 .nav-group-label {
   letter-spacing: 0.085em;
@@ -44,7 +41,6 @@
   font-weight: 650;
 }
 .nav-item {
-  border: 1px solid transparent;
   border-radius: var(--radius-md);
   transition: background-color var(--duration-fast), color var(--duration-fast);
 }
@@ -66,7 +62,6 @@
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--workspace-rule);
-  box-shadow: none;
 }
 
 /* Typography belongs to content, not to decorative effects. */
