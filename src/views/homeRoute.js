@@ -167,14 +167,14 @@ export function mountHomeView(deps = {}) {
               <div class="focus-widget-controls">
                 <p class="focus-widget-message" data-focus-message role="status" aria-live="polite">Loading focus timer…</p>
                 <label for="home-focus-preset">Study interval</label>
-                <select id="home-focus-preset" class="select" data-focus-preset>
+                <select id="home-focus-preset" class="select" data-focus-preset disabled>
                   <option value="classic">Classic · 25 min focus / 5 min break</option>
                   <option value="deep">Deep work · 50 min focus / 10 min break</option>
                 </select>
                 <div class="focus-widget-actions">
-                  <button class="btn btn-primary" type="button" data-focus-start>Start</button>
+                  <button class="btn btn-primary" type="button" data-focus-start disabled>Start</button>
                   <button class="btn btn-secondary" type="button" data-focus-next hidden>Next block</button>
-                  <button class="btn btn-ghost" type="button" data-focus-reset>Reset</button>
+                  <button class="btn btn-ghost" type="button" data-focus-reset disabled>Reset</button>
                 </div>
                 <p class="focus-widget-note">Breaks start only when you choose. Time is tracked locally on this device, not added to course progress.</p>
               </div>
