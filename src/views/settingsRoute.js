@@ -299,6 +299,38 @@ export function mountSettingsView(deps = {}) {
     routeListeners.push({ target, type, handler, options });
   };
 
+  // Settings section links are in-page navigation, not SPA routes.
+  // Keep the real viewport's active section visible and announce it to AT.
+  const sectionLinks = [...document.querySelectorAll('.settings-nav a[href^="#settings-"]')];
+  const setCurrentSection = (id) => {
+    sectionLinks.forEach((link) => {
+      if (link.getAttribute('href') === '#' + id) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  };
+  setCurrentSection('settings-appearance');
+  sectionLinks.forEach((link) => on(link, 'click', (event) => {
+    const id = link.getAttribute('href')?.slice(1);
+    const section = id && document.getElementById(id);
+    if (!section) return;
+    event.preventDefault();
+    setCurrentSection(id);
+    section.scrollIntoView?.({
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'instant' : 'smooth',
+      block: 'start',
+    });
+  }));
+  const settingsScrollContainer = document.getElementById('view-container');
+  on(settingsScrollContainer, 'scroll', () => {
+    const threshold = (settingsScrollContainer?.getBoundingClientRect?.().top || 0) + 96;
+    let closest = 'settings-appearance';
+    for (const link of sectionLinks) {
+      const id = link.getAttribute('href').slice(1);
+      if (document.getElementById(id)?.getBoundingClientRect?.().top <= threshold) closest = id;
+    }
+    setCurrentSection(closest);
+  }, { passive: true });
+
   // #btn-theme-toggle carries data-theme-toggle, so ThemeManager's delegated
   // click handler drives it (and keeps its icon/label in sync). Only sync the
   // label now in case the route rendered after the last theme change.
