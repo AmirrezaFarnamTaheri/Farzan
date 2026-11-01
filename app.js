@@ -1223,7 +1223,7 @@ import { Pointer } from './src/lib/pointer.js';
           category: topic.pdfs?.length ? 'PDF topic' : topic.videos?.length ? 'Video topic' : 'Topic',
           href: `#/courses?topic=${encodeURIComponent(String(topic.topicId))}`,
           action: () => {
-            setPendingCourseMedia(topic.topicId);
+            setPendingCourseMedia(topic.topicId, null, topic.courseId);
           },
         });
       });
