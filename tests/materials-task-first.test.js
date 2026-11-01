@@ -31,13 +31,15 @@ describe('Materials task-first browsing', () => {
   });
 
   async function mount() {
+    const Router = { navigate: vi.fn() };
+    const setPendingCourseMedia = vi.fn();
     cleanup = await mountMaterialsView({
       setView: html => { document.body.innerHTML = html; },
       createElement,
       eventTargetEl,
       safeMediaUrl: value => typeof value === 'string' && value.startsWith('https://') ? value : null,
-      Router: { navigate: vi.fn() },
-      setPendingCourseMedia: vi.fn(),
+      Router,
+      setPendingCourseMedia,
       Paginator: {
         paginate(items, state) {
           const pages = Math.max(1, Math.ceil(items.length / state.perPage));
@@ -48,6 +50,7 @@ describe('Materials task-first browsing', () => {
         renderControls(root, { total }) { root.textContent = `${total} materials`; },
       },
     });
+    return { Router, setPendingCourseMedia };
   }
 
   it('places topics with attached video and PDFs ahead of unlinked catalog records without dropping anything', async () => {
@@ -70,6 +73,22 @@ describe('Materials task-first browsing', () => {
     expect(optional.querySelector('#materials-source-filter')).not.toBeNull();
     optional.open = true;
     expect(optional.querySelector('#materials-course-filter option[value="c1"]')).not.toBeNull();
+  });
+
+  it('routes video playback to the exact course when topic IDs overlap', async () => {
+    window.DataStore.allTopics = () => [
+      { topicId: 'shared', courseId: 'course-a', title: 'Cardiac',
+        videos: ['https://example.org/a.mp4'], pdfs: [] },
+      { topicId: 'shared', courseId: 'course-b', title: 'Renal',
+        videos: ['https://example.org/b.mp4'], pdfs: [] },
+    ];
+    const { Router, setPendingCourseMedia } = await mount();
+    const row = document.querySelector('[data-topic-id="shared"][data-course-id="course-b"]');
+    expect(row).not.toBeNull();
+    row.querySelector('[data-action="play-video"]').click();
+    await vi.waitFor(() => expect(setPendingCourseMedia)
+      .toHaveBeenCalledWith('shared', null, 'course-b'));
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
   it('uses Persian course/source reading order while keeping English material names and controls LTR', async () => {
