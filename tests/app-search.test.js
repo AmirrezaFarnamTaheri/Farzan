@@ -904,7 +904,7 @@ describe('app topbar search rendering', () => {
 
   it('indexes durable PDF bookmarks with stable document identity and never seeks an unrelated PDF', async () => {
     const bookmarks = [
-      { id: 'renal-bm', docId: 'my-renamed.pdf', title: 'Renal bookmarked page', page: 12 },
+      { id: 'renal-bm', docId: 'fingerprint:renal-stable', title: 'Renal bookmarked page', page: 12 },
       { id: 'unanchored-bm', docId: 'global', title: 'Unanchored chemical page', page: 5 },
     ];
     window.DB = {
@@ -917,11 +917,11 @@ describe('app topbar search rendering', () => {
     const search = window.OpenCourseDeck.TopbarSearch;
     const stable = await search._queryUniversal('renal bookmarked');
     expect(stable).toEqual([expect.objectContaining({
-      sourceType: 'pdfBookmark', sourceId: 'my-renamed.pdf:12:renal-bm',
+      sourceType: 'pdfBookmark', sourceId: 'fingerprint:renal-stable:12:renal-bm',
       href: '#/pdf', category: 'PDF bookmark',
     })]);
     stable[0].action();
-    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('my-renamed.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:renal-stable');
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('12');
 
     const unanchored = await search._queryUniversal('unanchored chemical');
@@ -937,7 +937,7 @@ describe('app topbar search rendering', () => {
       getAllTimestamps: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
       getAllPdfBookmarks: vi.fn().mockRejectedValueOnce(new Error('bookmark IDB failed'))
-        .mockResolvedValueOnce([{ id: 'bm', docId: 'renal.pdf', title: 'Renal marked', page: 5 }]),
+        .mockResolvedValueOnce([{ id: 'bm', docId: 'fingerprint:renal-recovered', title: 'Renal marked', page: 5 }]),
     };
     window.DataStore = { init: vi.fn(async () => true), allCourses: () => [], allTopics: () => [] };
     const search = window.OpenCourseDeck.TopbarSearch;

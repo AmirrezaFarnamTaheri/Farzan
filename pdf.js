@@ -954,14 +954,13 @@ import { writeScopedPdfAnnotationFallback } from './src/core/pdfIdentityHardenin
       return { text, pages: pageTexts.length, totalPages, docId: State.annotationDocId || 'global' };
     },
 
-    _deriveSearchDocId(source, pdfDoc = State.pdfDoc) {
+    _deriveSearchDocId(_source, pdfDoc = State.pdfDoc) {
       const fingerprints = Array.isArray(pdfDoc?.fingerprints) ? pdfDoc.fingerprints.filter(Boolean) : [];
       if (fingerprints.length) return `fingerprint:${fingerprints.join(':')}`;
       if (pdfDoc?.fingerprint) return `fingerprint:${pdfDoc.fingerprint}`;
-      if (typeof source === 'string') return `url:${source}`;
-      if (source instanceof File) return `file:${source.name}:${source.size}:${source.lastModified || 0}`;
-      if (source instanceof ArrayBuffer) return `arraybuffer:${source.byteLength}`;
-      return State.annotationDocId || 'global';
+      // No filename, URL, buffer length or earlier document ID may become a
+      // canonical PDF identity. The caller hashes the current PDF bytes.
+      return '';
     },
 
     async _deriveCanonicalDocId(source, pdfDoc = State.pdfDoc, sourceData = null) {
@@ -982,7 +981,10 @@ import { writeScopedPdfAnnotationFallback } from './src/core/pdfIdentityHardenin
           return `sha256:${hex}`;
         } catch {}
       }
-      return fingerprintId;
+      // This document has no verifiable fingerprint and its bytes could not
+      // be hashed. Reject the load before annotations/bookmark handoff: using
+      // its URL or filename would risk applying another PDF's saved page.
+      throw new Error('PDF stable content identity is unavailable');
     },
 
     searchNext() {

@@ -1739,10 +1739,10 @@ describe('app shell resilience helpers', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => [
-        { id: 'note-pdf', title: 'Page note', sourceType: 'pdf', pdfDocId: 'doc-a.pdf', pdfPage: 9, updatedAt: 20 },
+        { id: 'note-pdf', title: 'Page note', sourceType: 'pdf', pdfDocId: 'fingerprint:doc-a-content', pdfPage: 9, updatedAt: 20 },
       ]),
       getAllAnnotations: vi.fn(async () => [
-        { id: 'ann-pdf', docId: 'doc-b.pdf', page: 4, updatedAt: 10 },
+        { id: 'ann-pdf', docId: 'fingerprint:doc-b-content', page: 4, updatedAt: 10 },
       ]),
     };
     window.PlasmaPDFViewer = { goTo: vi.fn() };
@@ -1752,7 +1752,7 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-bookmark-id="note-pdf"]').textContent).toContain('PDF page note');
     document.querySelector('[data-bookmark-id="note-pdf"] a').click();
 
-    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-a.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-a-content');
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('9');
     expect(window.location.hash).toBe('#/pdf');
     // A bookmark for a different document may not move the still-mounted
@@ -1760,7 +1760,7 @@ describe('app shell resilience helpers', () => {
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
 
     document.querySelector('[data-bookmark-id="ann-pdf"] a').click();
-    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('doc-b.pdf');
+    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-b-content');
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('4');
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
   });

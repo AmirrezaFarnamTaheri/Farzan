@@ -5,6 +5,7 @@
 // ============================================================
 
 import { Prefs, FontScale } from './src/core/prefs.js';
+import { isStablePdfDocumentId } from './src/core/pdfDocumentIdentity.js';
 import { ThemeManager } from './src/core/themeManager.js';
 import {
   $,
@@ -322,10 +323,12 @@ import { Pointer } from './src/lib/pointer.js';
 
   function setPendingPdfPage(docId, page = null) {
     try {
-      if (docId) sessionStorage.setItem('ocd_pending_pdf_doc', String(docId));
+      // Reject stale filenames/transport aliases before a route handoff.
+      const stable = isStablePdfDocumentId(String(docId ?? ''));
+      if (stable) sessionStorage.setItem('ocd_pending_pdf_doc', String(docId));
       else sessionStorage.removeItem('ocd_pending_pdf_doc');
       // Never apply an unanchored page to an earlier document's pending ID.
-      if (docId && Number.isFinite(Number(page)) && Number(page) > 0) {
+      if (stable && Number.isFinite(Number(page)) && Number(page) > 0) {
         sessionStorage.setItem('ocd_pending_pdf_page', String(Math.max(1, Math.floor(Number(page)))));
       } else {
         sessionStorage.removeItem('ocd_pending_pdf_page');
@@ -1294,7 +1297,7 @@ import { Pointer } from './src/lib/pointer.js';
       (pdfBookmarks || []).forEach((bookmark) => {
         if (!bookmark?.id) return;
         const docId = String(bookmark.docId ?? '').trim();
-        const stable = Boolean(docId && docId !== 'global');
+        const stable = isStablePdfDocumentId(docId);
         const page = Number.isFinite(Number(bookmark.page)) && Number(bookmark.page) > 0
           ? Math.max(1, Math.floor(Number(bookmark.page))) : null;
         results.push({
