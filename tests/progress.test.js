@@ -1214,4 +1214,26 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
+
+  it.each(['1.0', '1.1', '1.2', '1.3', '1.4', '1.5', undefined])(
+    'rejects never-shipped portable version %s before confirmation or write', async (version) => {
+      window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+      const file = new File([JSON.stringify({
+        ...(version === undefined ? {} : { version }),
+        progress: [{ topicId: 'never-shipped', courseId: 'c1', updatedAt: 99 }],
+      })], 'unreleased-archive.json', { type: 'application/json' });
+
+      await window.ProgressStats.importJSONFile(file);
+
+      expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Unsupported backup version'),
+      );
+      expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+      expect(window.DB.saveProgress).not.toHaveBeenCalled();
+      expect(window.DB.saveSetting).not.toHaveBeenCalled();
+      expect(window.OpenCourseDeck.lastImportPreview).toBeUndefined();
+      expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
+    },
+  );
+
 });
