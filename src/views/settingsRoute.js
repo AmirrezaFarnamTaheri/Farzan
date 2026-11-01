@@ -128,6 +128,9 @@ export function mountSettingsView(deps = {}) {
                 <span class="badge badge-info" data-ai-status aria-live="polite">Loading</span>
               </div>
 
+              <details class="settings-ai-disclosure" data-ai-disclosure>
+                <summary class="btn btn-ghost">Configure optional AI options (advanced)</summary>
+
               <div class="settings-ai-mode-grid">
                 <label class="settings-field">
                   <span>AI mode</span>
@@ -227,6 +230,7 @@ export function mountSettingsView(deps = {}) {
               <dl class="help-facts settings-facts" data-ai-summary>
                 <div><dt>Status</dt><dd>Loading…</dd></div>
               </dl>
+              </details>
             </div>
           </section>
 
@@ -528,6 +532,7 @@ export function mountSettingsView(deps = {}) {
     const localSource = document.querySelector('[data-ai-local-source]');
     const localFileInput = document.querySelector('[data-ai-local-file]');
     const status = document.querySelector('[data-ai-status]');
+    const disclosure = document.querySelector('[data-ai-disclosure]');
     const summary = document.querySelector('[data-ai-summary]');
     const downloadProgress = document.querySelector('[data-ai-download-progress]');
     const downloadLabel = document.querySelector('[data-ai-download-label]');
@@ -669,6 +674,9 @@ export function mountSettingsView(deps = {}) {
         hasKey: hasBoundKey,
       });
       mode.value = current.mode;
+      // Reopen saved, active configurations for direct recovery/editing while
+      // first-use users see only the concise privacy status and disclosure.
+      if (disclosure && ['custom-api', 'local-gemma'].includes(current.mode)) disclosure.open = true;
       model.value = current.model;
       if ([...localPackage.options].some(option => option.value === current.model)) localPackage.value = current.model;
       localSource.value = current.localModelSource;
