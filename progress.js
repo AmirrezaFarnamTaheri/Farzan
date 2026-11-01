@@ -1280,7 +1280,8 @@ const ProgressStats = (() => {
       'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
       'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
-      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy', 'plasma-pdf-annotations',
+      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy',
+      'ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page',
     ];
     const storage = window.localStorage;
     if (!storage || typeof storage.getItem !== 'function') {
