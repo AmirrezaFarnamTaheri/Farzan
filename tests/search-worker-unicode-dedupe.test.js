@@ -114,7 +114,7 @@ describe('search worker Unicode identity and stable protocol', () => {
       this.search = () => rows.map((item, index) => ({ item, score: index / 10, matches: [] }));
     }
     const rows = [
-      { label: 'Cardiology-ish', sourceType: 'note', sourceId: 'fuzzy' },
+      { label: 'Cariology-ish', sourceType: 'note', sourceId: 'fuzzy' },
       { label: 'Learning cardiology today', sourceType: 'note', sourceId: 'substring' },
       { label: 'Cardiology introduction', sourceType: 'note', sourceId: 'prefix' },
       { label: 'CARDIOLOGY', sourceType: 'note', sourceId: 'exact' },
