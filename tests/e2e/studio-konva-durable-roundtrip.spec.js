@@ -36,7 +36,18 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   await expect(page.locator('.view-studio')).toBeVisible();
   const live = await page.evaluate(async () => window.DB.getSetting('ocd_studio_board'));
   const draft = page.locator('[data-studio-konva-dialog]');
-  await page.locator('[data-studio-konva-open]').click({ timeout: 12000 });
+  const openKonvaLab = async () => {
+    const moreTools = page.locator('[data-studio-more-tools]');
+    // The production lab is inside a native, initially collapsed disclosure.
+    // Test actual pointer/keyboard access rather than bypassing hit testing.
+    if (!(await moreTools.evaluate(el => el.open))) {
+      await moreTools.locator('summary').click({ timeout: 12000 });
+      await expect(moreTools).toHaveAttribute('open', '');
+    }
+    const labButton = page.locator('[data-studio-konva-open]');
+    await labButton.click({ timeout: 12000 });
+  };
+  await openKonvaLab();
   await expect(draft).toBeVisible({ timeout: 20000 });
   await expect(draft.locator('[data-studio-konva-stage] canvas').first()).toBeVisible({ timeout: 20000 });
   await expect(draft.locator('[data-studio-konva-layer]')).toHaveValue('0');
@@ -86,7 +97,7 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
   await expect(page.locator('.view-studio')).toBeVisible();
   console.info('[konva-roundtrip] reloaded; reopen draft');
-  await page.locator('[data-studio-konva-open]').click({ timeout: 12000 });
+  await openKonvaLab();
   await expect(draft).toBeVisible({ timeout: 20000 });
   await expect(draft.locator('[data-studio-konva-object] option[value="' + shape.id + '"]')).toHaveCount(1);
   expect((await persisted()).layers[0].elements[0].x).toBe(-29);
