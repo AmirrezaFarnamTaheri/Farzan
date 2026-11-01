@@ -1151,15 +1151,16 @@ import { Pointer } from './src/lib/pointer.js';
       };
       const [catalog, notes, timestamps, annotations] = await Promise.all([
         (async () => {
-          try {
-            await window.DataStore?.init?.();
-            return {
-              courses: window.DataStore?.allCourses?.() ?? [],
-              topics: window.DataStore?.allTopics?.() ?? [],
-            };
-          } catch {
-            return { courses: [], topics: [] };
+          // Optional catalog API absence is a legitimate first-run condition.
+          // An existing canonical loader that rejects is not an empty corpus:
+          // propagate the read error to the accessible search retry state.
+          await window.DataStore?.init?.();
+          const courses = window.DataStore?.allCourses?.() ?? [];
+          const topics = window.DataStore?.allTopics?.() ?? [];
+          if (!Array.isArray(courses) || !Array.isArray(topics)) {
+            throw new TypeError('Invalid canonical search catalog data');
           }
+          return { courses, topics };
         })(),
         readSaved('getAllNotes'),
         readSaved('getAllTimestamps'),
