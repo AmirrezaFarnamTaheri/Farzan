@@ -1,4 +1,7 @@
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
@@ -43,12 +46,22 @@ describe('search source and index-cost acceptance evidence', () => {
     expect(items).toEqual(original);
   });
 
-  it('refuses a fictitious release footprint and includes the shipped worker and offline install', () => {
+  it('refuses fictitious footprints and measures only the exact release files and precache assets', () => {
     expect(() => releaseSearchFootprint('/directory/that/does/not/exist')).toThrow(/missing|release/i);
-    const reported = releaseSearchFootprint();
-    expect(reported.searchWorkerBytes).toBeGreaterThan(0);
-    expect(reported.entryBytes).toBeGreaterThan(0);
-    expect(reported.precacheFiles).toBeGreaterThan(0);
-    expect(reported.precacheBytes).toBeGreaterThan(reported.entryBytes);
+    const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'search-index-release-'));
+    try {
+      fs.mkdirSync(path.join(dist, 'src/workers'), { recursive: true });
+      fs.writeFileSync(path.join(dist, 'opencoursedeck.js'), 'export const shell = 1;');
+      fs.writeFileSync(path.join(dist, 'src/workers/search.worker.js'), 'self.onmessage = () => {}');
+      fs.writeFileSync(path.join(dist, 'sw.js'),
+        'precacheAndRoute([{url:"opencoursedeck.js",revision:"A"},{url:"src/workers/search.worker.js",revision:"B"}]);');
+      const reported = releaseSearchFootprint(dist);
+      expect(reported.searchWorkerBytes).toBeGreaterThan(0);
+      expect(reported.entryBytes).toBeGreaterThan(0);
+      expect(reported.precacheFiles).toBe(2);
+      expect(reported.precacheBytes).toBe(reported.searchWorkerBytes + reported.entryBytes);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
   });
 });
