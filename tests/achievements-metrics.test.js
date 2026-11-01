@@ -15,7 +15,7 @@ describe('achievements truthful activity', () => {
         { topicId: 'topic-a', start: 20, end: 80 },
       ]),
       getSetting: vi.fn(async key => key === 'ocd_flashcards'
-        ? [{ id: 'card-one', front: 'Explain this', deck: 'Biology', nextReviewDate: '2020-01-01' }]
+        ? [{ id: 'card-one', front: 'Explain this', deck: 'Biology', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2020-01-01T00:00:00.000Z' } } }]
         : null),
     };
     window.DataStore = {
