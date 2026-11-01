@@ -123,33 +123,6 @@ export function mountHomeView(deps = {}) {
           </div>
         </section>
 
-        <section class="card card-filled home-card">
-          <div class="card-body">
-            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Tools</h3>
-            <div class="home-tool-list">
-              <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
-              <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
-              <a href="#/settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span><strong>Preferences</strong><small>Tune appearance and behavior.</small></span></a>
-            </div>
-          </div>
-        </section>
-
-        <section class="card card-filled home-card home-card-wide">
-          <div class="card-body">
-            <div class="home-card-head">
-              <div>
-                <h2 class="home-card-title">Next steps</h2>
-              </div>
-              <span class="home-card-hint">Search: Ctrl+K</span>
-            </div>
-            <div class="home-widget-list" data-home-widgets aria-live="polite" aria-busy="true">
-              <div class="home-widget-skeleton" aria-hidden="true"></div>
-              <div class="home-widget-skeleton" aria-hidden="true"></div>
-              <div class="home-widget-skeleton" aria-hidden="true"></div>
-            </div>
-          </div>
-        </section>
-
         <section class="card card-filled home-card home-card-focus" aria-labelledby="home-focus-timer-title" data-focus-widget>
           <div class="card-body">
             <div class="home-card-head">
@@ -181,6 +154,35 @@ export function mountHomeView(deps = {}) {
             </div>
           </div>
         </section>
+
+        <section class="card card-filled home-card">
+          <div class="card-body">
+            <h3 class="home-card-title" style="margin-bottom:var(--space-3)">Tools</h3>
+            <div class="home-tool-list">
+              <a href="#/pdf"><svg class="icon" aria-hidden="true"><use href="#i-file-pdf"/></svg><span><strong>Read PDFs</strong><small>Annotate and reference pages.</small></span></a>
+              <a href="#/studio"><svg class="icon" aria-hidden="true"><use href="#i-studio"/></svg><span><strong>Open Studio</strong><small>Sketch concepts visually.</small></span></a>
+              <a href="#/settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span><strong>Preferences</strong><small>Tune appearance and behavior.</small></span></a>
+            </div>
+          </div>
+        </section>
+
+        <section class="card card-filled home-card home-card-wide">
+          <div class="card-body">
+            <div class="home-card-head">
+              <div>
+                <h2 class="home-card-title">Next steps</h2>
+              </div>
+              <span class="home-card-hint">Search: Ctrl+K</span>
+            </div>
+            <div class="home-widget-list" data-home-widgets aria-live="polite" aria-busy="true">
+              <div class="home-widget-skeleton" aria-hidden="true"></div>
+              <div class="home-widget-skeleton" aria-hidden="true"></div>
+              <div class="home-widget-skeleton" aria-hidden="true"></div>
+            </div>
+          </div>
+        </section>
+
+
 
         <section class="card card-filled home-card home-card-activity">
           <div class="card-body">
