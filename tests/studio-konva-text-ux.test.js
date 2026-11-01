@@ -126,6 +126,26 @@ describe('Studio Konva draft text controls and storage isolation', () => {
     await vi.waitFor(() => expect(save.disabled).toBe(true));
   });
 
+  it('exposes accessible bring-forward/backward controls and preserves the canonical layer metadata', async () => {
+    await openAndSelect('text-1');
+    const forward = document.querySelector('[data-studio-konva-reorder="forward"]');
+    const backward = document.querySelector('[data-studio-konva-reorder="backward"]');
+    expect(forward).toBeTruthy();
+    expect(backward).toBeTruthy();
+    expect(forward.disabled).toBe(false);
+    expect(backward.disabled).toBe(true); // first shape is at layer back
+    forward.click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledTimes(1));
+    const [key, persisted] = saveSetting.mock.calls[0];
+    expect(key).toBe('ocd_studio_konva_draft');
+    expect(persisted.layers[0].elements.map(shape => shape.id))
+      .toEqual(['rect-1', 'text-1']);
+    expect(persisted.layers[1].locked).toBe(true);
+    expect(persisted.layers[1].elements[0].text).toBe('Do not edit');
+    expect(window.OpenCourseDeck.Canvas.serialize().layers[0].elements[0].id).toBe('text-1');
+    expect(backward.disabled).toBe(false);
+  });
+
   it('keeps unsaved Unicode input and reports a rejected draft write, without claiming success', async () => {
     await openAndSelect();
     saveSetting.mockResolvedValue(false);
