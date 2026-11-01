@@ -154,6 +154,36 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     } finally { reopened.destroy(); }
   });
 
+  it('retains safe RTL, text alignment and class metadata when toolbar converts paragraph to heading', () => {
+    const html = '<p dir="rtl" class="align-right" style="text-align:right">فیزیولوژی 你好 Heart</p>';
+    expect(assessNoteForSquire(html).compatible).toBe(true);
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const editor = createSquireNoteEditor({ element: root, html });
+    let saved;
+    try {
+      expect(editor.run('h2')).toBe(true);
+      saved = editor.getHTML();
+      const inert = document.createElement('template');
+      inert.innerHTML = saved;
+      const heading = inert.content.querySelector('h2');
+      expect(heading).not.toBeNull();
+      expect(heading?.getAttribute('dir')).toBe('rtl');
+      expect(heading?.classList.contains('align-right')).toBe(true);
+      expect(heading?.style.textAlign).toBe('right');
+      expect(heading?.textContent).toContain('فیزیولوژی 你好 Heart');
+      expect(assessNoteForSquire(saved).compatible).toBe(true);
+    } finally { editor.destroy(); root.remove(); }
+    const reopenHost = document.createElement('div');
+    const reopened = createSquireNoteEditor({ element: reopenHost, html: saved });
+    try {
+      const h = reopenHost.querySelector('h2');
+      expect(h?.getAttribute('dir')).toBe('rtl');
+      expect(h?.style.textAlign).toBe('right');
+      expect(h?.classList.contains('align-right')).toBe(true);
+    } finally { reopened.destroy(); }
+  });
+
   it('admits only Squire list-text wrappers, never arbitrary divs or attached attributes', () => {
     const safe = '<ul><li><div>Blood pressure</div><ul><li>Renal</li></ul></li></ul>';
     expect(assessNoteForSquire(safe)).toEqual({ compatible: true, reason: null });
