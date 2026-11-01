@@ -251,6 +251,14 @@ export function createSquireNoteEditor({
       // intermediate text held by an active Chinese/Persian IME session.
       if (composing) throw new Error('Cannot replace note during IME composition');
       const next = preflight(value);
+      // A remote refresh, restore or note switch cannot silently discard
+      // changes the Squire editor has already surfaced to its save pipeline.
+      // A clean initial editor is still replaceable, and an identical refresh
+      // leaves the current selection/history intact.
+      if (dirty) {
+        if (next === editorHTML(editor)) return false;
+        throw new Error('Cannot overwrite unsaved note edits with a stale refresh');
+      }
       suppress = true;
       try {
         editor.setHTML(next);

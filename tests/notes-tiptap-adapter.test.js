@@ -307,6 +307,25 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('refuses to overwrite a modified Squire draft with a stale remote refresh', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Original saved note</p>', onUpdate: updates,
+    });
+    try {
+      element.querySelector('.notes-modern-editor p')
+        .appendChild(document.createTextNode(' plus local draft'));
+      expect(instance.syncChanges()).toBe(true);
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('plus local draft'));
+      const before = instance.getHTML();
+      expect(() => instance.setContent('<p>Stale remote snapshot</p>'))
+        .toThrow(/unsaved|pending|dirty/i);
+      expect(instance.getHTML()).toBe(before);
+      expect(instance.getHTML()).not.toContain('Stale remote snapshot');
+    } finally { instance.destroy(); }
+  });
+
   it('refuses a stale remote setContent while an IME composition is unfinished', () => {
     const element = document.createElement('div');
     const onUpdate = vi.fn();
