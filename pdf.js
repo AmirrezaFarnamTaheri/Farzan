@@ -167,7 +167,6 @@
     textCache:     new Map(),
     annotations:   {},          // { [pageNum]: Annotation[] }
     annotationDocId: 'global',
-    annotationAliases: [],
     searchDocId:   'global',
     activeTool:    'pan',       // 'pan' | 'highlight' | 'text' | 'draw'
     highlights:    [],          // persisted highlight annotations
@@ -295,8 +294,6 @@
         State.textCache = new Map();
         State.annotations = {};
         State.annotationDocId = await this._deriveCanonicalDocId(source, State.pdfDoc, src.data);
-        State.annotationAliases = this._deriveLegacyDocIds(source)
-          .filter(docId => docId && docId !== State.annotationDocId);
         State.searchDocId = State.annotationDocId;
 
         this._updatePageUI();
@@ -965,19 +962,6 @@
       return State.annotationDocId || 'global';
     },
 
-    _deriveLegacyDocIds(source) {
-      if (typeof source === 'string') return [source, `url:${source}`];
-      if (source instanceof File) {
-        return [
-          `file:${source.name}:${source.size}`,
-          `file:${source.name}:${source.size}:${source.lastModified || 0}`,
-        ];
-      }
-      if (source instanceof ArrayBuffer) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
-      if (ArrayBuffer.isView(source)) return [`file:local:0`, `arraybuffer:${source.byteLength}`];
-      return [];
-    },
-
     async _deriveCanonicalDocId(source, pdfDoc = State.pdfDoc, sourceData = null) {
       const fingerprintId = this._deriveSearchDocId(source, pdfDoc);
       if (fingerprintId.startsWith('fingerprint:')) return fingerprintId;
@@ -1182,45 +1166,37 @@
     },
 
     async _loadAnnotations() {
+      const docId = State.annotationDocId;
       if (window.DB?.getAnnotations) {
         try {
-          const canonicalId = State.annotationDocId;
-          const aliases = Array.from(new Set(State.annotationAliases || []));
-          const results = await Promise.all([
-            window.DB.getAnnotations(canonicalId),
-            ...aliases.map(alias => window.DB.getAnnotations(alias)),
-          ]);
-          const merged = new Map();
-          results.flat().forEach((annotation) => {
-            const next = { ...annotation, docId: canonicalId };
-            const current = merged.get(next.id);
-            if (!current || Number(next.updatedAt || 0) >= Number(current.updatedAt || 0)) {
-              merged.set(next.id, next);
-            }
-          });
-          const records = [...merged.values()];
-          State.annotations = records.reduce((acc, annotation) => {
-            const page = annotation.page ?? 1;
-            (acc[page] = acc[page] ?? []).push(annotation);
-            return acc;
-          }, {});
-          const migratedAliases = aliases.filter((_, index) => (results[index + 1] || []).length > 0);
-          if (migratedAliases.length && window.DB?.saveAnnotations) {
-            await window.DB.saveAnnotations(canonicalId, State.annotations);
-            await Promise.all(migratedAliases.map(alias => window.DB.saveAnnotations(alias, {})));
-            window.OpenCourseDeck?.bus?.emit?.('pdf:identity-migrated', {
-              docId: canonicalId,
-              aliases: migratedAliases,
-              annotations: records.length,
-            });
-          }
+          const records = await window.DB.getAnnotations(docId);
+          if (!Array.isArray(records)) throw new TypeError('Invalid annotation records');
+          State.annotations = records
+            .filter(a => a && a.docId === docId
+              && Number.isInteger(Number(a.page ?? 1)) && Number(a.page ?? 1) > 0)
+            .reduce((pages, annotation) => {
+              const page = annotation.page ?? 1;
+              (pages[page] = pages[page] || []).push(annotation);
+              return pages;
+            }, {});
           return;
-        } catch {}
+        } catch {
+          // A failed IndexedDB read never imports another PDF's annotations.
+        }
       }
-      const saved = localStorage.getItem('plasma-pdf-annotations');
-      if (saved) {
-        try { State.annotations = JSON.parse(saved); } catch {}
-      }
+      try {
+        const raw = localStorage.getItem('ocd_pdf_annotations_by_page');
+        const pages = raw ? JSON.parse(raw) : null;
+        State.annotations = {};
+        if (pages && typeof pages === 'object' && !Array.isArray(pages)) {
+          for (const [page, rows] of Object.entries(pages)) {
+            if (!Number.isInteger(Number(page)) || Number(page) < 1 || !Array.isArray(rows)) continue;
+            const owned = rows.filter(a => a && a.docId === docId
+              && Number(a.page ?? page) === Number(page));
+            if (owned.length) State.annotations[page] = owned;
+          }
+        }
+      } catch { State.annotations = {}; }
     },
 
     async refreshAnnotationsFromStorage() {
@@ -1241,15 +1217,21 @@
     },
 
     _saveAnnotations() {
+      const fallback = () => {
+        try {
+          localStorage.setItem('ocd_pdf_annotations_by_page', JSON.stringify(State.annotations));
+        } catch { /* The canonical IndexedDB writer remains authoritative. */ }
+      };
       if (window.DB?.saveAnnotations) {
         try {
-          window.DB.saveAnnotations(State.annotationDocId, State.annotations)
-            .catch(() => localStorage.setItem('plasma-pdf-annotations', JSON.stringify(State.annotations)));
+          Promise.resolve(window.DB.saveAnnotations(State.annotationDocId, State.annotations))
+            .catch(fallback);
           return;
-        } catch {}
+        } catch { /* Scoped local fallback below. */ }
       }
-      localStorage.setItem('plasma-pdf-annotations', JSON.stringify(State.annotations));
+      fallback();
     },
+
   };
 
 
@@ -1616,8 +1598,7 @@
       textCache: new Map(),
       annotations: {},
       annotationDocId: 'global',
-      annotationAliases: [],
-      searchDocId: 'global',
+        searchDocId: 'global',
       activeTool: 'pan',
       highlights: [],
     });
