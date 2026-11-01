@@ -623,7 +623,7 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.deletePdfBookmark('bm-unsaved')).resolves.toBe(false);
   });
 
-  it('deletes timestamps from local mirrors and IndexedDB stores', async () => {
+  it('deletes timestamps from canonical IndexedDB without creating a stale local mirror', async () => {
     await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', position: 42 });
 
     await window.DB.deleteTimestamp('delete-ts');
@@ -631,7 +631,7 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllTimestamps()).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'delete-ts' }),
     ]));
-    expect(JSON.parse(localStorage.getItem('plasma_timestamps_v1'))).toEqual([]);
+    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
   });
 
   it('updates existing timestamp records by id', async () => {
