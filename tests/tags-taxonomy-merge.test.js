@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountTagsView } from '../src/views/tagsRoute.js';
 import {
   TAG_TAXONOMY_KEY, parseTagTaxonomy, createTaxonomyTag,
-  mergeTaxonomyTags, resolveTaxonomyKey,
+  mergeTaxonomyTags, unmergeTaxonomyTag, resolveTaxonomyKey,
 } from '../src/features/tagTaxonomy.js';
 
 const mount = () => mountTagsView({
@@ -79,6 +79,41 @@ describe('persistent, non-destructive tag taxonomy', () => {
     await vi.waitFor(() => expect(cards()).toHaveLength(1));
   });
 
+  it('unmerges a previously combined facet after acknowledged durable storage and reload', async () => {
+    mount();
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+    const before = structuredClone({ notes, topics });
+    fill('[data-tag-merge-from]', 'review');
+    fill('[data-tag-merge-to]', 'کلیه');
+    submit('[data-tag-merge-form]');
+    await vi.waitFor(() => expect(cards()).toHaveLength(1));
+    const unmerge = document.querySelector('[data-tag-unmerge-form]');
+    expect(unmerge).not.toBeNull();
+    expect(fill('[data-tag-unmerge-source]', 'review').value).toBe('review');
+    submit('[data-tag-unmerge-form]');
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+    expect(saved.aliases).toEqual({});
+    expect({ notes, topics }).toEqual(before);
+    expect(document.querySelector('[data-tag-name="review"]')).not.toBeNull();
+    mount();
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+  });
+
+  it('retains the merged facet when unmerge storage is rejected without claiming success', async () => {
+    mount();
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+    fill('[data-tag-merge-from]', 'review');
+    fill('[data-tag-merge-to]', 'کلیه');
+    submit('[data-tag-merge-form]');
+    await vi.waitFor(() => expect(cards()).toHaveLength(1));
+    window.DB.saveSetting.mockRejectedValueOnce(new Error('quota'));
+    submit('[data-tag-unmerge-form]');
+    await vi.waitFor(() => expect(document.querySelector('[data-tag-mutation-error]')?.textContent)
+      .toContain('not saved'));
+    expect(saved.aliases).toEqual({ review: 'کلیه' });
+    expect(cards()).toHaveLength(1);
+  });
+
   it('does not pretend a rejected taxonomy write completed and retains source facets', async () => {
     window.DB.saveSetting.mockRejectedValue(new Error('storage quota exceeded'));
     mount();
@@ -107,6 +142,22 @@ describe('tag taxonomy validation and aliases', () => {
     expect(() => parseTagTaxonomy({version:1,labels:[],aliases:{a:'b',b:'a'}})).toThrow(/cycle/i);
     expect(() => createTaxonomyTag(parseTagTaxonomy(null),'x' + String.fromCharCode(0) + 'tag')).toThrow(/control/i);
   });
+  it('removes only a directly selected alias while preserving transitive aliases and labels', () => {
+    const original = parseTagTaxonomy({
+      version: 1,
+      labels: [{ key:'renal',label:'Renal' }, { key:'heart',label:'Heart' }],
+      aliases: { kidney:'renal', renal:'heart' },
+    });
+    const restored = unmergeTaxonomyTag(original, 'renal');
+    expect(restored.aliases).toEqual({ kidney:'renal' });
+    expect(resolveTaxonomyKey(restored, 'kidney')).toBe('renal');
+    expect(resolveTaxonomyKey(restored, 'heart')).toBe('heart');
+    expect(restored.labels).toEqual(original.labels);
+    expect(original.aliases).toEqual({ kidney:'renal', renal:'heart' });
+    expect(() => unmergeTaxonomyTag(original, 'heart')).toThrow(/merged|alias/i);
+    expect(() => unmergeTaxonomyTag(original, '__proto__')).toThrow();
+  });
+
   it('reassigns transitive aliases when merging without losing a pre-existing destination', () => {
     const original=parseTagTaxonomy({version:1,labels:[{key:'renal',label:'Renal'}],aliases:{kidney:'renal'}});
     const next=mergeTaxonomyTags(original,'renal','فیزیک');

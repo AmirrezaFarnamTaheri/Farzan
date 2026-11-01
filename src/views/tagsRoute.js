@@ -1,7 +1,7 @@
 import { normalizeSearchQuery } from '../core/searchRanking.js';
 import {
   TAG_TAXONOMY_KEY, parseTagTaxonomy, resolveTaxonomyKey,
-  createTaxonomyTag, mergeTaxonomyTags, persistTagTaxonomy,
+  createTaxonomyTag, mergeTaxonomyTags, unmergeTaxonomyTag, persistTagTaxonomy,
 } from '../features/tagTaxonomy.js';
 
 // A stale read must not replace a more recent successful retry or a new route.
@@ -42,7 +42,13 @@ export function mountTagsView({ setView } = {}) {
               <select class="select" id="tag-merge-to" data-tag-merge-to disabled></select>
               <button class="btn btn-ghost" type="button" disabled>Merge labels</button>
             </div>
-            <p class="text-muted">Merged labels stay in original Notes and courses; only the displayed taxonomy changes.</p>
+            <div data-tag-unmerge-form class="filter-row" role="group"
+              aria-label="Undo a taxonomy merge without changing saved records">
+              <label for="tag-unmerge-source">Restore merged label</label>
+              <select class="select" id="tag-unmerge-source" data-tag-unmerge-source disabled></select>
+              <button class="btn btn-ghost" type="button" disabled>Unmerge label</button>
+            </div>
+            <p class="text-muted">Merged labels stay in original Notes and courses; only the displayed taxonomy changes. Unmerge restores their original categories.</p>
             <p role="status" aria-live="polite" data-tag-mutation-status></p>
           </div>
           <div class="grid grid-3 tags-grid" data-tag-list>
@@ -354,6 +360,8 @@ async function renderTags() {
   const mergeForm = taxonomyControls.querySelector('[data-tag-merge-form]');
   const mergeFrom = taxonomyControls.querySelector('[data-tag-merge-from]');
   const mergeTo = taxonomyControls.querySelector('[data-tag-merge-to]');
+  const unmergeForm = taxonomyControls.querySelector('[data-tag-unmerge-form]');
+  const unmergeSource = taxonomyControls.querySelector('[data-tag-unmerge-source]');
   const status = taxonomyControls.querySelector('[data-tag-mutation-status]');
   const mutationEnabled = writable && typeof window.DB?.getSetting === 'function';
   createName.disabled = !mutationEnabled;
@@ -371,6 +379,21 @@ async function renderTags() {
     field.disabled = !mutationEnabled || tagEntries.length < 2;
   }
   mergeForm.querySelector('button').disabled = !mutationEnabled || tagEntries.length < 2;
+  const previousAlias = unmergeSource.value;
+  unmergeSource.replaceChildren();
+  Object.keys(taxonomy.aliases).sort().forEach(key => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = (taxonomy.labels.find(label => label.key === key)?.label || key)
+      + ' → ' + (preferredLabels.get(resolveTaxonomyKey(taxonomy, key))
+        || resolveTaxonomyKey(taxonomy, key));
+    unmergeSource.appendChild(option);
+  });
+  if (Object.prototype.hasOwnProperty.call(taxonomy.aliases, previousAlias)) {
+    unmergeSource.value = previousAlias;
+  }
+  unmergeSource.disabled = !mutationEnabled || !Object.keys(taxonomy.aliases).length;
+  unmergeForm.querySelector('button').disabled = unmergeSource.disabled;
   let mutationPending = false;
   const applyMutation = async transform => {
     if (mutationPending || !mutationEnabled) return;
@@ -394,6 +417,9 @@ async function renderTags() {
         mergeFrom.disabled = !canMerge;
         mergeTo.disabled = !canMerge;
         mergeForm.querySelector('button').disabled = !canMerge;
+        const canUnmerge = Object.keys(taxonomy.aliases).length > 0;
+        unmergeSource.disabled = !canUnmerge;
+        unmergeForm.querySelector('button').disabled = !canUnmerge;
       }
     } finally {
       mutationPending = false;
@@ -405,6 +431,8 @@ async function renderTags() {
   const submitMerge = () => void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
   createForm.querySelector('button').onclick = submitCreate;
   mergeForm.querySelector('button').onclick = submitMerge;
+  unmergeForm.querySelector('button').onclick = () => void applyMutation(current =>
+    unmergeTaxonomyTag(current, unmergeSource.value));
   createName.onkeydown = event => {
     if (event.key !== 'Enter' || event.isComposing) return;
     event.preventDefault();
