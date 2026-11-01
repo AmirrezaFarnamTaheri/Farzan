@@ -32,6 +32,15 @@ describe('single authoritative shared chrome CSS property ownership', () => {
     expect(final).toMatch(/border-bottom:/);
   });
 
+  it('keeps one winning rule for static topbar context and full-span activity across widths', () => {
+    // The final global rules already apply at every breakpoint, so earlier
+    // identical media overrides only obscure which declaration owns paint.
+    const chromeHides = owner.match(/\.topbar-context\s*\{\s*display:\s*none;\s*\}/g) || [];
+    const activityColumns = owner.match(/\.home-grid\s*>\s*\.home-card-activity\s*\{\s*grid-column:\s*1\s*\/\s*-1;\s*\}/g) || [];
+    expect(chromeHides).toHaveLength(1);
+    expect(activityColumns).toHaveLength(1);
+  });
+
   it('removes the earlier topbar and sidebar paint blocks and retains the winning owners', () => {
     for (const selector of ['.topbar', '.sidebar']) {
       expect(source).not.toContain(selector + ' {');
