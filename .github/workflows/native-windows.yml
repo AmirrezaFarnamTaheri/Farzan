@@ -129,6 +129,17 @@ jobs:
       - name: Enforce strict native prerequisites
         run: npm run native:preflight:strict
 
+      # Exercise the same Persian/Chinese Squire composition and blocked-route
+      # journey on an actual Windows runner. These are synthesized browser
+      # CompositionEvents; a human physical IME and screen-reader audit remains
+      # a separate release-acceptance requirement.
+      - name: Validate Notes composition in Windows Chromium
+        run: |
+          $chrome = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+          if (-not (Test-Path $chrome)) { throw "Chrome for Testing not found at $chrome" }
+          $env:CHROME_BIN = $chrome
+          npm run test:e2e -- tests/e2e/workspace-redesign.spec.js -g "keeps default Squire composing text|preserves an IME Notes draft"
+
       - name: Validate Cargo graph with lockfile
         run: npm run tauri:check:locked
 
