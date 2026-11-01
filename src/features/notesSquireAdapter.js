@@ -1,9 +1,8 @@
 /**
- * HTML-canonical Notes editor experiment backed by Squire 2.
+ * HTML-canonical Notes editor backed by Squire 2.
  *
  * Unlike a schema-bound editor this retains HTML as the document model. The
- * existing Notes editor remains the fallback until real-world parity and the
- * production bundle budget are verified. Never persist Squire-specific state.
+ * classic Notes editor remains a fallback for content Squire cannot safely represent. Never persist Squire-specific state.
  */
 import Squire from 'squire-rte';
 import DOMPurify from 'dompurify';
@@ -298,6 +297,3 @@ export function createSquireNoteEditor({
   };
 }
 
-// The former entrypoint remains available for already-shipped callers and tests.
-// New routes should use the engine's accurate name; no saved format changes.
-export const createTiptapNoteEditor = createSquireNoteEditor;
