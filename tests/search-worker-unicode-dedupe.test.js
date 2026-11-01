@@ -181,6 +181,22 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(rows[0].tags).toEqual(['  فيزيك', 'قلب 你好']);
   });
 
+  it('indexes imported taxonomy labels by default without widening explicit command-only keys', () => {
+    const rows = [{
+      title: 'Imported study guide', labels: ['فيزيك كليه', 'Renal medicine'],
+      sourceType: 'topic', sourceId: 'imported-taxonomy-1',
+    }];
+    const original = structuredClone(rows);
+    const worker = workerWithData(rows, { threshold: 0 });
+    expect(worker.search('فیزیک کلیه', { limit: 10 }, 23).results).toEqual(rows);
+    expect(worker.search('renal medicine', { limit: 10 }, 24).results).toEqual(rows);
+    expect(rows).toEqual(original);
+
+    const narrowed = workerWithData(rows, { keys: ['title'], threshold: 0 });
+    expect(narrowed.search('فیزیک کلیه', { limit: 10 }, 25).results).toEqual([]);
+    expect(narrowed.search('imported study guide', { limit: 10 }, 26).results).toEqual(rows);
+  });
+
   it('honours explicitly narrowed indexing keys rather than leaking unrelated taxonomy fields', () => {
     const worker = workerWithData([
       { label: 'Physics', category: 'Secret category', tags: ['Secret tag'] },
