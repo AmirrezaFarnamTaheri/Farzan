@@ -11,7 +11,7 @@ const snapshot = (ready, transfer, missing = 0) => ({
   resourceCount: 20,
   resourcePaths: Array.from({ length: 20 }, (_, i) => i === 0 ? '/opencoursedeck.js' : `/chunks/chunk-${i}.js`),
   transferSizeBytes: transfer,
-  encodedBodyBytes: transfer - 10,
+  encodedBodyBytes: Math.max(0, transfer - 10),
   missingTransferSizes: missing,
   scope,
 });
