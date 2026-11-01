@@ -695,6 +695,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const konvaStage = document.querySelector('[data-studio-konva-stage]');
   const konvaStatus = document.querySelector('[data-studio-konva-status]');
   let konvaWorkspace = null;
+  // Durable snapshot last observed by this editor. Reset and import must use
+  // this exact opened revision, not freshly read another tab's newer board.
+  let persistedKonvaDraft = null;
   let konvaModule = null;
   let konvaOpening = false;
   let konvaClosing = false;
@@ -795,6 +798,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const disposeKonva = ({ restoreFocus = true } = {}) => {
     konvaWorkspace?.destroy?.();
     konvaWorkspace = null;
+    persistedKonvaDraft = null;
     if (konvaDialog?.open) {
       if (typeof konvaDialog.close === 'function') konvaDialog.close();
       else konvaDialog.removeAttribute('open');
@@ -835,6 +839,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
           const accepted = await db.compareAndSwapSetting(loaded.DRAFT_KEY, lastSavedDraft, changed);
           if (!accepted) throw new Error('Konva draft changed in another tab. Reopen the draft before editing.');
           lastSavedDraft = structuredClone(changed);
+          persistedKonvaDraft = structuredClone(changed);
           return true;
         }
         // Compatibility path for test facades without transactional support.
@@ -852,6 +857,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
           throw new Error('Konva draft was not saved durably: canonical readback differed');
         }
         lastSavedDraft = structuredClone(verified);
+        persistedKonvaDraft = structuredClone(verified);
         return true;
       },
       onSelect: id => {
@@ -869,6 +875,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     // passed its own validation and mounted successfully.
     previousWorkspace?.destroy?.();
     konvaWorkspace = candidate;
+    persistedKonvaDraft = lastSavedDraft == null ? null : structuredClone(lastSavedDraft);
     populateKonvaObjects();
     return konvaWorkspace;
   };
@@ -1072,7 +1079,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       await previous.flush();
       if (unmounted || konvaClosing || konvaWorkspace !== previous) return;
       const candidate = structuredClone(imported);
-      const expected = await window.DB.getSetting(loaded.DRAFT_KEY);
+      const expected = persistedKonvaDraft;
       // Imported drafts must not overwrite a concurrent edit after confirmation.
       const receipt = typeof window.DB.compareAndSwapSetting === 'function'
         ? await window.DB.compareAndSwapSetting(loaded.DRAFT_KEY, expected, candidate)
@@ -1185,7 +1192,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       const previous = konvaWorkspace;
       await previous.flush();
       if (unmounted || konvaWorkspace !== previous) return;
-      const expected = await window.DB.getSetting(konvaModule.DRAFT_KEY);
+      const expected = persistedKonvaDraft;
       const receipt = typeof window.DB.compareAndSwapSetting === 'function'
         ? await window.DB.compareAndSwapSetting(konvaModule.DRAFT_KEY, expected, structuredClone(source))
         : await window.DB.saveSetting(konvaModule.DRAFT_KEY, structuredClone(source));
