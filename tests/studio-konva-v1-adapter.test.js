@@ -82,6 +82,20 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     expect(board).toEqual(original);
   });
 
+  it.each([
+    ['locked', 'true'],
+    ['locked', 1],
+    ['visible', 'false'],
+    ['visible', 0],
+  ])('fails closed on nonboolean %s layer metadata (%s) without rewriting saved geometry', (field, value) => {
+    const board = fixture();
+    board.layers[0][field] = value;
+    const saved = structuredClone(board);
+    const result = planKonvaV1Board(board);
+    expect(result).toEqual({ compatible: false, reason: 'invalid-layer-' + field });
+    expect(board).toEqual(saved);
+  });
+
   it('accepts supported explicit text layout width without rewriting canonical board-v1 JSON', () => {
     const board = fixture();
     board.layers[0].elements = [{
