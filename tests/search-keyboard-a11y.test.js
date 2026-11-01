@@ -13,6 +13,14 @@ describe('shared keyboard search selection contract', () => {
     expect(nextSearchSelectionIndex(6, 2, 'ArrowDown')).toBe(1);
   });
 
+  it('offers consistent Home/End edges on both search surfaces without wrapping beyond rendered rows', () => {
+    expect(nextSearchSelectionIndex(2, 4, 'Home')).toBe(0);
+    expect(nextSearchSelectionIndex(0, 4, 'End')).toBe(3);
+    expect(nextSearchSelectionIndex(-1, 4, 'End')).toBe(3);
+    expect(nextSearchSelectionIndex(9, 4, 'Home')).toBe(0);
+    expect(nextSearchSelectionIndex(1, 0, 'End')).toBe(-1);
+  });
+
   beforeEach(() => {
     document.body.innerHTML = `
       <input id="search" role="combobox" aria-controls="results" />
