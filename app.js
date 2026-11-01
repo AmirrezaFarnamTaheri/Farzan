@@ -994,6 +994,7 @@ import { Pointer } from './src/lib/pointer.js';
     _universalData: null,
     _hasDataOverride: false,
     _searchEpoch: 0,
+    _corpusEpoch: 0,
     _visibleResults: [],
     _renderedQuery: '',
 
@@ -1046,7 +1047,12 @@ import { Pointer } from './src/lib/pointer.js';
       // whenever any of them change so new content is searchable without a
       // reload. TopbarSearch is an app-lifetime singleton, so these
       // subscriptions intentionally live until the page unloads.
-      const invalidate = () => { this._universalData = null; };
+      const invalidate = () => {
+        // Invalidation also revokes any canonical snapshot still loading.
+        // Otherwise a slow pre-save read can repopulate this cache later.
+        this._corpusEpoch += 1;
+        this._universalData = null;
+      };
       const bus = OpenCourseDeck?.bus;
       for (const event of [
         'note:create', 'note:save', 'note:delete',
@@ -1065,6 +1071,7 @@ import { Pointer } from './src/lib/pointer.js';
       // A data-source switch invalidates any outstanding universal search.
       this._searchEpoch += 1;
       this._data = Array.isArray(data) ? data : [];
+      this._corpusEpoch += 1;
       this._universalData = null;
       this._hasDataOverride = true;
     },
@@ -1138,8 +1145,9 @@ import { Pointer } from './src/lib/pointer.js';
       }));
     },
 
-    async _loadUniversalData() {
+    async _loadUniversalData(retries = 0) {
       if (Array.isArray(this._universalData)) return [...this._universalData];
+      const startedAtEpoch = this._corpusEpoch;
       // Missing optional readers are allowed on first boot, but a reader
       // that exists and rejects must not masquerade as an empty collection.
       // Do not memoize a partial corpus after any failed canonical read.
@@ -1256,6 +1264,13 @@ import { Pointer } from './src/lib/pointer.js';
           href: '#/pdf',
         });
       });
+      // A save/import/cross-tab update may arrive while Notes or the catalog
+      // is loading. Reread the new source instead of returning/caching the
+      // obsolete snapshot. Bound retry under sustained mutation traffic.
+      if (startedAtEpoch !== this._corpusEpoch) {
+        if (retries >= 2) throw new Error('Search index changed repeatedly during canonical reads');
+        return this._loadUniversalData(retries + 1);
+      }
       this._universalData = dedupeSearchResults(results, { limit: results.length });
       return [...this._universalData];
     },
