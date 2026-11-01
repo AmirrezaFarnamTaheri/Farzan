@@ -124,6 +124,21 @@ export function resizeKonvaV1Element(board, id, bounds) {
     validBoard(next);
     return next;
   }
+  if (item.type === 'ellipse') {
+    const radiusX = bounds.width / 2, radiusY = bounds.height / 2;
+    const x = bounds.x + radiusX, y = bounds.y + radiusY;
+    if (![x, y, radiusX, radiusY].every(Number.isFinite)) {
+      throw new RangeError('Konva ellipse resize produced invalid geometry');
+    }
+    item.x = x;
+    item.y = y;
+    item.radiusX = radiusX;
+    item.radiusY = radiusY;
+    // Rotation remains canonical and unchanged: bounds are in the ellipse's
+    // own unrotated axes, never an axis-aligned screen bounding box.
+    validBoard(next);
+    return next;
+  }
   if (item.type !== 'rect' && item.type !== 'roundRect') {
     throw new TypeError('Unsupported Studio element for Konva resizing: ' + item.type);
   }
@@ -332,7 +347,7 @@ export function createKonvaV1MoveSession({
     const oldShape = before.layer.elements[before.index];
     const newShape = after.layer.elements[after.index];
     // A stationary Transformer must not create a fake edit or storage write.
-    if (['x', 'y', 'width', 'height', 'radius'].every(key => oldShape[key] === newShape[key])) {
+    if (['x', 'y', 'width', 'height', 'radius', 'radiusX', 'radiusY'].every(key => oldShape[key] === newShape[key])) {
       return structuredClone(current);
     }
     await persist(next);
@@ -392,13 +407,16 @@ export function createKonvaV1MoveSession({
     // signed rectangles and uniformly scaled circles. Never store Konva JSON.
     const shapeType = target.layer.elements[target.index].type;
     const isCircle = shapeType === 'circle' && node.getClassName?.() === 'Circle';
+    const isEllipse = shapeType === 'ellipse' && node.getClassName?.() === 'Ellipse';
     const canResize = (['rect', 'roundRect'].includes(shapeType)
-      && node.getClassName?.() === 'Rect') || isCircle;
+      && node.getClassName?.() === 'Rect') || isCircle || isEllipse;
     if (canResize) {
       let transformOrigin = null;
       const snapshotNode = () => ({
         x: node.x(), y: node.y(),
-        ...(isCircle ? { radius: node.radius() } : { width: node.width(), height: node.height() }),
+        ...(isCircle ? { radius: node.radius() }
+          : isEllipse ? { radiusX: node.radiusX(), radiusY: node.radiusY() }
+            : { width: node.width(), height: node.height() }),
         scaleX: node.scaleX(), scaleY: node.scaleY(), rotation: node.rotation(),
       });
       const applyNode = attrs => {
@@ -419,11 +437,15 @@ export function createKonvaV1MoveSession({
             || scaleX <= 0 || scaleY <= 0) {
             throw new RangeError('Konva transform requires positive finite scales; flips are unsupported');
           }
-          if (node.rotation() !== 0 || before.rotation !== 0) {
+          if (node.rotation() !== before.rotation
+            || (!isEllipse && node.rotation() !== 0)) {
             throw new RangeError('Konva transform rotation is unsupported by canonical v1 resize');
           }
-          const width = node.width() * scaleX, height = node.height() * scaleY;
-          bounds = isCircle
+          const width = (isCircle ? node.radius() * 2
+            : isEllipse ? node.radiusX() * 2 : node.width()) * scaleX;
+          const height = (isCircle ? node.radius() * 2
+            : isEllipse ? node.radiusY() * 2 : node.height()) * scaleY;
+          bounds = (isCircle || isEllipse)
             ? { x: node.x() - width / 2, y: node.y() - height / 2, width, height }
             : { x: node.x(), y: node.y(), width, height };
           // This synchronous validation also guards against infinity from
@@ -446,7 +468,11 @@ export function createKonvaV1MoveSession({
               x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2,
               radius: bounds.width / 2, scaleX: 1, scaleY: 1,
             }
-            : { ...bounds, scaleX: 1, scaleY: 1 });
+            : isEllipse ? {
+              x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2,
+              radiusX: bounds.width / 2, radiusY: bounds.height / 2,
+              scaleX: 1, scaleY: 1,
+            } : { ...bounds, scaleX: 1, scaleY: 1 });
           return result;
         }).catch(error => {
           applyNode(before);

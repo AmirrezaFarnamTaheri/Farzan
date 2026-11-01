@@ -466,4 +466,77 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
     node.destroy();
   });
 
+
+  it('resizes a rotated canonical ellipse in its local axes without losing metadata', () => {
+    const board = fixture();
+    board.layers[0].elements.push({
+      id: 'ellipse', type: 'ellipse', x: 40, y: 30,
+      radiusX: 10, radiusY: 20, rotation: 27, fill: '#123abc', opacity: 0.7,
+    });
+    const before = structuredClone(board);
+    const resized = resizeKonvaV1Element(board, 'ellipse', {
+      x: 12, y: 15, width: 50, height: 30,
+    });
+    expect(resized.layers[0].elements.at(-1)).toEqual({
+      ...before.layers[0].elements.at(-1), x: 37, y: 30,
+      radiusX: 25, radiusY: 15,
+    });
+    expect(resized.layers[0].elements.slice(0, -1)).toEqual(before.layers[0].elements.slice(0, -1));
+    expect(resized.viewport).toEqual(before.viewport);
+    expect(resized.metadata).toEqual(before.metadata);
+    expect(board).toEqual(before);
+    for (const bounds of [
+      { x: 0, y: 0, width: 0, height: 30 },
+      { x: 0, y: 0, width: 20, height: -4 },
+      { x: 0, y: 0, width: Infinity, height: 30 },
+    ]) {
+      expect(() => resizeKonvaV1Element(board, 'ellipse', bounds)).toThrow();
+    }
+    board.layers[0].locked = true;
+    expect(() => resizeKonvaV1Element(board, 'ellipse', {
+      x: 0, y: 0, width: 20, height: 30,
+    })).toThrow(/locked/i);
+  });
+
+  it('commits a rotated Konva Ellipse local-axis transform and rejects a rotation change', async () => {
+    const board = fixture();
+    board.layers[0].elements.push({
+      id: 'ellipse', type: 'ellipse', x: 40, y: 30,
+      radiusX: 10, radiusY: 20, rotation: 27, fill: '#123abc',
+    });
+    const changes = [];
+    const session = createKonvaV1MoveSession({
+      board, onChange: async next => { changes.push(structuredClone(next)); return true; },
+    });
+    const node = new Konva.Ellipse({
+      id: 'ellipse', x: 40, y: 30, radiusX: 10, radiusY: 20, rotation: 27,
+    });
+    const release = session.bind(node, 'ellipse');
+    node.fire('transformstart');
+    node.position({ x: 45, y: 15 });
+    node.scale({ x: 2, y: 0.5 });
+    node.fire('transformend');
+    await session.flush();
+    expect(session.getBoard().layers[0].elements.at(-1)).toMatchObject({
+      x: 45, y: 15, radiusX: 20, radiusY: 10, rotation: 27,
+    });
+    expect([node.x(), node.y(), node.radiusX(), node.radiusY(),
+      node.scaleX(), node.scaleY(), node.rotation()]).toEqual([45, 15, 20, 10, 1, 1, 27]);
+    expect(changes).toHaveLength(1);
+    await session.undo();
+    expect(session.getBoard()).toEqual(board);
+    await session.redo();
+    expect(session.getBoard().layers[0].elements.at(-1).radiusX).toBe(20);
+
+    node.fire('transformstart');
+    node.rotation(55);
+    node.fire('transformend');
+    await expect(session.flush()).rejects.toThrow(/rotation/i);
+    expect(changes).toHaveLength(3); // edit, undo, redo; forbidden rotation was not saved
+    expect(node.rotation()).toBe(27);
+    expect(session.getBoard().layers[0].elements.at(-1).rotation).toBe(27);
+    release();
+    node.destroy();
+  });
+
 });
