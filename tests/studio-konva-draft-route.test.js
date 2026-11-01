@@ -53,13 +53,15 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
       return parsed;
     }),
   }));
+  const downloadDataUrl = vi.fn(() => true);
   const controller = mountStudioView({
     setView: html => { document.body.innerHTML = html; },
     loadKonvaDraft: loader,
     Router: { navigate: vi.fn() },
     Toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+    downloadDataUrl,
   });
-  return { controller, canvasApi, saveSetting, getSetting, factory, loader, board };
+  return { controller, canvasApi, saveSetting, getSetting, factory, loader, board, downloadDataUrl };
 }
 
 describe('Studio experimental Konva draft opt-in', () => {
@@ -117,6 +119,33 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(saveSetting).not.toHaveBeenCalled();
     expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
     expect(document.querySelector('[data-studio-status]').textContent).toMatch(/Konva.*unavailable|incompatible/i);
+    controller.unmount();
+  });
+
+  it('downloads a viewport-only PNG of the separate draft without writing the live board', async () => {
+    const { controller, factory, saveSetting, canvasApi, downloadDataUrl } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const instance = factory.mock.results[0].value;
+    const png = 'data:image/png;base64,aGVsbG8=';
+    instance.exportPreviewPng = vi.fn(async () => png);
+
+    document.querySelector('[data-studio-konva-export-png]').click();
+    await vi.waitFor(() => expect(downloadDataUrl).toHaveBeenCalledWith(
+      png, 'farzan-konva-draft-viewport-preview.png'));
+    expect(instance.exportPreviewPng).toHaveBeenCalledOnce();
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(canvasApi.serialize()).toEqual(v1Board());
+    expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/viewport PNG downloaded/i);
+
+    instance.exportPreviewPng.mockRejectedValueOnce(new Error('Canvas not readable'));
+    downloadDataUrl.mockClear();
+    document.querySelector('[data-studio-konva-export-png]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-konva-status]').textContent)
+      .toMatch(/PNG preview export failed/i));
+    expect(downloadDataUrl).not.toHaveBeenCalled();
+    expect(saveSetting).not.toHaveBeenCalled();
     controller.unmount();
   });
 
