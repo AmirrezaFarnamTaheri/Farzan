@@ -14,7 +14,7 @@ function declarations(css, selector) {
 
 describe('Home workspace override ownership (#175)', () => {
   it('keeps only the later property owner for duplicated Home declarations', () => {
-    expect(manifest.indexOf('workspace.css')).toBeLessThan(manifest.indexOf('study-polish.css'));
+    expect(manifest.indexOf('study-polish.css')).toBeLessThan(manifest.indexOf('workspace.css'));
     const redundant = [
       ['.home-hero', 'align-items: stretch;'],
       ['.home-hero', 'background: var(--surface-2);'],
@@ -30,8 +30,8 @@ describe('Home workspace override ownership (#175)', () => {
       ['.home-pulse-item:hover', 'box-shadow: none;'],
     ];
     for (const [selector, property] of redundant) {
-      expect(declarations(workspace, selector), selector + ' earlier duplicate').not.toContain(property);
-      expect(declarations(polish, selector), selector + ' final owner').toContain(property);
+      expect(declarations(polish, selector), selector + ' earlier duplicate').not.toContain(property);
+      expect(declarations(workspace, selector), selector + ' final owner').toContain(property);
     }
   });
   it('keeps the unique workspace border, type and focus styles', () => {
