@@ -1074,13 +1074,23 @@ import { Pointer } from './src/lib/pointer.js';
       if (value.trim().length < 2) { this._close(); return; }
 
       let results;
-      if (this._hasDataOverride) {
-        // Client-side filter
-        results = rankLexicalMatches(this._data, value, {
-          keys: ['label', 'description'], limit: 8,
-        });
-      } else {
-        results = await this._queryUniversal(value);
+      try {
+        if (this._hasDataOverride) {
+          // Client-side filter
+          results = rankLexicalMatches(this._data, value, {
+            keys: ['label', 'description'], limit: 8,
+          });
+        } else {
+          results = await this._queryUniversal(value);
+        }
+      } catch {
+        // A failed canonical read is not an empty search result. Fail visibly
+        // without rendering a misleading zero state or caching partial data.
+        // Ignore failures from requests superseded or dismissed meanwhile.
+        if (requestEpoch === this._searchEpoch && this.input?.value === value) {
+          this._renderLoadError();
+        }
+        return;
       }
 
       // A slow data read must not replace newer results, reopen a dismissed
@@ -1130,6 +1140,15 @@ import { Pointer } from './src/lib/pointer.js';
 
     async _loadUniversalData() {
       if (Array.isArray(this._universalData)) return [...this._universalData];
+      // Missing optional readers are allowed on first boot, but a reader
+      // that exists and rejects must not masquerade as an empty collection.
+      // Do not memoize a partial corpus after any failed canonical read.
+      const readSaved = async (method) => {
+        if (typeof window.DB?.[method] !== 'function') return [];
+        const records = await window.DB[method]();
+        if (!Array.isArray(records)) throw new TypeError('Invalid canonical search records from ' + method);
+        return records;
+      };
       const [catalog, notes, timestamps, annotations] = await Promise.all([
         (async () => {
           try {
@@ -1142,9 +1161,9 @@ import { Pointer } from './src/lib/pointer.js';
             return { courses: [], topics: [] };
           }
         })(),
-        (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
-        (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-        (async () => { try { return await window.DB?.getAllAnnotations?.() ?? []; } catch { return []; } })(),
+        readSaved('getAllNotes'),
+        readSaved('getAllTimestamps'),
+        readSaved('getAllAnnotations'),
       ]);
       const results = [];
       (catalog.courses || []).forEach((course) => {
@@ -1256,6 +1275,20 @@ import { Pointer } from './src/lib/pointer.js';
       } catch {
         return source.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       }
+    },
+
+    _renderLoadError() {
+      this._visibleResults = [];
+      this._renderedQuery = '';
+      this.resultsBox.replaceChildren();
+      const alert = createElement('div', {
+        class: 'search-no-results',
+        role: 'alert',
+      }, 'Search unavailable: saved records could not be read. Your saved data was not changed. Edit the query to retry.');
+      this.resultsBox.appendChild(alert);
+      this._selectItem([], -1);
+      this.resultsBox.classList.add('open');
+      this.input?.setAttribute('aria-expanded', 'true');
     },
 
     _render(results, query) {
