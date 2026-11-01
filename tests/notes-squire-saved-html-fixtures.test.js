@@ -184,6 +184,18 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     } finally { reopened.destroy(); }
   });
 
+  it('accepts inert root break markers emitted by a safe heading edit, never attributed breaks', () => {
+    expect(assessNoteForSquire('<h2>Review</h2><br>')).toEqual({
+      compatible: true, reason: null,
+    });
+    for (const html of [
+      '<h2>Review</h2><br onclick="alert(1)">',
+      '<br data-course-identity="private">',
+    ]) {
+      expect(assessNoteForSquire(html).compatible).toBe(false);
+    }
+  });
+
   it('admits only Squire list-text wrappers, never arbitrary divs or attached attributes', () => {
     const safe = '<ul><li><div>Blood pressure</div><ul><li>Renal</li></ul></li></ul>';
     expect(assessNoteForSquire(safe)).toEqual({ compatible: true, reason: null });
