@@ -868,6 +868,20 @@
     max-height: max(420px, 72dvh);
     min-height: 360px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* The narrow library has ONE scroll container: the sidebar. Keeping the
+   * desktop inner 210px notes-list scroller under the outer scroller caused
+   * note rows to be scrolled underneath the section heading; at 200%-equivalent
+   * RTL reflow the heading intercepted actual pointer clicks. */
+  .view-notes .notes-shell[data-mobile-pane="library"] .notes-library-list {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+  .view-notes .notes-shell[data-mobile-pane="library"] .notes-list {
+    max-height: none;
+    overflow: visible;
   }
   .view-notes .notes-shell[data-mobile-pane="editor"] .notes-main {
     min-height: max(560px, calc(100dvh - 205px));
