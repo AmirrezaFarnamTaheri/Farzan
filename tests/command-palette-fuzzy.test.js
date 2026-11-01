@@ -40,6 +40,31 @@ describe('command palette uses vendored Fuse.js matching', () => {
     expect(window.OpenCourseDeck.Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('ranks substring navigation labels before unrelated fuzzy recall, matching the worker tiers', () => {
+    const FuzzyFirst = class {
+      constructor(items) { this.items = items; }
+      search() {
+        const label = value => this.items.find(item => item.label === value);
+        return [
+          { item: label('Show keyboard shortcuts') },
+          { item: label('My Courses') },
+          { item: label('Courses') },
+        ];
+      }
+    };
+    window.Fuse = FuzzyFirst;
+    initCommandPalette();
+    window.OpenCourseDeck.CommandPalette.open();
+    const input = document.getElementById('cp-input');
+    input.value = 'Courses';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const labels = [...document.querySelectorAll('#cp-results .cp-item-label')]
+      .map(element => element.textContent);
+    expect(labels).toEqual(['Courses', 'My Courses', 'Show keyboard shortcuts']);
+    expect(document.querySelector('#cp-results .cp-item[aria-selected="true"] .cp-item-label')
+      ?.textContent).toBe('Courses');
+  });
+
   it('ranks exact matches ahead of partial ones and respects category boundaries', () => {
     initCommandPalette();
     window.OpenCourseDeck.CommandPalette.open();
