@@ -107,7 +107,7 @@ describe('Studio experimental Konva draft opt-in', () => {
     const board = v1Board();
     board.viewport = { offsetX: 40, offsetY: -20, zoom: 2, rotation: 0 };
     const { controller, factory, canvasApi, saveSetting } = makeFixture({ board });
-    expect(document.querySelectorAll('[data-studio-konva-add]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-studio-konva-add]')).toHaveLength(4);
     document.querySelector('[data-studio-konva-open]').click();
     await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
     const instance = factory.mock.results[0].value;
@@ -116,6 +116,30 @@ describe('Studio experimental Konva draft opt-in', () => {
       type: 'rect', x: 80, y: 80, width: 120, height: 80,
     }));
     expect(instance.setMode).toHaveBeenCalledWith('select');
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(canvasApi.serialize()).toEqual(board);
+    controller.unmount();
+  });
+
+  it('offers accessible ellipse and text creation from the same inverse-viewport drawing center', async () => {
+    const board = v1Board();
+    board.viewport = { offsetX: 40, offsetY: -20, zoom: 2, rotation: 0 };
+    const { controller, factory, saveSetting, canvasApi } = makeFixture({ board });
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const instance = factory.mock.results[0].value;
+    const ellipse = document.querySelector('[data-studio-konva-add="ellipse"]');
+    const text = document.querySelector('[data-studio-konva-add="text"]');
+    expect(ellipse.getAttribute('aria-label')).toMatch(/ellipse/i);
+    expect(text.getAttribute('aria-label')).toMatch(/editable text/i);
+    ellipse.click();
+    await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledWith({
+      type: 'ellipse', x: 140, y: 120, radiusX: 60, radiusY: 30, rotation: 0,
+    }));
+    text.click();
+    await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledWith({
+      type: 'text', x: 140, y: 120, text: 'Text', fontSize: 20,
+    }));
     expect(saveSetting).not.toHaveBeenCalled();
     expect(canvasApi.serialize()).toEqual(board);
     controller.unmount();
