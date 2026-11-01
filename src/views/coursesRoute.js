@@ -1,4 +1,5 @@
 import { openPdfSource } from '../core/pdfNavigation.js';
+import { catalogReadingDirection } from '../lib/catalogDirection.js';
 export async function mountCoursesView(deps = {}) {
   const {
     setView,
@@ -888,7 +889,7 @@ export async function mountCoursesView(deps = {}) {
     // Actions already convey video/PDF availability; avoid repeating tags.
     if (!hasVideo && !hasPdf && !hasEmbed) meta.appendChild(badgeNode('No attached media'));
 
-    const actions = createElement('div', { class: 'topic-actions' });
+    const actions = createElement('div', { class: 'topic-actions', dir: 'ltr' });
     if (hasVideo && hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
     if (hasEmbed && (hasVideo || hasPdf)) actions.appendChild(actionButton('open-embed', 'Open'));
     if (toggle) {
@@ -1061,11 +1062,18 @@ export async function mountCoursesView(deps = {}) {
     } else {
       const rowTasks = [];
       groups.forEach(([groupKey, groupTopics]) => {
-        const section = createElement('section', { class: 'source-group' });
+        const sourceTitle = sourceLabelFromKey(groupKey);
+        // A Persian source can contain English medical lesson titles. The
+        // source/course controls column placement; each title keeps auto bidi.
+        const section = createElement('section', {
+          class: 'source-group',
+          dir: catalogReadingDirection(sourceTitle, course.title),
+        });
         const header = createElement('div', { class: 'source-group-header' });
         header.append(
-          createElement('div', { class: 'source-group-title' }, sourceLabelFromKey(groupKey)),
-          createElement('div', { class: 'source-group-count' }, `${groupTopics.length} topic${groupTopics.length === 1 ? '' : 's'}`)
+          createElement('div', { class: 'source-group-title', dir: 'auto' }, sourceTitle),
+          createElement('div', { class: 'source-group-count', dir: 'ltr' },
+            `${groupTopics.length} topic${groupTopics.length === 1 ? '' : 's'}`)
         );
         section.appendChild(header);
         topicsList.appendChild(section);
