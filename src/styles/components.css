@@ -1487,7 +1487,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: var(--text-sm);
-    padding: 6px 8px;
+    padding: 6px 10px;
     border-radius: var(--radius-full);
     cursor: pointer;
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
@@ -2023,7 +2023,7 @@
     font-weight: 600;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
-    padding: 6px 10px;
+    padding: 6px 8px;
     border-radius: var(--radius-full);
     cursor: pointer;
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
