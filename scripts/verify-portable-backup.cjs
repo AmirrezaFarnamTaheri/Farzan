@@ -60,6 +60,17 @@ function summarizePortableBackup(input) {
   if (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings)) {
     throw new TypeError('Portable backup settings are unavailable');
   }
+  // Every first-party v1.6 app-data export contains all eight canonical
+  // settings sections, even when an empty section is explicitly null. Missing
+  // fields cannot be interpreted as zero data during recovery certification.
+  for (const key of [
+    'notes', 'playlists', 'studio', 'flashcards',
+    'library', 'myCourses', 'mediaCues', 'tagTaxonomy',
+  ]) {
+    if (!Object.hasOwn(input.settings, key)) {
+      throw new TypeError('Portable backup settings section is missing: ' + key);
+    }
+  }
   const attachments = input.meta?.attachments;
   if (!attachments || attachments.mode !== 'metadata-only'
     || attachments.binaryIncluded !== false || !Array.isArray(attachments.references)) {
