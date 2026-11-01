@@ -327,6 +327,43 @@ describe('app shell resilience helpers', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('uses the shared Drawer overlay owner and preserves a quickly reopened drawer', async () => {
+    await loadApp(`
+      <button id="drawer-opener">Show notifications</button>
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <aside id="reopened-drawer" class="drawer" hidden aria-hidden="true">
+        <button data-drawer-close>Close</button>
+      </aside>
+    `);
+    const { Drawer } = await import('../src/ui/overlays.js');
+    const api = window.OpenCourseDeck.Drawer;
+    expect(api).toBe(Drawer);
+    const opener = document.getElementById('drawer-opener');
+    const drawer = document.getElementById('reopened-drawer');
+    const root = document.getElementById('ocd-app');
+
+    opener.focus();
+    api.open(drawer);
+    api.close(drawer);
+    api.open(drawer);
+    vi.runOnlyPendingTimers();
+
+    expect(drawer.hasAttribute('hidden')).toBe(false);
+    expect(drawer.classList.contains('open')).toBe(true);
+    expect(drawer.getAttribute('aria-modal')).toBe('true');
+    expect(root.hasAttribute('inert')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.querySelector('.drawer-backdrop')?.isConnected).toBe(true);
+
+    api.close(drawer);
+    vi.runOnlyPendingTimers();
+    expect(drawer.hasAttribute('hidden')).toBe(true);
+    expect(root.hasAttribute('inert')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(opener);
+    expect(document.querySelector('.drawer-backdrop')).toBeNull();
+  });
+
   it('removes app tooltips when their anchor leaves the DOM', async () => {
     await loadApp(`
       <div id="ocd-app">
