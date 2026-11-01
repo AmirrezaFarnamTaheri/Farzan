@@ -9,7 +9,7 @@ const scope = 'first-visit same-origin JavaScript/CSS resource timing at app-she
 const snapshot = (ready, transfer, missing = 0) => ({
   observedAtMs: ready,
   resourceCount: 20,
-  resourcePaths: ['/opencoursedeck.js', '/style.css'],
+  resourcePaths: Array.from({ length: 20 }, (_, i) => i === 0 ? '/opencoursedeck.js' : `/chunks/chunk-${i}.js`),
   transferSizeBytes: transfer,
   encodedBodyBytes: transfer - 10,
   missingTransferSizes: missing,
