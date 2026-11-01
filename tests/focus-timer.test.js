@@ -96,6 +96,8 @@ describe('Home focus timer widget', () => {
     showHome();
     await vi.waitFor(() => expect(document.querySelector('[data-focus-widget]')?.dataset.focusInitialized).toBe('true'));
     const widget = document.querySelector('[data-focus-widget]');
+    expect([...document.querySelectorAll('.home-grid > .home-card')].indexOf(widget))
+      .toBeLessThan([...document.querySelectorAll('.home-grid > .home-card')].findIndex(card => card.querySelector('.home-tool-list')));
     expect(widget.querySelector('[data-focus-clock]').textContent).toBe('25:00');
     expect(widget.querySelector('[data-focus-clock]').getAttribute('aria-live')).toBe('off');
     expect(widget.querySelector('[data-focus-message]').getAttribute('role')).toBe('status');
