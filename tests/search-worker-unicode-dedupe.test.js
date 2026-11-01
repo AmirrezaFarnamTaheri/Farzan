@@ -167,6 +167,28 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(response.results.every(item => !Object.keys(item).some(key => key.startsWith('__')))).toBe(true);
   });
 
+  it('indexes note tags, catalog keywords and category labels across the same offline vocabulary', () => {
+    const rows = [
+      { label: 'Saved article', tags: ['  فيزيك', 'قلب 你好'], sourceType: 'note', sourceId: 'n1' },
+      { title: 'Chapter one', keywords: ['Nephrology', 'Physiology'], sourceType: 'topic', sourceId: 't1' },
+      { label: 'Imported lecture', category: 'Downloaded media', sourceType: 'media', sourceId: 'm1' },
+    ];
+    const worker = workerWithData(rows, { threshold: 0 });
+    expect(worker.search('فیزیک', { limit: 10 }, 10).results.map(row => row.sourceId)).toEqual(['n1']);
+    expect(worker.search('nephrology', { limit: 10 }, 11).results.map(row => row.sourceId)).toEqual(['t1']);
+    expect(worker.search('downloaded media', { limit: 10 }, 12).results.map(row => row.sourceId)).toEqual(['m1']);
+    expect(worker.search('no such tag', { limit: 10 }, 13).results).toEqual([]);
+    expect(rows[0].tags).toEqual(['  فيزيك', 'قلب 你好']);
+  });
+
+  it('honours explicitly narrowed indexing keys rather than leaking unrelated taxonomy fields', () => {
+    const worker = workerWithData([
+      { label: 'Physics', category: 'Secret category', tags: ['Secret tag'] },
+    ], { keys: ['label'], threshold: 0 });
+    expect(worker.search('secret', {}, 14).results).toEqual([]);
+    expect(worker.search('physics', {}, 15).results).toHaveLength(1);
+  });
+
   it('keeps cancellation and identity protocol unchanged after Unicode normalization', () => {
     const worker = workerWithData([{ id: 'n', label: 'فیزیک' }]);
     const response = worker.search('فيزيك', { limit: 8 }, 7);

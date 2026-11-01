@@ -17,7 +17,7 @@ export function normalizeSearchQuery(value) {
 }
 
 export function rankLexicalMatches(items, query, {
-  keys = ['label', 'description', 'searchText', 'category'],
+  keys = ['label', 'description', 'searchText', 'category', 'tags', 'keywords'],
   limit = 12,
 } = {}) {
   if (!Array.isArray(items)) return [];
