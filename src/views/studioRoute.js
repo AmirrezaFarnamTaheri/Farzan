@@ -172,6 +172,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
           <div class="studio-konva-actions" role="group" aria-label="Konva draft editing controls">
             <button type="button" class="btn btn-ghost btn-sm active" data-studio-konva-mode="select" aria-pressed="true">Select</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-mode="pen" aria-pressed="false">Pen</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="rect" aria-label="Add rectangle to Konva draft">Add rectangle</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="circle" aria-label="Add circle to Konva draft">Add circle</button>
             <label for="studio-konva-object">Object</label>
             <select id="studio-konva-object" class="select input-sm" data-studio-konva-object></select>
             <div class="studio-konva-text-edit">
@@ -748,6 +750,13 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       button.classList.toggle('active', active);
     });
     if (konvaSelect) konvaSelect.disabled = mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
+    document.querySelectorAll('[data-studio-konva-add]').forEach(button => {
+      const board = konvaWorkspace?.getBoard?.();
+      const layer = board?.layers?.[board.activeLayerIdx ?? 0];
+      button.disabled = !konvaWorkspace?.addShape || !layer || layer.locked === true
+        || layer.visible === false || konvaTextSaving || konvaKeyboardBusy
+        || konvaClosing || konvaResetting || konvaImporting;
+    });
     document.querySelectorAll('[data-studio-konva-nudge]').forEach(button => {
       button.disabled = !selected || mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
     });
@@ -1127,6 +1136,55 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       }
     });
   });
+  // Shape creation lives on the actual Konva stage. The stage viewport group
+  // owns pan/zoom; always transform the visible center back into canonical
+  // board-v1 world coordinates before writing a shape.
+  document.querySelectorAll('[data-studio-konva-add]').forEach(button => {
+    on(button, 'click', async () => {
+      const workspace = konvaWorkspace;
+      if (unmounted || !workspace?.addShape || button.disabled || konvaKeyboardBusy
+        || konvaClosing || konvaResetting || konvaImporting || konvaTextSaving) return;
+      konvaKeyboardBusy = true;
+      refreshKonvaControls();
+      try {
+        const board = workspace.getBoard();
+        const scale = Number(board.viewport?.zoom ?? 1);
+        const offsetX = Number(board.viewport?.offsetX ?? 0);
+        const offsetY = Number(board.viewport?.offsetY ?? 0);
+        if (![scale, offsetX, offsetY].every(Number.isFinite) || scale <= 0) {
+          throw new TypeError('Invalid Konva draft viewport');
+        }
+        const stageWidth = Math.max(320, Math.floor(konvaStage?.clientWidth || 640));
+        const stageHeight = Math.max(280, Math.floor(konvaStage?.clientHeight || 440));
+        const x = (stageWidth / 2 - offsetX) / scale;
+        const y = (stageHeight / 2 - offsetY) / scale;
+        const kind = button.dataset.studioKonvaAdd;
+        const shape = kind === 'rect'
+          ? { type: 'rect', x: x - 60, y: y - 40, width: 120, height: 80 }
+          : kind === 'circle'
+            ? { type: 'circle', x, y, radius: 40 } : null;
+        if (!shape) throw new TypeError('Unsupported shape tool');
+        workspace.setMode('select');
+        const result = await workspace.addShape(shape);
+        if (unmounted || workspace !== konvaWorkspace || !result) return;
+        populateKonvaObjects();
+        const added = result.layers?.[result.activeLayerIdx ?? 0]?.elements?.at(-1);
+        if (added?.id && konvaSelect) {
+          konvaSelect.value = added.id;
+          workspace.select(added.id);
+        }
+        setKonvaStatus('New ' + shape.type + ' saved to isolated Konva draft');
+      } catch {
+        if (!unmounted && workspace === konvaWorkspace) {
+          setKonvaStatus('Konva shape creation failed; previous saved draft retained');
+        }
+      } finally {
+        konvaKeyboardBusy = false;
+        if (!unmounted && workspace === konvaWorkspace) refreshKonvaControls();
+      }
+    });
+  });
+
   const nudge = Object.freeze({
     left: [-10, 0], right: [10, 0], up: [0, -10], down: [0, 10],
   });
