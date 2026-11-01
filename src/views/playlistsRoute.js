@@ -78,6 +78,37 @@ function currentPlayerPosition() {
   return null;
 }
 
+// A live queue is resumable only from the actual player, with its confirmed
+// media ordering and explicit shuffle/repeat state. Never synthesize a resume
+// session from the textual playlist preview or stale catalog metadata.
+function readVerifiedLivePlayerSnapshot() {
+  for (const node of document.querySelectorAll('[data-player]')) {
+    try {
+      const snapshot = node._pdPlayer?.snapshot?.();
+      const queue = snapshot?.queue;
+      const index = snapshot?.queueIndex;
+      if (!Array.isArray(queue) || !queue.length
+        || !Number.isInteger(index) || index < 0 || index >= queue.length
+        || !queue.every(track => track && typeof track === 'object'
+          && (typeof track.src === 'string' && track.src.length
+            || typeof track.url === 'string' && track.url.length))
+        || !queue[index]?.courseId
+        || !Number.isFinite(snapshot.currentTime) || snapshot.currentTime < 0
+        || typeof snapshot.shuffle !== 'boolean'
+        || !['none', 'one', 'all'].includes(snapshot.repeat)
+        || !Number.isFinite(snapshot.volume)
+        || snapshot.volume < 0 || snapshot.volume > 1
+        || typeof snapshot.muted !== 'boolean'
+        || !Number.isFinite(snapshot.playbackRate) || snapshot.playbackRate <= 0) continue;
+      return {
+        ...snapshot, queue: queue.map(track => ({ ...track })),
+        track: { ...queue[index] }, playing: false,
+      };
+    } catch { /* A disconnected or destroyed player is not a resume source. */ }
+  }
+  return null;
+}
+
 function catalogVideoTopics(topics, safeMediaUrl) {
   return topics.filter(topic => {
     const firstVideo = topic.videos?.[0] ?? topic.url;
@@ -317,6 +348,7 @@ async function renderPlaylists(deps) {
     const link = document.createElement('a');
     link.className = 'btn btn-ghost';
     link.href = playlist.href;
+    if (playlist.id === 'active-queue') link.dataset.resumeLiveQueue = '';
     link.textContent = playlist.label === 'Resume' ? 'Open bookmarks'
       : playlist.label === 'Live' ? 'Open player' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
@@ -442,6 +474,23 @@ async function renderPlaylists(deps) {
 
   let reorderBusy = false;
   listRoot.onclick = async (event) => {
+    const live = event.target?.closest?.('[data-resume-live-queue]');
+    if (live) {
+      const snapshot = readVerifiedLivePlayerSnapshot();
+      // A missing or untrustworthy snapshot must not open unrelated media.
+      // Leave the real href intact so normal catalog navigation still works.
+      if (!snapshot || typeof setPendingCourseSession !== 'function'
+        || typeof Router?.navigate !== 'function') return;
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        setPendingCourseSession(snapshot);
+        Router.navigate('#/courses');
+      } catch {
+        Toast.error?.('The active player session could not be restored');
+      }
+      return;
+    }
     const move = event.target?.closest?.('[data-playlist-move]');
     if (move) {
       if (reorderBusy || move.disabled) return;
