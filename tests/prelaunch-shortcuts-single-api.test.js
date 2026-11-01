@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { KeyboardShortcuts } from '../src/core/keyboardShortcuts.js';
+import { Modal } from '../src/ui/overlays.js';
 
 describe('canonical keyboard shortcut help ownership (#175)', () => {
   it('has one public shortcut help API and no unshipped alias consumers', () => {
@@ -19,15 +20,16 @@ describe('canonical keyboard shortcut help ownership (#175)', () => {
     try {
       KeyboardShortcuts._shortcuts = [];
       KeyboardShortcuts.register('ctrl+/', vi.fn(), 'Show keyboard shortcuts');
-      const opened = vi.spyOn(KeyboardShortcuts, 'showHelp');
-      KeyboardShortcuts.showHelp();
-      expect(opened).toHaveBeenCalledOnce();
-      expect(document.querySelector('.shortcuts-table')?.textContent)
-        .toContain('Show keyboard shortcuts');
-      opened.mockRestore();
+      const create = vi.spyOn(Modal, 'create').mockImplementation(() => null);
+      try {
+        KeyboardShortcuts.showHelp();
+        expect(create).toHaveBeenCalledOnce();
+        const opts = create.mock.calls[0][0];
+        expect(opts.title).toBe('Keyboard Shortcuts');
+        expect(opts.body.textContent).toContain('Show keyboard shortcuts');
+      } finally { create.mockRestore(); }
     } finally {
       KeyboardShortcuts._shortcuts = list;
-      document.querySelector('.shortcuts-table')?.closest('[role="dialog"]')?.remove();
     }
   });
 });
