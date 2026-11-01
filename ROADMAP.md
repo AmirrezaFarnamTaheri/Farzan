@@ -347,7 +347,7 @@ Replace ad-hoc rAF loops in `canvas.js` and `player.js`.
 | Common base: `{name, icon, cursor, onActivate, onDeactivate, onMouseDown/Move/Up}` | `src/features/canvasTools/` | x-spreadsheet |
 | Dynamic tool registration (plugins can add tools) | a future plugin host (not shipped) extension point | — |
 
-> **Status: DONE** — Wired into src/index.js, exposed on OpenCourseDeck namespace. `src/features/canvasTools/` (13 files). Individual tool files with dynamic registration via `registry.js`.
+> **Status: PARTIAL** — Core canvas tools are wired through `src/features/canvasTools/` and its internal `registry.js`. Plugin-contributed tool installation is **not shipped** and remains dependent on a future sandboxed host.
 
 ### 4.6 Lasso/Marquee Multi-Select
 | Item | Target | Ported From |
