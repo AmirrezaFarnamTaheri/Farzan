@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { PlasmaDB } from '../db.js';
+import { OpenCourseDB } from '../db.js';
 import { replaceDocumentAnnotations } from '../src/core/annotationPersistence.js';
 
 describe('annotation persistence', () => {
@@ -9,7 +9,7 @@ describe('annotation persistence', () => {
   });
 
   it('replaces one document annotation set in exactly one read-write transaction', async () => {
-    const idb = new PlasmaDB('annotation-persistence-test', 1, [
+    const idb = new OpenCourseDB('annotation-persistence-test', 1, [
       { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }] },
     ]);
     await idb.bulkPut('annotations', [
@@ -108,7 +108,7 @@ describe('annotation persistence', () => {
 
 describe('annotation transaction failure isolation', () => {
   it('aborts a partially queued replacement when a later key is invalid', async () => {
-    const idb = new PlasmaDB('annotation-persistence-test', 1, [
+    const idb = new OpenCourseDB('annotation-persistence-test', 1, [
       { name: 'annotations', key: 'id', autoIncrement: false, indexes: [{ field: 'docId' }] },
     ]);
     await idb.put('annotations', { id: 'original', docId: 'doc-a', text: 'important' });
