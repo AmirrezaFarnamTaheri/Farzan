@@ -574,10 +574,6 @@
 }
 
 @media (max-width: 640px) {
-  .home-hero {
-    padding: var(--space-5);
-  }
-
   .home-title {
     font-size: clamp(2.25rem, 12vw, 3.4rem);
   }

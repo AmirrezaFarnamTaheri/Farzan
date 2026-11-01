@@ -427,10 +427,6 @@
     transform: translateX(calc(100% + 24px));
   }
 
-  .sidebar.sidebar-mobile-open {
-    transform: translateX(0);
-  }
-
   .sidebar.sidebar-collapsed {
     width: min(320px, calc(100vw - 44px));
     padding-inline: var(--space-5);
