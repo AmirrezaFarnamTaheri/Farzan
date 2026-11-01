@@ -44,6 +44,19 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'settings') {
+        const current = page.locator('.settings-nav [href="#settings-appearance"]');
+        await expect(current).toHaveAttribute('aria-current', 'location');
+        for (const selector of ['#select-density', '#select-language']) {
+          await expect(page.locator(selector)).toHaveCSS('appearance', 'auto');
+        }
+        const storageLink = page.locator('.settings-nav [href="#settings-storage"]');
+        await storageLink.click();
+        await expect(storageLink).toHaveAttribute('aria-current', 'location');
+        await expect(page).toHaveURL(/#\/settings$/);
+        await page.locator('.settings-nav [href="#settings-appearance"]').click();
+        await expect(current).toHaveAttribute('aria-current', 'location');
+      }
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
