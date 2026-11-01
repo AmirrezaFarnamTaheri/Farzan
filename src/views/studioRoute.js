@@ -187,6 +187,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-undo>Undo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export>Download draft JSON</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export-png>Download draft viewport PNG (preview)</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-import-trigger>Import draft JSON</button>
             <input type="file" hidden accept=".json,application/json" data-studio-konva-import aria-label="Import isolated Konva draft JSON" />
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reset>Start fresh from Studio</button>
@@ -909,6 +910,23 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       setKonvaStatus('Experimental draft JSON download started; Studio board unchanged');
     } catch {
       if (!unmounted) setKonvaStatus('Draft JSON export failed; saved board unchanged');
+    }
+  });
+  on(document.querySelector('[data-studio-konva-export-png]'), 'click', async () => {
+    if (unmounted || !konvaWorkspace || konvaClosing || konvaResetting || konvaImporting) return;
+    const previous = konvaWorkspace;
+    try {
+      const png = await previous.exportPreviewPng();
+      if (unmounted || konvaWorkspace !== previous) return;
+      if (typeof downloadDataUrl !== 'function'
+        || !downloadDataUrl(png, 'farzan-konva-draft-viewport-preview.png')) {
+        throw new Error('Draft PNG download unavailable');
+      }
+      setKonvaStatus('Experimental draft viewport PNG downloaded; Studio board unchanged');
+    } catch {
+      if (!unmounted && konvaWorkspace === previous) {
+        setKonvaStatus('Draft PNG preview export failed; saved Studio board unchanged');
+      }
     }
   });
   on(konvaImportInput, 'change', async () => {
