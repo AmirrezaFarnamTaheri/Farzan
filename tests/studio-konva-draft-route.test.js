@@ -177,6 +177,63 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
   });
 
+  it('supports stage-focused selection, fine/large keyboard nudge and canonical undo without changing the live board', async () => {
+    const { controller, factory, canvasApi, saveSetting } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const workspace = factory.mock.results[0].value;
+    workspace.canUndo = () => true;
+    workspace.canRedo = () => true;
+    const selected = document.querySelector('[data-studio-konva-object]');
+    selected.value = 'shape-1';
+    selected.dispatchEvent(new Event('change', { bubbles: true }));
+    const stage = document.querySelector('[data-studio-konva-stage]');
+    expect(stage.tabIndex).toBe(0);
+    stage.focus();
+    expect(document.activeElement).toBe(stage);
+
+    const fine = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    expect(stage.dispatchEvent(fine)).toBe(false);
+    await vi.waitFor(() => expect(workspace.move).toHaveBeenCalledWith('shape-1', 1, 0));
+
+    const coarse = new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true });
+    expect(stage.dispatchEvent(coarse)).toBe(false);
+    await vi.waitFor(() => expect(workspace.move).toHaveBeenCalledWith('shape-1', 0, -10));
+
+    const undo = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+    expect(stage.dispatchEvent(undo)).toBe(false);
+    await vi.waitFor(() => expect(workspace.undo).toHaveBeenCalledOnce());
+
+    const redo = new KeyboardEvent('keydown', { key: 'Z', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true });
+    expect(stage.dispatchEvent(redo)).toBe(false);
+    await vi.waitFor(() => expect(workspace.redo).toHaveBeenCalledOnce());
+
+    expect(stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))).toBe(false);
+    expect(selected.value).toBe('');
+    expect(workspace.select).toHaveBeenCalledWith(null);
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.serialize()).toEqual(v1Board());
+    controller.unmount();
+  });
+
+  it('does not intercept keyboard editing outside the stage or move shapes while pen is active', async () => {
+    const { controller, factory } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const workspace = factory.mock.results[0].value;
+    const select = document.querySelector('[data-studio-konva-object]');
+    select.value = 'shape-1';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const stage = document.querySelector('[data-studio-konva-stage]');
+    const input = document.querySelector('[data-studio-konva-text]');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    expect(workspace.move).not.toHaveBeenCalled();
+    document.querySelector('[data-studio-konva-mode="pen"]').click();
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    expect(workspace.move).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
   it('offers an explicit pen tool only inside the draft modal, without changing the main Studio tool', async () => {
     const { controller, factory, canvasApi } = makeFixture();
     document.querySelector('[data-studio-konva-open]').click();
