@@ -137,6 +137,19 @@ function mountDraftScene({
         }
         stage.batchDraw();
       },
+      exportPreviewPng() {
+        // Export only the current viewport of the isolated draft, without
+        // selection handles. It is NOT legacy Studio's full-board export.
+        const visibility = transformers.map(transformer => transformer.visible());
+        transformers.forEach(transformer => transformer.hide());
+        try {
+          stage.draw();
+          return stage.toDataURL({ mimeType: 'image/png', pixelRatio: 1 });
+        } finally {
+          transformers.forEach((transformer, index) => transformer.visible(visibility[index]));
+          stage.batchDraw();
+        }
+      },
       destroy() {
         penCapture?.destroy();
         window.removeEventListener('resize', resize);
@@ -263,6 +276,21 @@ export function createStudioKonvaDraftWorkspace({
     canUndo: () => session.canUndo(),
     canRedo: () => session.canRedo(),
     flush: () => session.flush(),
+    async exportPreviewPng() {
+      if (disposed) throw new Error('Konva draft workspace closed');
+      // A pending failed write must never appear in an exported screenshot.
+      if (mode !== 'select') throw new Error('Switch to Select before exporting a PNG preview');
+      await session.flush();
+      if (disposed) throw new Error('Konva draft workspace closed');
+      // Render again from the canonical, acknowledged v1 document rather than
+      // from transient drag state or a partially redrawn Konva node.
+      redraw();
+      const png = scene?.exportPreviewPng?.();
+      if (typeof png !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(png)) {
+        throw new Error('Konva draft PNG preview was unavailable');
+      }
+      return png;
+    },
     destroy() {
       if (disposed) return;
       disposed = true;

@@ -20,7 +20,10 @@ const board = () => ({
 function workspace({ document = board(), saveDraft = vi.fn(async () => true) } = {}) {
   const scenes = [];
   const createScene = vi.fn(args => {
-    const scene = { destroy: vi.fn(), select: vi.fn(), args };
+    const scene = {
+      destroy: vi.fn(), select: vi.fn(), args,
+      exportPreviewPng: vi.fn(() => 'data:image/png;base64,aGVsbG8='),
+    };
     scenes.push(scene);
     return scene;
   });
@@ -83,6 +86,36 @@ describe('opt-in Konva editing draft workspace', () => {
     await instance.redo();
     expect(instance.getBoard()).toEqual(resized);
     expect(saveDraft).toHaveBeenCalledTimes(3);
+    instance.destroy();
+  });
+
+  it('exports only the current acknowledged canonical draft preview, without storage mutations', async () => {
+    const { instance, scenes, saveDraft, start } = workspace();
+    const png = await instance.exportPreviewPng();
+    expect(png).toBe('data:image/png;base64,aGVsbG8=');
+    expect(scenes).toHaveLength(2);
+    expect(scenes[0].destroy).toHaveBeenCalledOnce();
+    expect(scenes[1].exportPreviewPng).toHaveBeenCalledOnce();
+    expect(scenes[1].args.board).toEqual(start);
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(instance.getBoard()).toEqual(start);
+    instance.setMode('pen');
+    await expect(instance.exportPreviewPng()).rejects.toThrow(/select/i);
+    instance.destroy();
+  });
+
+  it('refuses to capture a stale draft if a pending write is not acknowledged', async () => {
+    let resolveSave;
+    const saveDraft = vi.fn(() => new Promise(resolve => { resolveSave = resolve; }));
+    const { instance, scenes } = workspace({ saveDraft });
+    const edit = instance.move('rect-1', 4, 5);
+    const exportAttempt = instance.exportPreviewPng();
+    await vi.waitFor(() => expect(resolveSave).toBeTypeOf('function'));
+    resolveSave(false);
+    await expect(edit).rejects.toThrow(/acknowledg/i);
+    await expect(exportAttempt).rejects.toThrow(/acknowledg/i);
+    expect(instance.getBoard()).toEqual(board());
+    expect(scenes.every(scene => scene.exportPreviewPng.mock.calls.length === 0)).toBe(true);
     instance.destroy();
   });
 
