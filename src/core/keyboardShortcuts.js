@@ -71,6 +71,3 @@ export const KeyboardShortcuts = {
   },
 };
 
-// Alias: live consumers (help route + command palette) call `_showHelp()`,
-// matching the shell implementation this module replaces.
-KeyboardShortcuts._showHelp = KeyboardShortcuts.showHelp;
