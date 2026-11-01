@@ -427,8 +427,6 @@
     transform: translateX(calc(100% + 24px));
   }
 
-  /* The final redesign layer owns the identical mobile-open transform. */
-
   .sidebar.sidebar-collapsed {
     width: min(320px, calc(100vw - 44px));
     padding-inline: var(--space-5);
