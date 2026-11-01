@@ -744,6 +744,7 @@
       _anchor: null,
       _previousDescription: null,
       _initialized: false,
+      _listeners: [],
 
       init() {
         if (this._initialized) {
@@ -752,6 +753,12 @@
           if (this._tooltip && !this._tooltip.isConnected) document.body.appendChild(this._tooltip);
           return;
         }
+        // The UI module can be reloaded by a test/HMR or an independent
+        // initializer. There must still be just one document-wide owner,
+        // with its original keyboard listeners and ARIA link fully removed.
+        const previous = document.__farzanUiTooltipOwner;
+        if (previous && previous !== this) previous.destroy?.();
+        document.__farzanUiTooltipOwner = this;
         this._initialized = true;
         this._tooltip = document.createElement('div');
         this._tooltip.className = 'tooltip';
@@ -765,22 +772,26 @@
 
         const anchorOf = target => target instanceof Element
           ? target.closest('[data-tooltip]') : null;
-        document.addEventListener('mouseover', event => {
+        const listen = (name, callback) => {
+          document.addEventListener(name, callback);
+          this._listeners.push([name, callback]);
+        };
+        listen('mouseover', event => {
           const el = anchorOf(event.target);
           if (el) this.show(el);
         });
-        document.addEventListener('mouseout', event => {
+        listen('mouseout', event => {
           const el = anchorOf(event.target);
           if (el && el === this._anchor) this.hide();
         });
-        document.addEventListener('focusin', event => {
+        listen('focusin', event => {
           const el = anchorOf(event.target);
           if (el) this.show(el);
         });
-        document.addEventListener('focusout', event => {
+        listen('focusout', event => {
           if (this._anchor && event.target === this._anchor) this.hide();
         });
-        document.addEventListener('keydown', event => {
+        listen('keydown', event => {
           if (event.key === 'Escape' && this._anchor) this.hide();
         });
       },
@@ -814,6 +825,21 @@
         }
         this._anchor = null;
         this._previousDescription = null;
+      },
+
+      destroy() {
+        this.hide();
+        this._observer?.disconnect?.();
+        for (const [name, callback] of this._listeners) {
+          document.removeEventListener(name, callback);
+        }
+        this._listeners = [];
+        this._tooltip?.remove();
+        this._tooltip = null;
+        this._initialized = false;
+        if (document.__farzanUiTooltipOwner === this) {
+          delete document.__farzanUiTooltipOwner;
+        }
       }
     };
 
