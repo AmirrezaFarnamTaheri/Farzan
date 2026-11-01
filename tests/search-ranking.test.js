@@ -27,6 +27,19 @@ describe('shared topbar and command-palette lexical ranking', () => {
     expect(rankLexicalMatches(items,'BIOLOGY',{limit:2}).map(x=>x.id)).toEqual([3,1]);
   });
 
+  it('includes note tags, catalog keywords and category text in low-cost fallback ranking', () => {
+    const corpus = [
+      { id: 'note', label: 'Study notes', tags: ['كليه', 'Cardiology'] },
+      { id: 'topic', label: 'Chapter A', keywords: ['Physiology', 'Nephrology'] },
+      { id: 'media', label: 'My video', category: 'Downloaded media' },
+    ];
+    expect(rankLexicalMatches(corpus, 'کلیه').map(item => item.id)).toEqual(['note']);
+    expect(rankLexicalMatches(corpus, 'nephrology').map(item => item.id)).toEqual(['topic']);
+    expect(rankLexicalMatches(corpus, 'downloaded media').map(item => item.id)).toEqual(['media']);
+    // Explicit command-only vocabulary must remain limited to label.
+    expect(rankLexicalMatches(corpus, 'nephrology', { keys: ['label'] })).toEqual([]);
+  });
+
   it('filters unsafe record types and supports labels-only command searching', () => {
     const items = [null, { label:'Other',description:'plasma' }, { label:'Plasma theme', cat:'theme' }];
     expect(rankLexicalMatches(items,'plasma',{keys:['label']}).map(x=>x.label)).toEqual(['Plasma theme']);
