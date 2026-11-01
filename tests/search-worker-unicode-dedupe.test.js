@@ -167,6 +167,19 @@ describe('search worker Unicode identity and stable protocol', () => {
     expect(response.results.every(item => !Object.keys(item).some(key => key.startsWith('__')))).toBe(true);
   });
 
+  it('does not turn non-text metadata objects into invented searchable object strings', () => {
+    const rows = [
+      { sourceType: 'topic', sourceId: 't1', title: 'Renal chapter',
+        tags: [{ kind: 'taxonomy' }], labels: [null, { translated: 'different' }] },
+      { sourceType: 'note', sourceId: 'n1', label: 'Cardiology overview', keywords: ['Heart'] },
+    ];
+    const snapshot = structuredClone(rows);
+    const worker = workerWithData(rows, { threshold: 0 });
+    expect(worker.search('object', { limit: 10 }, 40).results).toEqual([]);
+    expect(worker.search('heart', { limit: 10 }, 41).results).toEqual([rows[1]]);
+    expect(rows).toEqual(snapshot);
+  });
+
   it('indexes note tags, catalog keywords and category labels across the same offline vocabulary', () => {
     const rows = [
       { label: 'Saved article', tags: ['  فيزيك', 'قلب 你好'], sourceType: 'note', sourceId: 'n1' },
