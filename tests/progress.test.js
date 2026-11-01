@@ -418,7 +418,7 @@ describe('progress backup exports', () => {
   it('rejects an extended media import before any write without an atomic rollback snapshot', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.5',
+      version: '1.6',
       watchedSegments: [{ id: 'segment', topicId: 'topic-1', start: 0, end: 10 }],
     })], 'media.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
@@ -429,7 +429,7 @@ describe('progress backup exports', () => {
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
 
-  it('restores version 1.5 media records when a v3 rollback snapshot is available', async () => {
+  it('restores current portable media records when a v3 rollback snapshot is available', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
       _meta: { format: 'opencoursedeck-snapshot', version: 3 },
@@ -438,7 +438,7 @@ describe('progress backup exports', () => {
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     const file = new File([JSON.stringify({
-      version: '1.5',
+      version: '1.6',
       watchedSegments: [{ id: 'segment-2', topicId: 'topic-1', start: 3, end: 14 }],
       pdfBookmarks: [{ id: 'pdf-2', docId: 'research.pdf', page: 6 }],
     })], 'portable-media.json', { type: 'application/json' });
@@ -450,7 +450,7 @@ describe('progress backup exports', () => {
     });
   });
 
-  it('exports Markdown notes from current content before legacy fields', async () => {
+  it('exports Markdown notes from current content before fallback fields', async () => {
     await window.ProgressStats.exportNotesMarkdown();
 
     const markdown = await downloadedBlob.text();
@@ -810,7 +810,7 @@ describe('progress backup exports', () => {
       scheduler: 'fsrs-v5',
       fsrsState: createFsrsV5State(new Date('2026-10-01T00:00:00.000Z')) };
     const payload = {
-      version: '1.4',
+      version: '1.6',
       progress: [
         { topicId: 'ok-topic', courseId: 'course-1', updatedAt: 10 },
         { topicId: 'bad-topic', courseId: 'course-1', updatedAt: 11 },
@@ -849,7 +849,7 @@ describe('progress backup exports', () => {
 
     expect(input.accept).toContain('application/json');
     expect(window.OpenCourseDeck.lastImportResult.preview).toEqual(expect.objectContaining({
-      version: '1.4',
+      version: '1.6',
       fileName: 'backup.json',
       progress: 2,
       notes: 1,
@@ -884,7 +884,7 @@ describe('progress backup exports', () => {
     // stale board back over the restored one.
     window.OpenCourseDeck.Canvas = { restoreBoard: vi.fn(async () => true) };
     const payload = {
-      version: '1.4',
+      version: '1.6',
       progress: [],
       notes: [],
       folders: [],
@@ -913,7 +913,7 @@ describe('progress backup exports', () => {
   });
 
   it('aborts an import before its first write when an original collection cannot be snapshotted', async () => {
-    const payload = { version: '1.4', progress: [{ topicId: 'new', courseId: 'a' }] };
+    const payload = { version: '1.6', progress: [{ topicId: 'new', courseId: 'a' }] };
     const file = new File([JSON.stringify(payload)], 'unsafe-import.json', { type: 'application/json' });
     window.DB.getAllNotes.mockRejectedValueOnce(new Error('Existing notes read failed'));
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
@@ -927,7 +927,7 @@ describe('progress backup exports', () => {
   });
 
   it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
-    const payload = { version: '1.4', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.6', notes: [{ id: 'bad', title: 'Bad' }] };
     const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
@@ -941,7 +941,7 @@ describe('progress backup exports', () => {
   });
 
   it('prefers atomic full-primary-store rollback when the v3 backup engine is available', async () => {
-    const payload = { version: '1.4', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.6', notes: [{ id: 'bad', title: 'Bad' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
     const original = {
       _meta: { format: 'opencoursedeck-snapshot', version: 3 },
@@ -1013,7 +1013,7 @@ describe('progress backup exports', () => {
     });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const payload = {
-      version: '1.4',
+      version: '1.6',
       progress: [
         { topicId: 'imported', courseId: 'course-new', updatedAt: 100 },
         { topicId: 'read-fails', courseId: 'course-new', updatedAt: 100 },
@@ -1036,7 +1036,7 @@ describe('progress backup exports', () => {
 
   it('rolls back backup import writes when any store write fails', async () => {
     const payload = {
-      version: '1.3',
+      version: '1.6',
       progress: [{ topicId: 'new-progress', courseId: 'course-2', updatedAt: 100 }],
       notes: [{ id: 'new-note', title: 'New note', updatedAt: 100 }],
     };
@@ -1087,7 +1087,7 @@ describe('progress backup exports', () => {
 
   it('shows import preview and does not write records when cancelled', async () => {
     const payload = {
-      version: '1.3',
+      version: '1.6',
       progress: [{ topicId: 'topic-cancel', courseId: 'course-1', updatedAt: 10 }],
       notes: [{ id: 'note-cancel', title: 'Cancelled', updatedAt: 12 }],
       folders: [{ id: 'folder-cancel', name: 'Cancelled folder' }],
@@ -1134,9 +1134,9 @@ describe('progress backup exports', () => {
     expect(window.DB.saveTimestamp).not.toHaveBeenCalled();
   });
 
-  it('imports notes-only backups without requiring a progress array', async () => {
+  it('imports current notes-only backups without requiring a progress array', async () => {
     const payload = {
-      version: '1.2',
+      version: '1.6',
       notes: [{ id: 'note-only', title: 'Notes only', content: '<p>Body</p>', updatedAt: 12 }],
     };
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
@@ -1171,7 +1171,7 @@ describe('progress backup exports', () => {
 
   it('imports a File argument without opening another picker', async () => {
     const payload = {
-      version: '1.4',
+      version: '1.6',
       notes: [{ id: 'note-file', title: 'From file', content: '<p>Body</p>', updatedAt: 12 }],
     };
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
