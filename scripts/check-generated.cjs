@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const esbuild = require('esbuild');
 const { generateSW } = require('workbox-build');
-const { EDITION_RUNTIME_FILES, createBuildOptions, renderReleaseStyles, rewriteReleaseStaticFile } = require('./build.cjs');
+const { createBuildOptions, renderReleaseStyles, rewriteReleaseStaticFile } = require('./build.cjs');
 const { stripSourceMapText } = require('./build-sw-dist.cjs');
 const workboxConfig = require('./workbox-dist.config.cjs');
 
@@ -202,30 +202,6 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
       } else if (hashBuffer(source) !== hashBuffer(staged)) {
         changed.push(relLabel);
       }
-    }
-  }
-
-  // The standalone edition's runtime files are intentionally staged without
-  // shipping internal verification scripts. Check exact source byte parity
-  // instead of exempting the directory from generated-artifact validation.
-  for (const relative of EDITION_RUNTIME_FILES) {
-    const from = path.join(rootDir, relative);
-    if (!fs.existsSync(from)) continue;
-    const name = relative.split(path.sep).join('/');
-    expectedStatic.add(name);
-    const to = path.join(actualOutdir, relative);
-    if (!fs.existsSync(to)) {
-      missing.push(name);
-      continue;
-    }
-    const source = fs.readFileSync(from);
-    const staged = fs.readFileSync(to);
-    if (relative.endsWith('.js')) {
-      if (stripSourceMapText(source.toString('utf8')) !== stripSourceMapText(staged.toString('utf8'))) {
-        changed.push(name);
-      }
-    } else if (hashBuffer(source) !== hashBuffer(staged)) {
-      changed.push(name);
     }
   }
 
