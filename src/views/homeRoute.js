@@ -150,6 +150,38 @@ export function mountHomeView(deps = {}) {
           </div>
         </section>
 
+        <section class="card card-filled home-card home-card-focus" aria-labelledby="home-focus-timer-title" data-focus-widget>
+          <div class="card-body">
+            <div class="home-card-head">
+              <div>
+                <span class="eyebrow">Make space for deep work</span>
+                <h2 id="home-focus-timer-title" class="home-card-title">Focus timer</h2>
+              </div>
+              <span class="home-focus-count"><strong data-focus-count>0</strong> focus blocks finished</span>
+            </div>
+            <div class="focus-widget-layout">
+              <div class="focus-clock-face" data-focus-ring>
+                <span data-focus-phase>Focus</span>
+                <output data-focus-clock aria-label="Time remaining" aria-live="off">25:00</output>
+              </div>
+              <div class="focus-widget-controls">
+                <p class="focus-widget-message" data-focus-message role="status" aria-live="polite">Loading focus timer…</p>
+                <label for="home-focus-preset">Study interval</label>
+                <select id="home-focus-preset" class="select" data-focus-preset>
+                  <option value="classic">Classic · 25 min focus / 5 min break</option>
+                  <option value="deep">Deep work · 50 min focus / 10 min break</option>
+                </select>
+                <div class="focus-widget-actions">
+                  <button class="btn btn-primary" type="button" data-focus-start>Start</button>
+                  <button class="btn btn-secondary" type="button" data-focus-next hidden>Next block</button>
+                  <button class="btn btn-ghost" type="button" data-focus-reset>Reset</button>
+                </div>
+                <p class="focus-widget-note">Breaks start only when you choose. Time is tracked locally on this device, not added to course progress.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="card card-filled home-card home-card-activity">
           <div class="card-body">
             <div class="home-card-head">
@@ -168,6 +200,16 @@ export function mountHomeView(deps = {}) {
 
   renderCatalogCounts();
   renderHomeDashboard({ Router, setPendingCourseMedia });
+  // Load the focus clock only on Home. Keep it out of the eager app bundle.
+  void import('../features/focusTimer.js').then(({ mountFocusTimerWidget }) => {
+    mountFocusTimerWidget();
+  }).catch(() => {
+    const root = document.querySelector('[data-focus-widget]');
+    if (!root) return;
+    const note = root.querySelector('[data-focus-message]');
+    if (note) note.textContent = 'Focus timer is unavailable. Reload to try again.';
+    root.querySelectorAll('button, select').forEach(control => { control.disabled = true; });
+  });
   document.querySelector('[data-home-add]')?.addEventListener('click', (event) => {
     event.stopPropagation();
     if (typeof window.OpenCourseDeck?.AddContent?.openMenu === 'function') {
