@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Farzan Plasmato Edition",
+  "productName": "OpenCourseDeck",
   "version": "1.1.2",
-  "identifier": "app.opencoursedeck.plasmato",
+  "identifier": "app.opencoursedeck.desktop",
   "build": {
     "beforeBuildCommand": "npm run build:release",
     "frontendDist": "../dist",
@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Farzan Plasmato Edition",
+        "title": "OpenCourseDeck",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
