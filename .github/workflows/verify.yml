@@ -268,6 +268,12 @@ jobs:
         continue-on-error: true
         run: npm run report:bundle 2>&1 | tee reports/ci/bundle-report.log
 
+      - name: Measure canonical search index and release footprint
+        id: search_index_report
+        if: steps.build_release.outcome == 'success'
+        continue-on-error: true
+        run: npm run report:search-index 2>&1 | tee reports/ci/search-index-report.log
+
       - name: Attribute generated bundle consumers
         id: bundle_consumers
         if: steps.build_release.outcome == 'success'
@@ -328,6 +334,7 @@ jobs:
           DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
           PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
           BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SEARCH_INDEX_REPORT: ${{ steps.search_index_report.outcome }}
           BUNDLE_CONSUMERS: ${{ steps.bundle_consumers.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
@@ -360,6 +367,7 @@ jobs:
           dependency-audit=$DEPENDENCY_AUDIT
           project-audit=$PROJECT_AUDIT
           bundle-report=$BUNDLE_REPORT
+          search-index-report=$SEARCH_INDEX_REPORT
           bundle-consumers=$BUNDLE_CONSUMERS
           smoke=$SMOKE
           browser-smoke=$BROWSER_SMOKE
@@ -400,6 +408,7 @@ jobs:
           DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
           PROJECT_AUDIT: ${{ steps.project_audit.outcome }}
           BUNDLE_REPORT: ${{ steps.bundle_report.outcome }}
+          SEARCH_INDEX_REPORT: ${{ steps.search_index_report.outcome }}
           BUNDLE_CONSUMERS: ${{ steps.bundle_consumers.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
@@ -427,6 +436,7 @@ jobs:
           dependency-audit=$DEPENDENCY_AUDIT
           project-audit=$PROJECT_AUDIT
           bundle-report=$BUNDLE_REPORT
+          search-index-report=$SEARCH_INDEX_REPORT
           bundle-consumers=$BUNDLE_CONSUMERS
           smoke=$SMOKE
           browser-smoke=$BROWSER_SMOKE
