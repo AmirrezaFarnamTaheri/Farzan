@@ -66,6 +66,52 @@ test.describe('Farzan desktop workspace redesign', () => {
     }
   });
 
+  test('anchors Persian course and Materials rows RTL while isolating English lesson and action text', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    const medicine = page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]');
+    await expect(medicine).toBeVisible({ timeout: 20000 });
+    await medicine.click();
+    const group = page.locator('#course-detail .source-group[dir="rtl"]').first();
+    await expect(group).toBeVisible({ timeout: 20000 });
+    const header = await group.evaluate(section => {
+      const title = section.querySelector('.source-group-title');
+      const count = section.querySelector('.source-group-count');
+      return {
+        titleLeft: title.getBoundingClientRect().left,
+        countRight: count.getBoundingClientRect().right,
+        headerDirection: getComputedStyle(section.querySelector('.source-group-header')).direction,
+        countDirection: getComputedStyle(count).direction,
+      };
+    });
+    expect(header.headerDirection).toBe('rtl');
+    expect(header.countDirection).toBe('ltr');
+    expect(header.titleLeft).toBeGreaterThan(header.countRight);
+
+    await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
+    await page.locator('#materials-course-filter')
+      .selectOption('comprehensive-internal-medicine-course');
+    const material = page.locator('#materials-list .topic-row[dir="rtl"]').first();
+    await expect(material).toBeVisible({ timeout: 20000 });
+    const layout = await material.evaluate(row => {
+      const title = row.querySelector('.topic-title');
+      const actions = row.querySelector('.topic-actions');
+      return {
+        direction: getComputedStyle(row).direction,
+        titleAlign: getComputedStyle(title).textAlign,
+        titleLeft: title.getBoundingClientRect().left,
+        actionsRight: actions.getBoundingClientRect().right,
+        actionsDirection: getComputedStyle(actions).direction,
+        titleDir: title.getAttribute('dir'),
+      };
+    });
+    expect(layout.direction).toBe('rtl');
+    expect(layout.titleAlign).toBe('right');
+    expect(layout.titleDir).toBe('auto');
+    expect(layout.actionsDirection).toBe('ltr');
+    expect(layout.titleLeft).toBeGreaterThan(layout.actionsRight);
+  });
+
   test('keeps the selected Materials page size when moving to the next page', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
