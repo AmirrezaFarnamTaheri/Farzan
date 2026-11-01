@@ -3783,6 +3783,12 @@
   margin-bottom: var(--space-3);
 }
 
+/* The empty reader already provides a prominent Choose PDF action. Keep
+   the hidden input in the DOM for that button; show the toolbar once loading. */
+.view-pdf .pdf-shell[data-document-state="empty"] .pdf-toolbar {
+  display: none;
+}
+
 .view-pdf .pdf-reader-open-actions {
   display: inline-flex;
   flex-wrap: wrap;

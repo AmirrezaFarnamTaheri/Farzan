@@ -44,6 +44,17 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'pdf') {
+        const state = page.locator('.pdf-shell');
+        if (await state.getAttribute('data-document-state') === 'empty') {
+          await expect(page.locator('.pdf-shell .pdf-toolbar')).toBeHidden();
+          await expect(page.locator('[data-pdf-empty-open]')).toBeVisible();
+        }
+      }
+      if (route === 'tags' && await page.locator('[data-tag-first-use]').isVisible()) {
+        await expect(page.locator('[data-tag-advanced]')).toBeHidden();
+        await expect(page.locator('[data-tag-create-form]')).toBeVisible();
+      }
       if (route === 'home') {
         await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
@@ -188,6 +199,8 @@ for (const setup of setups) {
     const missingView = page.locator('#view-container .view-notfound');
     await expect(missingView).toBeVisible();
     await expect(missingView.locator('h1')).toHaveText('Page not found');
+    await expect(missingView.locator('.notfound-header')).toHaveCSS('text-align', 'center');
+    await expect(missingView.locator('.page-subtitle')).toHaveCount(0);
     // The shell must describe this route, not leak the old internal product name.
     await expect(page.locator('#breadcrumb-list')).toContainText('Page not found');
     await expect(page.locator('#breadcrumb-list')).not.toContainText('OpenCourseDeck');
