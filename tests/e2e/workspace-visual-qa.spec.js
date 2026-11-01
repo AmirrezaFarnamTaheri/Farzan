@@ -211,6 +211,13 @@ for (const setup of setups) {
     await expect(missingView.locator('.page-subtitle')).toHaveCount(0);
     // The shell must describe this route, not leak the old internal product name.
     await expect(page.locator('#breadcrumb-list')).toContainText('Page not found');
+    if (setup.width > 460) {
+      await expect(page.locator('#breadcrumb-list a[href="#/home"]')).toBeVisible();
+      await expect(page.locator('#breadcrumb-list')).toContainText('Home');
+    } else {
+      // On a narrow screen the global menu is the explicit Home route.
+      await expect(page.locator('#breadcrumb-list a[href="#/home"]')).toHaveCount(0);
+    }
     await expect(page.locator('#breadcrumb-list')).not.toContainText('OpenCourseDeck');
     await expect(page.locator('[data-missing-route]')).toContainText('this-route-does-not-exist');
     await expect(missingView.getByRole('link', { name: /return home/i })).toBeVisible();
