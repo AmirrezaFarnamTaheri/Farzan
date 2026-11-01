@@ -23,6 +23,7 @@ const setups = [
   { name: 'desktop-dark', width: 1440, height: 900, dark: true },
   { name: 'mobile-light', width: 390, height: 844 },
   { name: 'mobile-rtl', width: 390, height: 844, rtl: true },
+  { name: 'desktop-rtl', width: 1440, height: 900, rtl: true },
 ];
 test.use({ channel: 'chrome' });
 test.setTimeout(240000);
@@ -46,8 +47,30 @@ for (const setup of setups) {
       if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
-        await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
-          el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(setup.width);
+        if (setup.width <= 1023) {
+          await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+            el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(setup.width);
+        } else {
+          // Desktop navigation must move to the inline-start (right) side.
+          await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
+            Math.round(el.getBoundingClientRect().right))).toBeGreaterThanOrEqual(setup.width - 2);
+        }
+        if (route === 'notes' || route === 'courses') {
+          const fieldSelector = route === 'notes' ? '.notes-search-field' : '.courses-search-field';
+          const field = page.locator(fieldSelector).first();
+          await expect(field).toBeVisible();
+          const position = await field.evaluate((el) => {
+            const icon = el.querySelector('.icon')?.getBoundingClientRect();
+            const input = el.querySelector('input')?.getBoundingClientRect();
+            return icon && input ? { iconX: icon.left + icon.width / 2, inputMid: input.left + input.width / 2 } : null;
+          });
+          expect(position, setup.name + '/' + route + ' search control missing').not.toBeNull();
+          expect(position.iconX, setup.name + '/' + route + ' search icon should be at inline-start')
+            .toBeGreaterThan(position.inputMid);
+        }
+        if (route === 'home') {
+          await expect(page.locator('.home-widget').first()).toHaveCSS('text-align', 'start');
+        }
       }
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const dimensions = await page.evaluate(() => ({
