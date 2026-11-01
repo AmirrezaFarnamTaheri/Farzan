@@ -574,8 +574,6 @@
 }
 
 @media (max-width: 640px) {
-  /* Home hero mobile padding has one later owner in study-polish.css. */
-
   .home-title {
     font-size: clamp(2.25rem, 12vw, 3.4rem);
   }
