@@ -1,7 +1,7 @@
 # OpenCourseDeck Plugin System Plan
 
-> **Status (2026-09-18): partially implemented — Phase 1 only, and not wired into the runtime.**
-> `src/features/pluginHost.js` exists as a manifest parser/validator and `src/features/chartPlugins/` holds the chart extension points, but `pluginHost` has no importers, so nothing loads it at boot. The registry, worker sandbox, Settings → Extensions panel, and plugin lifecycle are **not built**; Phases 2–5 below remain unstarted. `PRODUCT.md` and `ROADMAP.md` already describe the plugin host as planned rather than shipped. Read this document as a design proposal, not a description of current behavior.
+> **Status (2026-11-01): design proposal only; plugin host not shipped or present in app source.**
+> The unused Phase-1 manifest/registry prototype was retired after a consumer audit: it had no importer in the production build and no active plugin execution workflow. `src/features/chartPlugins/` is a separate, used Chart.js extension surface, **not** an app-plugin registry. The proposed plugin install path, worker sandbox, Settings → Extensions panel and lifecycle have never shipped. Retiring this prototype does not delete any historical `plasma-plugins-registry` data; future support requires a separately reviewed sandbox and storage migration. Read the APIs below as future design proposals, not usable application interfaces.
 
 ## Goal
 
