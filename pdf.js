@@ -5,6 +5,8 @@
 //   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 // ============================================================
 
+import { writeScopedPdfAnnotationFallback } from './src/core/pdfIdentityHardening.js';
+
 (() => {
   'use strict';
 
@@ -1217,11 +1219,9 @@
     },
 
     _saveAnnotations() {
-      const fallback = () => {
-        try {
-          localStorage.setItem('ocd_pdf_annotations_by_page', JSON.stringify(State.annotations));
-        } catch { /* The canonical IndexedDB writer remains authoritative. */ }
-      };
+      const fallback = () => writeScopedPdfAnnotationFallback(
+        localStorage, State.annotationDocId, State.annotations,
+      );
       if (window.DB?.saveAnnotations) {
         try {
           Promise.resolve(window.DB.saveAnnotations(State.annotationDocId, State.annotations))
