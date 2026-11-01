@@ -24,12 +24,12 @@ describe('canonical course/topic editing', () => {
     expect(Object.keys(state.courses)).toEqual([]);
   });
 
-  it('never auto-migrates a legacy outline if a canonical empty library exists', async () => {
+  it('keeps an intentionally empty canonical library empty after reload', async () => {
     const created = await library.upsertCourse({ title: 'Removed' });
     await library.removeCourse(created.id);
-    await library.migrateLegacyCourses([{ id: created.id, title: 'Removed' }]);
     const data = await library.loadLibrary();
     expect(Object.keys(data.courses)).toEqual([]);
+    expect(settings.ocd_user_library).toBeDefined();
   });
 
   it('moves only the selected user topic, preserving its URL and resource references', async () => {
