@@ -271,7 +271,7 @@ export function installBackupEngine(root = window) {
         warnings: [
           ...(mirrorFailures.length ? [{
             code: 'MIRROR_CLEANUP_INCOMPLETE',
-            message: 'Backup committed, but old browser-storage mirrors remain. Do not switch to legacy storage until they are cleared.',
+            message: 'Backup committed, but local annotation fallback copies remain. Clear them before reopening restored documents.',
             failures: mirrorFailures,
           }] : []),
           ...(authorityFailures.length ? [{

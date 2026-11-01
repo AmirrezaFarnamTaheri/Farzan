@@ -53,7 +53,7 @@ describe('bridge DB safety helpers', () => {
       version: 1, courses: { stale: { title: 'Must not overwrite canonical library' } },
     }));
     localStorage.setItem('ocd_notes', JSON.stringify([{ id: 'old-note' }]));
-    localStorage.setItem('plasma_progress_v1', JSON.stringify({ 'topic-stale': { topicId: 'topic-stale' } }));
+    localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({ 'topic-stale': { topicId: 'topic-stale' } }));
     const emit = vi.fn();
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.OpenCourseDB = class {
@@ -114,15 +114,15 @@ describe('bridge DB safety helpers', () => {
 
   it('uses IndexedDB as canonical for folders and settings from the first launch', async () => {
     await window.DB.saveFolder({ id: 'f1', name: 'Canonical folder', updatedAt: 30 });
-    await window.DB.saveSetting('plasma-playlists', [{ id: 'idb-playlist' }]);
+    await window.DB.saveSetting('ocd_playlists', [{ id: 'idb-playlist' }]);
     localStorage.setItem('ocd_folders', JSON.stringify([
       { id: 'f1', name: 'Stale folder', updatedAt: 999 },
       { id: 'local-folder', name: 'Local only' },
     ]));
-    localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'local-playlist' }]));
+    localStorage.setItem('ocd_playlists', JSON.stringify([{ id: 'local-playlist' }]));
 
     expect(await window.DB.getAllFolders()).toEqual([expect.objectContaining({ id: 'f1', name: 'Canonical folder' })]);
-    expect(await window.DB.getSetting('plasma-playlists')).toEqual([{ id: 'idb-playlist' }]);
+    expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'idb-playlist' }]);
   });
 
   it('saves folders and settings to canonical IndexedDB without refreshing localStorage from the first launch', async () => {
@@ -179,8 +179,8 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
-    await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
-    await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
+    await window.DB.saveSetting('ocd_playlists', [{ id: 'playlist-1' }]);
+    await window.DB.saveSetting('ocd_studio_board', { version: 1, layers: [] });
     await window.DB.saveSetting('ocd_user_library', { version: 1, courses: { 'user-library': { title: 'My Library' } } });
     localStorage.setItem('ocd_pdf_annotations_by_document', JSON.stringify([{ id: 'ann-1' }]));
     localStorage.setItem('ocd_user_library', JSON.stringify({ version: 1, courses: { leftover: true } }));
@@ -194,8 +194,8 @@ describe('bridge DB safety helpers', () => {
     expect(localStorage.getItem('ocd_notes')).toBeNull();
     expect(localStorage.getItem('ocd_folders')).toBeNull();
     expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
-    expect(localStorage.getItem('plasma-playlists')).toBeNull();
-    expect(localStorage.getItem('plasma-studio-board')).toBeNull();
+    expect(localStorage.getItem('ocd_playlists')).toBeNull();
+    expect(localStorage.getItem('ocd_studio_board')).toBeNull();
     expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
     expect(localStorage.getItem('ocd_user_library')).toBeNull();
     expect(await window.DB.getSetting('ocd_user_library')).toBeNull();
@@ -207,10 +207,10 @@ describe('bridge DB safety helpers', () => {
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
-    await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
-    await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
+    await window.DB.saveSetting('ocd_playlists', [{ id: 'playlist-1' }]);
+    await window.DB.saveSetting('ocd_studio_board', { version: 1, layers: [] });
     await window.DB.saveAnnotations('doc-a', { 1: [{ id: 'ann-1', type: 'highlight' }] });
-    localStorage.setItem('plasma_theme', 'dark');
+    localStorage.setItem('ocd_theme', 'dark');
 
     const result = await window.DB.clearUserData('notes');
 
@@ -220,26 +220,28 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllNotes()).toEqual([]);
     expect(await window.DB.getAllFolders()).toEqual([]);
     expect(await window.DB.getAnnotations('doc-a')).toHaveLength(1);
-    expect(localStorage.getItem('plasma_theme')).toBe('dark');
+    expect(localStorage.getItem('ocd_theme')).toBe('dark');
     expect(localStorage.getItem('ocd_notes')).toBeNull();
     expect(localStorage.getItem('ocd_folders')).toBeNull();
     expect(localStorage.getItem('ocd_notes_settings')).toBeNull();
-    expect(await window.DB.getSetting('plasma-playlists')).toEqual([{ id: 'playlist-1' }]);
-    expect(await window.DB.getSetting('plasma-studio-board')).toEqual({ version: 1, layers: [] });
+    expect(await window.DB.getSetting('ocd_playlists')).toEqual([{ id: 'playlist-1' }]);
+    expect(await window.DB.getSetting('ocd_studio_board')).toEqual({ version: 1, layers: [] });
   });
 
-  it('clearUserData can remove saved playlists and Studio boards independently', async () => {
-    await window.DB.saveSetting('plasma-playlists', [{ id: 'playlist-1' }]);
-    await window.DB.saveSetting('plasma-studio-board', { version: 1, layers: [] });
+  it('clearUserData can remove saved playlists and both active Studio boards independently', async () => {
+    await window.DB.saveSetting('ocd_playlists', [{ id: 'playlist-1' }]);
+    await window.DB.saveSetting('ocd_studio_board', { version: 1, layers: [] });
+    await window.DB.saveSetting('ocd_studio_konva_draft', { version: 1, layers: [] });
 
     const playlistResult = await window.DB.clearUserData('playlists');
     expect(playlistResult.scope).toBe('playlists');
-    expect(await window.DB.getSetting('plasma-playlists')).toBeNull();
-    expect(await window.DB.getSetting('plasma-studio-board')).toEqual({ version: 1, layers: [] });
+    expect(await window.DB.getSetting('ocd_playlists')).toBeNull();
+    expect(await window.DB.getSetting('ocd_studio_board')).toEqual({ version: 1, layers: [] });
 
     const studioResult = await window.DB.clearUserData('studio');
     expect(studioResult.scope).toBe('studio');
-    expect(await window.DB.getSetting('plasma-studio-board')).toBeNull();
+    expect(await window.DB.getSetting('ocd_studio_board')).toBeNull();
+    expect(await window.DB.getSetting('ocd_studio_konva_draft')).toBeNull();
   });
 
 
@@ -272,7 +274,7 @@ describe('bridge DB safety helpers', () => {
 
     await expect(window.DB.saveProgress('topic-quota', 'course-a', { status: 'done' })).rejects.toThrow('Quota exceeded');
 
-    expect(localStorage.getItem('plasma_progress_v1')).toBeNull();
+    expect(localStorage.getItem('ocd_progress_fallback_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'progress',
       backend: 'indexedDB',
@@ -291,7 +293,7 @@ describe('bridge DB safety helpers', () => {
 
     await expect(window.DB.saveProgress('topic-canonical', 'course-a', { bookmarked: true }))
       .rejects.toThrow('IDB transaction aborted');
-    expect(localStorage.getItem('plasma_progress_v1')).toBeNull();
+    expect(localStorage.getItem('ocd_progress_fallback_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'progress', canonical: true, backend: 'indexedDB',
     }));
@@ -306,12 +308,12 @@ describe('bridge DB safety helpers', () => {
 
     await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a' }))
       .rejects.toThrow('timestamp transaction aborted');
-    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
   });
 
   it('uses only IndexedDB timestamps when it is available', async () => {
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+    localStorage.setItem('ocd_timestamps_fallback_v1', JSON.stringify([
       { id: 'old-only', topicId: 'a' }, { id: 'both', topicId: 'stale' },
     ]));
     window.OpenCourseDeck.DB.OpenCourseDB = class {
@@ -321,7 +323,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('never overlays stale local progress onto canonical IndexedDB reads', async () => {
-    localStorage.setItem('plasma_progress_v1', JSON.stringify({
+    localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({
       fallback: { topicId: 'fallback', status: 'done' },
       both: { topicId: 'both', status: 'stale' },
     }));
@@ -345,7 +347,7 @@ describe('bridge DB safety helpers', () => {
 
     await expect(window.DB.saveTimestamp({ id: 'ts-quota', topicId: 'topic-a' })).rejects.toThrow('Persistent storage full');
 
-    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'timestamp',
       backend: 'indexedDB',
@@ -631,7 +633,7 @@ describe('bridge DB safety helpers', () => {
     expect(await window.DB.getAllTimestamps()).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'delete-ts' }),
     ]));
-    expect(localStorage.getItem('plasma_timestamps_v1')).toBeNull();
+    expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
   });
 
   it('updates existing timestamp records by id', async () => {
@@ -740,11 +742,11 @@ describe('bridge DB safety helpers', () => {
 
   it('falls back to localStorage for indexed helpers when IndexedDB is unavailable', async () => {
     window.OpenCourseDeck.DB.OpenCourseDB = null;
-    localStorage.setItem('plasma_progress_v1', JSON.stringify({
+    localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({
       'topic-a': { topicId: 'topic-a', courseId: 'course-a' },
       'topic-b': { topicId: 'topic-b', courseId: 'course-b' },
     }));
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([
+    localStorage.setItem('ocd_timestamps_fallback_v1', JSON.stringify([
       { id: 'ts-a', topicId: 'topic-a', courseId: 'course-a' },
       { id: 'ts-b', topicId: 'topic-b', courseId: 'course-b' },
     ]));
@@ -818,6 +820,20 @@ describe('bridge DB safety helpers', () => {
       expect.objectContaining({ kind: 'note', action: 'save' }),
     ]));
   });
+  it('never revives unshipped progress/timestamp aliases when IndexedDB is unavailable', async () => {
+    window.OpenCourseDeck.DB.OpenCourseDB = null;
+    localStorage.setItem('plasma_progress_v1', JSON.stringify({ old: { topicId: 'old' } }));
+    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([{ id: 'ts-old', topicId: 'old' }]));
+    expect(await window.DB.getAllProgress()).toEqual([]);
+    expect(await window.DB.getAllTimestamps()).toEqual([]);
+    await window.DB.saveProgress('now', 'course', { status: 'done' });
+    await window.DB.saveTimestamp({ id: 'ts-now', topicId: 'now' });
+    expect(JSON.parse(localStorage.getItem('ocd_progress_fallback_v1')).now.topicId).toBe('now');
+    expect(JSON.parse(localStorage.getItem('ocd_timestamps_fallback_v1'))).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'ts-now' })])
+    );
+  });
+
   it('never resolves a canonical setting from an obsolete alias', async () => {
     localStorage.setItem('plasma-playlists', JSON.stringify([{ id: 'obsolete' }]));
     expect(await window.DB.getSetting('ocd_playlists')).toBeNull();

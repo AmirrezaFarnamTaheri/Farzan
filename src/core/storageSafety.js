@@ -4,8 +4,8 @@ import { installPdfSecurity } from './pdfSecurity.js';
 import { committedReceipt, failedReceipt } from './mutationReceipt.js';
 
 const VALID_SCOPES = new Set(['progress', 'notes', 'media', 'playlists', 'studio', 'preferences', 'all']);
-const PREFERENCE_KEYS = ['ocd_accent', 'ocd_density', 'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_theme', 'ocd_sidebar_collapsed', 'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir', 'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session', 'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir'];
-const SESSION_KEYS = ['ocd_pending_topic', 'ocd_pending_position', 'ocd_pending_course_session', 'ocd_pending_library_course', 'ocd_pending_pdf_doc', 'ocd_pending_pdf_page', 'ocd_ai_api_key_session', 'ocd_ai_authority_session', 'plasma-ai-api-key-session', 'plasma-ai-authority-session', 'pd-player', 'pd-player-playlist'];
+const PREFERENCE_KEYS = ['ocd_accent', 'ocd_density', 'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_theme', 'ocd_sidebar_collapsed'];
+const SESSION_KEYS = ['ocd_pending_topic', 'ocd_pending_position', 'ocd_pending_course_session', 'ocd_pending_library_course', 'ocd_pending_pdf_doc', 'ocd_pending_pdf_page', 'ocd_ai_api_key_session', 'ocd_ai_authority_session', 'pd-player'];
 
 function unavailableFailure(backend) {
   return {
@@ -88,10 +88,7 @@ const FRIENDLY_FAILURE_LABELS = new Map([
   ['annotations', 'Document data'],
   ['opencoursedeck-translations', 'Translation cache'],
   ['opencoursedeck-media', 'Offline media'],
-  ['plasma-playlists', 'Playlists'],
   ['ocd_playlists', 'Playlists'],
-  ['plasma-studio-board', 'Studio data'],
-  ['plasma-canvas-board', 'Studio data'],
   ['ocd_studio_board', 'Studio data'],
   ['ocd_user_library', 'Library'],
   ['ocd_flashcards', 'Flashcards'],
