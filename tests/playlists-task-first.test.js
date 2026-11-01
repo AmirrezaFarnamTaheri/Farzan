@@ -116,6 +116,33 @@ describe('Playlists task-first organization', () => {
     expect(saved).toEqual(before);
   });
 
+  it('does not present a false empty Resume queue when canonical timestamps are temporarily unreadable', async () => {
+    saved = [{ id: 'review', title: 'Saved review', topicIds: ['a'], createdAt: 1 }];
+    const original = structuredClone(saved);
+    const writer = vi.spyOn(window.DB, 'saveSetting');
+    let inaccessible = true;
+    window.DB.getAllTimestamps = vi.fn(async () => {
+      if (inaccessible) throw new Error('Canonical timestamp storage inaccessible');
+      return [{ id: 'ts-a', topicId: 'a', position: 42, title: 'Saved point' }];
+    });
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    const error = document.querySelector('[data-playlists-error]');
+    expect(error.getAttribute('role')).toBe('alert');
+    expect(error.textContent).toMatch(/timestamp|saved.*moment|resume/i);
+    expect(document.querySelector('[data-playlist-id="review"]')).toBeNull();
+    expect(document.querySelector('[data-playlists-discover]').hidden).toBe(true);
+    expect(writer).not.toHaveBeenCalled();
+    expect(saved).toEqual(original);
+
+    inaccessible = false;
+    document.querySelector('[data-playlists-retry]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlist-id="timestamp-queue"]')).not.toBeNull());
+    expect(document.querySelector('[data-playlist-id="review"]')).not.toBeNull();
+    expect(document.querySelector('[data-playlists-error]')).toBeNull();
+    expect(writer).not.toHaveBeenCalled();
+  });
+
   it('does not repeat a single active-queue count as a prominent metric', async () => {
     const player = document.createElement('div');
     player.dataset.player = '';
