@@ -258,7 +258,7 @@ describe('Flashcards Studio create-card form', () => {
       expect((await manager.getCards())).toHaveLength(1);
     });
     const added = (await manager.getCards())[0];
-    expect(added.front).toBe('What is SM-2?'); // values are trimmed
+    expect(added.front).toBe('What is FSRS?'); // values are trimmed
     expect(added.deck).toBe('General'); // empty deck falls back to General
     expect(document.getElementById('aria-announcer').textContent).toContain('Card added');
   });
