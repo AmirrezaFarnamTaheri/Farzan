@@ -146,6 +146,27 @@ describe('search worker Unicode identity and stable protocol', () => {
       .toEqual(['exact-1', 'exact-2', 'topic-1']);
   });
 
+  it('returns single-character exact, prefix and substring labels when Fuse omits short matches', () => {
+    // Fuse's minMatchCharLength can suppress one-character queries. The
+    // canonical lexical tier must still make these common Persian initials
+    // navigable, without claiming invented match offsets.
+    function ShortQueryFuse() {
+      this.search = () => [];
+    }
+    const rows = [
+      { title: 'فصل س', sourceType: 'topic', sourceId: 'substring' },
+      { title: 'سیر', sourceType: 'topic', sourceId: 'prefix' },
+      { title: 'س', sourceType: 'topic', sourceId: 'exact' },
+      { title: 'Biology', sourceType: 'topic', sourceId: 'unrelated' },
+    ];
+    const worker = workerWithData(rows, { minMatchCharLength: 2 }, { FuseCtor: ShortQueryFuse });
+    const response = worker.search('س', { limit: 3 });
+    expect(response.results.map(item => item.sourceId)).toEqual(['exact', 'prefix', 'substring']);
+    expect(response.matches).toHaveLength(3);
+    expect(response.matches.every(match => match.matches.length === 0)).toBe(true);
+    expect(response.results.every(item => !Object.keys(item).some(key => key.startsWith('__')))).toBe(true);
+  });
+
   it('keeps cancellation and identity protocol unchanged after Unicode normalization', () => {
     const worker = workerWithData([{ id: 'n', label: 'فیزیک' }]);
     const response = worker.search('فيزيك', { limit: 8 }, 7);

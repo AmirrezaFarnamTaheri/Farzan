@@ -139,12 +139,31 @@ function search(query, options = {}) {
   // lightweight buckets over the already-ranked Fuse result set, not a new
   // index or protocol. Dedupe only after sorting, before applying the cap.
   const rankedBuckets = [[], [], [], []];
+  const indexedMatches = new Set();
   for (const match of state.fuse.search(normalized)) {
-    const item = state.data[match.item[ORIGINAL_INDEX]];
+    const index = match.item[ORIGINAL_INDEX];
+    indexedMatches.add(index);
+    const item = state.data[index];
     const label = normalizeWorkerQuery(item?.label || item?.title);
     const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1
       : label.includes(normalized) ? 2 : 3;
     rankedBuckets[tier].push(match);
+  }
+  // Fuse may return nothing for a single-character query due to its
+  // minMatchCharLength setting. For that case only, scan the canonical title
+  // labels to retain exact/prefix/substring navigation, without rebuilding
+  // the index, inventing visual offset highlights or mutating source rows.
+  // Longer queries continue to rely on the indexed Fuse search path.
+  if (Array.from(normalized).length === 1) {
+    for (let index = 0; index < state.data.length; index += 1) {
+      if (indexedMatches.has(index)) continue;
+      const item = state.data[index];
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const label = normalizeWorkerQuery(item.label || item.title);
+      if (!label.includes(normalized)) continue;
+      const tier = label === normalized ? 0 : label.startsWith(normalized) ? 1 : 2;
+      rankedBuckets[tier].push({ item: { [ORIGINAL_INDEX]: index }, matches: [] });
+    }
   }
   const results = [];
   const matches = [];
