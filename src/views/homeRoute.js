@@ -381,14 +381,26 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   }
   if (!document.body.contains(widgetsRoot)) return;
 
-  const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
-  // Use the freshest canonical row for each topic. Earlier unfinished rows
+  // Topic IDs are not necessarily global: a catalog import may contain the
+  // same lesson key under two different courses. Never attach the last
+  // catalog row's title to another course's saved progress.
+  const topicMap = new Map();
+  for (const topic of topics) {
+    if (!topic?.topicId) continue;
+    if (topicMap.has(topic.topicId)) topicMap.set(topic.topicId, null);
+    else topicMap.set(topic.topicId, topic);
+  }
+  const sourceKey = record => JSON.stringify([
+    String(record?.courseId || ''), String(record?.topicId || ''),
+  ]);
+  // Use the freshest canonical row for each course/topic pair. Earlier unfinished rows
   // cannot resurrect a lesson that a later update already completed.
   const progressByTopic = new Map();
   [...progress].filter(record => record?.topicId)
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))
     .forEach(record => {
-      if (!progressByTopic.has(record.topicId)) progressByTopic.set(record.topicId, record);
+      const key = sourceKey(record);
+      if (!progressByTopic.has(key)) progressByTopic.set(key, record);
     });
   const isFinished = record => record?.status === 'done' || Number(record?.percent) >= 100;
   const canResume = record => record?.topicId && !isFinished(record)
@@ -412,7 +424,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     ...active.map(record => ({ record, source: 'progress' })),
     ...timestamps.filter(item => item?.topicId
       && Number.isFinite(Number(item.position)) && Number(item.position) >= 0
-      && !isFinished(progressByTopic.get(item.topicId)))
+      && !isFinished(progressByTopic.get(sourceKey(item)))
       .map(record => ({ record, source: 'timestamp' })),
   ];
   const focusCandidate = focusCandidates.sort((a, b) =>
@@ -436,9 +448,11 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   setText('[data-pulse-average]', `${averageProgress}%`);
 
   const focusTopicId = focusRecord?.topicId;
-  const focusProgress = progressByTopic.get(focusTopicId) ?? null;
+  const focusProgress = focusRecord ? progressByTopic.get(sourceKey(focusRecord)) ?? null : null;
   const focusTimestamp = [...timestamps]
-    .filter(item => item?.topicId === focusTopicId)
+    // A different course's timestamp must never provide the seek position,
+    // even if its topic ID is identical.
+    .filter(item => focusRecord && sourceKey(item) === sourceKey(focusRecord))
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const progressPosition = Math.max(0, Number(focusProgress?.position) || 0);
   const timestampPosition = Math.max(0, Number(focusTimestamp?.position) || 0);
@@ -448,7 +462,11 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     !focusProgress || getRecordTime(focusTimestamp) > getRecordTime(focusProgress)
       || !progressPosition
   ) ? timestampPosition : progressPosition || timestampPosition;
-  const focusTopic = topicMap.get(focusTopicId);
+  const focusCatalogMatches = topics.filter(topic => topic?.topicId === focusTopicId);
+  const focusTopic = focusRecord?.courseId
+    ? focusCatalogMatches.find(topic => String(topic.courseId) === String(focusRecord.courseId))
+    : focusCatalogMatches.length === 1 ? focusCatalogMatches[0] : null;
+  const focusCourseId = focusRecord?.courseId || focusTopic?.courseId || null;
   const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
   const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
   const focusDetail = focusRecord
@@ -465,7 +483,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
   const openFocus = () => {
     if (focusTopicId) {
-      setPendingCourseMedia(focusTopicId, focusPosition || undefined);
+      if (focusCourseId) setPendingCourseMedia(focusTopicId, focusPosition || undefined, focusCourseId);
+      else setPendingCourseMedia(focusTopicId, focusPosition || undefined);
       Router.navigate('#/courses');
       return;
     }
@@ -513,7 +532,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
         : 'Start with the course catalog.',
       action: 'courses',
       topicId: focusTopicId,
-      // Use the same topic-scoped position as the Home hero. A later
+      courseId: focusCourseId,
+      // Use the same source-scoped position as the Home hero. A later
       // timestamp from another topic must never be handed to this topic.
       position: focusPosition || undefined,
     },
@@ -539,6 +559,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
             : 'Capture a note or timestamp.',
       action: latestNote ? 'notes' : latestTimestamp ? 'courses' : 'notes',
       topicId: latestTimestamp?.topicId,
+      courseId: latestTimestamp?.courseId,
       position: latestTimestamp?.position,
     },
   ];
@@ -572,7 +593,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     card.append(icon, copy, arrow);
     card.addEventListener('click', () => {
       if ((widget.action === 'courses' || widget.action === 'review') && widget.topicId) {
-        setPendingCourseMedia(widget.topicId, widget.position);
+        if (widget.courseId) setPendingCourseMedia(widget.topicId, widget.position, widget.courseId);
+        else setPendingCourseMedia(widget.topicId, widget.position);
         Router.navigate('#/courses');
         return;
       }
