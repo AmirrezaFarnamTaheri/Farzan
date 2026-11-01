@@ -576,30 +576,27 @@ test.describe('Farzan desktop workspace redesign', () => {
     expect(stored).toContain('70 mL');
   });
 
-  test('round-trips a multilingual note through the opt-in Squire editor in Chromium', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.OpenCourseDeck = window.OpenCourseDeck || {};
-      window.OpenCourseDeck.featureFlags = {
-        ...(window.OpenCourseDeck.featureFlags || {}),
-        notesSquireDefault: false,
-      };
-    });
+  test('round-trips a multilingual note from default Squire through classic and back in Chromium', async ({ page }) => {
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.locator('[data-action="new-note"]').first().click();
     const title = 'Squire browser round-trip';
     await page.locator('[data-note-title-input]').fill(title);
     const outer = page.locator('[data-notes-editor]');
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    const toggle = page.locator('[data-notes-modern-toggle]');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await expect(toggle).toContainText('Use classic editor');
+    await toggle.click();
+    await expect(modern).toHaveCount(0);
     await outer.fill('فیزیولوژی قلب 你好世界');
     const storedContent = () => page.evaluate(async noteTitle => {
       const notes = await window.DB.getAllNotes();
       return notes.find(note => note.title === noteTitle)?.content ?? '';
     }, title);
     await expect.poll(storedContent).toContain('你好世界');
-    const toggle = page.locator('[data-notes-modern-toggle]');
     await expect(toggle).toBeVisible();
     await toggle.click();
-    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
     await expect(modern).toBeVisible();
     await expect(outer).not.toHaveAttribute('role', 'textbox');
     await expect(modern).toHaveAttribute('role', 'textbox');
@@ -620,16 +617,13 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
   test('refuses unsupported unsaved table content without replacing the classic Notes DOM', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.OpenCourseDeck = window.OpenCourseDeck || {};
-      window.OpenCourseDeck.featureFlags = {
-        ...(window.OpenCourseDeck.featureFlags || {}),
-        notesSquireDefault: false,
-      };
-    });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.locator('[data-action="new-note"]').first().click();
+    const editor = page.locator('[data-notes-editor] .notes-modern-editor');
+    await expect(editor).toBeVisible({ timeout: 20000 });
+    await page.locator('[data-notes-modern-toggle]').click();
+    await expect(editor).toHaveCount(0);
     const result = await page.evaluate(async () => {
       const node = document.querySelector('[data-notes-editor]');
       node.innerHTML = '<p>Important material</p><table><tbody><tr><td>70 mL</td></tr></tbody></table>';
@@ -647,16 +641,13 @@ test.describe('Farzan desktop workspace redesign', () => {
   });
 
   test('preserves an IME Notes draft when route navigation is vetoed', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.OpenCourseDeck = window.OpenCourseDeck || {};
-      window.OpenCourseDeck.featureFlags = {
-        ...(window.OpenCourseDeck.featureFlags || {}),
-        notesSquireDefault: false,
-      };
-    });
     await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.view-notes')).toBeVisible();
     await page.locator('[data-action="new-note"]').first().click();
+    const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+    await expect(modern).toBeVisible({ timeout: 20000 });
+    await page.locator('[data-notes-modern-toggle]').click();
+    await expect(modern).toHaveCount(0);
     const editor = page.locator('[data-notes-editor]');
     await editor.fill('Initial note');
     await page.evaluate(() => {
