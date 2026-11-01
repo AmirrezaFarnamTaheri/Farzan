@@ -62,7 +62,7 @@ describe('Playlists and Settings: readable controls without losing behavior', ()
     expect(window.location.hash).toBe('#/settings');
     expect(storage.getAttribute('aria-current')).toBe('location');
     expect(first.hasAttribute('aria-current')).toBe(false);
-    expect(destination.scrollIntoView).toHaveBeenCalled();
+    expect(destination.scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'auto' }));
     mount?.unmount?.();
     expect(settingsCss).toMatch(/\.settings-nav a\[aria-current="location"\]\s*\{[^}]*background:/s);
     expect(settingsCss).toMatch(/#select-density,[\s\S]*?#select-language\s*\{[^}]*appearance:\s*auto;/);
