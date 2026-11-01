@@ -123,6 +123,28 @@ export function resizeKonvaV1Element(board, id, bounds) {
 }
 
 /**
+ * Change z-order by one slot within the *same* unlocked, visible layer.
+ * The array order is the canonical Canvas-v1 painter order; Konva scene
+ * nodes are never the storage format. Protected layers and missing IDs
+ * reject before even cloning the board. Other elements stay byte-equivalent.
+ */
+export function reorderKonvaV1Element(board, id, direction) {
+  if (direction !== 'forward' && direction !== 'backward') {
+    throw new TypeError('Unsupported Konva stacking direction');
+  }
+  validBoard(board);
+  const { layer, index } = findUnlockedElement(board, id);
+  const nextIndex = index + (direction === 'forward' ? 1 : -1);
+  if (nextIndex < 0 || nextIndex >= layer.elements.length) return structuredClone(board);
+  const next = structuredClone(board);
+  const target = findUnlockedElement(next, id);
+  const elements = target.layer.elements;
+  [elements[index], elements[nextIndex]] = [elements[nextIndex], elements[index]];
+  validBoard(next);
+  return next;
+}
+
+/**
  * Edit the literal Unicode content of one supported text shape in a complete
  * canonical Studio-v1 document. Preserve its geometry, paint, font, layer,
  * viewport and application metadata. Konva never owns the stored HTML/JSON.
@@ -239,6 +261,20 @@ export function createKonvaV1MoveSession({
   const commit = (id, dx, dy) => enqueue(async () => {
     if (dx === 0 && dy === 0) return structuredClone(current);
     const next = translateKonvaV1Element(current, id, dx, dy);
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
+  const reorder = (id, direction) => enqueue(async () => {
+    const next = reorderKonvaV1Element(current, id, direction);
+    const { layer, index } = findUnlockedElement(current, id);
+    if ((direction === 'backward' && index === 0)
+      || (direction === 'forward' && index === layer.elements.length - 1)) {
+      return structuredClone(current);
+    }
     await persist(next);
     push(undoStack, current);
     redoStack.length = 0;
@@ -403,6 +439,7 @@ export function createKonvaV1MoveSession({
   return {
     bind,
     commit,
+    reorder,
     resize,
     addStroke,
     updateText,
