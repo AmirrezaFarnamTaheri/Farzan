@@ -69,12 +69,14 @@ export function assessNoteForSquire(html) {
   for (const span of [...template.content.querySelectorAll('span')].reverse()) {
     span.replaceWith(...span.childNodes);
   }
-  // Squire can wrap browser-generated root text in paragraphs. Validate an
-  // inert structural copy, keeping the stored HTML untouched.
+  // Squire can leave browser-generated root text and standalone <br> caret
+  // markers after heading conversions. Wrap them only in the inert validation
+  // copy; never mutate saved canonical HTML or allow attributed root breaks.
   let paragraph = null;
   for (const node of [...template.content.childNodes]) {
     const inline = (node.nodeType === Node.TEXT_NODE && Boolean(node.textContent.trim()))
-      || (node.nodeType === Node.ELEMENT_NODE && MARKS.has(node.localName));
+      || (node.nodeType === Node.ELEMENT_NODE
+        && (MARKS.has(node.localName) || node.localName === 'br'));
     if (inline) {
       if (!paragraph) {
         paragraph = document.createElement('p');
