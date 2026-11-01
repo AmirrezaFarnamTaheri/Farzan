@@ -1365,7 +1365,7 @@ import { Pointer } from './src/lib/pointer.js';
       const items = $$('.search-result-item', this.resultsBox);
       const current = this.resultsBox.querySelector('.search-result-item[aria-selected="true"]');
       const index = current ? Number(current.dataset.index) : -1;
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
         e.preventDefault();
         this._selectItem(items, nextSearchSelectionIndex(index, items.length, e.key));
       } else if (e.key === 'Enter' && current) {
