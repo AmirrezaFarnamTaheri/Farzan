@@ -136,6 +136,7 @@ describe('Studio experimental Konva draft opt-in', () => {
     await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledWith({
       type: 'ellipse', x: 140, y: 120, radiusX: 60, radiusY: 30, rotation: 0,
     }));
+    await vi.waitFor(() => expect(text.disabled).toBe(false));
     text.click();
     await vi.waitFor(() => expect(instance.addShape).toHaveBeenCalledWith({
       type: 'text', x: 140, y: 120, text: 'Text', fontSize: 20,
