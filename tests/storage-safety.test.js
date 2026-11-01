@@ -50,7 +50,7 @@ describe('storage safety', () => {
       status: 'committed',
       operation: 'clear-preferences',
     });
-    expect(root.localStorage.removeItem).toHaveBeenCalledWith('plasma_theme');
+    expect(root.localStorage.removeItem).toHaveBeenCalledWith('ocd_theme');
     expect(originalClearUserData).not.toHaveBeenCalled();
     expect(originalClearAll).not.toHaveBeenCalled();
   });
@@ -120,17 +120,17 @@ describe('storage safety', () => {
 
   it('rejects preference deletion when storage reports the key still exists', async () => {
     const root = createRoot();
-    root.localStorage.getItem.mockImplementation(key => key === 'plasma_theme' ? 'dark' : null);
+    root.localStorage.getItem.mockImplementation(key => key === 'ocd_theme' ? 'dark' : null);
     installStorageSafety(root);
 
     const error = await root.DB.clearUserData('preferences').catch(value => value);
 
     expect(error).toMatchObject({ committed: false, status: 'failed' });
     expect(error.failures).toEqual(expect.arrayContaining([
-      expect.objectContaining({ backend: 'localStorage', key: 'plasma_theme' }),
+      expect.objectContaining({ backend: 'localStorage', key: 'ocd_theme' }),
     ]));
     expect(root.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Preferences'));
-    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('plasma_theme'));
+    expect(root.OpenCourseDeck.Toast.error).not.toHaveBeenCalledWith(expect.stringContaining('ocd_theme'));
   });
 
   it('rejects preference deletion when localStorage is unavailable', async () => {

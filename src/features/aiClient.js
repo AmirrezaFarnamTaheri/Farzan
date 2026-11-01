@@ -328,7 +328,6 @@ export function createAIClient(root = window) {
   async function getApiKey() {
     return String(
       root.sessionStorage?.getItem?.(AI_SESSION_KEY)
-      || root.sessionStorage?.getItem?.('plasma-ai-api-key-session')
       || '',
     ).trim();
   }

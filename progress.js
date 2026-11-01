@@ -446,7 +446,6 @@ const ProgressStats = (() => {
         ? await window.OpenCourseDeck.Flashcards.getCards()
         : null);
     const librarySettings= await DB.getSetting?.('ocd_user_library') ?? null;
-    const myCoursesSettings = await DB.getSetting?.('ocd_my_courses') ?? null;
     const mediaCuesSettings = await DB.getSetting?.('ocd_course_media_cues') ?? null;
     const tagTaxonomySettings = await DB.getSetting?.('ocd_tag_taxonomy') ?? null;
     if (tagTaxonomySettings != null) {
@@ -477,7 +476,6 @@ const ProgressStats = (() => {
         studio: studioSettings,
         flashcards: flashcardsSettings,
         library: librarySettings,
-        myCourses: myCoursesSettings,
         mediaCues: mediaCuesSettings,
         tagTaxonomy: tagTaxonomySettings,
       },
@@ -703,7 +701,6 @@ const ProgressStats = (() => {
           (payload.settings?.studio && typeof payload.settings.studio === 'object' && !Array.isArray(payload.settings.studio) ? 1 : 0) +
           (Array.isArray(payload.settings?.flashcards) ? 1 : 0) +
           (payload.settings?.library && typeof payload.settings.library === 'object' && !Array.isArray(payload.settings.library) ? 1 : 0) +
-          (Array.isArray(payload.settings?.myCourses) ? 1 : 0) +
           (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object' && !Array.isArray(payload.settings.mediaCues) ? 1 : 0) +
           (importedTagTaxonomy ? 1 : 0);
         const preview = {
@@ -896,16 +893,6 @@ const ProgressStats = (() => {
               _recordImportError(result, 'settings', 'ocd_user_library', err);
             }
         } else if (payload.settings?.library) {
-          result.skipped += 1;
-        }
-        if (Array.isArray(payload.settings?.myCourses) && DB.saveSetting) {
-          try {
-            _requireAcknowledgedWrite(await DB.saveSetting('ocd_my_courses', payload.settings.myCourses), 'ocd_my_courses');
-            result.settings += 1;
-          } catch (err) {
-            _recordImportError(result, 'settings', 'ocd_my_courses', err);
-          }
-        } else if (payload.settings?.myCourses) {
           result.skipped += 1;
         }
         if (payload.settings?.mediaCues && typeof payload.settings.mediaCues === 'object'
@@ -1263,7 +1250,7 @@ const ProgressStats = (() => {
   // NEVER substitute an empty collection when reading the rollback snapshot:
   // a later failure would clear the user's existing notes or study history.
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy'];
+    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_course_media_cues', 'ocd_tag_taxonomy'];
     const readList = async (name) => {
       if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
       const records = await DB[name]();
@@ -1277,10 +1264,10 @@ const ProgressStats = (() => {
     const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
       && primary._meta.version === 3;
     const mirrorKeys = [
-      'plasma_progress_v1', 'plasma_timestamps_v1', 'ocd_notes', 'ocd_folders',
-      'ocd_notes_settings', 'ocd_playlists', 'plasma-playlists',
-      'ocd_studio_board', 'plasma-studio-board', 'ocd_flashcards',
-      'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_tag_taxonomy',
+      'ocd_progress_fallback_v1', 'ocd_timestamps_fallback_v1', 'ocd_notes', 'ocd_folders',
+      'ocd_notes_settings', 'ocd_playlists',
+      'ocd_studio_board', 'ocd_studio_konva_draft', 'ocd_flashcards',
+      'ocd_user_library', 'ocd_course_media_cues', 'ocd_tag_taxonomy',
       'ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page',
     ];
     const storage = window.localStorage;

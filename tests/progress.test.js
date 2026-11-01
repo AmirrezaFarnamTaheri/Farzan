@@ -133,7 +133,7 @@ describe('progress backup exports', () => {
   it('exports every authored course domain and declares a metadata-only attachment manifest', async () => {
     const original = window.DB.getSetting;
     window.DB.getSetting = vi.fn(async key => {
-      if (key === 'ocd_my_courses') return [{ id: 'course-a', title: 'Study course' }];
+      if (key === 'ocd_user_library') return { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } };
       if (key === 'ocd_course_media_cues') return { 'topic-a': [{ at: 12, text: 'Recall' }] };
       return original(key);
     });
@@ -142,7 +142,8 @@ describe('progress backup exports', () => {
     };
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
-    expect(payload.settings.myCourses).toEqual([{ id: 'course-a', title: 'Study course' }]);
+    expect(payload.settings.library).toEqual({ version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } });
+    expect(payload.settings).not.toHaveProperty('myCourses');
     expect(payload.settings.mediaCues).toEqual({ 'topic-a': [{ at: 12, text: 'Recall' }] });
     expect(payload.meta.attachments).toEqual(expect.objectContaining({
       mode: 'metadata-only',
@@ -332,16 +333,16 @@ describe('progress backup exports', () => {
       .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
 
-  it('restores course outlines and media cues from version 1.6 portable backups', async () => {
+  it('restores canonical course library and media cues from version 1.6 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
-    const outlines = [{ id: 'course-a', title: 'Saved course' }];
+    const library = { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Saved course' } } };
     const cues = { 'topic-a': [{ at: 18, text: 'Start' }] };
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { myCourses: outlines, mediaCues: cues },
+      version: '1.6', settings: { library, mediaCues: cues },
       progress: [], notes: [], annotations: [], timestamps: [],
     })], 'all-domains.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_my_courses', outlines);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', library);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', cues);
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
   });
@@ -964,11 +965,11 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
   });
 
-  it('rolls back authored course outlines and media cues when a later import write fails', async () => {
-    const originalCourses = [{ id: 'course-old', title: 'Original course' }];
+  it('rolls back canonical course library and media cues when a later import write fails', async () => {
+    const originalLibrary = { version: 1, courses: { 'course-old': { id: 'course-old', title: 'Original course' } } };
     const originalCues = { 'topic-old': [{ at: 20, text: 'Original cue' }] };
     const state = new Map([
-      ['ocd_my_courses', originalCourses],
+      ['ocd_user_library', originalLibrary],
       ['ocd_course_media_cues', originalCues],
     ]);
     window.DB.getSetting = vi.fn(async key => state.get(key) ?? null);
@@ -983,7 +984,7 @@ describe('progress backup exports', () => {
     const file = new File([JSON.stringify({
       version: '1.6',
       settings: {
-        myCourses: [{ id: 'course-new', title: 'Imported course' }],
+        library: { version: 1, courses: { 'course-new': { id: 'course-new', title: 'Imported course' } } },
         mediaCues: { 'topic-new': [{ at: 30, text: 'Imported cue' }] },
       },
       timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
@@ -991,9 +992,9 @@ describe('progress backup exports', () => {
     })], 'partial-restore.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true });
-    expect(state.get('ocd_my_courses')).toEqual(originalCourses);
+    expect(state.get('ocd_user_library')).toEqual(originalLibrary);
     expect(state.get('ocd_course_media_cues')).toEqual(originalCues);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_my_courses', originalCourses);
+    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', originalLibrary);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', originalCues);
   });
 

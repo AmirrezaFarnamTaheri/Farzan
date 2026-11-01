@@ -356,8 +356,8 @@
   // DB (progress + timestamps + notes mirror) — IndexedDB preferred, localStorage fallback.
   // ───────────────────────────────────────────────────────────
   const DB = (() => {
-    const KEY_PROGRESS = 'plasma_progress_v1';
-    const KEY_TIMESTAMPS = 'plasma_timestamps_v1';
+    const KEY_PROGRESS = 'ocd_progress_fallback_v1';
+    const KEY_TIMESTAMPS = 'ocd_timestamps_fallback_v1';
 
     const IDB_NAME = 'opencoursedeck';
     const IDB_VERSION = 3;
@@ -837,18 +837,14 @@
       if (includeAnnotations) stores.push('annotations');
       const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
-      if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues', 'ocd_ai_settings');
+      if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_course_media_cues', 'ocd_ai_settings', 'ocd_tag_taxonomy', 'ocd_studio_board', 'ocd_studio_konva_draft');
       if (includeAnnotations) localKeys.push('ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page');
       if (includePrefs) localKeys.push(
-        'plasma_accent', 'plasma_density', 'plasma_font_scale', 'plasma_dir',
-        'plasma_theme', 'plasma_sidebar_collapsed', 'plasma-intro-seen', 'plasma-session',
-        'plasma-theme', 'plasma-sidebar-collapsed', 'plasma-accent', 'plasma-dir',
-        'plasma_pending_topic', 'plasma_pending_position', 'plasma_pending_course_session',
-        'plasma_pending_pdf_doc', 'plasma_pending_pdf_page', 'plasma-playlists', 'ocd_playlists', 'ocd_notes', 'ocd_folders',
-        'ocd_notes_settings', 'ocd_theme', 'ocd_accent', 'ocd_density',
-        'ocd_font_scale', 'ocd_dir', 'ocd_lang', 'ocd_sidebar_collapsed', 'ocd_flashcards',
-        'ocd_ai_settings', 'ocd_user_library', 'ocd_my_courses', 'ocd_course_media_cues',
-        'plasma-studio-board', 'plasma-canvas-board',
+        'ocd_theme', 'ocd_accent', 'ocd_density', 'ocd_font_scale',
+        'ocd_dir', 'ocd_lang', 'ocd_sidebar_collapsed',
+        'ocd_pending_topic', 'ocd_pending_position', 'ocd_pending_course_session',
+        'ocd_pending_library_course', 'ocd_pending_pdf_doc', 'ocd_pending_pdf_page',
+        'ocd_playlists', 'ocd_flashcards',
       );
 
       const idbResult = await _clearIdbStores(idb, stores);
@@ -880,14 +876,14 @@
       }
       if (scope === 'playlists') {
         return _deletionOutcome('clear-playlists', scope, [
-          await _deleteIdbSettings(idb, ['plasma-playlists', 'ocd_playlists']),
-          _storageRemoval(localStorage, ['plasma-playlists', 'ocd_playlists'], 'localStorage'),
+          await _deleteIdbSettings(idb, ['ocd_playlists']),
+          _storageRemoval(localStorage, ['ocd_playlists'], 'localStorage'),
         ]);
       }
       if (scope === 'studio') {
         return _deletionOutcome('clear-studio', scope, [
-          await _deleteIdbSettings(idb, ['plasma-studio-board', 'plasma-canvas-board', 'ocd_studio_board', 'ocd_canvas_board']),
-          _storageRemoval(localStorage, ['plasma-studio-board', 'plasma-canvas-board', 'ocd_studio_board', 'ocd_canvas_board'], 'localStorage'),
+          await _deleteIdbSettings(idb, ['ocd_studio_board', 'ocd_studio_konva_draft']),
+          _storageRemoval(localStorage, ['ocd_studio_board', 'ocd_studio_konva_draft'], 'localStorage'),
         ]);
       }
       if (scope === 'all') return clearAll();
