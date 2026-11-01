@@ -78,6 +78,54 @@ describe('bundle and CSP reporting', () => {
     })).toContain(`total JS ${limits.totalJsBytes + 1} exceeds ${limits.totalJsBytes}`);
   });
 
+  it('measures actual Workbox precache source bytes without treating deferred chunks as absent', async () => {
+    const os = await import('node:os');
+    const { measurePrecacheArtifacts } = await import('../scripts/bundle-report.cjs');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farzan-precache-'));
+    try {
+      fs.mkdirSync(path.join(root, 'chunks'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'index.html'), 'abc');
+      fs.writeFileSync(path.join(root, 'opencoursedeck.js'), 'entry');
+      fs.writeFileSync(path.join(root, 'chunks', 'lazy.js'), '1234567');
+      fs.writeFileSync(path.join(root, 'sw.js'), [
+        'precacheAndRoute([{url:"index.html",revision:"a"},',
+        '{url:"opencoursedeck.js",revision:"b"},',
+        '{url:"chunks/lazy.js",revision:"c"}]);',
+      ].join(''));
+      const data = measurePrecacheArtifacts(root);
+      expect(data.count).toBe(3);
+      expect(data.totalBytes).toBe(3 + 5 + 7);
+      expect(data.jsBytes).toBe(5 + 7);
+      expect(data.files.map(item => item.path)).toEqual([
+        'chunks/lazy.js', 'index.html', 'opencoursedeck.js',
+      ]);
+      expect(data.missing).toEqual([]);
+      expect(data.files.find(item => item.path === 'chunks/lazy.js')?.bytes).toBe(7);
+      fs.unlinkSync(path.join(root, 'chunks/lazy.js'));
+      const missing = measurePrecacheArtifacts(root);
+      expect(missing.missing).toEqual(['chunks/lazy.js']);
+      expect(missing.count).toBe(3);
+      expect(missing.totalBytes).toBe(8);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid or absent service worker precache evidence rather than claiming an empty install', async () => {
+    const os = await import('node:os');
+    const { measurePrecacheArtifacts } = await import('../scripts/bundle-report.cjs');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farzan-invalid-precache-'));
+    try {
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/service worker|precache/i);
+      fs.writeFileSync(path.join(root, 'sw.js'), 'this is not a Workbox manifest');
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/precache|manifest/i);
+      fs.writeFileSync(path.join(root, 'sw.js'), 'precacheAndRoute([{url:"../outside.js",revision:"x"}]);');
+      expect(() => measurePrecacheArtifacts(root)).toThrow(/unsafe|outside|path/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the bundle report gate wired into CI', async () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 
