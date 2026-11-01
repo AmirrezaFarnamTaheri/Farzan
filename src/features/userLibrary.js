@@ -589,45 +589,6 @@ export async function upsertCourse({ id, title, description = '' } = {}) {
   });
 }
 
-/**
- * Promote outlines from the old independent My Courses setting, but ONLY when
- * no canonical user library has ever been stored. The caller must establish
- * that the canonical setting is absent, not merely empty: an empty canonical
- * library can mean that the user intentionally deleted their last course.
- * The entire batch commits in one settings write, avoiding partial migration.
- */
-export async function migrateLegacyCourses(records) {
-  if (!Array.isArray(records)) throw new TypeError('Legacy courses must be an array');
-  return mutateLibrary(async library => {
-    // Only the actual absence of the canonical record permits historical
-    // migration. An intentionally empty canonical library means a user has
-    // removed their courses and must not be resurrected.
-    const canonical = await window.DB?.getSetting?.(LIBRARY_SETTING_KEY);
-    if (canonical != null || Object.keys(library.courses).length) {
-      return { migrated: 0, courses: Object.keys(library.courses).length };
-    }
-    let migrated = 0;
-    for (const record of records) {
-      if (!record || typeof record !== 'object') continue;
-      const id = String(record.id || '').trim();
-      const title = String(record.title || '').trim().slice(0, 120);
-      // Avoid reserved prototype properties and malformed course identifiers.
-      if (!/^[a-z0-9_-]{1,160}$/i.test(id) || !title || id === DEFAULT_COURSE_ID
-        || Object.prototype.hasOwnProperty.call(Object.prototype, id)) continue;
-      const course = ensureCourse(library, {
-        id, title,
-        description: String(record.description || '').trim().slice(0, 600),
-        overwriteTitle: true,
-      });
-      if (Number.isFinite(record.createdAt)) course.createdAt = record.createdAt;
-      if (Number.isFinite(record.updatedAt)) course.updatedAt = record.updatedAt;
-      migrated += 1;
-    }
-    if (migrated) await persistLibrary(library, { migratedLegacyCourses: migrated });
-    return { migrated, courses: Object.keys(library.courses).length };
-  });
-}
-
 export async function updateCourse({ id, title, description } = {}) {
   const courseId = String(id || '').trim();
   if (!courseId || courseId === DEFAULT_COURSE_ID) throw new TypeError('A personal course ID is required');
@@ -851,7 +812,6 @@ export function initUserLibrary(root = window) {
     overlay: overlayFromStorage,
     upsertCourse,
     updateCourse,
-    migrateLegacyCourses,
     removeCourse,
     addTopic,
     renameTopic,
