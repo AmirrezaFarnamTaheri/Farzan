@@ -687,6 +687,17 @@ input[type="file"][hidden] {
 .studio-toolbar-clusters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .studio-tool-group { border: 0; padding: 0 12px 0 0; gap: 7px; }
 .studio-tool-group .btn { min-height: 36px; }
+.view-studio [data-studio-tool][aria-pressed="true"] {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent-on-tint);
+  font-weight: 750;
+}
+.view-studio [data-studio-tool][aria-pressed="true"]:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
 .studio-more-tools { width: 100%; margin-top: 0; min-width: 0; }
 .studio-more-tools > summary {
   display: inline-flex;
