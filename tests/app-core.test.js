@@ -2482,6 +2482,42 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-timestamp-note-status]').textContent).toContain('1:35');
   });
 
+  it('refuses to attribute a timestamp to another lesson when the playback snapshot is stale', async () => {
+    await loadApp();
+    const saveTimestamp = vi.fn(async () => true);
+    const saveNote = vi.fn(async () => ({ id: 'incorrect-note' }));
+    window.DB = { getProgress: vi.fn(async () => null), saveTimestamp, saveNote };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: vi.fn(() => [{ id: 'course-a', title: 'Cardiology' }]),
+      allTopics: vi.fn(() => [
+        { topicId: 'topic-1', courseId: 'course-a', title: 'Known lecture',
+          videos: ['https://example.test/video.mp4'] },
+      ]),
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const actual = { topicId: 'topic-1', courseId: 'course-a', title: 'Known lecture' };
+    const other = { topicId: 'topic-1', courseId: 'course-b', title: 'Wrong course' };
+    const player = document.getElementById('course-player');
+    let snapshot = { queueIndex: -1, track: actual, currentTime: 95, duration: 300 };
+    player._pdPlayer = {
+      snapshot: vi.fn(() => snapshot), queue: [actual], trackIndex: 0,
+      on: vi.fn(), off: vi.fn(),
+    };
+    document.querySelector('[data-save-timestamp-note]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-timestamp-note-status]').textContent)
+      .toMatch(/play a course topic/i));
+    expect(saveTimestamp).not.toHaveBeenCalled();
+    expect(saveNote).not.toHaveBeenCalled();
+
+    snapshot = { queueIndex: 0, track: other, currentTime: 95, duration: 300 };
+    document.querySelector('[data-save-timestamp]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-timestamp-note-status]').textContent)
+      .toMatch(/play a course topic/i));
+    expect(saveTimestamp).not.toHaveBeenCalled();
+    expect(saveNote).not.toHaveBeenCalled();
+  });
+
   it('authors chapter and transcript cues from the course player', async () => {
     await loadApp();
     const saveSetting = vi.fn(async () => true);
