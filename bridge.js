@@ -917,7 +917,7 @@
       const idb = _getIdb();
       if (idb) {
         try {
-          if (typeof idb.queryIndex === 'function') return await idb.queryIndex('notes', 'updatedAt', null, limit, { direction: 'prev' }) ?? [];
+          if (typeof idb.queryIndex === 'function') return await idb.queryIndex('notes', 'updatedAt', null, { limit, direction: 'prev' }) ?? [];
         } catch (error) { _canonicalReadFailed('getRecentNotes', error); }
       }
       return (await getAllNotes()).sort((a, b) => Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0)).slice(0, limit);
@@ -929,7 +929,7 @@
       if (idb) {
         try {
           const range = IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
-          if (typeof idb.queryIndex === 'function') return await idb.queryIndex(store, indexName, range, limit) ?? [];
+          if (typeof idb.queryIndex === 'function') return await idb.queryIndex(store, indexName, range, { limit }) ?? [];
           const db = await idb.open();
           const tx = db.transaction(store, 'readonly');
           const idx = tx.objectStore(store).index(indexName);
