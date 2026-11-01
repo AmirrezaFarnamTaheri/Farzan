@@ -141,7 +141,7 @@ describe('PDF viewer safe messages', () => {
     }));
   });
 
-  it('uses canonical PDF identity and migrates transport-keyed annotations', async () => {
+  it('uses a fingerprint identity without loading transport-keyed PDF annotations', async () => {
     const sourceUrl = 'https://cdn.example.test/course.pdf?token=one';
     const makePage = () => ({
       rotate: 0,
@@ -160,9 +160,9 @@ describe('PDF viewer safe messages', () => {
     };
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform: vi.fn(), scale: vi.fn() }));
     const getAnnotations = vi.fn(async docId => docId === sourceUrl
-      ? [{ id: 'legacy-annotation', docId, page: 2, updatedAt: 10 }]
-      : []);
-    const saveAnnotations = vi.fn(async () => []);
+      ? [{ id: 'retired-transport-record', docId, page: 2 }]
+      : [{ id: 'canonical-record', docId, page: 1 }]);
+    const saveAnnotations = vi.fn();
     window.DB = { getAnnotations, saveAnnotations };
     window.PlasmaPDFViewer._buildThumbnails = vi.fn(async () => {});
 
@@ -170,20 +170,11 @@ describe('PDF viewer safe messages', () => {
 
     expect(window.PlasmaPDFState.annotationDocId).toBe('fingerprint:canonical-fingerprint');
     expect(window.PlasmaPDFState.searchDocId).toBe('fingerprint:canonical-fingerprint');
-    expect(window.PlasmaPDFState.annotationAliases).toContain(sourceUrl);
-    expect(window.PlasmaPDFState.annotations[2]).toEqual([
-      expect.objectContaining({ id: 'legacy-annotation', docId: 'fingerprint:canonical-fingerprint' }),
-    ]);
-    expect(saveAnnotations).toHaveBeenCalledWith(
-      'fingerprint:canonical-fingerprint',
-      expect.objectContaining({ 2: expect.any(Array) }),
-    );
-    expect(saveAnnotations).toHaveBeenCalledWith(sourceUrl, {});
-    expect(window.OpenCourseDeck.bus.emit).toHaveBeenCalledWith('pdf:identity-migrated', expect.objectContaining({
-      docId: 'fingerprint:canonical-fingerprint',
-      aliases: [sourceUrl],
-      annotations: 1,
-    }));
+    expect(window.PlasmaPDFState.annotations).toEqual({
+      1: [expect.objectContaining({ id: 'canonical-record', docId: 'fingerprint:canonical-fingerprint' })],
+    });
+    expect(getAnnotations).toHaveBeenCalledExactlyOnceWith('fingerprint:canonical-fingerprint');
+    expect(saveAnnotations).not.toHaveBeenCalled();
   });
 
   it('queues the latest page render instead of dropping requests during an active render', async () => {
