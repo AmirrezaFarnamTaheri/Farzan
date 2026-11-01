@@ -507,7 +507,6 @@ src/
 │   ├── keyboardShortcuts.js ← Motion Canvas (context-aware) + Splayer (conflict) + Vidstack (seek)
 │   ├── configManager.js     ← PDFMathTranslate (cascade: IDB→localStorage→default) — not yet implemented
 │   ├── locale.js            ← x-spreadsheet (registration, fallback, t()/tf())
-│   ├── storageMigrate.js    ← existing
 │   └── beforeUnloadGuard.js ← existing
 │
 ├── features/
