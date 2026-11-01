@@ -129,9 +129,10 @@ export function createSquireNoteEditor({
   let dirty = false;
   let suppress = false;
   let composing = false;
+  let disposed = false;
   let lastHTML = original;
   const notify = () => {
-    if (suppress || composing) return;
+    if (disposed || suppress || composing) return;
     const nextHTML = editorHTML(editor);
     if (nextHTML === lastHTML) return;
     dirty = true;
@@ -141,6 +142,7 @@ export function createSquireNoteEditor({
 
   const onCompositionStart = () => { composing = true; };
   const onCompositionEnd = () => {
+    if (disposed) return;
     composing = false;
     // Publish the final value after IME commit; a subsequent input event is
     // deduplicated by notify(), so this is safe across browser event orders.
@@ -186,6 +188,10 @@ export function createSquireNoteEditor({
             : 'This clipboard content cannot be pasted as text. Use the classic editor for images or tables.');
         } catch { /* Keep clipboard preservation independent from notifications. */ }
         if (plain) queueMicrotask(() => {
+          // A note may be switched or its editor torn down before the
+          // asynchronous plain-text fallback runs. Never paste into or
+          // notify about the previous note after that handoff.
+          if (disposed) return;
           editor.insertPlainText(plain);
           notify();
         });
@@ -240,6 +246,10 @@ export function createSquireNoteEditor({
       return true;
     },
     setContent(value) {
+      if (disposed) throw new Error('Cannot replace a destroyed note editor');
+      // Squire is HTML-canonical; a remote refresh cannot overwrite the
+      // intermediate text held by an active Chinese/Persian IME session.
+      if (composing) throw new Error('Cannot replace note during IME composition');
       const next = preflight(value);
       suppress = true;
       try {
@@ -252,6 +262,8 @@ export function createSquireNoteEditor({
       }
     },
     destroy() {
+      if (disposed) return;
+      disposed = true;
       editor.removeEventListener('input', notify);
       root.removeEventListener('compositionstart', onCompositionStart);
       root.removeEventListener('compositionend', onCompositionEnd);

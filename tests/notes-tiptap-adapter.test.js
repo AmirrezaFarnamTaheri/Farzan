@@ -307,6 +307,49 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('refuses a stale remote setContent while an IME composition is unfinished', () => {
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Original saved note</p>', onUpdate,
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = '未提交 متن فارسی';
+      expect(() => instance.setContent('<p>Stale remote snapshot</p>'))
+        .toThrow(/composition/i);
+      expect(root.textContent).toContain('未提交 متن فارسی');
+      expect(onUpdate).not.toHaveBeenCalled();
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(instance.syncChanges()).toBe(true);
+      expect(instance.getHTML()).toContain('未提交 متن فارسی');
+      expect(instance.getHTML()).not.toContain('Stale remote snapshot');
+    } finally { instance.destroy(); }
+  });
+
+  it('cancels a queued plain-text paste after the editor is destroyed', async () => {
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Before</p>', onUpdate, onPasteFallback: vi.fn(),
+    });
+    const root = element.querySelector('.notes-modern-editor');
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, 'clipboardData', { value: {
+      items: null, types: ['text/html'],
+      getData: type => type === 'text/html'
+        ? '<table><tr><td>Cannot commit to a closed note</td></tr></table>' : '',
+    } });
+    root.dispatchEvent(paste);
+    expect(paste.defaultPrevented).toBe(true);
+    instance.destroy();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(element.textContent).not.toContain('Cannot commit to a closed note');
+  });
+
   it('silences content-change notifications when initializing or restoring content', () => {
     const listener = vi.fn();
     const instance = createTiptapNoteEditor({ element: document.createElement('div'), html: '<p>A</p>', onUpdate: listener });
