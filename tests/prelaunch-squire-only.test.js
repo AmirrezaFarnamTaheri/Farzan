@@ -17,7 +17,7 @@ describe('greenfield Squire-only editor ownership', () => {
       'tests/notes-html-structural-gate.test.js',
     ]) expect(fs.existsSync(required), required).toBe(true);
     const notes = fs.readFileSync('notes.js', 'utf8');
-    expect(notes).not.toMatch(/_tiptap|Tiptap|ProseMirror/);
+    expect(notes).not.toMatch(/_tiptap|Tiptap|ProseMirror|notesSquireDefault/);
     expect(notes).toContain('_squire');
     const adapter = fs.readFileSync('src/features/notesSquireAdapter.js', 'utf8');
     expect(adapter).not.toContain('createTiptapNoteEditor');
@@ -25,6 +25,7 @@ describe('greenfield Squire-only editor ownership', () => {
     expect(help).not.toMatch(/notesMigrationAudit|data-help-notes-audit|loadNotesAudit/);
     const browser = fs.readFileSync('tests/e2e/workspace-redesign.spec.js', 'utf8');
     expect(browser).not.toContain('notesTiptapPreview');
+    expect(browser).not.toContain('notesSquireDefault');
   });
 
   it('retains fail-closed saved HTML validation in the new production owner', async () => {
