@@ -91,7 +91,6 @@ function assertNotCancelled(meta) {
 function initFuse(data, options = {}) {
   if (typeof Fuse !== 'function') throw Object.assign(new Error('Vendored Fuse.js is unavailable'), { code: 'SEARCH_ENGINE_UNAVAILABLE' });
   if (!Array.isArray(data)) throw new TypeError('Search index items must be an array');
-  state.data = data;
   const defaultKeys = ['title', 'label', 'description', 'searchText'];
   const keys = Array.isArray(options.keys) && options.keys.length
     ? options.keys : defaultKeys;
@@ -112,7 +111,7 @@ function initFuse(data, options = {}) {
     }).join(' ').trim();
     return { ...item, [ORIGINAL_INDEX]: index, [NORMALIZED_FIELD]: normalized };
   });
-  state.fuse = new Fuse(indexed, {
+  const nextFuse = new Fuse(indexed, {
     threshold: 0.3,
     distance: 100,
     includeMatches: true,
@@ -121,6 +120,10 @@ function initFuse(data, options = {}) {
     ...options,
     keys: [...keys, NORMALIZED_FIELD],
   });
+  // Commit the corpus and its Fuse offsets together. If construction fails,
+  // searches must continue to see the previous valid index and revision.
+  state.data = data;
+  state.fuse = nextFuse;
   state.revision += 1;
 }
 
