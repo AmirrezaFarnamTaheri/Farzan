@@ -73,7 +73,7 @@ function validateMappedElement(item, type) {
 
 
 function planShape(item) {
-  const type = String(item?.type || '');
+  const type = typeof item?.type === 'string' ? item.type : '';
   if (!TYPES.has(type)) return unsupported('unsupported-element-' + type);
   const mapped = validateMappedElement(item, type);
   if (!mapped.compatible) return mapped;
@@ -87,8 +87,12 @@ function planShape(item) {
     // advanced text layout, or links from canonical saved board elements.
     return unsupported('unsupported-element-metadata');
   }
-  const id = String(item.id || '');
-  if (!id) return unsupported('missing-element-id');
+  if (typeof item.id !== 'string') return unsupported('invalid-element-id');
+  const id = item.id;
+  if (!id.trim()) return unsupported('missing-element-id');
+  if (type === 'text' && item.text != null && typeof item.text !== 'string') {
+    return unsupported('invalid-element-text');
+  }
   const x = finite(item.x, 0), y = finite(item.y, 0);
   const common = {
     id,
@@ -167,6 +171,10 @@ function planShape(item) {
 
 export function planKonvaV1Board(board) {
   if (!board || board.version !== 1 || !Array.isArray(board.layers)) return unsupported('invalid-v1-board');
+  if (board.activeLayerIdx != null && (!Number.isInteger(board.activeLayerIdx)
+    || board.activeLayerIdx < 0 || board.activeLayerIdx >= board.layers.length)) {
+    return unsupported('invalid-active-layer');
+  }
   if (board.grid?.enabled) return unsupported('grid-renderer-not-parity-tested');
   // Do not silently coerce corrupt viewport data into a different visible
   // position or zoom. Omitted legacy fields still use the canonical defaults.
@@ -184,7 +192,8 @@ export function planKonvaV1Board(board) {
   const seenElements = new Set();
   for (const layer of board.layers) {
     if (!layer || !Array.isArray(layer.elements)) return unsupported('invalid-layer');
-    const layerId = String(layer.id || '');
+    if (typeof layer.id !== 'string') return unsupported('invalid-layer-id');
+    const layerId = layer.id;
     if (!layerId.trim()) return unsupported('missing-layer-id');
     if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
     seenLayers.add(layerId);
