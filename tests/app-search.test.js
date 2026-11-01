@@ -342,6 +342,32 @@ describe('app topbar search rendering', () => {
     expect({ courses, topics }).toEqual(original);
   });
 
+  it('keeps a same-ID imported topic attached to its original course after topbar search', async () => {
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allCourses: vi.fn(() => [{ id: 'course-a', title: 'Anatomy A' },
+        { id: 'course-b', title: 'Anatomy B' }]),
+      allTopics: vi.fn(() => [
+        { courseId: 'course-a', topicId: 'shared', title: 'Anatomy A topic' },
+        { courseId: 'course-b', topicId: 'shared', title: 'Anatomy B topic' },
+      ]),
+    };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    const results = await search._queryUniversal('Anatomy B topic');
+    const selected = results.find(row => row.sourceType === 'topic' && row.sourceId === 'course-b:shared');
+    expect(selected).toBeTruthy();
+    selected.action();
+    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('shared');
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-b');
+    sessionStorage.removeItem('ocd_pending_course');
+    sessionStorage.removeItem('ocd_pending_topic');
+  });
+
   it('never republishes a stale Notes corpus when a save invalidates an in-flight canonical read', async () => {
     let finishOld;
     const oldRecord = { id: 'same', title: 'Stale renal note', content: 'old' };
