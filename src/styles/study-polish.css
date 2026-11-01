@@ -63,10 +63,8 @@
 .home-hero {
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
   gap: clamp(var(--space-4), 2.5vw, var(--space-8));
-  align-items: stretch;
   padding: clamp(var(--space-6), 2.8vw, var(--space-10));
   border-color: var(--border);
-  background: var(--surface-2);
 }
 .home-hero::before {
   inset: 0 auto auto 0;
@@ -87,21 +85,17 @@
   font-weight: 800;
   line-height: 1.09;
   letter-spacing: -0.045em;
-  text-wrap: balance;
 }
 .home-subtitle {
   max-width: 57ch;
   font-size: clamp(1rem, 1.1vw, 1.125rem);
   line-height: 1.62;
-  color: var(--text-secondary);
 }
 .home-actions {
   margin-top: var(--space-5);
-  gap: var(--space-2);
 }
 .home-command-strip {
   margin-top: var(--space-5);
-  padding-top: var(--space-4);
   border-color: var(--border);
   color: var(--text-secondary);
 }
@@ -118,7 +112,6 @@
   line-height: 1.24;
 }
 .home-focus-status {
-  background: var(--accent-muted);
   border-color: var(--border-strong);
 }
 .home-focus-panel > p {
@@ -129,14 +122,11 @@
   box-shadow: none;
 }
 .home-focus-meta {
-  color: var(--text-secondary);
 }
 .home-focus-action {
   border-color: var(--border-strong);
 }
 .home-focus-action:hover {
-  background: var(--surface-hover);
-  transform: none;
 }
 .home-card,
 .home-card-wide,
@@ -150,8 +140,6 @@
 }
 /* Statistics are not buttons; do not animate them as if clickable. */
 .home-pulse-item:hover {
-  transform: none;
-  box-shadow: none;
   border-color: var(--border);
 }
 .home-pulse-item > span:last-child,
