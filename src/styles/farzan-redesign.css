@@ -629,6 +629,19 @@ input[type="file"][hidden] {
 .topic-meta { font-size: 11px; }
 .topic-meta .badge { border-color: var(--fz-line); background: var(--surface-3); font-size: 11px; }
 .topic-actions .btn { font-size: 12px; min-height: 32px; padding: 6px 11px; }
+/* Catalog RTL is driven by the course/source language, not by an English
+ * medical lesson title. Grid/flex tracks follow the explicit group/row dir;
+ * Latin labels remain in their own LTR islands. */
+.view-courses .source-group-count[dir="ltr"] {
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+.view-courses .source-group[dir="rtl"] .topic-title[dir="auto"],
+.view-materials .topic-row[dir="rtl"] .topic-title[dir="auto"],
+.view-materials .topic-row[dir="rtl"] .topic-submeta[dir="auto"] {
+  text-align: right;
+}
+
 .catalog-placeholder .catalog-empty { min-height: 205px; justify-content: center; }
 .course-session {
   padding: 0;

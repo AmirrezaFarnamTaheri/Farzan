@@ -1,4 +1,5 @@
 import { openPdfSource } from '../core/pdfNavigation.js';
+import { catalogReadingDirection } from '../lib/catalogDirection.js';
 export async function mountMaterialsView(deps = {}) {
   const {
     setView,
@@ -123,20 +124,22 @@ export async function mountMaterialsView(deps = {}) {
     const p = topic.pdfs?.[0];
     const row = createElement('div', {
       class: 'topic-row',
+      dir: catalogReadingDirection(topic.sourceLabel, topic.courseTitle),
       'data-topic-id': topic.topicId,
       'data-course-id': topic.courseId,
       'data-media': mediaClass(topic),
     });
     const copy = createElement('div');
     copy.append(
-      createElement('div', { class: 'topic-title' }, topic.title),
-      createElement('div', { class: 'topic-submeta' }, `${topic.courseTitle ?? ''} - ${topic.sourceLabel ?? 'Source'}`)
+      createElement('div', { class: 'topic-title', dir: 'auto' }, topic.title),
+      createElement('div', { class: 'topic-submeta', dir: 'auto' },
+        `${topic.courseTitle ?? ''} - ${topic.sourceLabel ?? 'Source'}`)
     );
-    const meta = createElement('div', { class: 'topic-meta' });
+    const meta = createElement('div', { class: 'topic-meta', dir: 'ltr' });
     if (v) meta.appendChild(materialBadge('video'));
     if (p) meta.appendChild(materialBadge('pdf'));
     if (!v && !p) meta.appendChild(materialBadge('no media'));
-    const actions = createElement('div', { class: 'topic-actions' });
+    const actions = createElement('div', { class: 'topic-actions', dir: 'ltr' });
     if (v) actions.appendChild(materialActionButton('play-video', 'Play'));
     if (p) actions.appendChild(materialActionButton('open-pdf', 'PDF'));
     row.append(copy, meta, actions);

@@ -71,4 +71,33 @@ describe('Materials task-first browsing', () => {
     optional.open = true;
     expect(optional.querySelector('#materials-course-filter option[value="c1"]')).not.toBeNull();
   });
+
+  it('uses Persian course/source reading order while keeping English material names and controls LTR', async () => {
+    window.DataStore.allTopics = () => [
+      {
+        topicId: 'embryology-ectoderm', courseId: 'embryology',
+        title: 'Ectoderm', courseTitle: 'دوره جامع جنین‌شناسی پزشکی',
+        sourceLabel: 'شروع این دوره',
+        videos: ['https://example.org/ectoderm.mp4'],
+        pdfs: ['https://example.org/ectoderm.pdf'],
+      },
+      {
+        topicId: 'english-only', courseId: 'english-course',
+        title: 'Cell Anatomy', courseTitle: 'English course',
+        sourceLabel: 'Introduction', videos: [], pdfs: [],
+      },
+    ];
+    await mount();
+    const rtl = document.querySelector('[data-topic-id="embryology-ectoderm"]');
+    expect(rtl?.getAttribute('dir')).toBe('rtl');
+    expect(rtl.querySelector('.topic-title')?.getAttribute('dir')).toBe('auto');
+    expect(rtl.querySelector('.topic-title')?.textContent).toBe('Ectoderm');
+    expect(rtl.querySelector('.topic-submeta')?.textContent).toContain('دوره جامع');
+    expect(rtl.querySelector('.topic-meta')?.getAttribute('dir')).toBe('ltr');
+    expect(rtl.querySelector('.topic-actions')?.getAttribute('dir')).toBe('ltr');
+    expect([...rtl.querySelectorAll('.topic-actions button')].map(btn => btn.dataset.action))
+      .toEqual(['play-video', 'open-pdf']);
+    expect(document.querySelector('[data-topic-id="english-only"]')?.getAttribute('dir')).toBe('ltr');
+  });
+
 });
