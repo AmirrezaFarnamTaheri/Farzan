@@ -76,7 +76,9 @@ function parseRules(css, file, layer) {
           file, layer,
           selector: header,
           context: atRules.join(' | '),
-          body: normal(body).replace(/\s*:\s*/g, ': ').replace(/\s*;\s*/g, ';').trim(),
+          // Keep original CSS value syntax. Normalizing colons or semicolons
+          // here used to corrupt quoted data URLs and declaration strings.
+          body: body.trim(),
           line: source.slice(0, i).split('\n').length,
         });
       }
