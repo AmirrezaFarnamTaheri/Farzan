@@ -159,14 +159,16 @@ export function initCommandPalette() {
     const ranked = fuseIndices.get(indexKey).search(query).map(result => result.item);
     const exact = [];
     const starts = [];
+    const substrings = [];
     const fuzzy = [];
     for (const item of ranked) {
       const label = normalizeSearchQuery(item.label);
       if (label === query) exact.push(item);
       else if (label.startsWith(query)) starts.push(item);
+      else if (label.includes(query)) substrings.push(item);
       else fuzzy.push(item);
     }
-    return [...exact, ...starts, ...fuzzy];
+    return [...exact, ...starts, ...substrings, ...fuzzy];
   };
 
   const setSelected = (idx) => {
