@@ -13,7 +13,7 @@ function rule(source, selector) {
 describe('RTL layout uses logical start/end in owning CSS rules', () => {
   it('mirrors Notes search, export menus, save status and folder counters', () => {
     expect(rule(notes, '.notes-search-field > .icon')).toMatch(/inset-inline-start:\s*var\(--space-3\)/);
-    expect(rule(notes, '.notes-search-field .input')).toMatch(/padding-inline-start:\s*var\(--space-9\)/);
+    expect(rule(notes, '.notes-search-field .input')).toMatch(/padding-inline:\s*var\(--space-9\)/);
     expect(rule(notes, '.notes-export-popover')).toMatch(/inset-inline-end:\s*0/);
     expect(rule(notes, '.notes-export-popover button')).toMatch(/text-align:\s*start/);
     expect(rule(notes, '.notes-save')).toMatch(/text-align:\s*end/);
