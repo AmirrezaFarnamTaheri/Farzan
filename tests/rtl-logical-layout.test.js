@@ -28,7 +28,7 @@ describe('RTL layout uses logical start/end in owning CSS rules', () => {
   });
   it('mirrors course filter search and avoids fixed left-aligned titles', () => {
     expect(rule(views, '.courses-search-field > .icon')).toMatch(/inset-inline-start:\s*var\(--space-3\)/);
-    expect(rule(enhancements, '.view-courses #courses-search')).toMatch(/padding-inline:\\s*calc\\([^)]*\\);/);
+    expect(rule(enhancements, '.view-courses #courses-search')).toMatch(/padding-inline:\s*calc\(/);
     expect(views).not.toContain('.courses-search-field .input {');
     expect(rule(views, '.courses-list')).toMatch(/padding-inline-end:/);
     expect(rule(views, '.course-item')).toMatch(/text-align:\s*start/);
