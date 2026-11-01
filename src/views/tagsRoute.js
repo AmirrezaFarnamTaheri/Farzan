@@ -29,19 +29,19 @@ export function mountTagsView({ setView } = {}) {
             <button class="filter-chip" type="button" data-tag-filter="catalog" aria-pressed="false">Catalog</button>
           </div>
           <div class="tags-taxonomy-controls" data-tag-taxonomy-controls>
-            <form data-tag-create-form class="filter-row" aria-label="Create a personal tag">
+            <div data-tag-create-form class="filter-row" role="group" aria-label="Create a personal tag">
               <label for="tag-new-label">New personal tag</label>
               <input id="tag-new-label" class="input" data-tag-create-name maxlength="80"
                 placeholder="Name a tag..." disabled required />
-              <button class="btn btn-ghost" type="submit" disabled>Create tag</button>
-            </form>
-            <form data-tag-merge-form class="filter-row" aria-label="Merge two tag facets without changing saved content">
+              <button class="btn btn-ghost" type="button" disabled>Create tag</button>
+            </div>
+            <div data-tag-merge-form class="filter-row" role="group" aria-label="Merge two tag facets without changing saved content">
               <label for="tag-merge-from">Merge label</label>
               <select class="select" id="tag-merge-from" data-tag-merge-from disabled></select>
               <label for="tag-merge-to">Into</label>
               <select class="select" id="tag-merge-to" data-tag-merge-to disabled></select>
-              <button class="btn btn-ghost" type="submit" disabled>Merge labels</button>
-            </form>
+              <button class="btn btn-ghost" type="button" disabled>Merge labels</button>
+            </div>
             <p class="text-muted">Merged labels stay in original Notes and courses; only the displayed taxonomy changes.</p>
             <p role="status" aria-live="polite" data-tag-mutation-status></p>
           </div>
@@ -401,13 +401,14 @@ async function renderTags() {
   };
   // Rebind to the current render state: leaving an old listener in place
   // retains stale controls, counts and write permissions after reload.
-  createForm.onsubmit = event => {
+  const submitCreate = () => void applyMutation(current => createTaxonomyTag(current, createName.value));
+  const submitMerge = () => void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
+  createForm.querySelector('button').onclick = submitCreate;
+  mergeForm.querySelector('button').onclick = submitMerge;
+  createName.onkeydown = event => {
+    if (event.key !== 'Enter' || event.isComposing) return;
     event.preventDefault();
-    void applyMutation(current => createTaxonomyTag(current, createName.value));
-  };
-  mergeForm.onsubmit = event => {
-    event.preventDefault();
-    void applyMutation(current => mergeTaxonomyTags(current, mergeFrom.value, mergeTo.value));
+    if (!createForm.querySelector('button').disabled) submitCreate();
   };
 
   if (!searchEl.dataset.pdBound) {
