@@ -364,6 +364,27 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('.drawer-backdrop')).toBeNull();
   });
 
+  it('keeps body scroll locked while another dialog drawer remains open', async () => {
+    await loadApp(`
+      <button id="drawer-origin">Open</button>
+      <div id="ocd-app"><main id="view-container"></main></div>
+      <aside class="drawer" id="first-drawer" hidden><button>First</button></aside>
+      <aside class="drawer" id="second-drawer" hidden><button>Second</button></aside>
+    `);
+    const { Drawer } = await import('../src/ui/overlays.js');
+    Drawer.open('first-drawer');
+    Drawer.open('second-drawer');
+    expect(document.body.style.overflow).toBe('hidden');
+    Drawer.close('first-drawer');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+    expect(document.querySelector('.drawer-backdrop')).not.toBeNull();
+    Drawer.close('second-drawer');
+    vi.runOnlyPendingTimers();
+    expect(document.body.style.overflow).toBe('');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+  });
+
   it('removes app tooltips when their anchor leaves the DOM', async () => {
     await loadApp(`
       <div id="ocd-app">
