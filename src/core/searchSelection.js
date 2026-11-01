@@ -8,6 +8,8 @@ export function nextSearchSelectionIndex(current, count, key) {
   const size = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
   if (!size) return -1;
   const index = Number.isInteger(current) ? current : -1;
+  if (key === 'Home') return 0;
+  if (key === 'End') return size - 1;
   if (key === 'ArrowDown') return Math.min(size - 1, Math.max(0, index + 1));
   if (key === 'ArrowUp') return Math.max(0, Math.min(size - 1, index - 1));
   return index >= 0 && index < size ? index : -1;

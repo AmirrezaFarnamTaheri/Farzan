@@ -41,7 +41,12 @@ export function rankLexicalMatches(items, query, {
     if (!Number.isFinite(score)) {
       for (let i = 0; i < keys.length; i += 1) {
         if (keys[i] === displayKey) continue;
-        if (normalizeSearchQuery(item[keys[i]]).includes(needle)) {
+        // Metadata is an index of independent tokens. Never convert arrays
+        // into a comma-delimited pseudo-field or index arbitrary objects.
+        const value = item[keys[i]];
+        const tokens = Array.isArray(value) ? value : [value];
+        if (tokens.some(token => (typeof token === 'string' || typeof token === 'number')
+          && normalizeSearchQuery(token).includes(needle))) {
           score = 3 + i;
           break;
         }

@@ -274,6 +274,11 @@ export function initCommandPalette() {
     // renderResults() and the user's next arrow keypress.
     const visibleCount = visibleItems.length;
     if (e.key === 'Enter') { e.preventDefault(); activateSelected(); return; }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      setSelected(nextSearchSelectionIndex(cpSelectedIdx, visibleCount, e.key));
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!visibleCount) return;
