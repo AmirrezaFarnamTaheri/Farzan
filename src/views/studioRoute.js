@@ -174,6 +174,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-mode="pen" aria-pressed="false">Pen</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="rect" aria-label="Add rectangle to Konva draft">Add rectangle</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-add="circle" aria-label="Add circle to Konva draft">Add circle</button>
+            <label for="studio-konva-layer">Active drawing layer</label>
+            <select id="studio-konva-layer" class="select input-sm"
+              data-studio-konva-layer aria-label="Active Konva drawing layer"></select>
             <label for="studio-konva-object">Object</label>
             <select id="studio-konva-object" class="select input-sm" data-studio-konva-object></select>
             <div class="studio-konva-text-edit">
@@ -691,6 +694,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let unmounted = false;
   const konvaDialog = document.querySelector('[data-studio-konva-dialog]');
   const konvaOpen = document.querySelector('[data-studio-konva-open]');
+  const konvaLayer = document.querySelector('[data-studio-konva-layer]');
   const konvaSelect = document.querySelector('[data-studio-konva-object]');
   const konvaTextInput = document.querySelector('[data-studio-konva-text]');
   const konvaTextSave = document.querySelector('[data-studio-konva-text-save]');
@@ -750,6 +754,13 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       button.classList.toggle('active', active);
     });
     if (konvaSelect) konvaSelect.disabled = mode === 'pen' || konvaTextSaving || konvaKeyboardBusy;
+    if (konvaLayer) konvaLayer.disabled = !konvaWorkspace?.selectLayer || konvaTextSaving
+      || konvaKeyboardBusy || konvaClosing || konvaResetting || konvaImporting;
+    const boardForLayer = konvaWorkspace?.getBoard?.();
+    const activeDrawingLayer = boardForLayer?.layers?.[boardForLayer.activeLayerIdx ?? 0];
+    const penButton = document.querySelector('[data-studio-konva-mode="pen"]');
+    if (penButton) penButton.disabled = !activeDrawingLayer || activeDrawingLayer.locked === true
+      || activeDrawingLayer.visible === false || konvaKeyboardBusy || konvaTextSaving;
     document.querySelectorAll('[data-studio-konva-add]').forEach(button => {
       const board = konvaWorkspace?.getBoard?.();
       const layer = board?.layers?.[board.activeLayerIdx ?? 0];
@@ -785,6 +796,17 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   const populateKonvaObjects = () => {
     if (!konvaSelect || !konvaWorkspace) return;
     const board = konvaWorkspace.getBoard();
+    if (konvaLayer) {
+      const layerOptions = (board.layers || []).map((layer, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        const label = String(layer.name || layer.id || ('Layer ' + (index + 1)));
+        option.textContent = label + (layer.locked ? ' (locked)' : layer.visible === false ? ' (hidden)' : '');
+        return option;
+      });
+      konvaLayer.replaceChildren(...layerOptions);
+      konvaLayer.value = String(board.activeLayerIdx ?? 0);
+    }
     const options = [];
     const placeholder = document.createElement('option');
     placeholder.value = '';
@@ -928,6 +950,33 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   on(konvaSelect, 'change', () => {
     konvaWorkspace?.select?.(konvaSelect.value || null);
     refreshKonvaControls();
+  });
+  on(konvaLayer, 'change', async () => {
+    const workspace = konvaWorkspace;
+    if (!workspace?.selectLayer || konvaKeyboardBusy || konvaClosing
+        || konvaResetting || konvaImporting || konvaTextSaving || unmounted) return;
+    const next = Number(konvaLayer.value);
+    konvaKeyboardBusy = true;
+    refreshKonvaControls();
+    try {
+      await workspace.selectLayer(next);
+      if (unmounted || konvaWorkspace !== workspace) return;
+      const layer = workspace.getBoard().layers[next];
+      if (layer?.locked || layer?.visible === false) workspace.setMode?.('select');
+      workspace.select?.(null);
+      populateKonvaObjects();
+      setKonvaStatus('Active draft layer saved');
+    } catch {
+      if (!unmounted && workspace === konvaWorkspace) {
+        setKonvaStatus('Layer selection not saved; previous drawing layer retained');
+      }
+    } finally {
+      konvaKeyboardBusy = false;
+      if (!unmounted && workspace === konvaWorkspace) {
+        populateKonvaObjects();
+        refreshKonvaControls();
+      }
+    }
   });
   const konvaArrowMoves = Object.freeze({
     ArrowLeft: [-1, 0], ArrowRight: [1, 0],

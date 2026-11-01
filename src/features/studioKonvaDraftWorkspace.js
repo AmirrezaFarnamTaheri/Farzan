@@ -275,6 +275,7 @@ export function createStudioKonvaDraftWorkspace({
     },
     addStroke: points => run(() => session.addStroke(points)),
     addShape: geometry => run(() => session.addShape(geometry)),
+    selectLayer: index => run(() => session.selectLayer(index)),
     select(id) {
       if (disposed) return;
       selectedId = id || null;
