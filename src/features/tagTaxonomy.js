@@ -95,7 +95,9 @@ export function mergeTaxonomyTags(current, sourceLabel, destinationLabel) {
   Object.defineProperty(aliases, source, {
     value: destination, enumerable: true, configurable: true, writable: true,
   });
-  const result = { ...taxonomy, aliases };
+  const labels = taxonomy.labels.some(label => label.key === destination)
+    ? taxonomy.labels : [...taxonomy.labels, normalizeLabel(destinationLabel)];
+  const result = { ...taxonomy, labels, aliases };
   // Validate all transitive aliases and reject any cycle before persistence.
   return parseTagTaxonomy(result);
 }
