@@ -14,9 +14,9 @@ const UNSAFE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 function normalizeLabel(value) {
   if (typeof value !== 'string') throw new TypeError('A tag label must be text');
-  const label = value.trim().replace(/\\s+/g, ' ');
+  const label = value.trim().replace(/\s+/g, ' ');
   if (!label || label.length > MAX_LABEL_LENGTH) throw new RangeError('A tag label must be 1–80 characters');
-  if (/[\\u0000-\\u001f\\u007f-\\u009f]/.test(label)) throw new TypeError('Tag labels cannot contain control characters');
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(label)) throw new TypeError('Tag labels cannot contain control characters');
   const key = normalizeSearchQuery(label);
   if (!key || UNSAFE_KEYS.has(key)) throw new TypeError('Invalid tag identity');
   return { key, label };
