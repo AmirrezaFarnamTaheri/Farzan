@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import DBExports from '../db.js';
 
@@ -121,38 +121,19 @@ describe('OpenCourseDB helper (formerly PlasmaDB)', () => {
     expect(a.iv).not.toEqual(b.iv);
   });
 
-  it('still decrypts legacy envelopes written before the v2 format', async () => {
+  it('rejects unpublished unversioned AES envelopes before key derivation', async () => {
     const { OpenCourseDB } = DBExports;
-    const db = new OpenCourseDB('ocd-test-db-legacy', 1, []);
-    db.setPassphrase('old-passphrase');
-
-    // Reproduce the pre-v2 envelope: static app salt, 10k iterations, no version field.
-    const { webcrypto } = await import('node:crypto');
-    const enc = new TextEncoder();
-    const baseKey = await webcrypto.subtle.importKey(
-      'raw',
-      enc.encode('old-passphrase'),
-      'PBKDF2',
-      false,
-      ['deriveKey']
-    );
-    const key = await webcrypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: enc.encode('opencoursedeck-salt'), iterations: 10000, hash: 'SHA-256' },
-      baseKey,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
-    const iv = webcrypto.getRandomValues(new Uint8Array(12));
-    const ciphertext = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify({ legacy: true })));
-    const envelope = {
+    const db = new OpenCourseDB('ocd-test-db-unversioned', 1, []);
+    db.setPassphrase('private-passphrase');
+    const derive = vi.spyOn(db, '_deriveKey');
+    const historical = {
       __encrypted: true,
-      iv: Array.from(iv),
-      ciphertext: Array.from(new Uint8Array(ciphertext)),
+      iv: Array(12).fill(1),
+      ciphertext: Array(32).fill(2),
     };
-
-    const decrypted = await db.decryptPayload(envelope);
-    expect(decrypted).toEqual({ legacy: true });
+    await expect(db.decryptPayload(historical)).rejects.toThrow(/version/i);
+    expect(derive).not.toHaveBeenCalled();
+    derive.mockRestore();
   });
 
   it('refuses encrypted reads with missing or incorrect passphrases', async () => {
