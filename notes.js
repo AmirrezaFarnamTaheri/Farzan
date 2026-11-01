@@ -2377,34 +2377,30 @@ import { countWords } from './src/core/textMetrics.js';
         toggle.disabled = false;
         toggle.removeAttribute('title');
         toggle.textContent = 'Try Squire editor';
-        // Test-only opt-out retains characterization of the classic editor.
-        // Normal first-launch users never see a migration/consent dialog.
-        if (window.OpenCourseDeck?.featureFlags?.notesSquireDefault !== false) {
-          const sessionEpoch = Editor._loadEpoch;
-          toggle.disabled = true;
-          toggle.textContent = 'Opening Squire editor…';
-          void this.enableModernEditor().then(result => {
-            // Reopening another note while the chunk loads must not publish
-            // stale mode labels or replace its authoritative editor.
-            if (!this._inited || Editor._loadEpoch !== sessionEpoch
-              || Editor._currentId !== id || !toggle.isConnected) return;
-            toggle.disabled = result.reason === 'incompatible';
-            toggle.textContent = result.ok
-              ? 'Use classic editor'
-              : result.reason === 'incompatible'
-                ? 'Classic editor (advanced formatting)'
-                : 'Try Squire editor';
-            if (result.reason === 'incompatible') {
-              toggle.title = 'This note keeps its original advanced formatting in the classic editor.';
-            }
-          }).catch(error => {
-            if (!this._inited || Editor._loadEpoch !== sessionEpoch
-              || Editor._currentId !== id || !toggle.isConnected) return;
-            toggle.disabled = false;
-            toggle.textContent = 'Try Squire editor';
-            console.warn('[Notes] Squire failed to initialize; classic editor preserved', error);
-          });
-        }
+        const sessionEpoch = Editor._loadEpoch;
+        toggle.disabled = true;
+        toggle.textContent = 'Opening Squire editor…';
+        void this.enableModernEditor().then(result => {
+          // Reopening another note while the chunk loads must not publish
+          // stale mode labels or replace its authoritative editor.
+          if (!this._inited || Editor._loadEpoch !== sessionEpoch
+            || Editor._currentId !== id || !toggle.isConnected) return;
+          toggle.disabled = result.reason === 'incompatible';
+          toggle.textContent = result.ok
+            ? 'Use classic editor'
+            : result.reason === 'incompatible'
+              ? 'Classic editor (advanced formatting)'
+              : 'Try Squire editor';
+          if (result.reason === 'incompatible') {
+            toggle.title = 'This note keeps its original advanced formatting in the classic editor.';
+          }
+        }).catch(error => {
+          if (!this._inited || Editor._loadEpoch !== sessionEpoch
+            || Editor._currentId !== id || !toggle.isConnected) return;
+          toggle.disabled = false;
+          toggle.textContent = 'Try Squire editor';
+          console.warn('[Notes] Squire failed to initialize; classic editor preserved', error);
+        });
       }
       return true;
     },
