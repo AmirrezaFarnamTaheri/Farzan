@@ -4,11 +4,10 @@ import { dueReviewCards, watchedCoverageSeconds } from '../src/core/studyMetrics
 describe('truthful study metrics', () => {
   it('counts due flashcards by their schedule rather than old completed topics', () => {
     const cards = [
-      { id: 'due', front: 'Question', nextReviewDate: '2026-10-23' },
-      { id: 'future', nextReviewDate: '2026-11-20' },
-      { id: 'undated' },
+      { id: 'due', front: 'Question', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-10-23T00:00:00.000Z' } } },
+      { id: 'future', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-11-20T00:00:00.000Z' } } },
     ];
-    expect(dueReviewCards(cards, '2026-10-24').map(card => card.id)).toEqual(['due', 'undated']);
+    expect(dueReviewCards(cards, '2026-10-24', new Date('2026-10-24T12:00:00.000Z')).map(card => card.id)).toEqual(['due']);
     expect(dueReviewCards([], '2026-10-24')).toEqual([]);
   });
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '../flashcards.js';
+import { createFsrsV5State } from '../src/features/flashcardsFsrsAdapter.js';
 
 const manager = window.OpenCourseDeck.Flashcards.manager;
 
@@ -65,7 +66,7 @@ describe('Flashcard canonical write serialization', () => {
     const today = new Date().toISOString().slice(0, 10);
     const existing = {
       id: 'fc_two_reviews', deck: 'Study', front: 'Q', back: 'A', sourceNoteId: null,
-      repetitions: 0, interval: 0, easeFactor: 2.5,
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(new Date()),
       nextReviewDate: today, createdAt: new Date().toISOString(),
     };
     const store = delayedCanonicalDeck([existing]);
@@ -78,9 +79,9 @@ describe('Flashcard canonical write serialization', () => {
 
     const [, secondResult] = await Promise.all([first, second]);
     expect(store.maxActive()).toBe(1);
-    expect(secondResult.repetitions).toBe(2);
-    expect(secondResult.interval).toBe(6);
-    expect(store.records()[0].repetitions).toBe(2);
+    expect(secondResult.fsrsState.card.reps).toBe(2);
+    expect(secondResult.fsrsState.reviewLog).toHaveLength(2);
+    expect(store.records()[0].fsrsState.reviewLog).toHaveLength(2);
   });
 
   it('continues the mutation queue after an earlier persistence failure', async () => {
@@ -108,7 +109,7 @@ describe('Flashcard canonical write serialization', () => {
   it('does not announce a successful rating when canonical persistence rejects it', async () => {
     const existing = {
       id: 'fc_uncommitted_review', deck: 'Review', front: 'Question', back: 'Answer',
-      repetitions: 0, interval: 0, easeFactor: 2.5,
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(new Date()),
       nextReviewDate: new Date().toISOString().slice(0, 10),
       createdAt: new Date().toISOString(),
     };
@@ -132,13 +133,13 @@ describe('Flashcard canonical write serialization', () => {
     });
     expect(document.getElementById('aria-announcer').textContent).not.toContain('Card rated');
     expect(container.querySelector('#fc-grade-btns button[data-grade="4"]').disabled).toBe(false);
-    expect(records[0].repetitions).toBe(0);
+    expect(records[0].fsrsState.reviewLog).toHaveLength(0);
   });
 
   it('does not grade the same visible card twice while its first save is pending', async () => {
     const existing = {
       id: 'fc_double_click', deck: 'Review', front: 'Question', back: 'Answer',
-      repetitions: 0, interval: 0, easeFactor: 2.5,
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(new Date()),
       nextReviewDate: new Date().toISOString().slice(0, 10),
       createdAt: new Date().toISOString(),
     };
@@ -170,7 +171,7 @@ describe('Flashcard canonical write serialization', () => {
       expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
     });
     expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
-    expect(records[0].repetitions).toBe(1);
+    expect(records[0].fsrsState.reviewLog).toHaveLength(1);
   });
 
 });

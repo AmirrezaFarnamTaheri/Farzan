@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '../flashcards.js';
+import { createFsrsV5State } from '../src/features/flashcardsFsrsAdapter.js';
 
 const flashcards = () => window.OpenCourseDeck.Flashcards;
 const host = () => document.getElementById('flashcards-integration-host');
@@ -50,7 +51,7 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
     expect(document.activeElement).toBe(begin);
   });
 
-  it('creates the first card without resetting its SM-2 defaults or blocking later review', async () => {
+  it('creates the first FSRS card without blocking later review', async () => {
     const records = restoreCanonical([]);
     const container = await render();
     container.querySelector('#fc-empty-create').click();
@@ -67,9 +68,10 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
     expect(records()[0]).toEqual(expect.objectContaining({
       front: 'What is a state machine?',
       back: 'A model with explicit transitions',
-      repetitions: 0,
-      interval: 0,
-      easeFactor: 2.5,
+      scheduler: 'fsrs-v5',
+      fsrsState: expect.objectContaining({
+        reviewLog: [], card: expect.objectContaining({ reps: 0 }),
+      }),
     }));
     expect(host().querySelector('#fc-add-btn').hidden).toBe(false);
     expect(host().querySelector('.fc-stats')).not.toBeNull();
@@ -80,7 +82,7 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
     const today = new Date().toISOString().slice(0, 10);
     let records = [{
       id: 'fc_integrated', deck: 'Engineering', front: 'Front', back: 'Back',
-      repetitions: 0, interval: 0, easeFactor: 2.5,
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(new Date()),
       nextReviewDate: today, createdAt: new Date().toISOString(),
     }];
     let releaseGrade;
@@ -106,11 +108,11 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
 
     expect(good.disabled).toBe(true);
     expect(status()).not.toContain('Card rated');
-    expect(records[0].repetitions).toBe(0);
+    expect(records[0].fsrsState.reviewLog).toHaveLength(0);
 
     releaseGrade();
     await vi.waitFor(() => expect(status()).toContain('Card rated'));
-    expect(records[0].repetitions).toBe(1);
+    expect(records[0].fsrsState.reviewLog).toHaveLength(1);
     expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
   });
 
@@ -118,7 +120,7 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
     const today = new Date().toISOString().slice(0, 10);
     const records = [{
       id: 'fc_rejected', deck: 'Engineering', front: 'Front', back: 'Back',
-      repetitions: 0, interval: 0, easeFactor: 2.5,
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(new Date()),
       nextReviewDate: today, createdAt: new Date().toISOString(),
     }];
     window.DB = {
@@ -133,7 +135,7 @@ describe('Integrated first-use flashcards and persistent review acknowledgments'
 
     await vi.waitFor(() => expect(status()).toContain('Storage unavailable'));
     expect(status()).not.toContain('Card rated');
-    expect(records[0].repetitions).toBe(0);
+    expect(records[0].fsrsState.reviewLog).toHaveLength(0);
     expect(good.disabled).toBe(false);
   });
 });

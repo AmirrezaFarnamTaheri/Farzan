@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../flashcards.js';
 
-describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
+describe('FSRS spaced repetition & flashcards engine', () => {
   beforeEach(() => {
     try { delete window.DB; } catch { window.DB = undefined; }
     window.OpenCourseDeck?.Flashcards?.manager?.reset();
@@ -10,62 +10,16 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
   it('registers window.OpenCourseDeck.Flashcards namespace', () => {
     expect(window.OpenCourseDeck).toBeDefined();
     expect(window.OpenCourseDeck.Flashcards).toBeDefined();
-    expect(typeof window.OpenCourseDeck.Flashcards.calculateSM2).toBe('function');
+    expect(window.OpenCourseDeck.Flashcards).not.toHaveProperty('calculateSM2');
     expect(typeof window.OpenCourseDeck.Flashcards.addCard).toBe('function');
     expect(typeof window.OpenCourseDeck.Flashcards.reviewCard).toBe('function');
     expect(typeof window.OpenCourseDeck.Flashcards.getDueCards).toBe('function');
   });
 
-  describe('SM-2 Algorithm Calculation', () => {
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('schedules nextReviewDate on the UTC calendar regardless of local timezone', () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-01-01T23:30:00Z'));
-      const { calculateSM2 } = window.OpenCourseDeck.Flashcards;
-      const result = calculateSM2(4, 0, 0, 2.5);
-      expect(result.nextReviewDate).toBe('2026-01-02');
-    });
-    const { calculateSM2 } = window.OpenCourseDeck.Flashcards;
-
-    it('resets repetitions and sets 1-day interval when grade < 3 (failure)', () => {
-      const result = calculateSM2(2, 3, 10, 2.5);
-      expect(result.repetitions).toBe(0);
-      expect(result.interval).toBe(1);
-      expect(result.easeFactor).toBeLessThan(2.5);
-    });
-
-    it('sets interval to 1 on first successful review (grade >= 3, repetitions = 0)', () => {
-      const result = calculateSM2(4, 0, 0, 2.5);
-      expect(result.repetitions).toBe(1);
-      expect(result.interval).toBe(1);
-    });
-
-    it('sets interval to 6 on second successful review (grade >= 3, repetitions = 1)', () => {
-      const result = calculateSM2(4, 1, 1, 2.5);
-      expect(result.repetitions).toBe(2);
-      expect(result.interval).toBe(6);
-    });
-
-    it('multiplies interval by ease factor on third+ successful review', () => {
-      const result = calculateSM2(5, 2, 6, 2.5);
-      expect(result.repetitions).toBe(3);
-      expect(result.interval).toBe(15); // Math.round(6 * 2.5)
-      expect(result.easeFactor).toBeGreaterThanOrEqual(2.5);
-    });
-
-    it('enforces minimum Ease Factor floor of 1.3', () => {
-      const result = calculateSM2(0, 0, 1, 1.4);
-      expect(result.easeFactor).toBe(1.3);
-    });
-  });
-
   describe('Flashcard Deck Manager Operations', () => {
     const { addCard, getCards, reviewCard, getDueCards, deleteCard } = window.OpenCourseDeck.Flashcards;
 
-    it('creates new flashcards with initial SM-2 defaults', async () => {
+    it('creates new flashcards with FSRS UTC timestamps', async () => {
       const card = await addCard({
         front: 'What is OKLCH?',
         back: 'Perceptually uniform color space using Lightness, Chroma, and Hue.',
@@ -75,15 +29,16 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
       expect(card.id).toMatch(/^fc_/);
       expect(card.front).toBe('What is OKLCH?');
       expect(card.deck).toBe('CSS & Design');
-      expect(card.repetitions).toBe(0);
-      expect(card.interval).toBe(0);
-      expect(card.easeFactor).toBe(2.5);
+      expect(card.scheduler).toBe('fsrs-v5');
+      expect(card.fsrsState.card.due).toBe(card.createdAt);
+      expect(card.fsrsState.reviewLog).toEqual([]);
+      expect(card).not.toHaveProperty('repetitions');
 
       const all = await getCards();
       expect(all.length).toBe(1);
     });
 
-    it('updates flashcard parameters upon review', async () => {
+    it('updates FSRS review state upon review', async () => {
       const card = await addCard({
         front: 'What is IndexedDB?',
         back: 'Low-level key-value browser storage engine.',
@@ -91,8 +46,8 @@ describe('SM-2 Spaced Repetition & Flashcards Engine', () => {
       });
 
       const updated = await reviewCard(card.id, 5);
-      expect(updated.repetitions).toBe(1);
-      expect(updated.interval).toBe(1);
+      expect(updated.fsrsState.reviewLog).toHaveLength(1);
+      expect(updated.fsrsState.card.reps).toBe(1);
       expect(updated.lastReviewedAt).toBeDefined();
     });
 
@@ -224,17 +179,14 @@ describe('Flashcards Studio UI (keyboard-driven review)', () => {
     expect(container.querySelector('#fc-grade-btns').hidden).toBe(false);
     expect(document.getElementById('aria-announcer').textContent).toContain('Answer shown');
 
-    // Grade 1 (Again) reviews the due card and records the SM-2 state change.
-    // Note: whether the failed card leaves today's queue is timezone-dependent
-    // (nextReviewDate mixes local midnight with UTC date strings), so assert
-    // persisted review state instead of deck membership.
+    // Grade 1 (Again) records an exact short-term FSRS review instant.
     container.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, cancelable: true }));
     await vi.waitFor(() => {
       expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
     });
     const cards = await manager.getCards();
     expect(cards[0].lastReviewedAt).toBeTruthy(); // the keypress reached reviewCard
-    expect(cards[0].repetitions).toBe(0); // grade < 3 resets progress
+    expect(cards[0].fsrsState.reviewLog[0].rating).toBe(1); // Again
     expect(document.getElementById('aria-announcer').textContent).toContain('Card rated');
   });
 
@@ -298,7 +250,7 @@ describe('Flashcards Studio create-card form', () => {
     const form = container.querySelector('#fc-new-form');
     expect(form.classList.contains('hidden')).toBe(false);
 
-    form.querySelector('#fc-new-front').value = '  What is SM-2? ';
+    form.querySelector('#fc-new-front').value = '  What is FSRS? ';
     form.querySelector('#fc-new-back').value = 'A spaced-repetition algorithm';
     form.querySelector('#fc-new-deck').value = '';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -306,7 +258,7 @@ describe('Flashcards Studio create-card form', () => {
       expect((await manager.getCards())).toHaveLength(1);
     });
     const added = (await manager.getCards())[0];
-    expect(added.front).toBe('What is SM-2?'); // values are trimmed
+    expect(added.front).toBe('What is FSRS?'); // values are trimmed
     expect(added.deck).toBe('General'); // empty deck falls back to General
     expect(document.getElementById('aria-announcer').textContent).toContain('Card added');
   });
@@ -356,11 +308,13 @@ describe('Flashcards vault persistence', () => {
 
     // A backup import writes the restored deck straight to persistence, the way
     // progress.js does during a vault import.
-    const today = new Date().toISOString().split('T')[0];
+    const created = new Date();
+    const { createFsrsV5State } = await import('../src/features/flashcardsFsrsAdapter.js');
     const restored = [{
       id: 'fc_restored_1', front: 'Restored', back: 'Restored answer', deck: 'New',
-      repetitions: 0, interval: 0, easeFactor: 2.5, nextReviewDate: today,
-      createdAt: new Date().toISOString(),
+      scheduler: 'fsrs-v5', fsrsState: createFsrsV5State(created),
+      nextReviewDate: created.toISOString().slice(0, 10),
+      createdAt: created.toISOString(),
     }];
     await window.DB.saveSetting('ocd_flashcards', restored);
     localStorage.setItem('ocd_flashcards', JSON.stringify(restored));
@@ -378,7 +332,7 @@ describe('Flashcards vault persistence', () => {
 
     // ...and survives the next review instead of being overwritten by the stale one.
     const reviewed = await reviewCard('fc_restored_1', 5);
-    expect(reviewed.repetitions).toBe(1);
+    expect(reviewed.fsrsState.reviewLog).toHaveLength(1);
     expect(window.DB.store.ocd_flashcards.map((c) => c.front)).toEqual(['Restored']);
   });
 });
@@ -436,7 +390,7 @@ describe('flashcard editing and deletion', () => {
     const updated = await manager.updateCard(card.id, { front: 'Corrected question', back: 'Corrected answer', deck: 'Biology' });
     expect(updated.id).toBe(card.id);
     expect(updated.sourceNoteId).toBe('note-1');
-    expect(updated.repetitions).toBe(reviewed.repetitions);
+    expect(updated.fsrsState).toEqual(reviewed.fsrsState);
     expect(window.DB.records[0].front).toBe('Corrected question');
   });
 
@@ -532,7 +486,7 @@ describe('flashcard canonical read and due query safety', () => {
     window.DB = {
       getSetting: vi.fn(async () => [{
         id: 'due-from-db', front: 'Review', back: 'Due', deck: 'Science',
-        nextReviewDate: '2020-01-01',
+        scheduler: 'fsrs-v5', fsrsState: { card: { due: '2020-01-01T00:00:00.000Z' } },
       }]),
       saveSetting: vi.fn(async () => true),
     };

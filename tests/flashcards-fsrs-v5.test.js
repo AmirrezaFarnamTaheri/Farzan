@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createFsrsV5State,
   rateFsrsV5State,
-  ratingFromLegacyGrade,
+  ratingFromUiGrade,
   assertFsrsV5State,
 } from '../src/features/flashcardsFsrsAdapter.js';
 import '../flashcards.js';
@@ -10,7 +10,7 @@ import '../flashcards.js';
 const fs = () => window.OpenCourseDeck.Flashcards;
 let canonical;
 
-describe('opt-in FSRS-6 scheduling through pinned ts-fsrs v5', () => {
+describe('canonical FSRS-6 scheduling through pinned ts-fsrs v5', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T23:59:00.000Z'));
@@ -36,13 +36,13 @@ describe('opt-in FSRS-6 scheduling through pinned ts-fsrs v5', () => {
   });
 
   it('maps Farzan buttons 1/2/4/5 to FSRS ratings 1/2/3/4, rejecting invalid grades', () => {
-    expect([1, 2, 4, 5].map(ratingFromLegacyGrade)).toEqual([1, 2, 3, 4]);
+    expect([1, 2, 4, 5].map(ratingFromUiGrade)).toEqual([1, 2, 3, 4]);
     for (const invalid of [0, 3, 6, -1, 2.5, '5', NaN, null]) {
-      expect(() => ratingFromLegacyGrade(invalid)).toThrow();
+      expect(() => ratingFromUiGrade(invalid)).toThrow();
     }
   });
 
-  it('creates a JSON-safe versioned new card without fabricating SM-2 history', () => {
+  it('creates a JSON-safe versioned new card with no legacy scheduling counters', () => {
     const created = createFsrsV5State(new Date());
     expect(created.version).toBe(1);
     expect(created.packageVersion).toBe('5.4.2');
@@ -91,22 +91,8 @@ describe('opt-in FSRS-6 scheduling through pinned ts-fsrs v5', () => {
     expect(reviewed).toEqual(before);
   });
 
-  it('preserves old SM-2 defaults and exact date-only due behavior', async () => {
-    const card = await fs().addCard({ front: 'Legacy', back: 'SM-2' });
-    expect(card.scheduler).toBeUndefined();
-    expect(card.repetitions).toBe(0);
-    expect(card.interval).toBe(0);
-    expect(card.easeFactor).toBe(2.5);
-    expect(card.nextReviewDate).toBe('2026-01-01');
-    const updated = await fs().reviewCard(card.id, 4);
-    expect(updated.interval).toBe(1);
-    expect(updated.scheduler).toBeUndefined();
-    expect(updated.nextReviewDate).toBe('2026-01-02');
-    expect(updated.fsrsState).toBeUndefined();
-  });
-
-  it('requires explicit opt-in for a new FSRS card and uses timestamp-accurate due checks', async () => {
-    const card = await fs().addCard({ front: 'New', back: 'FSRS', scheduler: 'fsrs-v5' });
+  it('uses FSRS by default and honors timestamp-accurate due checks', async () => {
+    const card = await fs().addCard({ front: 'New', back: 'FSRS' });
     expect(card.scheduler).toBe('fsrs-v5');
     expect(card.fsrsState.packageVersion).toBe('5.4.2');
     expect(card.repetitions).toBeUndefined();

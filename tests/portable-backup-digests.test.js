@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { comparePortableBackups, summarizePortableBackup } from '../scripts/verify-portable-backup.cjs';
+import { createFsrsV5State } from '../src/features/flashcardsFsrsAdapter.js';
 
 const before = {
   version: '1.6', exportedAt: '2026-10-31T12:00:00.000Z',
@@ -18,10 +19,10 @@ const before = {
     playlists: [], library: null, myCourses: [],
     mediaCues: null, tagTaxonomy: null,
     flashcards: [
-      { id: 'legacy', nextReviewDate: '2026-11-04', repetitions: 2 },
-      { id: 'modern', scheduler: 'fsrs-v5', fsrsState: {
-        version: 1, due: '2026-11-01T05:00:00.000Z',
-      }, fsrsMigration: { legacyCard: { id: 'modern', nextReviewDate: '2026-10-31' } } },
+      { id: 'study-one', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-11-04T05:00:00.000Z')) },
+      { id: 'study-two', scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(new Date('2026-11-01T05:00:00.000Z')) },
     ],
     studio: { version: 1, layers: [{ id: 'one', elements: [] }] },
   },
@@ -40,18 +41,17 @@ describe('read-only portable recovery digests', () => {
     expect(result.mismatches).toEqual([]);
     expect(result.before.counts.notes).toBe(2);
     expect(result.before.counts.flashcards).toBe(2);
-    expect(result.before.counts.fsrsV5).toBe(1);
-    expect(result.before.counts.sm2Legacy).toBe(1);
-    expect(result.before.counts.migrationArchives).toBe(1);
-    expect(JSON.stringify(result)).not.toMatch(/یادداشت|Heart study|private|medicine|legacy|modern/);
+    expect(result.before.counts.fsrsV5).toBe(2);
+    expect(result.before.counts).not.toHaveProperty('sm2Legacy');
+    expect(result.before.counts).not.toHaveProperty('migrationArchives');
+    expect(JSON.stringify(result)).not.toMatch(/یادداشت|Heart study|private|medicine|study-one|study-two/);
     expect(before).toEqual(original);
   });
 
-  it('detects changed note content, FSRS due timestamp, original archive, and attachment manifest', () => {
+  it('detects changed note content, FSRS due timestamp, and attachment manifest', () => {
     const changed = structuredClone(before);
     changed.notes[0].html = '<p dir="rtl">edited</p>';
-    changed.settings.flashcards[1].fsrsState.due = '2026-11-02T05:00:00.000Z';
-    changed.settings.flashcards[1].fsrsMigration.legacyCard.nextReviewDate = '2026-11-02';
+    changed.settings.flashcards[1].fsrsState.card.due = '2026-11-02T05:00:00.000Z';
     changed.meta.attachments.references[0].size = 20;
     const result = comparePortableBackups(before, changed);
     expect(result.ok).toBe(false);

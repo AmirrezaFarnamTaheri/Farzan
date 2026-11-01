@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountHomeView } from '../src/views/homeRoute.js';
+const scheduled = (id, front, due) => ({ id, front, scheduler: 'fsrs-v5', fsrsState: { card: { due } } });
 
 function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards = [], failNotes = false, catalogTopics = null } = {}) {
   document.body.innerHTML = '<main id="main-content"></main>';
@@ -45,7 +46,7 @@ describe('home dashboard', () => {
       ],
       notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', updatedAt: now - 1000 }],
       timestamps: [{ topicId: 'topic-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
-      flashcards: [{ id: 'card-due', front: 'Explain spacing', deck: 'Design', nextReviewDate: '2020-01-01' }],
+      flashcards: [{ ...scheduled('card-due', 'Explain spacing', '2020-01-01T00:00:00.000Z'), deck: 'Design' }],
     });
 
     await vi.waitFor(() => {
@@ -80,8 +81,8 @@ describe('home dashboard', () => {
     const { Router } = mountDashboard({
       progress: [{ topicId: 'topic-2', percent: 100, status: 'done', updatedAt: Date.now() - 40 * 86400000 }],
       flashcards: [
-        { id: 'one', front: 'Review this', nextReviewDate: '2020-01-01' },
-        { id: 'two', front: 'Later', nextReviewDate: '2099-01-01' },
+        scheduled('one', 'Review this', '2020-01-01T00:00:00.000Z'),
+        scheduled('two', 'Later', '2099-01-01T00:00:00.000Z'),
       ],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));

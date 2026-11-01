@@ -1,56 +1,17 @@
 /**
  * OpenCourseDeck — flashcards.js
- * SM-2 Spaced Repetition System & Interactive Study Studio
+ * Maintained FSRS spaced-repetition study studio
  */
 (() => {
   'use strict';
 
   const STORE_NAME = 'ocd_flashcards';
-  const LEGACY_STORE_NAME = 'plasma-flashcards-store';
   let memoryStore = [];
   let hydratePromise = null;
   let canonicalDeckKnown = false;
 // Keyboard handling re-attaches on every studio render; this controller
 // tears down the previous listener so re-renders never stack handlers.
 let studioKeyController = null;
-
-  /**
-   * SM-2 Spaced Repetition Engine
-   */
-  function calculateSM2(grade, repetitions = 0, interval = 0, easeFactor = 2.5) {
-    const validGrade = Math.max(0, Math.min(5, Math.floor(Number(grade) || 0)));
-    let newRepetitions;
-    let newInterval;
-    let newEaseFactor;
-
-    if (validGrade >= 3) {
-      if (repetitions === 0) {
-        newInterval = 1;
-      } else if (repetitions === 1) {
-        newInterval = 6;
-      } else {
-        newInterval = Math.max(1, Math.round(interval * easeFactor));
-      }
-      newRepetitions = repetitions + 1;
-    } else {
-      newRepetitions = 0;
-      newInterval = 1;
-    }
-
-    newEaseFactor = easeFactor + (0.1 - (5 - validGrade) * (0.08 + (5 - validGrade) * 0.02));
-    if (newEaseFactor < 1.3) newEaseFactor = 1.3;
-
-    // Pure UTC day arithmetic: getDueCards() compares against the UTC calendar
-    // date, so scheduling must not mix a local midnight into a UTC string.
-    const nextReviewDate = new Date(Date.now() + newInterval * 86400000).toISOString().split('T')[0];
-
-    return {
-      repetitions: newRepetitions,
-      interval: newInterval,
-      easeFactor: Number(newEaseFactor.toFixed(2)),
-      nextReviewDate,
-    };
-  }
 
   class FlashcardDeckManager {
     constructor() {
@@ -79,8 +40,7 @@ let studioKeyController = null;
       if (Array.isArray(memoryStore) && memoryStore.length) return memoryStore;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
-          const raw = window.localStorage.getItem(STORE_NAME)
-            ?? window.localStorage.getItem(LEGACY_STORE_NAME);
+          const raw = window.localStorage.getItem(STORE_NAME);
           if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
@@ -93,45 +53,13 @@ let studioKeyController = null;
       return memoryStore;
     }
 
-    async saveStorage(cards, { verifyAgainst } = {}) {
+    async saveStorage(cards) {
       const snapshot = cards.map(card => ({ ...card }));
       const hasCanonicalWriter = typeof window.DB?.saveSetting === 'function';
-      const strictTransition = verifyAgainst !== undefined;
-      const sameDeck = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-      // Conversion/rollback can replace a learner's original due dates.
-      // Require the authoritative snapshot we actually previewed, not a
-      // stale cached deck or a local mirror left over from a previous tab.
-      // Reads and writes are not an atomic compare-and-swap: concurrent tabs
-      // still require storage-level revision locks to close this narrow race.
-      if (strictTransition) {
-        if (!hasCanonicalWriter || typeof window.DB?.getSetting !== 'function') {
-          throw new Error('Canonical FSRS migration storage is unavailable');
-        }
-        const current = await window.DB.getSetting(STORE_NAME);
-        if (!Array.isArray(current) || !sameDeck(current, verifyAgainst)) {
-          throw new Error('Flashcard deck changed in another tab; reload before changing scheduler');
-        }
-      }
-
-      // A local mirror is not an acceptable fallback when the canonical IDB
-      // writer rejects: the next hydration would prefer the old IDB deck and
-      // silently overwrite the purportedly saved cards.
+      // A failed canonical write must never be reported as a local success.
       if (hasCanonicalWriter) {
         const receipt = await window.DB.saveSetting(STORE_NAME, snapshot);
         if (receipt === false) throw new Error('Flashcard write was not acknowledged by canonical storage');
-        if (strictTransition) {
-          // The DB bridge returns the committed array; some explicit test
-          // stores return true or { committed:true }. No acknowledgement is
-          // not proof that the archive or restored schedule exists.
-          const accepted = receipt === true || receipt?.committed === true
-            || (Array.isArray(receipt) && sameDeck(receipt, snapshot));
-          if (!accepted) throw new Error('FSRS migration write was not acknowledged');
-          const saved = await window.DB.getSetting(STORE_NAME);
-          if (!Array.isArray(saved) || !sameDeck(saved, snapshot)) {
-            throw new Error('FSRS migration was not saved durably: canonical readback differed');
-          }
-        }
       }
       let localSaved = false;
       let localError;
@@ -184,7 +112,6 @@ let studioKeyController = null;
       try {
         if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') {
           window.localStorage.removeItem(STORE_NAME);
-          window.localStorage.removeItem(LEGACY_STORE_NAME);
         }
       } catch {}
       try { window.DB?.saveSetting?.(STORE_NAME, []); } catch {}
@@ -210,38 +137,23 @@ let studioKeyController = null;
       return this._enqueueMutation(() => this._addCard(data));
     }
 
-    async _addCard({ front, back, deck = 'Default', sourceNoteId = null, scheduler = 'sm2-v1' }) {
+    async _addCard({ front, back, deck = 'Default', sourceNoteId = null, scheduler = 'fsrs-v5' }) {
       if (!front || !back) throw new Error('Front and back text are required');
-      if (scheduler !== 'sm2-v1' && scheduler !== 'fsrs-v5') {
-        throw new RangeError('Unknown flashcard scheduling engine');
+      if (scheduler !== 'fsrs-v5') {
+        throw new RangeError('Only the FSRS-v5 scheduling engine is supported');
       }
       const cards = [...await this.getCards()];
       const created = new Date();
-      let scheduling;
-      if (scheduler === 'fsrs-v5') {
-        // Lazy-load the maintained FSRS library only for opt-in cards.
-        const { createFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
-        scheduling = {
-          scheduler,
-          fsrsState: createFsrsV5State(created),
-          nextReviewDate: created.toISOString().slice(0, 10),
-        };
-      } else {
-        // Preserve the original SM-2 field shape and date-only semantics.
-        scheduling = {
-          repetitions: 0,
-          interval: 0,
-          easeFactor: 2.5,
-          nextReviewDate: created.toISOString().slice(0, 10),
-        };
-      }
+      const { createFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
       const newCard = {
         id: 'fc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         deck: deck.trim() || 'Default',
         front: front.trim(),
         back: back.trim(),
         sourceNoteId,
-        ...scheduling,
+        scheduler: 'fsrs-v5',
+        fsrsState: createFsrsV5State(created),
+        nextReviewDate: created.toISOString().slice(0, 10),
         createdAt: created.toISOString(),
       };
       cards.push(newCard);
@@ -257,26 +169,14 @@ let studioKeyController = null;
       const cards = [...await this.getCards()];
       const index = cards.findIndex(c => c.id === cardId);
       if (index === -1) throw new Error('Flashcard not found');
-
       const card = cards[index];
-      let scheduled;
-      if (card.scheduler === 'fsrs-v5') {
-        // A malformed FSRS snapshot must not overwrite canonical storage.
-        const { rateFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
-        const { state, nextReviewDate } = rateFsrsV5State(card.fsrsState, grade);
-        scheduled = { fsrsState: state, nextReviewDate };
-      } else if (!card.scheduler || card.scheduler === 'sm2-v1') {
-        scheduled = calculateSM2(grade, card.repetitions, card.interval, card.easeFactor);
-      } else {
-        throw new TypeError('Unknown saved flashcard scheduler');
-      }
-
+      if (card.scheduler !== 'fsrs-v5') throw new TypeError('Unsupported saved flashcard scheduler');
+      const { rateFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
+      const { state, nextReviewDate } = rateFsrsV5State(card.fsrsState, grade);
       const updatedCard = {
-        ...card,
-        ...scheduled,
+        ...card, fsrsState: state, nextReviewDate,
         lastReviewedAt: new Date().toISOString(),
       };
-
       cards[index] = updatedCard;
       await this.saveStorage(cards);
       return updatedCard;
@@ -305,121 +205,18 @@ let studioKeyController = null;
       return updated;
     }
 
-    /**
-     * A preview is intentionally read-only and does not infer FSRS difficulty,
-     * stability or review history from incomplete SM-2 counters.
-     */
-    async previewCardFsrsMigration(cardId) {
-      const card = (await this.getCards()).find(record => record.id === cardId);
-      if (!card) throw new Error('Flashcard not found');
-      if (card.scheduler === 'fsrs-v5') throw new Error('Card is already using FSRS');
-      if (card.scheduler && card.scheduler !== 'sm2-v1') {
-        throw new TypeError('Unknown saved flashcard scheduler');
-      }
-      return {
-        cardId,
-        currentScheduler: 'sm2-v1',
-        originalDue: card.nextReviewDate ?? null,
-        proposedScheduler: 'fsrs-v5',
-        proposedDue: new Date().toISOString(),
-        warning: 'FSRS will start fresh with no reconstructed history. Your original SM-2 schedule is archived for rollback.',
-      };
-    }
-
-    migrateCardToFsrs(cardId, options = {}) {
-      if (options?.consent !== true) {
-        return Promise.reject(new Error('Explicit consent is required to migrate a flashcard'));
-      }
-      return this._enqueueMutation(() => this._migrateCardToFsrs(cardId));
-    }
-
-    async _migrateCardToFsrs(cardId) {
-      const cards = [...await this.getCards()];
-      const expectedDeck = structuredClone(cards);
-      const index = cards.findIndex(card => card.id === cardId);
-      if (index < 0) throw new Error('Flashcard not found');
-      const card = cards[index];
-      if (card.scheduler === 'fsrs-v5') throw new Error('Card is already using FSRS');
-      if (card.scheduler && card.scheduler !== 'sm2-v1') {
-        throw new TypeError('Unknown saved flashcard scheduler');
-      }
-      if (card.fsrsState || card.fsrsMigration) {
-        throw new TypeError('Legacy card contains an unsupported FSRS archive');
-      }
-      const original = structuredClone(card);
-      const now = new Date();
-      const { createFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
-      const migrated = {
-        ...card,
-        scheduler: 'fsrs-v5',
-        fsrsState: createFsrsV5State(now),
-        nextReviewDate: now.toISOString().slice(0, 10),
-        fsrsMigration: {
-          version: 1,
-          consentedAt: now.toISOString(),
-          legacyCard: original,
-        },
-      };
-      // No stale SM-2 scheduling counters on the active FSRS card. Every
-      // historical value survives unchanged in the archived legacy card.
-      delete migrated.repetitions;
-      delete migrated.interval;
-      delete migrated.easeFactor;
-      delete migrated.lastReviewedAt;
-      cards[index] = migrated;
-      await this.saveStorage(cards, { verifyAgainst: expectedDeck });
-      return migrated;
-    }
-
-    rollbackCardToSm2(cardId, options = {}) {
-      if (options?.consent !== true) {
-        return Promise.reject(new Error('Explicit consent is required to restore SM-2'));
-      }
-      return this._enqueueMutation(() => this._rollbackCardToSm2(cardId));
-    }
-
-    async _rollbackCardToSm2(cardId) {
-      const cards = [...await this.getCards()];
-      const expectedDeck = structuredClone(cards);
-      const index = cards.findIndex(card => card.id === cardId);
-      if (index < 0) throw new Error('Flashcard not found');
-      const current = cards[index];
-      if (current.scheduler !== 'fsrs-v5' || !current.fsrsMigration) {
-        throw new Error('No archived SM-2 history is available for rollback');
-      }
-      const archive = current.fsrsMigration;
-      const original = archive.legacyCard;
-      if (archive.version !== 1 || !original || typeof original !== 'object'
-          || Array.isArray(original) || original.id !== cardId
-          || (original.scheduler && original.scheduler !== 'sm2-v1')
-          || original.fsrsState || original.fsrsMigration) {
-        throw new TypeError('Invalid archived SM-2 card snapshot');
-      }
-      const restored = structuredClone(original);
-      cards[index] = restored;
-      await this.saveStorage(cards, { verifyAgainst: expectedDeck });
-      return restored;
-    }
-
     async getDueCards(deckName = null) {
       const cards = await this.getCards();
       const now = Date.now();
-      const todayStr = new Date(now).toISOString().split('T')[0];
-      return cards.filter(c => {
-        if (deckName && c.deck !== deckName) return false;
-        if (c.scheduler === 'fsrs-v5') {
-          // FSRS learning steps can be minutes apart, not calendar days.
-          const due = c.fsrsState?.card?.due;
-          if (typeof due !== 'string' || !due.endsWith('Z') ||
-              !Number.isFinite(Date.parse(due))) {
-            throw new TypeError('Saved FSRS card has an invalid UTC due time');
-          }
-          return Date.parse(due) <= now;
+      return cards.filter(card => {
+        if (deckName && card.deck !== deckName) return false;
+        if (card.scheduler !== 'fsrs-v5') throw new TypeError('Unsupported saved flashcard scheduler');
+        const due = card.fsrsState?.card?.due;
+        if (typeof due !== 'string' || !due.endsWith('Z') ||
+            !Number.isFinite(Date.parse(due))) {
+          throw new TypeError('Saved FSRS card has an invalid UTC due time');
         }
-        if (c.scheduler && c.scheduler !== 'sm2-v1') {
-          throw new TypeError('Unknown saved flashcard scheduler');
-        }
-        return !c.nextReviewDate || c.nextReviewDate <= todayStr;
+        return Date.parse(due) <= now;
       });
     }
 
@@ -454,6 +251,7 @@ let studioKeyController = null;
       ])));
       const imported = [];
       const createdAt = new Date().toISOString();
+      const { createFsrsV5State } = await import('./src/features/flashcardsFsrsAdapter.js');
       for (const item of rawCards) {
         if (!item || typeof item !== 'object') continue;
         const fields = typeof item.flds === 'string' ? item.flds.split('\x1f') : [];
@@ -470,9 +268,8 @@ let studioKeyController = null;
           front,
           back,
           sourceNoteId: null,
-          repetitions: 0,
-          interval: 0,
-          easeFactor: 2.5,
+          scheduler: 'fsrs-v5',
+          fsrsState: createFsrsV5State(new Date(createdAt)),
           nextReviewDate: createdAt.slice(0, 10),
           createdAt,
         });
@@ -493,9 +290,6 @@ let studioKeyController = null;
           sfld: c.front,
           flds: `${c.front}\x1f${c.back}`,
           deck: c.deck,
-          easeFactor: c.easeFactor,
-          interval: c.interval,
-          repetitions: c.repetitions,
         })),
       };
     }
@@ -528,7 +322,7 @@ let studioKeyController = null;
             <div class="fc-empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-verified"/></svg></div>
             <h2 class="fc-empty-title">${cards.length ? 'All due cards reviewed' : 'No cards yet'}</h2>
             <p class="fc-sub">${cards.length
-              ? 'Nice work. Check back tomorrow for your next memory review cycle.'
+              ? 'You are up to date. Check back when the next review is due.'
               : 'Make a question-and-answer card to begin reviewing at your own pace.'}</p>
             ${cards.length ? '' : '<button id="fc-empty-create" class="btn btn-primary" type="button">Create your first card</button>'}
           </div>
@@ -553,7 +347,7 @@ let studioKeyController = null;
           <div>
             <span class="eyebrow">Spaced repetition</span>
             <h1 class="page-title fc-title">Flashcards</h1>
-            <p class="page-subtitle fc-sub">Review cards with a predictable schedule; FSRS is available for new cards by choice.</p>
+            <p class="page-subtitle fc-sub">Review cards with FSRS scheduling and exact due times.</p>
           </div>
           <button id="fc-add-btn" class="btn btn-primary" type="button" ${cards.length ? '': 'hidden'}>
             <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
@@ -573,13 +367,6 @@ let studioKeyController = null;
           <div class="fc-field fc-field-deck">
             <label for="fc-new-deck">Deck</label>
             <input id="fc-new-deck" name="deck" autocomplete="off" value="General" />
-          </div>
-          <div class="fc-field">
-            <label for="fc-new-scheduler">Review schedule</label>
-            <select id="fc-new-scheduler" name="scheduler" class="select">
-              <option value="sm2-v1">SM-2 (existing schedule)</option>
-              <option value="fsrs-v5">FSRS (new cards, experimental)</option>
-            </select>
           </div>
           <div class="fc-actions">
             <button id="fc-new-save" class="btn btn-primary" type="submit">Save card</button>
@@ -604,11 +391,6 @@ let studioKeyController = null;
                 <span class="text-sm"><strong>${esc(card.front)}</strong> · ${esc(card.deck)}</span>
                 <span class="button-row">
                   <button class="btn btn-ghost btn-sm" type="button" data-fc-edit="${esc(card.id)}">Edit</button>
-                  ${(!card.scheduler || card.scheduler === 'sm2-v1')
-                    ? `<button class="btn btn-ghost btn-sm" type="button" data-fc-migrate="${esc(card.id)}">Try FSRS</button>`
-                    : card.scheduler === 'fsrs-v5' && card.fsrsMigration?.legacyCard
-                      ? `<button class="btn btn-ghost btn-sm" type="button" data-fc-rollback="${esc(card.id)}">Restore SM-2</button>`
-                      : ''}
                   <button class="btn btn-danger-ghost btn-sm" type="button" data-fc-delete="${esc(card.id)}">Delete</button>
                 </span>
               </div>`).join('') : '<p class="text-muted">No saved cards yet.</p>'}
@@ -696,51 +478,6 @@ let studioKeyController = null;
     container.querySelector('#fc-manage-cards')?.addEventListener('click', async (event) => {
       const edit = event.target.closest('[data-fc-edit]');
       const remove = event.target.closest('[data-fc-delete]');
-      const migrate = event.target.closest('[data-fc-migrate]');
-      const rollback = event.target.closest('[data-fc-rollback]');
-      if (migrate || rollback) {
-        const action = migrate || rollback;
-        const cardId = migrate ? migrate.dataset.fcMigrate : rollback.dataset.fcRollback;
-        if (action.disabled) return;
-        action.disabled = true;
-        let saved = false;
-        try {
-          const card = cards.find(record => record.id === cardId);
-          if (!card) throw new Error('Flashcard not found');
-          let title, message, confirmLabel;
-          if (migrate) {
-            const preview = await manager.previewCardFsrsMigration(cardId);
-            title = 'Start a new FSRS schedule?';
-            confirmLabel = 'Start FSRS';
-            message = 'Current SM-2 due date: ' + (preview.originalDue || 'Not scheduled')
-              + '.\nNew FSRS due time: ' + preview.proposedDue + '.\n'
-              + 'FSRS starts fresh without inferred review history. Your original SM-2 '
-              + 'card and date are archived for rollback.';
-          } else {
-            title = 'Restore original SM-2 schedule?';
-            confirmLabel = 'Restore SM-2';
-            message = 'Restore the exact card and due date recorded before switching to FSRS? '
-              + 'FSRS reviews and edits made after conversion will no longer be active.';
-          }
-          const confirmed = window.OpenCourseDeck?.UI?.confirm
-            ? await window.OpenCourseDeck.UI.confirm({
-              title, message, confirmLabel, cancelLabel: 'Keep current schedule',
-            })
-            : window.confirm(message);
-          if (!confirmed) return;
-          if (migrate) await manager.migrateCardToFsrs(cardId, { consent: true });
-          else await manager.rollbackCardToSm2(cardId, { consent: true });
-          saved = true;
-          await renderStudio(container);
-          announce(migrate ? 'FSRS started. Original SM-2 schedule archived.'
-            : 'Original SM-2 schedule restored.');
-        } catch (error) {
-          announce('Could not change scheduler: ' + (error?.message || 'Please try again.'));
-        } finally {
-          if (!saved) action.disabled = false;
-        }
-        return;
-      }
       if (edit) {
         const card = cards.find(record => record.id === edit.dataset.fcEdit);
         if (!card || !newForm) return;
@@ -748,9 +485,6 @@ let studioKeyController = null;
         newForm.querySelector('#fc-new-front').value = card.front;
         newForm.querySelector('#fc-new-back').value = card.back;
         newForm.querySelector('#fc-new-deck').value = card.deck;
-        const schedulerSelect = newForm.querySelector('#fc-new-scheduler');
-        schedulerSelect.value = card.scheduler === 'fsrs-v5' ? 'fsrs-v5' : 'sm2-v1';
-        schedulerSelect.disabled = true; // Never migrate during editing.
         newForm.hidden = false;
         newForm.querySelector('#fc-new-save').textContent = 'Save changes';
         newForm.querySelector('#fc-new-front').focus();
@@ -778,14 +512,11 @@ let studioKeyController = null;
       const frontInput = newForm.querySelector('#fc-new-front');
       const backInput = newForm.querySelector('#fc-new-back');
       const deckInput = newForm.querySelector('#fc-new-deck');
-      const schedulerInput = newForm.querySelector('#fc-new-scheduler');
       addBtn.addEventListener('click', () => {
         editingCardId = null;
         frontInput.value = '';
         backInput.value = '';
         deckInput.value = 'General';
-        schedulerInput.disabled = false;
-        schedulerInput.value = 'sm2-v1';
         newForm.querySelector('#fc-new-save').textContent = 'Save card';
         newForm.hidden = !newForm.hidden;
         if (!newForm.hidden) frontInput.focus();
@@ -811,7 +542,7 @@ let studioKeyController = null;
             await manager.updateCard(editingCardId, { front, back, deck });
             announce('Flashcard updated.');
           } else {
-            await manager.addCard({ front, back, deck, scheduler: schedulerInput.value });
+            await manager.addCard({ front, back, deck });
             announce('Card added to deck ' + deck + '.');
           }
           await renderStudio(container);
@@ -826,15 +557,11 @@ let studioKeyController = null;
 
   const pd = window.OpenCourseDeck = window.OpenCourseDeck || {};
   pd.Flashcards = {
-    calculateSM2,
     manager,
     getCards: () => manager.getCards(),
     addCard: (data) => manager.addCard(data),
     reviewCard: (id, grade) => manager.reviewCard(id, grade),
     updateCard: (id, fields) => manager.updateCard(id, fields),
-    previewCardFsrsMigration: (id) => manager.previewCardFsrsMigration(id),
-    migrateCardToFsrs: (id, options) => manager.migrateCardToFsrs(id, options),
-    rollbackCardToSm2: (id, options) => manager.rollbackCardToSm2(id, options),
     getDueCards: (deck) => manager.getDueCards(deck),
     deleteCard: (id) => manager.deleteCard(id),
     invalidateCache: () => manager.invalidateCache(),
