@@ -48,8 +48,19 @@ export function assessNoteForTiptap(html) {
     for (const attribute of element.attributes) {
       const name = attribute.name.toLowerCase();
       if (tag !== 'a' || name !== 'href') return invalid('unsupported-attribute-' + name);
-      // A link with an unknown scheme may be silently stripped by the editor.
-      if (!/^(https?:|mailto:|tel:)/i.test(attribute.value)) {
+      // A scheme-shaped relative href (for example "https:chapter") can
+      // resolve against the current app origin and be silently rewritten on
+      // first save. Require an actual absolute HTTP(S) destination; keep
+      // ambiguous legacy links byte-for-byte in the classic editor.
+      const href = attribute.value;
+      if (/^https?:\/\//i.test(href)) {
+        try {
+          const parsed = new URL(href);
+          if (!parsed.hostname || !['http:', 'https:'].includes(parsed.protocol)) {
+            return invalid('unsupported-link');
+          }
+        } catch { return invalid('unsupported-link'); }
+      } else if (!/^(?:mailto:|tel:)/i.test(href)) {
         return invalid('unsupported-link');
       }
     }
