@@ -947,4 +947,79 @@ describe('app topbar search rendering', () => {
     expect(recovered.map(row => row.sourceType)).toContain('pdfBookmark');
   });
 
+
+  it('waits for the canonical personal library overlay before caching the first search corpus', async () => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    let courses = [{ id: 'base-course', title: 'Base medicine' }];
+    let topics = [];
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allCourses: vi.fn(() => structuredClone(courses)),
+      allTopics: vi.fn(() => structuredClone(topics)),
+    };
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+      getAllPdfBookmarks: vi.fn(async () => []),
+    };
+    const lib = {
+      courses: {
+        'personal-cardiology': {
+          title: 'Renamed Cardiology 你好',
+          sources: [{ label: 'My Library', topics: [{ url: 'personal-heart', title: 'فیزیک قلب' }] }],
+        },
+      },
+    };
+    const load = vi.fn(() => gate);
+    const overlay = vi.fn(() => {
+      courses = [...courses, { id: 'personal-cardiology', title: 'Renamed Cardiology 你好' }];
+      topics = [...topics, {
+        courseId: 'personal-cardiology',
+        topicId: 'personal-heart',
+        title: 'فیزیک قلب',
+        courseTitle: 'Renamed Cardiology 你好',
+        sourceLabel: 'My Library',
+      }];
+    });
+    window.OpenCourseDeck.UserLibrary = { load, overlay };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    let settled = false;
+    const pending = search._loadUniversalData().then(value => { settled = true; return value; });
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    expect(settled).toBe(false);
+    expect(search._universalData).toBeNull();
+    release(lib);
+    const indexed = await pending;
+    expect(overlay).toHaveBeenCalledWith(lib);
+    expect(indexed.map(item => [item.sourceType, item.sourceId])).toEqual(
+      expect.arrayContaining([['course', 'personal-cardiology'], ['topic', 'personal-cardiology:personal-heart']])
+    );
+    expect((await search._queryUniversal('cardiology')).some(row => row.sourceId === 'personal-cardiology')).toBe(true);
+    expect((await search._queryUniversal('فيزيك')).some(row => row.sourceId === 'personal-cardiology:personal-heart')).toBe(true);
+  });
+
+  it('rejects an unreadable canonical library before caching a partial search corpus', async () => {
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allCourses: vi.fn(() => [{ id: 'base', title: 'Base course' }]),
+      allTopics: vi.fn(() => []),
+    };
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
+      getAllPdfBookmarks: vi.fn(async () => []),
+    };
+    window.OpenCourseDeck.UserLibrary = {
+      load: vi.fn(async () => { throw new Error('canonical personal library unreadable'); }),
+      overlay: vi.fn(),
+    };
+    const search = window.OpenCourseDeck.TopbarSearch;
+    await expect(search._loadUniversalData()).rejects.toThrow('canonical personal library unreadable');
+    expect(search._universalData).toBeNull();
+    expect(window.OpenCourseDeck.UserLibrary.overlay).not.toHaveBeenCalled();
+  });
+
 });
