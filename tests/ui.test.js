@@ -172,6 +172,34 @@ describe('UI component safe rendering', () => {
     expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(false);
   });
 
+  it('keeps one shared tooltip owner and supports focus, keyboard dismissal and focus restore', () => {
+    document.body.innerHTML = '<button id="tip-anchor" data-tooltip="Course status">Status</button>';
+    const tooltip = window.OpenCourseDeck.UI.Tooltip;
+    tooltip.init();
+    tooltip.init(); // late route initialization must not multiply overlays/listeners
+    expect(document.body.querySelectorAll('.tooltip')).toHaveLength(1);
+
+    const anchor = document.getElementById('tip-anchor');
+    anchor.focus();
+    const tip = document.querySelector('.tooltip');
+    expect(tip.classList.contains('visible')).toBe(true);
+    expect(tip.getAttribute('role')).toBe('tooltip');
+    expect(anchor.getAttribute('aria-describedby')).toBe(tip.id);
+    expect(tip.textContent).toBe('Course status');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(false);
+    expect(anchor.hasAttribute('aria-describedby')).toBe(false);
+    expect(document.activeElement).toBe(anchor);
+
+    anchor.blur();
+    anchor.focus();
+    expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(true);
+    const other = document.createElement('button');
+    document.body.appendChild(other);
+    other.focus();
+    expect(document.querySelector('.tooltip').classList.contains('visible')).toBe(false);
+  });
+
   it('updates dynamically added range sliders through delegated events', () => {
     window.OpenCourseDeck.bus = { emit: vi.fn() };
     document.body.innerHTML = `
