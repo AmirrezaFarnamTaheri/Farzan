@@ -43,7 +43,11 @@ for (const setup of setups) {
       await expect(view).toBeVisible({ timeout: 25000 });
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
-      if (route === 'home') await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+      if (route === 'home') {
+        await expect(page.locator('[data-home-widgets]')).toHaveAttribute('aria-busy', 'false');
+        await expect(page.locator('[data-focus-widget]')).toHaveAttribute('data-focus-initialized', 'true');
+        await expect(page.locator('[data-focus-clock]')).toHaveText(/^\d\d:\d\d$/);
+      }
       if (setup.rtl) {
         await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
         await expect.poll(async () => page.locator('#sidebar').evaluate(el =>
@@ -61,6 +65,26 @@ for (const setup of setups) {
       const name = path.join(folder, route + '.png');
       const shot = await page.screenshot({ path: name, animations: 'disabled', caret: 'hide' });
       expect(shot.byteLength, `${setup.name}/${route} blank screenshot`).toBeGreaterThan(11000);
+      if (route === 'home') {
+        // The Focus card sits below the first fold on some screens. Capture
+        // the actual hydrated widget instead of declaring a passing top-only
+        // screenshot to be evidence of its readability.
+        const focusCard = page.locator('[data-focus-widget]');
+        await focusCard.scrollIntoViewIfNeeded();
+        await expect(page.locator('[data-focus-start]')).toBeEnabled();
+        await expect(page.locator('[data-focus-preset]')).toBeEnabled();
+        await page.screenshot({
+          path: path.join(folder, 'home-focus-widget.png'),
+          animations: 'disabled', caret: 'hide',
+        });
+        await page.locator('[data-focus-start]').click();
+        await expect(page.locator('[data-focus-start]')).toHaveText('Pause');
+        await page.locator('[data-focus-start]').click();
+        await expect(page.locator('[data-focus-start]')).toHaveText('Resume');
+        await page.locator('[data-focus-reset]').click();
+        await expect(page.locator('[data-focus-clock]')).toHaveText('25:00');
+        await page.locator('#view-container').evaluate(el => { el.scrollTop = 0; });
+      }
 
       // Record real opened overlays as separate visual states; close them
       // before subsequent routes to avoid accidentally obscuring screenshots.
