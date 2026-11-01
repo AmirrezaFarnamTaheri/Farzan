@@ -298,10 +298,10 @@ input[type="file"][hidden] {
   color: var(--fz-muted);
 }
 .topbar-action-btn {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: 10px;
   color: var(--text-secondary);
@@ -917,7 +917,7 @@ input[type="file"][hidden] {
 .sidebar-search-wrap { margin-inline: 2px; }
 .sidebar .nav-group { margin-block: 3px 10px; }
 .sidebar .nav-group-label { padding-block: 6px 4px; }
-.sidebar .nav-item { min-height: 36px; gap: 10px; margin-bottom: 2px; border-radius: 8px; }
+.sidebar .nav-item { min-height: 44px; gap: 10px; margin-bottom: 2px; border-radius: 8px; }
 .sidebar .nav-item.active,
 .sidebar .nav-item[aria-current="page"] {
   background: #244362;
