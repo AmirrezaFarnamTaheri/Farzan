@@ -341,7 +341,7 @@ export const Drawer = {
       if (!drawer.classList.contains('open')) return;
 
       drawer.classList.remove('open');
-      const stillOpen = $('.drawer.open').length > 0;
+      const stillOpen = document.querySelectorAll('.drawer.open').length > 0;
       const backdrop = $('.drawer-backdrop');
       if (!stillOpen) backdrop?.classList.remove('open');
       const duration = shell().config?.animationDuration ?? 0;
@@ -355,7 +355,7 @@ export const Drawer = {
         }, duration),
         backdrop: !stillOpen && backdrop ? setTimeout(() => {
           // A different drawer might have opened before the animation ends.
-          if (!$('.drawer.open').length) backdrop.remove();
+          if (!document.querySelector('.drawer.open')) backdrop.remove();
         }, duration) : null,
       };
       this._teardownTimers.set(drawer, pending);
