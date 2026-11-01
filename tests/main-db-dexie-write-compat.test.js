@@ -83,4 +83,43 @@ describe('Dexie primary-database mutations retain native-v3 semantics', () => {
     expect((await db.getAllByIndex('notes', 'courseId', 'medicine')).map(n => n.content))
       .toEqual(['Secret Arabic طب', 'Secret 中文']);
   });
+
+  it('atomically accepts one of two independent Konva draft writers on the same native settings key', async () => {
+    const first = new OpenCourseDB(name, 3, schema);
+    const second = new OpenCourseDB(name, 3, schema);
+    opened.push(first, second);
+    const key = 'ocd_studio_konva_draft';
+    const old = { version: 1, layers: [{ id: 'l', elements: [{ id: 'shape', x: 10 }] }] };
+    const newerA = { version: 1, layers: [{ id: 'l', elements: [{ id: 'shape', x: 20 }] }] };
+    const newerB = { version: 1, layers: [{ id: 'l', elements: [{ id: 'shape', x: 30 }] }] };
+    await first.put('settings', { key, value: old });
+    const [a, b] = await Promise.all([
+      first.compareAndSwapSetting(key, old, newerA),
+      second.compareAndSwapSetting(key, old, newerB),
+    ]);
+    expect([a, b].sort()).toEqual([false, true]);
+    expect((await first.get('settings', key)).value).toEqual(a ? newerA : newerB);
+    expect((await second.get('settings', key)).value).toEqual(a ? newerA : newerB);
+  });
+
+  it('refuses a stale/missing draft without inventing a saved receipt, and supports a first write from null', async () => {
+    const db = new OpenCourseDB(name, 3, schema);
+    opened.push(db);
+    const key = 'ocd_studio_konva_draft';
+    const firstDraft = { version: 1, layers: [] };
+    expect(await db.compareAndSwapSetting(key, { version: 1 }, firstDraft)).toBe(false);
+    expect(await db.compareAndSwapSetting(key, null, firstDraft)).toBe(true);
+    expect(await db.compareAndSwapSetting(key, null, { version: 1, layers: [{ id: 'wrong' }] })).toBe(false);
+    expect((await db.get('settings', key)).value).toEqual(firstDraft);
+  });
+
+  it('never bypasses envelope encryption or rewrites ciphertext through plaintext compare-and-swap', async () => {
+    const db = new OpenCourseDB(name, 3, schema);
+    opened.push(db);
+    db.setPassphrase('protected');
+    await expect(db.compareAndSwapSetting('ocd_studio_konva_draft', null, { version: 1 }))
+      .rejects.toThrow(/encrypted|protected|passphrase/i);
+    expect(await db.get('settings', 'ocd_studio_konva_draft')).toBeUndefined();
+  });
+
 });
