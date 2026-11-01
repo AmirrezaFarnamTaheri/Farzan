@@ -293,6 +293,67 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
     expect(board.layers[0].elements.at(-1)).toMatchObject({ x: 2, width: 40 });
   });
 
+  it('resizes canonical circles only with uniform positive dimensions while retaining metadata', () => {
+    const board = fixture();
+    const unchanged = structuredClone(board);
+    const changed = resizeKonvaV1Element(board, 'circle', {
+      x: 25, y: 30, width: 50, height: 50,
+    });
+    expect(changed.layers[0].elements[1]).toEqual({
+      ...unchanged.layers[0].elements[1], x: 50, y: 55, radius: 25,
+    });
+    expect(changed.layers[0].elements.filter(x => x.id !== 'circle'))
+      .toEqual(unchanged.layers[0].elements.filter(x => x.id !== 'circle'));
+    expect(changed.viewport).toEqual(unchanged.viewport);
+    expect(changed.metadata).toEqual(unchanged.metadata);
+    expect(board).toEqual(unchanged);
+    for (const bounds of [
+      { x: 25, y: 30, width: 50, height: 51 },
+      { x: 25, y: 30, width: -50, height: -50 },
+      { x: 25, y: 30, width: 50, height: Infinity },
+    ]) {
+      expect(() => resizeKonvaV1Element(board, 'circle', bounds)).toThrow();
+    }
+    expect(board).toEqual(unchanged);
+  });
+
+  it('applies uniform Konva circle transforms only after an acknowledged canonical save', async () => {
+    let accepted = true;
+    const writes = [];
+    const session = createKonvaV1MoveSession({
+      board: fixture(), onChange: async next => {
+        writes.push(structuredClone(next));
+        return accepted;
+      },
+    });
+    const node = new Konva.Circle({ id: 'circle', x: 50, y: 60, radius: 10 });
+    session.bind(node, 'circle');
+    node.fire('transformstart');
+    node.position({ x: 55, y: 65 });
+    node.scale({ x: 1.5, y: 1.5 });
+    node.fire('transformend');
+    await session.flush();
+    expect(session.getBoard().layers[0].elements[1]).toMatchObject({
+      x: 55, y: 65, radius: 15,
+    });
+    expect([node.x(), node.y(), node.radius(), node.scaleX(), node.scaleY()])
+      .toEqual([55, 65, 15, 1, 1]);
+    expect(writes).toHaveLength(1);
+    await session.undo();
+    expect(session.getBoard()).toEqual(fixture());
+    await session.redo();
+    expect(session.getBoard().layers[0].elements[1].radius).toBe(15);
+
+    accepted = false;
+    node.fire('transformstart');
+    node.scale({ x: 1.2, y: 1.2 });
+    node.fire('transformend');
+    await expect(session.flush()).rejects.toThrow(/acknowledge/i);
+    expect(session.getBoard().layers[0].elements[1].radius).toBe(15);
+    expect([node.radius(), node.scaleX(), node.scaleY()]).toEqual([15, 1, 1]);
+    node.destroy();
+  });
+
   it('refuses unsafe, nonfinite, flipped, zero-sized, or unsupported shape resizes without mutating input', () => {
     const board = fixture();
     const original = structuredClone(board);
