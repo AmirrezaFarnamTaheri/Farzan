@@ -385,7 +385,10 @@ describe('Courses workbench progress and accessible row actions', () => {
     sessionStorage.setItem('ocd_pending_position', '80');
     const controller = await mountCourses();
     await vi.waitFor(() => expect(document.querySelector('.course-item.active')).not.toBeNull());
-    expect(window.OpenCourseDeck.Player.init).not.toHaveBeenCalled();
+    // Player shell setup may occur on first mount. An ambiguous bookmark
+    // must not open playback or mark any course lesson as playing.
+    expect(document.querySelector('[data-course-playback]')?.hidden).toBe(true);
+    expect(document.querySelector('.topic-row[data-playing="true"]')).toBeNull();
     expect(sessionStorage.getItem('ocd_pending_position')).toBeNull();
     controller.unmount();
   });
