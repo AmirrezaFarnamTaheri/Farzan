@@ -45,8 +45,22 @@ for (const setup of setups) {
       if (route === 'courses') await expect(page.locator('#courses-list .course-item').first()).toBeVisible();
       if (route === 'progress') await expect(page.locator('[data-progress-loading]')).toHaveAttribute('aria-busy', 'false');
       if (route === 'notes') {
-        await expect(page.locator('[data-notes-semantic-search]')).toBeDisabled();
-        await expect(page.locator('[data-notes-semantic-clear]')).toBeDisabled();
+        const keywordAction = page.locator('[data-notes-semantic-search]');
+        const clearAction = page.locator('[data-notes-semantic-clear]');
+        await expect(keywordAction).toBeDisabled();
+        await expect(clearAction).toBeDisabled();
+        if (setup.name === 'desktop-light') {
+          const search = page.locator('[data-notes-search]');
+          await search.fill('renal');
+          await expect(keywordAction).toBeEnabled();
+          await keywordAction.click();
+          await expect(page.locator('[data-notes-semantic-status]')).toContainText('Related notes:');
+          await expect(clearAction).toBeEnabled();
+          await clearAction.click();
+          await expect(clearAction).toBeDisabled();
+          await search.fill('');
+          await expect(keywordAction).toBeDisabled();
+        }
         if (setup.width >= 1200) {
           const toolbarY = await page.locator('.notes-toolbar-scroll').evaluate(el => {
             const r = el.getBoundingClientRect();
