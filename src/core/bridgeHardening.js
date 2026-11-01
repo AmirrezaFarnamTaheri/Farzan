@@ -1,137 +1,8 @@
-const LEGACY_ANNOTATION_KEY = 'plasma-pdf-annotations';
-const DOCUMENT_ANNOTATION_KEY = 'plasma-pdf-annotations-by-document';
 const ERROR_STATUS_COLOR = '#b91c1c';
 const LEGACY_ERROR_STATUS_COLOR = '#ef4444';
 
-function readJson(storage, key, fallback) {
-  try {
-    const value = JSON.parse(storage?.getItem?.(key));
-    return value ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(storage, key, value) {
-  storage?.setItem?.(key, JSON.stringify(value));
-}
-
-function annotationIdentity(annotation) {
-  if (annotation?.id) return `id:${annotation.id}`;
-  return JSON.stringify([
-    annotation?.docId ?? '',
-    Number(annotation?.page ?? 0),
-    annotation?.type ?? '',
-    annotation?.text ?? '',
-    annotation?.x ?? null,
-    annotation?.y ?? null,
-    annotation?.createdAt ?? null,
-  ]);
-}
-
-function mergeAnnotations(...groups) {
-  const merged = new Map();
-  for (const group of groups) {
-    for (const annotation of Array.isArray(group) ? group : []) {
-      if (!annotation || typeof annotation !== 'object') continue;
-      const identity = annotationIdentity(annotation);
-      // Callers pass authoritative records first. Legacy and document fallback
-      // data may fill gaps, but must never overwrite a newer database record.
-      if (!merged.has(identity)) merged.set(identity, annotation);
-    }
-  }
-  return [...merged.values()];
-}
-
-function documentFallback(storage) {
-  const dictionary = readJson(storage, DOCUMENT_ANNOTATION_KEY, {});
-  if (!dictionary || Array.isArray(dictionary) || typeof dictionary !== 'object') return [];
-  return Object.entries(dictionary).flatMap(([docId, records]) => (
-    Array.isArray(records) ? records.map(record => ({ ...record, docId: record?.docId ?? docId })) : []
-  ));
-}
-
-function explicitLegacyAnnotations(storage) {
-  const legacy = readJson(storage, LEGACY_ANNOTATION_KEY, {});
-  if (Array.isArray(legacy)) return legacy.filter(record => typeof record?.docId === 'string' && record.docId);
-  if (!legacy || typeof legacy !== 'object') return [];
-  return Object.values(legacy).flatMap(records => (
-    Array.isArray(records)
-      ? records.filter(record => typeof record?.docId === 'string' && record.docId)
-      : []
-  ));
-}
-
-function moveFallbackDocument(storage, docId, records, legacyBefore) {
-  const legacyAfter = storage?.getItem?.(LEGACY_ANNOTATION_KEY) ?? null;
-  const documents = readJson(storage, DOCUMENT_ANNOTATION_KEY, {});
-  const nextDocuments = documents && !Array.isArray(documents) && typeof documents === 'object' ? { ...documents } : {};
-
-  if (legacyAfter !== legacyBefore) {
-    const legacy = readJson(storage, LEGACY_ANNOTATION_KEY, {});
-    if (legacy && !Array.isArray(legacy) && typeof legacy === 'object' && Object.hasOwn(legacy, docId)) {
-      const migrated = Array.isArray(legacy[docId]) ? legacy[docId] : records;
-      if (migrated.length) nextDocuments[docId] = migrated;
-      else delete nextDocuments[docId];
-      delete legacy[docId];
-      if (Object.keys(legacy).length) writeJson(storage, LEGACY_ANNOTATION_KEY, legacy);
-      else storage?.removeItem?.(LEGACY_ANNOTATION_KEY);
-    }
-  }
-
-  // The authoritative save defines the document's complete record set, so the
-  // fallback must mirror it exactly. Leaving a stale fallback entry in place
-  // would resurrect a removed annotation on the next read: mergeAnnotations
-  // only dedupes by identity, so any record absent from the primary set comes
-  // back from localStorage.
-  if (records.length) nextDocuments[docId] = records;
-  else delete nextDocuments[docId];
-  if (Object.keys(nextDocuments).length) writeJson(storage, DOCUMENT_ANNOTATION_KEY, nextDocuments);
-  else storage?.removeItem?.(DOCUMENT_ANNOTATION_KEY);
-}
-
-function hardenAnnotations(root, db) {
-  if (!db || db.__annotationFallbackHardened) return;
-  const originalGetAll = db.getAllAnnotations?.bind(db);
-  const originalGetByDocument = db.getAnnotations?.bind(db);
-  const originalSave = db.saveAnnotations?.bind(db);
-  if (typeof originalGetAll !== 'function' || typeof originalSave !== 'function') return;
-
-  db.getAllAnnotations = async () => {
-    const primary = await originalGetAll();
-    const legacy = readJson(root.localStorage, LEGACY_ANNOTATION_KEY, {});
-    const hasAmbiguousPageMap = legacy && !Array.isArray(legacy) && typeof legacy === 'object'
-      && Object.keys(legacy).some(key => Number.isFinite(Number(key)))
-      && Object.values(legacy).some(records => Array.isArray(records) && records.some(record => !record?.docId));
-    const safePrimary = hasAmbiguousPageMap
-      ? primary.filter(annotation => annotation?.docId !== 'global')
-      : primary;
-    // Once migration commits, IndexedDB is authoritative; a union with old
-    // localStorage data would resurrect deletions and overwritten backups.
-    if (root.localStorage?.getItem?.('plasma_migrated_v2') === 'true') return safePrimary;
-    return mergeAnnotations(safePrimary, explicitLegacyAnnotations(root.localStorage), documentFallback(root.localStorage));
-  };
-
-  db.getAnnotations = async (docId) => {
-    // Preserve the indexed document query on canonical profiles. The full
-    // database scan previously ran for every PDF annotation read.
-    if (root.localStorage?.getItem?.('plasma_migrated_v2') === 'true'
-      && typeof originalGetByDocument === 'function') {
-      return originalGetByDocument(docId);
-    }
-    return (await db.getAllAnnotations()).filter(annotation => annotation.docId === docId);
-  };
-
-  db.saveAnnotations = async (docId, pages) => {
-    const legacyBefore = root.localStorage?.getItem?.(LEGACY_ANNOTATION_KEY) ?? null;
-    const records = await originalSave(docId, pages);
-    moveFallbackDocument(root.localStorage, docId, records, legacyBefore);
-    return records;
-  };
-
-  Object.defineProperty(db, '__annotationFallbackHardened', { value: true });
-}
-
+// Catalog recovery stays active; annotation reads now use the canonical DB
+// directly, without overlaying prelaunch localStorage snapshots.
 function normalizedColor(root, value) {
   const probe = root.document?.createElement?.('span');
   if (!probe) return value;
@@ -221,10 +92,8 @@ export function installBridgeHardening(root = window) {
     root.DataStore = hardenedStore;
     root.OpenCourseDeck.DataStore = hardenedStore;
   }
-  hardenAnnotations(root, root.DB);
   root.OpenCourseDeck.BridgeHardening = Object.freeze({
     errorStatusColor: ERROR_STATUS_COLOR,
-    documentAnnotationKey: DOCUMENT_ANNOTATION_KEY,
   });
   return { dataStore: hardenedStore, db: root.DB };
 }
