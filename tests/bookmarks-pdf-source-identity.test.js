@@ -36,7 +36,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
   });
 
   it('queues a page only for a stable saved PDF source ID and navigates to the document viewer', async () => {
-    annotations = [{ id: 'ann-3', docId: 'local-doc-3', page: 17, docTitle: 'Chemistry notes' }];
+    annotations = [{ id: 'ann-3', docId: 'fingerprint:local-doc-3', page: 17, docTitle: 'Chemistry notes' }];
     route = mount();
     const card = await vi.waitFor(() => {
       const element = document.querySelector('[data-bookmark-id="ann-3"]');
@@ -46,8 +46,27 @@ describe('saved PDF bookmark stable-source navigation', () => {
     const open = card.querySelector('a');
     expect(open.getAttribute('href')).toBe('#/pdf');
     open.click();
-    expect(setPendingPdfPage).toHaveBeenCalledWith('local-doc-3', 17);
+    expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:local-doc-3', 17);
     expect(Router.navigate).toHaveBeenCalledWith('#/pdf');
+  });
+
+  it('never uses a renamed filename or URL as a stable PDF document identifier', async () => {
+    annotations = [
+      { id: 'ann-by-name', docId: 'renamed.pdf', page: 12, docTitle: 'Renamed PDF' },
+      { id: 'ann-by-url', docId: 'url:https://example.test/course.pdf', page: 3, docTitle: 'Remote PDF' },
+    ];
+    route = mount();
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-bookmark-id^="ann-by-"]')).toHaveLength(2));
+    for (const id of ['ann-by-name', 'ann-by-url']) {
+      const card = document.querySelector('[data-bookmark-id="' + id + '"]');
+      const link = card.querySelector('a');
+      expect(link.getAttribute('href')).toBe('#/materials');
+      link.click();
+    }
+    expect(setPendingPdfPage).toHaveBeenCalledTimes(2);
+    expect(setPendingPdfPage).toHaveBeenNthCalledWith(1, null, null);
+    expect(setPendingPdfPage).toHaveBeenNthCalledWith(2, null, null);
+    expect(Router.navigate).toHaveBeenLastCalledWith('#/materials');
   });
 
   it('routes a legacy global annotation to source discovery, never to the prior PDF page', async () => {
@@ -88,7 +107,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
 
   it('shows canonical saved PDF bookmarks and navigates only when their document identity is stable', async () => {
     const stored = [
-      { id: 'bm-renal', docId: 'renamed-renal.pdf', docTitle: 'Renal physiology', page: 7, updatedAt: 100 },
+      { id: 'bm-renal', docId: 'fingerprint:renal-doc-content', docTitle: 'Renal physiology', page: 7, updatedAt: 100 },
       { id: 'bm-unanchored', docId: 'global', docTitle: 'Unanchored PDF', page: 12, updatedAt: 90 },
     ];
     window.DB.getAllPdfBookmarks = vi.fn(async () => structuredClone(stored));
@@ -101,7 +120,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     expect(first.textContent).toContain('Renal physiology');
     expect(first.textContent).toContain('Page 7');
     first.querySelector('a').click();
-    expect(setPendingPdfPage).toHaveBeenCalledWith('renamed-renal.pdf', 7);
+    expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:renal-doc-content', 7);
     expect(Router.navigate).toHaveBeenCalledWith('#/pdf');
 
     const unsafe = document.querySelector('[data-bookmark-id="bm-unanchored"]');
@@ -115,7 +134,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
 
   it('fails closed when canonical PDF bookmarks cannot be read and offers retry without modifying records', async () => {
     const getAllPdfBookmarks = vi.fn().mockRejectedValueOnce(new Error('IDB unavailable'))
-      .mockResolvedValueOnce([{ id: 'bm-recovered', docId: 'renal.pdf', page: 3, title: 'Renal bookmark' }]);
+      .mockResolvedValueOnce([{ id: 'bm-recovered', docId: 'fingerprint:renal-doc-content-recovered', page: 3, title: 'Renal bookmark' }]);
     window.DB.getAllPdfBookmarks = getAllPdfBookmarks;
     route = mount();
     const retry = await vi.waitFor(() => {
