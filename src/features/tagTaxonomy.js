@@ -123,19 +123,36 @@ export function unmergeTaxonomyTag(current, sourceLabel) {
 }
 
 /**
- * The app's settings DB normally returns a full value. We still verify the
- * canonical read-after-write, because a resolved Promise or a localStorage
- * mirror alone does not prove that a requested mutation was persisted.
+ * Preserve the *raw* setting revision for atomic compare-and-swap. Parsing
+ * null into an empty taxonomy before CAS would otherwise compare a synthetic
+ * object with a genuinely missing record and reject the first save.
+ *
+ * New browser stores support atomic IndexedDB CAS; a concurrent tab that wrote
+ * first must win without its taxonomy being overwritten by this stale edit.
+ * Older integrations lacking CAS retain their existing acknowledged writer,
+ * with strict receipts and canonical readback rather than assumed success.
  */
 export async function persistTagTaxonomy(db, mutate) {
-  if (typeof db?.getSetting !== 'function' || typeof db?.saveSetting !== 'function') {
+  if (typeof db?.getSetting !== 'function'
+    || (typeof db.compareAndSwapSetting !== 'function'
+      && typeof db.saveSetting !== 'function')) {
     throw new Error('Canonical tag taxonomy storage is unavailable');
   }
-  const current = parseTagTaxonomy(await db.getSetting(TAG_TAXONOMY_KEY));
+  const stored = await db.getSetting(TAG_TAXONOMY_KEY);
+  const current = parseTagTaxonomy(stored);
   const next = parseTagTaxonomy(mutate(current));
-  const receipt = await db.saveSetting(TAG_TAXONOMY_KEY, next);
-  if (receipt === false || receipt?.committed === false || receipt?.status === 'failed') {
-    throw new Error('Tag taxonomy write was not acknowledged');
+  if (typeof db.compareAndSwapSetting === 'function') {
+    // Do not fallback to non-atomic saveSetting if encrypted settings, a
+    // transaction failure, or a concurrent tab refuses this revision.
+    const accepted = await db.compareAndSwapSetting(TAG_TAXONOMY_KEY, stored, next);
+    if (accepted !== true) {
+      throw new Error('Tag taxonomy changed elsewhere or atomic write was not acknowledged; reload before editing');
+    }
+  } else {
+    const receipt = await db.saveSetting(TAG_TAXONOMY_KEY, next);
+    if (receipt !== true && JSON.stringify(receipt) !== JSON.stringify(next)) {
+      throw new Error('Tag taxonomy write was not acknowledged');
+    }
   }
   const verified = parseTagTaxonomy(await db.getSetting(TAG_TAXONOMY_KEY));
   if (JSON.stringify(verified) !== JSON.stringify(next)) {
