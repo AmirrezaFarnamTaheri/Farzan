@@ -23,8 +23,6 @@ import { loadVendorScript } from './core/vendorLoader.js';
 
 import * as easing from './lib/easing.js';
 import { normalizeTimeIntervals, updateTimeIntervals } from './lib/timeRange.js';
-import { workerAssets } from './core/workerAssets.js';
-import { createLazyWorkerPool } from './core/lazyWorkerPool.js';
 import { buildUserThemeVars } from './core/themeBuilder.js';
 import * as locale from './core/locale.js';
 import enUS from './locales/en-US.js';
@@ -48,24 +46,11 @@ pd.easing = easing;
 pd.loadVendorScript = loadVendorScript;
 pd.AuxiliaryDbLifecycle = window.OpenCourseDeck.AuxiliaryDbLifecycle;
 pd.timeRange = { normalizeTimeIntervals, updateTimeIntervals };
-// Preserve the public synchronous WorkerPool namespace, but defer the worker
-// pool's scheduling machinery until a feature makes a real worker request.
-const lazyWorkerPool = createLazyWorkerPool({
-  load: async () => {
-    const workerPool = await import('./lib/workerPool.js');
-    // Direct imports self-register. Restore the stable public facade after
-    // loading for callers who captured it before the dynamic import.
-    pd.WorkerPool = lazyWorkerPool;
-    return workerPool;
-  },
-});
-pd.WorkerPool = lazyWorkerPool;
 pd.ThemeBuilder = { buildUserThemeVars };
 pd.locale = { ...locale, messages: { 'en-US': enUS, 'fa-IR': faIR } };
 locale.locale('en-US', enUS);
 locale.locale('fa-IR', faIR);
 pd.AI = initAIClient(window);
-pd.workers = workerAssets;
 // Automatic mutation retry primitives — db.js write paths already retry
 // transient IndexedDB failures through withMutationRetry; this namespace
 // exposes the same machinery (plus the quota-eviction hook) to features.

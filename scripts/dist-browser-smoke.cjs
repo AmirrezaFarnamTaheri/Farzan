@@ -125,38 +125,12 @@ function deleteDatabase(name) {
   });
 }
 
-function workerRequest(worker, type, data, id) {
-  return timeout(new Promise((resolve, reject) => {
-    const onMessage = event => {
-      if (event.data?.id !== id) return;
-      worker.removeEventListener('message', onMessage);
-      resolve(event.data);
-    };
-    const onError = event => {
-      worker.removeEventListener('message', onMessage);
-      reject(new Error(event.message || 'worker crashed'));
-    };
-    worker.addEventListener('message', onMessage);
-    worker.addEventListener('error', onError, { once: true });
-    worker.postMessage({
-      type,
-      id,
-      requestId: id,
-      generation: 0,
-      resource: 'dist-smoke',
-      revision: 1,
-      authority: null,
-      data,
-    });
-  }), 'worker request ' + type);
-}
-
 async function run() {
   const indexResponse = await fetch('/index.html', { cache: 'no-store' });
   invariant(indexResponse.ok, 'served dist index.html was unavailable');
   invariant((await indexResponse.text()).includes('opencoursedeck'), 'served index did not reference the production bundle');
 
-  await waitFor(() => window.OpenCourseDeck?.workers && window.OpenCourseDeck?.loadFeature && window.DB, 'application bundle');
+  await waitFor(() => window.OpenCourseDeck?.loadFeature && window.DB, 'application bundle');
   const pd = window.OpenCourseDeck;
 
   // Each smoke run uses a unique Chromium profile, so this is an observable
@@ -193,22 +167,6 @@ async function run() {
   const registration = await timeout(navigator.serviceWorker.register('/sw.js'), 'service worker registration');
   await timeout(navigator.serviceWorker.ready, 'service worker activation');
   invariant(Boolean(registration.active || registration.waiting || registration.installing), 'service worker has no lifecycle state');
-
-  const catalog = new Worker(pd.workers.catalog, { type: 'classic' });
-  const notReady = await workerRequest(catalog, 'search', { query: 'anything' }, 1);
-  invariant(notReady.type === 'error' && notReady.code === 'WORKER_NOT_READY' && notReady.catalogState === 'uninitialized', 'catalog worker did not report uninitialized state');
-  const parsed = await workerRequest(catalog, 'parse', { catalogJson: {} }, 2);
-  invariant(parsed.type === 'parse:done' && parsed.catalogState === 'ready' && parsed.empty === true, 'empty catalog was not represented as a ready empty result');
-  const emptySearch = await workerRequest(catalog, 'search', { query: 'anything' }, 3);
-  invariant(emptySearch.type === 'search:done' && emptySearch.empty === true && emptySearch.catalogState === 'ready', 'ready empty catalog search was ambiguous');
-  catalog.terminate();
-
-  const search = new Worker(pd.workers.search, { type: 'classic' });
-  const searchInit = await workerRequest(search, 'init', { items: [] }, 4);
-  invariant(searchInit.type === 'init:done' && searchInit.itemCount === 0, 'search worker failed to initialise from the production asset');
-  const searchEmpty = await workerRequest(search, 'search', { query: 'missing' }, 5);
-  invariant(searchEmpty.type === 'search:done' && Array.isArray(searchEmpty.results) && searchEmpty.results.length === 0, 'search worker empty result failed');
-  search.terminate();
 
   // Run this against the *built, served* app, not a VM simulation of bridge.js.
   // No remote Plasmato media is requested: link availability is not implied

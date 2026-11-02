@@ -110,7 +110,6 @@ function stageStaticAssets(sourceRoot = root, outputDir = outdir) {
     copyDirectory(path.join(sourceRoot, dir), path.join(outputDir, dir));
   }
   copyDirectory(path.join(sourceRoot, 'src', 'styles'), path.join(outputDir, 'src', 'styles'));
-  copyDirectory(path.join(sourceRoot, 'src', 'workers'), path.join(outputDir, 'src', 'workers'));
 
   // Ship the standalone edition beside the canonical study app. Keep
   // repository verification/recovery scripts out of the public runtime.
@@ -140,8 +139,6 @@ function assertReleaseGraph(outputDir = outdir) {
     'opencoursedeck.js',
     'style.css',
     path.join('src', 'styles', 'index.css'),
-    path.join('src', 'workers', 'search.worker.js'),
-    path.join('src', 'workers', 'catalog.worker.js'),
   ];
   const missing = requiredReleaseFiles.filter(file => !fs.existsSync(path.join(outputDir, file)));
   if (missing.length) {

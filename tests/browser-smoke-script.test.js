@@ -16,12 +16,12 @@ describe('browser smoke script wiring', () => {
     expect(packageJson.scripts.ci).toContain('npm run smoke:dist-browser');
   });
 
-  it('validates the built entry bundle and exercises staged production workers through the public namespace', () => {
+  it('validates the built entry and actual catalog/search flows without a dormant worker API', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'scripts/dist-browser-smoke.cjs'), 'utf8');
 
     expect(source).toContain("path.join(DIST, 'opencoursedeck.js')");
-    expect(source).toContain('new Worker(pd.workers.catalog');
-    expect(source).toContain('new Worker(pd.workers.search');
+    expect(source).not.toContain('new Worker(pd.workers');
+    expect(source).toContain('pd.TopbarSearch._queryUniversal(');
   });
 
   it('separates application readiness from the OpenCourseDeck namespace value', () => {

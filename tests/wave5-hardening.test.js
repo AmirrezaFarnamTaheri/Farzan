@@ -591,27 +591,9 @@ describe('canvas.js render resilience', () => {
   });
 });
 
-describe('workerPool.js generation guard', () => {
-  it('ignores an error from a worker that has already been replaced', () => {
-    const src = read('src/lib/workerPool.js');
-    const onerror = src
-      .slice(src.indexOf('worker.onerror'), src.indexOf('def.instance = worker;'))
-      // Drop comments: the rationale text names destroyWorker before the
-      // guard does, which would make a positional assertion meaningless.
-      .replace(/^\s*\/\/.*$/gm, '');
-
-    // destroyWorker() bumps def.generation, so a late crash event from the
-    // dead worker used to terminate its live successor and reject every
-    // request in flight on it. onmessage already guarded; onerror did not.
-    expect(onerror).toContain('def.instance !== worker');
-    expect(onerror).toContain('def.generation !== generation');
-    expect(onerror.indexOf('return;')).toBeLessThan(onerror.indexOf('destroyWorker'));
-  });
-});
-
 // ───────────────────────────────────────────────────────────
 // Accessibility and lifecycle: dialog naming, keyboard formatting,
-// chart re-registration, settings persistence scope
+// settings persistence scope
 // ───────────────────────────────────────────────────────────
 
 describe('app.js dialog accessible name', () => {

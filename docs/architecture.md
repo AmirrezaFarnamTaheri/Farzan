@@ -12,14 +12,13 @@
 
 - `index.html` provides native landmarks and a skip link to `#main-content`.
 - Avoid `role="application"` on the app root; native browser and screen-reader navigation should stay available.
-- Overlay primitives live in `app.js` and use helpers from `src/lib/dom.js`.
+- Modal and drawer primitives are owned by `src/ui/overlays.js`; the app shell uses them through their shared lifecycle.
 - Modal, drawer, and command palette openings inert `#ocd-app`, trap focus inside the overlay, and restore focus to the opener on close.
 - Route changes focus `#main-content` and announce through `#aria-announcer`.
 
 ### Storage
 
-- Phase 1 migration introduces IndexedDB-backed `window.DB` facade (see `bridge.js`).
-- A one-time migration reads legacy localStorage keys and writes them into IndexedDB.
+- `db.js` owns the IndexedDB schema, with `bridge.js` exposing the current canonical `window.DB` API.
 - When a passphrase is set on `OpenCourseDB`, `put`/`add`/`bulkPut`/`get`/`getAll`/`getAllByIndex`/`queryIndex` encrypt and decrypt AES-GCM v2 envelopes. IndexedDB keyPath and index fields (`id`, `courseId`, …) stay in plaintext on the envelope so indexes still work. Library file blobs in `opencoursedeck-library-files` are not encrypted.
 
 ### Key modules
@@ -28,7 +27,7 @@
 - `src/lib/dom.js`: shared DOM helpers such as focus trap, focus restore, inert app background, debounce, throttle, selectors, and IDs.
 - `src/features/commandPalette.js`: command palette overlay and keyboard semantics.
 - `src/core/prefs.js`: appearance preferences (accent, density, font scale, direction, language). Accent swatches opt in with `data-accent-option`; the root `<html data-accent>` attribute is the applied state, never a click target. `Prefs.init()` registers one delegated document listener and is idempotent — it returns a disposer, and `Prefs.dispose()` removes it.
-- `src/features/topbarSearch.js`: a thin facade over the app-shell search singleton. The live implementation lives in `app.js` and is published as `OpenCourseDeck.TopbarSearch`; the browser e2e suite asserts against that instance, so it is the single source of truth. Do not re-implement search here.
+- `app.js` owns `OpenCourseDeck.TopbarSearch`, which uses live Fuse.js and lexical search; there is no second application search engine.
 - `notes.js`: editor + notes UI (sanitized via DOMPurify).
 - `pdf.js`: PDF viewer (pdfjs-dist vendored).
 - `canvas.js`: whiteboard canvas (loop pauses when tab hidden).
@@ -64,19 +63,16 @@ navigation during the load cannot paint a stale view.
 
 ### Active namespaces
 
-- Utility/core namespaces exposed by the active app shell: `OpenCourseDeck.dom`, `OpenCourseDeck.ThemeManager`, `OpenCourseDeck.Prefs`, `OpenCourseDeck.FontScale`, `OpenCourseDeck.KeyboardShortcuts`, `OpenCourseDeck.ContextMenu`, `OpenCourseDeck.CanvasExport`, `OpenCourseDeck.Clipboard`, `OpenCourseDeck.Pointer`, and `OpenCourseDeck.CanvasTools`.
-- Chart and visualization namespaces exposed by the active app shell: `OpenCourseDeck.Charts`, `OpenCourseDeck.ChartPlugins`, `OpenCourseDeck.CanvasCharts`, `OpenCourseDeck.CanvasZoom`, `OpenCourseDeck.CourseGraph`, `OpenCourseDeck.KnowledgeGraph`, and `OpenCourseDeck.Graphs`.
-- `OpenCourseDeck.ChartPlugins` is bundled and exposes the Chart.js plugin objects imported in `app.js`: heatmap, sparkline, arc, and gauge. `OpenCourseDeck.CanvasCharts` is bundled and exposes `CanvasGauge`, `CanvasTreemap`, `CanvasAreaChart`, and `CanvasHeatmap`.
-- These visualization namespaces are bundled and exposed for runtime use; deeper route-level UX integration is still separate from namespace exposure.
+- Active utilities include `OpenCourseDeck.dom`, `ThemeManager`, `Prefs`, `FontScale`, `KeyboardShortcuts`, `ContextMenu`, `CanvasExport`, `Clipboard`, and `Pointer`. Unused graph, custom CanvasTools and Chart.js adapter facades were deleted before release.
 - The app-level `OpenCourseDeck.plugins` object is not an installable plugin system. The earlier unused manifest/registry prototype was retired; no `OpenCourseDeck.PluginHost`, worker plugin sandbox, marketplace or plugin lifecycle is shipped. Historical plugin registry keys are left intact for recovery and would require a separate, approved migration if a real plugin system is introduced.
-- Translation modules ARE part of the active runtime bundle: `src/index.js` imports `src/features/translator.js` and `src/features/translationCache.js` and exposes them as `OpenCourseDeck.TranslatorRegistry` and `OpenCourseDeck.TranslationCache`. The registry is wired, but no view calls it yet (notes and the player have no translate action).
+- Locale dictionaries remain. No translator or translation-cache runtime is shipped; do not advertise a translation workflow before it is implemented and approved.
 - Player-adjacent source modules `MediaStorage` and `WaveformScrubber` are imported by the lazy `player` feature loader in `src/index.js` (`pd.loadFeature('player')`). `player.js` still probes those namespaces at runtime and falls back if a custom embed loads the player without the feature loader.
 - User library creation is a shipped product surface: `src/features/addContent.js` and `src/features/userLibrary.js` are initialized after the app shell resolves. Add video/PDF/topic/course/URL writes a user overlay (`ocd_user_library`) that `DataStore.mergeRaw(..., { userOwned: true })` keeps separate from the catalog so a catalog reload cannot resurrect a deleted user course. File blobs live in the `opencoursedeck-library-files` IndexedDB and play through `library-file:` refs resolved to blob URLs.
 
 ### Performance notes
 
 - Startup timings are available through `?debug=1` and include bundle import, bundle-to-ready, and app init durations.
-- The generic `src/lib/workerPool.js` has no confirmed live caller and is not eagerly imported. A small `OpenCourseDeck.WorkerPool` facade keeps `runInWorker()` (Promise-returning), `getWorkerStatus()` and `terminateAll()` available synchronously; it imports the original pool only on an actual request. Direct exports remain available. The `OpenCourseDeck.workers` URLs and both shipped workers remain stable and precached for offline/browser verification.
+- Unused classic search/catalog workers and their public WorkerPool facade were removed. The shipped browser search uses Fuse.js and canonical lexical ranking; PDF.js maintains its own vendor worker.
 - High-impact lazy-init candidates are `notes.js`, `pdf.js`, `player.js`, `canvas.js`, and progress charts.
 - Known hotspots are tracked in `docs/roadmap.md`.
 
