@@ -214,6 +214,33 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('<table>');
   });
 
+  it('abandons a Squire preflight started for a different note after switching before import resolves', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    const firstId = 'regular-note';
+    const pending = app.enableModernEditor();
+    // Dynamic module loading yields to the microtask queue; opening another
+    // note before it resolves must invalidate the original compatibility
+    // decision, even if the currently shown draft was already sanitized.
+    expect(app.openNote('pinned-note')).toBe(true);
+    const result = await pending;
+    expect(result).toEqual(expect.objectContaining({ ok: false, reason: 'stale-mount' }));
+    expect(store.getNote(firstId).content).toBe('<p>Ordinary</p>');
+    expect(store.getNote('pinned-note').content).toContain('<img');
+    expect(document.querySelector('[data-notes-editor] .notes-modern-editor')).toBeNull();
+  });
+
+  it('does not remount Squire twice when two valid enable requests resolve together', async () => {
+    const app = window.PlasmaNotesApp;
+    expect(app.openNote('regular-note')).toBe(true);
+    const [first, second] = await Promise.all([app.enableModernEditor(), app.enableModernEditor()]);
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(document.querySelectorAll('[data-notes-editor] .notes-modern-editor')).toHaveLength(1);
+    expect(app.disableModernEditor()).toBe(true);
+  });
+
   it('does not autosave incomplete IME input through the outer Notes event handler', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
