@@ -2137,10 +2137,15 @@ import { countWords } from './src/core/textMetrics.js';
         RouteListeners.on(titleInput, 'input', () => {
           window.OpenCourseDeck?.beforeUnload?.mark?.('notes-title');
           clearTimeout(titleInput._pdTitleT);
+          const sourceNoteId = Editor._currentId;
+          const sourceEpoch = Editor._loadEpoch;
           titleInput._pdTitleT = setTimeout(() => {
             titleInput._pdTitleT = null;
-            if (Editor._currentId) {
-              Store.updateNote(Editor._currentId, { title: titleInput.value.trim() || 'Untitled' });
+            // An earlier note's debounce must never retitle a newer editor
+            // after a switch, hydration, deletion or route remount.
+            if (sourceNoteId && Editor._currentId === sourceNoteId
+              && Editor._loadEpoch === sourceEpoch && titleInput.isConnected) {
+              Store.updateNote(sourceNoteId, { title: titleInput.value.trim() || 'Untitled' });
               NotesList.render();
             }
             window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
@@ -2351,7 +2356,18 @@ import { countWords } from './src/core/textMetrics.js';
       // An edited missing note must stay mounted for recovery instead.
       if (!Store.getNote(Editor._currentId) && !this._hasPendingLocalEdit()) return true;
       try {
-        if (Editor.save(true) !== false) return true;
+        if (Editor.save(true) !== false) {
+          // Editor.save(true) already captured both body and the current title
+          // in the originating note's canonical write. Cancel its remaining
+          // title debounce *before* Editor.load binds a different note.
+          const titleInput = $('[data-note-title-input]');
+          if (titleInput?._pdTitleT) {
+            clearTimeout(titleInput._pdTitleT);
+            titleInput._pdTitleT = null;
+            window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
+          }
+          return true;
+        }
       } catch (error) {
         console.warn('[Notes] current note could not be saved before switching', error);
       }
