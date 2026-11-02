@@ -372,6 +372,48 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('plays the clicked course media, never the first matching topic ID from another course', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Cardiac A' },
+      { id: 'course-b', title: 'Renal B' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], topicId: 'shared', courseId: 'course-a',
+        title: 'Wrong course A', videos: ['https://example.test/course-a.mp4'] },
+      { ...topics[0], topicId: 'shared', courseId: 'course-b',
+        title: 'Selected course B', videos: ['https://example.test/course-b.mp4'] },
+    ];
+    const player = {
+      queue: [], trackIndex: 0, currentTime: 0, duration: 100,
+      loadPlaylist: vi.fn(), pause: vi.fn(), on: vi.fn(), off: vi.fn(),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    const courseB = await vi.waitFor(() => {
+      const button = document.querySelector('#courses-list [data-course-id="course-b"]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    courseB.click();
+    const play = await vi.waitFor(() => {
+      const button = document.querySelector(
+        '#course-detail [data-course-id="course-b"][data-topic-id="shared"] [data-action="play-video"]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    play.click();
+    await vi.waitFor(() => expect(player.loadPlaylist).toHaveBeenCalledOnce());
+    expect(player.loadPlaylist).toHaveBeenCalledWith([
+      expect.objectContaining({
+        topicId: 'shared', courseId: 'course-b', title: 'Selected course B',
+        src: 'https://example.test/course-b.mp4',
+      }),
+    ], true);
+    controller.unmount();
+  });
+
   it('never chooses the first of duplicate topic IDs when a bookmark has no course identity', async () => {
     window.DataStore.allCourses = () => [
       { id: 'course-a', title: 'Anatomy A' },
