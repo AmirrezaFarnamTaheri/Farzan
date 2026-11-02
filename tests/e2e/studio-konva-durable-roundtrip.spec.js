@@ -146,5 +146,31 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   expect((await persisted()).layers[0].elements[0].x).toBe(-29);
   expect((await persisted()).viewport.zoom).toBe(1.5);
   await expect(draft.locator('[data-studio-konva-zoom-label]')).toContainText('150%');
+  // Verify the new #362 canonical delete operation with actual Chromium
+  // controls and IndexedDB, not just a mocked Konva scene.
+  console.info('[konva-roundtrip] delete saved shape, undo, keyboard delete and reload');
+  await draft.locator('[data-studio-konva-object]').selectOption('seed', { timeout: 12000 });
+  await expect(draft.locator('[data-studio-konva-delete]')).toBeEnabled();
+  await draft.locator('[data-studio-konva-delete]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).layers[0].elements.map(item => item.id))
+    .toEqual([shape.id]);
+  expect((await persisted()).layers[1]).toEqual(saved.layers[1]);
+  await draft.locator('[data-studio-konva-undo]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).layers[0].elements.map(item => item.id))
+    .toEqual(['seed', shape.id]);
+
+  await draft.locator('[data-studio-konva-object]').selectOption('seed', { timeout: 12000 });
+  await draft.locator('[data-studio-konva-stage]').focus();
+  await page.keyboard.press('Backspace');
+  await expect.poll(async () => (await persisted()).layers[0].elements.map(item => item.id))
+    .toEqual([shape.id]);
+  await draft.locator('[data-studio-konva-close]').click({ timeout: 12000 });
+  await expect(draft).not.toBeVisible();
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
+  await openKonvaLab();
+  await expect(draft).toBeVisible({ timeout: 20000 });
+  await expect(draft.locator('[data-studio-konva-object] option[value="seed"]')).toHaveCount(0);
+  await expect(draft.locator('[data-studio-konva-object] option[value="' + shape.id + '"]')).toHaveCount(1);
+  expect((await persisted()).layers[1]).toEqual(saved.layers[1]);
   expect(await page.evaluate(async () => window.DB.getSetting('ocd_studio_board'))).toEqual(live);
 });
