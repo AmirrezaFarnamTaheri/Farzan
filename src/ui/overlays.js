@@ -6,7 +6,7 @@ const shell = () => window.OpenCourseDeck ?? {};
  * Extracted verbatim from the app shell so src/core modules can compose
  * dialogs without importing the whole IIFE shell.
  */
-import { $, $, appendContent, createElement, eventTargetEl, getFocusableElements, restoreFocus, setAppInert, trapFocus, uid } from '../lib/dom.js';
+import { $, $$, appendContent, createElement, eventTargetEl, getFocusableElements, restoreFocus, setAppInert, trapFocus, uid } from '../lib/dom.js';
 
 export const Modal = {
     _cleanupFns: new WeakMap(),
