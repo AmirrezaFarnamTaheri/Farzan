@@ -372,6 +372,82 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('plays the clicked course media, never the first matching topic ID from another course', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Cardiac A' },
+      { id: 'course-b', title: 'Renal B' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], topicId: 'shared', courseId: 'course-a',
+        title: 'Wrong course A', videos: ['https://example.test/course-a.mp4'] },
+      { ...topics[0], topicId: 'shared', courseId: 'course-b',
+        title: 'Selected course B', videos: ['https://example.test/course-b.mp4'] },
+    ];
+    const player = {
+      queue: [], trackIndex: 0, currentTime: 0, duration: 100,
+      loadPlaylist: vi.fn(), pause: vi.fn(), on: vi.fn(), off: vi.fn(),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    const courseB = await vi.waitFor(() => {
+      const button = document.querySelector('#courses-list [data-course-id="course-b"]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    courseB.click();
+    const play = await vi.waitFor(() => {
+      const button = document.querySelector(
+        '#course-detail [data-course-id="course-b"][data-topic-id="shared"] [data-action="play-video"]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    play.click();
+    await vi.waitFor(() => expect(player.loadPlaylist).toHaveBeenCalledOnce());
+    expect(player.loadPlaylist).toHaveBeenCalledWith([
+      expect.objectContaining({
+        topicId: 'shared', courseId: 'course-b', title: 'Selected course B',
+        src: 'https://example.test/course-b.mp4',
+      }),
+    ], true);
+    controller.unmount();
+  });
+
+  it('does not render or overwrite another course\'s progress for duplicate topic IDs', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Heart' },
+      { id: 'course-b', title: 'Kidneys' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], topicId: 'shared', courseId: 'course-a', title: 'Cardiac lesson' },
+      { ...topics[0], topicId: 'shared', courseId: 'course-b', title: 'Renal lesson' },
+    ];
+    window.DB.getAllProgress.mockResolvedValue([
+      { topicId: 'shared', courseId: 'course-a', status: 'done', percent: 100 },
+    ]);
+    const error = vi.fn();
+    const controller = await mountCourses();
+    const button = await vi.waitFor(() => {
+      const candidate = document.querySelector('#courses-list [data-course-id="course-b"]');
+      expect(candidate).not.toBeNull();
+      return candidate;
+    });
+    button.click();
+    const row = await vi.waitFor(() => {
+      const candidate = document.querySelector(
+        '#course-detail [data-course-id="course-b"][data-topic-id="shared"]');
+      expect(candidate).not.toBeNull();
+      return candidate;
+    });
+    expect(row.querySelector('[data-status="done"]')).toBeNull();
+    const completion = row.querySelector('[data-action="toggle-done"]');
+    expect(completion.disabled).toBe(true);
+    completion.click();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
   it('never chooses the first of duplicate topic IDs when a bookmark has no course identity', async () => {
     window.DataStore.allCourses = () => [
       { id: 'course-a', title: 'Anatomy A' },
