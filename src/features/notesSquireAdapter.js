@@ -272,6 +272,11 @@ export function createSquireNoteEditor({
       // intermediate text held by an active Chinese/Persian IME session.
       if (composing) throw new Error('Cannot replace note during IME composition');
       const next = preflight(value);
+      // The native DOM can already hold a committed keystroke before Squire's
+      // MutationObserver or input listener reports it. Inspect that live DOM
+      // synchronously, and publish the local edit before allowing a remote
+      // refresh to replace any content. This is not safe mid-IME (blocked above).
+      notify();
       // A remote refresh, restore or note switch cannot silently discard
       // changes the Squire editor has already surfaced to its save pipeline.
       // A clean initial editor is still replaceable, and an identical refresh
