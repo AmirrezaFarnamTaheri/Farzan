@@ -1663,6 +1663,7 @@ describe('app shell resilience helpers', () => {
     const getAllTimestamps = vi
       .fn()
       .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
+      .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
       .mockResolvedValue([{ id: 'ts-edit', topicId: 'topic-1', title: 'Edited title', position: 12, note: 'Edited note', updatedAt: 2 }]);
     window.DB = {
       getAllTimestamps,
