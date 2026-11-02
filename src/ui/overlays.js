@@ -391,7 +391,7 @@ export const Drawer = {
     closeAll() {
       // Escape may arrive in the frame between open() and the CSS .open
       // transition. Those pending drawers already own focus and inert depth.
-      $('.drawer').forEach(d => {
+      document.querySelectorAll('.drawer').forEach(d => {
         if (d.classList.contains('open') || this._openingTokens.has(d)) this.close(d);
       });
     },
