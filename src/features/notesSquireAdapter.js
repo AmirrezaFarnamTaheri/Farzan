@@ -226,11 +226,15 @@ export function createSquireNoteEditor({
     getText: () => root.textContent || '',
     commands: {
       insertContent(fragment) {
+        // Neither stale asynchronous callers nor toolbar actions may alter
+        // an active IME composition or a previously destroyed note session.
+        if (disposed || composing) return false;
         editor.insertHTML(preflight(fragment));
         notify();
         return true;
       },
       focus(position) {
+        if (disposed || composing) return false;
         if (position === 'end') editor.moveCursorToEnd();
         editor.focus();
         return true;
@@ -242,6 +246,7 @@ export function createSquireNoteEditor({
     editor: facade,
     supports: command => Object.hasOwn(commands, command),
     run: (command, value) => {
+      if (disposed || composing) return false;
       const action = commands[command];
       if (!action) return false;
       if (action(value) === false) return false;
