@@ -13,6 +13,14 @@ describe('CSS authoritative selector ownership', () => {
     expect(index.indexOf("progress-enhancements.css")).toBeLessThan(index.indexOf("farzan-redesign.css"));
   });
 
+  it('rejects empty selector blocks in the imported component stylesheets', () => {
+    const { inventoryCss } = require('../scripts/css-owner-inventory.cjs');
+    const unused = inventoryCss().rules
+      .filter(rule => rule.body.length === 0)
+      .map(rule => `${rule.file}:${rule.line}: ${rule.selector}`);
+    expect(unused).toEqual([]);
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
