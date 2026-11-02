@@ -95,6 +95,31 @@ export function mountBookmarksView(deps = {}) {
     };
   }
 
+
+  // Page navigation must bind to the exact saved revision displayed in this
+  // card. A stable document fingerprint alone cannot distinguish a stale
+  // annotation/note/bookmark after cross-tab edits or backup restore.
+  async function verifySavedPdfSource(source, kind, snapshot) {
+    const readers = {
+      note: 'getAllNotes',
+      annotation: 'getAllAnnotations',
+      bookmark: 'getAllPdfBookmarks',
+    };
+    const method = readers[kind];
+    const db = window.DB;
+    if (!source || source.id == null || !method || typeof db?.[method] !== 'function') {
+      throw new Error('Saved PDF source is unavailable; reload bookmarks');
+    }
+    const records = await db[method]();
+    if (!Array.isArray(records)) {
+      throw new Error('Saved PDF source could not be loaded');
+    }
+    const matches = records.filter(record => record?.id === source.id);
+    if (matches.length !== 1 || JSON.stringify(matches[0]) !== snapshot) {
+      throw new Error('Saved PDF source changed elsewhere; reload bookmarks');
+    }
+  }
+
   function formatDuration(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
     const hours = Math.floor(total / 3600);
@@ -205,6 +230,8 @@ export function mountBookmarksView(deps = {}) {
         docId: item.pdfDocId || item.docId,
         page: item.pdfPage || item.page,
         sourceType: item.sourceType,
+        sourceKind: 'note',
+        source: item,
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
       ...annotations.map(item => ({
@@ -215,6 +242,8 @@ export function mountBookmarksView(deps = {}) {
         id: item.id,
         docId: item.docId,
         page: item.page || 1,
+        sourceKind: 'annotation',
+        source: item,
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
       ...pdfBookmarks.filter(item => item && item.id != null).map(item => ({
@@ -225,6 +254,8 @@ export function mountBookmarksView(deps = {}) {
         id: item.id,
         docId: item.docId,
         page: item.page || 1,
+        sourceKind: 'bookmark',
+        source: item,
         updatedAt: item.updatedAt || item.createdAt || 0,
       })),
     ].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
@@ -334,7 +365,8 @@ export function mountBookmarksView(deps = {}) {
       link.href = item.href;
       link.textContent = 'Open';
       const pdfLink = item.href === '#/pdf';
-      if (pdfLink && !stablePdfDocId(item.docId)) {
+      const safePdfLink = pdfLink && stablePdfDocId(item.docId) && item.source?.id != null;
+      if (pdfLink && !safePdfLink) {
         // Preserve the saved card and its original page metadata, but guide
         // the learner to find the document manually. Never claim that an
         // unanchored page belongs to the previously mounted PDF.
@@ -390,14 +422,35 @@ export function mountBookmarksView(deps = {}) {
             link.removeAttribute('aria-busy');
           }
         });
-      } else if (pdfLink && stablePdfDocId(item.docId)) {
-        link.addEventListener('click', (event) => {
+      } else if (safePdfLink) {
+        const renderedRevision = JSON.stringify(item.source);
+        let opening = false;
+        link.addEventListener('click', async event => {
           event.preventDefault();
-          // Only queue a page tied to a real stable PDF identity. The viewer
-          // consumes the handoff after that document loads; do not seek a
-          // previously mounted, unrelated PDF.
-          setPendingPdfPage(item.docId, item.page ?? null);
-          Router.navigate('#/pdf');
+          if (opening) return;
+          opening = true;
+          link.setAttribute('aria-busy', 'true');
+          try {
+            await verifySavedPdfSource(item.source, item.sourceKind, renderedRevision);
+            // Async canonical reads can finish after a route/filter redraw.
+            // The detached card must not queue a new or obsolete PDF handoff.
+            if (!link.isConnected) return;
+            if (typeof setPendingPdfPage !== 'function'
+              || typeof Router?.navigate !== 'function') {
+              throw new Error('PDF navigation is unavailable');
+            }
+            // Only queue an unchanged saved page with a stable content ID.
+            // The viewer independently checks that its loaded PDF matches.
+            setPendingPdfPage(item.docId, item.page ?? null);
+            Router.navigate('#/pdf');
+          } catch (error) {
+            if (link.isConnected) {
+              Toast.error?.('Could not open PDF bookmark: ' + (error?.message || 'Source unavailable'));
+            }
+          } finally {
+            opening = false;
+            link.removeAttribute('aria-busy');
+          }
         });
       }
       body.append(badge, title, detail);
