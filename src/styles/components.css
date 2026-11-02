@@ -312,9 +312,6 @@
     color: var(--text-primary);
   }
 
-  /* Card Body */
-  .card-body { /* no extra styling by default — content flows naturally */ }
-
   /* Card Footer */
   .card-footer {
     display: flex;

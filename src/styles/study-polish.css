@@ -118,12 +118,8 @@
 .home-focus-progress {
   background: var(--surface-3);
 }
-.home-focus-meta {
-}
 .home-focus-action {
   border-color: var(--border-strong);
-}
-.home-focus-action:hover {
 }
 .home-card,
 .home-card-wide,
