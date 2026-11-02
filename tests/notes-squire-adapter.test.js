@@ -363,12 +363,13 @@ describe('Squire HTML-canonical edit adapter', () => {
       expect(selection.anchorNode).toBe(textNode);
       expect(selection.anchorOffset).toBe(3);
 
-      expect(instance.setContent('<p>قلب Heart 你好</p>')).toBe(false);
+      const refreshResult = instance.setContent('<p>قلب Heart 你好</p>');
       expect(element.querySelector('.notes-modern-editor p')).toBe(paragraph);
       expect(selection.anchorNode).toBe(textNode);
       expect(selection.anchorOffset).toBe(3);
       expect(instance.getHTML()).toBe('<p>قلب Heart 你好</p>');
       expect(onUpdate).not.toHaveBeenCalled();
+      expect(refreshResult).toBe(false);
       selection.removeAllRanges();
     } finally {
       instance.destroy();
