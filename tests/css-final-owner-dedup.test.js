@@ -33,4 +33,102 @@ describe('final-layer shared workspace style ownership (#175)', () => {
       expect(final?.owner.file).toBe('farzan-redesign.css');
     }
   });
+  it('leaves 15 exact view primitives to their authoritative final enhancement owner', () => {
+    const report = inventoryCss();
+    const manifest = report.stylesheets.map(sheet => sheet.file);
+    expect(manifest.indexOf('views.css')).toBeLessThan(manifest.indexOf('farzan-redesign.css'));
+    const primitives = [
+          [
+                ".home-title",
+                "font-family",
+                "var(--font-serif)"
+          ],
+          [
+                ".home-grid",
+                "display",
+                "grid"
+          ],
+          [
+                ".home-widget-copy",
+                "min-width",
+                "0"
+          ],
+          [
+                ".courses-shell",
+                "display",
+                "grid"
+          ],
+          [
+                ".courses-shell",
+                "align-items",
+                "start"
+          ],
+          [
+                ".courses-list",
+                "display",
+                "grid"
+          ],
+          [
+                ".course-item",
+                "width",
+                "100%"
+          ],
+          [
+                ".course-item",
+                "text-align",
+                "start"
+          ],
+          [
+                ".topic-row",
+                "display",
+                "grid"
+          ],
+          [
+                ".topic-row",
+                "align-items",
+                "center"
+          ],
+          [
+                ".view-studio",
+                "display",
+                "grid"
+          ],
+          [
+                ".studio-toolbar-clusters",
+                "display",
+                "flex"
+          ],
+          [
+                ".studio-toolbar-clusters",
+                "flex-wrap",
+                "wrap"
+          ],
+          [
+                ".studio-toolbar-clusters",
+                "align-items",
+                "center"
+          ],
+          [
+                ".studio-shell",
+                "position",
+                "relative"
+          ]
+    ];
+    const values = (file, selector, property) => report.rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body))
+      .filter(item => item.property === property).map(item => item.value);
+
+    for (const [selector, property, value] of primitives) {
+      expect(values('views.css', selector, property),
+        `${selector} ${property}: redundant base owner`).not.toContain(value);
+      expect(values('farzan-redesign.css', selector, property),
+        `${selector} ${property}: final enhancement owner`).toContain(value);
+      const owner = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(owner?.owner.file, `${selector} ${property}: final source`)
+        .toBe('farzan-redesign.css');
+    }
+  });
+
 });
