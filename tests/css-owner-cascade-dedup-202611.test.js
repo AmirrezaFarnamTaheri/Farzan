@@ -200,6 +200,10 @@ describe('canonical CSS cascade property ownership (#175)', () => {
         .toContain(value);
       const actual = report.propertyOwnership.finalDeclarations.find(item =>
         item.selector === selector && item.context === '' && item.property === property);
-      expect(actual?.owner.file).toBe(owner);
+      // A still-later redesign owner may intentionally use a different paint
+      // (e.g. Home dark hero contrast). Removing an earlier identical copy
+      // cannot change that final override; require it to stay downstream.
+      expect(actual?.owner.file).toBeDefined();
+      expect(sources.indexOf(actual.owner.file)).toBeGreaterThanOrEqual(sources.indexOf(owner));
     });
 });
