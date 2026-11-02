@@ -381,18 +381,40 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   }
   if (!document.body.contains(widgetsRoot)) return;
 
-  // Topic IDs are not necessarily global: a catalog import may contain the
-  // same lesson key under two different courses. Never attach the last
-  // catalog row's title to another course's saved progress.
-  const topicMap = new Map();
-  for (const topic of topics) {
-    if (!topic?.topicId) continue;
-    if (topicMap.has(topic.topicId)) topicMap.set(topic.topicId, null);
-    else topicMap.set(topic.topicId, topic);
-  }
+  // An imported topic ID is not necessarily unique across courses. Once
+  // marked ambiguous it must remain ambiguous even after a third duplicate.
+  // Exact course/topic identities are a separate, fail-closed namespace.
   const sourceKey = record => JSON.stringify([
     String(record?.courseId || ''), String(record?.topicId || ''),
   ]);
+  const topicMap = new Map(), ambiguousTopicIds = new Set();
+  const scopedTopicMap = new Map(), ambiguousScopedKeys = new Set();
+  for (const topic of topics) {
+    if (topic?.topicId == null || String(topic.topicId) === '') continue;
+    const id = String(topic.topicId);
+    if (!ambiguousTopicIds.has(id)) {
+      if (topicMap.has(id)) {
+        topicMap.delete(id);
+        ambiguousTopicIds.add(id);
+      } else topicMap.set(id, topic);
+    }
+    if (topic.courseId == null || String(topic.courseId) === '') continue;
+    const key = sourceKey(topic);
+    if (ambiguousScopedKeys.has(key)) continue;
+    if (scopedTopicMap.has(key)) {
+      scopedTopicMap.delete(key);
+      ambiguousScopedKeys.add(key);
+    } else scopedTopicMap.set(key, topic);
+  }
+  const resolvedTopic = record => {
+    if (record?.topicId == null || String(record.topicId) === '') return null;
+    const id = String(record.topicId);
+    if (record?.courseId != null && String(record.courseId) !== '') {
+      const key = sourceKey(record);
+      return ambiguousScopedKeys.has(key) ? null : scopedTopicMap.get(key) || null;
+    }
+    return ambiguousTopicIds.has(id) ? null : topicMap.get(id) || null;
+  };
   // Use the freshest canonical row for each course/topic pair. Earlier unfinished rows
   // cannot resurrect a lesson that a later update already completed.
   const progressByTopic = new Map();
@@ -421,8 +443,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   // its latest position came from video progress or a timestamp. A completed
   // topic must never displace the next active lesson.
   const focusCandidates = [
-    ...active.map(record => ({ record, source: 'progress' })),
-    ...timestamps.filter(item => item?.topicId
+    ...active.filter(resolvedTopic).map(record => ({ record, source: 'progress' })),
+    ...timestamps.filter(item => item?.topicId && resolvedTopic(item)
       && Number.isFinite(Number(item.position)) && Number(item.position) >= 0
       && !isFinished(progressByTopic.get(sourceKey(item))))
       .map(record => ({ record, source: 'timestamp' })),
@@ -462,10 +484,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     !focusProgress || getRecordTime(focusTimestamp) > getRecordTime(focusProgress)
       || !progressPosition
   ) ? timestampPosition : progressPosition || timestampPosition;
-  const focusCatalogMatches = topics.filter(topic => topic?.topicId === focusTopicId);
-  const focusTopic = focusRecord?.courseId
-    ? focusCatalogMatches.find(topic => String(topic.courseId) === String(focusRecord.courseId))
-    : focusCatalogMatches.length === 1 ? focusCatalogMatches[0] : null;
+  const focusTopic = resolvedTopic(focusRecord);
   const focusCourseId = focusRecord?.courseId || focusTopic?.courseId || null;
   const focusPercent = Math.max(0, Math.min(100, Number(focusProgress?.percent) || 0));
   const focusTitle = focusTopic?.title || focusProgress?.topicTitle || focusTimestamp?.title || 'Choose a course';
@@ -553,14 +572,16 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
       detail: latestNote?.sourceType === 'pdf'
         ? `PDF page ${latestNote.pdfPage || latestNote.page || 1}`
         : latestNote?.topicId
-          ? `Linked to ${topicMap.get(latestNote.topicId)?.title || latestNote.topicId}`
+          ? `Linked to ${resolvedTopic(latestNote)?.title || latestNote.topicId}`
           : latestTimestamp
             ? 'Saved timestamp'
             : 'Capture a note or timestamp.',
       action: latestNote ? 'notes' : latestTimestamp ? 'courses' : 'notes',
-      topicId: latestTimestamp?.topicId,
-      courseId: latestTimestamp?.courseId,
-      position: latestTimestamp?.position,
+      // No automatic media handoff when this saved timestamp has an
+      // ambiguous catalog identity (including an unscoped imported record).
+      topicId: resolvedTopic(latestTimestamp) ? latestTimestamp?.topicId : null,
+      courseId: resolvedTopic(latestTimestamp) ? latestTimestamp?.courseId : null,
+      position: resolvedTopic(latestTimestamp) ? latestTimestamp?.position : null,
     },
   ];
 
@@ -624,14 +645,14 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     })),
     ...timestamps.map(item => ({
       icon: 'i-clock',
-      title: item.title || topicMap.get(item.topicId)?.title || 'Saved timestamp',
+      title: item.title || resolvedTopic(item)?.title || 'Saved timestamp',
       detail: `Position ${formatDuration(item.position)}`,
       time: getRecordTime(item),
       href: '#/courses',
     })),
     ...progress.filter(item => getRecordTime(item)).map(item => ({
       icon: Number(item.percent) >= 100 ? 'i-circle-check' : 'i-chart-columns',
-      title: topicMap.get(item.topicId)?.title || item.topicTitle || 'Learning progress',
+      title: resolvedTopic(item)?.title || item.topicTitle || 'Learning progress',
       detail: Number(item.percent) >= 100 ? 'Topic completed' : `${Math.round(Number(item.percent) || 0)}% complete`,
       time: getRecordTime(item),
       href: '#/progress',
