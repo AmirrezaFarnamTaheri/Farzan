@@ -102,6 +102,26 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('keeps an ID-less legacy timestamp visible but disables unsafe source navigation', async () => {
+    delete saved[0].topicId;
+    const original = structuredClone(saved);
+    mount();
+    const link = await vi.waitFor(() => {
+      const result = document.querySelector('[data-bookmark-type="timestamp"] a.btn');
+      expect(result).not.toBeNull();
+      return result;
+    });
+    expect(document.querySelector('[data-bookmark-type="timestamp"]').textContent)
+      .toContain('Study at 1:18');
+    expect(link.hasAttribute('href')).toBe(false);
+    expect(link.getAttribute('aria-disabled')).toBe('true');
+    expect(link.textContent).toMatch(/source unavailable/i);
+    link.click();
+    expect(pending).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+    expect(saved).toEqual(original);
+  });
+
   it('cancels an in-flight timestamp click when its Bookmarks view is replaced', async () => {
     let resolveCatalog;
     const deferredCatalog = new Promise(resolve => { resolveCatalog = resolve; });
