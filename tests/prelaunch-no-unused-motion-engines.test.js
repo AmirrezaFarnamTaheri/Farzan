@@ -60,5 +60,15 @@ describe('pre-release animation and zoom entry footprint', () => {
     expect(html).toContain('id="app-loading"');
   });
 
+  it('does not advertise removed translation and plugin screens in locale registries', () => {
+    const orphanKeys = ["notes.translateTo","notes.translating","notes.translateSuccess","notes.translateError","settings.translation","settings.translationEngine","settings.translationTarget","settings.plugins","settings.noPlugins","player.subtitleTranslate","player.subtitleDual","player.subtitleTranslated"];
+    for (const language of ['en-US', 'fa-IR']) {
+      const locale = fs.readFileSync('src/locales/' + language + '.js', 'utf8');
+      for (const key of orphanKeys) {
+        expect(locale, key + ' must have a shipped consumer').not.toContain("'" + key + "'");
+      }
+    }
+  });
+
 
 });
