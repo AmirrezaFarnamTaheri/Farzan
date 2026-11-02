@@ -645,9 +645,25 @@ import { countWords } from './src/core/textMetrics.js';
       // Check the *original* HTML before sanitization. A schema-based editor
       // would otherwise drop unsupported saved metadata and silently replace
       // it when a title-only save occurs.
-      const originalNote = Store.getNote(this._currentId);
+      // Capture the identity *before* the first asynchronous import. Earlier
+      // implementations only guarded the later Squire chunk load; switching
+      // notes during the compatibility import could inspect the old saved
+      // HTML but mount on a newly opened note, bypassing its source preflight.
+      const preflightId = this._currentId;
+      const preflightEpoch = this._loadEpoch;
+      const preflightNode = this._el;
+      const originalNote = Store.getNote(preflightId);
+      const originalHtml = originalNote?.content ?? '';
       const { assessNoteForSquire } = await import('./src/features/notesSquireCompatibility.js');
-      const preflight = assessNoteForSquire(originalNote?.content ?? '');
+      if (this._currentId !== preflightId || this._loadEpoch !== preflightEpoch
+        || this._el !== preflightNode || !preflightNode.isConnected
+        || (Store.getNote(preflightId)?.content ?? '') !== originalHtml) {
+        return { ok: false, reason: 'stale-mount' };
+      }
+      // Concurrent activation is legitimate (route auto-open plus user
+      // button). Keep the already-mounted editor instead of replacing it.
+      if (this._squire) return { ok: true, alreadyEnabled: true };
+      const preflight = assessNoteForSquire(originalHtml);
       if (!preflight.compatible) return { ok: false, reason: 'incompatible', detail: preflight.reason };
       // A compatible persisted record does not imply the current, unsaved
       // draft is compatible. Reject tables/images/styles in the live editor
@@ -682,6 +698,7 @@ import { countWords } from './src/core/textMetrics.js';
       // An IME or storage refresh might start while the editor module loads.
       if (this._compositionActive) return { ok: false, reason: 'composing' };
       if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
+      if (this._squire) return { ok: true, alreadyEnabled: true };
       try {
         node.setAttribute('contenteditable', 'false');
         node.replaceChildren();
