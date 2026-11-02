@@ -8,6 +8,13 @@ describe('Saved timestamp destination identity', () => {
     document.body.innerHTML = '<main id="bookmark-view"></main>';
     pending = vi.fn();
     router = { navigate: vi.fn() };
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allTopics: vi.fn(() => [
+        { topicId: 'shared', courseId: 'course-a', title: 'Cardiac' },
+        { topicId: 'shared', courseId: 'course-b', title: 'Renal' },
+      ]),
+    };
     window.DB = {
       getAllTimestamps: vi.fn(async () => [{
         id: 'timestamp-b', title: 'Lesson at 1:18', topicId: 'shared',
@@ -20,6 +27,7 @@ describe('Saved timestamp destination identity', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     delete window.DB;
+    delete window.DataStore;
     vi.restoreAllMocks();
   });
   const mount = () => mountBookmarksView({
@@ -41,7 +49,7 @@ describe('Saved timestamp destination identity', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-type="timestamp"] a')).not.toBeNull());
     const card = document.querySelector('[data-bookmark-type="timestamp"]');
     card.querySelector('a.btn').click();
-    expect(pending).toHaveBeenCalledWith('shared', 78, 'course-b');
+    await vi.waitFor(() => expect(pending).toHaveBeenCalledWith('shared', 78, 'course-b'));
     expect(router.navigate).toHaveBeenCalledWith('#/courses');
   });
 });

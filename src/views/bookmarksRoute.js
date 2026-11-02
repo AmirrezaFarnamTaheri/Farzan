@@ -49,6 +49,52 @@ export function mountBookmarksView(deps = {}) {
   // navigation target: it could be applied to an unrelated open PDF.
   const stablePdfDocId = isStablePdfDocumentId;
 
+  async function resolveTimestampSource(original, snapshot) {
+    const db = window.DB;
+    const readSaved = async () => {
+      if (typeof db?.getAllTimestamps !== 'function') {
+        throw new Error('Saved timestamp is unavailable; reload bookmarks');
+      }
+      const rows = await db.getAllTimestamps();
+      if (!Array.isArray(rows)) throw new Error('Saved timestamp records are unavailable');
+      // Preserve imported ID-less records if their entire original revision
+      // still exists exactly once; never choose an unrelated first match.
+      const matches = original?.id != null
+        ? rows.filter(row => row && String(row.id) === String(original.id))
+        : rows.filter(row => JSON.stringify(row) === snapshot);
+      if (matches.length !== 1 || JSON.stringify(matches[0]) !== snapshot) {
+        throw new Error('Saved timestamp changed elsewhere; reload before opening');
+      }
+    };
+
+    await readSaved();
+    const store = window.DataStore;
+    if (typeof store?.allTopics !== 'function') {
+      throw new Error('Current course catalog is unavailable');
+    }
+    await store.init?.();
+    // Imported offline courses are an overlay on the shipped catalog. A
+    // failed overlay cannot authorize a topic-only fallback to another course.
+    await window.OpenCourseDeck?.UserLibrary?.overlay?.();
+    const topics = await store.allTopics();
+    if (!Array.isArray(topics)) throw new Error('Current course catalog is unavailable');
+    const matches = topics.filter(topic => topic?.topicId != null
+      && String(topic.topicId) === String(original.topicId)
+      && (original.courseId == null || String(original.courseId) === ''
+        || String(topic.courseId) === String(original.courseId)));
+    if (matches.length !== 1) {
+      throw new Error('Saved timestamp source is missing or ambiguous in the current course catalog');
+    }
+    // A second canonical read guards a cross-tab edit made while the imported
+    // library/catalog was loading. No saved records are mutated by this gate.
+    await readSaved();
+    return {
+      topicId: String(matches[0].topicId),
+      courseId: matches[0].courseId ?? null,
+      position: original.position,
+    };
+  }
+
   function formatDuration(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
     const hours = Math.floor(total / 3600);
@@ -304,10 +350,35 @@ export function mountBookmarksView(deps = {}) {
         });
       }
       if (item.type === 'Timestamp' && item.topicId) {
-        link.addEventListener('click', (event) => {
+        // A saved card is not a current catalog source. Revalidate its
+        // canonical revision and destination on the click, not at render.
+        const renderedSnapshot = JSON.stringify(item.source);
+        let opening = false;
+        link.addEventListener('click', async (event) => {
           event.preventDefault();
-          setPendingCourseMedia(item.topicId, item.position, item.courseId);
-          Router.navigate('#/courses');
+          if (opening) return;
+          opening = true;
+          link.setAttribute('aria-busy', 'true');
+          try {
+            const destination = await resolveTimestampSource(item.source, renderedSnapshot);
+            // A route transition/filter redraw can detach the clicked card
+            // while its catalog read is pending. Never open another route
+            // from a discarded view or overwrite its newer media session.
+            if (!link.isConnected) return;
+            if (typeof setPendingCourseMedia !== 'function'
+              || typeof Router?.navigate !== 'function') {
+              throw new Error('Course playback is unavailable');
+            }
+            setPendingCourseMedia(destination.topicId, destination.position, destination.courseId);
+            Router.navigate('#/courses');
+          } catch (error) {
+            if (link.isConnected) {
+              Toast.error?.('Could not open timestamp: ' + (error?.message || 'Source unavailable'));
+            }
+          } finally {
+            opening = false;
+            link.removeAttribute('aria-busy');
+          }
         });
       } else if (pdfLink && stablePdfDocId(item.docId)) {
         link.addEventListener('click', (event) => {

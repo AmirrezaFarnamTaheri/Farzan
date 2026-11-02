@@ -2088,6 +2088,15 @@ describe('app shell resilience helpers', () => {
 
   it('opens saved timestamp bookmarks at their recorded playback position', async () => {
     await loadApp();
+    // The source gate now checks a freshly loaded catalog before handing off
+    // saved media. Use a real, uniquely scoped catalog topic in this shell test.
+    window.DataStore = {
+      init: vi.fn(async () => true),
+      allTopics: vi.fn(() => [
+        { topicId: 'topic-1', courseId: 'course-a', title: 'Loaded lecture' },
+      ]),
+    };
+    window.OpenCourseDeck.UserLibrary = { overlay: vi.fn(async () => {}) };
     window.DB = {
       getAllTimestamps: vi.fn(async () => [
         { id: 'ts-1', topicId: 'topic-1', title: 'Saved checkpoint', position: 125, updatedAt: 30 },
@@ -2095,19 +2104,34 @@ describe('app shell resilience helpers', () => {
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
     };
+    for (const key of ['ocd_pending_topic', 'ocd_pending_position', 'ocd_pending_course']) {
+      sessionStorage.removeItem(key);
+    }
 
-    await window.OpenCourseDeck.Views.bookmarks();
-    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
-    document.querySelector('[data-bookmark-id="ts-1"] a').click();
+    // The actual Courses route may consume and remove pending session keys
+    // before this async source preflight click returns. Assert the real handoff
+    // writes, not a transient storage snapshot after router navigation.
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      await window.OpenCourseDeck.Views.bookmarks();
+      await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
+      document.querySelector('[data-bookmark-id="ts-1"] a').click();
 
-    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
-    expect(sessionStorage.getItem('ocd_pending_position')).toBe('125');
-    expect(window.location.hash).toBe('#/courses');
+      await vi.waitFor(() => {
+        expect(writes).toHaveBeenCalledWith('ocd_pending_topic', 'topic-1');
+        expect(writes).toHaveBeenCalledWith('ocd_pending_position', '125');
+        expect(writes).toHaveBeenCalledWith('ocd_pending_course', 'course-a');
+        expect(window.location.hash).toBe('#/courses');
+      });
+    } finally {
+      writes.mockRestore();
+    }
   });
 
   it('seeks pending course timestamp handoffs after loading the topic', async () => {
     await loadApp();
     sessionStorage.removeItem('ocd_pending_course_session');
+    sessionStorage.removeItem('ocd_pending_course');
     const seekTo = vi.fn();
     const loadPlaylist = vi.fn();
     const media = { addEventListener: vi.fn() };
