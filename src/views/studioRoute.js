@@ -212,6 +212,8 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
               aria-label="Send selected draft shape one layer step backward" disabled>Send backward</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reorder="forward"
               aria-label="Bring selected draft shape one layer step forward" disabled>Bring forward</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-delete
+              aria-label="Delete selected Konva draft object" disabled>Delete selected</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-undo>Undo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export>Download draft JSON</button>
@@ -223,7 +225,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
           </div>
           <div class="studio-konva-stage" data-studio-konva-stage tabindex="0" role="group"
             aria-label="Interactive experimental Konva draft canvas: arrow keys move selection; Shift adds ten-pixel steps"
-            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Control+z Control+Shift+z Escape"></div>
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Delete Backspace Control+z Control+Shift+z Escape"></div>
           <p data-studio-konva-status role="status" aria-live="polite">Move or resize a supported shape; changes save only to this draft.</p>
         </div>
       </dialog>
@@ -820,6 +822,10 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       }
       button.disabled = !allowed;
     });
+    const deleteButton = document.querySelector('[data-studio-konva-delete]');
+    if (deleteButton) deleteButton.disabled = !selected || mode !== 'select'
+      || konvaTextSaving || konvaKeyboardBusy || konvaClosing || konvaResetting
+      || konvaImporting || typeof konvaWorkspace?.remove !== 'function';
     const undo = document.querySelector('[data-studio-konva-undo]');
     const redo = document.querySelector('[data-studio-konva-redo]');
     if (undo) undo.disabled = !konvaWorkspace?.canUndo?.();
@@ -857,6 +863,29 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     konvaSelect.replaceChildren(...options);
     konvaSelect.value = options.some(option => option.value === previous) ? previous : '';
     refreshKonvaControls();
+  };
+  const removeKonvaSelection = async () => {
+    const workspace = konvaWorkspace, id = konvaSelect?.value;
+    if (!id || !workspace?.remove || workspace.getMode?.() !== 'select'
+      || konvaKeyboardBusy || konvaTextSaving || konvaClosing
+      || konvaResetting || konvaImporting || unmounted) return false;
+    konvaKeyboardBusy = true;
+    refreshKonvaControls();
+    try {
+      const result = await workspace.remove(id);
+      if (unmounted || workspace !== konvaWorkspace || !result) return false;
+      populateKonvaObjects();
+      setKonvaStatus('Selected draft object deleted and saved; Studio board unchanged');
+      return true;
+    } catch {
+      if (!unmounted && workspace === konvaWorkspace) {
+        setKonvaStatus('Draft object deletion not saved; previous board retained');
+      }
+      return false;
+    } finally {
+      konvaKeyboardBusy = false;
+      if (!unmounted && workspace === konvaWorkspace) refreshKonvaControls();
+    }
   };
   const disposeKonva = ({ restoreFocus = true } = {}) => {
     konvaWorkspace?.destroy?.();
@@ -1061,6 +1090,14 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         || konvaResetting || konvaImporting || konvaTextSaving) return;
     const previous = konvaWorkspace;
     const selected = konvaSelect?.value || '';
+    if ((event.key === 'Delete' || event.key === 'Backspace')
+      && !event.isComposing && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      if (selected && previous.getMode?.() === 'select') {
+        event.preventDefault();
+        await removeKonvaSelection();
+      }
+      return;
+    }
     if (event.key === 'Escape' && selected) {
       event.preventDefault();
       konvaSelect.value = '';
@@ -1346,6 +1383,9 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     });
   });
 
+  on(document.querySelector('[data-studio-konva-delete]'), 'click', () => {
+    void removeKonvaSelection();
+  });
   const nudge = Object.freeze({
     left: [-10, 0], right: [10, 0], up: [0, -10], down: [0, 10],
   });
