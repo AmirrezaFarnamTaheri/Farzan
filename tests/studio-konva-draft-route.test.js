@@ -50,6 +50,7 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     setMode: vi.fn(mode => { draftMode = mode; return mode; }),
     getMode: vi.fn(() => draftMode),
     select: vi.fn(), move: vi.fn(async () => imported),
+    remove: vi.fn(async () => imported),
     setViewport: vi.fn(async next => {
       imported.viewport = { ...(imported.viewport || {}), ...next };
       return structuredClone(imported);
@@ -418,6 +419,35 @@ describe('Studio experimental Konva draft opt-in', () => {
     document.querySelector('[data-studio-konva-mode="pen"]').click();
     stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
     expect(workspace.move).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('deletes only the selected draft shape via inspector and stage keyboard, never inside text inputs', async () => {
+    const { controller, factory, canvasApi, saveSetting } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const instance = factory.mock.results[0].value;
+    const selected = document.querySelector('[data-studio-konva-object]');
+    selected.value = 'shape-1';
+    selected.dispatchEvent(new Event('change', { bubbles: true }));
+    const remove = document.querySelector('[data-studio-konva-delete]');
+    expect(remove).not.toBeNull();
+    expect(remove.disabled).toBe(false);
+    remove.click();
+    await vi.waitFor(() => expect(instance.remove).toHaveBeenCalledWith('shape-1'));
+
+    const stage = document.querySelector('[data-studio-konva-stage]');
+    stage.focus();
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect(instance.remove).toHaveBeenCalledTimes(2));
+    const textarea = document.querySelector('[data-studio-konva-text]');
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+    expect(instance.remove).toHaveBeenCalledTimes(2);
+    document.querySelector('[data-studio-konva-mode="pen"]').click();
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    expect(instance.remove).toHaveBeenCalledTimes(2);
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.serialize()).toEqual(v1Board());
     controller.unmount();
   });
 

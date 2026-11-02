@@ -290,6 +290,7 @@ export function createStudioKonvaDraftWorkspace({
     },
     move: (id, dx, dy) => run(() => session.commit(id, dx, dy)),
     reorder: (id, direction) => run(() => session.reorder(id, direction)),
+    remove: id => run(() => session.remove(id)),
     resize: (id, bounds) => run(() => session.resize(id, bounds)),
     setViewport: viewport => run(() => session.setViewport(viewport)),
     updateText: (id, content) => run(() => session.updateText(id, content)),
