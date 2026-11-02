@@ -117,9 +117,10 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     // Route transition or an asynchronous filter redraw detaches this card.
     document.getElementById('bookmarks-root').replaceChildren(document.createElement('div'));
     resolveCatalog(topics);
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    // One real event-loop turn drains the entire async source validation,
+    // including its second canonical DB read. A few bare microtasks can
+    // falsely pass before the stale navigation callback actually runs.
+    await new Promise(resolve => setTimeout(resolve, 10));
     expect(pending).not.toHaveBeenCalled();
     expect(Router.navigate).not.toHaveBeenCalled();
     expect(Toast.error).not.toHaveBeenCalled();
