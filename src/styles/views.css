@@ -31,7 +31,6 @@
 .home-title {
   margin: var(--space-2) 0 var(--space-4);
   max-width: 760px;
-  font-family: var(--font-serif);
   font-style: normal;
   font-size: clamp(2.35rem, 5.5vw, 5rem);
   line-height: 1.12;
@@ -181,7 +180,6 @@
 }
 
 .home-grid {
-  display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--grid-gap);
   margin-top: var(--space-6);
@@ -401,7 +399,6 @@
 
 .home-widget-copy {
   display: grid;
-  min-width: 0;
   gap: 0.3rem;
 }
 
@@ -610,10 +607,8 @@
 
 /* Minimal styles for injected Courses / Materials views */
 .courses-shell {
-  display: grid;
   grid-template-columns: 320px 1fr;
   gap: var(--space-4);
-  align-items: start;
 }
 
 .courses-sidebar {
@@ -624,7 +619,6 @@
 }
 
 .courses-list {
-  display: grid;
   gap: var(--space-2);
   max-height: calc(100vh - 220px);
   overflow: auto;
@@ -633,8 +627,6 @@
 
 .course-item {
   position: relative;
-  width: 100%;
-  text-align: start;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-primary);
@@ -691,10 +683,8 @@
 .topics-list { display: grid; gap: var(--space-2); }
 
 .topic-row {
-  display: grid;
   grid-template-columns: 1fr auto auto;
   gap: var(--space-3);
-  align-items: center;
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: var(--radius-lg);
@@ -737,7 +727,6 @@
    Studio Whiteboard & Canvas Studio (.view-studio)
    ────────────────────────────────────────────────────────── */
 .view-studio {
-  display: grid;
   gap: var(--space-4);
   padding: clamp(var(--space-4), 2vw, var(--space-6));
 }
@@ -783,9 +772,6 @@
 }
 
 .studio-toolbar-clusters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: var(--space-3);
 }
 
@@ -822,7 +808,6 @@
   width: 100%;
   height: min(65vh, 700px);
   min-height: 480px;
-  position: relative;
   overflow: hidden;
 }
 
