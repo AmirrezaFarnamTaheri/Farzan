@@ -150,7 +150,7 @@ describe('opt-in Konva editing draft workspace', () => {
     } finally { instance.destroy(); }
   });
 
-  it('ignores a late pen callback after workspace disposal instead of rejecting a stale event', async () => {
+  it('preserves the closed-workspace rejection contract for disposed Pen callbacks', async () => {
     let staleStroke;
     const saveDraft = vi.fn(async () => true);
     const instance = createStudioKonvaDraftWorkspace({
@@ -162,7 +162,7 @@ describe('opt-in Konva editing draft workspace', () => {
     });
     instance.setMode('pen');
     instance.destroy();
-    expect(await staleStroke([[1, 1], [3, 3]])).toBe(false);
+    await expect(staleStroke([[1, 1], [3, 3]])).rejects.toThrow(/closed|disposed/i);
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
