@@ -81,6 +81,52 @@ describe('opt-in Konva editing draft workspace', () => {
     } finally { instance.destroy(); }
   });
 
+  it('ignores stale scene selection and error callbacks after switching to the pen scene', () => {
+    const scenes = [];
+    const onSelect = vi.fn();
+    const onError = vi.fn();
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'), board: board(),
+      saveDraft: vi.fn(async () => true), onSelect, onError,
+      sceneFactory: args => {
+        const scene = { args, select: vi.fn(), destroy: vi.fn() };
+        scenes.push(scene);
+        return scene;
+      },
+    });
+    try {
+      const previous = scenes[0].args;
+      previous.onSelect('rect-1');
+      expect(onSelect).toHaveBeenCalledWith('rect-1');
+      instance.setMode('pen');
+      onSelect.mockClear();
+      const active = scenes[1];
+      previous.onSelect('rect-1');
+      previous.onError(new Error('Old detached scene emitted a late failure'));
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(active.select).not.toHaveBeenCalledWith('rect-1');
+      instance.setMode('select');
+      expect(scenes[2].select).not.toHaveBeenCalledWith('rect-1');
+    } finally { instance.destroy(); }
+  });
+
+  it('never resurrects a selection from a destroyed Konva scene', () => {
+    const onSelect = vi.fn();
+    let staleSelect;
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'), board: board(),
+      saveDraft: vi.fn(async () => true), onSelect,
+      sceneFactory: args => {
+        staleSelect = args.onSelect;
+        return { select: vi.fn(), destroy: vi.fn() };
+      },
+    });
+    instance.destroy();
+    staleSelect('rect-1');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('moves an editable shape only after a real draft write acknowledgement and redraws from canonical v1', async () => {
     const { instance, scenes, saveDraft, document: input, start } = workspace();
     expect(scenes).toHaveLength(1);
