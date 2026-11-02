@@ -239,9 +239,33 @@ async function renderPlaylists(deps) {
   const activeQueue = currentPlayerTracks();
   const activePosition = activeQueue.length ? currentPlayerPosition() : null;
   const videoTopics = catalogVideoTopics(topics, safeMediaUrl);
-  const topicsById = new Map(topics.map(topic => [topic.topicId, topic]));
+  // Imported courses may reuse a topicId. A topic-only saved queue cannot
+  // select one safely, so do not let last-write-wins Map semantics silently
+  // redirect study playback to a different course.
+  const topicsById = new Map();
+  const ambiguousTopicIds = new Set();
+  for (const topic of topics) {
+    if (topic?.topicId == null) continue;
+    const id = String(topic.topicId);
+    if (!id || ambiguousTopicIds.has(id)) continue;
+    if (topicsById.has(id)) {
+      topicsById.delete(id);
+      ambiguousTopicIds.add(id);
+    } else topicsById.set(id, topic);
+  }
   const timestampTopics = timestamps
-    .map(item => topicsById.get(item.topicId) || item)
+    .map(item => {
+      const id = String(item?.topicId ?? '');
+      if (ambiguousTopicIds.has(id)) {
+        // A saved timestamp with explicit course identity can still render
+        // the right title. Without it, retain the record instead of borrowing
+        // the wrong course's title or other source metadata.
+        return topics.find(topic => String(topic?.topicId) === id
+          && item?.courseId != null && String(topic.courseId) === String(item.courseId))
+          || item;
+      }
+      return topicsById.get(id) || item;
+    })
     .filter(item => item?.topicId || item?.title || item?.topicTitle);
 
   const playlists = [];
@@ -250,7 +274,7 @@ async function renderPlaylists(deps) {
     .sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
     .forEach(saved => {
       const savedItems = saved.topicIds
-        .map(topicId => topicsById.get(topicId))
+        .map(topicId => topicsById.get(String(topicId)))
         .filter(Boolean)
         .map(playlistTopicTitle);
       playlists.push({
@@ -436,10 +460,10 @@ async function renderPlaylists(deps) {
           item.className = 'playlist-reorder-item';
           const title = document.createElement('span');
           title.dir = 'auto';
-          title.textContent = playlistTopicTitle(topicsById.get(topicId))
+          title.textContent = playlistTopicTitle(topicsById.get(String(topicId)))
             || String(topicId);
           // An unavailable source still needs a readable identity.
-          if (!topicsById.has(topicId)) title.textContent = String(topicId);
+          if (!topicsById.has(String(topicId))) title.textContent = String(topicId);
           item.appendChild(title);
           for (const direction of ['up', 'down']) {
             const button = document.createElement('button');
@@ -483,11 +507,19 @@ async function renderPlaylists(deps) {
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
     let creating = false;
-    saveBtn.disabled = !firstCatalog?.topicIds?.length
+    const ambiguousCatalog = firstCatalog?.topicIds?.some(id => ambiguousTopicIds.has(String(id))) === true;
+    saveBtn.disabled = !firstCatalog?.topicIds?.length || ambiguousCatalog
       || typeof window.DB?.saveSetting !== 'function'
       || typeof window.DB?.getSetting !== 'function';
+    if (ambiguousCatalog) {
+      const warning = document.createElement('p');
+      warning.dataset.playlistSourceWarning = '';
+      warning.setAttribute('role', 'alert');
+      warning.textContent = 'Some topic IDs appear in multiple courses. A saved queue cannot safely identify their source.';
+      saveBtn.closest('.playlists-form')?.after(warning);
+    }
     saveBtn.onclick = async () => {
-      if (creating || !firstCatalog?.topicIds?.length
+      if (creating || !firstCatalog?.topicIds?.length || ambiguousCatalog
         || typeof window.DB?.saveSetting !== 'function'
         || typeof window.DB?.getSetting !== 'function') return;
       const input = document.querySelector('[data-playlist-name]');
@@ -610,9 +642,13 @@ async function renderPlaylists(deps) {
       }
       const saved = savedPlaylists.find(item => item.id === open.dataset.openPlaylist);
       if (!saved) return;
+      if (saved.topicIds.some(id => ambiguousTopicIds.has(String(id)))) {
+        Toast.error?.('Saved queue contains ambiguous topic IDs across multiple courses. No player session was opened; saved data is unchanged.');
+        return;
+      }
       const queue = [];
       for (const topicId of saved.topicIds) {
-        const topic = topicsById.get(topicId);
+        const topic = topicsById.get(String(topicId));
         const media = topic?.videos?.[0];
         if (!media) continue;
         let src;
