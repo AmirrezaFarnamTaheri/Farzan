@@ -36,6 +36,21 @@ describe('CSS authoritative selector ownership', () => {
     });
   });
 
+  it('retains selectors containing quoted literal braces without inventing nested rule owners', () => {
+    const { parseRules, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
+    const simple = '.study-tooltip::before { content: "{\\"lesson\\":1}"; color: red; }';
+    const parsed = parseRules(simple, 'quoted.css', 'enhancements');
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].selector).toBe('.study-tooltip::before');
+    expect(parseDeclarations(parsed[0].body)).toContainEqual({
+      property: 'content', value: '"{\\"lesson\\":1}"',
+    });
+    // Actual nested selector blocks are not declarations. The report must
+    // avoid inventing an owner by flattening an unsupported CSS nesting.
+    expect(parseRules('.parent { &:hover { color: blue; } }',
+      'nested.css', 'enhancements')).toHaveLength(0);
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
