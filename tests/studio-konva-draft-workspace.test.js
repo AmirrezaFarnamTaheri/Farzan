@@ -49,6 +49,38 @@ describe('opt-in Konva editing draft workspace', () => {
     expect(createScene).not.toHaveBeenCalled();
   });
 
+  it('does not let a stale select-scene gesture remount or announce over the pen workspace', async () => {
+    const scenes = [];
+    const onStatus = vi.fn();
+    const onError = vi.fn();
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'),
+      board: board(),
+      saveDraft: vi.fn(async () => true),
+      onStatus,
+      onError,
+      sceneFactory: args => {
+        const scene = { args, select: vi.fn(), destroy: vi.fn() };
+        scenes.push(scene);
+        return scene;
+      },
+    });
+    try {
+      expect(scenes).toHaveLength(1);
+      const staleGesture = scenes[0].args.onGesture;
+      staleGesture(); // asynchronous completion from an earlier Konva scene
+      expect(instance.setMode('pen')).toBe('pen');
+      expect(scenes).toHaveLength(2);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(scenes).toHaveLength(2);
+      expect(scenes[1].destroy).not.toHaveBeenCalled();
+      expect(scenes[1].args.mode).toBe('pen');
+      expect(onStatus).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+    } finally { instance.destroy(); }
+  });
+
   it('moves an editable shape only after a real draft write acknowledgement and redraws from canonical v1', async () => {
     const { instance, scenes, saveDraft, document: input, start } = workspace();
     expect(scenes).toHaveLength(1);
