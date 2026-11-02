@@ -300,6 +300,10 @@ export function createSquireNoteEditor({
         if (next === editorHTML(editor)) return false;
         throw new Error('Cannot overwrite unsaved note edits with a stale refresh');
       }
+      // An identical canonical refresh of a clean note is not a replacement.
+      // Reinitializing Squire here destroys the user's live DOM range/caret
+      // and can reset undo history even though saved content did not change.
+      if (next === original) return false;
       suppress = true;
       try {
         editor.setHTML(next);

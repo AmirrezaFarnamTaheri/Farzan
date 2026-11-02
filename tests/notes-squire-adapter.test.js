@@ -344,6 +344,39 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('keeps the caret anchored when a clean note receives an identical saved refresh', () => {
+    const element = document.createElement('div');
+    document.body.appendChild(element);
+    const onUpdate = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>قلب Heart 你好</p>', onUpdate,
+    });
+    try {
+      const paragraph = element.querySelector('.notes-modern-editor p');
+      const textNode = paragraph.firstChild;
+      const caret = document.createRange();
+      caret.setStart(textNode, 3);
+      caret.collapse(true);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(caret);
+      expect(selection.anchorNode).toBe(textNode);
+      expect(selection.anchorOffset).toBe(3);
+
+      const refreshResult = instance.setContent('<p>قلب Heart 你好</p>');
+      expect(element.querySelector('.notes-modern-editor p')).toBe(paragraph);
+      expect(selection.anchorNode).toBe(textNode);
+      expect(selection.anchorOffset).toBe(3);
+      expect(instance.getHTML()).toBe('<p>قلب Heart 你好</p>');
+      expect(onUpdate).not.toHaveBeenCalled();
+      expect(refreshResult).toBe(false);
+      selection.removeAllRanges();
+    } finally {
+      instance.destroy();
+      element.remove();
+    }
+  });
+
   it('does not reset selection/history when an unobserved edit matches an incoming refresh', () => {
     const element = document.createElement('div');
     const updates = vi.fn();
