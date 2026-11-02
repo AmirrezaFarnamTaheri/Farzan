@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountBookmarksView } from '../src/views/bookmarksRoute.js';
 
 describe('saved PDF bookmark stable-source navigation', () => {
-  let annotations, notes, route, setPendingPdfPage, Router;
+  let annotations, notes, route, setPendingPdfPage, Router, Toast;
   beforeEach(() => {
     document.body.innerHTML = '';
     annotations = [];
@@ -14,6 +14,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     };
     setPendingPdfPage = vi.fn();
     Router = { navigate: vi.fn() };
+    Toast = { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() };
   });
   afterEach(() => {
     route?.unmount?.();
@@ -26,6 +27,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     setView: html => { document.body.innerHTML = html; },
     setPendingPdfPage,
     Router,
+    Toast,
     sanitizeHtml: html => html,
     createElement: (tag, attrs = {}, ...children) => {
       const el = document.createElement(tag);
@@ -46,7 +48,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     const open = card.querySelector('a');
     expect(open.getAttribute('href')).toBe('#/pdf');
     open.click();
-    expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:local-doc-3', 17);
+    await vi.waitFor(() => expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:local-doc-3', 17));
     expect(Router.navigate).toHaveBeenCalledWith('#/pdf');
   });
 
@@ -120,7 +122,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     expect(first.textContent).toContain('Renal physiology');
     expect(first.textContent).toContain('Page 7');
     first.querySelector('a').click();
-    expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:renal-doc-content', 7);
+    await vi.waitFor(() => expect(setPendingPdfPage).toHaveBeenCalledWith('fingerprint:renal-doc-content', 7));
     expect(Router.navigate).toHaveBeenCalledWith('#/pdf');
 
     const unsafe = document.querySelector('[data-bookmark-id="bm-unanchored"]');
@@ -147,6 +149,101 @@ describe('saved PDF bookmark stable-source navigation', () => {
     retry.click();
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="bm-recovered"]')).not.toBeNull());
     expect(getAllPdfBookmarks).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('refuses an annotation link if the canonical document or page changes in another tab', async () => {
+    annotations = [{ id: 'ann-stale', docId: 'fingerprint:old-document', page: 12, updatedAt: 10 }];
+    route = mount();
+    const card = await vi.waitFor(() => {
+      const value = document.querySelector('[data-bookmark-id="ann-stale"]');
+      expect(value).not.toBeNull();
+      return value;
+    });
+    // Another tab or backup restore now points this same ID to new content.
+    annotations = [{ ...annotations[0], docId: 'fingerprint:different-document',
+      page: 4, updatedAt: 20 }];
+    card.querySelector('a').click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/changed|reload|stale/i)));
+    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+    expect(annotations[0].page).toBe(4);
+  });
+
+  it('rejects a removed PDF bookmark rather than seeking in the previously mounted document', async () => {
+    let saved = [{ id: 'bm-removed', docId: 'fingerprint:source-a', page: 5 }];
+    window.DB.getAllPdfBookmarks = vi.fn(async () => structuredClone(saved));
+    route = mount();
+    const card = await vi.waitFor(() => {
+      const value = document.querySelector('[data-bookmark-id="bm-removed"]');
+      expect(value).not.toBeNull();
+      return value;
+    });
+    saved = [];
+    card.querySelector('a').click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/changed|reload|stale/i)));
+    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not open a stale PDF note after a newer saved page replaces it', async () => {
+    notes = [{ id: 'pdf-note', sourceType: 'pdf', title: 'Case',
+      pdfDocId: 'fingerprint:case-a', pdfPage: 6, updatedAt: 11 }];
+    route = mount();
+    const card = await vi.waitFor(() => {
+      const value = document.querySelector('[data-bookmark-id="pdf-note"]');
+      expect(value).not.toBeNull();
+      return value;
+    });
+    notes = [{ ...notes[0], pdfDocId: 'fingerprint:case-b',
+      pdfPage: 15, updatedAt: 12 }];
+    card.querySelector('a').click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/changed|reload|stale/i)));
+    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a canonical annotation read fails after the card rendered', async () => {
+    const original = { id: 'ann-offline', docId: 'fingerprint:source-offline', page: 8 };
+    window.DB.getAllAnnotations = vi.fn()
+      .mockResolvedValueOnce([original])
+      .mockRejectedValueOnce(new Error('Canonical IndexedDB unavailable'));
+    route = mount();
+    const card = await vi.waitFor(() => {
+      const value = document.querySelector('[data-bookmark-id="ann-offline"]');
+      expect(value).not.toBeNull();
+      return value;
+    });
+    card.querySelector('a').click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/unavailable|could not|failed|load/i)));
+    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not queue a source from a detached PDF bookmark card after an asynchronous read', async () => {
+    const saved = [{ id: 'ann-detached', docId: 'fingerprint:detached', page: 16 }];
+    let completeRead;
+    window.DB.getAllAnnotations = vi.fn()
+      .mockResolvedValueOnce(saved)
+      .mockImplementationOnce(() => new Promise(resolve => { completeRead = resolve; }));
+    route = mount();
+    const card = await vi.waitFor(() => {
+      const value = document.querySelector('[data-bookmark-id="ann-detached"]');
+      expect(value).not.toBeNull();
+      return value;
+    });
+    card.querySelector('a').click();
+    await vi.waitFor(() => expect(window.DB.getAllAnnotations).toHaveBeenCalledTimes(2));
+    card.remove();
+    completeRead(saved);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(setPendingPdfPage).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+    expect(Toast.error).not.toHaveBeenCalled();
   });
 
 });
