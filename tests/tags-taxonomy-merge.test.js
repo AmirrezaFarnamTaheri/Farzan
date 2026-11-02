@@ -3,6 +3,7 @@ import { mountTagsView } from '../src/views/tagsRoute.js';
 import {
   TAG_TAXONOMY_KEY, parseTagTaxonomy, createTaxonomyTag,
   mergeTaxonomyTags, unmergeTaxonomyTag, resolveTaxonomyKey,
+  persistTagTaxonomy,
 } from '../src/features/tagTaxonomy.js';
 
 const mount = () => mountTagsView({
@@ -164,5 +165,57 @@ describe('tag taxonomy validation and aliases', () => {
     expect(resolveTaxonomyKey(next,'kidney')).toBe('فیزیک');
     expect(resolveTaxonomyKey(next,'renal')).toBe('فیزیک');
     expect(original.aliases).toEqual({kidney:'renal'});
+  });
+});
+
+describe('atomic taxonomy persistence across tabs', () => {
+  const makeDB = () => {
+    let saved = null;
+    const db = {
+      getSetting: vi.fn(async key => {
+        expect(key).toBe(TAG_TAXONOMY_KEY);
+        return structuredClone(saved);
+      }),
+      saveSetting: vi.fn(async () => { throw new Error('Non-atomic writer must not run'); }),
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
+        expect(key).toBe(TAG_TAXONOMY_KEY);
+        if (JSON.stringify(saved) !== JSON.stringify(expected)) return false;
+        saved = structuredClone(next);
+        return true;
+      }),
+    };
+    return { db, read: () => structuredClone(saved) };
+  };
+
+  it('preserves the winning mutation when two tabs try to create tags from the same revision', async () => {
+    const { db, read } = makeDB();
+    const results = await Promise.allSettled([
+      persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Anatomy')),
+      persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Physiology')),
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected').reason.message)
+      .toMatch(/changed elsewhere|concurrent|conflict|reload/i);
+    expect(read().labels).toHaveLength(1);
+    expect(db.compareAndSwapSetting).toHaveBeenCalledTimes(2);
+    expect(db.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on missing or false atomic write receipts, never falling back to saveSetting', async () => {
+    const { db, read } = makeDB();
+    db.compareAndSwapSetting.mockResolvedValue(undefined);
+    await expect(persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Cardiology')))
+      .rejects.toThrow(/not acknowledged|changed|failed|atomic/i);
+    expect(read()).toBeNull();
+    expect(db.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('rejects a contradictory post-write readback even when atomic writer claims success', async () => {
+    const { db } = makeDB();
+    db.compareAndSwapSetting.mockResolvedValue(true);
+    await expect(persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Renal')))
+      .rejects.toThrow(/not saved|durab|verified/i);
+    expect(db.saveSetting).not.toHaveBeenCalled();
   });
 });
