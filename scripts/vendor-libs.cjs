@@ -133,7 +133,6 @@ function main() {
     { pkg: '@fontsource/vazirmatn', out: 'fonts/vazirmatn', weights: [400, 500, 600, 700, 800], subset: 'arabic', license: true },
   ];
 
-  const fontImports = [];
   for (const font of fonts) {
     const pkgRoot = path.join(root, 'node_modules', font.pkg);
     const outputRoot = path.join(vendor, font.out);
@@ -171,11 +170,9 @@ function main() {
     }
     if (font.license) fs.copyFileSync(path.join(pkgRoot, 'LICENSE'), path.join(outputRoot, 'LICENSE'));
     writeText(`${font.out}/index.css`, `${cssBlocks.join('\n\n')}\n`);
-    fontImports.push(`@import "./${path.basename(font.out)}/index.css";`);
     ok += referenced.size + 1;
   }
 
-  writeText('fonts/fonts.css', `${fontImports.join('\n')}\n`);
   const { checkFontBudget } = require('./check-font-budget.cjs');
   const budget = checkFontBudget();
   console.log(`[vendor-libs] Font budget: ${budget.count} files / ${budget.bytes} bytes`);

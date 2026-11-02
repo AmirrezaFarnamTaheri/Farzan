@@ -65,7 +65,14 @@ describe('static assets and service worker precache', () => {
     const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     const csp = html.match(/Content-Security-Policy"[\s\S]*?content="([^"]+)"/)?.[1] ?? '';
 
-    expect(exists('vendor/fonts/fonts.css')).toBe(true);
+    for (const family of ['inter', 'jetbrains-mono', 'playfair-display', 'vazirmatn']) {
+      expect(exists(`vendor/fonts/${family}/index.css`)).toBe(true);
+      expect(html).toContain(`./vendor/fonts/${family}/index.css`);
+    }
+    expect(exists('vendor/fonts/fonts.css')).toBe(false);
+    expect(exists('vendor/marked.min.js')).toBe(false);
+    expect(releaseExists('vendor/fonts/fonts.css')).toBe(false);
+    expect(releaseExists('vendor/marked.min.js')).toBe(false);
     expect(csp).toContain('img-src');
     expect(csp).toContain('media-src');
     expect(csp).toContain('connect-src');
