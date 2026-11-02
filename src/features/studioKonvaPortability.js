@@ -55,3 +55,132 @@ export function importKonvaV1DraftJSON(text, { maxChars = MAX_KONVA_DRAFT_JSON_C
   assertCanonicalBoard(board);
   return board;
 }
+
+/**
+ * SVG is a *viewport preview*, never canonical Studio storage. All shapes
+ * originate from the same fail-closed board-v1 mapping used by the live Konva
+ * draft scene; no renderer-specific JSON or remote SVG assets are emitted.
+ *
+ * Text with a finite wrap width is intentionally refused: plain SVG text
+ * does not reproduce Konva's wrapping, so exporting it would lie about the
+ * user's saved layout.
+ */
+const xml = value => String(value).replace(/[&<>"']/g, char => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
+})[char]);
+const safeNumber = value => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError('Invalid SVG geometry');
+  }
+  return String(Object.is(value, -0) ? 0 : value);
+};
+function safeSvgPaint(value, fallback = 'none') {
+  if (value == null || value === '') return fallback;
+  if (typeof value !== 'string') throw new TypeError('Unsupported SVG paint');
+  const color = value.trim();
+  // No url(), images, external resources, CSS declarations or event payloads.
+  if (!/^(?:none|transparent|currentcolor|#[0-9a-f]{3,8}|[a-z]{1,24}|rgba?\([0-9.%\s,]+\)|hsla?\([0-9.%\s,]+\)|var\(--[a-z0-9-]+\))$/i.test(color)) {
+    throw new TypeError('Unsupported SVG paint/color (remote resources are forbidden)');
+  }
+  return xml(color);
+}
+function svgAttributes(attrs) {
+  return ' data-board-id="' + xml(attrs.id) + '"'
+    + ' opacity="' + safeNumber(attrs.opacity ?? 1) + '"'
+    + ' fill="' + safeSvgPaint(attrs.fill) + '"'
+    + ' stroke="' + safeSvgPaint(attrs.stroke) + '"'
+    + ' stroke-width="' + safeNumber(attrs.strokeWidth ?? 1) + '"';
+}
+function svgLinePoints(points) {
+  if (!Array.isArray(points) || points.length < 4 || points.length % 2 !== 0) {
+    throw new TypeError('Invalid SVG line points');
+  }
+  return points.map(safeNumber);
+}
+function mappedSvgShape({ kind, attrs }) {
+  const common = svgAttributes(attrs);
+  switch (kind) {
+    case 'Rect':
+      return '<rect x="' + safeNumber(attrs.x) + '" y="' + safeNumber(attrs.y)
+        + '" width="' + safeNumber(attrs.width) + '" height="' + safeNumber(attrs.height)
+        + '"' + (attrs.cornerRadius != null ? ' rx="' + safeNumber(attrs.cornerRadius) + '"' : '')
+        + common + '/>';
+    case 'Circle':
+      return '<circle cx="' + safeNumber(attrs.x) + '" cy="' + safeNumber(attrs.y)
+        + '" r="' + safeNumber(attrs.radius) + '"' + common + '/>';
+    case 'Ellipse':
+      return '<ellipse cx="' + safeNumber(attrs.x) + '" cy="' + safeNumber(attrs.y)
+        + '" rx="' + safeNumber(attrs.radiusX) + '" ry="' + safeNumber(attrs.radiusY)
+        + '" transform="rotate(' + [attrs.rotation ?? 0, attrs.x, attrs.y].map(safeNumber).join(' ')
+        + ')"' + common + '/>';
+    case 'Line': {
+      const values = svgLinePoints(attrs.points);
+      const pairs = [];
+      for (let i = 0; i < values.length; i += 2) pairs.push(values[i] + ',' + values[i + 1]);
+      const name = attrs.closed ? 'polygon' : 'polyline';
+      const cap = attrs.lineCap ? ' stroke-linecap="' + xml(attrs.lineCap) + '"' : '';
+      const join = attrs.lineJoin ? ' stroke-linejoin="' + xml(attrs.lineJoin) + '"' : '';
+      return '<' + name + ' points="' + pairs.join(' ') + '"' + common + cap + join + '/>';
+    }
+    case 'Arrow': {
+      const points = svgLinePoints(attrs.points);
+      if (points.length !== 4) throw new TypeError('Unsupported SVG arrow geometry');
+      const [x1, y1, x2, y2] = points.map(Number);
+      const magnitude = Math.hypot(x2 - x1, y2 - y1);
+      const length = attrs.pointerLength ?? 12;
+      const width = attrs.pointerWidth ?? 12;
+      const line = '<line x1="' + safeNumber(x1) + '" y1="' + safeNumber(y1)
+        + '" x2="' + safeNumber(x2) + '" y2="' + safeNumber(y2) + '"' + common + '/>';
+      if (!magnitude || length === 0 || width === 0) return '<g>' + line + '</g>';
+      const ux = (x2 - x1) / magnitude, uy = (y2 - y1) / magnitude;
+      const bx = x2 - ux * length, by = y2 - uy * length;
+      const corners = [
+        [x2, y2], [bx - uy * width / 2, by + ux * width / 2],
+        [bx + uy * width / 2, by - ux * width / 2],
+      ].map(point => point.map(safeNumber).join(',')).join(' ');
+      // Konva Arrow uses the stroke color for its head, not a remote asset.
+      const headPaint = safeSvgPaint(attrs.stroke, 'none');
+      return '<g>' + line + '<polygon points="' + corners
+        + '" fill="' + headPaint + '" stroke="' + headPaint
+        + '" stroke-width="' + safeNumber(attrs.strokeWidth ?? 1) + '"/></g>';
+    }
+    case 'Text': {
+      if (attrs.width != null || /[\r\n]/.test(attrs.text)) {
+        throw new TypeError('Unsupported wrapped or multiline SVG text preview');
+      }
+      const baselineY = attrs.y + attrs.fontSize;
+      return '<text x="' + safeNumber(attrs.x) + '" y="' + safeNumber(baselineY)
+        + '" font-size="' + safeNumber(attrs.fontSize) + '" font-family="'
+        + xml(attrs.fontFamily) + '" xml:space="preserve"' + common + '>'
+        + xml(attrs.text) + '</text>';
+    }
+    default: throw new TypeError('Unsupported SVG shape ' + kind);
+  }
+}
+
+/** Bounded vector image of the current visible, compatible Konva viewport. */
+export function exportKonvaV1DraftSVG(board, {
+  width = 800, height = 600, maxChars = MAX_KONVA_DRAFT_JSON_CHARS,
+} = {}) {
+  assertCanonicalBoard(board);
+  if (!Number.isInteger(width) || width < 1 || width > 16384
+    || !Number.isInteger(height) || height < 1 || height > 16384) {
+    throw new RangeError('Invalid SVG viewport dimensions');
+  }
+  const plan = planKonvaV1Board(board);
+  const output = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + width
+    + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '">'];
+  for (const layer of plan.layers) {
+    if (!layer.visible) continue;
+    output.push('<g data-board-layer="' + xml(layer.id) + '" opacity="'
+      + safeNumber(layer.opacity) + '" transform="translate(' + safeNumber(plan.viewport.x)
+      + ' ' + safeNumber(plan.viewport.y) + ') scale('
+      + safeNumber(plan.viewport.zoom) + ')">');
+    for (const shape of layer.elements) output.push(mappedSvgShape(shape));
+    output.push('</g>');
+  }
+  output.push('</svg>');
+  const svg = output.join('');
+  assertSize(svg, maxChars);
+  return svg;
+}

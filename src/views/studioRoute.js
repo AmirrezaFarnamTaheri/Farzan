@@ -199,6 +199,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-redo>Redo</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export>Download draft JSON</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export-png>Download draft viewport PNG (preview)</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-export-svg>Download draft viewport SVG (preview)</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-import-trigger>Import draft JSON</button>
             <input type="file" hidden accept=".json,application/json" data-studio-konva-import aria-label="Import isolated Konva draft JSON" />
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-reset>Start fresh from Studio</button>
@@ -1097,6 +1098,37 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     } catch {
       if (!unmounted && konvaWorkspace === previous) {
         setKonvaStatus('Draft PNG preview export failed; saved Studio board unchanged');
+      }
+    }
+  });
+  on(document.querySelector('[data-studio-konva-export-svg]'), 'click', async () => {
+    if (unmounted || !konvaWorkspace || !konvaModule || konvaClosing || konvaResetting || konvaImporting) return;
+    const previous = konvaWorkspace;
+    try {
+      await previous.flush();
+      if (unmounted || konvaWorkspace !== previous) return;
+      // Match the current Konva sceneSize() viewport. This is not a full
+      // Canvas2D board export or a replacement for canonical board-v1 JSON.
+      const svg = konvaModule.exportKonvaV1DraftSVG(previous.getBoard(), {
+        width: Math.max(320, Math.floor(konvaStage?.clientWidth || 640)),
+        height: Math.max(280, Math.floor(konvaStage?.clientHeight || 440)),
+      });
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const href = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'farzan-konva-draft-viewport-preview.svg';
+        document.body.appendChild(link);
+        try { link.click(); } finally { link.remove(); }
+      } finally {
+        const revoke = URL.revokeObjectURL?.bind(URL);
+        setTimeout(() => { try { revoke?.(href); } catch {} }, 1000);
+      }
+      setKonvaStatus('Experimental draft viewport SVG downloaded; Studio board unchanged');
+    } catch {
+      if (!unmounted && konvaWorkspace === previous) {
+        setKonvaStatus('Draft SVG preview cannot represent this board safely; canonical draft unchanged');
       }
     }
   });

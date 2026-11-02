@@ -91,7 +91,27 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   expect(json.layers[0].elements.at(-1).id).toBe(shape.id);
   expect(json.layers[1]).toEqual(saved.layers[1]);
 
-  console.info('[konva-roundtrip] export verified; close and reload');
+  console.info('[konva-roundtrip] JSON verified; download safe SVG preview');
+  const [svgDownload] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15000 }),
+    draft.locator('[data-studio-konva-export-svg]').click({ timeout: 12000 }),
+  ]);
+  expect(svgDownload.suggestedFilename()).toBe('farzan-konva-draft-viewport-preview.svg');
+  const svg = await fs.readFile(await svgDownload.path(), 'utf8');
+  const parsed = await page.evaluate(source => {
+    const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
+    return {
+      root: doc.documentElement.localName,
+      invalid: doc.getElementsByTagName('parsererror').length,
+      rects: doc.getElementsByTagName('rect').length,
+      layers: doc.querySelectorAll('[data-board-layer]').length,
+    };
+  }, svg);
+  expect(parsed).toEqual({ root: 'svg', invalid: 0, rects: 2, layers: 2 });
+  expect(svg).toContain('translate(20 -10) scale(1.25)');
+  expect(svg).not.toContain('Konva.Stage');
+
+  console.info('[konva-roundtrip] exports verified; close and reload');
   await draft.locator('[data-studio-konva-close]').click({ timeout: 12000 });
   await expect(draft).not.toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
