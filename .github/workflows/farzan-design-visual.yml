@@ -12,6 +12,8 @@ on:
       - 'progress.js'
       - 'src/styles/**'
       - 'src/views/**'
+      - 'src/lib/**'
+      - 'src/ui/**'
       - 'tests/e2e/workspace-visual-qa.spec.js'
       - '.github/workflows/farzan-design-visual.yml'
   pull_request:
@@ -25,6 +27,8 @@ on:
       - 'progress.js'
       - 'src/styles/**'
       - 'src/views/**'
+      - 'src/lib/**'
+      - 'src/ui/**'
       - 'tests/e2e/workspace-visual-qa.spec.js'
       - '.github/workflows/farzan-design-visual.yml'
   workflow_dispatch:

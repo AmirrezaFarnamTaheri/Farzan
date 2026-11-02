@@ -86,6 +86,17 @@ describe('GitHub Actions hardening', () => {
     expect(native.split("'scripts/verify-portable-backup.cjs'").length - 1).toBe(2);
   });
 
+  it('runs native Windows and route-theme visual gates for shared overlay and DOM helpers', () => {
+    for (const name of ['native-windows.yml', 'farzan-design-visual.yml']) {
+      const workflow = readWorkflow(name);
+      const events = workflow.slice(0, workflow.indexOf('concurrency:'));
+      for (const glob of ["'src/ui/**'", "'src/lib/**'"]) {
+        // Every affected PR and exact-main push must test these UI entrypoints.
+        expect(events.split(glob).length - 1, name + ': ' + glob).toBe(2);
+      }
+    }
+  });
+
   it('checks legacy public UI primitives on Windows when ui.js changes', () => {
     const native = workflows['native-windows.yml'];
     expect(native.split("'ui.js'").length - 1).toBe(2);

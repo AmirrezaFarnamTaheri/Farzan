@@ -14,6 +14,8 @@ export const Modal = {
     // Pending deferred-teardown timers from close(), keyed by modal, so a
     // reopen inside the animation window can cancel the one still in flight.
     _teardownTimers: new WeakMap(),
+    // Track pending first paint separately from the animated 'open' class.
+    _openingTokens: new WeakMap(),
 
     /**
      * Open a modal by its ID or element reference
@@ -25,7 +27,7 @@ export const Modal = {
         ? document.getElementById(target)
         : target;
       if (!modal) return;
-      if (modal.classList.contains('open')) return;
+      if (modal.classList.contains('open') || this._openingTokens.has(modal)) return;
 
       // Cancel a teardown still pending from a close() moments ago. Without
       // this, reopening inside the animation window let the stale timer fire
@@ -66,7 +68,11 @@ export const Modal = {
         }
       }
 
+      const openToken = {};
+      this._openingTokens.set(modal, openToken);
       requestAnimationFrame(() => {
+        if (this._openingTokens.get(modal) !== openToken) return;
+        this._openingTokens.delete(modal);
         backdrop.classList.add('open');
         modal.classList.add('open');
       });
@@ -114,7 +120,8 @@ export const Modal = {
         ? document.getElementById(target)
         : target;
       if (!modal) return;
-      if (!modal.classList.contains('open')) return;
+      if (!modal.classList.contains('open') && !this._openingTokens.has(modal)) return;
+      this._openingTokens.delete(modal);
 
       const backdrop = modal.previousElementSibling;
       modal.classList.remove('open');
@@ -296,13 +303,21 @@ export const Drawer = {
     _previousFocus: new WeakMap(),
     // A close animation must never hide a subsequently reopened drawer.
     _teardownTimers: new WeakMap(),
+    _openingTokens: new WeakMap(),
+
+    _hasOpenOrOpeningDrawer() {
+      // First-frame-pending drawers already own focus, scroll and inertness.
+      // Counting only the CSS .open class prematurely releases those locks.
+      return [...document.querySelectorAll('.drawer')].some(drawer =>
+        drawer.classList.contains('open') || this._openingTokens.has(drawer));
+    },
 
     open(target) {
       const drawer = typeof target === 'string'
         ? document.getElementById(target)
         : target;
       if (!drawer) return;
-      if (drawer.classList.contains('open')) return;
+      if (drawer.classList.contains('open') || this._openingTokens.has(drawer)) return;
       const pending = this._teardownTimers.get(drawer);
       if (pending) {
         clearTimeout(pending.drawer);
@@ -322,7 +337,11 @@ export const Drawer = {
       drawer.setAttribute('aria-modal', 'true');
       drawer.setAttribute('role', 'dialog');
       drawer.setAttribute('tabindex', '-1');
+      const openToken = {};
+      this._openingTokens.set(drawer, openToken);
       requestAnimationFrame(() => {
+        if (this._openingTokens.get(drawer) !== openToken) return;
+        this._openingTokens.delete(drawer);
         backdrop.classList.add('open');
         drawer.classList.add('open');
       });
@@ -340,10 +359,10 @@ export const Drawer = {
         ? document.getElementById(target)
         : target;
       if (!drawer) return;
-      if (!drawer.classList.contains('open')) return;
-
+      if (!drawer.classList.contains('open') && !this._openingTokens.has(drawer)) return;
+      this._openingTokens.delete(drawer);
       drawer.classList.remove('open');
-      const stillOpen = document.querySelectorAll('.drawer.open').length > 0;
+      const stillOpen = this._hasOpenOrOpeningDrawer();
       const backdrop = $('.drawer-backdrop');
       if (!stillOpen) backdrop?.classList.remove('open');
       const duration = shell().config?.animationDuration ?? 0;
@@ -357,7 +376,7 @@ export const Drawer = {
         }, duration),
         backdrop: !stillOpen && backdrop ? setTimeout(() => {
           // A different drawer might have opened before the animation ends.
-          if (!document.querySelector('.drawer.open')) backdrop.remove();
+          if (!this._hasOpenOrOpeningDrawer()) backdrop.remove();
         }, duration) : null,
       };
       this._teardownTimers.set(drawer, pending);
@@ -377,7 +396,11 @@ export const Drawer = {
     },
 
     closeAll() {
-      $$('.drawer.open').forEach(d => this.close(d));
+      // Escape may arrive in the frame between open() and the CSS .open
+      // transition. Those pending drawers already own focus and inert depth.
+      document.querySelectorAll('.drawer').forEach(d => {
+        if (d.classList.contains('open') || this._openingTokens.has(d)) this.close(d);
+      });
     },
 
     init() {
