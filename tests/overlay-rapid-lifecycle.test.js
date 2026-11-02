@@ -84,6 +84,42 @@ describe('shared overlay lifecycle before the first paint (#175)', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
+  it('keeps a second still-opening drawer modal when a previous drawer closes before paint', () => {
+    // Simulate a browser that defers animation frames while timeouts still run.
+    // A pending second drawer owns its backdrop, scroll lock and focus trap.
+    const frames = [];
+    raf.mockImplementation(callback => { frames.push(callback); return frames.length; });
+    const first = document.getElementById('drawer');
+    const second = document.createElement('div');
+    second.id = 'drawer-secondary';
+    second.className = 'drawer';
+    second.hidden = true;
+    second.innerHTML = '<button id="drawer-secondary-action">Keep editing</button>';
+    document.body.appendChild(second);
+    Drawer.open(first);
+    Drawer.open(second);
+    const action = document.getElementById('drawer-secondary-action');
+    expect(document.activeElement).toBe(action);
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+
+    Drawer.close(first);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.activeElement).toBe(action);
+    vi.advanceTimersByTime(20);
+    expect(document.querySelector('.drawer-backdrop')).not.toBeNull();
+    expect(second.hidden).toBe(false);
+    frames.forEach(frame => frame());
+    expect(second.classList.contains('open')).toBe(true);
+    expect(document.querySelector('.drawer-backdrop.open')).not.toBeNull();
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+
+    Drawer.close(second);
+    vi.runAllTimers();
+    expect(document.body.style.overflow).toBe('');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+    expect(document.querySelector('.drawer-backdrop')).toBeNull();
+  });
+
   it('does not let a prior drawer opening frame resurrect a closed replacement', () => {
     const drawer = document.getElementById('drawer');
     Drawer.open(drawer);
