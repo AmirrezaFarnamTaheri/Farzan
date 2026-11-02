@@ -36,7 +36,7 @@ export function mountPlaylistsView({
               </label>
               <button class="btn btn-primary" type="button" data-save-playlist>
                 <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
-                Save first catalog queue
+                Save available catalog queue
               </button>
             </div>
           </div>
@@ -503,7 +503,11 @@ async function renderPlaylists(deps) {
   playlists.slice(0, 24).forEach(playlist => appendPlaylistCard(playlist, listRoot));
   catalogPlaylists.forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
 
-  const firstCatalog = catalogGroups[0];
+  // A duplicated topic key in a different course makes topic-only queue
+  // persistence ambiguous. Still allow saving another, unambiguous source
+  // instead of blocking every playlist behind the first unsafe catalog.
+  const firstCatalog = catalogGroups.find(group => group.topicIds.length
+    && group.topicIds.every(id => !ambiguousTopicIds.has(String(id)))) || catalogGroups[0];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
     let creating = false;
