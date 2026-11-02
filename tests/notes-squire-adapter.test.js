@@ -382,6 +382,62 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('never inserts unsupported clipboard fallback into an active Persian/Chinese IME composition', async () => {
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Prior note text</p>', onUpdate, onPasteFallback: vi.fn(),
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = 'ناتمام 中文';
+      const paste = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, 'clipboardData', { value: {
+        items: null, types: ['text/html'],
+        getData: type => type === 'text/html'
+          ? '<table><tr><td>Unwanted clipboard fallback</td></tr></table>' : '',
+      } });
+      root.dispatchEvent(paste);
+      expect(paste.defaultPrevented).toBe(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(root.textContent).toBe('ناتمام 中文');
+      expect(onUpdate).not.toHaveBeenCalled();
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(instance.getHTML()).toContain('ناتمام 中文');
+      expect(instance.getHTML()).not.toContain('Unwanted clipboard fallback');
+    } finally { instance.destroy(); }
+  });
+
+  it('invalidates a queued clipboard fallback if IME starts and ends before its microtask', async () => {
+    const element = document.createElement('div');
+    const onUpdate = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Prior note text</p>', onUpdate, onPasteFallback: vi.fn(),
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      const paste = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, 'clipboardData', { value: {
+        items: null, types: ['text/html'],
+        getData: type => type === 'text/html'
+          ? '<table><tr><td>Old queued clipboard text</td></tr></table>' : '',
+      } });
+      root.dispatchEvent(paste);
+      expect(paste.defaultPrevented).toBe(true);
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = '待确认 متن';
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(root.textContent).toBe('待确认 متن');
+      expect(instance.getHTML()).toContain('待确认 متن');
+      expect(instance.getHTML()).not.toContain('Old queued clipboard text');
+      expect(onUpdate).toHaveBeenCalledWith(expect.stringContaining('待确认 متن'));
+    } finally { instance.destroy(); }
+  });
+
   it('cancels a queued plain-text paste after the editor is destroyed', async () => {
     const element = document.createElement('div');
     const onUpdate = vi.fn();
