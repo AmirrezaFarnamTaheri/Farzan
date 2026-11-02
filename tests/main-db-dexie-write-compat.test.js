@@ -6,6 +6,7 @@ const name = 'farzan-dexie-mutation-compat-v3';
 const schema = [
   { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'courseId' }] },
   { name: 'settings', key: 'key', autoIncrement: false },
+  { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }] },
 ];
 const opened = [];
 
@@ -120,6 +121,58 @@ describe('Dexie primary-database mutations retain native-v3 semantics', () => {
     await expect(db.compareAndSwapSetting('ocd_studio_konva_draft', null, { version: 1 }))
       .rejects.toThrow(/encrypted|protected|passphrase/i);
     expect(await db.get('settings', 'ocd_studio_konva_draft')).toBeUndefined();
+  });
+
+
+  it('atomically accepts one of two stale concurrent timestamp edits without overwriting the winner', async () => {
+    const first = new OpenCourseDB(name, 3, schema);
+    const second = new OpenCourseDB(name, 3, schema);
+    opened.push(first, second);
+    const saved = { id: 'ts-race', topicId: 'shared', courseId: 'renal',
+      title: 'Earlier study checkpoint', note: 'Old note', position: 78 };
+    const editA = { ...saved, title: 'Tab A revision', note: 'Tab A', updatedAt: 200 };
+    const editB = { ...saved, title: 'Tab B revision', note: 'Tab B', updatedAt: 201 };
+    await first.put('timestamps', saved);
+
+    const [a, b] = await Promise.all([
+      first.compareAndSwapTimestamp(saved.id, saved, editA),
+      second.compareAndSwapTimestamp(saved.id, saved, editB),
+    ]);
+    expect([a, b].sort()).toEqual([false, true]);
+    const winner = a ? editA : editB;
+    expect(await first.get('timestamps', saved.id)).toEqual(winner);
+    expect(await second.compareAndSwapTimestamp(saved.id, saved, null)).toBe(false);
+    expect(await second.get('timestamps', saved.id)).toEqual(winner);
+  });
+
+  it('does not delete a timestamp changed since the saved Bookmarks revision', async () => {
+    const first = new OpenCourseDB(name, 3, schema);
+    const second = new OpenCourseDB(name, 3, schema);
+    opened.push(first, second);
+    const initial = { id: 'ts-delete-race', topicId: 'lesson-1', note: 'Before', position: 30 };
+    const latest = { ...initial, note: 'From another tab', position: 92 };
+    await first.put('timestamps', initial);
+    expect(await second.compareAndSwapTimestamp(initial.id, initial, latest)).toBe(true);
+    expect(await first.compareAndSwapTimestamp(initial.id, initial, null)).toBe(false);
+    expect(await first.get('timestamps', initial.id)).toEqual(latest);
+    expect(await first.compareAndSwapTimestamp(initial.id, latest, null)).toBe(true);
+    expect(await second.get('timestamps', initial.id)).toBeUndefined();
+  });
+
+  it('refuses mismatched IDs, unknown revisions and encrypted timestamp writes', async () => {
+    const db = new OpenCourseDB(name, 3, schema);
+    opened.push(db);
+    const original = { id: 'ts-guard', topicId: 'topic', position: 10 };
+    await db.put('timestamps', original);
+    await expect(db.compareAndSwapTimestamp(original.id, original, {
+      ...original, id: 'other', position: 11,
+    })).rejects.toThrow(/id|key/i);
+    expect(await db.compareAndSwapTimestamp('missing', original, null)).toBe(false);
+    expect(await db.get('timestamps', original.id)).toEqual(original);
+    db.setPassphrase('protected');
+    await expect(db.compareAndSwapTimestamp(original.id, original, null))
+      .rejects.toThrow(/encrypt|passphrase|protect/i);
+    expect(await db.get('timestamps', original.id)).toEqual(original);
   });
 
 });
