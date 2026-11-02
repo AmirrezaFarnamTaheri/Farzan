@@ -165,8 +165,13 @@ function planShape(item) {
       }
       break;
     case 'polyline':
-      if (!Array.isArray(item.points) || !item.points.every(p => Array.isArray(p) && p.length === 2
-        && p.every(value => typeof value === 'number' && Number.isFinite(value)))) {
+      // An imported path must satisfy the same visible, bounded geometry as
+      // a newly recorded pen stroke and the canonical SVG exporter. Refuse
+      // malformed data; never auto-rewrite a user's old Canvas2D board.
+      if (!Array.isArray(item.points) || item.points.length < 2 || item.points.length > 4096
+        || !item.points.every(p => Array.isArray(p) && p.length === 2
+          && p.every(value => typeof value === 'number' && Number.isFinite(value)))
+        || !item.points.some(([x, y]) => x !== item.points[0][0] || y !== item.points[0][1])) {
         return unsupported('invalid-pen-points');
       }
       kind = 'Line';

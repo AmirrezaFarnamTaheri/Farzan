@@ -289,6 +289,19 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     expect(plan.layers[0]).toMatchObject({ visible: false, locked: true, opacity: 0.9 });
   });
   it.each([
+    ['empty path', []],
+    ['single-point path', [[3, 4]]],
+    ['stationary path', [[3, 4], [3, 4]]],
+    ['unbounded imported path', Array.from({ length: 4097 }, (_, i) => [i, i * 2])],
+  ])('refuses imported %s before mounting, editing, or exporting the canonical board', (_label, points) => {
+    const board = fixture();
+    board.layers[0].elements = [{ id: 'imported-path', type: 'polyline', points }];
+    const original = structuredClone(board);
+    expect(planKonvaV1Board(board)).toMatchObject({ compatible: false, reason: expect.stringMatching(/pen|path|points/i) });
+    expect(board).toEqual(original);
+  });
+
+  it.each([
     ['nonfinite coordinate', [[0, 0], [Number.NaN, 12]]],
     ['infinite coordinate', [[0, 0], [10, Infinity]]],
     ['nonnumeric coordinate', [[0, 0], ['missing', 12]]],
