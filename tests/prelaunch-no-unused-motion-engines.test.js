@@ -11,4 +11,37 @@ describe('pre-release animation and zoom entry footprint', () => {
     expect(shell).not.toMatch(/CanvasZoom|features\/canvasZoom/);
     expect(route).toContain('screenToWorld');
   });
+  it('excludes unconsumed chart, graph and custom CanvasTools engines from the prelaunch app', () => {
+    const obsolete = [
+      'src/features/courseGraph.js',
+      'src/features/knowledgeGraph.js',
+      'src/features/canvasCharts/area.js',
+      'src/features/canvasCharts/gauge.js',
+      'src/features/canvasCharts/heatmap.js',
+      'src/features/canvasCharts/treemap.js',
+      'src/features/chartPlugins/arc.js',
+      'src/features/chartPlugins/calendarGrid.js',
+      'src/features/chartPlugins/gauge.js',
+      'src/features/chartPlugins/heatmap.js',
+      'src/features/chartPlugins/sparkline.js',
+      'src/features/canvasTools/index.js',
+      'src/features/canvasTools/registry.js',
+      'src/features/canvasTools/toolBase.js',
+    ];
+    for (const path of obsolete) {
+      expect(fs.existsSync(path), path + ' must not be shipped').toBe(false);
+    }
+    const shell = fs.readFileSync('app.js', 'utf8');
+    const canvas = fs.readFileSync('canvas.js', 'utf8');
+    expect(shell).not.toMatch(/CanvasCharts|ChartPlugins|CourseGraph|KnowledgeGraph|\bCharts\.init\(|\bHeatmap\s*=\s*\{/);
+    expect(canvas).not.toContain('CanvasTools');
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+    expect(pkg.dependencies).not.toHaveProperty('d3-force');
+    expect(lock.packages[''].dependencies).not.toHaveProperty('d3-force');
+    for (const name of ['d3-force', 'd3-quadtree', 'd3-timer', 'd3-dispatch']) {
+      expect(lock.packages).not.toHaveProperty('node_modules/' + name);
+    }
+  });
+
 });

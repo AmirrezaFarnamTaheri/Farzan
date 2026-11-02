@@ -38,6 +38,26 @@ describe('Canvas renderer scheduling', () => {
     await import('../canvas.js');
   });
 
+  it('recognizes only the built-in Studio tools, not obsolete plugin registry names', () => {
+    const original = window.OpenCourseDeck.CanvasTools;
+    window.OpenCourseDeck.CanvasTools = {
+      getToolNames: () => ['obsolete-plugin-tool'],
+    };
+    try {
+      const canvas = window.OpenCourseDeck.Canvas;
+      expect(canvas.getRegisteredTools()).toEqual([
+        'select', 'pen', 'eraser', 'rect', 'circle', 'line', 'arrow', 'text', 'fill',
+      ]);
+      canvas.setTool('obsolete-plugin-tool');
+      expect(canvas.getState().tool).toBe('select');
+      canvas.setTool('pen');
+      expect(canvas.getState().tool).toBe('pen');
+    } finally {
+      if (original === undefined) delete window.OpenCourseDeck.CanvasTools;
+      else window.OpenCourseDeck.CanvasTools = original;
+    }
+  });
+
   it('does not paint a minimap over a new empty or unzoomed Studio board', () => {
     const board = window.OpenCourseDeck.Canvas;
     board._drawMinimap(ctx, 700, 460);
