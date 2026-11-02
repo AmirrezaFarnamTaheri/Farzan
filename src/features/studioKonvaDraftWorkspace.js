@@ -215,8 +215,12 @@ export function createStudioKonvaDraftWorkspace({
   const notifyError = error => {
     if (!disposed) onError(error);
   };
+  let sceneGeneration = 0;
   const redraw = () => {
     if (disposed) return;
+    // Each scene owns its gesture completions. An old drag/transform flush
+    // must not tear down a newer Pen scene or publish a stale saved status.
+    const generation = ++sceneGeneration;
     scene?.destroy();
     scene = null;
     scene = sceneFactory({
@@ -234,11 +238,13 @@ export function createStudioKonvaDraftWorkspace({
       onGesture: () => {
         // The canonical session's drag/transform handler has queued its write.
         session.flush().then(() => {
-          if (!disposed) {
+          if (!disposed && generation === sceneGeneration) {
             redraw();
             onStatus('Experimental draft saved');
           }
-        }).catch(notifyError);
+        }).catch(error => {
+          if (!disposed && generation === sceneGeneration) notifyError(error);
+        });
       },
     });
     scene?.select?.(selectedId);
