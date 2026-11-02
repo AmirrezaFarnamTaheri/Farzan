@@ -120,6 +120,54 @@ describe('shared overlay lifecycle before the first paint (#175)', () => {
     expect(document.querySelector('.drawer-backdrop')).toBeNull();
   });
 
+  it('keeps background scroll locked when the top modal closes over a painted drawer', () => {
+    const modal = document.getElementById('dialog');
+    const drawer = document.getElementById('drawer');
+    Drawer.open(drawer);
+    Modal.open(modal);
+    vi.advanceTimersByTime(0);
+    expect(document.body.style.overflow).toBe('hidden');
+    try {
+      Modal.close(modal);
+      expect(window.OpenCourseDeck.state.openModals).toEqual([]);
+      expect(drawer.classList.contains('open')).toBe(true);
+      // The drawer still owns the scroll lock even though no modal remains.
+      expect(document.body.style.overflow).toBe('hidden');
+      expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+    } finally {
+      Modal.close(modal);
+      Drawer.close(drawer);
+      vi.runAllTimers();
+    }
+    expect(document.body.style.overflow).toBe('');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+  });
+
+  it('retains drawer scroll ownership before its first animation frame when a modal closes', () => {
+    const frames = [];
+    raf.mockImplementation(callback => { frames.push(callback); return frames.length; });
+    const modal = document.getElementById('dialog');
+    const drawer = document.getElementById('drawer');
+    Modal.open(modal);
+    Drawer.open(drawer);
+    try {
+      Modal.close(modal);
+      expect(drawer.hidden).toBe(false);
+      expect(drawer.classList.contains('open')).toBe(false);
+      expect(document.body.style.overflow).toBe('hidden');
+      expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+      frames.forEach(callback => callback());
+      expect(drawer.classList.contains('open')).toBe(true);
+      expect(document.body.style.overflow).toBe('hidden');
+    } finally {
+      Modal.close(modal);
+      Drawer.close(drawer);
+      vi.runAllTimers();
+    }
+    expect(document.body.style.overflow).toBe('');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+  });
+
   it('does not let a prior drawer opening frame resurrect a closed replacement', () => {
     const drawer = document.getElementById('drawer');
     Drawer.open(drawer);
