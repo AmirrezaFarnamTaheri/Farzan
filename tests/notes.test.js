@@ -748,6 +748,24 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('From IDB');
   });
 
+  it('saves the current title before switching notes without a stale debounced write to the next note', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    const titleInput = document.querySelector('[data-note-title-input]');
+    titleInput.value = 'Renal anatomy — فارسی';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(titleInput._pdTitleT).toBeTruthy();
+    expect(app.openNote('pinned-note')).toBe(true);
+    expect(store.getNote('regular-note').title).toBe('Renal anatomy — فارسی');
+    expect(titleInput._pdTitleT).toBeNull();
+    window.DB.saveNote.mockClear();
+    await vi.advanceTimersByTimeAsync(550);
+    expect(store.getNote('pinned-note').title).toBe('Pinned note');
+    expect(window.DB.saveNote.mock.calls.some(([note]) => note.id === 'pinned-note')).toBe(false);
+    expect(window.OpenCourseDeck.beforeUnload.unmark).toHaveBeenCalledWith('notes-title');
+  });
+
   it('refreshes canonical note sync in place without overwriting a pending editor draft', async () => {
     const titleInput = document.querySelector('[data-note-title-input]');
     const editor = document.querySelector('[data-notes-editor]');
