@@ -15,6 +15,12 @@ const source = () => ({
 });
 
 const incompatible = [
+  ['null viewport offset', board => { board.viewport.offsetX = null; }],
+  ['null viewport zoom', board => { board.viewport.zoom = null; }],
+  ['null rectangle x', board => { board.layers[0].elements[0].x = null; }],
+  ['null rectangle width', board => { board.layers[0].elements[0].width = null; }],
+  ['null shape opacity', board => { board.layers[0].elements[0].opacity = null; }],
+  ['null stroke width', board => { board.layers[0].elements[0].strokeWidth = null; }],
   ['zero viewport zoom', board => { board.viewport.zoom = 0; }],
   ['negative viewport zoom', board => { board.viewport.zoom = -1; }],
   ['zoom above supported range', board => { board.viewport.zoom = 9; }],

@@ -45,7 +45,10 @@ function validateMappedElement(item, type) {
     'width', 'height', 'radius', 'radiusX', 'radiusY', 'rotation',
     'strokeWidth', 'opacity', 'headSize', 'fontSize'];
   for (const name of numeric) {
-    if (Object.hasOwn(item, name) && item[name] != null
+    // A property absent from older v1 data uses the documented default.
+    // An explicitly saved null is NOT absent: Number(null) would silently
+    // render it as 0 and change the imported geometry/appearance.
+    if (Object.hasOwn(item, name)
       && (typeof item[name] !== 'number' || !Number.isFinite(item[name]))) {
       return unsupported('invalid-element-number-' + name);
     }
@@ -203,7 +206,10 @@ export function planKonvaV1Board(board) {
   // position or zoom. Omitted legacy fields still use the canonical defaults.
   for (const key of ['offsetX', 'offsetY', 'zoom', 'rotation']) {
     const value = board.viewport?.[key];
-    if (value != null && (typeof value !== 'number' || !Number.isFinite(value))) {
+    // Reject explicit null in an imported viewport; only omitted fields
+    // may inherit canonical offsets/zoom without changing stored geometry.
+    if (board.viewport != null && Object.hasOwn(board.viewport, key)
+      && (typeof value !== 'number' || !Number.isFinite(value))) {
       return unsupported('invalid-viewport-' + key);
     }
   }
