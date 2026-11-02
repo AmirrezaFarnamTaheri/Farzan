@@ -325,6 +325,42 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('captures an unobserved native edit before rejecting a stale remote refresh', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>قلب Heart 你好</p>', onUpdate: updates,
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.querySelector('p').append(document.createTextNode(' آخرین ویرایش'));
+      // No Squire input event or MutationObserver delivery yet.
+      expect(updates).not.toHaveBeenCalled();
+      expect(() => instance.setContent('<p>Older remote revision</p>'))
+        .toThrow(/unsaved|stale|overwrite/i);
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('آخرین ویرایش'));
+      expect(instance.getHTML()).toContain('آخرین ویرایش');
+      expect(instance.getHTML()).not.toContain('Older remote revision');
+    } finally { instance.destroy(); }
+  });
+
+  it('does not reset selection/history when an unobserved edit matches an incoming refresh', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Before</p>', onUpdate: updates,
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.querySelector('p').append(document.createTextNode(' and latest'));
+      const live = root.innerHTML;
+      expect(instance.setContent(live)).toBe(false);
+      expect(root.innerHTML).toBe(live);
+      expect(instance.getHTML()).toContain('and latest');
+      expect(updates).toHaveBeenCalledTimes(1);
+    } finally { instance.destroy(); }
+  });
+
   it('refuses a stale remote setContent while an IME composition is unfinished', () => {
     const element = document.createElement('div');
     const onUpdate = vi.fn();
