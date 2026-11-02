@@ -414,6 +414,40 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
+  it('does not render or overwrite another course\'s progress for duplicate topic IDs', async () => {
+    window.DataStore.allCourses = () => [
+      { id: 'course-a', title: 'Heart' },
+      { id: 'course-b', title: 'Kidneys' },
+    ];
+    window.DataStore.allTopics = () => [
+      { ...topics[0], topicId: 'shared', courseId: 'course-a', title: 'Cardiac lesson' },
+      { ...topics[0], topicId: 'shared', courseId: 'course-b', title: 'Renal lesson' },
+    ];
+    window.DB.getAllProgress.mockResolvedValue([
+      { topicId: 'shared', courseId: 'course-a', status: 'done', percent: 100 },
+    ]);
+    const error = vi.fn();
+    const controller = await mountCourses();
+    const button = await vi.waitFor(() => {
+      const candidate = document.querySelector('#courses-list [data-course-id="course-b"]');
+      expect(candidate).not.toBeNull();
+      return candidate;
+    });
+    button.click();
+    const row = await vi.waitFor(() => {
+      const candidate = document.querySelector(
+        '#course-detail [data-course-id="course-b"][data-topic-id="shared"]');
+      expect(candidate).not.toBeNull();
+      return candidate;
+    });
+    expect(row.querySelector('[data-status="done"]')).toBeNull();
+    const completion = row.querySelector('[data-action="toggle-done"]');
+    expect(completion.disabled).toBe(true);
+    completion.click();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
   it('never chooses the first of duplicate topic IDs when a bookmark has no course identity', async () => {
     window.DataStore.allCourses = () => [
       { id: 'course-a', title: 'Anatomy A' },
