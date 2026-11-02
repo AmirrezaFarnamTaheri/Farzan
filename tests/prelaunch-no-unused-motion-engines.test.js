@@ -43,5 +43,22 @@ describe('pre-release animation and zoom entry footprint', () => {
       expect(lock.packages).not.toHaveProperty('node_modules/' + name);
     }
   });
+  it('does not expose unused loading and pagination compatibility facades', () => {
+    const shell = fs.readFileSync('app.js', 'utf8');
+    for (const obsolete of [
+      'const Skeleton = {',
+      'const InfiniteScroll = {',
+      'OpenCourseDeck.Skeleton',
+      'OpenCourseDeck.InfiniteScroll',
+      'OpenCourseDeck.plugins =',
+    ]) {
+      expect(shell, obsolete + ' is unused public code').not.toContain(obsolete);
+    }
+    // Native route skeleton HTML and the active study scrolling CSS stay
+    // independently owned; this removes only their unconsumed JS facade.
+    const html = fs.readFileSync('index.html', 'utf8');
+    expect(html).toContain('id="app-loading"');
+  });
+
 
 });
