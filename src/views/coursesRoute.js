@@ -1188,8 +1188,15 @@ export async function mountCoursesView(deps = {}) {
       if (!row) return;
       const topicId = row.dataset.topicId;
       const courseId = row.dataset.courseId;
-      const topic = (window.DataStore?.allTopics?.() ?? []).find(t => t.topicId === topicId);
-      if (!topic) return;
+      // A catalog can contain different courses with an identical topicId.
+      // The rendered row carries both identifiers; never borrow the first
+      // matching course's video, PDF or embedded source from an unrelated row.
+      // Also refuse ambiguous duplicates *within* one course rather than
+      // choosing an arbitrary imported source after a catalog refresh.
+      const matches = (window.DataStore?.allTopics?.() ?? []).filter(t =>
+        String(t?.topicId) === topicId && String(t?.courseId) === courseId);
+      if (matches.length !== 1) return;
+      const [topic] = matches;
 
       if (action === 'toggle-done') {
         const existing = await window.DB?.getProgress?.(topicId);
