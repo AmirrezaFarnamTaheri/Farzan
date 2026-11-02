@@ -300,14 +300,18 @@ async function renderPlaylists(deps) {
   const timestampTopics = timestamps
     .map(item => {
       const id = String(item?.topicId ?? '');
-      if (ambiguousTopicIds.has(id)) {
-        // A saved timestamp with explicit course identity can still render
-        // the right title. Without it, retain the record instead of borrowing
-        // the wrong course's title or other source metadata.
-        return topics.find(topic => String(topic?.topicId) === id
-          && item?.courseId != null && String(topic.courseId) === String(item.courseId))
-          || item;
+      // A timestamp carrying a course identity may borrow catalog metadata
+      // only from one *unique exact* course/topic pair. Never take the first
+      // of conflicting restored imports, and never use a topic-only match from
+      // an unrelated course, even when that topicId is globally unique.
+      const scopedKey = courseTopicKey(item?.courseId, item?.topicId);
+      if (scopedKey) {
+        return ambiguousCourseTopics.has(scopedKey)
+          ? item : topicsByCourse.get(scopedKey) || item;
       }
+      // Legacy unscoped timestamps are safe only when the topic is globally
+      // unique in the current catalog; otherwise retain saved metadata.
+      if (ambiguousTopicIds.has(id)) return item;
       return topicsById.get(id) || item;
     })
     .filter(item => item?.topicId || item?.title || item?.topicTitle);
