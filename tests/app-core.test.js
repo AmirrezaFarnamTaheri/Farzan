@@ -2108,16 +2108,24 @@ describe('app shell resilience helpers', () => {
       sessionStorage.removeItem(key);
     }
 
-    await window.OpenCourseDeck.Views.bookmarks();
-    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
-    document.querySelector('[data-bookmark-id="ts-1"] a').click();
+    // The actual Courses route may consume and remove pending session keys
+    // before this async source preflight click returns. Assert the real handoff
+    // writes, not a transient storage snapshot after router navigation.
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      await window.OpenCourseDeck.Views.bookmarks();
+      await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"] a')).toBeTruthy());
+      document.querySelector('[data-bookmark-id="ts-1"] a').click();
 
-    await vi.waitFor(() => {
-      expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
-      expect(sessionStorage.getItem('ocd_pending_position')).toBe('125');
-      expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-a');
-      expect(window.location.hash).toBe('#/courses');
-    });
+      await vi.waitFor(() => {
+        expect(writes).toHaveBeenCalledWith('ocd_pending_topic', 'topic-1');
+        expect(writes).toHaveBeenCalledWith('ocd_pending_position', '125');
+        expect(writes).toHaveBeenCalledWith('ocd_pending_course', 'course-a');
+        expect(window.location.hash).toBe('#/courses');
+      });
+    } finally {
+      writes.mockRestore();
+    }
   });
 
   it('seeks pending course timestamp handoffs after loading the topic', async () => {
