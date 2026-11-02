@@ -714,38 +714,50 @@ async function renderPlaylists(deps) {
       }
       const saved = savedPlaylists.find(item => item.id === open.dataset.openPlaylist);
       if (!saved) return;
-      if (saved.topicIds.some(id => ambiguousTopicIds.has(String(id)))) {
-        Toast.error?.('Saved queue contains ambiguous topic IDs across multiple courses. No player session was opened; saved data is unchanged.');
-        return;
-      }
-      const queue = [];
-      for (const topicId of saved.topicIds) {
-        const topic = topicsById.get(String(topicId));
-        const media = topic?.videos?.[0];
-        if (!media) continue;
-        let src;
-        try {
-          const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
-          src = typeof resolve === 'function' ? await resolve(media, safeMediaUrl) : safeMediaUrl(media);
-        } catch {
-          src = null;
+      const stillCurrent = async () => {
+        const rows = await window.DB?.getSetting?.('ocd_playlists');
+        if (!Array.isArray(rows)) return false;
+        const row = rows.find(record => String(record?.id) === String(saved.id));
+        return row != null && JSON.stringify(row) === JSON.stringify(saved);
+      };
+      try {
+        // The rendered card is not a durable revision. Revalidate before
+        // and after async media resolution in case another tab changes it.
+        if (!(await stillCurrent())) throw new Error('Saved playlist changed elsewhere; reload before opening');
+        if (!saved.topicIds.length || !savedSourceIsAligned(saved)) {
+          throw new Error('Saved queue has incomplete or invalid source identity');
         }
-        if (!src) continue;
-        queue.push({
-          id: topicId, topicId, courseId: topic.courseId,
-          courseTitle: topic.courseTitle || '', title: playlistTopicTitle(topic),
-          src, type: 'video',
+        const queue = [];
+        for (let index = 0; index < saved.topicIds.length; index++) {
+          const topicId = String(saved.topicIds[index]);
+          const topic = savedTopic(saved, index);
+          if (!topic) throw new Error('Saved queue source is ambiguous, missing or unavailable');
+          const media = topic.videos?.[0] ?? topic.url;
+          if (!media) throw new Error('Saved queue lesson is missing or unavailable');
+          let src;
+          try {
+            const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
+            src = typeof resolve === 'function' ? await resolve(media, safeMediaUrl) : safeMediaUrl(media);
+          } catch {
+            src = null;
+          }
+          // A partial queue is never a legitimate replay of a saved order.
+          if (!src) throw new Error('Saved queue lesson is unavailable offline; no partial queue was opened');
+          queue.push({
+            id: topicId, topicId, courseId: topic.courseId,
+            courseTitle: topic.courseTitle || '', title: playlistTopicTitle(topic),
+            src, type: 'video',
+          });
+        }
+        if (!(await stillCurrent())) throw new Error('Saved playlist changed elsewhere; reload before opening');
+        setPendingCourseSession({
+          queue, track: queue[0], queueIndex: 0, currentTime: 0,
+          playing: false, repeat: 'none', shuffle: false,
         });
+        Router.navigate('#/courses');
+      } catch (error) {
+        Toast.error?.('Could not open saved queue: ' + (error?.message || 'Source unavailable'));
       }
-      if (!queue.length) {
-        Toast.error?.('No playable videos are available in this saved queue');
-        return;
-      }
-      setPendingCourseSession({
-        queue, track: queue[0], queueIndex: 0, currentTime: 0,
-        playing: false, repeat: 'none', shuffle: false,
-      });
-      Router.navigate('#/courses');
       return;
     }
     const btn = event.target?.closest?.('[data-delete-playlist]');
