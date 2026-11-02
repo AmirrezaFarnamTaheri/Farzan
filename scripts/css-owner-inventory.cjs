@@ -73,6 +73,25 @@ function closingBrace(src, start, end) {
   throw new Error('Unbalanced CSS block at offset ' + start);
 }
 
+// A quoted CSS string may contain literal braces (for example generated
+// counter labels). Only real nested blocks exclude an ordinary selector from
+// this source-ownership inventory; never omit its declarations by substring.
+function hasUnquotedOpeningBrace(input) {
+  let quote = '';
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (quote) {
+      if (ch === '\\') { i++; continue; }
+      if (ch === quote) quote = '';
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === '{') {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseRules(css, file, layer) {
   const source = maskComments(css);
   const result = [];
@@ -92,7 +111,7 @@ function parseRules(css, file, layer) {
           visit(separator.at + 1, close, [...atRules, header]);
         }
         // @keyframes, @font-face and @property are not component selectors.
-      } else if (header && !body.includes('{')) {
+      } else if (header && !hasUnquotedOpeningBrace(body)) {
         result.push({
           file, layer,
           selector: header,
