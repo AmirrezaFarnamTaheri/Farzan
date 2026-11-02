@@ -120,6 +120,37 @@ function playlistTopicTitle(topic) {
   return topic?.title || topic?.topicTitle || topic?.topicId || 'Untitled topic';
 }
 
+// A course/topic pair is the canonical lookup key. JSON tuples cannot
+// collide when imported identifiers contain separators or mixed scripts.
+function courseTopicKey(courseId, topicId) {
+  if (courseId == null || topicId == null) return null;
+  const course = String(courseId).trim(), topic = String(topicId).trim();
+  return course && topic ? JSON.stringify([course, topic]) : null;
+}
+
+function savedSourceIsAligned(saved) {
+  if (!Object.hasOwn(saved, 'sourceRefs')) return true;
+  return Array.isArray(saved.sourceRefs)
+    && saved.sourceRefs.length === saved.topicIds.length
+    && saved.sourceRefs.every((ref, index) => ref && !Array.isArray(ref)
+      && typeof ref === 'object' && typeof ref.courseId === 'string'
+      && typeof ref.topicId === 'string'
+      && ref.topicId === String(saved.topicIds[index])
+      && courseTopicKey(ref.courseId, ref.topicId));
+}
+
+function resolveSavedTopic(saved, index, topicsById, topicsByCourse, ambiguousTopics, ambiguousCourse) {
+  const topicId = String(saved.topicIds[index]);
+  if (Object.hasOwn(saved, 'sourceRefs')) {
+    // Invalid scoped identity never authorizes an unrelated topic-only match.
+    if (!savedSourceIsAligned(saved)) return null;
+    const ref = saved.sourceRefs[index];
+    const key = courseTopicKey(ref.courseId, ref.topicId);
+    return key && !ambiguousCourse.has(key) ? topicsByCourse.get(key) || null : null;
+  }
+  return ambiguousTopics.has(topicId) ? null : topicsById.get(topicId) || null;
+}
+
 function sanitizeSavedPlaylists(value) {
   return Array.isArray(value)
     ? value.filter(item => item && typeof item === 'object' && item.id && item.title && Array.isArray(item.topicIds))
@@ -253,6 +284,19 @@ async function renderPlaylists(deps) {
       ambiguousTopicIds.add(id);
     } else topicsById.set(id, topic);
   }
+  const topicsByCourse = new Map();
+  const ambiguousCourseTopics = new Set();
+  for (const topic of topics) {
+    const key = courseTopicKey(topic?.courseId, topic?.topicId);
+    if (!key || ambiguousCourseTopics.has(key)) continue;
+    if (topicsByCourse.has(key)) {
+      topicsByCourse.delete(key);
+      ambiguousCourseTopics.add(key);
+    } else topicsByCourse.set(key, topic);
+  }
+  const savedTopic = (saved, index) => resolveSavedTopic(
+    saved, index, topicsById, topicsByCourse, ambiguousTopicIds, ambiguousCourseTopics,
+  );
   const timestampTopics = timestamps
     .map(item => {
       const id = String(item?.topicId ?? '');
@@ -273,17 +317,17 @@ async function renderPlaylists(deps) {
     .slice()
     .sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
     .forEach(saved => {
-      const savedItems = saved.topicIds
-        .map(topicId => topicsById.get(String(topicId)))
-        .filter(Boolean)
-        .map(playlistTopicTitle);
+      // Keep the saved order visible even when a lesson cannot currently
+      // resolve, rather than compressing a partially unavailable queue.
+      const savedItems = saved.topicIds.map((topicId, index) =>
+        playlistTopicTitle(savedTopic(saved, index) || { topicId: String(topicId) }));
       playlists.push({
         id: saved.id,
         label: 'Saved',
         title: saved.title,
         detail: `${saved.topicIds.length} saved topic${saved.topicIds.length === 1 ? '' : 's'}`,
         href: '#/courses',
-        items: savedItems.length ? savedItems : saved.topicIds,
+        items: savedItems,
         saved: true,
       });
     });
@@ -321,10 +365,15 @@ async function renderPlaylists(deps) {
         href: '#/courses',
         items: [],
         topicIds: [],
+        sourceRefs: [],
       });
     }
     sourceGroups.get(key).items.push(playlistTopicTitle(topic));
     sourceGroups.get(key).topicIds.push(topic.topicId);
+    sourceGroups.get(key).sourceRefs.push({
+      courseId: topic.courseId == null ? '' : String(topic.courseId),
+      topicId: topic.topicId == null ? '' : String(topic.topicId),
+    });
   });
   const catalogGroups = [...sourceGroups.values()]
     .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
@@ -460,10 +509,9 @@ async function renderPlaylists(deps) {
           item.className = 'playlist-reorder-item';
           const title = document.createElement('span');
           title.dir = 'auto';
-          title.textContent = playlistTopicTitle(topicsById.get(String(topicId)))
-            || String(topicId);
+          const resolved = savedTopic(persisted, index);
+          title.textContent = resolved ? playlistTopicTitle(resolved) : String(topicId);
           // An unavailable source still needs a readable identity.
-          if (!topicsById.has(String(topicId))) title.textContent = String(topicId);
           item.appendChild(title);
           for (const direction of ['up', 'down']) {
             const button = document.createElement('button');
@@ -473,6 +521,7 @@ async function renderPlaylists(deps) {
             button.dataset.playlistId = String(playlist.id);
             button.dataset.topicIndex = String(index);
             button.dataset.topicId = String(topicId);
+            button.dataset.playlistCourse = String(persisted.sourceRefs?.[index]?.courseId ?? '');
             button.setAttribute('aria-label', `Move ${title.textContent} ${direction}`);
             button.textContent = direction === 'up' ? 'Up' : 'Down';
             button.disabled = direction === 'up'
@@ -503,27 +552,35 @@ async function renderPlaylists(deps) {
   playlists.slice(0, 24).forEach(playlist => appendPlaylistCard(playlist, listRoot));
   catalogPlaylists.forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
 
-  // A duplicated topic key in a different course makes topic-only queue
-  // persistence ambiguous. Still allow saving another, unambiguous source
-  // instead of blocking every playlist behind the first unsafe catalog.
-  const firstCatalog = catalogGroups.find(group => group.topicIds.length
-    && group.topicIds.every(id => !ambiguousTopicIds.has(String(id)))) || catalogGroups[0];
+  // New saved queues carry exact (courseId, topicId) identities, so a topic
+  // ID reused in another course is not inherently ambiguous. When a catalog
+  // lacks that identity, only globally unique topic IDs can be saved.
+  const scopedCatalog = group => Boolean(group && group.topicIds.length
+    && group.sourceRefs.length === group.topicIds.length
+    && new Set(group.topicIds.map(String)).size === group.topicIds.length
+    && group.sourceRefs.every(ref => {
+      const key = courseTopicKey(ref.courseId, ref.topicId);
+      return key && topicsByCourse.has(key) && !ambiguousCourseTopics.has(key);
+    }));
+  const canSaveCatalog = group => Boolean(group?.topicIds?.length
+    && (scopedCatalog(group) || group.topicIds.every(id => !ambiguousTopicIds.has(String(id)))));
+  const firstCatalog = catalogGroups.find(canSaveCatalog) || catalogGroups[0];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
     let creating = false;
-    const ambiguousCatalog = firstCatalog?.topicIds?.some(id => ambiguousTopicIds.has(String(id))) === true;
-    saveBtn.disabled = !firstCatalog?.topicIds?.length || ambiguousCatalog
+    const unsafeCatalog = !canSaveCatalog(firstCatalog);
+    saveBtn.disabled = unsafeCatalog
       || typeof window.DB?.saveSetting !== 'function'
       || typeof window.DB?.getSetting !== 'function';
-    if (ambiguousCatalog) {
+    if (unsafeCatalog) {
       const warning = document.createElement('p');
       warning.dataset.playlistSourceWarning = '';
       warning.setAttribute('role', 'alert');
-      warning.textContent = 'Some topic IDs appear in multiple courses. A saved queue cannot safely identify their source.';
+      warning.textContent = 'Some course or topic sources cannot be identified uniquely. No unsafe queue will be saved.';
       saveBtn.closest('.playlists-form')?.after(warning);
     }
     saveBtn.onclick = async () => {
-      if (creating || !firstCatalog?.topicIds?.length || ambiguousCatalog
+      if (creating || unsafeCatalog
         || typeof window.DB?.saveSetting !== 'function'
         || typeof window.DB?.getSetting !== 'function') return;
       const input = document.querySelector('[data-playlist-name]');
@@ -540,7 +597,11 @@ async function renderPlaylists(deps) {
         const now = Date.now();
         const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         const next = [
-          { id, title, topicIds: [...new Set(firstCatalog.topicIds)], createdAt: now, updatedAt: now },
+          { id, title, topicIds: [...new Set(firstCatalog.topicIds.map(String))],
+            ...(scopedCatalog(firstCatalog) ? {
+              sourceRefs: firstCatalog.sourceRefs.map(ref => ({ ...ref })),
+            } : {}),
+            createdAt: now, updatedAt: now },
           ...current,
         ];
         await persistSavedPlaylists(window.DB, raw, next);
@@ -596,20 +657,26 @@ async function renderPlaylists(deps) {
         const rendered = savedPlaylists.find(item => item.id === move.dataset.playlistId);
         if (!selected || !Array.isArray(selected.topicIds) || !rendered
             || selected.topicIds.length !== rendered.topicIds.length
-            || selected.topicIds.some((id, i) => String(id) !== String(rendered.topicIds[i]))) {
+            || selected.topicIds.some((id, i) => String(id) !== String(rendered.topicIds[i]))
+            || JSON.stringify(selected.sourceRefs) !== JSON.stringify(rendered.sourceRefs)
+            || !savedSourceIsAligned(selected)) {
           throw new Error('Saved playlist was changed elsewhere; reload before reordering');
         }
         const from = Number(move.dataset.topicIndex);
         const to = from + (move.dataset.playlistMove === 'up' ? -1 : 1);
         if (!Number.isSafeInteger(from) || from < 0 || to < 0
             || to >= selected.topicIds.length
-            || String(selected.topicIds[from]) !== move.dataset.topicId) {
+            || String(selected.topicIds[from]) !== move.dataset.topicId
+            || String(selected.sourceRefs?.[from]?.courseId ?? '') !== move.dataset.playlistCourse) {
           throw new Error('This playlist order is no longer current');
         }
         const ids = [...selected.topicIds];
         [ids[from], ids[to]] = [ids[to], ids[from]];
+        const refs = Array.isArray(selected.sourceRefs) ? [...selected.sourceRefs] : null;
+        if (refs) [refs[from], refs[to]] = [refs[to], refs[from]];
         const updated = records.map(record => record === selected
-          ? { ...record, topicIds: ids, updatedAt: Date.now() } : record);
+          ? { ...record, topicIds: ids, ...(refs ? { sourceRefs: refs } : {}),
+            updatedAt: Date.now() } : record);
         await persistSavedPlaylists(window.DB, records, updated);
         Toast.success?.('Playlist order saved');
         await renderPlaylists(deps);
@@ -620,6 +687,7 @@ async function renderPlaylists(deps) {
           const controls = [...listRoot.querySelectorAll('[data-playlist-move]')]
             .filter(button => button.dataset.playlistId === move.dataset.playlistId
               && button.dataset.topicId === move.dataset.topicId
+              && button.dataset.playlistCourse === move.dataset.playlistCourse
               && Number(button.dataset.topicIndex) === to);
           const focusTarget = controls.find(button =>
             button.dataset.playlistMove === move.dataset.playlistMove && !button.disabled)
@@ -646,38 +714,50 @@ async function renderPlaylists(deps) {
       }
       const saved = savedPlaylists.find(item => item.id === open.dataset.openPlaylist);
       if (!saved) return;
-      if (saved.topicIds.some(id => ambiguousTopicIds.has(String(id)))) {
-        Toast.error?.('Saved queue contains ambiguous topic IDs across multiple courses. No player session was opened; saved data is unchanged.');
-        return;
-      }
-      const queue = [];
-      for (const topicId of saved.topicIds) {
-        const topic = topicsById.get(String(topicId));
-        const media = topic?.videos?.[0];
-        if (!media) continue;
-        let src;
-        try {
-          const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
-          src = typeof resolve === 'function' ? await resolve(media, safeMediaUrl) : safeMediaUrl(media);
-        } catch {
-          src = null;
+      const stillCurrent = async () => {
+        const rows = await window.DB?.getSetting?.('ocd_playlists');
+        if (!Array.isArray(rows)) return false;
+        const row = rows.find(record => String(record?.id) === String(saved.id));
+        return row != null && JSON.stringify(row) === JSON.stringify(saved);
+      };
+      try {
+        // The rendered card is not a durable revision. Revalidate before
+        // and after async media resolution in case another tab changes it.
+        if (!(await stillCurrent())) throw new Error('Saved playlist changed elsewhere; reload before opening');
+        if (!saved.topicIds.length || !savedSourceIsAligned(saved)) {
+          throw new Error('Saved queue has incomplete or invalid source identity');
         }
-        if (!src) continue;
-        queue.push({
-          id: topicId, topicId, courseId: topic.courseId,
-          courseTitle: topic.courseTitle || '', title: playlistTopicTitle(topic),
-          src, type: 'video',
+        const queue = [];
+        for (let index = 0; index < saved.topicIds.length; index++) {
+          const topicId = String(saved.topicIds[index]);
+          const topic = savedTopic(saved, index);
+          if (!topic) throw new Error('Saved queue source is ambiguous, missing or unavailable');
+          const media = topic.videos?.[0] ?? topic.url;
+          if (!media) throw new Error('Saved queue lesson is missing or unavailable');
+          let src;
+          try {
+            const resolve = window.OpenCourseDeck?.UserLibrary?.resolvePlayable;
+            src = typeof resolve === 'function' ? await resolve(media, safeMediaUrl) : safeMediaUrl(media);
+          } catch {
+            src = null;
+          }
+          // A partial queue is never a legitimate replay of a saved order.
+          if (!src) throw new Error('Saved queue lesson is unavailable offline; no partial queue was opened');
+          queue.push({
+            id: topicId, topicId, courseId: topic.courseId,
+            courseTitle: topic.courseTitle || '', title: playlistTopicTitle(topic),
+            src, type: 'video',
+          });
+        }
+        if (!(await stillCurrent())) throw new Error('Saved playlist changed elsewhere; reload before opening');
+        setPendingCourseSession({
+          queue, track: queue[0], queueIndex: 0, currentTime: 0,
+          playing: false, repeat: 'none', shuffle: false,
         });
+        Router.navigate('#/courses');
+      } catch (error) {
+        Toast.error?.('Could not open saved queue: ' + (error?.message || 'Source unavailable'));
       }
-      if (!queue.length) {
-        Toast.error?.('No playable videos are available in this saved queue');
-        return;
-      }
-      setPendingCourseSession({
-        queue, track: queue[0], queueIndex: 0, currentTime: 0,
-        playing: false, repeat: 'none', shuffle: false,
-      });
-      Router.navigate('#/courses');
       return;
     }
     const btn = event.target?.closest?.('[data-delete-playlist]');
@@ -694,8 +774,7 @@ async function renderPlaylists(deps) {
       const current = raw.find(item => String(item?.id) === id);
       const rendered = savedPlaylists.find(item => String(item.id) === id);
       if (!current || !rendered || !Array.isArray(current.topicIds)
-        || current.topicIds.length !== rendered.topicIds.length
-        || current.topicIds.some((value, i) => String(value) !== String(rendered.topicIds[i]))) {
+        || JSON.stringify(current) !== JSON.stringify(rendered)) {
         throw new Error('Saved playlist changed elsewhere; reload before deleting');
       }
       // Only remove the selected row. Unknown records and metadata remain byte

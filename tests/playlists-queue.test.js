@@ -107,12 +107,12 @@ describe('saved video queue playback', () => {
     expect(saved[0].topicIds).toEqual(['shared']);
   });
 
-  it('disables saving a new catalog queue whose topic-only records would be ambiguous', async () => {
+  it('still disables unsafe queues when unscoped topic IDs cannot identify a course', async () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
-      { topicId: 'shared', courseId: 'a', title: 'Cardiac',
+      { topicId: 'shared', title: 'Cardiac',
         videos: [{ url: 'https://example.test/a.mp4' }] },
-      { topicId: 'shared', courseId: 'b', title: 'Renal',
+      { topicId: 'shared', title: 'Renal',
         videos: [{ url: 'https://example.test/b.mp4' }] },
     ] };
     window.DB = { getAllTimestamps: vi.fn(async () => []),
@@ -131,11 +131,11 @@ describe('saved video queue playback', () => {
     });
     expect(save.disabled).toBe(true);
     expect(document.querySelector('[data-playlist-source-warning]')?.textContent)
-      .toMatch(/multiple courses|ambiguous|same topic/i);
+      .toMatch(/cannot be identified|unsafe|source/i);
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
   });
 
-  it('offers the first unambiguous catalog queue when earlier groups reuse topic IDs', async () => {
+  it('prefers the first course-scoped queue when other courses reuse topic IDs', async () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     let saved = [];
     window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
@@ -162,7 +162,8 @@ describe('saved video queue playback', () => {
     save.click();
     await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Playlist saved'));
     expect(saved).toHaveLength(1);
-    expect(saved[0].topicIds).toEqual(['unique']);
+    expect(saved[0].topicIds).toEqual(['shared']);
+    expect(saved[0].sourceRefs).toEqual([{ courseId: 'a', topicId: 'shared' }]);
   });
 
   it('resolves a timestamp preview by course ID when the catalog repeats a topic ID', async () => {
