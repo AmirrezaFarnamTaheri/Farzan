@@ -102,6 +102,29 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
+  it('cancels an in-flight timestamp click when its Bookmarks view is replaced', async () => {
+    let resolveCatalog;
+    const deferredCatalog = new Promise(resolve => { resolveCatalog = resolve; });
+    window.DataStore.allTopics.mockImplementation(() => deferredCatalog);
+    mount();
+    const link = await vi.waitFor(() => {
+      const result = document.querySelector('[data-bookmark-type="timestamp"] a.btn');
+      expect(result).not.toBeNull();
+      return result;
+    });
+    link.click();
+    await vi.waitFor(() => expect(window.DataStore.allTopics).toHaveBeenCalledTimes(1));
+    // Route transition or an asynchronous filter redraw detaches this card.
+    document.getElementById('bookmarks-root').replaceChildren(document.createElement('div'));
+    resolveCatalog(topics);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(pending).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
+    expect(Toast.error).not.toHaveBeenCalled();
+  });
+
   it('refuses navigation if the canonical catalog cannot be loaded', async () => {
     window.DataStore.allTopics.mockRejectedValue(new Error('offline catalog unavailable'));
     mount();
