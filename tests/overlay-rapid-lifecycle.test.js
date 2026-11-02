@@ -70,6 +70,20 @@ describe('shared overlay lifecycle before the first paint (#175)', () => {
     expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
   });
 
+  it('lets Escape closeAll dismiss a drawer that has not painted its first frame', () => {
+    const drawer = document.getElementById('drawer');
+    Drawer.open(drawer);
+    // Drawer.init delegates Escape to closeAll(). The pending opening frame
+    // must count as an open drawer even before its CSS .open class exists.
+    Drawer.closeAll();
+    vi.runAllTimers();
+    expect(drawer.hidden).toBe(true);
+    expect(drawer.classList.contains('open')).toBe(false);
+    expect(document.querySelector('.drawer-backdrop')).toBeNull();
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+  });
+
   it('does not let a prior drawer opening frame resurrect a closed replacement', () => {
     const drawer = document.getElementById('drawer');
     Drawer.open(drawer);
