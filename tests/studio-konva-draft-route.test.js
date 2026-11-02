@@ -50,6 +50,10 @@ function makeFixture({ savedDraft = null, board = v1Board(), loadKonvaDraft } = 
     setMode: vi.fn(mode => { draftMode = mode; return mode; }),
     getMode: vi.fn(() => draftMode),
     select: vi.fn(), move: vi.fn(async () => imported),
+    setViewport: vi.fn(async next => {
+      imported.viewport = { ...(imported.viewport || {}), ...next };
+      return structuredClone(imported);
+    }),
     addShape: vi.fn(async () => imported),
     selectLayer: vi.fn(async index => ({ ...imported, activeLayerIdx: index })),
     undo: vi.fn(async () => false), redo: vi.fn(async () => false),
@@ -127,6 +131,31 @@ describe('Studio experimental Konva draft opt-in', () => {
     expect(instance.setMode).toHaveBeenCalledWith('select');
     expect(saveSetting).not.toHaveBeenCalled();
     expect(canvasApi.serialize()).toEqual(board);
+    controller.unmount();
+  });
+
+  it('uses accessible zoom/pan controls anchored to viewport center without mutating the live board', async () => {
+    const { controller, factory, canvasApi, saveSetting } = makeFixture();
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    const workspace = factory.mock.results[0].value;
+    const zoomLabel = document.querySelector('[data-studio-konva-zoom-label]');
+    const zoomIn = document.querySelector('[data-studio-konva-viewport="zoom-in"]');
+    const panRight = document.querySelector('[data-studio-konva-viewport="right"]');
+    expect(zoomIn?.getAttribute('aria-label')).toMatch(/zoom in/i);
+    expect(panRight?.getAttribute('aria-label')).toMatch(/pan right/i);
+    expect(zoomLabel?.textContent).toContain('100%');
+    zoomIn.click();
+    await vi.waitFor(() => expect(workspace.setViewport).toHaveBeenCalledWith({
+      offsetX: -80, offsetY: -55, zoom: 1.25,
+    }));
+    await vi.waitFor(() => expect(zoomLabel.textContent).toContain('125%'));
+    panRight.click();
+    await vi.waitFor(() => expect(workspace.setViewport).toHaveBeenCalledWith({
+      offsetX: -56, offsetY: -55, zoom: 1.25,
+    }));
+    expect(saveSetting).not.toHaveBeenCalledWith('ocd_studio_board', expect.anything());
+    expect(canvasApi.serialize()).toEqual(v1Board());
     controller.unmount();
   });
 

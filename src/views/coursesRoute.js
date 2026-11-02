@@ -327,7 +327,7 @@ export async function mountCoursesView(deps = {}) {
   let allCourses = [];
   let allTopics = [];
   let topicsByCourse = {};
-  let duplicateCueTopicIds = new Set();
+  let ambiguousProgressTopicIds = new Set();
   const rebuildCatalogIndexes = () => {
     const sourceCourses = window.DataStore?.allCourses?.() ?? [];
     // In Plasmato, show the 31 medical courses before the small starter tour.
@@ -339,16 +339,19 @@ export async function mountCoursesView(deps = {}) {
       (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
       return acc;
     }, {});
+    // Progress records use a topicId-keyed legacy store. Do not display or
+    // write one course's completion over another course's identically named
+    // topic until a versioned, explicitly migrated composite key exists.
     const owners = new Map();
     for (const topic of allTopics) {
-      const id = String(topic?.topicId ?? '');
-      if (!id) continue;
-      const courses = owners.get(id) || new Set();
-      courses.add(String(topic?.courseId ?? ''));
-      owners.set(id, courses);
+      if (topic?.topicId == null) continue;
+      const key = String(topic.topicId);
+      const courses = owners.get(key) || new Set();
+      courses.add(String(topic.courseId ?? ''));
+      owners.set(key, courses);
     }
-    duplicateCueTopicIds = new Set([...owners]
-      .filter(([, courses]) => courses.size > 1).map(([id]) => id));
+    ambiguousProgressTopicIds = new Set(
+      [...owners].filter(([, courses]) => courses.size > 1).map(([id]) => id));
   };
   // Legacy unscoped authored cues remain readable only when a topic ID is
   // unique. New edits to ambiguous imported lessons use course+topic keys,
@@ -356,7 +359,7 @@ export async function mountCoursesView(deps = {}) {
   const authoredCueKey = source => {
     const topicId = String(source?.topicId ?? '');
     const courseId = String(source?.courseId ?? '');
-    return duplicateCueTopicIds.has(topicId)
+    return ambiguousProgressTopicIds.has(topicId)
       ? 'source:' + JSON.stringify([courseId, topicId])
       : topicId;
   };
@@ -660,7 +663,7 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus('Active cue JSON belongs to a different course.', 'warning');
       return;
     }
-    if (duplicateCueTopicIds.has(topicId) && String(parsed?.courseId ?? '') !== context.courseId) {
+    if (ambiguousProgressTopicIds.has(topicId) && String(parsed?.courseId ?? '') !== context.courseId) {
       setLearningMarkerStatus('Active cue JSON needs explicit course identity for this shared topic ID.', 'warning');
       return;
     }
@@ -699,7 +702,7 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus('Cue JSON must be an object keyed by topic id.', 'warning');
       return;
     }
-    if (Object.keys(normalized).some(key => duplicateCueTopicIds.has(key))) {
+    if (Object.keys(normalized).some(key => ambiguousProgressTopicIds.has(key))) {
       setLearningMarkerStatus('Cue import needs explicit course identity for shared topic IDs.', 'warning');
       return;
     }
@@ -909,13 +912,17 @@ export async function mountCoursesView(deps = {}) {
     if (hasVideo && hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
     if (hasEmbed && (hasVideo || hasPdf)) actions.appendChild(actionButton('open-embed', 'Open'));
     if (toggle) {
+      const ambiguous = ambiguousProgressTopicIds.has(String(topic.topicId));
       const completion = createElement('button', {
         class: 'topic-completion-toggle',
         type: 'button',
         'data-action': 'toggle-done',
         'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
         'aria-pressed': status === 'done' ? 'true' : 'false',
-        title: status === 'done' ? 'Mark not started' : 'Mark completed',
+        ...(ambiguous ? { disabled: true } : {}),
+        title: ambiguous
+          ? 'Completion unavailable: this lesson ID belongs to multiple courses'
+          : (status === 'done' ? 'Mark not started' : 'Mark completed'),
       }, createElement('span', { 'aria-hidden': 'true' }, status === 'done' ? '✓' : '○'));
       completion.appendChild(createElement('span', {
         class: 'topic-completion-label',
@@ -1016,7 +1023,12 @@ export async function mountCoursesView(deps = {}) {
     }
     if (renderToken !== detailRenderToken) return;
     const courseTopicIds = new Set(topics.map(t => t.topicId));
-    const progById = new Map(progList.filter(p => p?.topicId && courseTopicIds.has(p.topicId)).map(p => [p.topicId, p]));
+    const progById = new Map(progList.filter(p =>
+      p?.topicId && courseTopicIds.has(p.topicId)
+      && (p.courseId != null
+        ? String(p.courseId) === String(courseId)
+        : !ambiguousProgressTopicIds.has(String(p.topicId))))
+      .map(p => [p.topicId, p]));
     const filteredTopics = topics.filter((topic) => passCourseFilter(topic, progById.get(topic.topicId)?.status ?? 'not-started', activeFilter));
     const grouped = filteredTopics.reduce((acc, topic) => {
       const key = sourceKey(topic);
@@ -1224,10 +1236,21 @@ export async function mountCoursesView(deps = {}) {
       if (!row) return;
       const topicId = row.dataset.topicId;
       const courseId = row.dataset.courseId;
-      const topic = (window.DataStore?.allTopics?.() ?? []).find(t => t.topicId === topicId);
-      if (!topic) return;
+      // A catalog can contain different courses with an identical topicId.
+      // The rendered row carries both identifiers; never borrow the first
+      // matching course's video, PDF or embedded source from an unrelated row.
+      // Also refuse ambiguous duplicates *within* one course rather than
+      // choosing an arbitrary imported source after a catalog refresh.
+      const matches = (window.DataStore?.allTopics?.() ?? []).filter(t =>
+        String(t?.topicId) === topicId && String(t?.courseId) === courseId);
+      if (matches.length !== 1) return;
+      const [topic] = matches;
 
       if (action === 'toggle-done') {
+        if (ambiguousProgressTopicIds.has(topicId)) {
+          Toast.error('Lesson progress cannot be changed while this topic ID belongs to multiple courses');
+          return;
+        }
         const existing = await window.DB?.getProgress?.(topicId);
         const isDone = existing?.status === 'done';
         await window.DB?.saveProgress?.(topicId, courseId, {
@@ -1293,7 +1316,8 @@ export async function mountCoursesView(deps = {}) {
       const t = track ?? inst?.queue?.[inst?.trackIndex ?? 0] ?? null;
       const topicId = t?.topicId;
       const courseId = t?.courseId;
-      if (!topicId || !courseId || typeof window.DB?.saveProgress !== 'function') return;
+      if (!topicId || !courseId || typeof window.DB?.saveProgress !== 'function'
+        || ambiguousProgressTopicIds.has(String(topicId))) return;
 
       // Completion is a learning decision, not an alias for the current media
       // position. Reading inside the canonical per-topic write queue is

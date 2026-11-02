@@ -187,6 +187,23 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
                 aria-label="Selected draft text" dir="auto" disabled></textarea>
               <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-text-save disabled>Save text</button>
             </div>
+            <div class="filter-row studio-konva-viewport" role="group" aria-label="Draft viewport navigation">
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="zoom-out"
+                aria-label="Zoom out draft viewport">Zoom out</button>
+              <output data-studio-konva-zoom-label aria-label="Draft viewport zoom">100%</output>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="zoom-in"
+                aria-label="Zoom in draft viewport">Zoom in</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="zoom-reset"
+                aria-label="Return draft viewport to 100 percent zoom">100%</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="left"
+                aria-label="Pan left draft viewport">Pan left</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="up"
+                aria-label="Pan up draft viewport">Pan up</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="down"
+                aria-label="Pan down draft viewport">Pan down</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-viewport="right"
+                aria-label="Pan right draft viewport">Pan right</button>
+            </div>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="left" title="Move left">Left</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="up" title="Move up">Up</button>
             <button type="button" class="btn btn-ghost btn-sm" data-studio-konva-nudge="down" title="Move down">Down</button>
@@ -760,6 +777,18 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     if (konvaLayer) konvaLayer.disabled = !konvaWorkspace?.selectLayer || konvaTextSaving
       || konvaKeyboardBusy || konvaClosing || konvaResetting || konvaImporting;
     const boardForLayer = konvaWorkspace?.getBoard?.();
+    const viewportZoom = boardForLayer?.viewport?.zoom ?? 1;
+    const zoomLabel = document.querySelector('[data-studio-konva-zoom-label]');
+    if (zoomLabel) zoomLabel.textContent = Math.round(viewportZoom * 100) + '%';
+    document.querySelectorAll('[data-studio-konva-viewport]').forEach(button => {
+      const action = button.dataset.studioKonvaViewport;
+      const busy = !konvaWorkspace?.setViewport || konvaKeyboardBusy || konvaTextSaving
+        || konvaClosing || konvaResetting || konvaImporting;
+      button.disabled = busy
+        || (action === 'zoom-in' && viewportZoom >= 4)
+        || (action === 'zoom-out' && viewportZoom <= 0.1)
+        || (action === 'zoom-reset' && viewportZoom === 1);
+    });
     const activeDrawingLayer = boardForLayer?.layers?.[boardForLayer.activeLayerIdx ?? 0];
     const penButton = document.querySelector('[data-studio-konva-mode="pen"]');
     if (penButton) penButton.disabled = !activeDrawingLayer || activeDrawingLayer.locked === true
@@ -970,6 +999,56 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         refreshKonvaControls();
       }
     }
+  });
+  document.querySelectorAll('[data-studio-konva-viewport]').forEach(button => {
+    on(button, 'click', async () => {
+      const workspace = konvaWorkspace;
+      if (!workspace?.setViewport || unmounted || konvaKeyboardBusy
+          || konvaTextSaving || konvaClosing || konvaResetting || konvaImporting) return;
+      const action = button.dataset.studioKonvaViewport;
+      const board = workspace.getBoard();
+      const current = board.viewport || {};
+      const oldZoom = current.zoom ?? 1;
+      const oldX = current.offsetX ?? 0;
+      const oldY = current.offsetY ?? 0;
+      let zoom = oldZoom;
+      let offsetX = oldX;
+      let offsetY = oldY;
+      if (action === 'zoom-in' || action === 'zoom-out' || action === 'zoom-reset') {
+        zoom = action === 'zoom-reset' ? 1
+          : Math.round(Math.min(4, Math.max(0.1,
+            oldZoom + (action === 'zoom-in' ? 0.25 : -0.25))) * 100) / 100;
+        // Keep the same world location beneath the stage center: panning
+        // and zooming must honor Konva's inverse viewport transformation.
+        const centerX = Math.max(320, Math.floor(konvaStage?.clientWidth || 640)) / 2;
+        const centerY = Math.max(280, Math.floor(konvaStage?.clientHeight || 440)) / 2;
+        offsetX = centerX - ((centerX - oldX) / oldZoom) * zoom;
+        offsetY = centerY - ((centerY - oldY) / oldZoom) * zoom;
+      } else {
+        const pan = {
+          left: [-24, 0], right: [24, 0], up: [0, -24], down: [0, 24],
+        }[action];
+        if (!pan) return;
+        offsetX += pan[0];
+        offsetY += pan[1];
+      }
+      if (zoom === oldZoom && offsetX === oldX && offsetY === oldY) return;
+      konvaKeyboardBusy = true;
+      refreshKonvaControls();
+      try {
+        await workspace.setViewport({ offsetX, offsetY, zoom });
+        if (!unmounted && konvaWorkspace === workspace) {
+          setKonvaStatus('Experimental draft viewport saved; Studio board unchanged');
+        }
+      } catch {
+        if (!unmounted && konvaWorkspace === workspace) {
+          setKonvaStatus('Draft viewport not saved; previous view retained');
+        }
+      } finally {
+        konvaKeyboardBusy = false;
+        if (!unmounted && konvaWorkspace === workspace) refreshKonvaControls();
+      }
+    });
   });
   const konvaArrowMoves = Object.freeze({
     ArrowLeft: [-1, 0], ArrowRight: [1, 0],
