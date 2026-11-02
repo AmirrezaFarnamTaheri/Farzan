@@ -27,17 +27,6 @@ import { dedupeSearchResults, normalizeSearchQuery, rankLexicalMatches, searchRe
 import { nextSearchSelectionIndex, reflectSearchSelection } from './src/core/searchSelection.js';
 const Modal = ModalOverlay;
 import { mountNotFoundView } from './src/views/notFoundRoute.js';
-import { chartArc as ArcPlugin } from './src/features/chartPlugins/arc.js';
-import { chartGauge as GaugePlugin } from './src/features/chartPlugins/gauge.js';
-import { chartHeatmap as HeatmapPlugin } from './src/features/chartPlugins/heatmap.js';
-import { chartSparkline as SparklinePlugin } from './src/features/chartPlugins/sparkline.js';
-import { CanvasAreaChart } from './src/features/canvasCharts/area.js';
-import { CanvasGauge } from './src/features/canvasCharts/gauge.js';
-import { CanvasHeatmap } from './src/features/canvasCharts/heatmap.js';
-import { CanvasTreemap } from './src/features/canvasCharts/treemap.js';
-import './src/features/canvasTools/index.js';
-import { CourseGraph } from './src/features/courseGraph.js';
-import { KnowledgeGraph } from './src/features/knowledgeGraph.js';
 import { AudioEnhancer } from './src/features/audioEnhancer.js';
 import * as ContextMenu from './src/ui/contextMenu.js';
 import * as CanvasExport from './src/lib/canvasExport.js';
@@ -2451,151 +2440,6 @@ import { Pointer } from './src/lib/pointer.js';
 
 
   // ──────────────────────────────────────────────────────────
-  // 16. CHARTS (Thin wrappers — expects Chart.js or similar)
-  // ──────────────────────────────────────────────────────────
-
-  const Charts = {
-    _instances: new Map(),
-    _pluginsRegistered: false,
-
-    plugins: {
-      HeatmapPlugin,
-      SparklinePlugin,
-      ArcPlugin,
-      GaugePlugin,
-    },
-
-    registerPlugins() {
-      const Chart = window.Chart;
-      if (!Chart || typeof Chart.register !== 'function' || this._pluginsRegistered) return false;
-      const globalSet = Chart.__openCourseDeckRegisteredPlugins ??= new Set();
-      const plugins = [HeatmapPlugin, SparklinePlugin, ArcPlugin, GaugePlugin].filter(plugin => plugin?.id && !globalSet.has(plugin.id));
-      if (!plugins.length) {
-        this._pluginsRegistered = true;
-        return false;
-      }
-      Chart.register(...plugins);
-      plugins.forEach(plugin => globalSet.add(plugin.id));
-      this._pluginsRegistered = true;
-      return true;
-    },
-
-    /**
-     * Register a chart instance for later updates
-     */
-    register(id, instance) {
-      // Re-registering the same id happens on every route remount. Overwriting
-      // the map entry dropped the only reference to the previous chart without
-      // destroying it, so its canvas, resize listeners and animation loop
-      // stayed live and invisible for the rest of the session.
-      const existing = this._instances.get(id);
-      if (existing && existing !== instance) {
-        try { existing.destroy?.(); } catch (error) {
-          console.warn(`[Charts] failed to destroy the previous "${id}" chart`, error);
-        }
-      }
-      this._instances.set(id, instance);
-    },
-
-    get(id) {
-      return this._instances.get(id);
-    },
-
-    /**
-     * Destroy all charts (e.g. before hot-reload)
-     */
-    destroyAll() {
-      this._instances.forEach(chart => chart?.destroy?.());
-      this._instances.clear();
-    },
-
-    /**
-     * Update a chart's data
-     */
-    update(id, labels, datasets) {
-      const chart = this.get(id);
-      if (!chart) return;
-      chart.data.labels   = labels;
-      chart.data.datasets = datasets;
-      chart.update();
-    },
-
-    /**
-     * Base theme-aware options for Chart.js
-     */
-    themeOptions(override = {}) {
-      const isDark = OpenCourseDeck.state.theme !== 'light';
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: { color: isDark ? '#94a3b8' : '#475569' },
-          },
-          tooltip: {
-            backgroundColor: isDark ? '#1e293b' : '#fff',
-            titleColor:      isDark ? '#f1f5f9' : '#0f172a',
-            bodyColor:       isDark ? '#94a3b8' : '#475569',
-            borderColor:     isDark ? '#334155' : '#e2e8f0',
-            borderWidth: 1,
-          },
-        },
-        scales: {
-          x: {
-            ticks: { color: isDark ? '#64748b' : '#94a3b8' },
-            grid:  { color: isDark ? '#1e293b' : '#f1f5f9' },
-          },
-          y: {
-            ticks: { color: isDark ? '#64748b' : '#94a3b8' },
-            grid:  { color: isDark ? '#1e293b' : '#f1f5f9' },
-          },
-        },
-        ...override,
-      };
-    },
-
-    _mergeOptions(target, source) {
-      for (const [key, value] of Object.entries(source || {})) {
-        const existing = target[key];
-        if (
-          value
-          && typeof value === 'object'
-          && !Array.isArray(value)
-          && existing
-          && typeof existing === 'object'
-          && !Array.isArray(existing)
-        ) {
-          this._mergeOptions(existing, value);
-        } else {
-          target[key] = value;
-        }
-      }
-      return target;
-    },
-
-    /**
-     * Re-render all charts when theme changes
-     */
-    init() {
-      // NOTE: Plugins are NOT registered globally here. Chart.js v4.5.1 has a
-      // Data Proxy recursion bug that fires when a plugin's beforeInit hook
-      // mutates chart.options.plugins.legend or chart.options.plugins.tooltip.
-      // Register only when a chart is explicitly created with a plugin, per-chart.
-      // The four plugins (arc/gauge/heatmap/sparkline) are available via
-      // OpenCourseDeck.ChartPlugins and should be passed via each chart's
-      // plugins:[...] array when that specific chart type is needed.
-      OpenCourseDeck.bus.on('theme:change', () => {
-        this._instances.forEach(chart => {
-          if (!chart?.options) return;
-          this._mergeOptions(chart.options, this.themeOptions());
-          chart.update();
-        });
-      });
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
   // 17. STAT CARDS — Animated counters
   // ──────────────────────────────────────────────────────────
 
@@ -3377,53 +3221,6 @@ import { Pointer } from './src/lib/pointer.js';
 
 
   // ──────────────────────────────────────────────────────────
-  // 31. HEATMAP CALENDAR (renders inside [data-heatmap])
-  // ──────────────────────────────────────────────────────────
-
-  const Heatmap = {
-    /**
-     * @param {string|HTMLElement} container
-     * @param {Object} data  { 'YYYY-MM-DD': count }
-     * @param {Object} opts
-     */
-    render(container, data = {}, opts = {}) {
-      const el = typeof container === 'string'
-        ? document.getElementById(container)
-        : container;
-      if (!el) return;
-
-      const weeks     = opts.weeks ?? 52;
-      const maxCount  = Math.max(...Object.values(data), 1);
-      const today     = new Date();
-      const grid      = createElement('div', { class: 'heatmap-grid' });
-
-      for (let w = weeks - 1; w >= 0; w--) {
-        const col = createElement('div', { class: 'heatmap-col' });
-        for (let d = 0; d < 7; d++) {
-          const date = new Date(today);
-          date.setDate(today.getDate() - (w * 7 + (6 - d)));
-          // Key by local day: toISOString() shifts the date for non-UTC users.
-          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-          const count = data[key] ?? 0;
-          const level = count === 0 ? 0 : Math.ceil((count / maxCount) * 4);
-
-                    const cell = document.createElement('div');
-          cell.className = `heatmap-cell level-${level}`;
-          cell.setAttribute('data-date', key);
-          cell.setAttribute('data-count', count);
-          cell.title = `${count} activity on ${key}`;
-
-          col.appendChild(cell);
-        }
-        grid.appendChild(col);
-      }
-
-      el.replaceChildren(grid);
-    }
-  };
-
-
-  // ──────────────────────────────────────────────────────────
   // 32. INITIALIZATION
   // ──────────────────────────────────────────────────────────
 
@@ -3594,7 +3391,6 @@ import { Pointer } from './src/lib/pointer.js';
 
     Tooltips.init();
 
-    Charts.init();
     StatCards.init();
 
     NotificationsPanel.init();
@@ -3661,19 +3457,12 @@ KeyboardShortcuts.register('ctrl+0', () => FontScale.reset(), 'Reset UI font siz
     OpenCourseDeck.Prefs        = Prefs;
     OpenCourseDeck.FontScale    = FontScale;
     OpenCourseDeck.KeyboardShortcuts = KeyboardShortcuts;
-    OpenCourseDeck.Heatmap    = Heatmap;
-    OpenCourseDeck.ChartPlugins = Charts.plugins;
-    OpenCourseDeck.CanvasCharts = { CanvasGauge, CanvasTreemap, CanvasAreaChart, CanvasHeatmap };
-    OpenCourseDeck.CourseGraph = CourseGraph;
-    OpenCourseDeck.KnowledgeGraph = KnowledgeGraph;
-    OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph };
     OpenCourseDeck.ContextMenu = OpenCourseDeck.ContextMenu ?? ContextMenu;
     OpenCourseDeck.CanvasExport = OpenCourseDeck.CanvasExport ?? CanvasExport;
     OpenCourseDeck.Clipboard = OpenCourseDeck.Clipboard ?? ClipboardBridge;
     OpenCourseDeck.Pointer = OpenCourseDeck.Pointer ?? Pointer;
     OpenCourseDeck.Skeleton   = Skeleton;
     OpenCourseDeck.InfiniteScroll = InfiniteScroll;
-    OpenCourseDeck.Charts     = Charts;
     OpenCourseDeck.Views      = Views;
     OpenCourseDeck.TopbarSearch = TopbarSearch;
     OpenCourseDeck.safeExternalUrl = safeExternalUrl;

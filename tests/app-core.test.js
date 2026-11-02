@@ -188,40 +188,6 @@ describe('app shell resilience helpers', () => {
     expect([...table.querySelectorAll('tbody tr')].map(row => row.textContent.trim()).at(-1)).toBe('N/A');
   });
 
-  it('deep-merges chart theme options without deleting custom nested options', async () => {
-    await loadApp();
-    const chart = {
-      options: {
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { usePointStyle: true },
-          },
-          customPlugin: { enabled: true },
-        },
-        scales: {
-          y: {
-            min: 0,
-            ticks: { precision: 0 },
-          },
-        },
-      },
-      update: vi.fn(),
-    };
-
-    window.OpenCourseDeck.Charts.register('custom', chart);
-    window.OpenCourseDeck.bus.emit('theme:change', { theme: 'light' });
-
-    expect(chart.options.plugins.legend.position).toBe('bottom');
-    expect(chart.options.plugins.legend.labels.usePointStyle).toBe(true);
-    expect(chart.options.plugins.legend.labels.color).toBeTruthy();
-    expect(chart.options.plugins.customPlugin.enabled).toBe(true);
-    expect(chart.options.scales.y.min).toBe(0);
-    expect(chart.options.scales.y.ticks.precision).toBe(0);
-    expect(chart.options.scales.y.ticks.color).toBeTruthy();
-    expect(chart.update).toHaveBeenCalled();
-  });
-
   it('stores modal cleanup state in weak maps', async () => {
     await loadApp();
 

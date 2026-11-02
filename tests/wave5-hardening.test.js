@@ -672,49 +672,6 @@ describe('app.js dialog accessible name', () => {
   });
 });
 
-describe('app.js chart registry', () => {
-  afterEach(() => { document.body.innerHTML = ''; });
-
-  it('destroys the chart it is replacing', async () => {
-    const pd = await loadApp();
-    const first = { destroy: vi.fn() };
-    const second = { destroy: vi.fn() };
-
-    pd.Charts.register('stats', first);
-    pd.Charts.register('stats', second);
-
-    // Overwriting the map entry dropped the only reference to the previous
-    // chart without destroying it: its canvas, resize listeners and animation
-    // loop stayed live and invisible for the rest of the session.
-    expect(first.destroy).toHaveBeenCalledTimes(1);
-    expect(second.destroy).not.toHaveBeenCalled();
-    expect(pd.Charts.get('stats')).toBe(second);
-  });
-
-  it('re-registering the identical instance is a no-op', async () => {
-    const pd = await loadApp();
-    const chart = { destroy: vi.fn() };
-
-    pd.Charts.register('stats', chart);
-    pd.Charts.register('stats', chart);
-
-    expect(chart.destroy).not.toHaveBeenCalled();
-    expect(pd.Charts.get('stats')).toBe(chart);
-  });
-
-  it('survives a chart whose destroy throws', async () => {
-    const pd = await loadApp();
-    const bad = { destroy: () => { throw new Error('boom'); } };
-    const next = { destroy: vi.fn() };
-
-    expect(() => {
-      pd.Charts.register('stats', bad);
-      pd.Charts.register('stats', next);
-    }).not.toThrow();
-    expect(pd.Charts.get('stats')).toBe(next);
-  });
-});
-
 describe('notes.js toolbar keyboard access', () => {
   it('handles both pointer and keyboard activation', () => {
     const src = read('notes.js');

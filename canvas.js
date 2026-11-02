@@ -102,11 +102,10 @@
 
   const baseLayer = () => ({ id: 'layer-1', name: 'Layer 1', visible: true, locked: false, elements: [] });
 
-  const getAllowedTools = () => {
-    const defaults = ['select', 'pen', 'eraser', 'rect', 'circle', 'line', 'arrow', 'text', 'fill'];
-    const names = window.OpenCourseDeck?.CanvasTools?.getToolNames?.();
-    return new Set([...defaults, ...(Array.isArray(names) ? names : [])]);
-  };
+  // Pre-release editor tools are owned by the native editing implementation.
+  // There is no dormant extension registry or speculative plugin mode.
+  const builtInTools = Object.freeze(['select', 'pen', 'eraser', 'rect', 'circle', 'line', 'arrow', 'text', 'fill']);
+  const getAllowedTools = () => new Set(builtInTools);
 
   const normalizeLayers = (layers) => {
     const source = Array.isArray(layers) ? layers : [];
