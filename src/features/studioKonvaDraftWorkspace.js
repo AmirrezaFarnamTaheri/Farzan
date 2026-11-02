@@ -230,7 +230,18 @@ export function createStudioKonvaDraftWorkspace({
       container,
       board: session.getBoard(),
       mode,
-      onStroke: points => run(() => session.addStroke(points)),
+      onStroke: points => {
+        // Pen gesture completions from a destroyed scene or after a tool
+        // switch must not persist an invisible ghost stroke into board-v1.
+        // Preserve the existing explicit closed-workspace rejection contract.
+        // While an active workspace switches tools, discard detached input
+        // without ever entering the canonical stroke queue.
+        if (disposed) return Promise.reject(new Error('Konva draft workspace closed'));
+        if (generation !== sceneGeneration || mode !== 'pen') {
+          return Promise.resolve(false);
+        }
+        return run(() => session.addStroke(points));
+      },
       // Late events from a detached stage must not control the newly mounted
       // tool or report an error against the wrong selection/session.
       onError: error => {
