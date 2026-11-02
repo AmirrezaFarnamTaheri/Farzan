@@ -206,6 +206,9 @@ export function createStudioKonvaDraftWorkspace({
       return true;
     },
     onSelect: id => {
+      // An acknowledged save may finish after the draft dialog closes.
+      // Never resurrect selection in a destroyed route from that callback.
+      if (disposed) return;
       selectedId = id;
       scene?.select?.(id);
       onSelect(id);
@@ -228,9 +231,14 @@ export function createStudioKonvaDraftWorkspace({
       board: session.getBoard(),
       mode,
       onStroke: points => run(() => session.addStroke(points)),
-      onError: notifyError,
+      // Late events from a detached stage must not control the newly mounted
+      // tool or report an error against the wrong selection/session.
+      onError: error => {
+        if (!disposed && generation === sceneGeneration) notifyError(error);
+      },
       bind: (node, id) => session.bind(node, id),
       onSelect: id => {
+        if (disposed || generation !== sceneGeneration) return;
         selectedId = id;
         scene?.select?.(id);
         onSelect(id);
