@@ -150,11 +150,14 @@ export function createSquireNoteEditor({
   let compositionGeneration = 0;
   let disposed = false;
   let lastHTML = original;
+  // The normalized stored document, not a one-way dirty flag, owns conflict
+  // detection: native Undo can restore this exact baseline after an edit.
+  let cleanBaselineHTML = original;
   const notify = () => {
     if (disposed || suppress || composing) return;
     const nextHTML = editorHTML(editor);
     if (nextHTML === lastHTML) return;
-    dirty = true;
+    dirty = nextHTML !== cleanBaselineHTML;
     lastHTML = nextHTML;
     onUpdate(nextHTML);
   };
@@ -178,6 +181,7 @@ export function createSquireNoteEditor({
     // subsequent DOM changes with its rendered baseline, not the raw source,
     // or an untouched note is falsely reported as edited during handoff.
     lastHTML = editorHTML(editor);
+    cleanBaselineHTML = lastHTML;
     // Fail closed if initialization loses textual information.
     const input = document.createElement('template');
     input.innerHTML = original;
@@ -309,6 +313,7 @@ export function createSquireNoteEditor({
         editor.setHTML(next);
         original = next;
         lastHTML = editorHTML(editor);
+        cleanBaselineHTML = lastHTML;
         dirty = false;
       } finally {
         suppress = false;
