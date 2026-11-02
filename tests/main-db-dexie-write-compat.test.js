@@ -167,7 +167,7 @@ describe('Dexie primary-database mutations retain native-v3 semantics', () => {
     await expect(db.compareAndSwapTimestamp(original.id, original, {
       ...original, id: 'other', position: 11,
     })).rejects.toThrow(/id|key/i);
-    expect(await db.compareAndSwapTimestamp('missing', original, null)).toBe(false);
+    expect(await db.compareAndSwapTimestamp('missing', { ...original, id: 'missing' }, null)).toBe(false);
     expect(await db.get('timestamps', original.id)).toEqual(original);
     db.setPassphrase('protected');
     await expect(db.compareAndSwapTimestamp(original.id, original, null))
