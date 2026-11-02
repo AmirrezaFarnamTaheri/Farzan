@@ -657,20 +657,26 @@ async function renderPlaylists(deps) {
         const rendered = savedPlaylists.find(item => item.id === move.dataset.playlistId);
         if (!selected || !Array.isArray(selected.topicIds) || !rendered
             || selected.topicIds.length !== rendered.topicIds.length
-            || selected.topicIds.some((id, i) => String(id) !== String(rendered.topicIds[i]))) {
+            || selected.topicIds.some((id, i) => String(id) !== String(rendered.topicIds[i]))
+            || JSON.stringify(selected.sourceRefs) !== JSON.stringify(rendered.sourceRefs)
+            || !savedSourceIsAligned(selected)) {
           throw new Error('Saved playlist was changed elsewhere; reload before reordering');
         }
         const from = Number(move.dataset.topicIndex);
         const to = from + (move.dataset.playlistMove === 'up' ? -1 : 1);
         if (!Number.isSafeInteger(from) || from < 0 || to < 0
             || to >= selected.topicIds.length
-            || String(selected.topicIds[from]) !== move.dataset.topicId) {
+            || String(selected.topicIds[from]) !== move.dataset.topicId
+            || String(selected.sourceRefs?.[from]?.courseId ?? '') !== move.dataset.playlistCourse) {
           throw new Error('This playlist order is no longer current');
         }
         const ids = [...selected.topicIds];
         [ids[from], ids[to]] = [ids[to], ids[from]];
+        const refs = Array.isArray(selected.sourceRefs) ? [...selected.sourceRefs] : null;
+        if (refs) [refs[from], refs[to]] = [refs[to], refs[from]];
         const updated = records.map(record => record === selected
-          ? { ...record, topicIds: ids, updatedAt: Date.now() } : record);
+          ? { ...record, topicIds: ids, ...(refs ? { sourceRefs: refs } : {}),
+            updatedAt: Date.now() } : record);
         await persistSavedPlaylists(window.DB, records, updated);
         Toast.success?.('Playlist order saved');
         await renderPlaylists(deps);
@@ -681,6 +687,7 @@ async function renderPlaylists(deps) {
           const controls = [...listRoot.querySelectorAll('[data-playlist-move]')]
             .filter(button => button.dataset.playlistId === move.dataset.playlistId
               && button.dataset.topicId === move.dataset.topicId
+              && button.dataset.playlistCourse === move.dataset.playlistCourse
               && Number(button.dataset.topicIndex) === to);
           const focusTarget = controls.find(button =>
             button.dataset.playlistMove === move.dataset.playlistMove && !button.disabled)
@@ -755,8 +762,7 @@ async function renderPlaylists(deps) {
       const current = raw.find(item => String(item?.id) === id);
       const rendered = savedPlaylists.find(item => String(item.id) === id);
       if (!current || !rendered || !Array.isArray(current.topicIds)
-        || current.topicIds.length !== rendered.topicIds.length
-        || current.topicIds.some((value, i) => String(value) !== String(rendered.topicIds[i]))) {
+        || JSON.stringify(current) !== JSON.stringify(rendered)) {
         throw new Error('Saved playlist changed elsewhere; reload before deleting');
       }
       // Only remove the selected row. Unknown records and metadata remain byte
