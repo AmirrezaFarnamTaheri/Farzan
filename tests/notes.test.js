@@ -887,6 +887,7 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
     paragraph.textContent = 'Temporary draft to undo';
     root.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(1);
     expect(app._hasPendingLocalEdit()).toBe(true);
     expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
 
@@ -895,6 +896,7 @@ describe('notes route filters', () => {
     // nonexistent browser-native History input UI.
     paragraph.textContent = 'Ordinary';
     root.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(1);
     expect(app._hasPendingLocalEdit()).toBe(false);
     expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
 
