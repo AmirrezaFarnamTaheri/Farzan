@@ -135,6 +135,36 @@ describe('saved video queue playback', () => {
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
   });
 
+  it('offers the first unambiguous catalog queue when earlier groups reuse topic IDs', async () => {
+    document.body.innerHTML = '<main id="main-content"></main>';
+    let saved = [];
+    window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
+      { topicId: 'shared', courseId: 'a', title: 'Cardiac', videos: [{ url: 'https://example.test/a.mp4' }] },
+      { topicId: 'shared', courseId: 'b', title: 'Renal', videos: [{ url: 'https://example.test/b.mp4' }] },
+      { topicId: 'unique', courseId: 'c', title: 'Safe lecture', videos: [{ url: 'https://example.test/c.mp4' }] },
+    ] };
+    window.DB = {
+      getAllTimestamps: vi.fn(async () => []),
+      getSetting: vi.fn(async () => structuredClone(saved)),
+      saveSetting: vi.fn(async (_key, value) => { saved = structuredClone(value); return true; }),
+    };
+    window.OpenCourseDeck = {};
+    const Toast = { success: vi.fn(), error: vi.fn() };
+    mountPlaylistsView({
+      setView: html => { document.querySelector('main').innerHTML = html; },
+      safeMediaUrl: media => typeof media === 'string' ? media : media?.url, Toast,
+    });
+    const save = await vi.waitFor(() => {
+      expect(document.querySelector('[data-playlist-id="source-3"]')).not.toBeNull();
+      return document.querySelector('[data-save-playlist]');
+    });
+    expect(save.disabled).toBe(false);
+    save.click();
+    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Playlist saved'));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].topicIds).toEqual(['unique']);
+  });
+
   it('resolves a timestamp preview by course ID when the catalog repeats a topic ID', async () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
