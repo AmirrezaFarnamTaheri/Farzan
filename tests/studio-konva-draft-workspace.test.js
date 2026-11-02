@@ -89,6 +89,17 @@ describe('opt-in Konva editing draft workspace', () => {
     instance.destroy();
   });
 
+  it('saves viewport-only edits in the isolated draft and redraws an acknowledged stage', async () => {
+    const { instance, scenes, saveDraft, start } = workspace();
+    const next = await instance.setViewport({ offsetX: 32, offsetY: -12, zoom: 2 });
+    expect(next.viewport).toMatchObject({ offsetX: 32, offsetY: -12, zoom: 2 });
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+    expect(saveDraft).toHaveBeenCalledWith(next);
+    expect(scenes.at(-1).args.board.viewport.zoom).toBe(2);
+    expect(start.layers).toEqual(next.layers);
+    expect(await instance.undo()).toEqual(start);
+  });
+
   it('exports only the current acknowledged canonical draft preview, without storage mutations', async () => {
     const { instance, scenes, saveDraft, start } = workspace();
     const png = await instance.exportPreviewPng();

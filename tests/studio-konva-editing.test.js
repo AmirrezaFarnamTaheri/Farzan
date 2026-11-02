@@ -540,3 +540,67 @@ describe('Konva editing geometry to canonical board-v1 commands', () => {
   });
 
 });
+
+
+describe('canonical Konva viewport navigation and history (#172)', () => {
+  it('pans and zooms a cloned board without losing metadata, layers or shape positions', () => {
+    const start = fixture();
+    const snapshot = structuredClone(start);
+    const result = studioEditing.setKonvaV1Viewport(start, {
+      offsetX: -48, offsetY: 72, zoom: 2,
+    });
+    expect(result.viewport).toEqual({
+      ...start.viewport, offsetX: -48, offsetY: 72, zoom: 2,
+    });
+    expect(result.layers).toEqual(start.layers);
+    expect(result.metadata).toEqual(start.metadata);
+    expect(start).toEqual(snapshot);
+  });
+
+  it('rejects malformed, overflowing or unsupported viewport edits before any mutation', () => {
+    const start = fixture(), saved = structuredClone(start);
+    for (const invalid of [
+      { offsetX: 0, offsetY: 0, zoom: 0 },
+      { offsetX: 0, offsetY: 0, zoom: 4.01 },
+      { offsetX: NaN, offsetY: 0, zoom: 1 },
+      { offsetX: 0, offsetY: Infinity, zoom: 1 },
+      { offsetX: '1', offsetY: 0, zoom: 1 },
+      { offsetX: 0, offsetY: 0, zoom: 1, rotation: 10 },
+    ]) {
+      expect(() => studioEditing.setKonvaV1Viewport(start, invalid)).toThrow();
+    }
+    expect(start).toEqual(saved);
+  });
+
+  it('queues zoom and pan behind one durable board write with undo/redo and no-op suppression', async () => {
+    const writer = vi.fn(async () => true);
+    const session = createKonvaV1MoveSession({ board: fixture(), onChange: writer });
+    expect(await session.setViewport({ offsetX: 30, offsetY: -10, zoom: 1.5 }))
+      .toEqual(fixture());
+    expect(writer).not.toHaveBeenCalled();
+    const changed = await session.setViewport({ offsetX: 42, offsetY: -10, zoom: 1.75 });
+    expect(writer).toHaveBeenCalledTimes(1);
+    expect(writer).toHaveBeenCalledWith(changed);
+    expect(changed.viewport.zoom).toBe(1.75);
+    expect(changed.viewport.offsetX).toBe(42);
+    expect(await session.undo()).toEqual(fixture());
+    expect(await session.redo()).toEqual(changed);
+  });
+
+  it('leaves current viewport and history unchanged when the durable writer refuses', async () => {
+    let accepted = true;
+    const session = createKonvaV1MoveSession({ board: fixture(),
+      onChange: async () => accepted });
+    await session.setViewport({ offsetX: 30, offsetY: -10, zoom: 2 });
+    const original = session.getBoard();
+    accepted = false;
+    await expect(session.setViewport({
+      offsetX: 400, offsetY: 50, zoom: 1,
+    })).rejects.toThrow(/acknowledg/i);
+    expect(session.getBoard()).toEqual(original);
+    expect(session.canUndo()).toBe(true);
+    expect(session.canRedo()).toBe(false);
+    accepted = true;
+    expect(await session.undo()).toEqual(fixture());
+  });
+});

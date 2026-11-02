@@ -253,6 +253,29 @@ export function appendKonvaV1Stroke(board, id, points) {
   return next;
 }
 
+/**
+ * Only canonical board-v1 pan and zoom values may be changed. No Konva
+ * stage position/scale is serialized and the original board is immutable.
+ * The v1 renderer has a hard 0.1–4x zoom range and no viewport rotation.
+ */
+export function setKonvaV1Viewport(board, nextViewport) {
+  validBoard(board);
+  if (!nextViewport || typeof nextViewport !== 'object'
+    || Array.isArray(nextViewport)
+    || Object.keys(nextViewport).some(key => !['offsetX', 'offsetY', 'zoom'].includes(key))
+    || !['offsetX', 'offsetY', 'zoom'].every(key =>
+      typeof nextViewport[key] === 'number' && Number.isFinite(nextViewport[key]))) {
+    throw new TypeError('Konva viewport pan and zoom require finite canonical numbers');
+  }
+  if (nextViewport.zoom < 0.1 || nextViewport.zoom > 4) {
+    throw new RangeError('Konva viewport zoom must remain between 0.1 and 4');
+  }
+  const next = structuredClone(board);
+  next.viewport = { ...(next.viewport || {}), ...nextViewport };
+  validBoard(next);
+  return next;
+}
+
 /** Change drawing layer, retaining every canonical element and metadata field. */
 export function selectKonvaV1ActiveLayer(board, layerIndex) {
   validBoard(board);
@@ -446,6 +469,21 @@ export function createKonvaV1MoveSession({
     return structuredClone(current);
   });
 
+  const setViewport = nextViewport => enqueue(async () => {
+    const next = setKonvaV1Viewport(current, nextViewport);
+    const previous = current.viewport || {};
+    if ((previous.offsetX ?? 0) === nextViewport.offsetX
+      && (previous.offsetY ?? 0) === nextViewport.offsetY
+      && (previous.zoom ?? 1) === nextViewport.zoom) {
+      return structuredClone(current);
+    }
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    return structuredClone(current);
+  });
+
   const resize = (id, bounds) => enqueue(async () => {
     const next = resizeKonvaV1Element(current, id, bounds);
     const before = findUnlockedElement(current, id);
@@ -598,6 +636,7 @@ export function createKonvaV1MoveSession({
     commit,
     reorder,
     resize,
+    setViewport,
     addStroke,
     addShape,
     selectLayer,

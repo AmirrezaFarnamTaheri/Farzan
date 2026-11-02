@@ -111,6 +111,29 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   expect(svg).toContain('translate(20 -10) scale(1.25)');
   expect(svg).not.toContain('Konva.Stage');
 
+  console.info('[konva-roundtrip] viewport zoom/pan and canonical history');
+  const beforeZoom = await persisted();
+  const stageSize = await draft.locator('[data-studio-konva-stage]').evaluate(node => ({
+    width: Math.max(320, Math.floor(node.clientWidth || 640)),
+    height: Math.max(280, Math.floor(node.clientHeight || 440)),
+  }));
+  await draft.locator('[data-studio-konva-viewport="zoom-in"]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).viewport.zoom, { timeout: 18000 }).toBe(1.5);
+  const afterZoom = await persisted();
+  const worldCenter = (viewport, axis) =>
+    (stageSize[axis === 'x' ? 'width' : 'height'] / 2 -
+      viewport[axis === 'x' ? 'offsetX' : 'offsetY']) / viewport.zoom;
+  expect(worldCenter(afterZoom.viewport, 'x')).toBeCloseTo(worldCenter(beforeZoom.viewport, 'x'), 7);
+  expect(worldCenter(afterZoom.viewport, 'y')).toBeCloseTo(worldCenter(beforeZoom.viewport, 'y'), 7);
+  await expect(draft.locator('[data-studio-konva-zoom-label]')).toContainText('150%');
+  await draft.locator('[data-studio-konva-viewport="right"]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).viewport.offsetX, { timeout: 18000 })
+    .toBe(afterZoom.viewport.offsetX + 24);
+  await draft.locator('[data-studio-konva-undo]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).viewport.offsetX).toBe(afterZoom.viewport.offsetX);
+  await draft.locator('[data-studio-konva-redo]').click({ timeout: 12000 });
+  await expect.poll(async () => (await persisted()).viewport.offsetX).toBe(afterZoom.viewport.offsetX + 24);
+
   console.info('[konva-roundtrip] exports verified; close and reload');
   await draft.locator('[data-studio-konva-close]').click({ timeout: 12000 });
   await expect(draft).not.toBeVisible();
@@ -121,5 +144,7 @@ test('reopens and exports acknowledged Konva board-v1 edits without changing liv
   await expect(draft).toBeVisible({ timeout: 20000 });
   await expect(draft.locator('[data-studio-konva-object] option[value="' + shape.id + '"]')).toHaveCount(1);
   expect((await persisted()).layers[0].elements[0].x).toBe(-29);
+  expect((await persisted()).viewport.zoom).toBe(1.5);
+  await expect(draft.locator('[data-studio-konva-zoom-label]')).toContainText('150%');
   expect(await page.evaluate(async () => window.DB.getSetting('ocd_studio_board'))).toEqual(live);
 });
