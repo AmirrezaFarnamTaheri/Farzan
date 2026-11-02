@@ -1624,7 +1624,12 @@ describe('app shell resilience helpers', () => {
 
   it('deletes timestamp bookmarks from the Bookmarks route after confirmation', async () => {
     await loadApp();
-    const deleteTimestamp = vi.fn(async () => true);
+    const compareAndSwapTimestamp = vi.fn(async (id, expected, next) => {
+      expect(id).toBe('ts-delete');
+      expect(expected).toMatchObject({ id: 'ts-delete', title: 'Delete me' });
+      expect(next).toBeNull();
+      return true;
+    });
     const getAllTimestamps = vi
       .fn()
       .mockResolvedValueOnce([{ id: 'ts-delete', topicId: 'topic-1', title: 'Delete me', position: 12 }])
@@ -1634,21 +1639,27 @@ describe('app shell resilience helpers', () => {
       getAllTimestamps,
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
-      deleteTimestamp,
+      compareAndSwapTimestamp,
     };
 
     await window.OpenCourseDeck.Views.bookmarks();
     await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-delete"]')).toBeTruthy());
     document.querySelector('[data-delete-timestamp="ts-delete"]').click();
 
-    await vi.waitFor(() => expect(deleteTimestamp).toHaveBeenCalledWith('ts-delete'));
+    await vi.waitFor(() => expect(compareAndSwapTimestamp).toHaveBeenCalledWith(
+      'ts-delete', expect.objectContaining({ title: 'Delete me' }), null));
     expect(window.OpenCourseDeck.UI.confirm).toHaveBeenCalledWith('Delete this timestamp bookmark?');
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-delete"]')).toBeNull());
   });
 
   it('edits timestamp bookmarks from the Bookmarks route', async () => {
     await loadApp();
-    const saveTimestamp = vi.fn(async () => true);
+    const compareAndSwapTimestamp = vi.fn(async (id, expected, next) => {
+      expect(id).toBe('ts-edit');
+      expect(expected).toMatchObject({ title: 'Original title', note: 'Original note' });
+      expect(next).toMatchObject({ title: 'Edited title', note: 'Edited note' });
+      return true;
+    });
     const getAllTimestamps = vi
       .fn()
       .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
@@ -1657,7 +1668,7 @@ describe('app shell resilience helpers', () => {
       getAllTimestamps,
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
-      saveTimestamp,
+      compareAndSwapTimestamp,
     };
 
     await window.OpenCourseDeck.Views.bookmarks();
@@ -1668,14 +1679,14 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-timestamp-edit-form="ts-edit"] textarea[name="note"]').value = 'Edited note';
     document.querySelector('[data-timestamp-edit-form="ts-edit"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    await vi.waitFor(() => expect(saveTimestamp).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'ts-edit',
-      topicId: 'topic-1',
-      title: 'Edited title',
-      note: 'Edited note',
-      position: 12,
-    })));
-    expect(saveTimestamp.mock.calls[0][0].updatedAt).toEqual(expect.any(Number));
+    await vi.waitFor(() => expect(compareAndSwapTimestamp).toHaveBeenCalledWith(
+      'ts-edit',
+      expect.objectContaining({ id: 'ts-edit', topicId: 'topic-1', title: 'Original title' }),
+      expect.objectContaining({
+        id: 'ts-edit', topicId: 'topic-1', title: 'Edited title',
+        note: 'Edited note', position: 12, updatedAt: expect.any(Number),
+      }),
+    ));
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-edit"]').textContent).toContain('Edited title'));
   });
 
