@@ -2713,6 +2713,99 @@ describe('app shell resilience helpers', () => {
     ]));
   });
 
+  it('does not attach unscoped legacy or another course\'s authored cues to a duplicate topic ID', async () => {
+    await loadApp();
+    const persisted = {
+      shared: { chapters: [{ time: 10, title: 'Unscoped old cue', authored: true }] },
+    };
+    const saveSetting = vi.fn(async (_key, value) => {
+      Object.assign(persisted, structuredClone(value));
+      return true;
+    });
+    window.DB = {
+      getSetting: vi.fn(async () => structuredClone(persisted)),
+      getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true),
+      saveSetting,
+    };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: vi.fn(() => [
+        { id: 'course-a', title: 'Cardiac' },
+        { id: 'course-b', title: 'Renal' },
+      ]),
+      allTopics: vi.fn(() => [
+        { topicId: 'shared', courseId: 'course-a', title: 'Heart', videos: ['https://example.test/a.mp4'] },
+        { topicId: 'shared', courseId: 'course-b', title: 'Kidney', videos: ['https://example.test/b.mp4'] },
+      ]),
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const a = { title: 'Heart', topicId: 'shared', courseId: 'course-a' };
+    const b = { title: 'Kidney', topicId: 'shared', courseId: 'course-b' };
+    let active = b;
+    const player = document.getElementById('course-player');
+    player._pdPlayer = {
+      snapshot: () => ({ queueIndex: 0, track: active, currentTime: 72, duration: 180 }),
+      get queue() { return [active]; }, trackIndex: 0,
+      on: vi.fn(), off: vi.fn(), showChapters: vi.fn(), showTranscript: vi.fn(),
+    };
+    document.querySelector('[data-review-learning-cues]').click();
+    expect(document.querySelector('[data-learning-marker-list]').textContent)
+      .not.toContain('Unscoped old cue');
+
+    document.querySelector('[data-learning-marker-text]').value = 'Only Renal B';
+    document.querySelector('[data-save-chapter-cue]').click();
+    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith(
+      'ocd_course_media_cues',
+      expect.objectContaining({
+        shared: expect.objectContaining({ chapters: [{ time: 10, title: 'Unscoped old cue', authored: true }] }),
+        'source:["course-b","shared"]': expect.objectContaining({
+          chapters: expect.arrayContaining([expect.objectContaining({ title: 'Only Renal B', time: 72 })]),
+        }),
+      }),
+    ));
+    active = a;
+    document.querySelector('[data-review-learning-cues]').click();
+    const text = document.querySelector('[data-learning-marker-list]').textContent;
+    expect(text).not.toContain('Only Renal B');
+    expect(text).not.toContain('Unscoped old cue');
+  });
+
+  it('refuses course-less active cue JSON for ambiguous IDs and rejects JSON from another course', async () => {
+    await loadApp();
+    const saveSetting = vi.fn(async () => true);
+    window.DB = { getSetting: vi.fn(async () => ({})), getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true), saveSetting };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: () => [{ id: 'course-a', title: 'A' }, { id: 'course-b', title: 'B' }],
+      allTopics: () => [
+        { topicId: 'shared', courseId: 'course-a', title: 'A1', videos: ['https://example.test/a.mp4'] },
+        { topicId: 'shared', courseId: 'course-b', title: 'B1', videos: ['https://example.test/b.mp4'] },
+      ],
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const track = { topicId: 'shared', courseId: 'course-b', title: 'B1' };
+    document.getElementById('course-player')._pdPlayer = {
+      queue: [track], trackIndex: 0,
+      snapshot: () => ({ queueIndex: 0, track, currentTime: 22, duration: 120 }),
+      on: vi.fn(), off: vi.fn(),
+    };
+    const json = document.querySelector('[data-learning-marker-json]');
+    const apply = document.querySelector('[data-apply-active-learning-cues]');
+    json.value = JSON.stringify({ topicId: 'shared', chapters: [{ time: 15, title: 'Ambiguous' }] });
+    apply.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
+      .toMatch(/course identity|course ID/i));
+    expect(saveSetting).not.toHaveBeenCalled();
+    json.value = JSON.stringify({ courseId: 'course-a', topicId: 'shared',
+      chapters: [{ time: 15, title: 'Wrong course' }] });
+    apply.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
+      .toMatch(/different course/i));
+    expect(saveSetting).not.toHaveBeenCalled();
+  });
+
   it('refreshes synced course progress without disturbing the live player queue', async () => {
     await loadApp();
     const progressByTopic = {
