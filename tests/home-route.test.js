@@ -153,6 +153,48 @@ describe('home dashboard', () => {
     expect(setPendingCourseMedia).toHaveBeenLastCalledWith('shared', 999, 'course-a');
   });
 
+  it('never revives an ambiguous topic after a third catalog duplicate or mislabels its saved activity', async () => {
+    const now = Date.now();
+    mountDashboard({
+      catalogTopics: [
+        { topicId: 'shared', courseId: 'a', title: 'Cardiac' },
+        { topicId: 'shared', courseId: 'b', title: 'Renal' },
+        { topicId: 'shared', courseId: 'c', title: 'Neurology' },
+      ],
+      progress: [{ topicId: 'shared', courseId: 'a', percent: 100, updatedAt: now }],
+      notes: [{ id: 'n1', title: 'Reference', topicId: 'shared', updatedAt: now + 1 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    const note = document.querySelector('[data-home-widget="recent"]');
+    expect(note.textContent).toContain('Linked to shared');
+    expect(note.textContent).not.toContain('Neurology');
+    expect(note.textContent).not.toContain('Cardiac');
+    expect(note.textContent).not.toContain('Renal');
+  });
+
+  it('refuses unscoped duplicate-course resume and keeps an older uniquely resolved lesson available', async () => {
+    const now = Date.now();
+    const { Router, setPendingCourseMedia } = mountDashboard({
+      catalogTopics: [
+        { topicId: 'shared', courseId: 'a', title: 'Cardiac' },
+        { topicId: 'shared', courseId: 'b', title: 'Renal' },
+        { topicId: 'unique', courseId: 'b', title: 'Safe course lesson' },
+      ],
+      progress: [
+        { topicId: 'shared', percent: 90, position: 500, updatedAt: now },
+        { topicId: 'unique', courseId: 'b', percent: 20, position: 50, updatedAt: now - 1000 },
+      ],
+      timestamps: [{ topicId: 'shared', position: 999, updatedAt: now + 2000 }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    expect(document.getElementById('home-focus-title').textContent).toBe('Safe course lesson');
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledExactlyOnceWith('unique', 50, 'b');
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+    document.querySelector('[data-home-widget="recent"]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledTimes(1);
+  });
+
   it('prioritizes a real unfinished lesson over a newer completed lesson', async () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({
