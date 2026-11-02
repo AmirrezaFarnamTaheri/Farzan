@@ -56,7 +56,7 @@
     transform: translate(-50%, -50%);
   }
   .breadcrumb-current {
-    color: var(--text-primary);
+
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1321,7 +1321,7 @@
   .nav-group { display: flex; flex-direction: column; gap: 1px; }
   .nav-group + .nav-group { margin-top: var(--space-2); }
   .nav-group-label {
-    display: block;
+
     font-size: 11px;
     font-weight: 700;
     letter-spacing: var(--tracking-widest);
@@ -1349,8 +1349,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
-    border: 1px solid transparent;
+
+
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
   }
   .topbar-action-btn:hover {

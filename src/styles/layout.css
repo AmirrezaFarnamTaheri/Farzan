@@ -8,7 +8,7 @@
 }
 
 .sidebar {
-  width: var(--sidebar-width);
+
   flex: 0 0 var(--sidebar-width);
   height: 100vh;
   height: 100dvh;
@@ -69,7 +69,7 @@
 }
 
 .topbar {
-  min-height: var(--topbar-height);
+
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -103,8 +103,8 @@
 }
 
 .view-container {
-  flex: 1 1 auto;
-  min-height: 0;
+
+
   overflow: auto;
   overscroll-behavior: contain;
   padding: var(--space-6) var(--density-pad-x) max(var(--space-8), env(safe-area-inset-bottom));
@@ -178,7 +178,7 @@
 }
 
 .sidebar-logo-text {
-  min-width: 0;
+
   /* UI font scaling must not truncate the application identity beside
      the fixed-width sidebar collapse control. */
   font-size: min(0.95rem, 15px);
@@ -190,7 +190,7 @@
 }
 
 .sidebar-collapse-btn {
-  margin-left: auto;
+
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
