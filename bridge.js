@@ -565,6 +565,27 @@
       return true;
     }
 
+    // Bookmarks edits/deletions may race another tab or restored backup.
+    // Only broadcast a confirmed native atomic receipt; do not fall back
+    // to the legacy unconditional timestamp writer or localStorage.
+    async function compareAndSwapTimestamp(id, expected, next) {
+      const idb = _getIdb();
+      if (!idb || typeof idb.compareAndSwapTimestamp !== 'function') {
+        throw new Error('Atomic canonical timestamp storage unavailable');
+      }
+      try {
+        const accepted = await idb.compareAndSwapTimestamp(id, expected, next);
+        if (accepted === true) {
+          _broadcast('timestamp', next === null ? 'delete' : 'save',
+            next === null ? { id } : next);
+        }
+        return accepted === true;
+      } catch (error) {
+        _signalSaveError('timestamp-cas', 'indexedDB', error, { canonical: true });
+        throw error;
+      }
+    }
+
     async function deleteTimestamp(id) {
       const idb = _getIdb();
       if (idb) {
@@ -1174,6 +1195,7 @@
       saveProgress,
       getAllTimestamps,
       saveTimestamp,
+      compareAndSwapTimestamp,
       deleteTimestamp,
       getProgressByCourse,
       getTimestampsByTopic,
