@@ -79,7 +79,6 @@
 .card:hover,
 .card.card-interactive:hover {
   box-shadow: none;
-  transform: none;
 }
 .card .card-body {
   min-width: 0;
@@ -158,7 +157,6 @@ input::placeholder {
 .home-title {
   max-width: 21ch;
   margin-block: 0 var(--space-3);
-  font-family: var(--font-serif);
   font-size: clamp(2.25rem, 2.2rem + 1.55vw, 3.7rem);
   font-weight: 650;
   line-height: 1.11;
@@ -268,7 +266,6 @@ input::placeholder {
   padding: var(--space-4);
   border: 1px solid var(--workspace-rule);
   border-radius: var(--radius-md);
-  background: var(--surface);
 }
 .home-pulse-item:hover {
   transform: none;
@@ -326,7 +323,6 @@ input::placeholder {
   -webkit-backdrop-filter: none;
 }
 .view-courses .filter-chip {
-  background: var(--surface);
   border-color: var(--workspace-rule-strong);
   color: var(--text-secondary);
   font-weight: 650;
