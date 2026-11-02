@@ -368,6 +368,51 @@ describe('Squire HTML-canonical edit adapter', () => {
     expect(element.textContent).not.toContain('Cannot commit to a closed note');
   });
 
+  it('defers all rich-text commands until Persian/Chinese IME composition commits', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>یادداشت 你好</p>', onUpdate: updates,
+    });
+    try {
+      const root = element.querySelector('.notes-modern-editor');
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      root.querySelector('p').textContent = 'نیمه‌تمام 中文';
+      const during = root.innerHTML;
+
+      expect(instance.run('h2')).toBe(false);
+      expect(instance.run('bold')).toBe(false);
+      expect(instance.editor.commands.insertContent('<p>Unwanted toolbar insertion</p>')).toBe(false);
+      expect(instance.editor.commands.focus('end')).toBe(false);
+      expect(root.innerHTML).toBe(during);
+      expect(instance.syncChanges()).toBe(false);
+      expect(updates).not.toHaveBeenCalled();
+
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(instance.syncChanges()).toBe(true);
+      expect(instance.getHTML()).toContain('نیمه‌تمام 中文');
+      expect(instance.getHTML()).not.toContain('Unwanted toolbar insertion');
+      expect(updates).toHaveBeenCalledWith(expect.stringContaining('نیمه‌تمام 中文'));
+
+      expect(instance.editor.commands.insertContent('<p>Finished revision</p>')).toBe(true);
+      expect(instance.getHTML()).toContain('Finished revision');
+    } finally { instance.destroy(); }
+  });
+
+  it('does not allow a stale editor handle to mutate a destroyed note', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const instance = createSquireNoteEditor({
+      element, html: '<p>Original canonical note</p>', onUpdate: updates,
+    });
+    instance.destroy();
+    expect(instance.run('h2')).toBe(false);
+    expect(instance.editor.commands.insertContent('<p>Stale write</p>')).toBe(false);
+    expect(instance.editor.commands.focus('end')).toBe(false);
+    expect(element.textContent).toBe('');
+    expect(updates).not.toHaveBeenCalled();
+  });
+
   it('silences content-change notifications when initializing or restoring content', () => {
     const listener = vi.fn();
     const instance = createSquireNoteEditor({ element: document.createElement('div'), html: '<p>A</p>', onUpdate: listener });
