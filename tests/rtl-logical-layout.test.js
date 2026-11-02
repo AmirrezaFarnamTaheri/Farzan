@@ -31,7 +31,10 @@ describe('RTL layout uses logical start/end in owning CSS rules', () => {
     expect(rule(enhancements, '.view-courses #courses-search')).toMatch(/padding-inline:\s*calc\(/);
     expect(views).not.toContain('.courses-search-field .input {');
     expect(rule(views, '.courses-list')).toMatch(/padding-inline-end:/);
-    expect(rule(views, '.course-item')).toMatch(/text-align:\s*start/);
+    // The final redesign layer owns this logical text alignment; keeping
+    // a duplicate in views.css hid ownership without changing the cascade.
+    expect(rule(studio, '.course-item')).toMatch(/text-align:\s*start/);
+    expect(rule(views, '.course-item')).not.toMatch(/text-align:\s*start/);
     expect(rule(views, '.home-widget')).toMatch(/text-align:\s*start/);
   });
   it('mirrors Studio group separators and the tool popover anchoring', () => {
