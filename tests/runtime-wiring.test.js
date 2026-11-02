@@ -90,14 +90,14 @@ describe('runtime wiring', () => {
     expect(hardeningCall).toBeGreaterThan(pdfImport);
   });
 
-  it('keeps graph constructors owned by the lazy app shell instead of duplicating them in the entry bundle', () => {
+  it('omits unconsumed graph, chart and CanvasTools public facades from the app', () => {
     const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
-
-    for (const specifier of ['./src/features/knowledgeGraph.js', './src/features/courseGraph.js']) {
-      expect(appSource).toContain(specifier);
-      expect(indexSource).not.toContain(specifier);
+    const canvas = fs.readFileSync(path.join(root, 'canvas.js'), 'utf8');
+    for (const obsolete of ['knowledgeGraph', 'courseGraph', 'canvasCharts/', 'chartPlugins/', 'canvasTools/']) {
+      expect(appSource).not.toContain(obsolete);
+      expect(indexSource).not.toContain(obsolete);
     }
-    expect(appSource).toContain('OpenCourseDeck.Graphs = { CourseGraph, KnowledgeGraph }');
+    expect(canvas).not.toContain('CanvasTools');
   });
 
   it('uses one document-relative resolver for public and pooled production workers', () => {

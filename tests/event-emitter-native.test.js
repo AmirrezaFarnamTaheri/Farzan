@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from '../src/lib/eventEmitter.js';
-import { CourseGraph } from '../src/features/courseGraph.js';
-import { KnowledgeGraph } from '../src/features/knowledgeGraph.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -96,16 +94,3 @@ describe('EventEmitter WHATWG EventTarget interoperability', () => {
 });
 
 
-describe('EventTarget-backed graph teardown', () => {
-  for (const [name, Graph] of [['CourseGraph', CourseGraph], ['KnowledgeGraph', KnowledgeGraph]]) {
-    it(`${name}.destroy() detaches fluent callbacks from native EventTarget`, () => {
-      const graph = new Graph();
-      const callback = vi.fn();
-      graph.on('graph:disposed', callback);
-      graph.destroy();
-      graph.dispatchEvent(new CustomEvent('graph:disposed', { detail: [1] }));
-      expect(graph.listenerCount('graph:disposed')).toBe(0);
-      expect(callback).not.toHaveBeenCalled();
-    });
-  }
-});
