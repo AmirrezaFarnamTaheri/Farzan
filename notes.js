@@ -709,6 +709,24 @@ import { countWords } from './src/core/textMetrics.js';
             // The current ID may be rebound to a recovered copy after remote
             // deletion; the mount epoch, not the old note ID, owns the editor.
             if (this._el !== node || this._loadEpoch !== mountEpoch || !this._currentId) return;
+            // An Undo can restore the exact saved canonical note after a
+            // previous input already scheduled autosave. Squire sees this as
+            // clean, but the shell must also retire its obsolete write timer
+            // or a cross-tab refresh will create a spurious conflict copy.
+            // Keep dirty protection if the source was deleted, was changed
+            // remotely, or a durable write for this note is still pending.
+            const savedNote = Store.getNote(this._currentId);
+            const liveHtml = this._squire?.getHTML();
+            if (savedNote && typeof liveHtml === 'string'
+              && this._sanitize(liveHtml) === this._sanitize(savedNote.content ?? '')
+              && !Store._noteWriteQueue.has(String(this._currentId))) {
+              this._squireChanged = false;
+              this._squireOriginal = savedNote.content ?? '';
+              clearTimeout(this._saveTimer);
+              this._saveTimer = null;
+              window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-body');
+              return;
+            }
             this._squireChanged = true;
             this._onInput();
           },
