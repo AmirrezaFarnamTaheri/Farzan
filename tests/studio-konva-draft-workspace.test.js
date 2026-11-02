@@ -127,6 +127,45 @@ describe('opt-in Konva editing draft workspace', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('refuses late pen strokes delivered after switching to Select without modifying the draft', async () => {
+    const scenes = [];
+    const saveDraft = vi.fn(async () => true);
+    const initial = board();
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'), board: initial, saveDraft,
+      sceneFactory: args => {
+        const scene = { args, select: vi.fn(), destroy: vi.fn() };
+        scenes.push(scene);
+        return scene;
+      },
+    });
+    try {
+      instance.setMode('pen');
+      const staleStroke = scenes.at(-1).args.onStroke;
+      instance.setMode('select');
+      expect(await staleStroke([[0, 0], [6, 12]])).toBe(false);
+      await instance.flush();
+      expect(saveDraft).not.toHaveBeenCalled();
+      expect(instance.getBoard()).toEqual(initial);
+    } finally { instance.destroy(); }
+  });
+
+  it('ignores a late pen callback after workspace disposal instead of rejecting a stale event', async () => {
+    let staleStroke;
+    const saveDraft = vi.fn(async () => true);
+    const instance = createStudioKonvaDraftWorkspace({
+      container: document.createElement('div'), board: board(), saveDraft,
+      sceneFactory: args => {
+        if (args.mode === 'pen') staleStroke = args.onStroke;
+        return { select: vi.fn(), destroy: vi.fn() };
+      },
+    });
+    instance.setMode('pen');
+    instance.destroy();
+    expect(await staleStroke([[1, 1], [3, 3]])).toBe(false);
+    expect(saveDraft).not.toHaveBeenCalled();
+  });
+
   it('moves an editable shape only after a real draft write acknowledgement and redraws from canonical v1', async () => {
     const { instance, scenes, saveDraft, document: input, start } = workspace();
     expect(scenes).toHaveLength(1);
