@@ -19,6 +19,14 @@ export const KeyboardShortcuts = {
     const EDITABLE = 'input,textarea,select,[contenteditable]:not([contenteditable="false"])';
     this._bound = (e) => {
       const target = eventTargetEl(e);
+      // An active editor IME owns its in-progress keyboard events. Never
+      // interpret a provisional composition as an app-level command.
+      if (e.isComposing || e.key === 'Process' || e.keyCode === 229) return;
+      // Dialogs own their keyboard scope from the moment open() removes the
+      // hidden attribute, including the frame before the 'open' CSS class.
+      // Background shortcuts must not mutate the workspace through a modal,
+      // drawer or native <dialog>; normal commands resume after teardown.
+      if (document.querySelector('.modal-container:not([hidden]), .drawer:not([hidden]), dialog[open]')) return;
       if (target?.matches?.(EDITABLE)) return;
       if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) return;
       const combo = [
