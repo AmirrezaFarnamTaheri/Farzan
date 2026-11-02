@@ -361,6 +361,10 @@ export function mountBookmarksView(deps = {}) {
           link.setAttribute('aria-busy', 'true');
           try {
             const destination = await resolveTimestampSource(item.source, renderedSnapshot);
+            // A route transition/filter redraw can detach the clicked card
+            // while its catalog read is pending. Never open another route
+            // from a discarded view or overwrite its newer media session.
+            if (!link.isConnected) return;
             if (typeof setPendingCourseMedia !== 'function'
               || typeof Router?.navigate !== 'function') {
               throw new Error('Course playback is unavailable');
@@ -368,7 +372,9 @@ export function mountBookmarksView(deps = {}) {
             setPendingCourseMedia(destination.topicId, destination.position, destination.courseId);
             Router.navigate('#/courses');
           } catch (error) {
-            Toast.error?.('Could not open timestamp: ' + (error?.message || 'Source unavailable'));
+            if (link.isConnected) {
+              Toast.error?.('Could not open timestamp: ' + (error?.message || 'Source unavailable'));
+            }
           } finally {
             opening = false;
             link.removeAttribute('aria-busy');
