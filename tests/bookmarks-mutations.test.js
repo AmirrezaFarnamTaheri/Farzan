@@ -18,6 +18,13 @@ describe('Bookmarks timestamp mutation receipts', () => {
         records = records.map(existing => existing.id === record.id ? record : existing);
         return true;
       }),
+      compareAndSwapTimestamp: vi.fn(async (id, expected, next) => {
+        const index = records.findIndex(record => record.id === id);
+        if (index < 0 || JSON.stringify(records[index]) !== JSON.stringify(expected)) return false;
+        if (next === null) records.splice(index, 1);
+        else records[index] = structuredClone(next);
+        return true;
+      }),
       deleteTimestamp: vi.fn(async id => {
         records = records.filter(record => record.id !== id);
         return true;
@@ -58,9 +65,9 @@ describe('Bookmarks timestamp mutation receipts', () => {
   }
 
   it('never reports a rejected timestamp save as success or dismisses its unsaved edit', async () => {
-    window.DB.saveTimestamp.mockResolvedValue(false);
+    window.DB.compareAndSwapTimestamp.mockResolvedValue(false);
     await editTimestamp();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp update failed'));
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp changed elsewhere; reload bookmarks'));
     expect(Toast.success).not.toHaveBeenCalled();
     expect(document.querySelector('[data-timestamp-edit-form="ts-1"]')).not.toBeNull();
     expect(document.querySelector('[data-timestamp-edit-form="ts-1"]').elements.namedItem('title').value)
@@ -86,13 +93,70 @@ describe('Bookmarks timestamp mutation receipts', () => {
   });
 
   it('retains a timestamp and reports failure when deletion is unacknowledged', async () => {
-    window.DB.deleteTimestamp.mockResolvedValue(false);
+    window.DB.compareAndSwapTimestamp.mockResolvedValue(false);
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-1"]')).not.toBeNull());
     document.querySelector('[data-delete-timestamp="ts-1"]').click();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp delete failed'));
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp changed elsewhere; reload bookmarks'));
     expect(Toast.success).not.toHaveBeenCalled();
     expect(document.querySelector('[data-bookmark-id="ts-1"]')).not.toBeNull();
     expect(records[0].id).toBe('ts-1');
   });
+
+  it('does not overwrite a timestamp modified in another tab after an edit form opened', async () => {
+    window.DB.compareAndSwapTimestamp = vi.fn(async (id, expected, next) => {
+      const current = records.find(row => row.id === id);
+      if (JSON.stringify(current) !== JSON.stringify(expected)) return false;
+      records = records.map(row => row.id === id ? next : row);
+      return true;
+    });
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-edit-timestamp="ts-1"]')).not.toBeNull());
+    document.querySelector('[data-edit-timestamp="ts-1"]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-timestamp-edit-form="ts-1"]')).not.toBeNull());
+    const form = document.querySelector('[data-timestamp-edit-form="ts-1"]');
+    form.elements.namedItem('title').value = 'Unsaved local revision';
+    records[0] = { ...records[0], title: 'Newer cross-tab title', note: 'Preserve remote edit',
+      updatedAt: 200 };
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/changed elsewhere|reload/i)));
+    expect(records[0].title).toBe('Newer cross-tab title');
+    expect(records[0].note).toBe('Preserve remote edit');
+    expect(window.DB.saveTimestamp).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-timestamp-edit-form="ts-1"]').elements.namedItem('title').value)
+      .toBe('Unsaved local revision');
+  });
+
+  it('does not delete a newer revision while the confirmation dialog is open', async () => {
+    window.DB.compareAndSwapTimestamp = vi.fn(async (id, expected, next) => {
+      const current = records.find(row => row.id === id);
+      if (JSON.stringify(current) !== JSON.stringify(expected)) return false;
+      if (next === null) records = records.filter(row => row.id !== id);
+      return true;
+    });
+    window.OpenCourseDeck.UI.confirm.mockImplementation(async () => {
+      records[0] = { ...records[0], title: 'Newer saved bookmark', position: 126,
+        updatedAt: 201 };
+      return true;
+    });
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-1"]')).not.toBeNull());
+    document.querySelector('[data-delete-timestamp="ts-1"]').click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/changed elsewhere|reload/i)));
+    expect(records).toHaveLength(1);
+    expect(records[0].title).toBe('Newer saved bookmark');
+    expect(window.DB.deleteTimestamp).not.toHaveBeenCalled();
+  });
+
+  it('does not expose timestamp mutation controls when atomic canonical revisions are unavailable', async () => {
+    delete window.DB.compareAndSwapTimestamp;
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"]')).not.toBeNull());
+    expect(document.querySelector('[data-edit-timestamp]')).toBeNull();
+    expect(document.querySelector('[data-delete-timestamp]')).toBeNull();
+    expect(records[0].title).toBe('Original checkpoint');
+  });
+
 });

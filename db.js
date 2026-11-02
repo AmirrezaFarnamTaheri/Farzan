@@ -256,6 +256,66 @@ async compareAndSwapSetting(key, expected, next) {
   });
 }
 
+/**
+ * Compare and replace/delete one saved timestamp inside the SAME native
+ * readwrite transaction. A stale Bookmarks card must never overwrite a
+ * different tab's newer timestamp, or delete it after a confirmation delay.
+ * No unlocked read-then-write or localStorage downgrade is permitted.
+ */
+async compareAndSwapTimestamp(id, expected, next) {
+  const validId = (typeof id === 'string' && id.trim() !== '')
+    || (typeof id === 'number' && Number.isFinite(id));
+  if (!validId || !expected || typeof expected !== 'object'
+    || Array.isArray(expected) || expected.id !== id
+    || (next !== null && (!next || typeof next !== 'object'
+      || Array.isArray(next) || next.id !== id))) {
+    throw new TypeError('Atomic timestamp revision requires matching record IDs');
+  }
+  if (this.encryptionPassphrase) {
+    throw new Error('Atomic timestamp edits are unavailable for encrypted records');
+  }
+  const expectedText = JSON.stringify(expected);
+  if (typeof expectedText !== 'string'
+    || (next !== null && typeof JSON.stringify(next) !== 'string')) {
+    throw new TypeError('Atomic timestamp revision requires JSON-safe records');
+  }
+  const connection = await this.open();
+  return new Promise((resolve, reject) => {
+    let transaction;
+    let accepted = false;
+    try {
+      transaction = connection.transaction('timestamps', 'readwrite');
+      const store = transaction.objectStore('timestamps');
+      const read = store.get(id);
+      read.onsuccess = () => {
+        const existing = read.result;
+        if (existing?.__encrypted) {
+          transaction.abort();
+          return;
+        }
+        // A removed or concurrently updated record is never a fresh insert.
+        if (!existing || JSON.stringify(existing) !== expectedText) return;
+        try {
+          if (next === null) store.delete(id);
+          else store.put(structuredClone(next));
+          accepted = true;
+        } catch (error) {
+          try { transaction.abort(); } catch {}
+          reject(error);
+        }
+      };
+      transaction.oncomplete = () => resolve(accepted);
+      transaction.onerror = () => reject(transaction.error
+        || new Error('Atomic timestamp write failed'));
+      transaction.onabort = () => reject(transaction.error
+        || new Error('Atomic timestamp revision was aborted or protected'));
+    } catch (error) {
+      try { transaction?.abort(); } catch {}
+      reject(error);
+    }
+  });
+}
+
 async add(store, data) {
   return withMutationRetry(async () => {
     const payload = await this._seal(store, data);

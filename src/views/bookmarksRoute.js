@@ -455,7 +455,8 @@ export function mountBookmarksView(deps = {}) {
       const actions = document.createElement('div');
       actions.className = 'button-row';
       actions.appendChild(link);
-      if (item.type === 'Timestamp' && item.id && window.DB?.saveTimestamp) {
+      if (item.type === 'Timestamp' && item.id != null
+        && typeof window.DB?.compareAndSwapTimestamp === 'function') {
         const edit = document.createElement('button');
         edit.type = 'button';
         edit.className = 'btn btn-ghost btn-sm';
@@ -463,7 +464,8 @@ export function mountBookmarksView(deps = {}) {
         edit.textContent = 'Edit';
         actions.appendChild(edit);
       }
-      if (item.type === 'Timestamp' && item.id && window.DB?.deleteTimestamp) {
+      if (item.type === 'Timestamp' && item.id != null
+        && typeof window.DB?.compareAndSwapTimestamp === 'function') {
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'btn btn-ghost btn-sm';
@@ -521,17 +523,31 @@ export function mountBookmarksView(deps = {}) {
         return;
       }
       const deleteButton = event.target?.closest?.('[data-delete-timestamp]');
-      if (deleteButton) {
-        const ok = await window.OpenCourseDeck?.UI?.confirm?.('Delete this timestamp bookmark?');
-        if (!ok) return;
+      if (deleteButton && !deleteButton.disabled) {
+        // Capture the rendered revision BEFORE showing an asynchronous
+        // confirmation. Another tab may edit/delete this record meanwhile.
+        const original = timestamps.find(item => item?.id != null
+          && String(item.id) === deleteButton.dataset.deleteTimestamp);
+        if (!original || typeof window.DB?.compareAndSwapTimestamp !== 'function') {
+          Toast.error('Timestamp changed elsewhere; reload bookmarks');
+          return;
+        }
+        deleteButton.disabled = true;
         try {
-          const deleted = await window.DB?.deleteTimestamp?.(deleteButton.dataset.deleteTimestamp);
-          if (deleted !== true) throw new Error('Timestamp deletion was not acknowledged');
+          const ok = await window.OpenCourseDeck?.UI?.confirm?.('Delete this timestamp bookmark?');
+          if (!ok) return;
+          const deleted = await window.DB.compareAndSwapTimestamp(original.id, original, null);
+          if (deleted !== true) {
+            Toast.error('Timestamp changed elsewhere; reload bookmarks');
+            return;
+          }
           delete listRoot.dataset.editingTimestamp;
           Toast.success('Timestamp deleted');
           renderBookmarks();
         } catch {
           Toast.error('Timestamp delete failed');
+        } finally {
+          deleteButton.disabled = false;
         }
       }
     };
@@ -539,24 +555,38 @@ export function mountBookmarksView(deps = {}) {
       const form = event.target?.closest?.('[data-timestamp-edit-form]');
       if (!form) return;
       event.preventDefault();
-      const original = timestamps.find(item => String(item.id || item.topicId) === String(form.dataset.timestampEditForm));
-      if (!original || !window.DB?.saveTimestamp) return;
+      if (form.dataset.saving === 'true') return;
+      const original = timestamps.find(item => item?.id != null
+        && String(item.id) === String(form.dataset.timestampEditForm));
+      if (!original || typeof window.DB?.compareAndSwapTimestamp !== 'function') {
+        Toast.error('Timestamp changed elsewhere; reload bookmarks');
+        return;
+      }
       const title = form.elements.title?.value?.trim();
       const note = form.elements.note?.value?.trim();
+      form.dataset.saving = 'true';
       try {
-        const saved = await window.DB.saveTimestamp({
+        const changed = {
           ...original,
-          id: original.id || form.dataset.timestampEditForm,
           title: title || original.title || original.topicTitle || 'Video timestamp',
           note: note || '',
           updatedAt: Date.now(),
-        });
-        if (saved !== true) throw new Error('Timestamp update was not acknowledged');
+        };
+        // One native IndexedDB transaction compares the *complete* original
+        // saved record before replacing it. Never trust a stale rendered form,
+        // fall back to unconditional save, or rewrite an imported source ID.
+        const saved = await window.DB.compareAndSwapTimestamp(original.id, original, changed);
+        if (saved !== true) {
+          Toast.error('Timestamp changed elsewhere; reload bookmarks');
+          return;
+        }
         delete listRoot.dataset.editingTimestamp;
         Toast.success('Timestamp updated');
         renderBookmarks();
       } catch {
         Toast.error('Timestamp update failed');
+      } finally {
+        delete form.dataset.saving;
       }
     };
   }
