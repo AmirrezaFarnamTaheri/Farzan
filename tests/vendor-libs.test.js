@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 describe('vendored browser libraries', () => {
-  it('bundles Fuse as a classic-worker-compatible global', () => {
+  it('bundles Fuse as an active browser-accessible search implementation', () => {
     const vendorScript = fs.readFileSync(path.join(root, 'scripts/vendor-libs.cjs'), 'utf8');
     expect(vendorScript).toContain("globalThis.Fuse = Fuse");
     expect(vendorScript).toContain("format: 'iife'");
@@ -19,8 +19,6 @@ describe('vendored browser libraries', () => {
     vm.runInContext(fs.readFileSync(bundlePath, 'utf8'), context);
     expect(typeof context.Fuse).toBe('function');
 
-    const workerSource = fs.readFileSync(path.join(root, 'src/workers/search.worker.js'), 'utf8');
-    expect(workerSource).toContain("importScripts('../../vendor/fuse.min.js')");
   });
 
   it('adapts PDF.js document destruction to the loading task', () => {

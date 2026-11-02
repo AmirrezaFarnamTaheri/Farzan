@@ -127,20 +127,16 @@ describe('static release artifact verification', () => {
     expect(result.missing).toEqual(['docs/guide.md']);
   });
 
-  it('reports missing, changed, and extra worker files as well as unexpected static files', () => {
+  it('rejects accidental worker artifacts and unrelated extra release files', () => {
     const rootDir = makeDir();
     const outDir = makeDir();
-    write(rootDir, 'src/workers/search.worker.js', 'export const search = 1;');
-    write(rootDir, 'src/workers/catalog.worker.js', 'export const catalog = 1;');
-    write(outDir, 'src/workers/search.worker.js', 'export const search = 2;');
-    write(outDir, 'src/workers/extra.worker.js', 'export const extra = true;');
-    write(outDir, 'unlisted.txt', 'not staged from a declared source');
-
+    write(rootDir, 'data/catalog.json', '{"currentCatalog":"data/current.json"}');
+    write(outDir, 'data/catalog.json', '{"currentCatalog":"data/current.json"}');
+    write(outDir, 'src/workers/unused.worker.js', 'obsolete background worker');
+    write(outDir, 'unlisted.txt', 'not staged from declared sources');
     const result = checkStaticArtifacts({ rootDir, actualOutdir: outDir });
     expect(result.clean).toBe(false);
-    expect(result.missing).toEqual(['src/workers/catalog.worker.js']);
-    expect(result.changed).toEqual(['src/workers/search.worker.js']);
-    expect(result.extra).toEqual(['src/workers/extra.worker.js', 'unlisted.txt']);
+    expect(result.extra).toEqual(['src/workers/unused.worker.js', 'unlisted.txt']);
   });
 });
 

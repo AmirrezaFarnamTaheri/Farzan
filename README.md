@@ -86,7 +86,7 @@ The app also includes an in-app Help route at `#/help` with the first-run checkl
 ### Code layout
 
 - `index.html`: static app shell, landmarks, overlay roots, vendor script tags, and boot entry.
-- `src/styles/index.css`: stylesheet entry; `src/styles/themes.css` contains the theme palettes, and `src/styles/workspace.css` contains shared refinements. `style.css` is the compatibility entry.
+- `src/styles/index.css`: stylesheet entry; `src/styles/themes.css` contains the theme palettes, and `src/styles/workspace.css` contains shared refinements. `style.css` contains opt-in token aliases and utilities outside the stylesheet layers.
 - `src/index.js`: ES module entry that bundles the current vanilla modules.
 - `app.js`: app shell behavior, routes, views, modal/drawer primitives, settings, and shortcuts.
 - `ui.js`: reusable UI helpers.

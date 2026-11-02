@@ -100,18 +100,12 @@ describe('runtime wiring', () => {
     expect(canvas).not.toContain('CanvasTools');
   });
 
-  it('uses one document-relative resolver for public and pooled production workers', () => {
-    const poolSource = fs.readFileSync(path.join(root, 'src/lib/workerPool.js'), 'utf8');
-    const assetSource = fs.readFileSync(path.join(root, 'src/core/workerAssets.js'), 'utf8');
-
-    expect(indexSource).not.toContain("from './lib/workerPool.js'");
-    expect(indexSource).toContain("import { workerAssets } from './core/workerAssets.js'");
-    expect(indexSource).toContain('pd.workers = workerAssets');
-    expect(poolSource).toContain("import { workerAssets } from '../core/workerAssets.js'");
-    expect(poolSource).toContain('createDefinition(workerAssets.search)');
-    expect(poolSource).toContain('createDefinition(workerAssets.catalog)');
-    expect(assetSource).toContain('globalThis.document?.baseURI');
-    expect(assetSource).toContain('src/workers/${file}');
+  it('has no unused WorkerPool or worker-asset namespace in the pre-release app entry', () => {
+    for (const old of ['WorkerPool', 'workerAssets', 'pd.workers', 'lazyWorkerPool']) {
+      expect(indexSource).not.toContain(old);
+    }
+    const script = fs.readFileSync(path.join(root, 'scripts/workbox-dist.config.cjs'), 'utf8');
+    expect(script).not.toContain('src/workers/');
   });
 
   it('player.js media-storage integration has a provider on the namespace', async () => {

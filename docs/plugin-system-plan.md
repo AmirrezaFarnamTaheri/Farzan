@@ -1,7 +1,7 @@
 # OpenCourseDeck Plugin System Plan
 
 > **Status (2026-11-01): design proposal only; plugin host not shipped or present in app source.**
-> The unused Phase-1 manifest/registry prototype was retired after a consumer audit: it had no importer in the production build and no active plugin execution workflow. `src/features/chartPlugins/` is a separate, used Chart.js extension surface, **not** an app-plugin registry. The proposed plugin install path, worker sandbox, Settings → Extensions panel and lifecycle have never shipped. Retiring this prototype does not delete any historical `plasma-plugins-registry` data; future support requires a separately reviewed sandbox and storage migration. Read the APIs below as future design proposals, not usable application interfaces.
+> The unused Phase-1 manifest/registry prototype was retired after a consumer audit: it had no importer in the production build and no active plugin execution workflow. The unrelated unused Chart.js adapter/plugin facades were also retired; active Progress charts use their own lazy Chart.js consumer. The proposed plugin install path, worker sandbox, Settings → Extensions panel and lifecycle have never shipped. Retiring this prototype does not delete any historical `plasma-plugins-registry` data; future support requires a separately reviewed sandbox and storage migration. Read the APIs below as future design proposals, not usable application interfaces.
 
 ## Goal
 

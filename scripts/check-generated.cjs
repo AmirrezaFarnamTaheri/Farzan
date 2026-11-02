@@ -151,7 +151,7 @@ function compareDirs(expectedDir, actualDir, { filter = file => file.endsWith('.
 }
 
 const STATIC_ROOT_FILES = ['index.html', 'manifest.json', 'style.css', 'boot.js', 'pdf-runtime.js'];
-const STATIC_DIRS = ['assets', 'data', 'docs', 'vendor', 'src/workers'];
+const STATIC_DIRS = ['assets', 'data', 'docs', 'vendor'];
 
 function hashBuffer(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -179,8 +179,7 @@ function checkStaticArtifacts({ rootDir = root, actualOutdir = outdir } = {}) {
 
   // src/styles is flattened into a single bundled index.css at release time
   // (see build.cjs bundleReleaseStyles); it is verified separately by
-  // checkReleaseStyles() rather than byte-compared here. The worker directory
-  // is copied verbatim and therefore belongs in the static inventory.
+  // checkReleaseStyles() rather than byte-compared here.
   const styleSource = path.join(rootDir, 'src', 'styles', 'index.css');
   if (fs.existsSync(styleSource)) expectedStatic.add('src/styles/index.css');
   const dirPairs = STATIC_DIRS.map((dir) => [path.join(rootDir, dir), path.join(actualOutdir, dir), dir]);
