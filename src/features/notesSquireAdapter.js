@@ -145,6 +145,9 @@ export function createSquireNoteEditor({
   let dirty = false;
   let suppress = false;
   let composing = false;
+  // Increment for both IME edges so queued clipboard work cannot revive
+  // after a whole composition cycle that completed before its microtask.
+  let compositionGeneration = 0;
   let disposed = false;
   let lastHTML = original;
   const notify = () => {
@@ -156,10 +159,14 @@ export function createSquireNoteEditor({
     onUpdate(nextHTML);
   };
 
-  const onCompositionStart = () => { composing = true; };
+  const onCompositionStart = () => {
+    composing = true;
+    compositionGeneration++;
+  };
   const onCompositionEnd = () => {
     if (disposed) return;
     composing = false;
+    compositionGeneration++;
     // Publish the final value after IME commit; a subsequent input event is
     // deduplicated by notify(), so this is safe across browser event orders.
     notify();
@@ -198,19 +205,27 @@ export function createSquireNoteEditor({
         const template = document.createElement('template');
         template.innerHTML = clean;
         const plain = template.content.textContent ?? '';
-        try {
-          onPasteFallback(plain
-            ? 'Pasted as plain text; unsupported formatting was removed.'
-            : 'This clipboard content cannot be pasted as text. Use the classic editor for images or tables.');
-        } catch { /* Keep clipboard preservation independent from notifications. */ }
-        if (plain) queueMicrotask(() => {
-          // A note may be switched or its editor torn down before the
-          // asynchronous plain-text fallback runs. Never paste into or
-          // notify about the previous note after that handoff.
-          if (disposed) return;
-          editor.insertPlainText(plain);
-          notify();
-        });
+        const inform = () => {
+          try {
+            onPasteFallback(plain
+              ? 'Pasted as plain text; unsupported formatting was removed.'
+              : 'This clipboard content cannot be pasted as text. Use the classic editor for images or tables.');
+          } catch { /* Keep clipboard preservation independent from notifications. */ }
+        };
+        if (!plain) {
+          inform();
+        } else {
+          const pasteGeneration = compositionGeneration;
+          queueMicrotask(() => {
+            // A stale paste must never be inserted after a note switch or
+            // during/after any intervening IME composition. Do not claim a
+            // paste succeeded unless the actual text insertion occurred.
+            if (disposed || composing || pasteGeneration !== compositionGeneration) return;
+            editor.insertPlainText(plain);
+            notify();
+            inform();
+          });
+        }
       }
     });
     element.appendChild(root);
