@@ -30,7 +30,10 @@ describe('Home workspace override ownership (#175)', () => {
       ['.home-pulse-item:hover', 'box-shadow: none;'],
     ];
     for (const [selector, property] of redundant) {
-      expect(declarations(polish, selector), selector + ' earlier duplicate').not.toContain(property);
+      // An obsolete earlier selector may be deleted completely once its
+      // final workspace owner remains; it need not survive as an empty rule.
+      const early = polish.includes(selector + ' {') ? declarations(polish, selector) : '';
+      expect(early, selector + ' earlier duplicate').not.toContain(property);
       expect(declarations(workspace, selector), selector + ' final owner').toContain(property);
     }
   });
