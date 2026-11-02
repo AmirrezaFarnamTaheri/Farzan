@@ -18,6 +18,13 @@ describe('Bookmarks timestamp mutation receipts', () => {
         records = records.map(existing => existing.id === record.id ? record : existing);
         return true;
       }),
+      compareAndSwapTimestamp: vi.fn(async (id, expected, next) => {
+        const index = records.findIndex(record => record.id === id);
+        if (index < 0 || JSON.stringify(records[index]) !== JSON.stringify(expected)) return false;
+        if (next === null) records.splice(index, 1);
+        else records[index] = structuredClone(next);
+        return true;
+      }),
       deleteTimestamp: vi.fn(async id => {
         records = records.filter(record => record.id !== id);
         return true;
@@ -58,9 +65,9 @@ describe('Bookmarks timestamp mutation receipts', () => {
   }
 
   it('never reports a rejected timestamp save as success or dismisses its unsaved edit', async () => {
-    window.DB.saveTimestamp.mockResolvedValue(false);
+    window.DB.compareAndSwapTimestamp.mockResolvedValue(false);
     await editTimestamp();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp update failed'));
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp changed elsewhere; reload bookmarks'));
     expect(Toast.success).not.toHaveBeenCalled();
     expect(document.querySelector('[data-timestamp-edit-form="ts-1"]')).not.toBeNull();
     expect(document.querySelector('[data-timestamp-edit-form="ts-1"]').elements.namedItem('title').value)
@@ -86,11 +93,11 @@ describe('Bookmarks timestamp mutation receipts', () => {
   });
 
   it('retains a timestamp and reports failure when deletion is unacknowledged', async () => {
-    window.DB.deleteTimestamp.mockResolvedValue(false);
+    window.DB.compareAndSwapTimestamp.mockResolvedValue(false);
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-delete-timestamp="ts-1"]')).not.toBeNull());
     document.querySelector('[data-delete-timestamp="ts-1"]').click();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp delete failed'));
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith('Timestamp changed elsewhere; reload bookmarks'));
     expect(Toast.success).not.toHaveBeenCalled();
     expect(document.querySelector('[data-bookmark-id="ts-1"]')).not.toBeNull();
     expect(records[0].id).toBe('ts-1');
