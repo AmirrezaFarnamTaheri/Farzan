@@ -1264,7 +1264,7 @@ const ProgressStats = (() => {
     const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
       && primary._meta.version === 3;
     const mirrorKeys = [
-      'ocd_progress_fallback_v1', 'ocd_timestamps_fallback_v1', 'ocd_notes', 'ocd_folders',
+      'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists',
       'ocd_studio_board', 'ocd_studio_konva_draft', 'ocd_flashcards',
       'ocd_user_library', 'ocd_course_media_cues', 'ocd_tag_taxonomy',
@@ -1344,8 +1344,8 @@ const ProgressStats = (() => {
           _requireAcknowledgedWrite(await DB.saveTimestamp(item), 'rollback timestamps');
         }
       }
-      // Restore local mirrors after primary storage so fallback reads never
-      // resurrect a partially imported version.
+      // Restore current local UI mirrors after the canonical primary snapshot
+      // so a partially imported UI setting is never left behind.
       for (const [key, value] of Object.entries(snapshot.mirrors)) {
         if (value === null) window.localStorage.removeItem(key);
         else window.localStorage.setItem(key, value);
