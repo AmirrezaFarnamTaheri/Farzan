@@ -145,7 +145,11 @@ export const Modal = {
       const stackNow = shell().state?.openModals;
       if (stackNow) shell().state.openModals = stackNow.filter(m => m !== modal);
 
-      if (!shell().state?.openModals?.length) {
+      // A surviving drawer (including one before its first animation frame)
+      // still owns the background scroll lock when the last modal closes.
+      // Use the same active-drawer check as Drawer.close(), not CSS .open
+      // alone, which misses pending first-paint overlays.
+      if (!shell().state?.openModals?.length && !Drawer._hasOpenOrOpeningDrawer()) {
         document.body.style.overflow = '';
       }
 
