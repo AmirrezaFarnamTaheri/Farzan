@@ -137,33 +137,6 @@ describe('app shell resilience helpers', () => {
     expect(window.OpenCourseDeck.state.activeToasts).not.toContain(first);
   });
 
-  it('recovers infinite scroll loading state when onLoad rejects', async () => {
-    await loadApp(`
-      <div id="ocd-app">
-        <main id="view-container"></main>
-        <section id="scroll-root">
-          <div class="scroll-loader" hidden></div>
-          <div class="scroll-sentinel"></div>
-        </section>
-      </div>
-    `);
-    const onLoad = vi.fn()
-      .mockRejectedValueOnce(new Error('network failed'))
-      .mockResolvedValueOnce(true);
-
-    window.OpenCourseDeck.InfiniteScroll.init({
-      container: document.getElementById('scroll-root'),
-      onLoad,
-    });
-
-    const callback = intersectionCallbacks.at(-1);
-    await callback([{ isIntersecting: true }]);
-    await callback([{ isIntersecting: true }]);
-
-    expect(onLoad).toHaveBeenCalledTimes(2);
-    expect(document.querySelector('.scroll-loader').hasAttribute('hidden')).toBe(true);
-  });
-
   it('keeps invalid numeric table values at the bottom while sorting', async () => {
     await loadApp(`
       <div id="ocd-app">

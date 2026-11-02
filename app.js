@@ -84,7 +84,6 @@ import { Pointer } from './src/lib/pointer.js';
       ...((OpenCourseDeck.config ?? {}).breakpoints ?? {}),
     },
   };
-  OpenCourseDeck.plugins = OpenCourseDeck.plugins ?? {};
   OpenCourseDeck.dom = {
     $,
     $$,
@@ -2662,89 +2661,6 @@ import { Pointer } from './src/lib/pointer.js';
 
 
   // ──────────────────────────────────────────────────────────
-  // 22. SKELETON LOADERS
-  // ──────────────────────────────────────────────────────────
-
-  const Skeleton = {
-    /**
-     * Show skeletons inside a container, hide real content
-     */
-    show(container) {
-      const el = typeof container === 'string'
-        ? document.getElementById(container)
-        : container;
-      if (!el) return;
-      el.classList.add('skeleton-loading');
-      $$('[data-skeleton]', el).forEach(sk => sk.removeAttribute('hidden'));
-      $$('[data-content]', el).forEach(c  => c.setAttribute('hidden', ''));
-    },
-
-    hide(container) {
-      const el = typeof container === 'string'
-        ? document.getElementById(container)
-        : container;
-      if (!el) return;
-      el.classList.remove('skeleton-loading');
-      $$('[data-skeleton]', el).forEach(sk => sk.setAttribute('hidden', ''));
-      $$('[data-content]', el).forEach(c  => c.removeAttribute('hidden'));
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
-  // 23. INFINITE SCROLL
-  // ──────────────────────────────────────────────────────────
-
-  const InfiniteScroll = {
-    /**
-     * @param {Object} opts
-     * @param {string|HTMLElement} opts.container
-     * @param {Function} opts.onLoad  async fn(page) → returns false when exhausted
-     * @param {string} opts.sentinel  selector for bottom sentinel element
-     */
-    init({ container, onLoad, sentinel = '.scroll-sentinel' } = {}) {
-      const el       = typeof container === 'string'
-        ? document.getElementById(container)
-        : container;
-      const sentinelEl = typeof sentinel === 'string'
-        ? el?.querySelector(sentinel)
-        : sentinel;
-      if (!el || !sentinelEl) return;
-
-      let page    = 1;
-      let loading = false;
-      let done    = false;
-
-      const observer = new IntersectionObserver(async entries => {
-        if (!entries[0].isIntersecting || loading || done) return;
-        loading = true;
-        const loader = el.querySelector('.scroll-loader');
-        if (loader) loader.removeAttribute('hidden');
-
-        let hasMore;
-        try {
-          hasMore = await onLoad(++page);
-        } catch (err) {
-          OpenCourseDeck.bus.emit('infinite-scroll:error', { err, page });
-        } finally {
-          loading = false;
-          if (loader) loader.setAttribute('hidden', '');
-        }
-
-        if (hasMore === false) {
-          done = true;
-          observer.disconnect();
-        }
-      }, { rootMargin: '0px 0px 200px 0px' });
-
-      observer.observe(sentinelEl);
-
-      return () => observer.disconnect(); // cleanup
-    },
-  };
-
-
-  // ──────────────────────────────────────────────────────────
   // 24. ROUTER (Hash-based SPA helper)
   // ──────────────────────────────────────────────────────────
 
@@ -3461,8 +3377,6 @@ KeyboardShortcuts.register('ctrl+0', () => FontScale.reset(), 'Reset UI font siz
     OpenCourseDeck.CanvasExport = OpenCourseDeck.CanvasExport ?? CanvasExport;
     OpenCourseDeck.Clipboard = OpenCourseDeck.Clipboard ?? ClipboardBridge;
     OpenCourseDeck.Pointer = OpenCourseDeck.Pointer ?? Pointer;
-    OpenCourseDeck.Skeleton   = Skeleton;
-    OpenCourseDeck.InfiniteScroll = InfiniteScroll;
     OpenCourseDeck.Views      = Views;
     OpenCourseDeck.TopbarSearch = TopbarSearch;
     OpenCourseDeck.safeExternalUrl = safeExternalUrl;
