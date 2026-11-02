@@ -205,6 +205,37 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { instance.destroy(); }
   });
 
+  it('allows a new saved revision after undo restores the untouched canonical note', () => {
+    const element = document.createElement('div');
+    const updates = vi.fn();
+    const original = '<p>Previous saved note</p>';
+    const instance = createSquireNoteEditor({ element, html: original, onUpdate: updates });
+    try {
+      instance.editor.commands.insertContent('<p>Local edit to undo</p>');
+      expect(instance.getHTML()).toContain('Local edit to undo');
+      expect(instance.run('undo')).toBe(true);
+      expect(instance.getHTML()).toBe(original);
+      expect(instance.setContent('<p>New version from the synced Notes store</p>')).not.toBe(false);
+      expect(instance.getHTML()).toContain('New version from the synced Notes store');
+      expect(element.textContent).not.toContain('Local edit to undo');
+    } finally { instance.destroy(); }
+  });
+
+  it('still rejects an unrelated remote revision after redo reintroduces local note changes', () => {
+    const element = document.createElement('div');
+    const instance = createSquireNoteEditor({ element, html: '<p>Original</p>' });
+    try {
+      instance.editor.commands.insertContent('<p>Local revision</p>');
+      expect(instance.run('undo')).toBe(true);
+      expect(instance.run('redo')).toBe(true);
+      expect(instance.getHTML()).toContain('Local revision');
+      expect(() => instance.setContent('<p>Conflicting remote revision</p>'))
+        .toThrow(/unsaved|stale|overwrite/i);
+      expect(instance.getHTML()).toContain('Local revision');
+      expect(instance.getHTML()).not.toContain('Conflicting remote revision');
+    } finally { instance.destroy(); }
+  });
+
   it('notifies only once composition is complete, never for unfinished IME text', () => {
     const updates = vi.fn();
     const element = document.createElement('div');
