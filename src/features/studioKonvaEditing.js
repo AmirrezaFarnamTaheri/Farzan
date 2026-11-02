@@ -155,6 +155,19 @@ export function resizeKonvaV1Element(board, id, bounds) {
   return next;
 }
 
+/** Remove exactly one editable element from a cloned canonical-v1 board.
+ * Locked/hidden layers and malformed imports reject without any mutation.
+ */
+export function removeKonvaV1Element(board, id) {
+  validBoard(board);
+  findUnlockedElement(board, id);
+  const next = structuredClone(board);
+  const { layer, index } = findUnlockedElement(next, id);
+  layer.elements.splice(index, 1);
+  validBoard(next);
+  return next;
+}
+
 /**
  * Change z-order by one slot within the *same* unlocked, visible layer.
  * The array order is the canonical Canvas-v1 painter order; Konva scene
@@ -408,6 +421,17 @@ export function createKonvaV1MoveSession({
     return structuredClone(current);
   });
 
+  const remove = id => enqueue(async () => {
+    const next = removeKonvaV1Element(current, id);
+    await persist(next);
+    push(undoStack, current);
+    redoStack.length = 0;
+    current = next;
+    // Never drop the selection before the durable board write is confirmed.
+    onSelect(null);
+    return structuredClone(current);
+  });
+
   const reorder = (id, direction) => enqueue(async () => {
     const next = reorderKonvaV1Element(current, id, direction);
     const { layer, index } = findUnlockedElement(current, id);
@@ -635,6 +659,7 @@ export function createKonvaV1MoveSession({
     bind,
     commit,
     reorder,
+    remove,
     resize,
     setViewport,
     addStroke,
