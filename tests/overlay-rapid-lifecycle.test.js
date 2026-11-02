@@ -168,6 +168,44 @@ describe('shared overlay lifecycle before the first paint (#175)', () => {
     expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
   });
 
+  it('never restores focus to the inert background when a newer drawer survives a modal', () => {
+    const modal = document.getElementById('dialog');
+    const drawer = document.getElementById('drawer');
+    Modal.open(modal);
+    Drawer.open(drawer);
+    vi.advanceTimersByTime(0);
+    const drawerButton = drawer.querySelector('button');
+    expect(document.activeElement).toBe(drawerButton);
+
+    Modal.close(modal);
+    expect(document.activeElement).toBe(drawerButton);
+    expect(drawer.contains(document.activeElement)).toBe(true);
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    Drawer.close(drawer);
+    vi.runAllTimers();
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+  });
+
+  it('moves focus back into a surviving drawer if a top modal closes over it', () => {
+    const modal = document.getElementById('dialog');
+    const drawer = document.getElementById('drawer');
+    Drawer.open(drawer);
+    const drawerButton = drawer.querySelector('button');
+    expect(document.activeElement).toBe(drawerButton);
+    Modal.open(modal);
+    vi.advanceTimersByTime(0);
+    expect(document.activeElement).toBe(modal.querySelector('button'));
+
+    Modal.close(modal);
+    expect(document.activeElement).toBe(drawerButton);
+    expect(drawer.contains(document.activeElement)).toBe(true);
+    Drawer.close(drawer);
+    vi.runAllTimers();
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(false);
+  });
+
   it('does not let a prior drawer opening frame resurrect a closed replacement', () => {
     const drawer = document.getElementById('drawer');
     Drawer.open(drawer);
