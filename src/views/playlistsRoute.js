@@ -134,6 +134,27 @@ function assertSavedPlaylistReceipt(receipt, expected) {
   throw new Error('Saved playlist write was not acknowledged');
 }
 
+/**
+ * Commit the whole canonical playlist revision atomically when IndexedDB CAS
+ * is available. A separate get/save pair would erase concurrent tab writes.
+ * A declined or failed CAS must NEVER fall back to the non-atomic writer.
+ * Legacy settings integrations retain acknowledged saves and strict readback.
+ */
+async function persistSavedPlaylists(db, expected, next) {
+  if (typeof db?.compareAndSwapSetting === 'function') {
+    const accepted = await db.compareAndSwapSetting('ocd_playlists', expected, next);
+    if (accepted !== true) {
+      throw new Error('Saved playlist changed elsewhere or atomic write was not acknowledged; reload before editing');
+    }
+  } else {
+    assertSavedPlaylistReceipt(await db.saveSetting('ocd_playlists', next), next);
+  }
+  const verified = await db.getSetting('ocd_playlists');
+  if (!Array.isArray(verified) || JSON.stringify(verified) !== JSON.stringify(next)) {
+    throw new Error('Saved playlist write could not be verified after saving');
+  }
+}
+
 async function renderPlaylists(deps) {
   const { safeMediaUrl, Router, setPendingCourseSession, Toast = window.OpenCourseDeck?.Toast } = deps;
   const metricsRoot = document.querySelector('[data-playlist-metrics]');
@@ -486,7 +507,7 @@ async function renderPlaylists(deps) {
           { id, title, topicIds: [...new Set(firstCatalog.topicIds)], createdAt: now, updatedAt: now },
           ...current,
         ];
-        assertSavedPlaylistReceipt(await window.DB.saveSetting('ocd_playlists', next), next);
+        await persistSavedPlaylists(window.DB, raw, next);
         if (input) input.value = '';
         Toast.success?.('Playlist saved');
         void renderPlaylists(deps);
@@ -553,8 +574,7 @@ async function renderPlaylists(deps) {
         [ids[from], ids[to]] = [ids[to], ids[from]];
         const updated = records.map(record => record === selected
           ? { ...record, topicIds: ids, updatedAt: Date.now() } : record);
-        const receipt = await window.DB.saveSetting('ocd_playlists', updated);
-        assertSavedPlaylistReceipt(receipt, updated);
+        await persistSavedPlaylists(window.DB, records, updated);
         Toast.success?.('Playlist order saved');
         await renderPlaylists(deps);
         if (document.body.contains(listRoot)) {
@@ -641,7 +661,7 @@ async function renderPlaylists(deps) {
       // Only remove the selected row. Unknown records and metadata remain byte
       // for byte unchanged; they may be needed by another app version.
       const next = raw.filter(item => String(item?.id) !== id);
-      assertSavedPlaylistReceipt(await window.DB.saveSetting('ocd_playlists', next), next);
+      await persistSavedPlaylists(window.DB, raw, next);
       Toast.success?.('Playlist deleted');
       void renderPlaylists(deps);
     } catch (error) {
