@@ -21,6 +21,21 @@ describe('CSS authoritative selector ownership', () => {
     expect(unused).toEqual([]);
   });
 
+  it('preserves quoted comment markers when collecting CSS declaration provenance', () => {
+    const { parseRules, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
+    const source = '.example::before { content: "/* literal ; : */"; color: red;'
+      + ' /* actual stylesheet comment */ direction: rtl; }';
+    const rules = parseRules(source, 'quoted-fixture.css', 'enhancements');
+    expect(rules).toHaveLength(1);
+    expect(rules[0].body).toContain('content: "/* literal ; : */"');
+    expect(parseDeclarations(rules[0].body)).toContainEqual({
+      property: 'content', value: '"/* literal ; : */"',
+    });
+    expect(parseDeclarations(rules[0].body)).toContainEqual({
+      property: 'direction', value: 'rtl',
+    });
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
