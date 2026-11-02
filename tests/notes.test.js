@@ -877,6 +877,40 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-notes-list]').textContent).toContain('Another window saved this');
   });
 
+  it('clears a stale Squire autosave after an edit is restored to the saved note before sync', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    app.openNote('regular-note');
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    const paragraph = root.querySelector('p');
+    expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
+    paragraph.textContent = 'Temporary draft to undo';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(app._hasPendingLocalEdit()).toBe(true);
+    expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
+
+    // Squire's native Undo yields the original saved HTML. Drive the same
+    // committed editable DOM transition here without relying on JSDOM's
+    // nonexistent browser-native History input UI.
+    paragraph.textContent = 'Ordinary';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(app._hasPendingLocalEdit()).toBe(false);
+    expect(store.getNote('regular-note').content).toBe('<p>Ordinary</p>');
+
+    const remote = store.getNotes().map(note => note.id === 'regular-note'
+      ? { ...note, content: '<p>New remote revision</p>', updatedAt: now + 1200 } : note);
+    window.DB.getAllNotes.mockResolvedValueOnce(remote);
+    const result = await app.refreshFromSync({ kind: 'note', action: 'save' });
+    expect(result).toMatchObject({
+      refreshed: true, currentId: 'regular-note', conflictCopyId: null,
+    });
+    expect(store.getNote('regular-note').content).toBe('<p>New remote revision</p>');
+    expect(store.getNotes().filter(note => note.title.includes('synced copy'))).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toBe('<p>New remote revision</p>');
+  });
+
   it('preserves in-progress Squire IME composition across canonical sync refresh', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
