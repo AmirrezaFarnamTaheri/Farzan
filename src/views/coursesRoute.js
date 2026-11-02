@@ -894,7 +894,7 @@ export async function mountCoursesView(deps = {}) {
         'data-action': 'toggle-done',
         'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
         'aria-pressed': status === 'done' ? 'true' : 'false',
-        disabled: ambiguous ? true : undefined,
+        ...(ambiguous ? { disabled: true } : {}),
         title: ambiguous
           ? 'Completion unavailable: this lesson ID belongs to multiple courses'
           : (status === 'done' ? 'Mark not started' : 'Mark completed'),
