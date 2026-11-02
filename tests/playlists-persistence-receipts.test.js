@@ -119,4 +119,61 @@ describe('Saved playlists acknowledged mutations', () => {
     expect(Toast.success).not.toHaveBeenCalled();
     expect(saved[0].topicIds).toEqual(['a','b']);
   });
+  it('does not overwrite a second tab when the atomic playlist compare fails during creation', async () => {
+    window.DB.compareAndSwapSetting = vi.fn(async (key, expected) => {
+      expect(key).toBe('ocd_playlists');
+      expect(expected).toHaveLength(1);
+      saved = [{ id: 'other-tab', title: 'From another tab', topicIds: ['b'] }, ...saved];
+      return false;
+    });
+    await create();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringMatching(/changed|save|reload/i)));
+    expect(Toast.success).not.toHaveBeenCalled();
+    expect(saved.map(item => item.id)).toEqual(['other-tab', 'old']);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('uses atomic compare-and-swap and canonical readback for an acknowledged new queue', async () => {
+    window.DB.compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+      expect(key).toBe('ocd_playlists');
+      if (JSON.stringify(expected) !== JSON.stringify(saved)) return false;
+      saved = structuredClone(next);
+      return true;
+    });
+    await create();
+    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Playlist saved'));
+    expect(saved[0].title).toBe('My durable queue');
+    expect(saved[1].id).toBe('old');
+    expect(window.DB.compareAndSwapSetting).toHaveBeenCalledTimes(1);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing atomic receipt even if a non-atomic writer is available', async () => {
+    window.DB.compareAndSwapSetting = vi.fn(async () => undefined);
+    await create();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalled());
+    expect(Toast.success).not.toHaveBeenCalled();
+    expect(saved).toHaveLength(1);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete an older playlist revision after a concurrent tab update', async () => {
+    window.DB.compareAndSwapSetting = vi.fn(async (_key, expected) => {
+      expect(expected[0].id).toBe('old');
+      saved[0].title = 'Changed in another tab';
+      return false;
+    });
+    mount();
+    const button = await vi.waitFor(() => {
+      const node = document.querySelector('[data-delete-playlist="old"]');
+      expect(node).not.toBeNull();
+      return node;
+    });
+    button.click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalled());
+    expect(Toast.success).not.toHaveBeenCalled();
+    expect(saved[0].title).toBe('Changed in another tab');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+  });
+
 });
