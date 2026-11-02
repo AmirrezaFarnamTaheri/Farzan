@@ -327,6 +327,7 @@ export async function mountCoursesView(deps = {}) {
   let allCourses = [];
   let allTopics = [];
   let topicsByCourse = {};
+  let duplicateCueTopicIds = new Set();
   const rebuildCatalogIndexes = () => {
     const sourceCourses = window.DataStore?.allCourses?.() ?? [];
     // In Plasmato, show the 31 medical courses before the small starter tour.
@@ -338,6 +339,26 @@ export async function mountCoursesView(deps = {}) {
       (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
       return acc;
     }, {});
+    const owners = new Map();
+    for (const topic of allTopics) {
+      const id = String(topic?.topicId ?? '');
+      if (!id) continue;
+      const courses = owners.get(id) || new Set();
+      courses.add(String(topic?.courseId ?? ''));
+      owners.set(id, courses);
+    }
+    duplicateCueTopicIds = new Set([...owners]
+      .filter(([, courses]) => courses.size > 1).map(([id]) => id));
+  };
+  // Legacy unscoped authored cues remain readable only when a topic ID is
+  // unique. New edits to ambiguous imported lessons use course+topic keys,
+  // never guessing that one course owns an unscoped legacy cue.
+  const authoredCueKey = source => {
+    const topicId = String(source?.topicId ?? '');
+    const courseId = String(source?.courseId ?? '');
+    return duplicateCueTopicIds.has(topicId)
+      ? 'source:' + JSON.stringify([courseId, topicId])
+      : topicId;
   };
   rebuildCatalogIndexes();
   const courseFacetState = {
@@ -436,7 +457,7 @@ export async function mountCoursesView(deps = {}) {
   ].join('|');
   const mergedCues = (topic, key, fallbackKey) => [
     ...cueList(topic[key] ?? (fallbackKey ? topic[fallbackKey] : undefined)),
-    ...cueList(authoredMediaCues?.[topic.topicId]?.[key]),
+    ...cueList(authoredMediaCues?.[authoredCueKey(topic)]?.[key]),
   ];
   const courseMediaTrack = (topic, url, courseId) => ({
     title: topic.title,
@@ -519,7 +540,7 @@ export async function mountCoursesView(deps = {}) {
     if (!context?.topicId) return;
     const activeTrack = context.activeTrack || context.track;
     if (!activeTrack) return;
-    const authored = authoredMediaCues[context.topicId] || {};
+    const authored = authoredMediaCues[authoredCueKey(context)] || {};
     ['chapters', 'transcript'].forEach((key) => {
       const authoredIds = new Set(cueList(authored[key]).map(cueIdentity));
       const existing = cueList(activeTrack[key]).filter(cue => !cue.authored || authoredIds.has(cueIdentity(cue)));
@@ -539,7 +560,7 @@ export async function mountCoursesView(deps = {}) {
       learningMarkerListEl.appendChild(createElement('div', { class: 'text-muted text-sm' }, 'Play a topic to review authored cues.'));
       return;
     }
-    const authored = authoredMediaCues[context.topicId] || {};
+    const authored = authoredMediaCues[authoredCueKey(context)] || {};
     const rows = [
       ...cueList(authored.chapters).map((cue, index) => ({ type: 'chapters', index, cue, label: 'Chapter' })),
       ...cueList(authored.transcript).map((cue, index) => ({ type: 'transcript', index, cue, label: 'Transcript' })),
@@ -573,15 +594,16 @@ export async function mountCoursesView(deps = {}) {
       return;
     }
     const key = type === 'chapters' ? 'chapters' : 'transcript';
-    const topicCues = authoredMediaCues[context.topicId] && typeof authoredMediaCues[context.topicId] === 'object'
-      ? authoredMediaCues[context.topicId]
+    const cueKey = authoredCueKey(context);
+    const topicCues = authoredMediaCues[cueKey] && typeof authoredMediaCues[cueKey] === 'object'
+      ? authoredMediaCues[cueKey]
       : {};
     const nextList = cueList(topicCues[key]);
     const removed = nextList.splice(index, 1)[0];
     if (!removed) return;
     authoredMediaCues = {
       ...authoredMediaCues,
-      [context.topicId]: {
+      [cueKey]: {
         ...topicCues,
         [key]: nextList,
       },
@@ -604,10 +626,11 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus('Play a course topic before editing active cues.', 'warning');
       return;
     }
-    const cues = authoredMediaCues[context.topicId] || {};
+    const cues = authoredMediaCues[authoredCueKey(context)] || {};
     if (learningMarkerJsonEl) {
       learningMarkerJsonEl.value = JSON.stringify({
         topicId: context.topicId,
+        courseId: context.courseId,
         chapters: cueList(cues.chapters),
         transcript: cueList(cues.transcript),
       }, null, 2);
@@ -633,6 +656,14 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus('Active cue JSON belongs to a different topic.', 'warning');
       return;
     }
+    if (parsed?.courseId != null && String(parsed.courseId) !== context.courseId) {
+      setLearningMarkerStatus('Active cue JSON belongs to a different course.', 'warning');
+      return;
+    }
+    if (duplicateCueTopicIds.has(topicId) && String(parsed?.courseId ?? '') !== context.courseId) {
+      setLearningMarkerStatus('Active cue JSON needs explicit course identity for this shared topic ID.', 'warning');
+      return;
+    }
     const stats = { kept: 0, dropped: 0, deduped: 0, clamped: 0 };
     const normalized = normalizeImportedCues({ [context.topicId]: parsed }, { maxTime: context.duration, stats });
     const cues = normalized?.[context.topicId];
@@ -642,7 +673,7 @@ export async function mountCoursesView(deps = {}) {
     }
     authoredMediaCues = {
       ...authoredMediaCues,
-      [context.topicId]: {
+      [authoredCueKey(context)]: {
         chapters: cueList(cues.chapters),
         transcript: cueList(cues.transcript),
       },
@@ -666,6 +697,10 @@ export async function mountCoursesView(deps = {}) {
     const normalized = normalizeImportedCues(parsed, { stats });
     if (!normalized) {
       setLearningMarkerStatus('Cue JSON must be an object keyed by topic id.', 'warning');
+      return;
+    }
+    if (Object.keys(normalized).some(key => duplicateCueTopicIds.has(key))) {
+      setLearningMarkerStatus('Cue import needs explicit course identity for shared topic IDs.', 'warning');
       return;
     }
     authoredMediaCues = {
@@ -704,8 +739,9 @@ export async function mountCoursesView(deps = {}) {
     const cue = type === 'chapter'
       ? { time, title: text, authored: true, createdAt: now, updatedAt: now }
       : { start: time, text, authored: true, createdAt: now, updatedAt: now };
-    const topicCues = authoredMediaCues[context.topicId] && typeof authoredMediaCues[context.topicId] === 'object'
-      ? authoredMediaCues[context.topicId]
+    const cueKey = authoredCueKey(context);
+    const topicCues = authoredMediaCues[cueKey] && typeof authoredMediaCues[cueKey] === 'object'
+      ? authoredMediaCues[cueKey]
       : {};
     const nextTopicCues = {
       ...topicCues,
@@ -713,7 +749,7 @@ export async function mountCoursesView(deps = {}) {
     };
     authoredMediaCues = {
       ...authoredMediaCues,
-      [context.topicId]: nextTopicCues,
+      [cueKey]: nextTopicCues,
     };
     await persistAuthoredMediaCues();
     const activeTrack = context.activeTrack || context.track;
