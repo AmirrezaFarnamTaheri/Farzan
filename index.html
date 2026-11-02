@@ -51,13 +51,11 @@
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
 
-  <!-- Local fonts (vendored from @fontsource/*). The two Latin Inter faces
-       that paint the shell are preloaded so first text render doesn't wait
-       for the @import chain in fonts.css to be discovered. -->
+  <!-- Local Fontsource faces load directly. Preload the two Latin Inter faces
+       used by the shell while keeping the family stylesheets independently cached. -->
   <link rel="preload" href="./vendor/fonts/inter/files/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="./vendor/fonts/inter/files/inter-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
-  <!-- Linked individually (rather than via fonts.css @imports) so the
-       three @font-face sheets download in parallel with the app CSS. -->
+  <!-- Link each font family's CSS directly, without an unused aggregate sheet. -->
   <link rel="stylesheet" href="./vendor/fonts/inter/index.css" />
   <link rel="stylesheet" href="./vendor/fonts/jetbrains-mono/index.css" />
   <link rel="stylesheet" href="./vendor/fonts/playfair-display/index.css" />
