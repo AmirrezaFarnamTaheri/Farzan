@@ -1764,15 +1764,22 @@ describe('app shell resilience helpers', () => {
     expect(document.querySelector('[data-bookmark-id="note-pdf"]').textContent).toContain('PDF page note');
     document.querySelector('[data-bookmark-id="note-pdf"] a').click();
 
-    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-a-content');
+    await vi.waitFor(() =>
+      expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-a-content'));
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('9');
     expect(window.location.hash).toBe('#/pdf');
     // A bookmark for a different document may not move the still-mounted
     // PDF reader before the requested document has loaded.
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
 
+    // Re-open Bookmarks after the first asynchronous source handoff; the
+    // router can detach its original cards on the #/pdf transition.
+    await window.OpenCourseDeck.Router.ready();
+    await window.OpenCourseDeck.Views.bookmarks();
+    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ann-pdf"] a')).toBeTruthy());
     document.querySelector('[data-bookmark-id="ann-pdf"] a').click();
-    expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-b-content');
+    await vi.waitFor(() =>
+      expect(sessionStorage.getItem('ocd_pending_pdf_doc')).toBe('fingerprint:doc-b-content'));
     expect(sessionStorage.getItem('ocd_pending_pdf_page')).toBe('4');
     expect(window.PlasmaPDFViewer.goTo).not.toHaveBeenCalled();
   });
