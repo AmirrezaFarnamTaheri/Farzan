@@ -305,6 +305,13 @@ export const Drawer = {
     _teardownTimers: new WeakMap(),
     _openingTokens: new WeakMap(),
 
+    _hasOpenOrOpeningDrawer() {
+      // First-frame-pending drawers already own focus, scroll and inertness.
+      // Counting only the CSS .open class prematurely releases those locks.
+      return [...document.querySelectorAll('.drawer')].some(drawer =>
+        drawer.classList.contains('open') || this._openingTokens.has(drawer));
+    },
+
     open(target) {
       const drawer = typeof target === 'string'
         ? document.getElementById(target)
@@ -355,7 +362,7 @@ export const Drawer = {
       if (!drawer.classList.contains('open') && !this._openingTokens.has(drawer)) return;
       this._openingTokens.delete(drawer);
       drawer.classList.remove('open');
-      const stillOpen = document.querySelectorAll('.drawer.open').length > 0;
+      const stillOpen = this._hasOpenOrOpeningDrawer();
       const backdrop = $('.drawer-backdrop');
       if (!stillOpen) backdrop?.classList.remove('open');
       const duration = shell().config?.animationDuration ?? 0;
@@ -369,7 +376,7 @@ export const Drawer = {
         }, duration),
         backdrop: !stillOpen && backdrop ? setTimeout(() => {
           // A different drawer might have opened before the animation ends.
-          if (!document.querySelector('.drawer.open')) backdrop.remove();
+          if (!this._hasOpenOrOpeningDrawer()) backdrop.remove();
         }, duration) : null,
       };
       this._teardownTimers.set(drawer, pending);
