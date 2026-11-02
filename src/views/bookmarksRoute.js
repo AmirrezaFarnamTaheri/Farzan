@@ -349,7 +349,17 @@ export function mountBookmarksView(deps = {}) {
           Router.navigate('#/materials');
         });
       }
-      if (item.type === 'Timestamp' && item.topicId) {
+      // Some imported legacy timestamps have no stable topic ID. Retain the
+      // saved card and metadata, but never offer a link that can fall through
+      // to another course (or consume an unrelated pending media handoff).
+      const hasTimestampTopic = item.topicId != null && String(item.topicId).trim() !== '';
+      if (item.type === 'Timestamp' && !hasTimestampTopic) {
+        link.removeAttribute('href');
+        link.setAttribute('aria-disabled', 'true');
+        link.textContent = 'Source unavailable';
+        link.title = 'This saved timestamp has no topic ID; find the lesson manually in Courses.';
+      }
+      if (item.type === 'Timestamp' && hasTimestampTopic) {
         // A saved card is not a current catalog source. Revalidate its
         // canonical revision and destination on the click, not at render.
         const renderedSnapshot = JSON.stringify(item.source);
