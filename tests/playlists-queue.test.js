@@ -166,6 +166,59 @@ describe('saved video queue playback', () => {
     expect(saved[0].sourceRefs).toEqual([{ courseId: 'a', topicId: 'shared' }]);
   });
 
+  it('keeps a saved timestamp title instead of borrowing a duplicated imported course-topic source', async () => {
+    document.body.innerHTML = '<main id="main-content"></main>';
+    const timestamps = [{ id: 'ts-ambiguous', topicId: 'shared',
+      courseId: 'renal', title: 'Saved kidney lecture checkpoint', position: 104 }];
+    window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
+      { topicId: 'shared', courseId: 'renal', title: 'Incorrect first imported source',
+        videos: [{ url: 'https://example.test/a.mp4' }] },
+      { topicId: 'shared', courseId: 'renal', title: 'Conflicting second imported source',
+        videos: [{ url: 'https://example.test/b.mp4' }] },
+    ] };
+    window.DB = { getAllTimestamps: vi.fn(async () => structuredClone(timestamps)),
+      getSetting: vi.fn(async () => null), saveSetting: vi.fn() };
+    window.OpenCourseDeck = {};
+    mountPlaylistsView({
+      setView: html => { document.querySelector('main').innerHTML = html; },
+      safeMediaUrl: media => typeof media === 'string' ? media : media?.url,
+      Toast: { error: vi.fn() },
+    });
+    const card = await vi.waitFor(() => {
+      const el = document.querySelector('[data-playlist-id="timestamp-queue"]');
+      expect(el).not.toBeNull(); return el;
+    });
+    expect(card.textContent).toContain('Saved kidney lecture checkpoint');
+    expect(card.textContent).not.toContain('Incorrect first imported source');
+    expect(card.textContent).not.toContain('Conflicting second imported source');
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(timestamps[0].title).toBe('Saved kidney lecture checkpoint');
+  });
+
+  it('never borrows a uniquely named topic from a different course than the saved timestamp', async () => {
+    document.body.innerHTML = '<main id="main-content"></main>';
+    const timestamp = { id: 'ts-removed', topicId: 'legacy-topic',
+      courseId: 'old-course', title: 'Archived course checkpoint', position: 62 };
+    window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
+      { topicId: 'legacy-topic', courseId: 'replacement-course',
+        title: 'Unrelated new imported lesson', videos: [{ url: 'https://example.test/unrelated.mp4' }] },
+    ] };
+    window.DB = { getAllTimestamps: vi.fn(async () => [structuredClone(timestamp)]),
+      getSetting: vi.fn(async () => null) };
+    window.OpenCourseDeck = {};
+    mountPlaylistsView({
+      setView: html => { document.querySelector('main').innerHTML = html; },
+      safeMediaUrl: media => typeof media === 'string' ? media : media?.url,
+      Toast: { error: vi.fn() },
+    });
+    const card = await vi.waitFor(() => {
+      const el = document.querySelector('[data-playlist-id="timestamp-queue"]');
+      expect(el).not.toBeNull(); return el;
+    });
+    expect(card.textContent).toContain('Archived course checkpoint');
+    expect(card.textContent).not.toContain('Unrelated new imported lesson');
+  });
+
   it('resolves a timestamp preview by course ID when the catalog repeats a topic ID', async () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     window.DataStore = { init: vi.fn(async () => true), allTopics: () => [
