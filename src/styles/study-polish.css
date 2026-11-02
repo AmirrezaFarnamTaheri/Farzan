@@ -97,7 +97,7 @@
 .home-command-strip {
   margin-top: var(--space-5);
   border-color: var(--border);
-  color: var(--text-secondary);
+
 }
 .home-focus-panel {
   padding: clamp(var(--space-5), 2vw, var(--space-7));
