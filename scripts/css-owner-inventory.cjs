@@ -8,7 +8,28 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function maskComments(input) {
-  return input.replace(/\/\*[\s\S]*?\*\//g, text => text.replace(/[^\n]/g, ' '));
+  // CSS comment delimiters inside quoted content/URLs are literal data.
+  // Preserve them while masking real comments to keep exact source offsets.
+  const output = input.split('');
+  let quote = '';
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (quote) {
+      if (ch === '\\') { i++; continue; }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch !== '/' || input[i + 1] !== '*') continue;
+    const end = input.indexOf('*/', i + 2);
+    // Keep malformed unclosed comments unchanged, as the former regex did.
+    if (end === -1) break;
+    for (let j = i; j < end + 2; j++) {
+      if (input[j] !== '\n' && input[j] !== '\r') output[j] = ' ';
+    }
+    i = end + 1;
+  }
+  return output.join('');
 }
 
 function normal(value) {
