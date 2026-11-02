@@ -230,7 +230,15 @@ export function createStudioKonvaDraftWorkspace({
       container,
       board: session.getBoard(),
       mode,
-      onStroke: points => run(() => session.addStroke(points)),
+      onStroke: points => {
+        // Pen gesture completions from a destroyed scene or after a tool
+        // switch must not persist an invisible ghost stroke into board-v1.
+        // No rejected Promise should leak out of an already closed surface.
+        if (disposed || generation !== sceneGeneration || mode !== 'pen') {
+          return Promise.resolve(false);
+        }
+        return run(() => session.addStroke(points));
+      },
       // Late events from a detached stage must not control the newly mounted
       // tool or report an error against the wrong selection/session.
       onError: error => {
