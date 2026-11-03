@@ -113,7 +113,7 @@ function validateBackup(input) {
       }
       if (store === 'timestamps') {
         try { courseTopicIdentity(record.courseId, record.topicId); }
-        catch { throw new TypeError(`Backup timestamp at index ${index} has no course/topic identity`); }
+        catch (error) { throw new TypeError(`Backup timestamp at index ${index} has no course/topic identity`, { cause: error }); }
       }
     }
     included.push(store);
