@@ -451,7 +451,10 @@ import { countWords } from './src/core/textMetrics.js';
         deletion = Promise.reject(error);
       }
       void deletion.then(receipt => {
-        if (receipt == null || receipt === false) throw new Error('Canonical Notes folder delete not acknowledged');
+        // The canonical bridge deleteFolder() resolves undefined after
+        // its IndexedDB delete completes and broadcasts the change. Unlike
+        // saveFolder(), a void delete receipt is a documented success.
+        if (receipt === false) throw new Error('Canonical Notes folder delete was refused');
         window.OpenCourseDeck?.beforeUnload?.unmark?.(reason);
       }).catch(error => {
         this._emitStorageIssue('storage:save-error', {
