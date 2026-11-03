@@ -2530,6 +2530,46 @@ describe('app shell resilience helpers', () => {
     expect(saveNote).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['canonical cue reads fail', 'read-failed'],
+    ['canonical cue writer is missing', 'writer-missing'],
+    ['canonical cue writer refuses the write', 'writer-refused'],
+  ])('does not claim an unsaved course chapter after %s', async (_caseName, failure) => {
+    await loadApp();
+    const saveSetting = vi.fn(async () => false);
+    window.DB = {
+      getSetting: vi.fn(async () => {
+        if (failure === 'read-failed') throw new Error('IndexedDB unavailable');
+        return null;
+      }),
+      getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true),
+      ...(failure === 'writer-missing' ? {} : { saveSetting }),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: () => [{ id: 'course-a', title: 'Cardiology' }],
+      allTopics: () => [{ topicId: 'topic-1', courseId: 'course-a', title: 'Lecture',
+        videos: ['https://example.test/video.mp4'] }],
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const activeTrack = { topicId: 'topic-1', courseId: 'course-a', title: 'Lecture', chapters: [] };
+    document.getElementById('course-player')._pdPlayer = {
+      snapshot: () => ({ track: activeTrack, queueIndex: 0, currentTime: 45, duration: 180 }),
+      queue: [activeTrack], trackIndex: 0, on: vi.fn(), off: vi.fn(),
+      showChapters: vi.fn(), showTranscript: vi.fn(),
+    };
+    const textInput = document.querySelector('[data-learning-marker-text]');
+    textInput.value = 'Unsaved chapter should remain a draft';
+    document.querySelector('[data-save-chapter-cue]').click();
+
+    await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
+      .toMatch(/unavailable|could not|failed|not saved/i));
+    expect(activeTrack.chapters).toEqual([]);
+    expect(textInput.value).toBe('Unsaved chapter should remain a draft');
+    if (failure === 'read-failed') expect(saveSetting).not.toHaveBeenCalled();
+  });
+
   it('authors chapter and transcript cues from the course player', async () => {
     await loadApp();
     const saveSetting = vi.fn(async () => true);
