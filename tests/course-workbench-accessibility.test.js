@@ -313,7 +313,7 @@ describe('Courses workbench progress and accessible row actions', () => {
 
     const controller = await mountCourses();
     await callbacks.get('trackChange')(track);
-    expect(records.get('anemia')).toMatchObject({
+    expect(records.get(progressId)).toMatchObject({
       status: 'in-progress', percent: 40, position: 48,
     });
     controller.unmount();
