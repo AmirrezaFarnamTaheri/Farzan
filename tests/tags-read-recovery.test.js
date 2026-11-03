@@ -15,6 +15,7 @@ describe('Tags canonical read recovery', () => {
     delete window.OpenCourseDeck.rerenderVisibleTags;
     window.DB = {
       getAllNotes: vi.fn(async () => []),
+      getSetting: vi.fn(async () => null),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -24,6 +25,19 @@ describe('Tags canonical read recovery', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('rejects a missing canonical taxonomy reader instead of inventing an empty read-only taxonomy', async () => {
+    delete window.DB.getSetting;
+    window.DB.getAllNotes.mockResolvedValue([{ id: 'n1', tags: ['Saved renal label'] }]);
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-tag-retry]')).not.toBeNull());
+    expect(document.querySelector('[data-tag-list] [role="alert"]').textContent)
+      .toMatch(/taxonomy|stored|could not be loaded/i);
+    expect(document.querySelector('[data-tag-metrics]').children).toHaveLength(0);
+    expect(document.querySelector('[data-tag-name]')).toBeNull();
+    expect(document.querySelector('[data-tag-create-form] button').disabled).toBe(true);
+    expect(document.querySelector('[data-tag-list]').textContent).not.toContain('No tags yet');
   });
 
   it('does not render fabricated zero tag counts when the canonical notes read fails', async () => {
