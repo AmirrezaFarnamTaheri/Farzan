@@ -237,6 +237,23 @@ describe('user library overlay', () => {
     expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('library:changed', expect.anything());
   });
 
+  it.each([
+    ['string instead of a record', 'not-a-library'],
+    ['array instead of a record', []],
+    ['array instead of a courses map', { version: 1, courses: [] }],
+    ['unsupported future schema', { version: 999, courses: {} }],
+    ['missing canonical courses map', { version: 1 }],
+  ])('refuses to overwrite %s returned from canonical library storage', async (_label, stored) => {
+    const original = structuredClone(stored);
+    window.DB.store.ocd_user_library = structuredClone(stored);
+    await expect(loadLibrary()).rejects.toThrow(/invalid|unsupported|corrupt/i);
+    await expect(upsertCourse({ title: 'Must not erase existing data' }))
+      .rejects.toThrow(/invalid|unsupported|corrupt/i);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.store.ocd_user_library).toEqual(original);
+    expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
+  });
+
   it('serializes concurrent user-library edits without dropping a course or topic', async () => {
     // Interleave reads via an asynchronous adapter; without the lock both
     // operations see the same empty snapshot and the last writer wins.
