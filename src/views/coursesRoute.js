@@ -318,11 +318,27 @@ export async function mountCoursesView(deps = {}) {
 
   const MEDIA_CUES_KEY = 'ocd_course_media_cues';
   let authoredMediaCues = {};
+  let durableAuthoredMediaCues = {};
+  let canonicalCuesReadable = false;
+  let cueSavePending = false;
   try {
-    const savedCues = await window.DB?.getSetting?.(MEDIA_CUES_KEY);
-    authoredMediaCues = savedCues && typeof savedCues === 'object' ? savedCues : {};
+    if (typeof window.DB?.getSetting !== 'function') {
+      throw new Error('Canonical learning cue reader unavailable');
+    }
+    const savedCues = await window.DB.getSetting(MEDIA_CUES_KEY);
+    if (savedCues != null && (typeof savedCues !== 'object' || Array.isArray(savedCues))) {
+      throw new TypeError('Unsupported canonical learning cue record');
+    }
+    authoredMediaCues = savedCues ?? {};
+    durableAuthoredMediaCues = structuredClone(authoredMediaCues);
+    canonicalCuesReadable = true;
   } catch {
-    authoredMediaCues = {};
+    // A failed canonical read is not an empty library. Editing stays blocked
+    // until a route reload successfully reads the saved source of truth.
+    if (learningMarkerStatusEl) {
+      learningMarkerStatusEl.textContent = 'Saved learning cues could not be loaded. Editing is unavailable until you retry.';
+      learningMarkerStatusEl.dataset.tone = 'warning';
+    }
   }
   let allCourses = [];
   let allTopics = [];
@@ -587,10 +603,44 @@ export async function mountCoursesView(deps = {}) {
       learningMarkerListEl.appendChild(row);
     });
   };
+  const ensureCuesEditable = () => {
+    if (!canonicalCuesReadable) {
+      setLearningMarkerStatus('Saved learning cues are unavailable. Retry opening Courses before editing.', 'warning');
+      return false;
+    }
+    if (cueSavePending) {
+      setLearningMarkerStatus('A learning cue save is still in progress. Retry your edit after it finishes.', 'warning');
+      return false;
+    }
+    return true;
+  };
   const persistAuthoredMediaCues = async () => {
-    await window.DB?.saveSetting?.(MEDIA_CUES_KEY, authoredMediaCues);
+    const snapshot = structuredClone(authoredMediaCues);
+    const failed = (message) => {
+      authoredMediaCues = structuredClone(durableAuthoredMediaCues);
+      renderLearningCueList();
+      setLearningMarkerStatus(message, 'warning');
+      return false;
+    };
+    if (!canonicalCuesReadable || typeof window.DB?.saveSetting !== 'function') {
+      return failed('Canonical learning cue storage is unavailable. Your changes were not saved.');
+    }
+    cueSavePending = true;
+    try {
+      const receipt = await window.DB.saveSetting(MEDIA_CUES_KEY, snapshot);
+      if (receipt !== true && JSON.stringify(receipt) !== JSON.stringify(snapshot)) {
+        throw new Error('Canonical learning cue write was not acknowledged');
+      }
+      durableAuthoredMediaCues = snapshot;
+      return true;
+    } catch {
+      return failed('Learning cues could not be saved. Your changes were not applied; retry your edit.');
+    } finally {
+      cueSavePending = false;
+    }
   };
   const deleteLearningCue = async (type, index) => {
+    if (!ensureCuesEditable()) return;
     const context = currentPlayerContext();
     if (!context?.topicId) {
       setLearningMarkerStatus('Play a course topic before editing learning markers.', 'warning');
@@ -611,7 +661,7 @@ export async function mountCoursesView(deps = {}) {
         [key]: nextList,
       },
     };
-    await persistAuthoredMediaCues();
+    if (!await persistAuthoredMediaCues()) return;
     syncActiveTrackCues(context);
     if (key === 'chapters') context.inst?.showChapters?.();
     else context.inst?.showTranscript?.();
@@ -642,6 +692,7 @@ export async function mountCoursesView(deps = {}) {
     setLearningMarkerStatus('Active topic cues loaded for bulk editing.', 'success');
   };
   const applyActiveLearningCues = async () => {
+    if (!ensureCuesEditable()) return;
     const context = currentPlayerContext();
     if (!context?.topicId) {
       setLearningMarkerStatus('Play a course topic before applying active cues.', 'warning');
@@ -681,7 +732,7 @@ export async function mountCoursesView(deps = {}) {
         transcript: cueList(cues.transcript),
       },
     };
-    await persistAuthoredMediaCues();
+    if (!await persistAuthoredMediaCues()) return;
     syncActiveTrackCues(context);
     context.inst?.showChapters?.();
     context.inst?.showTranscript?.();
@@ -689,6 +740,7 @@ export async function mountCoursesView(deps = {}) {
     setLearningMarkerStatus(cueImportSummary(stats, 'Active topic cues applied'), 'success');
   };
   const importLearningCues = async () => {
+    if (!ensureCuesEditable()) return;
     let parsed;
     try {
       parsed = JSON.parse(String(learningMarkerJsonEl?.value || '{}'));
@@ -716,7 +768,7 @@ export async function mountCoursesView(deps = {}) {
         }];
       })),
     };
-    await persistAuthoredMediaCues();
+    if (!await persistAuthoredMediaCues()) return;
     const context = currentPlayerContext();
     syncActiveTrackCues(context);
     context?.inst?.showChapters?.();
@@ -725,6 +777,7 @@ export async function mountCoursesView(deps = {}) {
     setLearningMarkerStatus(cueImportSummary(stats, 'Learning cue JSON imported'), 'success');
   };
   const saveLearningCue = async (type) => {
+    if (!ensureCuesEditable()) return null;
     const context = currentPlayerContext();
     if (!context?.topicId || !context?.courseId) {
       setLearningMarkerStatus('Play a course topic before adding a learning marker.', 'warning');
@@ -754,7 +807,7 @@ export async function mountCoursesView(deps = {}) {
       ...authoredMediaCues,
       [cueKey]: nextTopicCues,
     };
-    await persistAuthoredMediaCues();
+    if (!await persistAuthoredMediaCues()) return null;
     const activeTrack = context.activeTrack || context.track;
     activeTrack[key] = [...cueList(activeTrack[key]), cue].sort((a, b) => Number(a.time ?? a.start ?? 0) - Number(b.time ?? b.start ?? 0));
     if (type === 'chapter') context.inst?.showChapters?.();
@@ -792,7 +845,8 @@ export async function mountCoursesView(deps = {}) {
     const nextCues = payload.record?.value && typeof payload.record.value === 'object'
       ? payload.record.value
       : await window.DB?.getSetting?.(MEDIA_CUES_KEY);
-    authoredMediaCues = nextCues && typeof nextCues === 'object' ? nextCues : {};
+    authoredMediaCues = nextCues && typeof nextCues === 'object' && !Array.isArray(nextCues) ? nextCues : {};
+    durableAuthoredMediaCues = structuredClone(authoredMediaCues);
     const context = currentPlayerContext();
     syncActiveTrackCues(context);
     renderLearningCueList();
