@@ -319,6 +319,10 @@ export async function mountCoursesView(deps = {}) {
   const MEDIA_CUES_KEY = 'ocd_course_media_cues';
   let authoredMediaCues = {};
   let durableAuthoredMediaCues = {};
+  // Keep the exact original canonical revision (including null on first use)
+  // for an atomic transaction. A normalized empty object is not an equivalent
+  // compare-and-swap expected value.
+  let durableCueRecord = null;
   let canonicalCuesReadable = false;
   let cueSavePending = false;
   try {
@@ -331,6 +335,7 @@ export async function mountCoursesView(deps = {}) {
     }
     authoredMediaCues = savedCues ?? {};
     durableAuthoredMediaCues = structuredClone(authoredMediaCues);
+    durableCueRecord = structuredClone(savedCues);
     canonicalCuesReadable = true;
   } catch {
     // A failed canonical read is not an empty library. Editing stays blocked
@@ -622,19 +627,28 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus(message, 'warning');
       return false;
     };
-    if (!canonicalCuesReadable || typeof window.DB?.saveSetting !== 'function') {
-      return failed('Canonical learning cue storage is unavailable. Your changes were not saved.');
+    if (!canonicalCuesReadable || typeof window.DB?.compareAndSwapSetting !== 'function'
+        || typeof window.DB?.getSetting !== 'function') {
+      return failed('Atomic canonical learning cue storage is unavailable. Your changes were not saved.');
     }
     cueSavePending = true;
     try {
-      const receipt = await window.DB.saveSetting(MEDIA_CUES_KEY, snapshot);
-      if (receipt !== true && JSON.stringify(receipt) !== JSON.stringify(snapshot)) {
-        throw new Error('Canonical learning cue write was not acknowledged');
+      // A getSetting/saveSetting pair would accept stale edits from another tab.
+      // Only the IndexedDB transaction may approve this exact base revision.
+      const receipt = await window.DB.compareAndSwapSetting(MEDIA_CUES_KEY, durableCueRecord, snapshot);
+      if (receipt !== true) throw new Error('Canonical learning cue CAS was not acknowledged');
+      const verified = await window.DB.getSetting(MEDIA_CUES_KEY);
+      if (JSON.stringify(verified) !== JSON.stringify(snapshot)) {
+        throw new Error('Canonical learning cue readback did not match the saved revision');
       }
-      durableAuthoredMediaCues = snapshot;
+      durableCueRecord = structuredClone(verified);
+      durableAuthoredMediaCues = structuredClone(verified);
       return true;
     } catch {
-      return failed('Learning cues could not be saved. Your changes were not applied; retry your edit.');
+      // After an atomic conflict or unreadable readback, the previous locally
+      // cached snapshot is no longer a safe basis for another edit.
+      canonicalCuesReadable = false;
+      return failed('Learning cues could not be saved or verified. Reload Courses before editing again.');
     } finally {
       cueSavePending = false;
     }
@@ -842,11 +856,21 @@ export async function mountCoursesView(deps = {}) {
       return;
     }
     if (payload.kind !== 'setting' || payload.record?.key !== MEDIA_CUES_KEY) return;
+    // Do not let another tab's notification overwrite a mutation while its
+    // atomic commit and readback are still in flight.
+    if (cueSavePending) return;
     const nextCues = payload.record?.value && typeof payload.record.value === 'object'
       ? payload.record.value
       : await window.DB?.getSetting?.(MEDIA_CUES_KEY);
-    authoredMediaCues = nextCues && typeof nextCues === 'object' && !Array.isArray(nextCues) ? nextCues : {};
+    if (nextCues != null && (typeof nextCues !== 'object' || Array.isArray(nextCues))) {
+      setLearningMarkerStatus('Remote learning cue revision is incompatible. Reload Courses.', 'warning');
+      canonicalCuesReadable = false;
+      return;
+    }
+    authoredMediaCues = nextCues ?? {};
     durableAuthoredMediaCues = structuredClone(authoredMediaCues);
+    durableCueRecord = structuredClone(nextCues);
+    canonicalCuesReadable = true;
     const context = currentPlayerContext();
     syncActiveTrackCues(context);
     renderLearningCueList();
