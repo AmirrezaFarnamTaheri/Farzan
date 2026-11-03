@@ -1296,7 +1296,7 @@ const ProgressStats = (() => {
       ? await DB.exportBackup()
       : null;
     const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
-      && primary._meta.version === 4;
+      && primary._meta.version === 5;
     const mirrorKeys = [
       'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists',
@@ -1329,7 +1329,7 @@ const ProgressStats = (() => {
     result.rollbackErrors = [];
     try {
       if (snapshot.primary && typeof DB.importBackup === 'function') {
-        // The v4 backup engine overwrites all primary object stores in ONE IDB
+        // The v5 backup engine overwrites all primary object stores in ONE IDB
         // transaction, preserving untouched watchedSegments/pdfBookmarks.
         const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
         if (receipt?.committed !== true || receipt.degraded === true) {
