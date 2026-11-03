@@ -1320,13 +1320,7 @@
   .nav-group { display: flex; flex-direction: column; gap: 1px; }
   .nav-group + .nav-group { margin-top: var(--space-2); }
   .nav-group-label {
-
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: var(--tracking-widest);
-    color: var(--text-tertiary);
     text-transform: uppercase;
-    padding: var(--space-2) var(--space-3) var(--space-1);
     white-space: nowrap;
     overflow: hidden;
   }
@@ -1335,24 +1329,17 @@
     width: 22px;
     height: 22px;
     flex-shrink: 0;
-    color: inherit;
     opacity: 0.95;
   }
-  .nav-item.active .icon { color: var(--accent); }
 
   /* Topbar button alias */
   .topbar-action-btn {
-    border-radius: var(--radius-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
-
     transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
   }
   .topbar-action-btn:hover {
-    background: color-mix(in srgb, var(--glass-bg) 65%, transparent);
-    border-color: var(--glass-border);
     color: var(--text-primary);
     transform: translateY(-1px);
   }
@@ -3052,8 +3039,6 @@
 
 .studio-panel-heading {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
 }
 
 /* PDF reader layout: the document is primary; thumbnails support it. */
