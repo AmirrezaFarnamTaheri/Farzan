@@ -669,7 +669,7 @@ describe('app shell resilience helpers', () => {
     expect(view.textContent).toContain('Active tracks');
     expect(view.textContent).toContain('Video topics');
     expect(live.textContent).toContain('Loaded lecture');
-    expect(resume.textContent).toContain('Rhythm review');
+    expect(resume.textContent).toContain('Saved checkpoint');
     expect(catalog.textContent).toContain('Lectures');
     expect(catalog.textContent).toContain('2 video topics');
     expect(catalog.querySelector('a[href="#/courses"]')).toBeTruthy();
