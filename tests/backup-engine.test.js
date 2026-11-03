@@ -4,7 +4,7 @@ import { installBackupEngine } from '../src/core/backupEngine.js';
 import { AI_BINDING_KEY, AI_SESSION_KEY, AI_SETTINGS_KEY } from '../src/core/aiAuthority.js';
 
 const schema = [
-  ['progress', 'topicId'],
+  ['progress', 'id'],
   ['timestamps', 'id'],
   ['notes', 'id'],
   ['folders', 'id'],
@@ -21,7 +21,7 @@ async function createDatabase() {
     drop.onerror = () => reject(drop.error);
   });
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('opencoursedeck', 3);
+    const request = indexedDB.open('opencoursedeck', 4);
     request.onupgradeneeded = () => {
       for (const [name, keyPath] of schema) request.result.createObjectStore(name, { keyPath });
     };
