@@ -137,6 +137,14 @@ describe('atomic backup engine', () => {
     }, { mode: 'merge' })).rejects.toThrow(/invalid course-scoped key/i);
   });
 
+  it('rejects internal timestamp snapshots without course/topic identity', async () => {
+    const root = rootWithFacade();
+    installBackupEngine(root);
+    await expect(root.DB.importBackup({
+      timestamps: [{ id: 'ts-unscoped', topicId: 'shared', position: 12 }],
+    }, { mode: 'merge' })).rejects.toThrow(/timestamp.*course\/topic identity/i);
+  });
+
   it('removes endpoint approval and credential authority from exported settings', async () => {
     await putSetting({
       mode: 'custom-api',
