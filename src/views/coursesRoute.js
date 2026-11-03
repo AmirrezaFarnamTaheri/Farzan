@@ -1,6 +1,7 @@
 import { openPdfSource } from '../core/pdfNavigation.js';
 import { resolveActiveCoursePlayback } from '../core/coursePlaybackIdentity.js';
 import { catalogReadingDirection } from '../lib/catalogDirection.js';
+import { courseTopicIdentity, parseCourseTopicIdentity } from '../core/courseTopicIdentity.js';
 export async function mountCoursesView(deps = {}) {
   const {
     setView,
@@ -348,7 +349,6 @@ export async function mountCoursesView(deps = {}) {
   let allCourses = [];
   let allTopics = [];
   let topicsByCourse = {};
-  let ambiguousProgressTopicIds = new Set();
   const rebuildCatalogIndexes = () => {
     const sourceCourses = window.DataStore?.allCourses?.() ?? [];
     // In Plasmato, show the 31 medical courses before the small starter tour.
@@ -360,30 +360,8 @@ export async function mountCoursesView(deps = {}) {
       (acc[t.courseId] = acc[t.courseId] ?? []).push(t);
       return acc;
     }, {});
-    // Progress records use a topicId-keyed legacy store. Do not display or
-    // write one course's completion over another course's identically named
-    // topic until a versioned, explicitly migrated composite key exists.
-    const owners = new Map();
-    for (const topic of allTopics) {
-      if (topic?.topicId == null) continue;
-      const key = String(topic.topicId);
-      const courses = owners.get(key) || new Set();
-      courses.add(String(topic.courseId ?? ''));
-      owners.set(key, courses);
-    }
-    ambiguousProgressTopicIds = new Set(
-      [...owners].filter(([, courses]) => courses.size > 1).map(([id]) => id));
   };
-  // Legacy unscoped authored cues remain readable only when a topic ID is
-  // unique. New edits to ambiguous imported lessons use course+topic keys,
-  // never guessing that one course owns an unscoped legacy cue.
-  const authoredCueKey = source => {
-    const topicId = String(source?.topicId ?? '');
-    const courseId = String(source?.courseId ?? '');
-    return ambiguousProgressTopicIds.has(topicId)
-      ? 'source:' + JSON.stringify([courseId, topicId])
-      : topicId;
-  };
+  const authoredCueKey = source => courseTopicIdentity(source?.courseId, source?.topicId);
   rebuildCatalogIndexes();
   const courseFacetState = {
     query: '',
@@ -479,8 +457,8 @@ export async function mountCoursesView(deps = {}) {
     String(cueTime(cue)),
     cueLabel(cue),
   ].join('|');
-  const mergedCues = (topic, key, fallbackKey) => [
-    ...cueList(topic[key] ?? (fallbackKey ? topic[fallbackKey] : undefined)),
+  const mergedCues = (topic, key) => [
+    ...cueList(topic[key]),
     ...cueList(authoredMediaCues?.[authoredCueKey(topic)]?.[key]),
   ];
   const courseMediaTrack = (topic, url, courseId) => ({
@@ -489,7 +467,7 @@ export async function mountCoursesView(deps = {}) {
     artist: topic.courseTitle ?? courseId,
     topicId: topic.topicId,
     courseId,
-    chapters: mergedCues(topic, 'chapters', 'chapterMarkers'),
+    chapters: mergedCues(topic, 'chapters'),
     transcript: mergedCues(topic, 'transcript'),
     captions: topic.captions,
     captionTracks: topic.captionTracks ?? topic.subtitles,
@@ -540,12 +518,14 @@ export async function mountCoursesView(deps = {}) {
   const normalizeImportedCues = (value, options = {}) => {
     const stats = options.stats || { kept: 0, dropped: 0, deduped: 0, clamped: 0 };
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const entries = Object.entries(value);
+    if (entries.some(([identity, cues]) => !parseCourseTopicIdentity(identity)
+      || !cues || typeof cues !== 'object' || Array.isArray(cues))) return null;
     const normalized = {};
-    Object.entries(value).forEach(([topicId, cues]) => {
-      if (!cues || typeof cues !== 'object' || Array.isArray(cues)) return;
+    entries.forEach(([identity, cues]) => {
       const chapters = normalizeCueList(cues.chapters, 'chapters', options.maxTime, stats);
       const transcript = normalizeCueList(cues.transcript, 'transcript', options.maxTime, stats);
-      normalized[topicId] = {
+      normalized[identity] = {
         ...(chapters.length ? { chapters } : {}),
         ...(transcript.length ? { transcript } : {}),
       };
@@ -719,22 +699,16 @@ export async function mountCoursesView(deps = {}) {
       setLearningMarkerStatus('Active cue JSON is not valid.', 'warning');
       return;
     }
-    const topicId = String(parsed?.topicId || context.topicId);
-    if (topicId !== context.topicId) {
-      setLearningMarkerStatus('Active cue JSON belongs to a different topic.', 'warning');
+    const topicId = String(parsed?.topicId ?? '');
+    const courseId = String(parsed?.courseId ?? '');
+    if (topicId !== context.topicId || courseId !== context.courseId) {
+      setLearningMarkerStatus('Active cue JSON must match the current course and topic.', 'warning');
       return;
     }
-    if (parsed?.courseId != null && String(parsed.courseId) !== context.courseId) {
-      setLearningMarkerStatus('Active cue JSON belongs to a different course.', 'warning');
-      return;
-    }
-    if (ambiguousProgressTopicIds.has(topicId) && String(parsed?.courseId ?? '') !== context.courseId) {
-      setLearningMarkerStatus('Active cue JSON needs explicit course identity for this shared topic ID.', 'warning');
-      return;
-    }
+    const identity = authoredCueKey(context);
     const stats = { kept: 0, dropped: 0, deduped: 0, clamped: 0 };
-    const normalized = normalizeImportedCues({ [context.topicId]: parsed }, { maxTime: context.duration, stats });
-    const cues = normalized?.[context.topicId];
+    const normalized = normalizeImportedCues({ [identity]: parsed }, { maxTime: context.duration, stats });
+    const cues = normalized?.[identity];
     if (!cues) {
       setLearningMarkerStatus('Active cue JSON needs chapters or transcript arrays.', 'warning');
       return;
@@ -765,18 +739,14 @@ export async function mountCoursesView(deps = {}) {
     const stats = { kept: 0, dropped: 0, deduped: 0, clamped: 0 };
     const normalized = normalizeImportedCues(parsed, { stats });
     if (!normalized) {
-      setLearningMarkerStatus('Cue JSON must be an object keyed by topic id.', 'warning');
-      return;
-    }
-    if (Object.keys(normalized).some(key => ambiguousProgressTopicIds.has(key))) {
-      setLearningMarkerStatus('Cue import needs explicit course identity for shared topic IDs.', 'warning');
+      setLearningMarkerStatus('Cue JSON must use canonical course/topic identity keys.', 'warning');
       return;
     }
     authoredMediaCues = {
       ...authoredMediaCues,
-      ...Object.fromEntries(Object.entries(normalized).map(([topicId, cues]) => {
-        const existing = authoredMediaCues[topicId] || {};
-        return [topicId, {
+      ...Object.fromEntries(Object.entries(normalized).map(([identity, cues]) => {
+        const existing = authoredMediaCues[identity] || {};
+        return [identity, {
           chapters: normalizeCueList([...cueList(existing.chapters), ...cueList(cues.chapters)], 'chapters', undefined, stats),
           transcript: normalizeCueList([...cueList(existing.transcript), ...cueList(cues.transcript)], 'transcript', undefined, stats),
         }];
@@ -990,17 +960,13 @@ export async function mountCoursesView(deps = {}) {
     if (hasVideo && hasPdf) actions.appendChild(actionButton('open-pdf', 'PDF'));
     if (hasEmbed && (hasVideo || hasPdf)) actions.appendChild(actionButton('open-embed', 'Open'));
     if (toggle) {
-      const ambiguous = ambiguousProgressTopicIds.has(String(topic.topicId));
       const completion = createElement('button', {
         class: 'topic-completion-toggle',
         type: 'button',
         'data-action': 'toggle-done',
         'aria-label': `${status === 'done' ? 'Mark not started' : 'Mark completed'}: ${topic.title}`,
         'aria-pressed': status === 'done' ? 'true' : 'false',
-        ...(ambiguous ? { disabled: true } : {}),
-        title: ambiguous
-          ? 'Completion unavailable: this lesson ID belongs to multiple courses'
-          : (status === 'done' ? 'Mark not started' : 'Mark completed'),
+        title: status === 'done' ? 'Mark not started' : 'Mark completed',
       }, createElement('span', { 'aria-hidden': 'true' }, status === 'done' ? '✓' : '○'));
       completion.appendChild(createElement('span', {
         class: 'topic-completion-label',
@@ -1078,15 +1044,10 @@ export async function mountCoursesView(deps = {}) {
     // An unavailable store must not be misrepresented as all topics unstarted.
     let progList;
     try {
-      if (typeof window.DB?.getAllProgress === 'function') {
-        progList = await window.DB.getAllProgress();
-      } else if (typeof window.DB?.getProgress === 'function') {
-        // Legacy bridges and test adapters predate the bulk read API.
-        // Never interpret a rejected individual read as empty progress.
-        progList = await Promise.all(topics.map(topic => window.DB.getProgress(topic.topicId)));
-      } else {
-        throw new Error('Progress storage unavailable');
+      if (typeof window.DB?.getAllProgress !== 'function') {
+        throw new Error('Canonical course-scoped progress reader unavailable');
       }
+      progList = await window.DB.getAllProgress();
       if (!Array.isArray(progList)) throw new Error('Unexpected progress response');
     } catch {
       if (renderToken !== detailRenderToken) return;
@@ -1100,13 +1061,12 @@ export async function mountCoursesView(deps = {}) {
       return;
     }
     if (renderToken !== detailRenderToken) return;
-    const courseTopicIds = new Set(topics.map(t => t.topicId));
-    const progById = new Map(progList.filter(p =>
-      p?.topicId && courseTopicIds.has(p.topicId)
-      && (p.courseId != null
-        ? String(p.courseId) === String(courseId)
-        : !ambiguousProgressTopicIds.has(String(p.topicId))))
-      .map(p => [p.topicId, p]));
+    const courseTopicIds = new Set(topics.map(topic => String(topic.topicId)));
+    const progById = new Map(progList.filter(record =>
+      record?.topicId != null && record?.courseId != null
+      && courseTopicIds.has(String(record.topicId))
+      && String(record.courseId) === String(courseId))
+      .map(record => [String(record.topicId), record]));
     const filteredTopics = topics.filter((topic) => passCourseFilter(topic, progById.get(topic.topicId)?.status ?? 'not-started', activeFilter));
     const grouped = filteredTopics.reduce((acc, topic) => {
       const key = sourceKey(topic);
@@ -1325,11 +1285,7 @@ export async function mountCoursesView(deps = {}) {
       const [topic] = matches;
 
       if (action === 'toggle-done') {
-        if (ambiguousProgressTopicIds.has(topicId)) {
-          Toast.error('Lesson progress cannot be changed while this topic ID belongs to multiple courses');
-          return;
-        }
-        const existing = await window.DB?.getProgress?.(topicId);
+        const existing = await window.DB?.getProgress?.(topicId, courseId);
         const isDone = existing?.status === 'done';
         await window.DB?.saveProgress?.(topicId, courseId, {
           status: isDone ? 'not-started' : 'done',
@@ -1394,8 +1350,7 @@ export async function mountCoursesView(deps = {}) {
       const t = track ?? inst?.queue?.[inst?.trackIndex ?? 0] ?? null;
       const topicId = t?.topicId;
       const courseId = t?.courseId;
-      if (!topicId || !courseId || typeof window.DB?.saveProgress !== 'function'
-        || ambiguousProgressTopicIds.has(String(topicId))) return;
+      if (!topicId || !courseId || typeof window.DB?.saveProgress !== 'function') return;
 
       // Completion is a learning decision, not an alias for the current media
       // position. Reading inside the canonical per-topic write queue is
@@ -1408,7 +1363,7 @@ export async function mountCoursesView(deps = {}) {
       const dur = Number(duration ?? inst?.duration ?? 0);
       const pct = Number(percent ?? (dur > 0 ? Math.round((cur / dur) * 100) : 0));
       if (![cur, dur, pct].every(Number.isFinite)) return;
-      const previous = await window.DB?.getProgress?.(topicId);
+      const previous = await window.DB?.getProgress?.(topicId, courseId);
       // Do not overwrite manual or previously achieved completion when a
       // learner replays or seeks backward. Explicit "Mark incomplete" uses
       // its separate action and remains the only completion-reset path.
