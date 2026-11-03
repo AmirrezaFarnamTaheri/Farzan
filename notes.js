@@ -188,7 +188,11 @@ import { countWords } from './src/core/textMetrics.js';
         throw error;
       }
 
-      const overlay = new Map();
+      // Concurrent sync/restore reads can finish out of order. Only the
+      // newest canonical snapshot may publish, while each pending read tracks
+      // local mutations made after it began.
+      const generation = this._hydrationReadGeneration = (this._hydrationReadGeneration || 0) + 1;
+      const overlay = { notes: new Map(), folders: new Map(), settingsChanged: false };
       this._activeHydrationReads.add(overlay);
       try {
         // Collect the full read snapshot before publishing any of it. A
@@ -201,18 +205,19 @@ import { countWords } from './src/core/textMetrics.js';
           if (!Array.isArray(folders)) throw new TypeError('Invalid canonical Notes folders collection');
         }
         let settings = null;
-        if (typeof DB.getSetting === 'function') {
+        const hasSettingsReader = typeof DB.getSetting === 'function';
+        if (hasSettingsReader) {
           settings = await DB.getSetting(SETTINGS_KEY);
           if (settings != null && (typeof settings !== 'object' || Array.isArray(settings))) {
             throw new TypeError('Invalid canonical Notes settings record');
           }
         }
 
-        // These mutations happened while the asynchronous read was pending.
-        // Do not resurrect a remotely deleted note or overwrite a newer
-        // in-flight local draft with the earlier snapshot.
+        if (generation !== this._hydrationReadGeneration) return false;
+        // Replay all local mutations made during the read onto its snapshot.
+        // Neither a remote deletion nor a local edit should be silently lost.
         const latest = notes.slice();
-        for (const [id, updated] of overlay) {
+        for (const [id, updated] of overlay.notes) {
           const index = latest.findIndex(note => String(note?.id) === id);
           if (updated === null) {
             if (index >= 0) latest.splice(index, 1);
@@ -223,11 +228,27 @@ import { countWords } from './src/core/textMetrics.js';
           }
         }
         this._notes = latest;
-        if (folders !== null) this._folders = folders.slice();
-        if (settings !== null) this._settings = { ...(settings ?? {}) };
+        if (folders !== null) {
+          const latestFolders = folders.slice();
+          for (const [id, updated] of overlay.folders) {
+            const index = latestFolders.findIndex(folder => String(folder?.id) === id);
+            if (updated === null) {
+              if (index >= 0) latestFolders.splice(index, 1);
+            } else if (index >= 0) {
+              latestFolders[index] = updated;
+            } else {
+              latestFolders.push(updated);
+            }
+          }
+          this._folders = latestFolders;
+        }
+        // A confirmed null means that settings were removed, not that the
+        // previously cached settings should remain authoritative.
+        if (hasSettingsReader && !overlay.settingsChanged) this._settings = { ...(settings ?? {}) };
         this._hydrated = true;
         return true;
       } catch (error) {
+        if (generation !== this._hydrationReadGeneration) return false;
         this._emitStorageIssue('storage:read-error', {
           kind: 'notes-hydration', backend: 'indexedDB', error: this._storageErrorInfo(error),
         });
@@ -247,7 +268,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     _cacheNote(note, fallbackNotes = null) {
       for (const read of this._activeHydrationReads) {
-        read.set(String(note.id), { ...note });
+        read.notes.set(String(note.id), { ...note });
       }
       if (Array.isArray(fallbackNotes)) {
         this._notes = fallbackNotes.slice();
@@ -360,7 +381,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     deleteNote(id) {
-      for (const read of this._activeHydrationReads) read.set(String(id), null);
+      for (const read of this._activeHydrationReads) read.notes.set(String(id), null);
       const notes = this.getNotes().filter(n => n.id !== id);
       this._notes = notes;
       return this._enqueueNoteMutation(id, 'delete', () => {
@@ -385,6 +406,9 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _cacheFolder(folder, fallbackFolders = null) {
+      for (const read of this._activeHydrationReads) {
+        read.folders.set(String(folder.id), { ...folder });
+      }
       if (Array.isArray(fallbackFolders)) {
         this._folders = fallbackFolders.slice();
         return;
@@ -437,6 +461,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     deleteFolder(id) {
       if (this.isSystemFolder(id)) return { deleted: false, moved: 0 };
+      for (const read of this._activeHydrationReads) read.folders.set(String(id), null);
       const folders = this.getFolders().filter(f => f.id !== id);
       this._folders = folders;
       const reason = 'notes-durable-folder:' + String(id);
@@ -487,6 +512,7 @@ import { countWords } from './src/core/textMetrics.js';
 
     saveSettings(value) {
       const snapshot = { ...(value ?? {}) };
+      for (const read of this._activeHydrationReads) read.settingsChanged = true;
       this._settings = snapshot;
       const reason = 'notes-durable-settings';
       window.OpenCourseDeck?.beforeUnload?.mark?.(reason);
