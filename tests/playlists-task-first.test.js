@@ -23,7 +23,12 @@ describe('Playlists task-first organization', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async key => key === 'ocd_playlists' ? saved : null),
-      saveSetting: vi.fn(async (key, value) => { saved = value; return true; }),
+      saveSetting: vi.fn(async () => { throw new Error('Non-atomic writer must not run'); }),
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
+        if (key !== 'ocd_playlists' || JSON.stringify(expected) !== JSON.stringify(saved)) return false;
+        saved = structuredClone(next);
+        return true;
+      }),
     };
   });
   afterEach(() => {
