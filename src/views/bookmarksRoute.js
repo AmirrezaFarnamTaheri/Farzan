@@ -50,48 +50,44 @@ export function mountBookmarksView(deps = {}) {
   const stablePdfDocId = isStablePdfDocumentId;
 
   async function resolveTimestampSource(original, snapshot) {
+    const id = String(original?.id ?? '').trim();
+    const topicId = String(original?.topicId ?? '').trim();
+    const courseId = String(original?.courseId ?? '').trim();
+    if (!id || !topicId || !courseId) {
+      throw new Error('Saved timestamp requires a stable ID and exact course/topic identity');
+    }
     const db = window.DB;
+    if (typeof db?.getAllTimestamps !== 'function') {
+      throw new Error('Saved timestamp is unavailable; reload bookmarks');
+    }
     const readSaved = async () => {
-      if (typeof db?.getAllTimestamps !== 'function') {
-        throw new Error('Saved timestamp is unavailable; reload bookmarks');
-      }
       const rows = await db.getAllTimestamps();
       if (!Array.isArray(rows)) throw new Error('Saved timestamp records are unavailable');
-      // Preserve imported ID-less records if their entire original revision
-      // still exists exactly once; never choose an unrelated first match.
-      const matches = original?.id != null
-        ? rows.filter(row => row && String(row.id) === String(original.id))
-        : rows.filter(row => JSON.stringify(row) === snapshot);
+      const matches = rows.filter(row => row && String(row.id) === id);
       if (matches.length !== 1 || JSON.stringify(matches[0]) !== snapshot) {
         throw new Error('Saved timestamp changed elsewhere; reload before opening');
       }
     };
-
     await readSaved();
+
     const store = window.DataStore;
     if (typeof store?.allTopics !== 'function') {
       throw new Error('Current course catalog is unavailable');
     }
     await store.init?.();
-    // Imported offline courses are an overlay on the shipped catalog. A
-    // failed overlay cannot authorize a topic-only fallback to another course.
     await window.OpenCourseDeck?.UserLibrary?.overlay?.();
     const topics = await store.allTopics();
     if (!Array.isArray(topics)) throw new Error('Current course catalog is unavailable');
-    const matches = topics.filter(topic => topic?.topicId != null
-      && String(topic.topicId) === String(original.topicId)
-      && (original.courseId == null || String(original.courseId) === ''
-        || String(topic.courseId) === String(original.courseId)));
+    const matches = topics.filter(topic => String(topic?.topicId) === topicId
+      && String(topic?.courseId) === courseId);
     if (matches.length !== 1) {
       throw new Error('Saved timestamp source is missing or ambiguous in the current course catalog');
     }
-    // A second canonical read guards a cross-tab edit made while the imported
-    // library/catalog was loading. No saved records are mutated by this gate.
     await readSaved();
     return {
-      topicId: String(matches[0].topicId),
-      courseId: matches[0].courseId ?? null,
-      position: original.position,
+      topicId,
+      courseId,
+      position: Math.max(0, Number(original.position) || 0),
     };
   }
 
@@ -382,14 +378,16 @@ export function mountBookmarksView(deps = {}) {
       // Some imported legacy timestamps have no stable topic ID. Retain the
       // saved card and metadata, but never offer a link that can fall through
       // to another course (or consume an unrelated pending media handoff).
-      const hasTimestampTopic = item.topicId != null && String(item.topicId).trim() !== '';
-      if (item.type === 'Timestamp' && !hasTimestampTopic) {
+      const hasTimestampIdentity = item.id != null && String(item.id).trim() !== ''
+        && item.topicId != null && String(item.topicId).trim() !== ''
+        && item.courseId != null && String(item.courseId).trim() !== '';
+      if (item.type === 'Timestamp' && !hasTimestampIdentity) {
         link.removeAttribute('href');
         link.setAttribute('aria-disabled', 'true');
         link.textContent = 'Source unavailable';
-        link.title = 'This saved timestamp has no topic ID; find the lesson manually in Courses.';
+        link.title = 'This saved timestamp has no canonical course/topic identity; find the lesson manually in Courses.';
       }
-      if (item.type === 'Timestamp' && hasTimestampTopic) {
+      if (item.type === 'Timestamp' && hasTimestampIdentity) {
         // A saved card is not a current catalog source. Revalidate its
         // canonical revision and destination on the click, not at render.
         const renderedSnapshot = JSON.stringify(item.source);
