@@ -37,7 +37,7 @@ This folder workflow is optional and currently unavailable in browsers without d
 
 When no missing-file section appears, there are no missing imported file references detected in the current library. A storage read failure must not be interpreted as an empty library; the interface reports an error instead.
 
-The importer prepares a snapshot of existing data for recovery, including course outlines and media cues. Imports containing watch history or PDF bookmarks require an atomic version-3 recovery snapshot; unsupported storage environments should reject those imports rather than risk a partial restore. If a recoverable write fails, the importer attempts to restore original settings and records; if rollback fails it reports that explicitly. An interrupted browser process is not guaranteed to recover an older multi-step import automatically.
+The importer prepares a snapshot of existing data for recovery, including course outlines and media cues. Imports containing watch history or PDF bookmarks require an atomic version-4 recovery snapshot; unsupported storage environments should reject those imports rather than risk a partial restore. If a recoverable write fails, the importer attempts to restore original settings and records; if rollback fails it reports that explicitly. An interrupted browser process is not guaranteed to recover an older multi-step import automatically.
 
 ## Read-only before/after restore verification (local files only)
 
