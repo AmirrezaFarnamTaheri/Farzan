@@ -81,6 +81,30 @@ describe('CSS authoritative selector ownership', () => {
     }
   });
 
+  it('removes superseded unconditional navigation and inspector paint from earlier component layer', () => {
+    const { inventoryCss, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
+    const rules = inventoryCss().rules;
+    const retired = [
+      ['.nav-group-label', ['padding', 'font-size', 'font-weight', 'letter-spacing', 'color']],
+      ['.nav-item .icon', ['color']],
+      ['.nav-item.active .icon', ['color']],
+      ['.topbar-action-btn', ['border-radius']],
+      ['.topbar-action-btn:hover', ['background', 'border-color']],
+      ['.studio-panel-heading', ['font-size', 'color']],
+    ];
+    const getProps = (file, selector) => rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body).map(decl => decl.property));
+    for (const [selector, properties] of retired) {
+      const obsolete = getProps('components.css', selector);
+      const authoritative = getProps('farzan-redesign.css', selector);
+      for (const property of properties) {
+        expect(obsolete, `earlier components.css still owns ${selector}:${property}`).not.toContain(property);
+        expect(authoritative, `final redesign is missing ${selector}:${property}`).toContain(property);
+      }
+    }
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
