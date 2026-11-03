@@ -1132,7 +1132,7 @@ describe('progress backup exports', () => {
       folders: [{ id: 'folder-cancel', name: 'Cancelled folder' }],
       settings: { notes: { view: 'grid' } },
       annotations: [{ id: 'ann-cancel', docId: 'doc-1', page: 1, updatedAt: 13 }],
-      timestamps: [{ id: 'ts-cancel', topicId: 'topic-cancel' }],
+      timestamps: [{ id: 'ts-cancel', topicId: 'topic-cancel', courseId: 'course-1' }],
     };
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => false) };
     const file = new File([JSON.stringify(payload)], 'cancelled-backup.json', { type: 'application/json' });
