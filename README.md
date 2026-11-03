@@ -63,7 +63,7 @@ npm run audit
 OpenCourseDeck stores data locally in the browser profile for the origin you open, usually `http://localhost:5173`.
 
 - IndexedDB stores progress, timestamps, and database-backed records.
-- Some preferences and notes compatibility data may be mirrored in `localStorage`.
+- `localStorage` holds preferences and noncanonical UI state only; progress, notes, timestamps, settings records, and PDF annotations use canonical IndexedDB without data mirrors or persistence fallbacks.
 - Nothing is uploaded by the app by default.
 - Progress and Settings export portable JSON **1.6**, including notes, progress, PDF annotations/bookmarks, watched segments, flashcards, Studio metadata, custom course outlines, media cues, and local-library references. The export is **metadata-only** for imported PDF/video files: original binary bytes are not included. After importing on another device, open **My Courses → Missing local files → Locate file** to relink original media without changing saved source IDs.
 

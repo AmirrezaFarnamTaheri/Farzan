@@ -33,7 +33,7 @@ The app saves notes, bookmarks, progress, settings, and other supported records 
 
 - Vanilla JavaScript and ES modules, built with esbuild.
 - A hash-based router in `src/router/router.js`.
-- IndexedDB storage through `bridge.js`, with compatibility data in `localStorage`.
+- Canonical study records use IndexedDB through `bridge.js`; `localStorage` is for preferences and transient UI state, not duplicated study records.
 - Native CSS custom properties and layers in `src/styles/`, with reusable UI helpers in `ui.js`.
 - Vitest unit tests, browser smoke tests, and GitHub Actions verification.
 - Workbox service worker and vendored runtime libraries.
