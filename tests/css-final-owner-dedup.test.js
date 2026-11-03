@@ -131,4 +131,111 @@ describe('final-layer shared workspace style ownership (#175)', () => {
     }
   });
 
+  it('retires shadowed desktop shell declarations instead of preserving obsolete pre-release cascade', () => {
+    const report = inventoryCss();
+    const retire = [
+      [
+            "layout.css",
+            ".ocd-app",
+            "min-height"
+      ],
+      [
+            "layout.css",
+            ".ocd-app",
+            "background"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "height"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "background"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "box-shadow"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "backdrop-filter"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "position"
+      ],
+      [
+            "layout.css",
+            ".sidebar",
+            "top"
+      ],
+      [
+            "layout.css",
+            ".main-content",
+            "height"
+      ],
+      [
+            "layout.css",
+            ".topbar",
+            "box-shadow"
+      ],
+      [
+            "layout.css",
+            ".topbar",
+            "position"
+      ],
+      [
+            "layout.css",
+            ".topbar",
+            "top"
+      ],
+      [
+            "layout.css",
+            ".view-container",
+            "scroll-padding-top"
+      ],
+      [
+            "layout.css",
+            ".sidebar-logo",
+            "background"
+      ],
+      [
+            "layout.css",
+            ".sidebar-logo-icon",
+            "box-shadow"
+      ],
+      [
+            "components.css",
+            ".breadcrumb-current",
+            "font-weight"
+      ],
+      [
+            "components.css",
+            ".topbar-action-btn",
+            "width"
+      ],
+      [
+            "components.css",
+            ".topbar-action-btn",
+            "height"
+      ]
+];
+    const owned = (file, selector, property) => report.rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body))
+      .filter(decl => decl.property === property);
+    for (const [file, selector, property] of retire) {
+      expect(owned(file, selector, property), `${file}: ${selector} ${property}`).toHaveLength(0);
+      const final = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(final?.owner.file, `final owner: ${selector} ${property}`)
+        .toBe('farzan-redesign.css');
+    }
+  });
+
 });
