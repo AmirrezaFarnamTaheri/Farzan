@@ -2841,6 +2841,7 @@ import { Pointer } from './src/lib/pointer.js';
         safeMediaUrl,
         safeFrameUrl,
         setPendingCourseMedia,
+        setPendingPdfPage,
         Router,
         Toast,
         downloadTextFile,
