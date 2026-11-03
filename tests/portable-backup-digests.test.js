@@ -3,7 +3,7 @@ import { comparePortableBackups, summarizePortableBackup } from '../scripts/veri
 import { createFsrsV5State } from '../src/features/flashcardsFsrsAdapter.js';
 
 const before = {
-  version: '1.6', exportedAt: '2026-10-31T12:00:00.000Z',
+  version: '1.7', exportedAt: '2026-10-31T12:00:00.000Z',
   meta: { sizeBytes: 123, attachments: {
     mode: 'metadata-only', binaryIncluded: false,
     references: [{ id: 'library-file:private', size: 22 }],
@@ -30,7 +30,7 @@ const before = {
 };
 
 describe('read-only portable recovery digests', () => {
-  it('compares first-party 1.6 exports without leaking raw notes, IDs or changing input', () => {
+  it('compares first-party 1.7 exports without leaking raw notes, IDs or changing input', () => {
     const original = structuredClone(before);
     const reopened = structuredClone(before);
     reopened.exportedAt = '2026-11-01T18:00:00.000Z';
