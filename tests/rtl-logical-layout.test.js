@@ -31,7 +31,7 @@ describe('RTL layout uses logical start/end in owning CSS rules', () => {
     expect(rule(enhancements, '.view-courses #courses-search')).toMatch(/padding-inline:\s*calc\(/);
     expect(views).not.toContain('.courses-search-field .input {');
     // Logical scroll padding remains RTL-safe, but now has one final owner.
-    expect(rule(studio, '.courses-list')).toMatch(/padding-inline-end:\\s*3px/);
+    expect(rule(studio, '.courses-list')).toMatch(/padding-inline-end:\s*3px/);
     expect(rule(views, '.courses-list')).not.toMatch(/padding-inline-end:/);
     // The final redesign layer owns this logical text alignment; keeping
     // a duplicate in views.css hid ownership without changing the cascade.
