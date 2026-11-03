@@ -2008,7 +2008,7 @@ describe('app shell resilience helpers', () => {
     };
     window.DB = {
       getAllNotes: vi.fn(async () => [{ id: 'note-1', title: 'Rhythm note', topicId: 'topic-1' }]),
-      getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1', title: 'Saved checkpoint', position: 125 }]),
+      getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1', courseId: 'course-a', title: 'Saved checkpoint', position: 125 }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-a', title: 'Rhythm annotation', page: 4 }]),
     };
 
@@ -2102,7 +2102,7 @@ describe('app shell resilience helpers', () => {
     window.DB = {
       getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [
-        { id: 'ts-1', topicId: 'topic-1', title: 'Saved checkpoint', position: 125, updatedAt: 30 },
+        { id: 'ts-1', topicId: 'topic-1', courseId: 'course-a', title: 'Saved checkpoint', position: 125, updatedAt: 30 },
       ]),
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
