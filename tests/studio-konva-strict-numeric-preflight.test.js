@@ -15,6 +15,11 @@ const source = () => ({
 });
 
 const incompatible = [
+  ['null viewport object', board => { board.viewport = null; }],
+  ['array viewport', board => { board.viewport = [8, 2, 1]; }],
+  ['text viewport', board => { board.viewport = 'saved viewport'; }],
+  ['numeric viewport', board => { board.viewport = 24; }],
+  ['boolean viewport', board => { board.viewport = false; }],
   ['null viewport offset', board => { board.viewport.offsetX = null; }],
   ['null viewport zoom', board => { board.viewport.zoom = null; }],
   ['null rectangle x', board => { board.layers[0].elements[0].x = null; }],
