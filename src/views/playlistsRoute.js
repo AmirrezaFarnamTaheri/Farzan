@@ -288,16 +288,19 @@ async function renderPlaylists(deps) {
     .filter(item => item?.id && item?.topicId && item?.courseId)
     .map(item => {
       const key = courseTopicKey(item.courseId, item.topicId);
-      if (!key || ambiguousCourseTopics.has(key)) return null;
-      const topic = topicsByCourse.get(key);
-      return topic ? {
-        ...topic,
+      const topic = key && !ambiguousCourseTopics.has(key) ? topicsByCourse.get(key) : null;
+      // Keep the saved moment visible when a source is offline or ambiguous.
+      // No topic-only fallback and no guessed playback destination: the card
+      // links to Bookmarks, which validates its exact source before handoff.
+      return {
+        ...(topic || {}),
+        topicId: item.topicId,
+        courseId: item.courseId,
         position: item.position,
         timestampId: item.id,
-        title: item.title || topic.title,
-      } : null;
-    })
-    .filter(Boolean);
+        title: item.title || item.topicTitle || topic?.title || 'Saved timestamp',
+      };
+    });
 
   const playlists = [];
   savedPlaylists
