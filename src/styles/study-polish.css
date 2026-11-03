@@ -19,20 +19,10 @@
 /* Structural navigation should remain clearly separated while scrolling.
  * A solid surface also works on platforms lacking backdrop-filter. */
 .sidebar {
-  border-inline-end: 1px solid var(--border);
   border-right: none;
-}
-.topbar {
-  border-bottom: 1px solid var(--border);
 }
 .sidebar-logo {
   border-color: var(--border);
-}
-.nav-item.active,
-.nav-item[aria-current="page"] {
-  background: var(--accent-muted);
-  color: var(--text-primary);
-  font-weight: 700;
 }
 .nav-item:focus-visible,
 .home-focus-action:focus-visible,
@@ -47,7 +37,6 @@
   min-height: 40px;
 }
 .view-container {
-  scroll-padding-top: var(--space-5);
   padding-block: var(--space-5) max(var(--space-8), env(safe-area-inset-bottom));
 }
 
@@ -66,9 +55,6 @@
   opacity: 0.22;
   pointer-events: none;
 }
-.home-hero-copy {
-  max-width: 65ch;
-}
 .home-title {
   margin-block: var(--space-3);
 }
@@ -86,12 +72,6 @@
 .home-focus-status {
   border-color: var(--border-strong);
 }
-.home-focus-panel > p {
-  color: var(--text-secondary);
-}
-.home-focus-progress {
-  background: var(--surface-3);
-}
 .home-focus-action {
   border-color: var(--border-strong);
 }
@@ -101,7 +81,6 @@
   border-color: var(--border);
 }
 .home-pulse-item {
-  background: var(--surface-2);
   border-color: var(--border);
   box-shadow: none;
 }
@@ -119,7 +98,6 @@
   max-width: 65ch;
 }
 .home-tool-list a {
-  min-height: 48px;
   border-color: transparent;
 }
 .home-tool-list a:hover {
