@@ -62,7 +62,7 @@ function summarizePortableBackup(input) {
   if (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings)) {
     throw new TypeError('Portable backup settings are unavailable');
   }
-  // Every first-party v1.6 app-data export contains all eight canonical
+  // Every first-party v1.7 app-data export contains all eight canonical
   // settings sections, even when an empty section is explicitly null. Missing
   // fields cannot be interpreted as zero data during recovery certification.
   for (const key of [
@@ -115,7 +115,7 @@ function summarizePortableBackup(input) {
   counts.attachments = attachments.references.length;
   digests.attachments = digest(sortedRecords(attachments.references, 'attachments'));
 
-  return { version: '1.6', counts, digests };
+  return { version: '1.7', counts, digests };
 }
 
 function comparePortableBackups(original, restored) {
