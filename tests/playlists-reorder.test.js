@@ -31,9 +31,10 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async key => key === 'ocd_playlists' ? saved : null),
-      saveSetting: vi.fn(async (key, value) => {
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
         if (key !== 'ocd_playlists') throw new Error('Wrong storage key');
-        saved = structuredClone(value);
+        if (JSON.stringify(expected) !== JSON.stringify(saved)) return false;
+        saved = structuredClone(next);
         return true;
       }),
     };
@@ -61,7 +62,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
     expect(saved[0].metadata).toEqual(original[0].metadata);
     expect(saved[0].createdAt).toBe(original[0].createdAt);
     expect(saved[0].updatedAt).toBeGreaterThan(original[0].updatedAt);
-    expect(window.DB.saveSetting).toHaveBeenCalledTimes(1);
+    expect(window.DB.compareAndSwapSetting).toHaveBeenCalledTimes(1);
     expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/order/i));
 
     const open = await vi.waitFor(() => {
@@ -100,7 +101,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
   });
 
   it('preserves the previous canonical order when a durable writer rejects the update', async () => {
-    window.DB.saveSetting = vi.fn(async () => false);
+    window.DB.compareAndSwapSetting = vi.fn(async () => false);
     mount();
     const move = await vi.waitFor(() => {
       const button = document.querySelector('[data-playlist-move="down"][data-topic-index="0"]');
@@ -124,7 +125,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
     saved = [{ ...saved[0], topicIds: ['e','a','b','c','d'] }];
     stale.click();
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.compareAndSwapSetting).not.toHaveBeenCalled();
     expect(saved[0].topicIds).toEqual(['e','a','b','c','d']);
   });
 });

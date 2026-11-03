@@ -146,7 +146,11 @@ describe('saved video queue playback', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async () => structuredClone(saved)),
-      saveSetting: vi.fn(async (_key, value) => { saved = structuredClone(value); return true; }),
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
+        if (key !== 'ocd_playlists' || JSON.stringify(expected) !== JSON.stringify(saved)) return false;
+        saved = structuredClone(next);
+        return true;
+      }),
     };
     window.OpenCourseDeck = {};
     const Toast = { success: vi.fn(), error: vi.fn() };

@@ -157,28 +157,18 @@ function sanitizeSavedPlaylists(value) {
     : [];
 }
 
-// Canonical saveSetting may acknowledge with true or the exact saved value.
-// False, null, missing or unrelated receipts cannot establish a durable write.
-function assertSavedPlaylistReceipt(receipt, expected) {
-  if (receipt === true) return;
-  if (Array.isArray(receipt) && JSON.stringify(receipt) === JSON.stringify(expected)) return;
-  throw new Error('Saved playlist write was not acknowledged');
-}
-
 /**
- * Commit the whole canonical playlist revision atomically when IndexedDB CAS
- * is available. A separate get/save pair would erase concurrent tab writes.
- * A declined or failed CAS must NEVER fall back to the non-atomic writer.
- * Legacy settings integrations retain acknowledged saves and strict readback.
+ * Commit a saved playlist revision only with an atomic IndexedDB CAS.
+ * A get/save pair can erase another tab's data and is unsupported.
+ * Keep strict canonical readback after an acknowledged transaction.
  */
 async function persistSavedPlaylists(db, expected, next) {
-  if (typeof db?.compareAndSwapSetting === 'function') {
-    const accepted = await db.compareAndSwapSetting('ocd_playlists', expected, next);
-    if (accepted !== true) {
-      throw new Error('Saved playlist changed elsewhere or atomic write was not acknowledged; reload before editing');
-    }
-  } else {
-    assertSavedPlaylistReceipt(await db.saveSetting('ocd_playlists', next), next);
+  if (typeof db?.compareAndSwapSetting !== 'function') {
+    throw new Error('Canonical atomic saved playlist storage is unavailable');
+  }
+  const accepted = await db.compareAndSwapSetting('ocd_playlists', expected, next);
+  if (accepted !== true) {
+    throw new Error('Saved playlist changed elsewhere or atomic write was not acknowledged; reload before editing');
   }
   const verified = await db.getSetting('ocd_playlists');
   if (!Array.isArray(verified) || JSON.stringify(verified) !== JSON.stringify(next)) {
@@ -574,7 +564,7 @@ async function renderPlaylists(deps) {
     let creating = false;
     const unsafeCatalog = !canSaveCatalog(firstCatalog);
     saveBtn.disabled = unsafeCatalog
-      || typeof window.DB?.saveSetting !== 'function'
+      || typeof window.DB?.compareAndSwapSetting !== 'function'
       || typeof window.DB?.getSetting !== 'function';
     if (unsafeCatalog) {
       const warning = document.createElement('p');
@@ -585,7 +575,7 @@ async function renderPlaylists(deps) {
     }
     saveBtn.onclick = async () => {
       if (creating || unsafeCatalog
-        || typeof window.DB?.saveSetting !== 'function'
+        || typeof window.DB?.compareAndSwapSetting !== 'function'
         || typeof window.DB?.getSetting !== 'function') return;
       const input = document.querySelector('[data-playlist-name]');
       const title = String(input?.value || firstCatalog.title || 'Saved playlist').trim() || 'Saved playlist';
@@ -646,7 +636,7 @@ async function renderPlaylists(deps) {
       const wasExpanded = move.closest('details')?.open === true;
       const hadKeyboardFocus = document.activeElement === move;
       if (typeof window.DB?.getSetting !== 'function'
-          || typeof window.DB?.saveSetting !== 'function') {
+          || typeof window.DB?.compareAndSwapSetting !== 'function') {
         Toast.error?.('Saved playlist storage is unavailable');
         return;
       }
@@ -766,7 +756,7 @@ async function renderPlaylists(deps) {
     }
     const btn = event.target?.closest?.('[data-delete-playlist]');
     if (!btn || btn.disabled) return;
-    if (typeof window.DB?.getSetting !== 'function' || typeof window.DB?.saveSetting !== 'function') {
+    if (typeof window.DB?.getSetting !== 'function' || typeof window.DB?.compareAndSwapSetting !== 'function') {
       Toast.error?.('Could not delete playlist: storage is unavailable');
       return;
     }

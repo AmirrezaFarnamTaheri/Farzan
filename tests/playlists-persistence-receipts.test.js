@@ -18,8 +18,11 @@ describe('Saved playlists acknowledged mutations', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async key => key === 'ocd_playlists' ? structuredClone(saved) : null),
-      saveSetting: vi.fn(async (key, value) => {
-        saved = structuredClone(value);
+      saveSetting: vi.fn(async () => { throw new Error('Non-atomic writer must not run'); }),
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
+        expect(key).toBe('ocd_playlists');
+        if (JSON.stringify(expected) !== JSON.stringify(saved)) return false;
+        saved = structuredClone(next);
         return true;
       }),
     };
@@ -56,9 +59,40 @@ describe('Saved playlists acknowledged mutations', () => {
     return { field, button };
   }
 
+  it('does not expose queue creation through a non-atomic saveSetting-only adapter', async () => {
+    delete window.DB.compareAndSwapSetting;
+    mount();
+    const saveButton = await vi.waitFor(() => {
+      expect(document.querySelector('[data-playlist-id="old"]')).not.toBeNull();
+      const button = document.querySelector('[data-save-playlist]');
+      expect(button).not.toBeNull();
+      return button;
+    });
+    expect(saveButton.disabled).toBe(true);
+    saveButton.click();
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(saved).toHaveLength(1);
+  });
+
+  it('never deletes a saved queue through the legacy non-atomic writer', async () => {
+    delete window.DB.compareAndSwapSetting;
+    mount();
+    const button = await vi.waitFor(() => {
+      const node = document.querySelector('[data-delete-playlist="old"]');
+      expect(node).not.toBeNull();
+      return node;
+    });
+    button.click();
+    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/storage|atomic|unavailable/i),
+    ));
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(saved).toEqual([{ id: 'old', title: 'Before', topicIds: ['a','b'], createdAt: 10 }]);
+  });
+
   it('does not claim creation succeeded when the canonical writer refuses the receipt', async () => {
     const initial = structuredClone(saved);
-    window.DB.saveSetting.mockResolvedValue(false);
+    window.DB.compareAndSwapSetting.mockResolvedValue(false);
     const { field } = await create();
     await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringMatching(/save.*playlist|playlist.*save/i)));
     expect(Toast.success).not.toHaveBeenCalled();
@@ -66,20 +100,9 @@ describe('Saved playlists acknowledged mutations', () => {
     expect(saved).toEqual(initial);
   });
 
-  it('accepts the existing canonical settings API returning the written array', async () => {
-    window.DB.saveSetting.mockImplementation(async (_key, value) => {
-      saved = structuredClone(value);
-      return structuredClone(value);
-    });
-    await create();
-    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Playlist saved'));
-    expect(saved[0].title).toBe('My durable queue');
-    expect(saved[1].id).toBe('old');
-  });
-
   it('rejects a missing write receipt without erasing the original queue on delete', async () => {
     const initial = structuredClone(saved);
-    window.DB.saveSetting.mockResolvedValue(undefined);
+    window.DB.compareAndSwapSetting.mockResolvedValue(undefined);
     mount();
     const button = await vi.waitFor(() => {
       const deleteButton = document.querySelector('[data-delete-playlist="old"]');
@@ -107,7 +130,7 @@ describe('Saved playlists acknowledged mutations', () => {
   });
 
   it('rejects an unacknowledged reorder without notifying success', async () => {
-    window.DB.saveSetting.mockResolvedValue(undefined);
+    window.DB.compareAndSwapSetting.mockResolvedValue(undefined);
     mount();
     const move = await vi.waitFor(() => {
       const button = document.querySelector('[data-playlist-move="down"][data-topic-index="0"]');

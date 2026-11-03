@@ -673,11 +673,16 @@ describe('app shell resilience helpers', () => {
 
   it('saves a named playlist from the first catalog queue', async () => {
     await loadApp();
-    const saveSetting = vi.fn(async () => true);
+    let stored = [];
+    const compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+      if (key !== 'ocd_playlists' || JSON.stringify(expected) !== JSON.stringify(stored)) return false;
+      stored = structuredClone(next);
+      return true;
+    });
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
-      getSetting: vi.fn(async () => []),
-      saveSetting,
+      getSetting: vi.fn(async () => structuredClone(stored)),
+      compareAndSwapSetting,
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -693,8 +698,13 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-playlist-name]').value = 'Cardio queue';
     document.querySelector('[data-save-playlist]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_playlists', expect.any(Array)));
-    const saved = saveSetting.mock.calls[0][1][0];
+    await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenCalledTimes(1));
+    const [key, expected, next] = compareAndSwapSetting.mock.calls[0];
+    expect(key).toBe('ocd_playlists');
+    expect(Array.isArray(expected)).toBe(true);
+    expect(expected).toEqual([]);
+    expect(Array.isArray(next)).toBe(true);
+    const saved = next[0];
     expect(saved.title).toBe('Cardio queue');
     expect(saved.topicIds).toEqual(['topic-1', 'topic-2']);
   });
