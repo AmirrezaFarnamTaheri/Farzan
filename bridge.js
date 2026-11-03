@@ -934,7 +934,6 @@
     }
 
     const getProgressByCourse = async courseId => (await _byIndex('progress', 'courseId', courseId)).map(_publicProgress);
-    const getTimestampsByTopic = topicId => _byIndex('timestamps', 'topicId', topicId);
     const getTimestampsByCourse = courseId => _byIndex('timestamps', 'courseId', courseId);
     const getNotesByTopic = topicId => _byIndex('notes', 'topicId', topicId);
     const getNotesByCourse = courseId => _byIndex('notes', 'courseId', courseId);
