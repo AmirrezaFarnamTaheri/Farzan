@@ -1678,6 +1678,45 @@ describe('notes route filters', () => {
     expect(window.__importScriptXss).toBeUndefined();
   });
 
+  it('rejects malformed non-string imported note content without overwriting saved HTML', async () => {
+    const saved = structuredClone(window.PlasmaNotesStore.getNote('pinned-note'));
+    window.DB.saveNote.mockClear();
+    const file = new File([JSON.stringify([
+      { id: 'pinned-note', title: 'Malicious replacement', content: { type: 'doc', html: '<p>Not HTML</p>' },
+        updatedAt: now + 100000 },
+      { id: 'invalid-array', title: 'Array note', content: ['<p>False body</p>'] },
+      { id: 'invalid-number', title: 'Number note', content: 41 },
+      { id: 'invalid-boolean', title: 'Boolean note', content: false },
+      { id: 'valid-rich-html', title: 'Genuine HTML', content: '<p><strong>Retained</strong></p>' },
+    ])], 'malformed-notes.json', { type: 'application/json' });
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
+      imported: 1, updated: 0, skipped: 0, invalid: 4, conflicts: 0,
+    })), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('pinned-note')).toEqual(saved);
+    for (const id of ['invalid-array', 'invalid-number', 'invalid-boolean']) {
+      expect(window.PlasmaNotesStore.getNote(id)).toBeNull();
+      expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({ id }));
+    }
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'pinned-note' }));
+    expect(window.PlasmaNotesStore.getNote('valid-rich-html').content).toContain('<strong>Retained</strong>');
+    expect(window.OpenCourseDeck.lastNotesImportResult.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'pinned-note', message: expect.stringMatching(/html|text|content/i) })])
+    );
+  });
+
+  it('permits an absent first-use note body as empty HTML without guessing an object encoding', async () => {
+    const file = new File([JSON.stringify([{ id: 'empty-imported-note', title: 'Blank import', content: null }])],
+      'blank-notes.json', { type: 'application/json' });
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
+      imported: 1, updated: 0, invalid: 0,
+    })), { timeout: 5000 });
+    const note = window.PlasmaNotesStore.getNote('empty-imported-note');
+    expect(note).toBeTruthy();
+    expect(note.content).toBe('');
+  });
+
   it('sanitizes imported HTML offline without requiring a separately loaded DOMPurify global', async () => {
     // A bundled sanitizer must remain available when no runtime vendor script
     // has established window.DOMPurify yet.
