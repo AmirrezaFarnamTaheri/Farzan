@@ -59,14 +59,8 @@
 }
 
 .view-courses .filter-chip {
-  min-height: 34px;
   padding: 0.45rem 0.75rem;
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--surface-3) 72%, transparent);
-
-  font-size: var(--text-xs);
-  font-weight: 700;
   line-height: 1;
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
 }
@@ -782,10 +776,7 @@ article:has(#btn-theme-toggle) { min-width: 0; }
    home hero only; tool pages get a single-line working header. */
 .view .page-header {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-bottom: 18px;
 }
 .view .page-header .eyebrow {
   font-size: 0.7rem;
