@@ -32,6 +32,27 @@ describe('Escape dismisses only the topmost overlay owner (#175)', () => {
     document.body.innerHTML = '';
   });
 
+  it('keeps the drawer open even when its Escape listener is registered after the modal listener', () => {
+    // A route can create a modal before shared Drawer.init() is called.
+    // The modal's handler then runs first and removes the active-modal stack.
+    // The same Escape must not fall through into a background drawer.
+    const drawer = document.getElementById('background-drawer');
+    const modal = document.getElementById('top-modal');
+    Drawer.open(drawer);
+    Modal.open(modal);
+    Drawer.init();
+    vi.advanceTimersByTime(0);
+    expect(window.OpenCourseDeck.state.openModals).toEqual([modal]);
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape', bubbles: true, cancelable: true,
+    }));
+    expect(window.OpenCourseDeck.state.openModals).toEqual([]);
+    expect(drawer.hidden).toBe(false);
+    expect(drawer.classList.contains('open')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
+  });
+
   it.each([
     ['before the opening animation', false],
     ['after the opening animation', true],
