@@ -7,6 +7,7 @@ safeFetchUrl,
 safeMediaUrl,
 safeFrameUrl,
 setPendingCourseMedia,
+setPendingPdfPage,
 Router,
 // Fall back to no-ops: Toast may be unregistered during partial init or in
 // test harnesses, and a bare Toast.success() then threw mid-handler,
@@ -348,9 +349,25 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       return true;
     }
     if (type === 'pdf') {
-      Router.navigate('#/pdf');
-      setStatus('Opening linked PDF');
-      return true;
+      // A Studio board stores only a topic/source label, not a stable PDF
+      // content fingerprint or a verified page bookmark. Opening #/pdf
+      // directly could show the unrelated last-mounted document and page.
+      // Require the app-owned handoff to clear that stale selection first.
+      if (typeof setPendingPdfPage !== 'function' || typeof Router?.navigate !== 'function') {
+        setStatus('PDF source discovery unavailable');
+        Toast.error?.('PDF source discovery unavailable');
+        return false;
+      }
+      try {
+        setPendingPdfPage(null, null);
+        setStatus('Find linked PDF in Materials');
+        Router.navigate('#/materials');
+        return true;
+      } catch {
+        setStatus('PDF source discovery unavailable');
+        Toast.error?.('PDF source discovery unavailable');
+        return false;
+      }
     }
     if (type === 'note') {
       Router.navigate('#/notes');
@@ -487,7 +504,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
         open.type = 'button';
         open.className = 'btn btn-ghost btn-sm';
         open.dataset.openStudioLink = element.id;
-        open.textContent = 'Open';
+        open.textContent = element.linkType === 'pdf' ? 'Find PDF' : 'Open';
         row.appendChild(open);
       }
       const del = document.createElement('button');
@@ -604,7 +621,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       open.type = 'button';
       open.className = 'btn btn-ghost btn-sm';
       open.dataset.openStudioLink = inspected.id;
-      open.textContent = 'Open linked resource';
+      open.textContent = inspected.linkType === 'pdf' ? 'Find linked PDF' : 'Open linked resource';
       wrap.appendChild(open);
     }
     propertiesRoot.replaceChildren(wrap);
