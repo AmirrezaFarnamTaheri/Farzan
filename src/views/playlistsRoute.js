@@ -145,6 +145,7 @@ function resolveSavedTopic(saved, index, topicsByCourse, ambiguousCourse) {
 }
 
 function sanitizeSavedPlaylists(value) {
+  if (value == null) return [];
   if (!Array.isArray(value) || value.some(item => !savedSourceIsAligned(item))) {
     throw new TypeError('Saved playlists require canonical course/topic source references');
   }
