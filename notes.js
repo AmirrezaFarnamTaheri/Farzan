@@ -196,24 +196,6 @@ import { countWords } from './src/core/textMetrics.js';
       }
     },
 
-    _newerRecord(a, b) {
-      const at = Number(a?.updatedAt ?? a?.createdAt ?? 0);
-      const bt = Number(b?.updatedAt ?? b?.createdAt ?? 0);
-      if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at > bt ? a : b;
-      return b ?? a;
-    },
-
-    _mergeById(localRecords = [], dbRecords = []) {
-      const byId = new Map();
-      [...localRecords, ...dbRecords].forEach(record => {
-        if (!record || typeof record !== 'object') return;
-        const id = String(record.id || '').trim();
-        if (!id) return;
-        byId.set(id, byId.has(id) ? this._newerRecord(byId.get(id), { ...record, id }) : { ...record, id });
-      });
-      return [...byId.values()];
-    },
-
     _coerceFolderId(folderId) {
       const id = String(folderId || '').trim();
       return id && id !== '__pinned__' ? id : 'default';
@@ -234,66 +216,6 @@ import { countWords } from './src/core/textMetrics.js';
         icon: String(folder.icon || 'folder').trim().slice(0, 64) || 'folder',
         color: String(folder.color || '').trim().slice(0, 64),
       };
-    },
-
-    async repairStorage(options = {}) {
-      const DB = window.DB;
-      const mirror = options.mirror ?? true;
-      const localNotes = this._readArray(STORAGE_KEY);
-      const localFolders = this._readArray(FOLDERS_KEY).map(folder => this._normalizeFolder(folder)).filter(Boolean);
-      const localSettings = this._readObject(SETTINGS_KEY);
-      let dbNotes = [];
-      let dbFolders = [];
-      let dbSettings = null;
-
-      if (typeof DB?.getAllNotes === 'function') {
-        try { dbNotes = await DB.getAllNotes(); } catch {}
-      }
-      if (typeof DB?.getAllFolders === 'function') {
-        try { dbFolders = await DB.getAllFolders(); } catch {}
-      }
-      if (typeof DB?.getSetting === 'function') {
-        try { dbSettings = await DB.getSetting(SETTINGS_KEY); } catch {}
-      }
-
-      const mergedNotes = this._mergeById(localNotes, Array.isArray(dbNotes) ? dbNotes : [])
-        .map(note => ({ ...note, folderId: this._coerceFolderId(note.folderId) }));
-      const mergedFolders = this._mergeById(localFolders, Array.isArray(dbFolders) ? dbFolders : [])
-        .map(folder => this._normalizeFolder(folder))
-        .filter(Boolean);
-      const mergedSettings = {
-        ...(localSettings && typeof localSettings === 'object' ? localSettings : {}),
-        ...(dbSettings && typeof dbSettings === 'object' ? dbSettings : {}),
-      };
-
-      this._notes = mergedNotes.slice();
-      this._folders = mergedFolders.slice();
-      this._settings = { ...mergedSettings };
-
-      if (typeof DB?.saveNote === 'function') {
-        await Promise.allSettled(mergedNotes.map(note => DB.saveNote(note)));
-      }
-      if (typeof DB?.saveFolder === 'function') {
-        await Promise.allSettled(mergedFolders.map(folder => DB.saveFolder(folder)));
-      }
-      if (typeof DB?.saveSetting === 'function') {
-        await DB.saveSetting(SETTINGS_KEY, mergedSettings).catch?.(() => {});
-      }
-
-      if (mirror) {
-        this.saveNotes(mergedNotes, { mirror: true });
-        this.saveFolders(mergedFolders, { mirror: true });
-        this.saveSettings(mergedSettings, { mirror: true });
-      }
-
-      const result = {
-        notes: { local: localNotes.length, db: Array.isArray(dbNotes) ? dbNotes.length : 0, merged: mergedNotes.length },
-        folders: { local: localFolders.length, db: Array.isArray(dbFolders) ? dbFolders.length : 0, merged: mergedFolders.length },
-        settings: { merged: Object.keys(mergedSettings).length },
-      };
-      window.OpenCourseDeck = window.OpenCourseDeck ?? {};
-      window.OpenCourseDeck.lastNotesRepairResult = result;
-      return result;
     },
 
     async hydrateFromDB(options = {}) {
