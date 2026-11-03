@@ -257,4 +257,23 @@ describe('final-layer shared workspace style ownership (#175)', () => {
     }
   });
 
+  it('retires 20 unconditional study-polish declarations shadowed by final redesign owners', () => {
+    const report = inventoryCss();
+    const retire = [[".sidebar","gap"],[".sidebar","background"],[".topbar","background"],[".sidebar-logo","background"],[".sidebar-logo","border-radius"],[".nav-item","border-radius"],[".home-title","max-width"],[".home-title","font-family"],[".home-title","font-size"],[".home-title","font-weight"],[".home-title","line-height"],[".home-title","letter-spacing"],[".home-subtitle","max-width"],[".home-subtitle","font-size"],[".home-subtitle","line-height"],[".home-actions","margin-top"],[".home-command-strip","margin-top"],[".home-focus-panel","padding"],[".home-focus-panel","border-radius"],[".home-focus-head h2","font-size"]];
+    const props = (file, selector, property) => report.rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body))
+      .filter(item => item.property === property);
+    for (const [selector, property] of retire) {
+      expect(props('study-polish.css', selector, property),
+        `obsolete study-polish owner: ${selector}: ${property}`).toHaveLength(0);
+      expect(props('farzan-redesign.css', selector, property).length,
+        `final redesign owner: ${selector}: ${property}`).toBeGreaterThan(0);
+      const final = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(final?.owner.file, `authoritative source: ${selector}: ${property}`)
+        .toBe('farzan-redesign.css');
+    }
+  });
+
 });
