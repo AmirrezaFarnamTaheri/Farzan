@@ -676,6 +676,10 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
     if (progress && progress.courseId !== fromId) {
       throw new Error('Progress belongs to a different course; review this topic before moving');
     }
+    const destinationProgress = await db.getProgress(id, toId);
+    if (destinationProgress) {
+      throw new Error('Destination already has saved progress for this topic; resolve it before moving');
+    }
     if (progress && (typeof db?.saveProgress !== 'function' || typeof db?.deleteProgress !== 'function')) {
       throw new Error('Course-scoped progress move is unavailable; topic was not moved');
     }
