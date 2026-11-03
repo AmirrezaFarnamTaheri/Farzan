@@ -115,7 +115,7 @@ async function renderTags() {
         return { writable: false, taxonomy: parseTagTaxonomy(null) };
       }
       const saved = await db.getSetting(TAG_TAXONOMY_KEY);
-      return { writable: typeof db.saveSetting === 'function', taxonomy: parseTagTaxonomy(saved) };
+      return { writable: typeof db.compareAndSwapSetting === 'function', taxonomy: parseTagTaxonomy(saved) };
     })(),
   ]);
   if (!document.body.contains(listRoot) || renderVersions.get(listRoot) !== version) return;
