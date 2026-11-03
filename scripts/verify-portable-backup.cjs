@@ -38,7 +38,10 @@ function sortedRecords(records, section) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new TypeError('Portable backup ' + section + ' has an invalid record');
     }
-    const id = record.id ?? (section === 'progress' && record.courseId && record.topicId
+    if (section === 'progress' && (!record.courseId || !record.topicId)) {
+      throw new TypeError('Portable backup progress must have course and topic identity');
+    }
+    const id = record.id ?? (section === 'progress'
       ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key);
     if (id !== undefined && id !== null) {
       const key = String(id);
@@ -48,7 +51,7 @@ function sortedRecords(records, section) {
     return record;
   });
   return normalized.sort((a, b) => {
-    const key = record => String(record.id ?? (section === 'progress' && record.courseId && record.topicId
+    const key = record => String(record.id ?? (section === 'progress'
       ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key) ?? digest(record));
     return key(a).localeCompare(key(b));
   });
