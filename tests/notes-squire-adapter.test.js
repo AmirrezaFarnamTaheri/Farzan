@@ -3,6 +3,31 @@ import { createSquireNoteEditor } from '../src/features/notesSquireAdapter.js';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 
 describe('Squire HTML-canonical edit adapter', () => {
+  it.each([
+    [{ content: '<p>Rich</p>' }],
+    [['<p>Rich</p>']],
+    [42],
+  ])('rejects a non-HTML canonical payload before replacing saved editor state (%j)', value => {
+    const host = document.createElement('div');
+    host.innerHTML = '<p>Existing saved body</p>';
+    const originalHost = host.innerHTML;
+    expect(() => createSquireNoteEditor({ element: host, html: value })).toThrow(/html|content|type/i);
+    expect(host.innerHTML).toBe(originalHost);
+
+    const onUpdate = vi.fn();
+    const editor = createSquireNoteEditor({
+      element: host, html: '<p>Original intact</p>', onUpdate,
+    });
+    try {
+      const before = editor.getHTML();
+      expect(() => editor.setContent(value)).toThrow(/html|content|type/i);
+      expect(editor.getHTML()).toBe(before);
+      expect(() => editor.editor.commands.insertContent(value)).toThrow(/html|content|type/i);
+      expect(editor.getHTML()).toBe(before);
+      expect(onUpdate).not.toHaveBeenCalled();
+    } finally { editor.destroy(); }
+  });
+
   it('exports only the Squire editor entrypoint', () => {
     const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Safe rich text</p>',
