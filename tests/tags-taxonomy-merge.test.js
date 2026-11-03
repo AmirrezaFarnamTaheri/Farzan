@@ -43,6 +43,22 @@ describe('persistent, non-destructive tag taxonomy', () => {
     window.DataStore = { init: vi.fn(async () => {}), allTopics: () => structuredClone(topics) };
   });
 
+  it('does not enable tag changes with a non-atomic saveSetting-only adapter', async () => {
+    // The pre-release route must not present an unsafe writer as durable.
+    const oldWriter = window.DB.saveSetting;
+    expect(window.DB.compareAndSwapSetting).toBeUndefined();
+    mount();
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+    const create = document.querySelector('[data-tag-create-form] button');
+    const merge = document.querySelector('[data-tag-merge-form] button');
+    expect(create.disabled).toBe(true);
+    expect(merge.disabled).toBe(true);
+    fill('[data-tag-create-name]', 'Anatomy');
+    create.click();
+    expect(oldWriter).not.toHaveBeenCalled();
+    expect(saved).toBeNull();
+  });
+
   it('creates and reloads an empty taxonomy label without inventing tagged notes', async () => {
     mount();
     await vi.waitFor(() => expect(cards()).toHaveLength(2));
@@ -186,6 +202,16 @@ describe('atomic taxonomy persistence across tabs', () => {
     };
     return { db, read: () => structuredClone(saved) };
   };
+
+  it('rejects non-atomic legacy writers before they can modify stored taxonomy', async () => {
+    const db = {
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => true),
+    };
+    await expect(persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Anatomy')))
+      .rejects.toThrow(/atomic|compareAndSwap|unavailable/);
+    expect(db.saveSetting).not.toHaveBeenCalled();
+  });
 
   it('preserves the winning mutation when two tabs try to create tags from the same revision', async () => {
     const { db, read } = makeDB();
