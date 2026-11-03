@@ -264,6 +264,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let interactiveSaveTimer = null;
   let studioLinkOptions = [];
   let studioLinkOptionsError = false;
+  let linkedTimestampOpening = false;
   const studioLinkReadErrorElement = () => {
     const alert = document.createElement('p');
     alert.dataset.studioLinkReadError = '';
@@ -296,11 +297,54 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       return true;
     }
     if (type === 'timestamp') {
-      if (target) {
-        setPendingCourseMedia(target);
-      }
-      Router.navigate('#/courses');
-      setStatus('Opening linked timestamp');
+      if (linkedTimestampOpening) return false;
+      linkedTimestampOpening = true;
+      // A saved link is not a current source: resolve the exact course from
+      // the canonical catalog including imported offline courses at click
+      // time, never from the first matching or previously rendered option.
+      void (async () => {
+        try {
+          const store = window.DataStore;
+          if (!target || !element.id || typeof store?.init !== 'function'
+              || typeof store?.allTopics !== 'function') {
+            throw new Error('Canonical linked timestamp source is unavailable');
+          }
+          await store.init();
+          await window.OpenCourseDeck?.UserLibrary?.overlay?.();
+          const topics = await store.allTopics();
+          if (!Array.isArray(topics)) throw new Error('Canonical topics are unavailable');
+          const matches = topics.filter(topic => topic?.topicId != null
+            && String(topic.topicId) === target);
+          if (matches.length !== 1 || !String(matches[0].courseId ?? '').trim()) {
+            throw new Error('Linked timestamp source is missing or ambiguous');
+          }
+          if (unmounted || !document.querySelector('.view-studio')?.isConnected) return;
+          // An editor mutation or route transition while a reader was in
+          // flight invalidates the captured element; never open a stale link.
+          const currentBoard = window.OpenCourseDeck?.Canvas?.serialize?.();
+          const sameId = (currentBoard?.layers || [])
+            .flatMap(layer => Array.isArray(layer.elements) ? layer.elements : [])
+            .filter(item => item?.id === element.id);
+          if (sameId.length !== 1 || sameId[0].linkType !== 'timestamp'
+              || String(sameId[0].linkTarget ?? '').trim() !== target) {
+            throw new Error('Linked timestamp was changed while loading');
+          }
+          if (typeof setPendingCourseMedia !== 'function'
+              || typeof Router?.navigate !== 'function') {
+            throw new Error('Course navigation unavailable');
+          }
+          setPendingCourseMedia(target, null, String(matches[0].courseId).trim());
+          setStatus('Opening linked timestamp');
+          Router.navigate('#/courses');
+        } catch {
+          if (!unmounted) {
+            setStatus('Linked timestamp source unavailable or ambiguous');
+            Toast.error?.('Linked timestamp could not be opened; check its source');
+          }
+        } finally {
+          linkedTimestampOpening = false;
+        }
+      })();
       return true;
     }
     if (type === 'pdf') {
