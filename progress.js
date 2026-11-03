@@ -434,6 +434,12 @@ const ProgressStats = (() => {
     const allProgress  = await DB.getAllProgress();
     const allNotes     = await DB.getAllNotes();
     const allTimestamps= await DB.getAllTimestamps();
+    if (!Array.isArray(allProgress) || allProgress.some(record => !_isProgressRecord(record))) {
+      throw new TypeError('Saved progress cannot be exported without course/topic identity');
+    }
+    if (!Array.isArray(allTimestamps) || allTimestamps.some(record => !_isTimestampRecord(record))) {
+      throw new TypeError('Saved timestamps cannot be exported without course/topic identity');
+    }
     const allFolders   = await DB.getAllFolders?.() ?? [];
     const allAnnotations = await DB.getAllAnnotations?.() ?? [];
     // A portable app-data backup must not silently omit auxiliary stores.
@@ -681,7 +687,17 @@ const ProgressStats = (() => {
         const noteRecords = _asArray(payload.notes).filter(_isObjectRecord);
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
-        const timestampRecords = _asArray(payload.timestamps).filter((timestamp) => _isObjectRecord(timestamp) && timestamp.id != null);
+        const rawTimestamps = _asArray(payload.timestamps);
+        const timestampRecords = rawTimestamps.filter(_isTimestampRecord);
+        if (timestampRecords.length !== rawTimestamps.length) {
+          throw new TypeError('Portable timestamps require stable IDs and exact course/topic identity');
+        }
+        const timestampIds = new Set();
+        for (const record of timestampRecords) {
+          const id = String(record.id);
+          if (timestampIds.has(id)) throw new TypeError('Portable timestamps contain duplicate IDs');
+          timestampIds.add(id);
+        }
         const rawWatchedSegments = _asArray(payload.watchedSegments);
         const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
         const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
@@ -1217,6 +1233,12 @@ const ProgressStats = (() => {
     return !!value && typeof value === 'object' && !Array.isArray(value);
   }
 
+  function _isTimestampRecord(value) {
+    if (!_isObjectRecord(value) || value.id == null) return false;
+    try { courseTopicIdentity(value.courseId, value.topicId); return true; }
+    catch { return false; }
+  }
+
   function _isProgressRecord(value) {
     if (!_isObjectRecord(value)) return false;
     try { courseTopicIdentity(value.courseId, value.topicId); return true; }
@@ -1284,7 +1306,7 @@ const ProgressStats = (() => {
       ? await DB.exportBackup()
       : null;
     const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
-      && primary._meta.version === 4;
+      && primary._meta.version === 5;
     const mirrorKeys = [
       'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists',
@@ -1317,7 +1339,7 @@ const ProgressStats = (() => {
     result.rollbackErrors = [];
     try {
       if (snapshot.primary && typeof DB.importBackup === 'function') {
-        // The v4 backup engine overwrites all primary object stores in ONE IDB
+        // The v5 backup engine overwrites all primary object stores in ONE IDB
         // transaction, preserving untouched watchedSegments/pdfBookmarks.
         const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
         if (receipt?.committed !== true || receipt.degraded === true) {

@@ -44,7 +44,7 @@ describe('saved video queue playback', () => {
     window.DB = {
       getAllTimestamps: vi.fn(async () => []),
       getSetting: vi.fn(async key => key === 'ocd_playlists'
-        ? [{ id: 'playlist-1', title: 'My queue', topicIds: ['topic-2','topic-1'], createdAt: 1 }]
+        ? [{ id: 'playlist-1', title: 'My queue', topicIds: ['topic-2','topic-1'], sourceRefs: [{ courseId: 'course-1', topicId: 'topic-2' }, { courseId: 'course-1', topicId: 'topic-1' }], createdAt: 1 }]
         : null),
       saveSetting: vi.fn(async () => true),
     };
@@ -93,14 +93,8 @@ describe('saved video queue playback', () => {
       Router, Toast, setPendingCourseSession,
       safeMediaUrl: media => typeof media === 'string' ? media : media?.url,
     });
-    const open = await vi.waitFor(() => {
-      const button = document.querySelector('[data-open-playlist="ambiguous"]');
-      expect(button).not.toBeNull();
-      return button;
-    });
-    open.click();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(
-      expect.stringMatching(/ambiguous|multiple courses|wrong/i)));
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    expect(document.querySelector('[data-open-playlist="ambiguous"]')).toBeNull();
     expect(setPendingCourseSession).not.toHaveBeenCalled();
     expect(Router.navigate).not.toHaveBeenCalled();
     expect(window.DB.saveSetting).not.toHaveBeenCalled();

@@ -23,7 +23,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('acknowledges a successful timestamp deletion after removing its canonical record', async () => {
-    const saved = { id: 'ts-ack', topicId: 'topic-1', position: 30 };
+    const saved = { id: 'ts-ack', topicId: 'topic-1', courseId: 'course-1', position: 30 };
     await expect(window.DB.saveTimestamp(saved)).resolves.toBe(true);
     expect(await window.DB.getAllTimestamps()).toEqual(
       expect.arrayContaining([expect.objectContaining(saved)])
@@ -35,7 +35,39 @@ describe('bridge DB safety helpers', () => {
     );
   });
 
-  it('replaces the pre-release topic-only progress store with the v4 composite-key schema', async () => {
+  it('preserves v4 course-scoped progress but retires old timestamps at the v5 cutover', async () => {
+    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const previous = new OpenCourseDB('opencoursedeck', 4, [
+      { name: 'progress', key: 'id', autoIncrement: false, indexes: [
+        { field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' },
+      ] },
+      { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [
+        { field: 'topicId' }, { field: 'courseId' },
+      ] },
+    ]);
+    const id = JSON.stringify(['course-a', 'shared-topic']);
+    await previous.put('progress', { id, courseId: 'course-a', topicId: 'shared-topic', status: 'done' });
+    await previous.put('timestamps', { id: 'old-timestamp', courseId: 'course-a', topicId: 'shared-topic', position: 42 });
+    previous.db?.close();
+    previous.db = null;
+
+    await expect(window.DB.getAllProgress()).resolves.toEqual([
+      expect.objectContaining({ courseId: 'course-a', topicId: 'shared-topic', status: 'done' }),
+    ]);
+    await expect(window.DB.getAllTimestamps()).resolves.toEqual([]);
+    const raw = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('opencoursedeck');
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const version = req.result.version;
+        req.result.close();
+        resolve(version);
+      };
+    });
+    expect(raw).toBe(5);
+  });
+
+  it('replaces the pre-release topic-only progress store with the v5 composite-key schema', async () => {
     const { OpenCourseDB } = window.OpenCourseDeck.DB;
     const previous = new OpenCourseDB('opencoursedeck', 3, [
       { name: 'progress', key: 'topicId', autoIncrement: false },
@@ -61,7 +93,7 @@ describe('bridge DB safety helpers', () => {
       };
     });
     expect(schema).toEqual({
-      version: 4, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
+      version: 5, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
     });
   });
 
@@ -74,6 +106,18 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.getProgress('shared-topic', 'course-a')).resolves.toBeNull();
     await expect(window.DB.getProgress('shared-topic', 'course-b'))
       .resolves.toMatchObject({ status: 'in-progress', courseId: 'course-b' });
+  });
+
+  it('requires course and topic identity for timestamp writes and preserves it through edits', async () => {
+    await expect(window.DB.saveTimestamp({ id: 'ts-unscoped', topicId: 'shared' }))
+      .rejects.toThrow(/course and topic identity/i);
+    const original = {
+      id: 'ts-scoped', topicId: 'shared', courseId: 'course-a', position: 18,
+    };
+    await expect(window.DB.saveTimestamp(original)).resolves.toBe(true);
+    await expect(window.DB.compareAndSwapTimestamp(original.id, original, {
+      ...original, courseId: 'course-b',
+    })).rejects.toThrow(/cannot change their course\/topic source/i);
   });
 
   it('stores progress independently for the same topic in different courses', async () => {
@@ -154,7 +198,7 @@ describe('bridge DB safety helpers', () => {
 
   it('rejects every canonical record mutation when IndexedDB is absent rather than restoring a localStorage snapshot', async () => {
     const snapshots = {
-      ocd_progress_fallback_v1: JSON.stringify({ t: { topicId: 't', percent: 1 } }),
+      ocd_progress_fallback_v1: JSON.stringify({ t: { topicId: 't', courseId: 'course-a', percent: 1 } }),
       ocd_timestamps_fallback_v1: JSON.stringify([{ id: 'legacy-ts', topicId: 't' }]),
       ocd_notes: JSON.stringify([{ id: 'legacy-note', title: 'Older' }]),
       ocd_folders: JSON.stringify([{ id: 'legacy-folder' }]),
@@ -169,7 +213,7 @@ describe('bridge DB safety helpers', () => {
       ['getProgress', ['t', 'course-a']], ['getAllProgress', []], ['getAllTimestamps', []],
       ['getAllNotes', []], ['getAllFolders', []], ['getSetting', ['test']],
       ['getAllAnnotations', []], ['getProgressByCourse', ['course-a']],
-      ['getTimestampsByTopic', ['t']], ['getNotesByFolder', ['default']],
+      ['getTimestampsByCourse', ['course-a']], ['getNotesByFolder', ['default']],
       ['queryByRange', ['progress', 'updatedAt', 0, 100]],
       ['countByIndex', ['progress', 'courseId', 'course-a']],
       ['getWatchedSegments', ['t']], ['getPdfBookmarks', ['doc']],
@@ -180,12 +224,12 @@ describe('bridge DB safety helpers', () => {
     }
     const writes = [
       ['saveProgress', ['t', 'course-a', { percent: 99 }]],
-      ['saveTimestamp', [{ id: 'legacy-ts', topicId: 't', position: 99 }]],
+      ['saveTimestamp', [{ id: 'legacy-ts', topicId: 't', courseId: 'course-a', position: 99 }]],
       ['saveNote', [{ id: 'legacy-note', title: 'Unsafe overwrite' }]],
       ['saveFolder', [{ id: 'legacy-folder', name: 'Unsafe overwrite' }]],
       ['saveSetting', ['test', true]],
       ['saveAnnotations', ['doc', { 1: [{ id: 'legacy-ann', text: 'Unsafe' }] }]],
-      ['addWatchedSegment', [{ id: 'ws-unsaved', topicId: 't', start: 0, end: 10 }]],
+      ['addWatchedSegment', [{ id: 'ws-unsaved', topicId: 't', courseId: 'course-a', start: 0, end: 10 }]],
     ];
     for (const [method, args] of writes) {
       await expect(window.DB[method](...args), method).rejects.toThrow(/IndexedDB|canonical|unavailable/i);
@@ -297,7 +341,7 @@ describe('bridge DB safety helpers', () => {
 
   it('clearAll removes app-owned stores and localStorage mirrors', async () => {
     await window.DB.saveProgress('topic-1', 'course-1', { status: 'done' });
-    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
+    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1', courseId: 'course-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
@@ -325,7 +369,7 @@ describe('bridge DB safety helpers', () => {
 
   it('clearUserData removes only the requested data scope', async () => {
     await window.DB.saveProgress('topic-1', 'course-1', { status: 'done' });
-    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
+    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1', courseId: 'course-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
@@ -428,7 +472,7 @@ describe('bridge DB safety helpers', () => {
       async put() { throw new Error('timestamp transaction aborted'); }
     };
 
-    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a' }))
+    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a', courseId: 'course-a' }))
       .rejects.toThrow('timestamp transaction aborted');
     expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
@@ -446,8 +490,8 @@ describe('bridge DB safety helpers', () => {
 
   it('never overlays stale local progress onto canonical IndexedDB reads', async () => {
     localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({
-      fallback: { topicId: 'fallback', status: 'done' },
-      both: { topicId: 'both', status: 'stale' },
+      fallback: { topicId: 'fallback', courseId: 'course-a', status: 'done' },
+      both: { topicId: 'both', courseId: 'course-a', status: 'stale' },
     }));
     const rows = new Map([[JSON.stringify(['course-a', 'both']), { id: JSON.stringify(['course-a', 'both']), topicId: 'both', courseId: 'course-a', status: 'canonical' }]]);
     window.OpenCourseDeck.DB.OpenCourseDB = class {
@@ -467,7 +511,7 @@ describe('bridge DB safety helpers', () => {
       async put() { throw quotaError; }
     };
 
-    await expect(window.DB.saveTimestamp({ id: 'ts-quota', topicId: 'topic-a' })).rejects.toThrow('Persistent storage full');
+    await expect(window.DB.saveTimestamp({ id: 'ts-quota', topicId: 'topic-a', courseId: 'course-a' })).rejects.toThrow('Persistent storage full');
 
     expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
@@ -575,7 +619,7 @@ describe('bridge DB safety helpers', () => {
       data: {
         kind: 'progress',
         action: 'save',
-        record: { topicId: 'topic-external', status: 'done' },
+        record: { topicId: 'topic-external', courseId: 'course-a', status: 'done' },
         source: 'external-tab',
       },
     });
@@ -734,7 +778,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('deletes timestamps from canonical IndexedDB without creating a stale local mirror', async () => {
-    await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', position: 42 });
+    await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', courseId: 'course-a', position: 42 });
 
     await window.DB.deleteTimestamp('delete-ts');
 
@@ -745,8 +789,8 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('updates existing timestamp records by id', async () => {
-    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', title: 'Old title', position: 10 });
-    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', title: 'New title', position: 25 });
+    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', courseId: 'course-a', title: 'Old title', position: 10 });
+    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', courseId: 'course-a', title: 'New title', position: 25 });
 
     const timestamps = await window.DB.getAllTimestamps();
     expect(timestamps.filter(item => item.id === 'edit-ts')).toHaveLength(1);
@@ -777,7 +821,7 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.getProgressByCourse('course-a')).resolves.toEqual([
       expect.objectContaining({ topicId: 'topic-a' }),
     ]);
-    await expect(window.DB.getTimestampsByTopic('topic-a')).resolves.toEqual([
+    await expect(window.DB.getTimestampsByCourse('course-a')).resolves.toEqual([
       expect.objectContaining({ id: 'ts-a' }),
     ]);
     await expect(window.DB.getTimestampsByCourse('course-b')).resolves.toEqual([
@@ -785,7 +829,7 @@ describe('bridge DB safety helpers', () => {
     ]);
     expect(calls).toEqual([
       ['progress', 'courseId', 'course-a'],
-      ['timestamps', 'topicId', 'topic-a'],
+      ['timestamps', 'courseId', 'course-a'],
       ['timestamps', 'courseId', 'course-b'],
     ]);
   });

@@ -357,7 +357,7 @@
   // ───────────────────────────────────────────────────────────
   const DB = (() => {
     const IDB_NAME = 'opencoursedeck';
-    const IDB_VERSION = 4;
+    const IDB_VERSION = 5;
 
     let _idb = null;
     let _idbCtor = null;
@@ -379,8 +379,8 @@
       if (_idb && _idbCtor === OpenCourseDB) return _idb;
       _idbCtor = OpenCourseDB;
       _idb = new OpenCourseDB(IDB_NAME, IDB_VERSION, [
-        { name: 'progress', key: 'id', autoIncrement: false, recreateOnUpgrade: true, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
-        { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
+        { name: 'progress', key: 'id', autoIncrement: false, recreateOnUpgradeBeforeVersion: 4, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
+        { name: 'timestamps', key: 'id', autoIncrement: false, recreateOnUpgradeBeforeVersion: 5, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
         { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'folders', key: 'id', autoIncrement: false, indexes: [{ field: 'parentId' }] },
         { name: 'settings', key: 'key', autoIncrement: false },
@@ -582,8 +582,18 @@
       catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
     }
 
+    function _timestampIdentity(value) {
+      const topicId = String(value?.topicId ?? '').trim();
+      const courseId = String(value?.courseId ?? '').trim();
+      if (!topicId || !courseId) {
+        throw new TypeError('Saved timestamps require exact course and topic identity');
+      }
+      return { topicId, courseId };
+    }
+
     async function saveTimestamp(ts) {
-      const next = { ...ts, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+      const identity = _timestampIdentity(ts);
+      const next = { ...ts, ...identity, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
       const idb = _requireIdb('timestamp', true);
       try {
         await idb.put('timestamps', next);
@@ -599,6 +609,21 @@
     // Only broadcast a confirmed native atomic receipt; do not fall back
     // to the legacy unconditional timestamp writer or localStorage.
     async function compareAndSwapTimestamp(id, expected, next) {
+      if (expected != null) {
+        const identity = _timestampIdentity(expected);
+        if (String(expected.id) !== String(id)) throw new TypeError('Timestamp identity changed during edit');
+        if (next != null) {
+          const nextIdentity = _timestampIdentity(next);
+          if (String(next.id) !== String(id)
+            || nextIdentity.courseId !== identity.courseId
+            || nextIdentity.topicId !== identity.topicId) {
+            throw new TypeError('Timestamp edits cannot change their course/topic source');
+          }
+        }
+      } else if (next != null) {
+        _timestampIdentity(next);
+        if (String(next.id) !== String(id)) throw new TypeError('Timestamp ID does not match its compare-and-swap key');
+      }
       const idb = _getIdb();
       if (!idb || typeof idb.compareAndSwapTimestamp !== 'function') {
         throw new Error('Atomic canonical timestamp storage unavailable');
@@ -909,7 +934,6 @@
     }
 
     const getProgressByCourse = async courseId => (await _byIndex('progress', 'courseId', courseId)).map(_publicProgress);
-    const getTimestampsByTopic = topicId => _byIndex('timestamps', 'topicId', topicId);
     const getTimestampsByCourse = courseId => _byIndex('timestamps', 'courseId', courseId);
     const getNotesByTopic = topicId => _byIndex('notes', 'topicId', topicId);
     const getNotesByCourse = courseId => _byIndex('notes', 'courseId', courseId);
@@ -1097,9 +1121,7 @@
       saveTimestamp,
       compareAndSwapTimestamp,
       deleteTimestamp,
-      getProgressByCourse,
-      getTimestampsByTopic,
-      getTimestampsByCourse,
+      getProgressByCourse,      getTimestampsByCourse,
       getAllNotes,
       saveNote,
       deleteNote,

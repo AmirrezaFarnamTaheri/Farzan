@@ -68,7 +68,7 @@ describe('Playlists task-first organization', () => {
   });
 
   it('puts saved queues in the main view and keeps catalog recommendations in a disclosure', async () => {
-    saved = [{ id: 'favorite', title: 'My queue', topicIds: ['b', 'a'], createdAt: 1 }];
+    saved = [{ id: 'favorite', title: 'My queue', topicIds: ['b', 'a'], sourceRefs: [{ courseId: 'course-1', topicId: 'b' }, { courseId: 'course-1', topicId: 'a' }], createdAt: 1 }];
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-playlist-id="favorite"]')).not.toBeNull());
     const list = document.querySelector('[data-playlist-list]');
@@ -139,7 +139,7 @@ describe('Playlists task-first organization', () => {
     expect(document.querySelector('[data-playlists-discover]').hidden).toBe(true);
     expect(document.querySelector('[data-playlist-list] [data-playlist-id]')).toBeNull();
 
-    saved = [{ id: 'restored', title: 'Restored queue', topicIds: ['b'], createdAt: 2 }];
+    saved = [{ id: 'restored', title: 'Restored queue', topicIds: ['b'], sourceRefs: [{ courseId: 'course-1', topicId: 'b' }], createdAt: 2 }];
     unavailable = false;
     document.querySelector('[data-playlists-retry]').click();
     await vi.waitFor(() => expect(document.querySelector('[data-playlist-list] [data-playlist-id="restored"]')).not.toBeNull());
@@ -148,7 +148,7 @@ describe('Playlists task-first organization', () => {
 
 
   it('shows a retryable catalog failure without editing saved playlists or claiming the catalog is empty', async () => {
-    saved = [{ id: 'saved-renal', title: 'Renal review queue', topicIds: ['a'], createdAt: 3 }];
+    saved = [{ id: 'saved-renal', title: 'Renal review queue', topicIds: ['a'], sourceRefs: [{ courseId: 'course-1', topicId: 'a' }], createdAt: 3 }];
     const before = structuredClone(saved);
     let offline = true;
     window.DataStore.init = vi.fn(async () => {
@@ -176,13 +176,13 @@ describe('Playlists task-first organization', () => {
   });
 
   it('does not present a false empty Resume queue when canonical timestamps are temporarily unreadable', async () => {
-    saved = [{ id: 'review', title: 'Saved review', topicIds: ['a'], createdAt: 1 }];
+    saved = [{ id: 'review', title: 'Saved review', topicIds: ['a'], sourceRefs: [{ courseId: 'course-1', topicId: 'a' }], createdAt: 1 }];
     const original = structuredClone(saved);
     const writer = vi.spyOn(window.DB, 'saveSetting');
     let inaccessible = true;
     window.DB.getAllTimestamps = vi.fn(async () => {
       if (inaccessible) throw new Error('Canonical timestamp storage inaccessible');
-      return [{ id: 'ts-a', topicId: 'a', position: 42, title: 'Saved point' }];
+      return [{ id: 'ts-a', topicId: 'a', courseId: 'course-1', position: 42, title: 'Saved point' }];
     });
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());

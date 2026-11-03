@@ -11,7 +11,7 @@ describe('Saved playlists acknowledged mutations', () => {
   let saved, Toast;
   beforeEach(() => {
     document.body.innerHTML = '<main></main>';
-    saved = [{ id: 'old', title: 'Before', topicIds: ['a','b'], createdAt: 10 }];
+    saved = [{ id: 'old', title: 'Before', topicIds: ['a','b'], sourceRefs: [{ courseId: 'course-1', topicId: 'a' }, { courseId: 'course-1', topicId: 'b' }], createdAt: 10 }];
     Toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     window.DataStore = { init: vi.fn(async () => true), allTopics: () => topics };
     window.OpenCourseDeck = { UserLibrary: { overlay: vi.fn(async () => {}) } };
@@ -87,7 +87,7 @@ describe('Saved playlists acknowledged mutations', () => {
       expect.stringMatching(/storage|atomic|unavailable/i),
     ));
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
-    expect(saved).toEqual([{ id: 'old', title: 'Before', topicIds: ['a','b'], createdAt: 10 }]);
+    expect(saved).toEqual([{ id: 'old', title: 'Before', topicIds: ['a','b'], sourceRefs: [{ courseId: 'course-1', topicId: 'a' }, { courseId: 'course-1', topicId: 'b' }], createdAt: 10 }]);
   });
 
   it('does not claim creation succeeded when the canonical writer refuses the receipt', async () => {
@@ -118,15 +118,13 @@ describe('Saved playlists acknowledged mutations', () => {
 
   it('preserves unrecognized saved playlist records on deletion rather than rewriting the collection', async () => {
     saved.push({ id: 'future-format', version: 2, unrecognized: { needsRetaining: true } });
+    const original = structuredClone(saved);
     mount();
-    const button = await vi.waitFor(() => {
-      const deleteButton = document.querySelector('[data-delete-playlist="old"]');
-      expect(deleteButton).not.toBeNull();
-      return deleteButton;
-    });
-    button.click();
-    await vi.waitFor(() => expect(Toast.success).toHaveBeenCalledWith('Playlist deleted'));
-    expect(saved).toEqual([{ id: 'future-format', version: 2, unrecognized: { needsRetaining: true } }]);
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    expect(document.querySelector('[data-delete-playlist="old"]')).toBeNull();
+    expect(window.DB.compareAndSwapSetting).not.toHaveBeenCalled();
+    expect(Toast.success).not.toHaveBeenCalled();
+    expect(saved).toEqual(original);
   });
 
   it('rejects an unacknowledged reorder without notifying success', async () => {
@@ -146,7 +144,7 @@ describe('Saved playlists acknowledged mutations', () => {
     window.DB.compareAndSwapSetting = vi.fn(async (key, expected) => {
       expect(key).toBe('ocd_playlists');
       expect(expected).toHaveLength(1);
-      saved = [{ id: 'other-tab', title: 'From another tab', topicIds: ['b'] }, ...saved];
+      saved = [{ id: 'other-tab', title: 'From another tab', topicIds: ['b'], sourceRefs: [{ courseId: 'course-1', topicId: 'b' }] }, ...saved];
       return false;
     });
     await create();

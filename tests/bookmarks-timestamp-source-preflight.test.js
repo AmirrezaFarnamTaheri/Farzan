@@ -57,8 +57,14 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     delete saved[0].courseId;
     const previous = structuredClone(saved);
     mount();
-    await openBookmark();
-    await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringMatching(/ambiguous|identify|source/i)));
+    const link = await vi.waitFor(() => {
+      const result = document.querySelector('[data-bookmark-type="timestamp"] a.btn');
+      expect(result).not.toBeNull();
+      return result;
+    });
+    expect(link.getAttribute('aria-disabled')).toBe('true');
+    expect(link.hasAttribute('href')).toBe(false);
+    link.click();
     expect(pending).not.toHaveBeenCalled();
     expect(Router.navigate).not.toHaveBeenCalled();
     expect(saved).toEqual(previous);
@@ -94,13 +100,16 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     expect(Router.navigate).not.toHaveBeenCalled();
   });
 
-  it('accepts a globally unique unscoped source but sends the catalog course ID explicitly', async () => {
+  it('rejects even globally unique unscoped saved timestamps without source inference', async () => {
     topics = [{ topicId: 'shared', courseId: 'renal', title: 'Unique lecture' }];
     delete saved[0].courseId;
     mount();
     await openBookmark();
-    await vi.waitFor(() => expect(pending).toHaveBeenCalledExactlyOnceWith('shared', 78, 'renal'));
-    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+    const link = document.querySelector('[data-bookmark-type="timestamp"] a.btn');
+    expect(link.getAttribute('aria-disabled')).toBe('true');
+    expect(link.hasAttribute('href')).toBe(false);
+    expect(pending).not.toHaveBeenCalled();
+    expect(Router.navigate).not.toHaveBeenCalled();
   });
 
   it('keeps an ID-less legacy timestamp visible but disables unsafe source navigation', async () => {

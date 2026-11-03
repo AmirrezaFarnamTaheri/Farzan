@@ -86,6 +86,12 @@ describe('read-only portable recovery digests', () => {
     expect(() => summarizePortableBackup(scoped)).toThrow(/course and topic identity/i);
   });
 
+  it('rejects unscoped timestamp records in portable backups', () => {
+    const payload = structuredClone(before);
+    payload.timestamps = [{ id: 'ts-legacy', topicId: 'shared', position: 12 }];
+    expect(() => summarizePortableBackup(payload)).toThrow(/course and topic identity/i);
+  });
+
   it('rejects malformed, duplicate-ID, future-version, and missing required snapshot sections', () => {
     expect(() => summarizePortableBackup({ ...before, version: '9.0' })).toThrow(/version/i);
     expect(() => summarizePortableBackup({ ...before, notes: undefined })).toThrow(/notes/i);

@@ -7,7 +7,7 @@ import {
 import { courseTopicIdentity } from './courseTopicIdentity.js';
 
 const DATABASE_NAME = 'opencoursedeck';
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const MAIN_STORES = Object.freeze([
   'progress',
   'timestamps',
@@ -111,6 +111,10 @@ function validateBackup(input) {
           throw new TypeError(`Backup progress record at index ${index} has an invalid course-scoped key`);
         }
       }
+      if (store === 'timestamps') {
+        try { courseTopicIdentity(record.courseId, record.topicId); }
+        catch (error) { throw new TypeError(`Backup timestamp at index ${index} has no course/topic identity`, { cause: error }); }
+      }
     }
     included.push(store);
   }
@@ -152,7 +156,7 @@ export function installBackupEngine(root = window) {
       await completion;
       result._meta = {
         format: 'opencoursedeck-snapshot',
-        version: 4,
+        version: 5,
         databaseVersion: db.version,
         exportedAt: new Date().toISOString(),
         portableAuthority: false,

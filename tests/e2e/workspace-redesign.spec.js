@@ -936,6 +936,8 @@ test.describe('Farzan desktop workspace redesign', () => {
       await window.DB.saveSetting('ocd_playlists', [{
         id: 'e2e-order', title: 'فارسی Review queue',
         topicIds: ['saved-a', 'saved-b', 'saved-c', 'saved-d', 'saved-e'],
+        sourceRefs: ['saved-a', 'saved-b', 'saved-c', 'saved-d', 'saved-e']
+          .map(topicId => ({ topicId, courseId: 'e2e-private-course' })),
         metadata: { owner: 'local', language: 'fa-IR' },
         createdAt: 1,
       }]);
