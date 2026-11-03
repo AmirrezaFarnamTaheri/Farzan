@@ -2837,7 +2837,7 @@ describe('app shell resilience helpers', () => {
     });
     document.querySelector('[data-apply-active-learning-cues]').click();
 
-    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2]['topic-1']).toEqual(expect.objectContaining({
+    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2][cueKey]).toEqual(expect.objectContaining({
       chapters: [
         expect.objectContaining({ time: 30, title: 'Bulk chapter' }),
         expect.objectContaining({ time: 300, title: 'Late chapter' }),
