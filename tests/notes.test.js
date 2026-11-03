@@ -1201,9 +1201,6 @@ describe('notes route filters', () => {
     const store = window.PlasmaNotesStore;
     let releaseFirst;
     const committed = [];
-    // Startup hydration may save the first open note. This regression counts
-    // only the two writes belonging to the new note under test.
-    window.DB.saveNote.mockClear();
     window.DB.saveNote.mockImplementationOnce(note => {
       const snapshot = { ...note };
       return new Promise(resolve => {
@@ -1660,12 +1657,6 @@ describe('notes route filters', () => {
 
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
-    // Canonical hydration can open the pinned note at startup and stamp a
-    // fresh local edit time. Explicitly prepare the old record revision so
-    // the import exercises both sides of the timestamp rule deterministically.
-    const store = window.PlasmaNotesStore;
-    store._notes = store.getNotes().map(note => note.id === 'pinned-note'
-      ? { ...note, updatedAt: now - 1000 } : note);
     window.PlasmaNotesStore.updateNote('regular-note', {
       title: 'Existing canonical note',
       updatedAt: now + 100,

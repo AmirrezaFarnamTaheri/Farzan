@@ -2145,7 +2145,13 @@ import { countWords } from './src/core/textMetrics.js';
         if (changed) this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
         const hydrated = Store.getNotes();
         if (!hydrated.length) this.newNote(undefined, { preventScroll: true });
-        else if (!notes.length) this.openNote(hydrated[0].id, { preventScroll: true });
+        else if (!notes.length && !Editor._currentId) {
+          // _renderAfterCanonicalRefresh has already activated the first
+          // saved note on successful hydration. Calling openNote() twice
+          // flushes its untouched body, restamps updatedAt and can make a
+          // stale local copy win over newer imported/remote revisions.
+          this.openNote(hydrated[0].id, { preventScroll: true });
+        }
         $('[data-notes-hydration-error]')?.remove();
         return true;
       };
