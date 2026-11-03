@@ -69,6 +69,18 @@ describe('Konva canonical board-v1 viewport SVG preview (#172)', () => {
     expect(before.layers[0].elements[0].fill).toBe('#aabbcc');
   });
 
+  it.each([
+    ['unresolved CSS token', 'var(--farzan-brand)'],
+    ['ambient currentColor', 'currentColor'],
+    ['invalid short hexadecimal length', '#12345'],
+  ])('refuses %s because standalone SVG cannot preserve canonical board paint', (_kind, paint) => {
+    const board = fixture();
+    board.layers[0].elements[0].fill = paint;
+    const original = structuredClone(board);
+    expect(() => exportKonvaV1DraftSVG(board)).toThrow(/unsupported|paint|color/i);
+    expect(board).toEqual(original);
+  });
+
   it('enforces bounded viewport dimensions and preview size', () => {
     const board = fixture();
     for (const size of [
