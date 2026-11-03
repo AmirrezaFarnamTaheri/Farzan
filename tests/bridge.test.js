@@ -87,9 +87,9 @@ describe('bridge DB safety helpers', () => {
     expect(courseA).not.toHaveProperty('id');
     expect(courseB).not.toHaveProperty('id');
     await expect(window.DB.getProgress('shared-topic', 'course-a'))
-      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', status: 'done', position: 120 });
+      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', courseId: 'course-a', status: 'done', position: 120 });
     await expect(window.DB.getProgress('shared-topic', 'course-b'))
-      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', status: 'in-progress', position: 42 });
+      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', courseId: 'course-a', status: 'in-progress', position: 42 });
     expect(await window.DB.getAllProgress()).toHaveLength(2);
     const raw = await new Promise((resolve, reject) => {
       const request = indexedDB.open('opencoursedeck');
@@ -154,7 +154,7 @@ describe('bridge DB safety helpers', () => {
 
   it('rejects every canonical record mutation when IndexedDB is absent rather than restoring a localStorage snapshot', async () => {
     const snapshots = {
-      ocd_progress_fallback_v1: JSON.stringify({ t: { topicId: 't', percent: 1 } }),
+      ocd_progress_fallback_v1: JSON.stringify({ t: { topicId: 't', courseId: 'course-a', percent: 1 } }),
       ocd_timestamps_fallback_v1: JSON.stringify([{ id: 'legacy-ts', topicId: 't' }]),
       ocd_notes: JSON.stringify([{ id: 'legacy-note', title: 'Older' }]),
       ocd_folders: JSON.stringify([{ id: 'legacy-folder' }]),
@@ -180,12 +180,12 @@ describe('bridge DB safety helpers', () => {
     }
     const writes = [
       ['saveProgress', ['t', 'course-a', { percent: 99 }]],
-      ['saveTimestamp', [{ id: 'legacy-ts', topicId: 't', position: 99 }]],
+      ['saveTimestamp', [{ id: 'legacy-ts', topicId: 't', courseId: 'course-a', position: 99 }]],
       ['saveNote', [{ id: 'legacy-note', title: 'Unsafe overwrite' }]],
       ['saveFolder', [{ id: 'legacy-folder', name: 'Unsafe overwrite' }]],
       ['saveSetting', ['test', true]],
       ['saveAnnotations', ['doc', { 1: [{ id: 'legacy-ann', text: 'Unsafe' }] }]],
-      ['addWatchedSegment', [{ id: 'ws-unsaved', topicId: 't', start: 0, end: 10 }]],
+      ['addWatchedSegment', [{ id: 'ws-unsaved', topicId: 't', courseId: 'course-a', start: 0, end: 10 }]],
     ];
     for (const [method, args] of writes) {
       await expect(window.DB[method](...args), method).rejects.toThrow(/IndexedDB|canonical|unavailable/i);
@@ -446,8 +446,8 @@ describe('bridge DB safety helpers', () => {
 
   it('never overlays stale local progress onto canonical IndexedDB reads', async () => {
     localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({
-      fallback: { topicId: 'fallback', status: 'done' },
-      both: { topicId: 'both', status: 'stale' },
+      fallback: { topicId: 'fallback', courseId: 'course-a', status: 'done' },
+      both: { topicId: 'both', courseId: 'course-a', status: 'stale' },
     }));
     const rows = new Map([[JSON.stringify(['course-a', 'both']), { id: JSON.stringify(['course-a', 'both']), topicId: 'both', courseId: 'course-a', status: 'canonical' }]]);
     window.OpenCourseDeck.DB.OpenCourseDB = class {
@@ -575,7 +575,7 @@ describe('bridge DB safety helpers', () => {
       data: {
         kind: 'progress',
         action: 'save',
-        record: { topicId: 'topic-external', status: 'done' },
+        record: { topicId: 'topic-external', courseId: 'course-a', status: 'done' },
         source: 'external-tab',
       },
     });
@@ -734,7 +734,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('deletes timestamps from canonical IndexedDB without creating a stale local mirror', async () => {
-    await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', position: 42 });
+    await window.DB.saveTimestamp({ id: 'delete-ts', topicId: 'topic-1', courseId: 'course-a', position: 42 });
 
     await window.DB.deleteTimestamp('delete-ts');
 
@@ -745,8 +745,8 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('updates existing timestamp records by id', async () => {
-    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', title: 'Old title', position: 10 });
-    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', title: 'New title', position: 25 });
+    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', courseId: 'course-a', title: 'Old title', position: 10 });
+    await window.DB.saveTimestamp({ id: 'edit-ts', topicId: 'topic-1', courseId: 'course-a', title: 'New title', position: 25 });
 
     const timestamps = await window.DB.getAllTimestamps();
     expect(timestamps.filter(item => item.id === 'edit-ts')).toHaveLength(1);
