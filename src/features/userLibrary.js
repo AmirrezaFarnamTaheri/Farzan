@@ -717,7 +717,7 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
         if (compensationErrors.length) {
           throw new AggregateError([error, ...compensationErrors],
             'Topic move failed and compensation was incomplete',
-            { cause: compensationErrors[0] });
+            { cause: error });
         }
         throw error;
       }
