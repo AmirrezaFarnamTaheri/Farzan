@@ -152,6 +152,33 @@ describe('progress backup exports', () => {
     }));
   });
 
+  it('rejects retired portable formats and topic-only progress before any canonical write', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const oldFormat = new File([JSON.stringify({ version: '1.6', progress: [] })],
+      'retired-v1.6.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(oldFormat);
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+
+    const unscoped = new File([JSON.stringify({
+      version: '1.7', progress: [{ topicId: 'shared', status: 'done' }],
+    })], 'topic-only-progress.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(unscoped);
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
+  it('rejects topic-only authored media cue keys in the current portable format', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      settings: { mediaCues: { shared: { chapters: [{ time: 12, title: 'Legacy' }] } } },
+    })], 'topic-only-cues.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).not.toHaveBeenCalledWith('ocd_course_media_cues', expect.anything());
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
   it('rejects a corrupted FSRS backup before touching any canonical study data', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
