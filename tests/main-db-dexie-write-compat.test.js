@@ -43,12 +43,12 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('preserves add/put/delete/clear return contracts and native indexes', async () => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     expect(await db.add('notes', { id: 'a', courseId: 'medicine', content: 'First' })).toBe('a');
     expect(await db.put('notes', { id: 'a', courseId: 'medicine', content: 'Revised' })).toBe('a');
     expect((await raw('a')).record.content).toBe('Revised');
-    expect((await raw('a')).version).toBe(4);
+    expect((await raw('a')).version).toBe(5);
     expect((await raw('a')).indexes).toEqual(['courseId']);
     expect(await db.delete('notes', 'a')).toBe(true);
     expect(await db.get('notes', 'a')).toBeUndefined();
@@ -58,7 +58,7 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it.each(['bulkAdd', 'bulkPut'])('%s rolls back all earlier records on invalid later key', async method => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     await db.put('notes', { id: 'previous', content: 'Must remain' });
     await expect(db[method]('notes', [
@@ -70,7 +70,7 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('bulk-writes sealed records while keeping plaintext index metadata queryable', async () => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     db.setPassphrase('saved phrase');
     expect(await db.bulkPut('notes', [
@@ -86,8 +86,8 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('atomically accepts one of two independent Konva draft writers on the same native settings key', async () => {
-    const first = new OpenCourseDB(name, 4, schema);
-    const second = new OpenCourseDB(name, 4, schema);
+    const first = new OpenCourseDB(name, 5, schema);
+    const second = new OpenCourseDB(name, 5, schema);
     opened.push(first, second);
     const key = 'ocd_studio_konva_draft';
     const old = { version: 1, layers: [{ id: 'l', elements: [{ id: 'shape', x: 10 }] }] };
@@ -104,7 +104,7 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('refuses a stale/missing draft without inventing a saved receipt, and supports a first write from null', async () => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     const key = 'ocd_studio_konva_draft';
     const firstDraft = { version: 1, layers: [] };
@@ -115,7 +115,7 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('never bypasses envelope encryption or rewrites ciphertext through plaintext compare-and-swap', async () => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     db.setPassphrase('protected');
     await expect(db.compareAndSwapSetting('ocd_studio_konva_draft', null, { version: 1 }))
@@ -125,8 +125,8 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
 
 
   it('atomically accepts one of two stale concurrent timestamp edits without overwriting the winner', async () => {
-    const first = new OpenCourseDB(name, 4, schema);
-    const second = new OpenCourseDB(name, 4, schema);
+    const first = new OpenCourseDB(name, 5, schema);
+    const second = new OpenCourseDB(name, 5, schema);
     opened.push(first, second);
     const saved = { id: 'ts-race', topicId: 'shared', courseId: 'renal',
       title: 'Earlier study checkpoint', note: 'Old note', position: 78 };
@@ -146,8 +146,8 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('does not delete a timestamp changed since the saved Bookmarks revision', async () => {
-    const first = new OpenCourseDB(name, 4, schema);
-    const second = new OpenCourseDB(name, 4, schema);
+    const first = new OpenCourseDB(name, 5, schema);
+    const second = new OpenCourseDB(name, 5, schema);
     opened.push(first, second);
     const initial = { id: 'ts-delete-race', topicId: 'lesson-1', note: 'Before', position: 30 };
     const latest = { ...initial, note: 'From another tab', position: 92 };
@@ -160,7 +160,7 @@ describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   });
 
   it('refuses mismatched IDs, unknown revisions and encrypted timestamp writes', async () => {
-    const db = new OpenCourseDB(name, 4, schema);
+    const db = new OpenCourseDB(name, 5, schema);
     opened.push(db);
     const original = { id: 'ts-guard', topicId: 'topic', position: 10 };
     await db.put('timestamps', original);
