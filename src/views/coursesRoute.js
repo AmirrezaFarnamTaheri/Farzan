@@ -331,8 +331,10 @@ export async function mountCoursesView(deps = {}) {
       throw new Error('Canonical learning cue reader unavailable');
     }
     const savedCues = await window.DB.getSetting(MEDIA_CUES_KEY);
-    if (savedCues != null && (typeof savedCues !== 'object' || Array.isArray(savedCues))) {
-      throw new TypeError('Unsupported canonical learning cue record');
+    if (savedCues != null && (typeof savedCues !== 'object' || Array.isArray(savedCues)
+      || Object.entries(savedCues).some(([identity, cues]) => !parseCourseTopicIdentity(identity)
+        || !cues || typeof cues !== 'object' || Array.isArray(cues)))) {
+      throw new TypeError('Unsupported canonical course-scoped learning cue record');
     }
     authoredMediaCues = savedCues ?? {};
     durableAuthoredMediaCues = structuredClone(authoredMediaCues);
@@ -832,7 +834,9 @@ export async function mountCoursesView(deps = {}) {
     const nextCues = payload.record?.value && typeof payload.record.value === 'object'
       ? payload.record.value
       : await window.DB?.getSetting?.(MEDIA_CUES_KEY);
-    if (nextCues != null && (typeof nextCues !== 'object' || Array.isArray(nextCues))) {
+    if (nextCues != null && (typeof nextCues !== 'object' || Array.isArray(nextCues)
+      || Object.entries(nextCues).some(([identity, cues]) => !parseCourseTopicIdentity(identity)
+        || !cues || typeof cues !== 'object' || Array.isArray(cues)))) {
       setLearningMarkerStatus('Remote learning cue revision is incompatible. Reload Courses.', 'warning');
       canonicalCuesReadable = false;
       return;
