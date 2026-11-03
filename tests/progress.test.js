@@ -641,7 +641,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-json').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.6');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.7');
 
     downloadedBlob = null;
     document.getElementById('btn-export-csv').click();
@@ -994,7 +994,7 @@ describe('progress backup exports', () => {
 
   it('rolls back canonical course library and media cues when a later import write fails', async () => {
     const originalLibrary = { version: 1, courses: { 'course-old': { id: 'course-old', title: 'Original course' } } };
-    const originalCues = { 'topic-old': [{ at: 20, text: 'Original cue' }] };
+    const originalCues = { [JSON.stringify(['course-old', 'topic-old'])]: { chapters: [{ time: 20, title: 'Original cue' }] } };
     const state = new Map([
       ['ocd_user_library', originalLibrary],
       ['ocd_course_media_cues', originalCues],
@@ -1012,9 +1012,9 @@ describe('progress backup exports', () => {
       version: '1.7',
       settings: {
         library: { version: 1, courses: { 'course-new': { id: 'course-new', title: 'Imported course' } } },
-        mediaCues: { 'topic-new': [{ at: 30, text: 'Imported cue' }] },
+        mediaCues: { [JSON.stringify(['course-new', 'topic-new'])]: { chapters: [{ time: 30, title: 'Imported cue' }] } },
       },
-      timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
+      timestamps: [{ id: 'ts-new', topicId: 'topic-new', courseId: 'course-new', position: 30 }],
       progress: [], notes: [], annotations: [],
     })], 'partial-restore.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
