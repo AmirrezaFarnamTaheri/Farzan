@@ -74,6 +74,20 @@ describe('read-only portable recovery digests', () => {
     expect(summarizePortableBackup(legitimateEmpty).counts.flashcards).toBe(0);
   });
 
+  it('distinguishes identical topic IDs across courses and rejects unscoped progress', () => {
+    const scoped = summarizePortableBackup({
+      version: '1.7',
+      progress: [
+        { topicId: 'shared', courseId: 'course-a', percent: 100 },
+        { topicId: 'shared', courseId: 'course-b', percent: 30 },
+      ],
+    });
+    expect(scoped.counts.progress).toBe(2);
+    expect(() => summarizePortableBackup({
+      version: '1.7', progress: [{ topicId: 'shared', percent: 100 }],
+    })).toThrow(/course and topic identity/i);
+  });
+
   it('rejects malformed, duplicate-ID, future-version, and missing required snapshot sections', () => {
     expect(() => summarizePortableBackup({ ...before, version: '9.0' })).toThrow(/version/i);
     expect(() => summarizePortableBackup({ ...before, notes: undefined })).toThrow(/notes/i);
