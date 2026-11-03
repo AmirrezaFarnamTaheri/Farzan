@@ -1446,13 +1446,17 @@ describe('app shell resilience helpers', () => {
 
     const controller = await window.OpenCourseDeck.Views.studio();
     const input = document.querySelector('[data-studio-import-file]');
+    // The route can detach while async import settles; its original status
+    // node is still the target written by the mounted controller.
+    const status = document.querySelector('[data-studio-status]');
+    expect(status).not.toBeNull();
     const file = new File([JSON.stringify(importedBoard)], 'studio.json', { type: 'application/json' });
     Object.defineProperty(input, 'files', { configurable: true, value: [file] });
     input.dispatchEvent(new Event('change'));
 
     await vi.waitFor(() => expect(canvasApi.loadState).toHaveBeenCalledWith(importedBoard));
     expect(saveSetting).toHaveBeenCalledWith('ocd_studio_board', normalizedBoard);
-    expect(document.querySelector('[data-studio-status]').textContent).toBe('JSON imported');
+    await vi.waitFor(() => expect(status.textContent).toBe('JSON imported'));
 
     controller.unmount();
   });
