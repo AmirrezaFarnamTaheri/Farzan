@@ -7,7 +7,7 @@ import {
 import { courseTopicIdentity } from './courseTopicIdentity.js';
 
 const DATABASE_NAME = 'opencoursedeck';
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const MAIN_STORES = Object.freeze([
   'progress',
   'timestamps',
@@ -156,7 +156,7 @@ export function installBackupEngine(root = window) {
       await completion;
       result._meta = {
         format: 'opencoursedeck-snapshot',
-        version: 4,
+        version: 5,
         databaseVersion: db.version,
         exportedAt: new Date().toISOString(),
         portableAuthority: false,
