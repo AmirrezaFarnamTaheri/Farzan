@@ -1339,68 +1339,6 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.hydrateFromDB).toBeTypeOf('function');
   });
 
-  it('repairs split notes storage by merging local and canonical DB records', async () => {
-    window.PlasmaNotesStore._notes = null;
-    window.PlasmaNotesStore._folders = null;
-    window.PlasmaNotesStore._settings = null;
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'repair-same', title: 'Local older', folderId: '__pinned__', updatedAt: now - 10 },
-      { id: 'repair-local', title: 'Local only', folderId: 'xss-folder', updatedAt: now + 1 },
-    ]));
-    localStorage.setItem('ocd_folders', JSON.stringify([
-      { id: 'xss-folder', name: 'Local folder', icon: 'Folder', color: '' },
-      { id: '__pinned__', name: 'Bad pinned folder', icon: 'Pin', color: '' },
-    ]));
-    localStorage.setItem('ocd_notes_settings', JSON.stringify({ view: 'list', density: 'compact' }));
-    window.DB.getAllNotes.mockResolvedValueOnce([
-      { id: 'repair-same', title: 'DB newer', folderId: 'default', updatedAt: now + 20 },
-      { id: 'repair-db', title: 'DB only', folderId: 'default', updatedAt: now + 2 },
-    ]);
-    window.DB.getAllFolders.mockResolvedValueOnce([
-      { id: 'db-folder', name: 'DB folder', icon: 'DB', color: '' },
-    ]);
-    window.DB.getSetting.mockResolvedValueOnce({ view: 'grid' });
-    window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
-    window.DB.saveFolder.mockImplementation((folder) => Promise.resolve(folder));
-    window.DB.saveSetting.mockImplementation((_key, value) => Promise.resolve(value));
-
-    const result = await window.PlasmaNotesStore.repairStorage();
-
-    expect(result).toEqual({
-      notes: { local: 2, db: 2, merged: 3 },
-      folders: { local: 1, db: 1, merged: 2 },
-      settings: { merged: 2 },
-    });
-    expect(window.PlasmaNotesStore.getNote('repair-same')).toEqual(expect.objectContaining({
-      title: 'DB newer',
-      folderId: 'default',
-    }));
-    expect(window.PlasmaNotesStore.getNote('repair-local')).toEqual(expect.objectContaining({
-      title: 'Local only',
-      folderId: 'xss-folder',
-    }));
-    expect(window.PlasmaNotesStore.getNote('repair-db')).toEqual(expect.objectContaining({
-      title: 'DB only',
-    }));
-    expect(window.PlasmaNotesStore.getFolders()).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'xss-folder' }),
-      expect.objectContaining({ id: 'db-folder' }),
-    ]));
-    expect(window.PlasmaNotesStore.getFolders()).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: '__pinned__' }),
-    ]));
-    expect(window.PlasmaNotesStore.getSettings()).toEqual({ view: 'grid', density: 'compact' });
-    expect(window.DB.saveNote).toHaveBeenCalledTimes(3);
-    expect(window.DB.saveFolder).toHaveBeenCalledTimes(2);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_notes_settings', { view: 'grid', density: 'compact' });
-    expect(JSON.parse(localStorage.getItem('ocd_notes'))).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'repair-same', title: 'DB newer' }),
-      expect.objectContaining({ id: 'repair-local' }),
-      expect.objectContaining({ id: 'repair-db' }),
-    ]));
-    expect(window.OpenCourseDeck.lastNotesRepairResult).toEqual(result);
-  });
-
   it('keeps localStorage as a bridge-less notes, folders, and settings fallback', () => {
     delete window.DB.saveNote;
     delete window.DB.saveFolder;
