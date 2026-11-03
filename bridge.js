@@ -581,8 +581,18 @@
       catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
     }
 
+    function _timestampIdentity(value) {
+      const topicId = String(value?.topicId ?? '').trim();
+      const courseId = String(value?.courseId ?? '').trim();
+      if (!topicId || !courseId) {
+        throw new TypeError('Saved timestamps require exact course and topic identity');
+      }
+      return { topicId, courseId };
+    }
+
     async function saveTimestamp(ts) {
-      const next = { ...ts, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+      const identity = _timestampIdentity(ts);
+      const next = { ...ts, ...identity, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
       const idb = _requireIdb('timestamp', true);
       try {
         await idb.put('timestamps', next);
@@ -598,6 +608,21 @@
     // Only broadcast a confirmed native atomic receipt; do not fall back
     // to the legacy unconditional timestamp writer or localStorage.
     async function compareAndSwapTimestamp(id, expected, next) {
+      if (expected != null) {
+        const identity = _timestampIdentity(expected);
+        if (String(expected.id) !== String(id)) throw new TypeError('Timestamp identity changed during edit');
+        if (next != null) {
+          const nextIdentity = _timestampIdentity(next);
+          if (String(next.id) !== String(id)
+            || nextIdentity.courseId !== identity.courseId
+            || nextIdentity.topicId !== identity.topicId) {
+            throw new TypeError('Timestamp edits cannot change their course/topic source');
+          }
+        }
+      } else if (next != null) {
+        _timestampIdentity(next);
+        if (String(next.id) !== String(id)) throw new TypeError('Timestamp ID does not match its compare-and-swap key');
+      }
       const idb = _getIdb();
       if (!idb || typeof idb.compareAndSwapTimestamp !== 'function') {
         throw new Error('Atomic canonical timestamp storage unavailable');
