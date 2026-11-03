@@ -225,6 +225,18 @@ describe('user library overlay', () => {
     expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['false', false],
+    ['missing', undefined],
+    ['unrelated', { version: 1, courses: { wrong: { title: 'Different library' } } }],
+  ])('does not announce a saved course for a %s canonical write receipt', async (_label, receipt) => {
+    window.DB.saveSetting = vi.fn(async () => receipt);
+    await expect(upsertCourse({ title: 'Not durably committed' })).rejects.toThrow(/acknowledg|commit/i);
+    expect(window.DB.store.ocd_user_library).toBeUndefined();
+    expect(window.DataStore.mergeRaw).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('library:changed', expect.anything());
+  });
+
   it('serializes concurrent user-library edits without dropping a course or topic', async () => {
     // Interleave reads via an asynchronous adapter; without the lock both
     // operations see the same empty snapshot and the last writer wins.
