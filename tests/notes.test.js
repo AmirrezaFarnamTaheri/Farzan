@@ -804,6 +804,62 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-notes-editor]').textContent).toContain('From IDB');
   });
 
+  it('does not lose folder creates/deletes or settings edits while a canonical read is in flight', async () => {
+    const store = window.PlasmaNotesStore;
+    const oldFolders = store.getFolders().map(folder => ({ ...folder }));
+    store._hydrated = false;
+    let finishFolders;
+    window.DB.getAllNotes.mockResolvedValueOnce(store.getNotes());
+    window.DB.getAllFolders.mockImplementationOnce(() => new Promise(resolve => {
+      finishFolders = resolve;
+    }));
+    window.DB.getSetting.mockResolvedValueOnce({ view: 'stale-remote' });
+
+    const pendingRead = store.hydrateFromDB();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(finishFolders).toEqual(expect.any(Function));
+    const added = store.createFolder('Created while reading');
+    store.deleteFolder('xss-folder');
+    const settingsWrite = store.saveSettings({ view: 'fresh-local' });
+    finishFolders(oldFolders);
+    await Promise.all([pendingRead, settingsWrite]);
+
+    expect(store.getFolders().map(folder => folder.id)).toContain(added.id);
+    expect(store.getFolders().map(folder => folder.id)).not.toContain('xss-folder');
+    expect(store.getSettings()).toEqual({ view: 'fresh-local' });
+  });
+
+  it('clears removed canonical Notes settings rather than retaining a stale in-memory view', async () => {
+    const store = window.PlasmaNotesStore;
+    await store.saveSettings({ view: 'stale-local' });
+    window.DB.getSetting.mockResolvedValueOnce(null);
+
+    await store.hydrateFromDB({ force: true });
+
+    expect(store.getSettings()).toEqual({});
+  });
+
+  it('discards an older canonical hydration response after a newer refresh commits', async () => {
+    const store = window.PlasmaNotesStore;
+    const oldNotes = store.getNotes().map(note => ({ ...note }));
+    const latestNotes = oldNotes.map(note => note.id === 'regular-note'
+      ? { ...note, title: 'Latest canonical revision' } : note);
+    let finishOlderRead;
+    window.DB.getAllNotes.mockImplementationOnce(() => new Promise(resolve => {
+      finishOlderRead = resolve;
+    }));
+    window.DB.getAllNotes.mockResolvedValueOnce(latestNotes);
+
+    const oldRead = store.hydrateFromDB({ force: true });
+    const latestRead = store.hydrateFromDB({ force: true });
+    expect(await latestRead).toBe(true);
+    finishOlderRead(oldNotes);
+    await oldRead;
+
+    expect(store.getNote('regular-note').title).toBe('Latest canonical revision');
+  });
+
   it('saves the current title before switching notes without a stale debounced write to the next note', async () => {
     const app = window.PlasmaNotesApp;
     const store = window.PlasmaNotesStore;
