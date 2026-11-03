@@ -155,11 +155,9 @@ export function mountBookmarksView(deps = {}) {
       readCollection(window.DB?.getAllTimestamps, 'Timestamps'),
       readCollection(window.DB?.getAllNotes, 'Notes'),
       readCollection(window.DB?.getAllAnnotations, 'PDF annotations'),
-      // The canonical PDF bookmark store is optional on older/partial app
-      // facades, but a present reader that throws cannot mean "no bookmarks".
-      typeof window.DB?.getAllPdfBookmarks === 'function'
-        ? readCollection(window.DB.getAllPdfBookmarks, 'PDF bookmarks')
-        : Promise.resolve([]),
+      // This is an independently persisted canonical collection. A missing
+      // reader is a storage failure, not proof the learner has no PDF pages.
+      readCollection(window.DB?.getAllPdfBookmarks, 'PDF bookmarks'),
     ]);
     // A slower earlier filter request must never overwrite a newer result,
     // error or active filter. DOM replacement also invalidates old requests.

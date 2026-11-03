@@ -11,6 +11,7 @@ describe('Bookmarks timestamp mutation receipts', () => {
     Toast = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() };
     window.OpenCourseDeck = { UI: { confirm: vi.fn(async () => true) } };
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => records.map(record => ({ ...record }))),
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),

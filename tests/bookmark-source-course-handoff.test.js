@@ -16,6 +16,7 @@ describe('Saved timestamp destination identity', () => {
       ]),
     };
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [{
         id: 'timestamp-b', title: 'Lesson at 1:18', topicId: 'shared',
         courseId: 'course-b', position: 78, updatedAt: 99,

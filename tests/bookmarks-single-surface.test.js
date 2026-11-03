@@ -14,6 +14,7 @@ describe('Bookmarks does not nest a card inside another card for focused views',
   beforeEach(() => {
     document.body.innerHTML = '<main id="host"></main>';
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),

@@ -22,6 +22,7 @@ describe('Bookmarks focused saved-item and first-use states', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main id="bookmarks-focus-host"></main>';
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),

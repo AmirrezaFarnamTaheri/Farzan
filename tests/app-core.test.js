@@ -1564,6 +1564,7 @@ describe('app shell resilience helpers', () => {
   it('renders bookmarks from timestamps, notes, and PDF annotations', async () => {
     await loadApp();
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [
         { id: 'ts-1', topicId: 'topic-1', title: 'Video point', position: 125, note: '<script>alert(1)</script> Rhythm insight', noteId: 'note-linked', updatedAt: 30 },
       ]),
@@ -1614,6 +1615,7 @@ describe('app shell resilience helpers', () => {
       .mockResolvedValue([]);
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps,
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
@@ -1644,6 +1646,7 @@ describe('app shell resilience helpers', () => {
       .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
       .mockResolvedValue([{ id: 'ts-edit', topicId: 'topic-1', title: 'Edited title', position: 12, note: 'Edited note', updatedAt: 2 }]);
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps,
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
@@ -1727,6 +1730,7 @@ describe('app shell resilience helpers', () => {
   it('opens PDF-linked bookmarks with pending document and page state', async () => {
     await loadApp();
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => [
         { id: 'note-pdf', title: 'Page note', sourceType: 'pdf', pdfDocId: 'fingerprint:doc-a-content', pdfPage: 9, updatedAt: 20 },
@@ -1765,6 +1769,7 @@ describe('app shell resilience helpers', () => {
   it('routes page-only bookmarks to Materials and clears an unrelated pending PDF handoff', async () => {
     await loadApp();
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => [
         { id: 'page-only', title: 'Legacy unanchored page note', sourceType: 'pdf', pdfPage: 2 },
@@ -2095,6 +2100,7 @@ describe('app shell resilience helpers', () => {
     };
     window.OpenCourseDeck.UserLibrary = { overlay: vi.fn(async () => {}) };
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [
         { id: 'ts-1', topicId: 'topic-1', title: 'Saved checkpoint', position: 125, updatedAt: 30 },
       ]),
