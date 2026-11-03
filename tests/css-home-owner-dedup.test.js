@@ -1,46 +1,54 @@
-import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
-const workspace = fs.readFileSync('src/styles/workspace.css', 'utf8');
-const polish = fs.readFileSync('src/styles/study-polish.css', 'utf8');
-const manifest = fs.readFileSync('src/styles/index.css', 'utf8');
+const require = createRequire(import.meta.url);
+const { inventoryCss, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
 
-function declarations(css, selector) {
-  const start = css.indexOf(selector + ' {');
-  if (start < 0) throw new Error('Missing CSS owner: ' + selector);
-  const end = css.indexOf('}', start);
-  return css.slice(start, end + 1);
+function values(report, file, selector, property) {
+  return report.rules
+    .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+    .flatMap(rule => parseDeclarations(rule.body))
+    .filter(item => item.property === property)
+    .map(item => item.value);
 }
 
-describe('Home workspace override ownership (#175)', () => {
-  it('keeps only the later property owner for duplicated Home declarations', () => {
+describe('Home workspace and final redesign cascade ownership (#175)', () => {
+  it('keeps single authoritative later owners for superseded Home presentation', () => {
+    const report = inventoryCss();
+    const manifest = report.stylesheets.map(sheet => sheet.file);
     expect(manifest.indexOf('study-polish.css')).toBeLessThan(manifest.indexOf('workspace.css'));
-    const redundant = [
-      ['.home-hero', 'align-items: stretch;'],
-      ['.home-hero', 'background: var(--surface-2);'],
-      ['.home-title', 'text-wrap: balance;'],
-      ['.home-subtitle', 'color: var(--text-secondary);'],
-      ['.home-actions', 'gap: var(--space-2);'],
-      ['.home-command-strip', 'padding-top: var(--space-4);'],
-      ['.home-focus-status', 'background: var(--accent-muted);'],
-      ['.home-focus-meta', 'color: var(--text-secondary);'],
-      ['.home-focus-action:hover', 'background: var(--surface-hover);'],
-      ['.home-focus-action:hover', 'transform: none;'],
-      ['.home-pulse-item:hover', 'transform: none;'],
-      ['.home-pulse-item:hover', 'box-shadow: none;'],
+    expect(manifest.indexOf('workspace.css')).toBeLessThan(manifest.indexOf('farzan-redesign.css'));
+    const final = [
+      ['.home-subtitle', 'color', '#d5e8f6'],
+      ['.home-actions', 'gap', '9px'],
+      ['.home-command-strip', 'padding-top', '15px'],
+      ['.home-focus-status', 'background', '#eaf3fb'],
+      ['.home-focus-meta', 'color', '#617387'],
+      ['.home-focus-action:hover', 'background', '#e5f1fc'],
+      ['.home-title', 'letter-spacing', '-.05em'],
     ];
-    for (const [selector, property] of redundant) {
-      // An obsolete earlier selector may be deleted completely once its
-      // final workspace owner remains; it need not survive as an empty rule.
-      const early = polish.includes(selector + ' {') ? declarations(polish, selector) : '';
-      expect(early, selector + ' earlier duplicate').not.toContain(property);
-      expect(declarations(workspace, selector), selector + ' final owner').toContain(property);
+    for (const [selector, property, value] of final) {
+      expect(values(report, 'workspace.css', selector, property),
+        `retired old workspace owner: ${selector} ${property}`).toHaveLength(0);
+      expect(values(report, 'farzan-redesign.css', selector, property),
+        `final Home owner: ${selector} ${property}`).toContain(value);
+      const owner = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(owner?.owner.file).toBe('farzan-redesign.css');
     }
   });
-  it('keeps the unique workspace border, type and focus styles', () => {
-    expect(declarations(workspace, '.home-hero')).toContain('border: 1px solid var(--workspace-rule)');
-    expect(declarations(workspace, '.home-title')).toContain('letter-spacing: -0.052em');
-    expect(declarations(workspace, '.home-focus-action:hover')).toContain('border-color: var(--workspace-rule-strong)');
-    expect(declarations(workspace, '.home-pulse-item:hover')).toContain('border-color: var(--workspace-rule)');
+
+  it('retains truly independent workspace border, text wrap and focus styles', () => {
+    const report = inventoryCss();
+    const unique = [
+      ['.home-hero', 'border', '1px solid var(--workspace-rule)'],
+      ['.home-title', 'text-wrap', 'balance'],
+      ['.home-focus-action:hover', 'border-color', 'var(--workspace-rule-strong)'],
+      ['.home-pulse-item:hover', 'border-color', 'var(--workspace-rule)'],
+    ];
+    for (const [selector, property, value] of unique) {
+      expect(values(report, 'workspace.css', selector, property),
+        `preserved workspace behavior: ${selector} ${property}`).toContain(value);
+    }
   });
 });
