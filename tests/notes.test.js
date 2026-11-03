@@ -139,6 +139,21 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
+  it('accepts the canonical folder delete bridge void success without leaking an unsaved-work warning', async () => {
+    const store = window.PlasmaNotesStore;
+    const folder = store.createFolder('A canonical folder to delete');
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    window.OpenCourseDeck.Toast.error.mockClear();
+    window.DB.deleteFolder.mockResolvedValueOnce(undefined);
+    store.deleteFolder(folder.id);
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.deleteFolder).toHaveBeenCalledWith(folder.id);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .toHaveBeenCalledWith('notes-durable-folder:' + folder.id);
+    expect(window.OpenCourseDeck.Toast.error).not.toHaveBeenCalled();
+  });
+
   it('does not save or restamp a saved note just by completing first canonical hydration', () => {
     // A previously loaded record must be opened exactly once. Reopening
     // through openNote() immediately after _renderAfterCanonicalRefresh()
