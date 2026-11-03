@@ -13,7 +13,7 @@ describe('progress backup exports', () => {
     window.DB = {
       getAllProgress: vi.fn(async () => [{ topicId: 'topic-1', courseId: 'course-1', updatedAt: 20 }]),
       getProgress: vi.fn(async () => null),
-      getAllNotes: vi.fn(async () => [{ id: 'note-1', topicId: 'topic-1', title: 'Current note', content: '<p>Current body</p>', updatedAt: 30 }]),
+      getAllNotes: vi.fn(async () => [{ id: 'note-1', topicId: 'topic-1', courseId: 'course-1', title: 'Current note', content: '<p>Current body</p>', updatedAt: 30 }]),
       getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1' }]),
       getAllFolders: vi.fn(async () => [{ id: 'folder-1', name: 'Folder' }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-1', page: 2 }]),
@@ -115,7 +115,7 @@ describe('progress backup exports', () => {
 
   it('includes watched segments and PDF bookmarks in version 1.6 JSON exports', async () => {
     window.DB.getAllWatchedSegments.mockResolvedValueOnce([
-      { id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 },
+      { id: 'segment-1', topicId: 'topic-1', courseId: 'course-1', start: 0, end: 15 },
     ]);
     window.DB.getAllPdfBookmarks.mockResolvedValueOnce([
       { id: 'page-bookmark', docId: 'document.pdf', page: 4 },
@@ -124,7 +124,7 @@ describe('progress backup exports', () => {
     const payload = JSON.parse(await downloadedBlob.text());
     expect(payload).toMatchObject({
       version: '1.7',
-      watchedSegments: [{ id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 }],
+      watchedSegments: [{ id: 'segment-1', topicId: 'topic-1', courseId: 'course-1', start: 0, end: 15 }],
       pdfBookmarks: [{ id: 'page-bookmark', docId: 'document.pdf', page: 4 }],
     });
   });
@@ -326,7 +326,7 @@ describe('progress backup exports', () => {
     const file = new File([JSON.stringify({
       version: '1.7',
       annotations: [{ id: 'annot-new', docId: 'doc-1', page: 2, updatedAt: 123 }],
-      timestamps: [{ id: 'time-new', topicId: 'topic-1', position: 40 }],
+      timestamps: [{ id: 'time-new', topicId: 'topic-1', courseId: 'course-1', position: 40 }],
     })], 'rejected-media-receipts.json', { type: 'application/json' });
 
     await window.ProgressStats.importJSONFile(file);
@@ -447,7 +447,7 @@ describe('progress backup exports', () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
       version: '1.7',
-      watchedSegments: [{ id: 'segment', topicId: 'topic-1', start: 0, end: 10 }],
+      watchedSegments: [{ id: 'segment', topicId: 'topic-1', courseId: 'course-1', start: 0, end: 10 }],
     })], 'media.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
     expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
@@ -467,7 +467,7 @@ describe('progress backup exports', () => {
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     const file = new File([JSON.stringify({
       version: '1.7',
-      watchedSegments: [{ id: 'segment-2', topicId: 'topic-1', start: 3, end: 14 }],
+      watchedSegments: [{ id: 'segment-2', topicId: 'topic-1', courseId: 'course-1', start: 3, end: 14 }],
       pdfBookmarks: [{ id: 'pdf-2', docId: 'research.pdf', page: 6 }],
     })], 'portable-media.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
@@ -489,7 +489,7 @@ describe('progress backup exports', () => {
 
   it('retains nested Markdown structure from HTML when exporting existing notes', async () => {
     window.DB.getAllNotes.mockResolvedValueOnce([{
-      id: 'nested-one', title: 'Nested note', topicId: 'topic-1',
+      id: 'nested-one', title: 'Nested note', topicId: 'topic-1', courseId: 'course-1',
       content: '<h3>فیزیولوژی قلب</h3><p><strong>Bold <em>nested</em></strong> &amp; safe.</p>'
         + '<ul><li>First</li><li>Second</li></ul>'
         + '<img src="https://tracker.example/pixel.png">'
@@ -509,7 +509,7 @@ describe('progress backup exports', () => {
     window.DB.getAllNotes.mockResolvedValueOnce([
       {
         id: 'note-1',
-        topicId: 'topic-1',
+        topicId: 'topic-1', courseId: 'course-1',
         title: 'Current note',
         content: '<p>Current body</p>',
         sourceType: 'pdf-selection',
@@ -539,8 +539,8 @@ describe('progress backup exports', () => {
 
   it('keeps vault note filenames unique and includes a machine-readable manifest', async () => {
     window.DB.getAllNotes.mockResolvedValueOnce([
-      { id: 'note-a', topicId: 'topic-1', title: 'Duplicate', content: '<p>One</p>', sourceType: 'note' },
-      { id: 'note-b', topicId: 'topic-1', title: 'Duplicate', content: '<p>Two</p>', sourceType: 'pdf' },
+      { id: 'note-a', topicId: 'topic-1', courseId: 'course-1', title: 'Duplicate', content: '<p>One</p>', sourceType: 'note' },
+      { id: 'note-b', topicId: 'topic-1', courseId: 'course-1', title: 'Duplicate', content: '<p>Two</p>', sourceType: 'pdf' },
     ]);
 
     await window.ProgressStats.exportVaultMarkdown();
@@ -555,7 +555,7 @@ describe('progress backup exports', () => {
 
   it('exports a portable vault archive with separate file entries', async () => {
     window.DB.getAllNotes.mockResolvedValueOnce([
-      { id: 'note-a', topicId: 'topic-1', title: 'Archive note', content: '<p>Body</p>', sourceType: 'note' },
+      { id: 'note-a', topicId: 'topic-1', courseId: 'course-1', title: 'Archive note', content: '<p>Body</p>', sourceType: 'note' },
     ]);
 
     await window.ProgressStats.exportVaultArchive();
@@ -572,7 +572,7 @@ describe('progress backup exports', () => {
 
   it('exports a standards-shaped vault ZIP without adding a ZIP dependency', async () => {
     window.DB.getAllNotes.mockResolvedValueOnce([
-      { id: 'note-a', topicId: 'topic-1', title: 'Zip note', content: '<p>Zip body</p>', sourceType: 'note' },
+      { id: 'note-a', topicId: 'topic-1', courseId: 'course-1', title: 'Zip note', content: '<p>Zip body</p>', sourceType: 'note' },
     ]);
 
     await window.ProgressStats.exportVaultZip();
@@ -603,7 +603,7 @@ describe('progress backup exports', () => {
     });
     window.showDirectoryPicker = vi.fn(async () => makeDir());
     window.DB.getAllNotes.mockResolvedValueOnce([
-      { id: 'note-a', topicId: 'topic-1', title: 'Folder note', content: '<p>Saved to disk</p>', sourceType: 'note' },
+      { id: 'note-a', topicId: 'topic-1', courseId: 'course-1', title: 'Folder note', content: '<p>Saved to disk</p>', sourceType: 'note' },
     ]);
 
     const result = await window.ProgressStats.exportVaultDirectory();
@@ -686,8 +686,8 @@ describe('progress backup exports', () => {
 
   it('keeps the latest note body in JSON and Markdown exports after edits', async () => {
     window.DB.getAllNotes
-      .mockResolvedValueOnce([{ id: 'note-1', topicId: 'topic-1', title: 'Edited note', content: '<p>Edited body</p>', updatedAt: 40 }])
-      .mockResolvedValueOnce([{ id: 'note-1', topicId: 'topic-1', title: 'Edited note', content: '<p>Edited body</p>', updatedAt: 40 }]);
+      .mockResolvedValueOnce([{ id: 'note-1', topicId: 'topic-1', courseId: 'course-1', title: 'Edited note', content: '<p>Edited body</p>', updatedAt: 40 }])
+      .mockResolvedValueOnce([{ id: 'note-1', topicId: 'topic-1', courseId: 'course-1', title: 'Edited note', content: '<p>Edited body</p>', updatedAt: 40 }]);
 
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
@@ -1014,7 +1014,7 @@ describe('progress backup exports', () => {
         library: { version: 1, courses: { 'course-new': { id: 'course-new', title: 'Imported course' } } },
         mediaCues: { 'topic-new': [{ at: 30, text: 'Imported cue' }] },
       },
-      timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
+      timestamps: [{ id: 'ts-new', topicId: 'topic-new', courseId: 'course-1', position: 30 }],
       progress: [], notes: [], annotations: [],
     })], 'partial-restore.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
