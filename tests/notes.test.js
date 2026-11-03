@@ -139,6 +139,16 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
+  it('does not save or restamp a saved note just by completing first canonical hydration', () => {
+    // A previously loaded record must be opened exactly once. Reopening
+    // through openNote() immediately after _renderAfterCanonicalRefresh()
+    // incorrectly invokes Editor.save(true) before the user has edited it,
+    // making an older local copy look newer than a genuine remote revision.
+    expect(window.PlasmaNotesStore.getNote('pinned-note')).not.toBeNull();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesStore.getNote('pinned-note').updatedAt).toBe(now - 1000);
+  });
+
   it('counts Chinese words accurately in saved note metadata using native word segmentation', async () => {
     const editor = document.querySelector('[data-notes-editor]');
     const priorLanguage = document.documentElement.lang;
