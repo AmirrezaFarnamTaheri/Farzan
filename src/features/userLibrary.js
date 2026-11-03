@@ -708,7 +708,7 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
         if (destinationProgressSaved) {
           try {
             const deleted = await db.deleteProgress(id, toId);
-            if (deleted !== true) throw new Error('Destination progress cleanup was not acknowledged');
+            if (deleted !== true) throw new Error('Destination progress cleanup was not acknowledged', { cause: error });
           } catch (cleanupError) { compensationErrors.push(cleanupError); }
         }
         try {
