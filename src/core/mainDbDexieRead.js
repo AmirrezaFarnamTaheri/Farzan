@@ -1,6 +1,6 @@
 /**
  * Strictly read an existing native IndexedDB database through Dexie's dynamic
- * schema mode. Do not declare a Dexie version here: the main app's native v3
+ * schema mode. Do not declare a Dexie version here: the main app's native v4
  * schema, encryption, migrations and multi-store writes remain authoritative.
  *
  * A short-lived Dexie connection avoids long-lived cross-tab upgrade/reset
