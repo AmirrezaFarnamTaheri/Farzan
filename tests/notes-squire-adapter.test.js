@@ -213,6 +213,24 @@ describe('Squire HTML-canonical edit adapter', () => {
     } finally { editor.destroy(); host.remove(); }
   });
 
+  it('never exposes provisional Persian/Chinese composition text through a canonical read', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createSquireNoteEditor({ element: host, html: '<p>Saved body</p>' });
+    const root = host.querySelector('.notes-modern-editor');
+    try {
+      const p = root.querySelector('p');
+      p.append(document.createTextNode(' committed'));
+      editor.syncChanges();
+      const beforeIME = editor.getHTML();
+      root.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+      p.append(document.createTextNode(' provisional فارسی 你好'));
+      expect(editor.getHTML()).toBe(beforeIME);
+      root.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      expect(editor.getHTML()).toContain('provisional فارسی 你好');
+    } finally { editor.destroy(); host.remove(); }
+  });
+
   it('round-trips inserted text through native undo and redo without losing content', () => {
     const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Before editing</p>',
