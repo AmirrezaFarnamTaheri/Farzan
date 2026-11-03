@@ -21,7 +21,7 @@ async function createDatabase() {
     drop.onerror = () => reject(drop.error);
   });
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('opencoursedeck', 4);
+    const request = indexedDB.open('opencoursedeck', 5);
     request.onupgradeneeded = () => {
       for (const [name, keyPath] of schema) request.result.createObjectStore(name, { keyPath });
     };
@@ -51,7 +51,7 @@ function rootWithFacade(sessionEntries) {
 
 async function putSetting(value) {
   const db = await new Promise((resolve, reject) => {
-    const request = indexedDB.open('opencoursedeck', 4);
+    const request = indexedDB.open('opencoursedeck', 5);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -115,7 +115,7 @@ describe('atomic backup engine', () => {
     const snapshot = await root.DB.exportBackup();
 
     expect(snapshot._meta.format).toBe('opencoursedeck-snapshot');
-    expect(snapshot._meta.version).toBe(4);
+    expect(snapshot._meta.version).toBe(5);
     expect(snapshot._meta.portableAuthority).toBe(false);
     expect(Object.keys(snapshot._meta.stores).sort()).toEqual(schema.map(([name]) => name).sort());
   });
