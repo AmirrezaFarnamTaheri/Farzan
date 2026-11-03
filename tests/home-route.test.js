@@ -44,7 +44,7 @@ describe('home dashboard', () => {
         { topicId: 'topic-1', courseId: 'course-1', percent: 42, updatedAt: now },
         { topicId: 'topic-2', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now - 40 * 24 * 60 * 60 * 1000 },
       ],
-      notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', updatedAt: now - 1000 }],
+      notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', courseId: 'course-1', updatedAt: now - 1000 }],
       timestamps: [{ topicId: 'topic-1', courseId: 'course-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
       flashcards: [{ ...scheduled('card-due', 'Explain spacing', '2020-01-01T00:00:00.000Z'), deck: 'Design' }],
     });
@@ -377,6 +377,6 @@ describe('home entry and resume contracts', () => {
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90, 'course-1');
   });
 });
