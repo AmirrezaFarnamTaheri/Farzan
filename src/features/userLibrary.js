@@ -155,6 +155,18 @@ export async function loadLibrary() {
     // user's real data. Verified absence (below) is the only safe empty.
     throw new Error('Unable to read the user library from storage', { cause: error });
   }
+  // Only a genuinely absent key may initialize as an empty library. A
+  // malformed or future-version canonical record is NOT an empty dataset:
+  // silently normalizing it would let the next edit overwrite stored study
+  // metadata, leaving uploaded media blobs and their references orphaned.
+  if (saved != null && (
+    typeof saved !== 'object' || Array.isArray(saved)
+    || saved.version !== 1
+    || !saved.courses || typeof saved.courses !== 'object'
+    || Array.isArray(saved.courses)
+  )) {
+    throw new TypeError('Invalid or unsupported canonical user-library record; refusing to overwrite stored data');
+  }
   return cloneLibrary(saved);
 }
 
