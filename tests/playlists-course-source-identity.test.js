@@ -108,7 +108,7 @@ describe('course-scoped persisted playlists and complete playback (#174)', () =>
     catalog = [
       { topicId: 'a1', courseId: 'a', title: 'Available', videos: [{ url: 'https://example.test/a1.mp4' }] },
     ];
-    saved = [{ id: 'partial', title: 'Do not truncate', topicIds: ['a1', 'offline'] }];
+    saved = [{ id: 'partial', title: 'Do not truncate', topicIds: ['a1', 'offline'], sourceRefs: [{ courseId: 'a', topicId: 'a1' }, { courseId: 'a', topicId: 'offline' }] }];
     mount();
     await openSaved('partial');
     await vi.waitFor(() => expect(Toast.error).toHaveBeenCalledWith(expect.stringMatching(/unavailable|missing|incomplete/i)));
@@ -119,7 +119,7 @@ describe('course-scoped persisted playlists and complete playback (#174)', () =>
 
   it('refuses a stale saved queue whose canonical revision changed in another tab', async () => {
     catalog = [{ topicId: 'a1', courseId: 'a', title: 'Available', videos: [{ url: 'https://example.test/a1.mp4' }] }];
-    saved = [{ id: 'stale', title: 'My queue', topicIds: ['a1'], updatedAt: 1 }];
+    saved = [{ id: 'stale', title: 'My queue', topicIds: ['a1'], sourceRefs: [{ courseId: 'a', topicId: 'a1' }], updatedAt: 1 }];
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-open-playlist="stale"]')).not.toBeNull());
     saved = [{ ...saved[0], title: 'Updated on another tab', updatedAt: 2 }];
