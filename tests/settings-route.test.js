@@ -77,6 +77,27 @@ describe('settings route', () => {
     active.controller.unmount();
   });
 
+  it('keeps the storage meter visible and places technical diagnostics behind a keyboard-operable disclosure', () => {
+    const { controller } = mountSettings();
+    try {
+      const section = document.querySelector('#settings-storage');
+      const details = section.querySelector('[data-storage-diagnostics]');
+      expect(details).not.toBeNull();
+      expect(details.tagName).toBe('DETAILS');
+      expect(details.open).toBe(false);
+      expect(details.querySelector('summary')?.textContent).toMatch(/diagnostics|advanced|details/i);
+      expect(details.querySelector('[data-storage-health]')).not.toBeNull();
+      expect(section.querySelector('.settings-storage-meter')).not.toBeNull();
+      expect(details.contains(section.querySelector('[data-storage-status]'))).toBe(false);
+      const summary = details.querySelector('summary');
+      summary.focus();
+      summary.click();
+      expect(details.open).toBe(true);
+      expect(document.querySelector('#btn-export-json-2')).not.toBeNull();
+      expect(document.querySelector('#btn-import-json-2')).not.toBeNull();
+    } finally { controller.unmount(); }
+  });
+
   it('preserves appearance, storage, portability, data, and AI controls', () => {
     const { controller } = mountSettings();
     const required = [
