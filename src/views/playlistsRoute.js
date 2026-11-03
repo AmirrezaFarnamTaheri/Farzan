@@ -123,45 +123,34 @@ function playlistTopicTitle(topic) {
 // A course/topic pair is the canonical lookup key. JSON tuples cannot
 // collide when imported identifiers contain separators or mixed scripts.
 function courseTopicKey(courseId, topicId) {
-  if (courseId == null || topicId == null) return null;
-  const course = String(courseId).trim(), topic = String(topicId).trim();
-  return course && topic ? JSON.stringify([course, topic]) : null;
+  try { return courseTopicIdentity(courseId, topicId); }
+  catch { return null; }
 }
 
 function savedSourceIsAligned(saved) {
-  if (!Object.hasOwn(saved, 'sourceRefs')) return true;
-  return Array.isArray(saved.sourceRefs)
-    && saved.sourceRefs.length === saved.topicIds.length
+  return Boolean(saved && typeof saved === 'object' && saved.id && saved.title
+    && Array.isArray(saved.topicIds) && saved.topicIds.length > 0
+    && Array.isArray(saved.sourceRefs) && saved.sourceRefs.length === saved.topicIds.length
     && saved.sourceRefs.every((ref, index) => ref && !Array.isArray(ref)
-      && typeof ref === 'object' && typeof ref.courseId === 'string'
-      && typeof ref.topicId === 'string'
-      && ref.topicId === String(saved.topicIds[index])
-      && courseTopicKey(ref.courseId, ref.topicId));
+      && typeof ref === 'object' && typeof ref.courseId === 'string' && ref.courseId.trim()
+      && typeof ref.topicId === 'string' && ref.topicId === String(saved.topicIds[index])
+      && courseTopicKey(ref.courseId, ref.topicId)));
 }
 
-function resolveSavedTopic(saved, index, topicsById, topicsByCourse, ambiguousTopics, ambiguousCourse) {
-  const topicId = String(saved.topicIds[index]);
-  if (Object.hasOwn(saved, 'sourceRefs')) {
-    // Invalid scoped identity never authorizes an unrelated topic-only match.
-    if (!savedSourceIsAligned(saved)) return null;
-    const ref = saved.sourceRefs[index];
-    const key = courseTopicKey(ref.courseId, ref.topicId);
-    return key && !ambiguousCourse.has(key) ? topicsByCourse.get(key) || null : null;
-  }
-  return ambiguousTopics.has(topicId) ? null : topicsById.get(topicId) || null;
+function resolveSavedTopic(saved, index, topicsByCourse, ambiguousCourse) {
+  if (!savedSourceIsAligned(saved)) return null;
+  const ref = saved.sourceRefs[index];
+  const key = courseTopicKey(ref.courseId, ref.topicId);
+  return key && !ambiguousCourse.has(key) ? topicsByCourse.get(key) || null : null;
 }
 
 function sanitizeSavedPlaylists(value) {
-  return Array.isArray(value)
-    ? value.filter(item => item && typeof item === 'object' && item.id && item.title && Array.isArray(item.topicIds))
-    : [];
+  if (!Array.isArray(value) || value.some(item => !savedSourceIsAligned(item))) {
+    throw new TypeError('Saved playlists require canonical course/topic source references');
+  }
+  return value.slice();
 }
 
-/**
- * Commit a saved playlist revision only with an atomic IndexedDB CAS.
- * A get/save pair can erase another tab's data and is unsupported.
- * Keep strict canonical readback after an acknowledged transaction.
- */
 async function persistSavedPlaylists(db, expected, next) {
   if (typeof db?.compareAndSwapSetting !== 'function') {
     throw new Error('Canonical atomic saved playlist storage is unavailable');
@@ -279,17 +268,6 @@ async function renderPlaylists(deps) {
   // Imported courses may reuse a topicId. A topic-only saved queue cannot
   // select one safely, so do not let last-write-wins Map semantics silently
   // redirect study playback to a different course.
-  const topicsById = new Map();
-  const ambiguousTopicIds = new Set();
-  for (const topic of topics) {
-    if (topic?.topicId == null) continue;
-    const id = String(topic.topicId);
-    if (!id || ambiguousTopicIds.has(id)) continue;
-    if (topicsById.has(id)) {
-      topicsById.delete(id);
-      ambiguousTopicIds.add(id);
-    } else topicsById.set(id, topic);
-  }
   const topicsByCourse = new Map();
   const ambiguousCourseTopics = new Set();
   for (const topic of topics) {
@@ -301,90 +279,23 @@ async function renderPlaylists(deps) {
     } else topicsByCourse.set(key, topic);
   }
   const savedTopic = (saved, index) => resolveSavedTopic(
-    saved, index, topicsById, topicsByCourse, ambiguousTopicIds, ambiguousCourseTopics,
+    saved, index, topicsByCourse, ambiguousCourseTopics,
   );
   const timestampTopics = timestamps
+    .filter(item => item?.id && item?.topicId && item?.courseId)
     .map(item => {
-      const id = String(item?.topicId ?? '');
-      // A timestamp carrying a course identity may borrow catalog metadata
-      // only from one *unique exact* course/topic pair. Never take the first
-      // of conflicting restored imports, and never use a topic-only match from
-      // an unrelated course, even when that topicId is globally unique.
-      const scopedKey = courseTopicKey(item?.courseId, item?.topicId);
-      if (scopedKey) {
-        return ambiguousCourseTopics.has(scopedKey)
-          ? item : topicsByCourse.get(scopedKey) || item;
-      }
-      // Legacy unscoped timestamps are safe only when the topic is globally
-      // unique in the current catalog; otherwise retain saved metadata.
-      if (ambiguousTopicIds.has(id)) return item;
-      return topicsById.get(id) || item;
+      const key = courseTopicKey(item.courseId, item.topicId);
+      if (!key || ambiguousCourseTopics.has(key)) return null;
+      const topic = topicsByCourse.get(key);
+      return topic ? {
+        ...topic,
+        position: item.position,
+        timestampId: item.id,
+        title: item.title || topic.title,
+      } : null;
     })
-    .filter(item => item?.topicId || item?.title || item?.topicTitle);
+    .filter(Boolean);
 
-  const playlists = [];
-  savedPlaylists
-    .slice()
-    .sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
-    .forEach(saved => {
-      // Keep the saved order visible even when a lesson cannot currently
-      // resolve, rather than compressing a partially unavailable queue.
-      const savedItems = saved.topicIds.map((topicId, index) =>
-        playlistTopicTitle(savedTopic(saved, index) || { topicId: String(topicId) }));
-      playlists.push({
-        id: saved.id,
-        label: 'Saved',
-        title: saved.title,
-        detail: `${saved.topicIds.length} saved topic${saved.topicIds.length === 1 ? '' : 's'}`,
-        href: '#/courses',
-        items: savedItems,
-        saved: true,
-      });
-    });
-  if (activeQueue.length) {
-    playlists.push({
-      id: 'active-queue',
-      label: 'Live',
-      title: 'Active player queue',
-      detail: `${activeQueue.length} track${activeQueue.length === 1 ? '' : 's'} currently loaded`,
-      href: '#/courses',
-      items: activeQueue.map(track => track.title || track.topicTitle || track.topicId || 'Queued track'),
-    });
-  }
-  if (timestampTopics.length) {
-    playlists.push({
-      id: 'timestamp-queue',
-      label: 'Resume',
-      title: 'Saved timestamp queue',
-      detail: `${timestampTopics.length} saved point${timestampTopics.length === 1 ? '' : 's'} ready to revisit`,
-      href: '#/bookmarks',
-      items: timestampTopics.map(playlistTopicTitle),
-    });
-  }
-
-  const sourceGroups = new Map();
-  videoTopics.forEach(topic => {
-    const key = `${topic.courseId || 'course'}|${topic.sourceIndex ?? topic.sourceLabel ?? 'source'}`;
-    if (!sourceGroups.has(key)) {
-      sourceGroups.set(key, {
-        id: `source-${sourceGroups.size + 1}`,
-        label: 'Catalog',
-        title: topic.courseTitle || topic.courseId || topic.sourceLabel || 'Catalog course',
-        sourceLabel: topic.sourceLabel || '',
-        courseId: topic.courseId,
-        href: '#/courses',
-        items: [],
-        topicIds: [],
-        sourceRefs: [],
-      });
-    }
-    sourceGroups.get(key).items.push(playlistTopicTitle(topic));
-    sourceGroups.get(key).topicIds.push(topic.topicId);
-    sourceGroups.get(key).sourceRefs.push({
-      courseId: topic.courseId == null ? '' : String(topic.courseId),
-      topicId: topic.topicId == null ? '' : String(topic.topicId),
-    });
-  });
   const catalogGroups = [...sourceGroups.values()]
     .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
   const catalogPlaylists = catalogGroups.slice(0, 10).map(group => ({
@@ -599,8 +510,7 @@ async function renderPlaylists(deps) {
       const key = courseTopicKey(ref.courseId, ref.topicId);
       return key && topicsByCourse.has(key) && !ambiguousCourseTopics.has(key);
     }));
-  const canSaveCatalog = group => Boolean(group?.topicIds?.length
-    && (scopedCatalog(group) || group.topicIds.every(id => !ambiguousTopicIds.has(String(id)))));
+  const canSaveCatalog = group => Boolean(group?.topicIds?.length && scopedCatalog(group));
   const firstCatalog = catalogGroups.find(canSaveCatalog) || catalogGroups[0];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
@@ -625,19 +535,14 @@ async function renderPlaylists(deps) {
       creating = true;
       saveBtn.disabled = true;
       try {
-        // Preserve unknown future-version rows verbatim. Silently sanitizing
-        // the complete collection before a write can erase user data.
         const raw = await window.DB.getSetting('ocd_playlists');
-        if (raw != null && !Array.isArray(raw)) throw new TypeError('Saved playlists could not be read');
-        const current = raw ?? [];
+        const current = sanitizeSavedPlaylists(raw ?? []);
         if (current.length >= 50) throw new Error('Saved playlist limit reached; remove one before creating another');
         const now = Date.now();
         const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         const next = [
           { id, title, topicIds: [...new Set(firstCatalog.topicIds.map(String))],
-            ...(scopedCatalog(firstCatalog) ? {
-              sourceRefs: firstCatalog.sourceRefs.map(ref => ({ ...ref })),
-            } : {}),
+            sourceRefs: firstCatalog.sourceRefs.map(ref => ({ ...ref })),
             createdAt: now, updatedAt: now },
           ...current,
         ];
