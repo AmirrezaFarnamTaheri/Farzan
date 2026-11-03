@@ -213,7 +213,7 @@ describe('bridge DB safety helpers', () => {
       ['getProgress', ['t', 'course-a']], ['getAllProgress', []], ['getAllTimestamps', []],
       ['getAllNotes', []], ['getAllFolders', []], ['getSetting', ['test']],
       ['getAllAnnotations', []], ['getProgressByCourse', ['course-a']],
-      ['getTimestampsByTopic', ['t']], ['getNotesByFolder', ['default']],
+      ['getTimestampsByCourse', ['course-a']], ['getNotesByFolder', ['default']],
       ['queryByRange', ['progress', 'updatedAt', 0, 100]],
       ['countByIndex', ['progress', 'courseId', 'course-a']],
       ['getWatchedSegments', ['t']], ['getPdfBookmarks', ['doc']],
@@ -472,7 +472,7 @@ describe('bridge DB safety helpers', () => {
       async put() { throw new Error('timestamp transaction aborted'); }
     };
 
-    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a' }))
+    await expect(window.DB.saveTimestamp({ id: 'ts-canonical', topicId: 'topic-a', courseId: 'course-a' }))
       .rejects.toThrow('timestamp transaction aborted');
     expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(window.OpenCourseDeck.bus.emit).not.toHaveBeenCalledWith('sync:local-change', expect.anything());
@@ -511,7 +511,7 @@ describe('bridge DB safety helpers', () => {
       async put() { throw quotaError; }
     };
 
-    await expect(window.DB.saveTimestamp({ id: 'ts-quota', topicId: 'topic-a' })).rejects.toThrow('Persistent storage full');
+    await expect(window.DB.saveTimestamp({ id: 'ts-quota', topicId: 'topic-a', courseId: 'course-a' })).rejects.toThrow('Persistent storage full');
 
     expect(localStorage.getItem('ocd_timestamps_fallback_v1')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
@@ -821,7 +821,7 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.getProgressByCourse('course-a')).resolves.toEqual([
       expect.objectContaining({ topicId: 'topic-a' }),
     ]);
-    await expect(window.DB.getTimestampsByTopic('topic-a')).resolves.toEqual([
+    await expect(window.DB.getTimestampsByCourse('course-a')).resolves.toEqual([
       expect.objectContaining({ id: 'ts-a' }),
     ]);
     await expect(window.DB.getTimestampsByCourse('course-b')).resolves.toEqual([
@@ -829,7 +829,7 @@ describe('bridge DB safety helpers', () => {
     ]);
     expect(calls).toEqual([
       ['progress', 'courseId', 'course-a'],
-      ['timestamps', 'topicId', 'topic-a'],
+      ['timestamps', 'courseId', 'course-a'],
       ['timestamps', 'courseId', 'course-b'],
     ]);
   });
