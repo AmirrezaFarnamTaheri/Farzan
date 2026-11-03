@@ -968,8 +968,11 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     try {
       const loaded = await loadKonvaDraft();
       if (unmounted) return;
-      if (!window.DB?.getSetting || !window.DB?.saveSetting) {
-        throw new Error('Experimental draft storage unavailable');
+      // The draft has no non-atomic compatibility path: its move, import,
+      // undo, pen and export workflow is backed by a single CAS writer.
+      if (typeof window.DB?.getSetting !== 'function'
+          || typeof window.DB?.compareAndSwapSetting !== 'function') {
+        throw new Error('Atomic experimental draft storage unavailable');
       }
       const savedDraft = await window.DB.getSetting(loaded.DRAFT_KEY);
       if (unmounted) return;
