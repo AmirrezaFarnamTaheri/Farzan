@@ -85,6 +85,7 @@ export function mountBookmarksView(deps = {}) {
     }
     await readSaved();
     return {
+      topic: matches[0],
       topicId,
       courseId,
       position: Math.max(0, Number(original.position) || 0),
