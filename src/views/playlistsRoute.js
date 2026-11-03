@@ -1,3 +1,5 @@
+import { courseTopicIdentity } from '../core/courseTopicIdentity.js';
+
 export function mountPlaylistsView({
   setView,
   safeMediaUrl,
@@ -297,6 +299,69 @@ async function renderPlaylists(deps) {
     })
     .filter(Boolean);
 
+  const playlists = [];
+  savedPlaylists
+    .slice()
+    .sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
+    .forEach(saved => {
+      // Keep the saved order visible even when a lesson cannot currently
+      // resolve, rather than compressing a partially unavailable queue.
+      const savedItems = saved.topicIds.map((topicId, index) =>
+        playlistTopicTitle(savedTopic(saved, index) || { topicId: String(topicId) }));
+      playlists.push({
+        id: saved.id,
+        label: 'Saved',
+        title: saved.title,
+        detail: `${saved.topicIds.length} saved topic${saved.topicIds.length === 1 ? '' : 's'}`,
+        href: '#/courses',
+        items: savedItems,
+        saved: true,
+      });
+    });
+  if (activeQueue.length) {
+    playlists.push({
+      id: 'active-queue',
+      label: 'Live',
+      title: 'Active player queue',
+      detail: `${activeQueue.length} track${activeQueue.length === 1 ? '' : 's'} currently loaded`,
+      href: '#/courses',
+      items: activeQueue.map(track => track.title || track.topicTitle || track.topicId || 'Queued track'),
+    });
+  }
+  if (timestampTopics.length) {
+    playlists.push({
+      id: 'timestamp-queue',
+      label: 'Resume',
+      title: 'Saved timestamp queue',
+      detail: `${timestampTopics.length} saved point${timestampTopics.length === 1 ? '' : 's'} ready to revisit`,
+      href: '#/bookmarks',
+      items: timestampTopics.map(playlistTopicTitle),
+    });
+  }
+
+  const sourceGroups = new Map();
+  videoTopics.forEach(topic => {
+    const key = `${topic.courseId || 'course'}|${topic.sourceIndex ?? topic.sourceLabel ?? 'source'}`;
+    if (!sourceGroups.has(key)) {
+      sourceGroups.set(key, {
+        id: `source-${sourceGroups.size + 1}`,
+        label: 'Catalog',
+        title: topic.courseTitle || topic.courseId || topic.sourceLabel || 'Catalog course',
+        sourceLabel: topic.sourceLabel || '',
+        courseId: topic.courseId,
+        href: '#/courses',
+        items: [],
+        topicIds: [],
+        sourceRefs: [],
+      });
+    }
+    sourceGroups.get(key).items.push(playlistTopicTitle(topic));
+    sourceGroups.get(key).topicIds.push(topic.topicId);
+    sourceGroups.get(key).sourceRefs.push({
+      courseId: topic.courseId == null ? '' : String(topic.courseId),
+      topicId: topic.topicId == null ? '' : String(topic.topicId),
+    });
+  });
   const catalogGroups = [...sourceGroups.values()]
     .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
   const catalogPlaylists = catalogGroups.slice(0, 10).map(group => ({
