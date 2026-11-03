@@ -76,6 +76,18 @@ describe('bridge DB safety helpers', () => {
       .resolves.toMatchObject({ status: 'in-progress', courseId: 'course-b' });
   });
 
+  it('requires course and topic identity for timestamp writes and preserves it through edits', async () => {
+    await expect(window.DB.saveTimestamp({ id: 'ts-unscoped', topicId: 'shared' }))
+      .rejects.toThrow(/course and topic identity/i);
+    const original = {
+      id: 'ts-scoped', topicId: 'shared', courseId: 'course-a', position: 18,
+    };
+    await expect(window.DB.saveTimestamp(original)).resolves.toBe(true);
+    await expect(window.DB.compareAndSwapTimestamp(original.id, original, {
+      ...original, courseId: 'course-b',
+    })).rejects.toThrow(/cannot change their course\/topic source/i);
+  });
+
   it('stores progress independently for the same topic in different courses', async () => {
     const courseA = await window.DB.saveProgress('shared-topic', 'course-a', {
       status: 'done', percent: 100, position: 120,
