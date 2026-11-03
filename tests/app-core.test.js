@@ -444,8 +444,8 @@ describe('app shell resilience helpers', () => {
     window.DataStore = {
       init: vi.fn(async () => {}),
       allTopics: vi.fn(() => [
-        { topicId: 'topic-1', title: 'ECG basics', tags: ['ECG', 'signals'] },
-        { topicId: 'topic-2', title: 'Heart failure', labels: ['cardiology'] },
+        { topicId: 'topic-1', courseId: 'course-a', title: 'ECG basics', tags: ['ECG', 'signals'] },
+        { topicId: 'topic-2', courseId: 'course-a', title: 'Heart failure', labels: ['cardiology'] },
       ]),
     };
 
@@ -492,10 +492,10 @@ describe('app shell resilience helpers', () => {
         { topicId: 'topic-current', courseId: 'course-1', status: 'in-progress', percent: 45, position: 120, updatedAt: recentActivity },
       ]),
       getAllNotes: vi.fn(async () => [
-        { id: 'note-1', title: 'Fresh ECG insight', topicId: 'topic-current', updatedAt: recentActivity },
+        { id: 'note-1', title: 'Fresh ECG insight', topicId: 'topic-current', courseId: 'course-a', updatedAt: recentActivity },
       ]),
       getAllTimestamps: vi.fn(async () => [
-        { id: 'ts-1', topicId: 'topic-current', title: 'Checkpoint', position: 125, updatedAt: recentActivity },
+        { id: 'ts-1', topicId: 'topic-current', courseId: 'course-a', title: 'Checkpoint', position: 125, updatedAt: recentActivity },
       ]),
       getSetting: vi.fn(async key => key === 'ocd_flashcards'
         ? [{ id: 'card-old', front: 'Old physiology', deck: 'Physiology', scheduler: 'fsrs-v5', fsrsState: { card: { due: '2026-05-04T00:00:00.000Z' } } }]
@@ -636,13 +636,13 @@ describe('app shell resilience helpers', () => {
     player.setAttribute('data-player', '');
     player._pdPlayer = {
       queue: [
-        { title: 'Loaded lecture', topicId: 'topic-1', src: 'https://example.test/video.mp4' },
+        { title: 'Loaded lecture', topicId: 'topic-1', courseId: 'course-a', src: 'https://example.test/video.mp4' },
       ],
     };
     document.body.appendChild(player);
     window.DB = {
       getAllTimestamps: vi.fn(async () => [
-        { id: 'ts-1', topicId: 'topic-2', title: 'Saved checkpoint' },
+        { id: 'ts-1', topicId: 'topic-2', courseId: 'course-a', title: 'Saved checkpoint' },
       ]),
       // Valid first-use canonical playlist collection; a missing reader is
       // a storage error rather than evidence that no queues were saved.
@@ -1332,13 +1332,13 @@ describe('app shell resilience helpers', () => {
     window.DataStore = {
       init: vi.fn(async () => {}),
       allCourses: vi.fn(() => [{ id: 'course-1', title: 'Cardiology' }]),
-      allTopics: vi.fn(() => [{ topicId: 'topic-pdf', title: 'Rhythm PDF', pdfs: ['rhythm.pdf'] }]),
+      allTopics: vi.fn(() => [{ topicId: 'topic-pdf', courseId: 'course-a', title: 'Rhythm PDF', pdfs: ['rhythm.pdf'] }]),
     };
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting: vi.fn(async () => true),
       getAllNotes: vi.fn(async () => [{ id: 'note-1', title: 'ECG note' }]),
-      getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', title: 'Saved video moment' }]),
+      getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', topicId: 'topic-1', courseId: 'course-a', title: 'Saved video moment' }]),
       getAllAnnotations: vi.fn(async () => [{ id: 'ann-1', docId: 'doc-a', page: 3 }]),
     };
 
@@ -1566,10 +1566,10 @@ describe('app shell resilience helpers', () => {
     window.DB = {
       getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [
-        { id: 'ts-1', topicId: 'topic-1', title: 'Video point', position: 125, note: '<script>alert(1)</script> Rhythm insight', noteId: 'note-linked', updatedAt: 30 },
+        { id: 'ts-1', topicId: 'topic-1', courseId: 'course-a', title: 'Video point', position: 125, note: '<script>alert(1)</script> Rhythm insight', noteId: 'note-linked', updatedAt: 30 },
       ]),
       getAllNotes: vi.fn(async () => [
-        { id: 'note-1', topicId: 'topic-2', title: 'Linked note', updatedAt: 20 },
+        { id: 'note-1', topicId: 'topic-2', courseId: 'course-a', title: 'Linked note', updatedAt: 20 },
       ]),
       getAllAnnotations: vi.fn(async () => [
         { id: 'ann-1', docId: 'doc-a', page: 4, updatedAt: 10 },
@@ -1611,7 +1611,7 @@ describe('app shell resilience helpers', () => {
     });
     const getAllTimestamps = vi
       .fn()
-      .mockResolvedValueOnce([{ id: 'ts-delete', topicId: 'topic-1', title: 'Delete me', position: 12 }])
+      .mockResolvedValueOnce([{ id: 'ts-delete', topicId: 'topic-1', courseId: 'course-a', title: 'Delete me', position: 12 }])
       .mockResolvedValue([]);
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB = {
@@ -1642,9 +1642,9 @@ describe('app shell resilience helpers', () => {
     });
     const getAllTimestamps = vi
       .fn()
-      .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
-      .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
-      .mockResolvedValue([{ id: 'ts-edit', topicId: 'topic-1', title: 'Edited title', position: 12, note: 'Edited note', updatedAt: 2 }]);
+      .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', courseId: 'course-a', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
+      .mockResolvedValueOnce([{ id: 'ts-edit', topicId: 'topic-1', courseId: 'course-a', title: 'Original title', position: 12, note: 'Original note', createdAt: 1 }])
+      .mockResolvedValue([{ id: 'ts-edit', topicId: 'topic-1', courseId: 'course-a', title: 'Edited title', position: 12, note: 'Edited note', updatedAt: 2 }]);
     window.DB = {
       getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps,
@@ -1663,9 +1663,9 @@ describe('app shell resilience helpers', () => {
 
     await vi.waitFor(() => expect(compareAndSwapTimestamp).toHaveBeenCalledWith(
       'ts-edit',
-      expect.objectContaining({ id: 'ts-edit', topicId: 'topic-1', title: 'Original title' }),
+      expect.objectContaining({ id: 'ts-edit', topicId: 'topic-1', courseId: 'course-a', title: 'Original title' }),
       expect.objectContaining({
-        id: 'ts-edit', topicId: 'topic-1', title: 'Edited title',
+        id: 'ts-edit', topicId: 'topic-1', courseId: 'course-a', title: 'Edited title',
         note: 'Edited note', position: 12, updatedAt: expect.any(Number),
       }),
     ));
@@ -2177,7 +2177,7 @@ describe('app shell resilience helpers', () => {
 
     expect(loadPlaylist).toHaveBeenCalledWith([
       expect.objectContaining({
-        topicId: 'topic-1',
+        topicId: 'topic-1', courseId: 'course-a',
         chapters: [{ time: 0, title: 'Intro' }],
         transcript: [{ start: 5, text: 'Transcript line' }],
         captions: [{ start: 5, end: 8, text: 'Caption line' }],
@@ -3059,7 +3059,7 @@ describe('app shell resilience helpers', () => {
     expect(restoreSnapshot).not.toHaveBeenCalled();
     expect(syncEvents.at(-1)).toEqual(expect.objectContaining({
       kind: 'progress',
-      topicId: 'topic-1',
+      topicId: 'topic-1', courseId: 'course-a',
       playbackPreserved: true,
       queuePreserved: true,
     }));
