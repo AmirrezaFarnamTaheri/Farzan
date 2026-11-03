@@ -16,8 +16,6 @@ import { countWords } from './src/core/textMetrics.js';
   // 0. CONSTANTS & STATE
   // ──────────────────────────────────────────────────────────
 
-  const STORAGE_KEY   = 'ocd_notes';
-  const FOLDERS_KEY   = 'ocd_folders';
   const SETTINGS_KEY  = 'ocd_notes_settings';
   const SYSTEM_FOLDER_IDS = new Set(['', 'default', '__pinned__']);
 
@@ -132,30 +130,6 @@ import { countWords } from './src/core/textMetrics.js';
     _folders: null,
     _settings: null,
 
-    _hasWriteBridge(method) {
-      return typeof window.DB?.[method] === 'function';
-    },
-
-    _readArray(key, fallback = []) {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(key));
-        return Array.isArray(parsed) ? parsed : fallback.slice();
-      } catch {
-        return fallback.slice();
-      }
-    },
-
-    _readObject(key, fallback = {}) {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(key));
-        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? { ...parsed }
-          : { ...fallback };
-      } catch {
-        return { ...fallback };
-      }
-    },
-
     _storageErrorInfo(err) {
       const name = err?.name || '';
       const message = err?.message || String(err || '');
@@ -177,23 +151,6 @@ import { countWords } from './src/core/textMetrics.js';
         }
       } catch {}
       return payload;
-    },
-
-    _writeLocal(key, value, kind, record = null) {
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-        return { ok: true };
-      } catch (err) {
-        const error = this._storageErrorInfo(err);
-        this._emitStorageIssue('storage:save-error', {
-          kind,
-          backend: 'localStorage',
-          key,
-          record,
-          error,
-        });
-        return { ok: false, error };
-      }
     },
 
     _coerceFolderId(folderId) {
@@ -219,81 +176,73 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     async hydrateFromDB(options = {}) {
+      if (this._hydrated && !options.force) return false;
       const DB = window.DB;
-      if (!DB || (this._hydrated && !options.force)) return false;
-      let changed = false;
-      // Canonical reads are asynchronous. A note created/edited/deleted after
-      // getAllNotes() starts must not be overwritten by its earlier snapshot.
-      // Record only mutations during this read, rather than merging the
-      // entire localStorage mirror (which could resurrect old deletions).
+      // Canonical records must not be synthesized from a stale browser mirror
+      // after a failed or unavailable IndexedDB read.
+      if (typeof DB?.getAllNotes !== 'function') {
+        const error = new TypeError('Canonical IndexedDB Notes reader is unavailable');
+        this._emitStorageIssue('storage:read-error', {
+          kind: 'notes-hydration', backend: 'indexedDB', error: this._storageErrorInfo(error),
+        });
+        throw error;
+      }
+
       const overlay = new Map();
       this._activeHydrationReads.add(overlay);
       try {
-        if (typeof DB.getAllNotes === 'function') {
-          const notes = await DB.getAllNotes();
-          if (Array.isArray(notes)) {
-            const latest = notes.slice();
-            for (const [id, updated] of overlay) {
-              const index = latest.findIndex(note => String(note?.id) === id);
-              if (updated === null) {
-                if (index >= 0) latest.splice(index, 1);
-              } else if (index >= 0) {
-                latest[index] = updated;
-              } else {
-                latest.unshift(updated);
-              }
-            }
-            this._notes = latest;
-            changed = true;
+        // Collect the full read snapshot before publishing any of it. A
+        // failed folder/settings read must not leave half-updated state.
+        const notes = await DB.getAllNotes();
+        if (!Array.isArray(notes)) throw new TypeError('Invalid canonical Notes collection');
+        let folders = null;
+        if (typeof DB.getAllFolders === 'function') {
+          folders = await DB.getAllFolders();
+          if (!Array.isArray(folders)) throw new TypeError('Invalid canonical Notes folders collection');
+        }
+        let settings = null;
+        if (typeof DB.getSetting === 'function') {
+          settings = await DB.getSetting(SETTINGS_KEY);
+          if (settings != null && (typeof settings !== 'object' || Array.isArray(settings))) {
+            throw new TypeError('Invalid canonical Notes settings record');
           }
         }
-      } catch {
-        // Keep the existing in-memory draft when canonical reads are offline.
+
+        // These mutations happened while the asynchronous read was pending.
+        // Do not resurrect a remotely deleted note or overwrite a newer
+        // in-flight local draft with the earlier snapshot.
+        const latest = notes.slice();
+        for (const [id, updated] of overlay) {
+          const index = latest.findIndex(note => String(note?.id) === id);
+          if (updated === null) {
+            if (index >= 0) latest.splice(index, 1);
+          } else if (index >= 0) {
+            latest[index] = updated;
+          } else {
+            latest.unshift(updated);
+          }
+        }
+        this._notes = latest;
+        if (folders !== null) this._folders = folders.slice();
+        if (settings !== null) this._settings = { ...(settings ?? {}) };
+        this._hydrated = true;
+        return true;
+      } catch (error) {
+        this._emitStorageIssue('storage:read-error', {
+          kind: 'notes-hydration', backend: 'indexedDB', error: this._storageErrorInfo(error),
+        });
+        throw error;
       } finally {
         this._activeHydrationReads.delete(overlay);
       }
-      try {
-        if (typeof DB.getAllFolders === 'function') {
-          const folders = await DB.getAllFolders();
-          if (Array.isArray(folders)) {
-            this._folders = folders.slice();
-            changed = true;
-          }
-        }
-      } catch {}
-      try {
-        if (typeof DB.getSetting === 'function') {
-          const settings = await DB.getSetting(SETTINGS_KEY);
-          if (settings && typeof settings === 'object') {
-            this._settings = { ...settings };
-            changed = true;
-          }
-        }
-      } catch {}
-      this._hydrated = true;
-      return changed;
     },
 
     // ── Notes ─────────────────────────────────────────────
     getNotes() {
-      if (Array.isArray(this._notes)) return this._notes.slice();
-      // Hydrate from DB (bridge/IndexedDB) if not yet hydrated, then use cached data
-      if (!this._hydrated) {
-        // Defer to the async hydration path; return localStorage data as fallback
-        this._notes = this._readArray(STORAGE_KEY);
-        return this._notes.slice();
-      }
-      // After hydration, prefer IndexedDB data from this._notes
-      if (Array.isArray(this._notes)) return this._notes.slice();
-      this._notes = this._readArray(STORAGE_KEY);
-      return this._notes.slice();
-    },
-
-    saveNotes(notes, options = {}) {
-      this._notes = Array.isArray(notes) ? notes.slice() : [];
-      const shouldMirror = options.mirror ?? !this._hasWriteBridge('saveNote');
-      if (!shouldMirror) return { ok: true, skipped: true };
-      return this._writeLocal(STORAGE_KEY, this._notes, 'note-list', { count: this._notes.length });
+      // A missing canonical read is not evidence that legacy localStorage
+      // contains recoverable data. Return only live in-memory state; the
+      // asynchronous hydration owner is responsible for availability errors.
+      return Array.isArray(this._notes) ? this._notes.slice() : [];
     },
 
     _cacheNote(note, fallbackNotes = null) {
@@ -360,12 +309,15 @@ import { countWords } from './src/core/textMetrics.js';
     persistNote(note, fallbackNotes = null) {
       if (!note) return;
       this._cacheNote(note, fallbackNotes);
-      if (typeof window.DB?.saveNote === 'function') {
-        // Capture immutable values now, not when the queued operation starts.
-        const snapshot = { ...note };
-        return this._enqueueNoteMutation(note.id, 'save', () => window.DB.saveNote(snapshot));
-      }
-      return this.saveNotes(Array.isArray(fallbackNotes) ? fallbackNotes : this._notes);
+      // The current in-memory edit remains available on failure. Never claim
+      // a durable save by writing a second, incompatible browser mirror.
+      const snapshot = { ...note };
+      return this._enqueueNoteMutation(note.id, 'save', () => {
+        if (typeof window.DB?.saveNote !== 'function') {
+          throw new Error('Canonical IndexedDB Notes writer unavailable');
+        }
+        return window.DB.saveNote(snapshot);
+      });
     },
 
     getNote(id) {
@@ -411,28 +363,25 @@ import { countWords } from './src/core/textMetrics.js';
       for (const read of this._activeHydrationReads) read.set(String(id), null);
       const notes = this.getNotes().filter(n => n.id !== id);
       this._notes = notes;
-      if (typeof window.DB?.deleteNote === 'function') {
-        return this._enqueueNoteMutation(id, 'delete', () => window.DB.deleteNote(id));
-      }
-      return this.saveNotes(notes);
+      return this._enqueueNoteMutation(id, 'delete', () => {
+        if (typeof window.DB?.deleteNote !== 'function') {
+          throw new Error('Canonical IndexedDB Notes delete unavailable');
+        }
+        return window.DB.deleteNote(id);
+      });
     },
 
     // ── Folders ───────────────────────────────────────────
     getFolders() {
       if (Array.isArray(this._folders)) return this._folders.slice();
-      this._folders = this._readArray(FOLDERS_KEY, [
-        { id: 'default', name: 'Personal',  icon: 'folder', color: '' },
-        { id: 'work',    name: 'Work',      icon: 'briefcase', color: '' },
-        { id: 'archive', name: 'Archive',   icon: 'archive', color: '' },
-      ]);
+      // First-use display defaults are not persisted data. Canonical folder
+      // hydration replaces them when the database becomes available.
+      this._folders = [
+        { id: 'default', name: 'Personal', icon: 'folder', color: '' },
+        { id: 'work', name: 'Work', icon: 'briefcase', color: '' },
+        { id: 'archive', name: 'Archive', icon: 'archive', color: '' },
+      ];
       return this._folders.slice();
-    },
-
-    saveFolders(folders, options = {}) {
-      this._folders = Array.isArray(folders) ? folders.slice() : [];
-      const shouldMirror = options.mirror ?? !this._hasWriteBridge('saveFolder');
-      if (!shouldMirror) return { ok: true, skipped: true };
-      return this._writeLocal(FOLDERS_KEY, this._folders, 'folder-list', { count: this._folders.length });
     },
 
     _cacheFolder(folder, fallbackFolders = null) {
@@ -448,13 +397,32 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     persistFolder(folder, fallbackFolders = null) {
-      if (!folder) return;
-      if (this.isSystemFolder(folder.id) && folder.id !== 'default') return;
+      if (!folder) return Promise.resolve(false);
+      if (this.isSystemFolder(folder.id) && folder.id !== 'default') return Promise.resolve(false);
       this._cacheFolder(folder, fallbackFolders);
-      if (window.DB?.saveFolder) {
-        try { window.DB.saveFolder(folder).catch?.(() => {}); return; } catch { /* fallback below */ }
+      const reason = 'notes-durable-folder:' + String(folder.id);
+      window.OpenCourseDeck?.beforeUnload?.mark?.(reason);
+      let operation;
+      try {
+        if (typeof window.DB?.saveFolder !== 'function') {
+          throw new Error('Canonical IndexedDB Notes folder writer unavailable');
+        }
+        operation = Promise.resolve(window.DB.saveFolder({ ...folder }));
+      } catch (error) {
+        operation = Promise.reject(error);
       }
-      this.saveFolders(Array.isArray(fallbackFolders) ? fallbackFolders : this._folders);
+      return operation.then(receipt => {
+        if (receipt == null || receipt === false) throw new Error('Canonical Notes folder save not acknowledged');
+        window.OpenCourseDeck?.beforeUnload?.unmark?.(reason);
+        return true;
+      }).catch(error => {
+        this._emitStorageIssue('storage:save-error', {
+          kind: 'folder', backend: 'indexedDB', record: { id: folder.id },
+          error: this._storageErrorInfo(error),
+        });
+        window.OpenCourseDeck?.Toast?.error?.('Could not save this folder to the database. Retry before leaving.');
+        return false;
+      });
     },
 
     createFolder(name, icon = 'folder', color = '') {
@@ -471,11 +439,27 @@ import { countWords } from './src/core/textMetrics.js';
       if (this.isSystemFolder(id)) return { deleted: false, moved: 0 };
       const folders = this.getFolders().filter(f => f.id !== id);
       this._folders = folders;
-      if (window.DB?.deleteFolder) {
-        try { window.DB.deleteFolder(id).catch?.(() => {}); } catch { this.saveFolders(folders); }
-      } else {
-        this.saveFolders(folders);
+      const reason = 'notes-durable-folder:' + String(id);
+      window.OpenCourseDeck?.beforeUnload?.mark?.(reason);
+      let deletion;
+      try {
+        if (typeof window.DB?.deleteFolder !== 'function') {
+          throw new Error('Canonical IndexedDB Notes folder delete unavailable');
+        }
+        deletion = Promise.resolve(window.DB.deleteFolder(id));
+      } catch (error) {
+        deletion = Promise.reject(error);
       }
+      void deletion.then(receipt => {
+        if (receipt == null || receipt === false) throw new Error('Canonical Notes folder delete not acknowledged');
+        window.OpenCourseDeck?.beforeUnload?.unmark?.(reason);
+      }).catch(error => {
+        this._emitStorageIssue('storage:save-error', {
+          kind: 'folder-delete', backend: 'indexedDB', record: { id },
+          error: this._storageErrorInfo(error),
+        });
+        window.OpenCourseDeck?.Toast?.error?.('Could not delete this folder from the database. Retry before leaving.');
+      });
       // Move notes to default
       const movedNotes = [];
       const notes = this.getNotes().map(n => {
@@ -486,29 +470,51 @@ import { countWords } from './src/core/textMetrics.js';
       });
       this._notes = notes;
       movedNotes.forEach(note => this.persistNote(note, notes));
-      if (!window.DB?.saveNote) this.saveNotes(notes);
       return { deleted: true, moved: movedNotes.length };
     },
 
     // ── Settings ──────────────────────────────────────────
     getSettings() {
-      if (this._settings && typeof this._settings === 'object') return { ...this._settings };
-      this._settings = this._readObject(SETTINGS_KEY);
-      return { ...this._settings };
-    },
-    saveSettings(s, options = {}) {
-      this._settings = { ...(s ?? {}) };
-      if (window.DB?.saveSetting) {
-        try {
-          window.DB.saveSetting(SETTINGS_KEY, this._settings).catch?.(() => {});
-          if (!options.mirror) return { ok: true, skipped: true };
-        } catch { /* fallback below */ }
+      if (this._settings && typeof this._settings === 'object' && !Array.isArray(this._settings)) {
+        return { ...this._settings };
       }
-      const shouldMirror = options.mirror ?? !this._hasWriteBridge('saveSetting');
-      if (!shouldMirror) return { ok: true, skipped: true };
-      return this._writeLocal(SETTINGS_KEY, this._settings, 'note-settings', this._settings);
+      this._settings = {};
+      return {};
+    },
+
+    saveSettings(value) {
+      const snapshot = { ...(value ?? {}) };
+      this._settings = snapshot;
+      const reason = 'notes-durable-settings';
+      window.OpenCourseDeck?.beforeUnload?.mark?.(reason);
+      let operation;
+      try {
+        if (typeof window.DB?.saveSetting !== 'function') {
+          throw new Error('Canonical IndexedDB Notes settings writer unavailable');
+        }
+        operation = Promise.resolve(window.DB.saveSetting(SETTINGS_KEY, snapshot));
+      } catch (error) {
+        operation = Promise.reject(error);
+      }
+      return operation.then(receipt => {
+        if (receipt !== true && JSON.stringify(receipt) !== JSON.stringify(snapshot)) {
+          throw new Error('Canonical Notes settings write was not acknowledged');
+        }
+        window.OpenCourseDeck?.beforeUnload?.unmark?.(reason);
+        return true;
+      }).catch(error => {
+        this._emitStorageIssue('storage:save-error', {
+          kind: 'note-settings', backend: 'indexedDB', key: SETTINGS_KEY,
+          error: this._storageErrorInfo(error),
+        });
+        window.OpenCourseDeck?.Toast?.error?.('Could not save Notes settings to the database. Retry before leaving.');
+        return false;
+      });
     },
   };
+
+
+  // DOMPurify  };
 
 
   // DOMPurify 3.4.17 is bundled by esbuild as an explicit module import;
@@ -2126,24 +2132,52 @@ import { countWords } from './src/core/textMetrics.js';
         }
       });
 
-      // Open the first locally known note immediately, but defer the
-      // "create a starter note" decision until IndexedDB hydration: for
-      // users whose notes live only in the DB the localStorage mirror is
-      // empty, and creating here would persist a spurious "Untitled Note"
-      // on every page load.
+      // The canonical database, never an obsolete localStorage mirror,
+      // decides whether a starter note may be created. A failed read must
+      // keep the current in-memory draft and offer retry instead of silently
+      // manufacturing an empty library.
       const notes = Store.getNotes();
       if (notes.length) this.openNote(notes[0].id, { preventScroll: true });
 
       this._bindSyncRefresh();
-      Store.hydrateFromDB().then((changed) => {
-        if (!this._inited) return;
+      const epoch = this._hydrationEpoch = (this._hydrationEpoch || 0) + 1;
+      const current = () => this._inited && this._hydrationEpoch === epoch;
+      const hydrate = async (force = false) => {
+        const changed = await Store.hydrateFromDB(force ? { force: true } : {});
+        if (!current()) return false;
         if (changed) this._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
         const hydrated = Store.getNotes();
         if (!hydrated.length) this.newNote(undefined, { preventScroll: true });
         else if (!notes.length) this.openNote(hydrated[0].id, { preventScroll: true });
-      }).catch(() => {
-        if (this._inited && !Store.getNotes().length) this.newNote(undefined, { preventScroll: true });
-      });
+        $('[data-notes-hydration-error]')?.remove();
+        return true;
+      };
+      const handleError = error => {
+        if (!current()) return false;
+        console.warn('[Notes] Canonical IndexedDB read unavailable', error);
+        window.OpenCourseDeck?.Toast?.error?.('Saved notes could not be loaded. No empty library was created.');
+        const root = $('[data-notes-main-pane]') || $('[data-notes-list]');
+        if (root && !root.querySelector('[data-notes-hydration-error]')) {
+          const alert = document.createElement('div');
+          alert.dataset.notesHydrationError = '';
+          alert.setAttribute('role', 'alert');
+          alert.append(document.createTextNode(
+            'Saved Notes are unavailable in IndexedDB. Changes have not been replaced with an empty library. '
+          ));
+          const retry = document.createElement('button');
+          retry.type = 'button';
+          retry.className = 'btn btn-ghost btn-sm';
+          retry.textContent = 'Retry loading notes';
+          retry.addEventListener('click', () => {
+            if (!current()) return;
+            this._initialHydration = hydrate(true).catch(handleError);
+          });
+          alert.append(retry);
+          root.prepend(alert);
+        }
+        return false;
+      };
+      this._initialHydration = hydrate().catch(handleError);
     },
 
     _bindSyncRefresh() {
@@ -2601,6 +2635,7 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     destroy() {
+      this._hydrationEpoch = (this._hydrationEpoch || 0) + 1;
       this._unbindSyncRefresh();
       this.flushPendingSave?.();
       Editor.disableModern({ preserveContent: false });

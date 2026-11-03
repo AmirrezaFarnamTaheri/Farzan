@@ -128,6 +128,8 @@ describe('notes route filters', () => {
     `;
 
     await import('../notes.js');
+    if (!window.PlasmaNotesApp._inited) document.dispatchEvent(new Event('DOMContentLoaded'));
+    await window.PlasmaNotesApp._initialHydration;
   });
 
   afterEach(() => {
@@ -1392,55 +1394,6 @@ describe('notes route filters', () => {
       .toHaveBeenCalledWith('storage:read-error', expect.objectContaining({
         kind: 'notes-hydration', backend: 'indexedDB',
       }));
-  });
-
-  it('keeps localStorage as a bridge-less notes, folders, and settings fallback', () => {
-    delete window.DB.saveNote;
-    delete window.DB.saveFolder;
-    delete window.DB.saveSetting;
-
-    const note = window.PlasmaNotesStore.createNote({ title: 'Fallback note', folderId: 'default' });
-    const folder = window.PlasmaNotesStore.createFolder('Fallback folder');
-    window.PlasmaNotesStore.saveSettings({ view: 'list' });
-
-    expect(JSON.parse(localStorage.getItem('ocd_notes'))).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: note.id, title: 'Fallback note' }),
-    ]));
-    expect(JSON.parse(localStorage.getItem('ocd_folders'))).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: folder.id, name: 'Fallback folder' }),
-    ]));
-    expect(JSON.parse(localStorage.getItem('ocd_notes_settings'))).toEqual({ view: 'list' });
-  });
-
-  it('reports bridge-less localStorage write failures through the storage issue channel', () => {
-    delete window.DB.saveNote;
-    const emit = vi.fn();
-    const quotaError = Object.assign(new Error('notes storage full'), { name: 'QuotaExceededError' });
-    const originalSetItem = Storage.prototype.setItem;
-    window.OpenCourseDeck.bus.emit = emit;
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
-      if (key === 'ocd_notes') throw quotaError;
-      return originalSetItem.call(this, key, value);
-    });
-
-    const result = window.PlasmaNotesStore.saveNotes([{ id: 'fallback-fail', title: 'Cannot mirror' }]);
-    setItemSpy.mockRestore();
-
-    expect(result).toEqual(expect.objectContaining({
-      ok: false,
-      error: expect.objectContaining({ quota: true, name: 'QuotaExceededError' }),
-    }));
-    expect(window.OpenCourseDeck.lastStorageIssue).toEqual(expect.objectContaining({
-      kind: 'note-list',
-      backend: 'localStorage',
-      key: 'ocd_notes',
-      error: expect.objectContaining({ quota: true }),
-    }));
-    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
-      kind: 'note-list',
-      backend: 'localStorage',
-      key: 'ocd_notes',
-    }));
   });
 
   it('renders note list and folder labels as text, not executable HTML', () => {
