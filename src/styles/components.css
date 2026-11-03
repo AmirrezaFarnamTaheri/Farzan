@@ -57,7 +57,6 @@
   }
   .breadcrumb-current {
 
-    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -1343,8 +1342,6 @@
 
   /* Topbar button alias */
   .topbar-action-btn {
-    width: 40px;
-    height: 40px;
     border-radius: var(--radius-md);
     display: inline-flex;
     align-items: center;

@@ -1,28 +1,18 @@
 /* App shell — the ambient background lives on .ambient-desk-surface
    (elevation.css) so the shell itself stays a cheap, static flex row. */
 .ocd-app {
-  min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
-  background: var(--bg);
 }
 
 .sidebar {
 
   flex: 0 0 var(--sidebar-width);
-  height: 100vh;
-  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: var(--space-5);
   gap: var(--space-4);
   border-right: 1px solid var(--glass-border);
-  background: linear-gradient(180deg, var(--glass-bg) 0%, color-mix(in srgb, var(--glass-bg) 72%, var(--bg)) 100%);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  position: sticky;
-  top: 0;
   z-index: 70;
   transition: transform var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
@@ -62,8 +52,6 @@
 .main-content {
   flex: 1 1 auto;
   min-width: 0;
-  height: 100vh;
-  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -78,11 +66,8 @@
   padding: env(safe-area-inset-top) max(var(--density-pad-x), env(safe-area-inset-right)) 0 max(var(--density-pad-x), env(safe-area-inset-left));
   border-bottom: 1px solid var(--glass-border);
   background: linear-gradient(180deg, var(--glass-bg-strong) 0%, color-mix(in srgb, var(--glass-bg) 76%, var(--bg)) 100%);
-  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  position: sticky;
-  top: 0;
   z-index: 50;
 }
 
@@ -108,7 +93,6 @@
   overflow: auto;
   overscroll-behavior: contain;
   padding: var(--space-6) var(--density-pad-x) max(var(--space-8), env(safe-area-inset-bottom));
-  scroll-padding-top: var(--space-6);
 }
 
 .view {
@@ -159,7 +143,6 @@
   padding: var(--space-3);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--glass-highlight), transparent);
   position: relative;
 }
 
@@ -174,7 +157,6 @@
   background:
     radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), transparent 55%),
     linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 35%, #06b6d4) 100%);
-  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-logo-text {
