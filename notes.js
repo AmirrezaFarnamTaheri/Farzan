@@ -514,9 +514,6 @@ import { countWords } from './src/core/textMetrics.js';
   };
 
 
-  // DOMPurify  };
-
-
   // DOMPurify 3.4.17 is bundled by esbuild as an explicit module import;
   // no script-global race and no second home-made HTML sanitizer.
   const noteSanitizer = typeof DOMPurify.sanitize === 'function'
