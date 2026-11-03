@@ -634,6 +634,28 @@ describe('Squire HTML-canonical edit adapter', () => {
     expect(updates).not.toHaveBeenCalled();
   });
 
+  it('rejects stale canonical reads and save acknowledgments after note-session teardown', () => {
+    const updates = vi.fn();
+    const mount = document.createElement('div');
+    const instance = createSquireNoteEditor({
+      element: mount,
+      html: '<p>Original persisted note</p>',
+      onUpdate: updates,
+    });
+    const staleRead = instance.editor.getHTML;
+    instance.destroy();
+
+    // An async note switch or autosave must never treat an unmounted editor
+    // as a successfully synchronized source of an old note revision.
+    expect(instance.syncChanges()).toBe(false);
+    expect(instance.supports('bold')).toBe(false);
+    expect(instance.isActive('bold')).toBe(false);
+    expect(() => instance.getHTML()).toThrow(/destroyed note editor/i);
+    expect(() => staleRead()).toThrow(/destroyed note editor/i);
+    expect(mount.textContent).toBe('');
+    expect(updates).not.toHaveBeenCalled();
+  });
+
   it('silences content-change notifications when initializing or restoring content', () => {
     const listener = vi.fn();
     const instance = createSquireNoteEditor({ element: document.createElement('div'), html: '<p>A</p>', onUpdate: listener });

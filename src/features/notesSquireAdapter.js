@@ -247,6 +247,7 @@ export function createSquireNoteEditor({
   const commands = withEditor(editor);
   const facade = {
     getHTML: () => {
+      if (disposed) throw new Error('Cannot read a destroyed note editor');
       // Browser contenteditable DOM can contain a committed keystroke before
       // Squire's queued input observer runs. Publish it before handing HTML to
       // any save caller. During IME, return only the last completed document,
@@ -275,7 +276,7 @@ export function createSquireNoteEditor({
 
   return {
     editor: facade,
-    supports: command => Object.hasOwn(commands, command),
+    supports: command => !disposed && Object.hasOwn(commands, command),
     run: (command, value) => {
       if (disposed || composing) return false;
       const action = commands[command];
@@ -285,6 +286,7 @@ export function createSquireNoteEditor({
       return true;
     },
     isActive: command => {
+      if (disposed) return false;
       const formats = inlineFormats[command] || blockFormats[command];
       return formats ? formats.some(tag => editor.hasFormat(tag)) : false;
     },
@@ -293,7 +295,7 @@ export function createSquireNoteEditor({
     // delivers the final edit. Publish that live DOM change synchronously.
     // Never commit an unfinished IME composition during a mode switch.
     syncChanges() {
-      if (composing) return false;
+      if (disposed || composing) return false;
       notify();
       return true;
     },
