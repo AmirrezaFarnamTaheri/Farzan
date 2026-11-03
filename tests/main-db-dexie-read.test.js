@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { OpenCourseDB } from '../db.js';
 import { withExistingIndexedDBStore } from '../src/core/mainDbDexieRead.js';
 
-const NAME = 'farzan-native-primary-compat-test';
+const NAME = 'farzan-native-primary-v4-test';
 const SCHEMA = [
   { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
-  { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }] },
+  { name: 'progress', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
   { name: 'settings', key: 'key', autoIncrement: false },
 ];
 let connections = [];
@@ -33,7 +33,7 @@ function inspectRaw() {
   });
 }
 
-describe('Dexie read-only adapter for existing primary IndexedDB v3', () => {
+describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
   afterEach(async () => {
     for (const db of connections) { try { db.db?.close(); } catch {} }
     connections = [];
@@ -46,7 +46,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v3', () => {
   });
 
   it('reads existing IndexedDB v3 notes and course index without rewriting the schema', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     await db.put('notes', { id: 'note-1', courseId: 'medicine', updatedAt: 100, content: '<p>Heart 你好</p>' });
     await db.put('notes', { id: 'note-2', courseId: 'biology', updatedAt: 200, content: 'Cell' });
@@ -59,7 +59,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v3', () => {
 
     const live = await inspectRaw();
     expect(live.schema).toEqual({
-      version: 3, stores: ['notes', 'progress', 'settings'],
+      version: 4, stores: ['notes', 'progress', 'settings'],
       keyPath: 'id', autoIncrement: false, indexes: ['courseId', 'updatedAt'],
     });
     expect(live.value.content).toBe('<p>Heart 你好</p>');
