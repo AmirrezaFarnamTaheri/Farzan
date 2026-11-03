@@ -21,7 +21,7 @@ describe('keyboard-accessible canonical saved playlist reordering', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main></main>';
     saved = [{ id: 'focus-queue', title: 'Focus playlist',
-      topicIds: ['a','b','c','d','e'], createdAt: 1, updatedAt: 5,
+      topicIds: ['a','b','c','d','e'], sourceRefs: [{ courseId: 'course-1', topicId: 'a' }, { courseId: 'course-1', topicId: 'b' }, { courseId: 'course-1', topicId: 'c' }, { courseId: 'course-1', topicId: 'd' }, { courseId: 'course-1', topicId: 'e' }], createdAt: 1, updatedAt: 5,
       metadata: { script: 'فارسی', custom: ['one', 'two'] } }];
     original = structuredClone(saved);
     toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
