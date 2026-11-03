@@ -643,6 +643,9 @@ describe('app shell resilience helpers', () => {
       getAllTimestamps: vi.fn(async () => [
         { id: 'ts-1', topicId: 'topic-2', title: 'Saved checkpoint' },
       ]),
+      // Valid first-use canonical playlist collection; a missing reader is
+      // a storage error rather than evidence that no queues were saved.
+      getSetting: vi.fn(async () => null),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),

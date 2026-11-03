@@ -190,11 +190,14 @@ async function renderPlaylists(deps) {
   const [topics, timestamps, savedPlaylists] = await Promise.all([
     (async () => {
       try {
-        await window.DataStore?.init?.();
-        try { await window.OpenCourseDeck?.UserLibrary?.overlay?.(); } catch {}
-        // Support synchronous catalog readers and promise-backed adapters
-        // before validating the complete result as a canonical collection.
-        const catalogTopics = (await window.DataStore?.allTopics?.()) ?? [];
+        if (typeof window.DataStore?.allTopics !== 'function') {
+          throw new Error('Canonical course catalog reader unavailable');
+        }
+        await window.DataStore.init?.();
+        // A failed imported-course overlay is not proof that the catalog has
+        // no user-created courses; keep the saved playlist view read-only.
+        await window.OpenCourseDeck?.UserLibrary?.overlay?.();
+        const catalogTopics = await window.DataStore.allTopics();
         if (!Array.isArray(catalogTopics)) throw new TypeError('Invalid canonical playlist catalog topics');
         return catalogTopics;
       } catch (error) {
@@ -206,7 +209,10 @@ async function renderPlaylists(deps) {
     })(),
     (async () => {
       try {
-        const values = await window.DB?.getAllTimestamps?.() ?? [];
+        if (typeof window.DB?.getAllTimestamps !== 'function') {
+          throw new Error('Canonical saved timestamp reader unavailable');
+        }
+        const values = await window.DB.getAllTimestamps();
         if (!Array.isArray(values)) throw new TypeError('Invalid canonical timestamp collection');
         return values;
       } catch (error) {
@@ -215,7 +221,17 @@ async function renderPlaylists(deps) {
         return [];
       }
     })(),
-    (async () => { try { return sanitizeSavedPlaylists(await window.DB?.getSetting?.('ocd_playlists')); } catch (error) { savedReadError = error; return []; } })(),
+    (async () => {
+      try {
+        if (typeof window.DB?.getSetting !== 'function') {
+          throw new Error('Canonical saved playlist reader unavailable');
+        }
+        return sanitizeSavedPlaylists(await window.DB.getSetting('ocd_playlists'));
+      } catch (error) {
+        savedReadError = error;
+        return [];
+      }
+    })(),
   ]);
   if (!document.body.contains(listRoot)) return;
   if (savedReadError || catalogReadError || timestampReadError) {

@@ -43,6 +43,30 @@ describe('Playlists task-first organization', () => {
     Toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
   });
 
+  it.each([
+    ['course catalog reader', () => { delete window.DataStore.allTopics; }, /catalog|course/i],
+    ['timestamp reader', () => { delete window.DB.getAllTimestamps; }, /timestamp|saved.*moment/i],
+    ['saved playlist reader', () => { delete window.DB.getSetting; }, /saved playlists/i],
+    ['imported course overlay', () => {
+      window.OpenCourseDeck.UserLibrary.overlay.mockRejectedValue(new Error('Imported courses unavailable'));
+    }, /catalog|course/i],
+  ])('fails closed when the %s is unavailable rather than showing empty queues', async (_reason, breakReader, message) => {
+    saved = [{ id: 'stored-queue', title: 'Persisted offline queue', topicIds: ['a'],
+      sourceRefs: [{ courseId: 'course-1', topicId: 'a' }], createdAt: 1 }];
+    const original = structuredClone(saved);
+    breakReader();
+    mount();
+    await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
+    const alert = document.querySelector('[data-playlists-error]');
+    expect(alert.getAttribute('role')).toBe('alert');
+    expect(alert.textContent).toMatch(message);
+    expect(document.querySelector('[data-playlists-discover]').hidden).toBe(true);
+    expect(document.querySelector('[data-playlist-list] [data-playlist-id]')).toBeNull();
+    expect(document.querySelector('[data-playlist-metrics]').children).toHaveLength(0);
+    expect(window.DB.compareAndSwapSetting).not.toHaveBeenCalled();
+    expect(saved).toEqual(original);
+  });
+
   it('puts saved queues in the main view and keeps catalog recommendations in a disclosure', async () => {
     saved = [{ id: 'favorite', title: 'My queue', topicIds: ['b', 'a'], createdAt: 1 }];
     mount();
