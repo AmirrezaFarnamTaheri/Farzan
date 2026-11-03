@@ -2540,7 +2540,8 @@ describe('app shell resilience helpers', () => {
     ['canonical cue writer refuses the write', 'writer-refused'],
   ])('does not claim an unsaved course chapter after %s', async (_caseName, failure) => {
     await loadApp();
-    const saveSetting = vi.fn(async () => false);
+    const saveSetting = vi.fn(async () => true);
+    const compareAndSwapSetting = vi.fn(async () => false);
     window.DB = {
       getSetting: vi.fn(async () => {
         if (failure === 'read-failed') throw new Error('IndexedDB unavailable');
@@ -2548,7 +2549,8 @@ describe('app shell resilience helpers', () => {
       }),
       getProgress: vi.fn(async () => null),
       saveProgress: vi.fn(async () => true),
-      ...(failure === 'writer-missing' ? {} : { saveSetting }),
+      saveSetting,
+      ...(failure === 'writer-missing' ? {} : { compareAndSwapSetting }),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -2571,7 +2573,8 @@ describe('app shell resilience helpers', () => {
       .toMatch(/unavailable|could not|failed|not saved/i));
     expect(activeTrack.chapters).toEqual([]);
     expect(textInput.value).toBe('Unsaved chapter should remain a draft');
-    if (failure === 'read-failed') expect(saveSetting).not.toHaveBeenCalled();
+    expect(saveSetting).not.toHaveBeenCalled();
+    if (failure === 'read-failed') expect(compareAndSwapSetting).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -2661,17 +2664,24 @@ describe('app shell resilience helpers', () => {
 
   it('authors chapter and transcript cues from the course player', async () => {
     await loadApp();
-    const saveSetting = vi.fn(async () => true);
+    let persistedCues = {
+      'topic-1': {
+        chapters: [{ time: 12, title: 'Existing chapter' }],
+        transcript: [{ start: 14, text: 'Existing line' }],
+      },
+    };
+    const saveSetting = vi.fn(async () => { throw new Error('Non-atomic legacy cue writer must not run'); });
+    const compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+      expect(key).toBe('ocd_course_media_cues');
+      if (JSON.stringify(expected) !== JSON.stringify(persistedCues)) return false;
+      persistedCues = structuredClone(next);
+      return true;
+    });
     window.DB = {
-      getSetting: vi.fn(async () => ({
-        'topic-1': {
-          chapters: [{ time: 12, title: 'Existing chapter' }],
-          transcript: [{ start: 14, text: 'Existing line' }],
-        },
-      })),
+      getSetting: vi.fn(async () => structuredClone(persistedCues)),
       getProgress: vi.fn(async () => null),
       saveProgress: vi.fn(async () => true),
-      saveSetting,
+      saveSetting, compareAndSwapSetting,
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -2708,7 +2718,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-learning-marker-text]').value = 'QRS morphology';
     document.querySelector('[data-save-chapter-cue]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', expect.objectContaining({
+    await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenCalledWith('ocd_course_media_cues', expect.anything(), expect.objectContaining({
       'topic-1': expect.objectContaining({
         chapters: expect.arrayContaining([expect.objectContaining({ time: 95, title: 'QRS morphology', authored: true })]),
       }),
@@ -2721,7 +2731,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-learning-marker-text]').value = 'Axis deviation becomes clear.';
     document.querySelector('[data-save-transcript-cue]').click();
 
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenLastCalledWith('ocd_course_media_cues', expect.objectContaining({
+    await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenLastCalledWith('ocd_course_media_cues', expect.anything(), expect.objectContaining({
       'topic-1': expect.objectContaining({
         chapters: expect.arrayContaining([expect.objectContaining({ title: 'QRS morphology' })]),
         transcript: expect.arrayContaining([expect.objectContaining({ start: 95, text: 'Axis deviation becomes clear.', authored: true })]),
@@ -2731,6 +2741,7 @@ describe('app shell resilience helpers', () => {
       expect.objectContaining({ start: 95, text: 'Axis deviation becomes clear.' }),
     ])));
     expect(player._pdPlayer.showTranscript).toHaveBeenCalledTimes(1);
+    expect(saveSetting).not.toHaveBeenCalled();
     expect(document.querySelector('[data-learning-marker-status]').textContent).toContain('1:35');
 
     document.querySelector('[data-review-learning-cues]').click();
@@ -2739,7 +2750,7 @@ describe('app shell resilience helpers', () => {
       .find(button => button.closest('.learning-marker-row')?.textContent.includes('QRS morphology'))
       .click();
 
-    await vi.waitFor(() => expect(saveSetting.mock.calls.at(-1)[1]['topic-1'].chapters).not.toEqual(expect.arrayContaining([
+    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2]['topic-1'].chapters).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ title: 'QRS morphology' }),
     ])));
     await vi.waitFor(() => expect(activeTrack.chapters).not.toEqual(expect.arrayContaining([
@@ -2758,7 +2769,7 @@ describe('app shell resilience helpers', () => {
     });
     document.querySelector('[data-import-learning-cues]').click();
 
-    await vi.waitFor(() => expect(saveSetting.mock.calls.at(-1)[1]['topic-1'].chapters).toEqual(expect.arrayContaining([
+    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2]['topic-1'].chapters).toEqual(expect.arrayContaining([
       expect.objectContaining({ time: 140, title: 'Imported chapter' }),
     ])));
     await vi.waitFor(() => expect(activeTrack.chapters).toEqual(expect.arrayContaining([
@@ -2791,7 +2802,7 @@ describe('app shell resilience helpers', () => {
     });
     document.querySelector('[data-apply-active-learning-cues]').click();
 
-    await vi.waitFor(() => expect(saveSetting.mock.calls.at(-1)[1]['topic-1']).toEqual(expect.objectContaining({
+    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2]['topic-1']).toEqual(expect.objectContaining({
       chapters: [
         expect.objectContaining({ time: 30, title: 'Bulk chapter' }),
         expect.objectContaining({ time: 300, title: 'Late chapter' }),
@@ -2836,18 +2847,19 @@ describe('app shell resilience helpers', () => {
 
   it('does not attach unscoped legacy or another course\'s authored cues to a duplicate topic ID', async () => {
     await loadApp();
-    const persisted = {
+    let persisted = {
       shared: { chapters: [{ time: 10, title: 'Unscoped old cue', authored: true }] },
     };
-    const saveSetting = vi.fn(async (_key, value) => {
-      Object.assign(persisted, structuredClone(value));
+    const compareAndSwapSetting = vi.fn(async (_key, expected, next) => {
+      if (JSON.stringify(expected) !== JSON.stringify(persisted)) return false;
+      persisted = structuredClone(next);
       return true;
     });
     window.DB = {
       getSetting: vi.fn(async () => structuredClone(persisted)),
       getProgress: vi.fn(async () => null),
       saveProgress: vi.fn(async () => true),
-      saveSetting,
+      compareAndSwapSetting,
     };
     window.DataStore = {
       init: vi.fn(async () => {}),
@@ -2876,8 +2888,8 @@ describe('app shell resilience helpers', () => {
 
     document.querySelector('[data-learning-marker-text]').value = 'Only Renal B';
     document.querySelector('[data-save-chapter-cue]').click();
-    await vi.waitFor(() => expect(saveSetting).toHaveBeenCalledWith(
-      'ocd_course_media_cues',
+    await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenCalledWith(
+      'ocd_course_media_cues', expect.anything(),
       expect.objectContaining({
         shared: expect.objectContaining({ chapters: [{ time: 10, title: 'Unscoped old cue', authored: true }] }),
         'source:["course-b","shared"]': expect.objectContaining({
@@ -2894,9 +2906,9 @@ describe('app shell resilience helpers', () => {
 
   it('refuses course-less active cue JSON for ambiguous IDs and rejects JSON from another course', async () => {
     await loadApp();
-    const saveSetting = vi.fn(async () => true);
+    const compareAndSwapSetting = vi.fn(async () => true);
     window.DB = { getSetting: vi.fn(async () => ({})), getProgress: vi.fn(async () => null),
-      saveProgress: vi.fn(async () => true), saveSetting };
+      saveProgress: vi.fn(async () => true), compareAndSwapSetting };
     window.DataStore = {
       init: vi.fn(async () => {}),
       allCourses: () => [{ id: 'course-a', title: 'A' }, { id: 'course-b', title: 'B' }],
@@ -2918,13 +2930,13 @@ describe('app shell resilience helpers', () => {
     apply.click();
     await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
       .toMatch(/course identity|course ID/i));
-    expect(saveSetting).not.toHaveBeenCalled();
+    expect(compareAndSwapSetting).not.toHaveBeenCalled();
     json.value = JSON.stringify({ courseId: 'course-a', topicId: 'shared',
       chapters: [{ time: 15, title: 'Wrong course' }] });
     apply.click();
     await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
       .toMatch(/different course/i));
-    expect(saveSetting).not.toHaveBeenCalled();
+    expect(compareAndSwapSetting).not.toHaveBeenCalled();
   });
 
   it('refreshes synced course progress without disturbing the live player queue', async () => {
