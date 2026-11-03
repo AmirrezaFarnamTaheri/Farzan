@@ -72,6 +72,29 @@ describe('Canvas board restore races', () => {
     window.OpenCourseDeck.Canvas.serialize().layers
       .flatMap((layer) => layer.elements.map((element) => element.id));
 
+  it('does not restore a stale localStorage board when canonical IndexedDB is unavailable', async () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    const stale = boardWith(['localstorage-should-never-restore']);
+    localStorage.setItem('ocd_studio_board', JSON.stringify(stale));
+    window.DB = {};
+    try {
+      expect(await canvas.restoreBoard()).toBe(false);
+      expect(elementIds()).not.toContain('localstorage-should-never-restore');
+      expect(localStorage.getItem('ocd_studio_board')).toBe(JSON.stringify(stale));
+    } finally {
+      localStorage.removeItem('ocd_studio_board');
+    }
+  });
+
+  it('does not create a second localStorage board snapshot without canonical writes', () => {
+    const canvas = window.OpenCourseDeck.Canvas;
+    localStorage.removeItem('ocd_studio_board');
+    window.DB = {};
+    canvas.addElement({ id: 'not-mirrored', type: 'rect' });
+    canvas._autosave();
+    expect(localStorage.getItem('ocd_studio_board')).toBeNull();
+  });
+
   it('reads only the canonical board and never adopts a retired setting alias', async () => {
     const canvas = window.OpenCourseDeck.Canvas;
     const old = boardWith(['must-not-import']);
