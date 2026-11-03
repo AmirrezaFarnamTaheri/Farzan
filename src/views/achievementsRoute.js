@@ -1,5 +1,6 @@
 import { dueReviewCards, watchedCoverageSeconds } from '../core/studyMetrics.js';
 import { ProceduralTrophy } from '../features/proceduralTrophy.js';
+import { courseTopicIdentity } from '../core/courseTopicIdentity.js';
 
 export function mountAchievementsView(deps = {}) {
   const {
@@ -99,13 +100,14 @@ export function mountAchievementsView(deps = {}) {
       listRoot.replaceChildren(notice);
       return;
     }
-    const [progress, notes, timestamps, topics, watchedSegments, cards] = loaded;
+    const [progress, , , topics, watchedSegments, cards] = loaded;
     if (!document.body.contains(listRoot)) return;
 
-    const topicMap = new Map(topics.map(topic => [topic.topicId, topic]));
-    const progressByTopic = new Map(progress.map(record => [record.topicId, record]));
-    const doneRecords = progress.filter(record => record.status === 'done' || Number(record.percent) >= 100);
-    const activeRecords = progress.filter(record => Number(record.percent) > 0 || Number(record.position) > 0 || record.status === 'in-progress');
+    const scopedProgress = progress.filter(record => record?.courseId && record?.topicId);
+    const progressByTopic = new Map(scopedProgress
+      .map(record => [courseTopicIdentity(record.courseId, record.topicId), record]));
+    const doneRecords = scopedProgress.filter(record => record.status === 'done' || Number(record.percent) >= 100);
+    const activeRecords = scopedProgress.filter(record => Number(record.percent) > 0 || Number(record.position) > 0 || record.status === 'in-progress');
     const watchedSeconds = watchedCoverageSeconds(watchedSegments);
     const courseIds = new Set(topics.map(topic => topic.courseId).filter(Boolean));
     const reviewItems = dueReviewCards(cards).slice(0, 6);
@@ -113,7 +115,7 @@ export function mountAchievementsView(deps = {}) {
     courseIds.forEach(courseId => {
       const courseTopics = topics.filter(topic => topic.courseId === courseId);
       if (courseTopics.length && courseTopics.every(topic => {
-        const record = progressByTopic.get(topic.topicId);
+        const record = progressByTopic.get(courseTopicIdentity(topic.courseId, topic.topicId));
         return record?.status === 'done' || Number(record?.percent) >= 100;
       })) {
         completedCourses += 1;
@@ -148,14 +150,13 @@ export function mountAchievementsView(deps = {}) {
       { id: 'deep-focus', title: 'Deep Focus', detail: 'Track 30 minutes of watched video coverage.', unlocked: watchedSeconds >= 1800 },
       { id: 'course-complete', title: 'Course Complete', detail: 'Finish every topic in a course.', unlocked: completedCourses >= 1 },
       { id: 'collector', title: 'Collector', detail: 'Make progress on 10 topics.', unlocked: activeRecords.length >= 10 },
-      { id: 'catalog-roamer', title: 'Catalog Roamer', detail: 'Touch topics from three courses.', unlocked: new Set(activeRecords.map(record => record.courseId || topicMap.get(record.topicId)?.courseId).filter(Boolean)).size >= 3 },
+      { id: 'catalog-roamer', title: 'Catalog Roamer', detail: 'Touch topics from three courses.', unlocked: new Set(activeRecords.map(record => record.courseId).filter(Boolean)).size >= 3 },
     ];
 
     // Pick the closest incomplete objective, retaining the gentle first-step
     // order for learners with no recorded activity. These are actual activity
     // totals, never decorative or inferred XP percentages.
-    const touchedCourses = new Set(activeRecords.map(record =>
-      record.courseId || topicMap.get(record.topicId)?.courseId).filter(Boolean)).size;
+    const touchedCourses = new Set(activeRecords.map(record => record.courseId).filter(Boolean)).size;
     const progressGoals = [
       { id: 'first-step', title: 'First Step', current: Math.min(activeRecords.length, 1), target: 1, action: 'Browse courses' },
       { id: 'first-finish', title: 'First Finish', current: Math.min(doneRecords.length, 1), target: 1, action: 'Continue a lesson' },

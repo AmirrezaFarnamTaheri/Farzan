@@ -106,7 +106,8 @@ test('Plasmato courses, actual topic progress, and Materials',async({page})=>{
   await expect(topic).toBeVisible();await shot(page,'functional','01-plasmato-lecture-selected');
   const id=await topic.getAttribute('data-topic-id');
   await topic.locator('[data-action="toggle-done"]').click();
-  await expect.poll(()=>page.evaluate(async id=>(await window.DB.getProgress(id))?.status,id)).toBe('done');
+  const courseId=await topic.getAttribute('data-course-id');
+  await expect.poll(()=>page.evaluate(async source=>(await window.DB.getProgress(source.id, source.courseId))?.status,{id,courseId})).toBe('done');
   await shot(page,'functional','02-real-completion-saved');
   await visit(page,'materials');
   await expect(page.locator('#materials-course-filter option[value="comprehensive-internal-medicine-course"]')).toHaveCount(1);

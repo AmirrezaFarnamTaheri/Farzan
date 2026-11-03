@@ -4,9 +4,9 @@ OpenCourseDeck stores study data in the browser profile and origin you use. Expo
 
 ## What a JSON backup includes
 
-The current **Progress and Settings** export uses portable JSON format **1.6**. It includes saved progress, notes, folders, timestamps, PDF annotations, watched segments, PDF bookmarks, flashcards, saved playlists, Studio board metadata, personal course outlines (`ocd_my_courses`), course media cues (`ocd_course_media_cues`), user-owned library metadata (`ocd_user_library`), and personal Tags taxonomy/merge aliases (`ocd_tag_taxonomy`), when present.
+The current **Progress and Settings** export uses portable JSON format **1.7**. It includes saved progress, notes, folders, timestamps, PDF annotations, watched segments, PDF bookmarks, flashcards, saved playlists, Studio board metadata, personal course outlines (`ocd_my_courses`), course media cues (`ocd_course_media_cues`), user-owned library metadata (`ocd_user_library`), and personal Tags taxonomy/merge aliases (`ocd_tag_taxonomy`), when present.
 
-The optional tag taxonomy field requires a compatible versioned value; malformed or future schemas are rejected before import writes. Tag merges do not rewrite the underlying Notes or catalog labels. Version 1.6 imports remain compatible with supported portable versions 1.0–1.5. The internal database snapshot used to protect an import during rollback is a **different format (version 3)**, not a portable 1.6 file.
+The optional tag taxonomy field requires a compatible versioned value; malformed or future schemas are rejected before import writes. Tag merges do not rewrite the underlying Notes or catalog labels. Only the current pre-release portable format 1.7 is accepted; older formats are retired. The internal database snapshot used to protect an import during rollback is a **different format (version 4)**, not a portable 1.7 file.
 
 **Binary attachment policy: metadata-only.** The export includes a `meta.attachments` manifest containing local-file references and explicitly sets `mode: "metadata-only"` and `binaryIncluded: false`. It does **not** include imported PDF/video bytes from the separate `opencoursedeck-library-files` IndexedDB database. External media links also remain links and may require a network connection. Keep the original local media and any manually edited catalog JSON files when moving devices.
 
@@ -37,11 +37,11 @@ This folder workflow is optional and currently unavailable in browsers without d
 
 When no missing-file section appears, there are no missing imported file references detected in the current library. A storage read failure must not be interpreted as an empty library; the interface reports an error instead.
 
-The importer prepares a snapshot of existing data for recovery, including course outlines and media cues. Imports containing watch history or PDF bookmarks require an atomic version-3 recovery snapshot; unsupported storage environments should reject those imports rather than risk a partial restore. If a recoverable write fails, the importer attempts to restore original settings and records; if rollback fails it reports that explicitly. An interrupted browser process is not guaranteed to recover an older multi-step import automatically.
+The importer prepares a snapshot of existing data for recovery, including course outlines and media cues. Imports containing watch history or PDF bookmarks require an atomic version-4 recovery snapshot; unsupported storage environments should reject those imports rather than risk a partial restore. If a recoverable write fails, the importer attempts to restore original settings and records; if rollback fails it reports that explicitly. An interrupted browser process is not guaranteed to recover an older multi-step import automatically.
 
 ## Read-only before/after restore verification (local files only)
 
-After exporting a portable v1.6 app-data JSON file from the original profile, import that
+After exporting a portable v1.7 app-data JSON file from the original profile, import that
 backup into a **different, initially empty** browser profile at the correct origin.
 Before deleting or overwriting any original profile, export the restored profile to a
 second portable JSON file. With this repository and its Node dependencies available,

@@ -3,7 +3,7 @@ import { comparePortableBackups, summarizePortableBackup } from '../scripts/veri
 import { createFsrsV5State } from '../src/features/flashcardsFsrsAdapter.js';
 
 const before = {
-  version: '1.6', exportedAt: '2026-10-31T12:00:00.000Z',
+  version: '1.7', exportedAt: '2026-10-31T12:00:00.000Z',
   meta: { sizeBytes: 123, attachments: {
     mode: 'metadata-only', binaryIncluded: false,
     references: [{ id: 'library-file:private', size: 22 }],
@@ -30,7 +30,7 @@ const before = {
 };
 
 describe('read-only portable recovery digests', () => {
-  it('compares first-party 1.6 exports without leaking raw notes, IDs or changing input', () => {
+  it('compares first-party 1.7 exports without leaking raw notes, IDs or changing input', () => {
     const original = structuredClone(before);
     const reopened = structuredClone(before);
     reopened.exportedAt = '2026-11-01T18:00:00.000Z';
@@ -72,6 +72,18 @@ describe('read-only portable recovery digests', () => {
     const legitimateEmpty = structuredClone(before);
     legitimateEmpty.settings.flashcards = null;
     expect(summarizePortableBackup(legitimateEmpty).counts.flashcards).toBe(0);
+  });
+
+  it('distinguishes identical topic IDs across courses and rejects unscoped progress', () => {
+    const scoped = structuredClone(before);
+    scoped.progress = [
+      { topicId: 'shared', courseId: 'course-a', percent: 100 },
+      { topicId: 'shared', courseId: 'course-b', percent: 30 },
+    ];
+    const result = summarizePortableBackup(scoped);
+    expect(result.counts.progress).toBe(2);
+    scoped.progress = [{ topicId: 'shared', percent: 100 }];
+    expect(() => summarizePortableBackup(scoped)).toThrow(/course and topic identity/i);
   });
 
   it('rejects malformed, duplicate-ID, future-version, and missing required snapshot sections', () => {

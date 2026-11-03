@@ -1,4 +1,5 @@
 import { dueReviewCards } from '../core/studyMetrics.js';
+import { courseTopicIdentity } from '../core/courseTopicIdentity.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
@@ -407,24 +408,14 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   }
   if (!document.body.contains(widgetsRoot)) return;
 
-  // An imported topic ID is not necessarily unique across courses. Once
-  // marked ambiguous it must remain ambiguous even after a third duplicate.
-  // Exact course/topic identities are a separate, fail-closed namespace.
-  const sourceKey = record => JSON.stringify([
-    String(record?.courseId || ''), String(record?.topicId || ''),
-  ]);
-  const topicMap = new Map(), ambiguousTopicIds = new Set();
-  const scopedTopicMap = new Map(), ambiguousScopedKeys = new Set();
+  // Every saved lesson is resolved by its exact course/topic pair. A
+  // topic-only lookup is not a supported identity in the current schema.
+  const sourceKey = record => record?.courseId && record?.topicId
+    ? courseTopicIdentity(record.courseId, record.topicId) : null;
+  const scopedTopicMap = new Map();
+  const ambiguousScopedKeys = new Set();
   for (const topic of topics) {
-    if (topic?.topicId == null || String(topic.topicId) === '') continue;
-    const id = String(topic.topicId);
-    if (!ambiguousTopicIds.has(id)) {
-      if (topicMap.has(id)) {
-        topicMap.delete(id);
-        ambiguousTopicIds.add(id);
-      } else topicMap.set(id, topic);
-    }
-    if (topic.courseId == null || String(topic.courseId) === '') continue;
+    if (topic?.topicId == null || topic?.courseId == null) continue;
     const key = sourceKey(topic);
     if (ambiguousScopedKeys.has(key)) continue;
     if (scopedTopicMap.has(key)) {
@@ -433,18 +424,14 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     } else scopedTopicMap.set(key, topic);
   }
   const resolvedTopic = record => {
-    if (record?.topicId == null || String(record.topicId) === '') return null;
-    const id = String(record.topicId);
-    if (record?.courseId != null && String(record.courseId) !== '') {
-      const key = sourceKey(record);
-      return ambiguousScopedKeys.has(key) ? null : scopedTopicMap.get(key) || null;
-    }
-    return ambiguousTopicIds.has(id) ? null : topicMap.get(id) || null;
+    if (record?.topicId == null || record?.courseId == null) return null;
+    const key = sourceKey(record);
+    return ambiguousScopedKeys.has(key) ? null : scopedTopicMap.get(key) || null;
   };
   // Use the freshest canonical row for each course/topic pair. Earlier unfinished rows
   // cannot resurrect a lesson that a later update already completed.
   const progressByTopic = new Map();
-  [...progress].filter(record => record?.topicId)
+  [...progress].filter(record => record?.topicId && record?.courseId)
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))
     .forEach(record => {
       const key = sourceKey(record);
@@ -455,7 +442,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     && (Number(record?.percent) > 0 || Number(record?.position) > 0
       || record.status === 'in-progress');
   const latestTimestamp = [...timestamps]
-    .filter(item => item?.topicId)
+    .filter(item => item?.topicId && item?.courseId)
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
 

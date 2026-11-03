@@ -669,13 +669,19 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
     if (duplicate) throw new Error('Destination already contains this topic');
 
     const db = window.DB;
-    const progress = typeof db?.getProgress === 'function'
-      ? await db.getProgress(id) : null;
-    if (progress && progress.courseId && progress.courseId !== fromId && progress.courseId !== toId) {
+    if (typeof db?.getProgress !== 'function') {
+      throw new Error('Canonical course-scoped progress storage is unavailable');
+    }
+    const progress = await db.getProgress(id, fromId);
+    if (progress && progress.courseId !== fromId) {
       throw new Error('Progress belongs to a different course; review this topic before moving');
     }
-    if (progress?.courseId === fromId && typeof db?.saveProgress !== 'function') {
-      throw new Error('Progress migration is unavailable; topic was not moved');
+    const destinationProgress = await db.getProgress(id, toId);
+    if (destinationProgress) {
+      throw new Error('Destination already has saved progress for this topic; resolve it before moving');
+    }
+    if (progress && (typeof db?.saveProgress !== 'function' || typeof db?.deleteProgress !== 'function')) {
+      throw new Error('Course-scoped progress move is unavailable; topic was not moved');
     }
 
     const before = cloneLibrary(library);
@@ -684,22 +690,34 @@ export async function moveTopic({ topicId, fromCourseId, toCourseId } = {}) {
     from.updatedAt = Date.now();
     to.updatedAt = Date.now();
     await persistLibrary(library, { topicId: id, fromCourseId: fromId, courseId: toId });
-    if (progress?.courseId === fromId) {
+    if (progress) {
+      let destinationProgressSaved = false;
       try {
         const receipt = await db.saveProgress(id, toId, {
           ...progress, courseId: toId, updatedAt: Date.now(),
         });
-        if (receipt === false) throw new Error('Progress migration was not acknowledged');
+        if (receipt === false) throw new Error('Destination progress write was not acknowledged');
+        destinationProgressSaved = true;
+        const deleted = await db.deleteProgress(id, fromId);
+        if (deleted !== true) throw new Error('Source progress deletion was not acknowledged');
       } catch (error) {
-        // The two stores cannot be committed in a single transaction. Restore
-        // the original course mapping if the linked progress write rejects,
-        // and report incomplete compensation rather than false success.
+        // The two stores cannot be committed in a single transaction. Remove
+        // any destination copy and restore the original library mapping when
+        // either half of the course-scoped progress move fails.
+        const compensationErrors = [];
+        if (destinationProgressSaved) {
+          try {
+            const deleted = await db.deleteProgress(id, toId);
+            if (deleted !== true) throw new Error('Destination progress cleanup was not acknowledged', { cause: error });
+          } catch (cleanupError) { compensationErrors.push(cleanupError); }
+        }
         try {
           await persistLibrary(before, { topicId: id, courseId: fromId, rollback: true });
-        } catch (rollbackError) {
-          throw new AggregateError([error, rollbackError],
-            'Topic move failed and could not restore the original course mapping',
-            { cause: rollbackError });
+        } catch (rollbackError) { compensationErrors.push(rollbackError); }
+        if (compensationErrors.length) {
+          throw new AggregateError([error, ...compensationErrors],
+            'Topic move failed and compensation was incomplete',
+            { cause: error });
         }
         throw error;
       }

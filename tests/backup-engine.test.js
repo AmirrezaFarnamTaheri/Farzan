@@ -4,7 +4,7 @@ import { installBackupEngine } from '../src/core/backupEngine.js';
 import { AI_BINDING_KEY, AI_SESSION_KEY, AI_SETTINGS_KEY } from '../src/core/aiAuthority.js';
 
 const schema = [
-  ['progress', 'topicId'],
+  ['progress', 'id'],
   ['timestamps', 'id'],
   ['notes', 'id'],
   ['folders', 'id'],
@@ -21,7 +21,7 @@ async function createDatabase() {
     drop.onerror = () => reject(drop.error);
   });
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('opencoursedeck', 3);
+    const request = indexedDB.open('opencoursedeck', 4);
     request.onupgradeneeded = () => {
       for (const [name, keyPath] of schema) request.result.createObjectStore(name, { keyPath });
     };
@@ -51,7 +51,7 @@ function rootWithFacade(sessionEntries) {
 
 async function putSetting(value) {
   const db = await new Promise((resolve, reject) => {
-    const request = indexedDB.open('opencoursedeck', 3);
+    const request = indexedDB.open('opencoursedeck', 4);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -74,7 +74,7 @@ describe('atomic backup engine', () => {
   it('observes completion even when a transaction finishes immediately after its last read', async () => {
     const tx = { oncomplete: null, onerror: null, onabort: null };
     const db = {
-      version: 3,
+      version: 4,
       objectStoreNames: { contains: () => true },
       close() {},
       transaction: () => tx,
@@ -115,9 +115,26 @@ describe('atomic backup engine', () => {
     const snapshot = await root.DB.exportBackup();
 
     expect(snapshot._meta.format).toBe('opencoursedeck-snapshot');
-    expect(snapshot._meta.version).toBe(3);
+    expect(snapshot._meta.version).toBe(4);
     expect(snapshot._meta.portableAuthority).toBe(false);
     expect(Object.keys(snapshot._meta.stores).sort()).toEqual(schema.map(([name]) => name).sort());
+  });
+
+  it('accepts same-topic progress records from separate courses and rejects mismatched primary keys', async () => {
+    const root = rootWithFacade();
+    installBackupEngine(root);
+    const records = [
+      { id: JSON.stringify(['course-a', 'shared']), topicId: 'shared', courseId: 'course-a', status: 'done' },
+      { id: JSON.stringify(['course-b', 'shared']), topicId: 'shared', courseId: 'course-b', status: 'in-progress' },
+    ];
+    const receipt = await root.DB.importBackup({ progress: records }, { mode: 'merge' });
+    expect(receipt.stores.progress).toBe(2);
+    const snapshot = await root.DB.exportBackup();
+    expect(snapshot.progress).toEqual(expect.arrayContaining(records));
+
+    await expect(root.DB.importBackup({
+      progress: [{ id: 'shared', topicId: 'shared', courseId: 'course-a' }],
+    }, { mode: 'merge' })).rejects.toThrow(/invalid course-scoped key/i);
   });
 
   it('removes endpoint approval and credential authority from exported settings', async () => {
@@ -218,7 +235,7 @@ describe('atomic backup engine', () => {
 
   it('treats an included empty store as an overwrite-to-empty command', async () => {
     const seed = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('opencoursedeck', 3);
+      const request = indexedDB.open('opencoursedeck', 4);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -306,7 +323,7 @@ describe('atomic backup engine', () => {
     expect(root.sessionStorage.getItem(AI_BINDING_KEY)).toContain('prior');
 
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('opencoursedeck', 3);
+      const request = indexedDB.open('opencoursedeck', 4);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

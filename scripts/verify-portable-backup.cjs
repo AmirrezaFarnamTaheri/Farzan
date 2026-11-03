@@ -38,7 +38,11 @@ function sortedRecords(records, section) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new TypeError('Portable backup ' + section + ' has an invalid record');
     }
-    const id = record.id ?? record.topicId ?? record.key;
+    if (section === 'progress' && (!record.courseId || !record.topicId)) {
+      throw new TypeError('Portable backup progress must have course and topic identity');
+    }
+    const id = record.id ?? (section === 'progress'
+      ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key);
     if (id !== undefined && id !== null) {
       const key = String(id);
       if (seen.has(key)) throw new TypeError('Portable backup ' + section + ' contains a duplicate stable ID');
@@ -47,7 +51,8 @@ function sortedRecords(records, section) {
     return record;
   });
   return normalized.sort((a, b) => {
-    const key = record => String(record.id ?? record.topicId ?? record.key ?? digest(record));
+    const key = record => String(record.id ?? (section === 'progress'
+      ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key) ?? digest(record));
     return key(a).localeCompare(key(b));
   });
 }
@@ -56,11 +61,11 @@ function summarizePortableBackup(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new TypeError('Portable backup must be a JSON object');
   }
-  if (input.version !== '1.6') throw new TypeError('Unsupported portable backup version (require 1.6)');
+  if (input.version !== '1.7') throw new TypeError('Unsupported portable backup version (require 1.7)');
   if (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings)) {
     throw new TypeError('Portable backup settings are unavailable');
   }
-  // Every first-party v1.6 app-data export contains all eight canonical
+  // Every first-party v1.7 app-data export contains all eight canonical
   // settings sections, even when an empty section is explicitly null. Missing
   // fields cannot be interpreted as zero data during recovery certification.
   for (const key of [
@@ -113,7 +118,7 @@ function summarizePortableBackup(input) {
   counts.attachments = attachments.references.length;
   digests.attachments = digest(sortedRecords(attachments.references, 'attachments'));
 
-  return { version: '1.6', counts, digests };
+  return { version: '1.7', counts, digests };
 }
 
 function comparePortableBackups(original, restored) {

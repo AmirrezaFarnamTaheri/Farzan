@@ -8,8 +8,8 @@ function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards
     init: vi.fn(async () => true),
     allCourses: vi.fn(() => [{ id: 'course-1' }, { id: 'course-2' }]),
     allTopics: vi.fn(() => catalogTopics ?? [
-      { topicId: 'topic-1', title: 'Design Systems' },
-      { topicId: 'topic-2', title: 'Frontend Performance' },
+      { topicId: 'topic-1', courseId: 'course-1', title: 'Design Systems' },
+      { topicId: 'topic-2', courseId: 'course-1', title: 'Frontend Performance' },
     ]),
   };
   window.DB = {
@@ -41,11 +41,11 @@ describe('home dashboard', () => {
     const now = Date.now();
     mountDashboard({
       progress: [
-        { topicId: 'topic-1', percent: 42, updatedAt: now },
-        { topicId: 'topic-2', percent: 100, status: 'done', updatedAt: now - 40 * 24 * 60 * 60 * 1000 },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 42, updatedAt: now },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now - 40 * 24 * 60 * 60 * 1000 },
       ],
-      notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', updatedAt: now - 1000 }],
-      timestamps: [{ topicId: 'topic-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
+      notes: [{ id: 'note-1', title: 'Spacing principles', topicId: 'topic-1', courseId: 'course-1', updatedAt: now - 1000 }],
+      timestamps: [{ topicId: 'topic-1', courseId: 'course-1', title: 'Design Systems', position: 125, updatedAt: now - 2000 }],
       flashcards: [{ ...scheduled('card-due', 'Explain spacing', '2020-01-01T00:00:00.000Z'), deck: 'Design' }],
     });
 
@@ -69,7 +69,7 @@ describe('home dashboard', () => {
     const previousLanguage = document.documentElement.lang;
     document.documentElement.lang = 'en-US';
     try {
-      mountDashboard({ catalogTopics: Array.from({ length: 6421 }, (_, i) => ({ topicId: `topic-${i}` })) });
+      mountDashboard({ catalogTopics: Array.from({ length: 6421 }, (_, i) => ({ topicId: `topic-${i}`, courseId: 'course-1' })) });
       await vi.waitFor(() => expect(document.getElementById('home-topic-count')?.textContent).toBe('6,421'));
       expect(document.getElementById('home-course-count')?.textContent).toBe('2');
     } finally {
@@ -79,7 +79,7 @@ describe('home dashboard', () => {
 
   it('counts only actual scheduled flashcards and opens the Review screen', async () => {
     const { Router } = mountDashboard({
-      progress: [{ topicId: 'topic-2', percent: 100, status: 'done', updatedAt: Date.now() - 40 * 86400000 }],
+      progress: [{ topicId: 'topic-2', courseId: 'course-1', percent: 100, status: 'done', updatedAt: Date.now() - 40 * 86400000 }],
       flashcards: [
         scheduled('one', 'Review this', '2020-01-01T00:00:00.000Z'),
         scheduled('two', 'Later', '2099-01-01T00:00:00.000Z'),
@@ -97,10 +97,10 @@ describe('home dashboard', () => {
     const now = Date.now();
     mountDashboard({
       progress: [
-        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 100000 },
-        { topicId: 'topic-1', percent: 30, status: 'in-progress', position: 120, updatedAt: now },
-        { topicId: 'topic-2', percent: 80, status: 'in-progress', position: 240, updatedAt: now - 50000 },
-        { topicId: 'topic-2', percent: 20, status: 'in-progress', position: 10, updatedAt: now - 150000 },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now - 100000 },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 30, status: 'in-progress', position: 120, updatedAt: now },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 80, status: 'in-progress', position: 240, updatedAt: now - 50000 },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 20, status: 'in-progress', position: 10, updatedAt: now - 150000 },
       ],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
@@ -115,8 +115,8 @@ describe('home dashboard', () => {
     const now = Date.now();
     mountDashboard({
       progress: [
-        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now },
-        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 7000 },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now - 7000 },
       ],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
@@ -199,23 +199,23 @@ describe('home dashboard', () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({
       progress: [
-        { topicId: 'topic-1', percent: 48, position: 245, status: 'in-progress', updatedAt: now - 60000 },
-        { topicId: 'topic-2', percent: 100, position: 1200, status: 'done', updatedAt: now },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 48, position: 245, status: 'in-progress', updatedAt: now - 60000 },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 100, position: 1200, status: 'done', updatedAt: now },
       ],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     expect(document.getElementById('home-focus-title').textContent).toBe('Design Systems');
     expect(document.querySelector('[data-home-focus-percent]').textContent).toBe('48% complete');
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 245);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 245, 'course-1');
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
   it('does not offer resuming an already completed or never-started topic', async () => {
     const { Router, setPendingCourseMedia } = mountDashboard({
       progress: [
-        { topicId: 'topic-2', percent: 100, status: 'done', position: 900, updatedAt: Date.now() },
-        { topicId: 'topic-1', percent: 0, status: 'not-started', position: 0, updatedAt: Date.now() - 1000 },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 100, status: 'done', position: 900, updatedAt: Date.now() },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 0, status: 'not-started', position: 0, updatedAt: Date.now() - 1000 },
       ],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
@@ -232,25 +232,25 @@ describe('home dashboard', () => {
   it('resumes a newer timestamp from another unfinished topic rather than an older progress row', async () => {
     const now = Date.now();
     const { setPendingCourseMedia } = mountDashboard({
-      progress: [{ topicId: 'topic-1', percent: 33, position: 60, updatedAt: now - 90000 }],
-      timestamps: [{ topicId: 'topic-2', position: 345, updatedAt: now }],
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 33, position: 60, updatedAt: now - 90000 }],
+      timestamps: [{ topicId: 'topic-2', courseId: 'course-1', position: 345, updatedAt: now }],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     expect(document.getElementById('home-focus-title').textContent).toBe('Frontend Performance');
     expect(document.querySelector('[data-home-focus-time]').textContent).toContain('5:45');
     document.querySelector('[data-home-focus-action]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 345);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 345, 'course-1');
   });
 
   it('uses a newer same-topic progress position instead of an older bookmarked timestamp', async () => {
     const now = Date.now();
     const { setPendingCourseMedia } = mountDashboard({
-      progress: [{ topicId: 'topic-1', percent: 70, position: 310, status: 'in-progress', updatedAt: now }],
-      timestamps: [{ topicId: 'topic-1', position: 22, updatedAt: now - 180000 }],
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 70, position: 310, status: 'in-progress', updatedAt: now }],
+      timestamps: [{ topicId: 'topic-1', courseId: 'course-1', position: 22, updatedAt: now - 180000 }],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 310);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 310, 'course-1');
     expect(document.querySelector('[data-home-focus-time]').textContent).toContain('5:10');
   });
 
@@ -258,20 +258,20 @@ describe('home dashboard', () => {
     const now = Date.now();
     const { setPendingCourseMedia } = mountDashboard({
       progress: [
-        { topicId: 'topic-1', percent: 100, status: 'done', updatedAt: now - 60000 },
-        { topicId: 'topic-2', percent: 44, position: 72, status: 'in-progress', updatedAt: now - 100000 },
+        { topicId: 'topic-1', courseId: 'course-1', percent: 100, status: 'done', updatedAt: now - 60000 },
+        { topicId: 'topic-2', courseId: 'course-1', percent: 44, position: 72, status: 'in-progress', updatedAt: now - 100000 },
       ],
-      timestamps: [{ topicId: 'topic-1', position: 200, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-1', courseId: 'course-1', position: 200, updatedAt: now }],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 72);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-2', 72, 'course-1');
   });
 
   it('resumes the latest topic from its saved position', async () => {
     const { Router, setPendingCourseMedia } = mountDashboard({
-      progress: [{ topicId: 'topic-1', percent: 60, updatedAt: Date.now() }],
-      timestamps: [{ topicId: 'topic-1', position: 180, updatedAt: Date.now() }],
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 60, updatedAt: Date.now() }],
+      timestamps: [{ topicId: 'topic-1', courseId: 'course-1', position: 180, updatedAt: Date.now() }],
     });
 
     await vi.waitFor(() => {
@@ -281,7 +281,7 @@ describe('home dashboard', () => {
     expect(document.querySelector('[data-home-browse-secondary]')?.getAttribute('href')).toBe('#/courses');
     expect(document.querySelector('[data-home-resume] use')?.getAttribute('href')).toBe('#i-play');
     document.querySelector('[data-home-resume]')?.click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 180);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 180, 'course-1');
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
@@ -298,9 +298,9 @@ describe('home dashboard', () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({
       failNotes: true,
-      progress: [{ topicId: 'topic-1', percent: 36, position: 115,
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 36, position: 115,
         status: 'in-progress', updatedAt: now }],
-      timestamps: [{ topicId: 'topic-1', position: 115, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-1', courseId: 'course-1', position: 115, updatedAt: now }],
     });
     await vi.waitFor(() => expect(document.querySelector('.home-data-error')).not.toBeNull());
     expect(document.querySelector('[data-pulse-active]').textContent).toBe('—');
@@ -320,7 +320,7 @@ describe('home dashboard', () => {
     expect(document.querySelector('[data-home-note-count]').textContent).toBe('1');
     expect(document.activeElement).not.toBe(document.body);
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 115);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 115, 'course-1');
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
     expect(window.DB.saveSetting).toBeUndefined();
   });
@@ -360,23 +360,23 @@ describe('home entry and resume contracts', () => {
   it('does not pair the Continue widget topic with a different topic timestamp', async () => {
     const now = Date.now();
     const { Router, setPendingCourseMedia } = mountDashboard({
-      progress: [{ topicId: 'topic-1', percent: 60, position: 90, updatedAt: now }],
-      timestamps: [{ topicId: 'topic-2', position: 10, updatedAt: now - 60000 }],
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 60, position: 90, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-2', courseId: 'course-1', position: 10, updatedAt: now - 60000 }],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     document.querySelector('[data-home-widget="continue"]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90, 'course-1');
     expect(Router.navigate).toHaveBeenCalledWith('#/courses');
   });
 
   it('only resumes a position belonging to the focused topic', async () => {
     const now = Date.now();
     const { setPendingCourseMedia } = mountDashboard({
-      progress: [{ topicId: 'topic-1', percent: 60, position: 90, updatedAt: now }],
-      timestamps: [{ topicId: 'topic-2', position: 10, updatedAt: now - 60000 }],
+      progress: [{ topicId: 'topic-1', courseId: 'course-1', percent: 60, position: 90, updatedAt: now }],
+      timestamps: [{ topicId: 'topic-2', courseId: 'course-1', position: 10, updatedAt: now - 60000 }],
     });
     await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
     document.querySelector('[data-home-resume]').click();
-    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90);
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 90, 'course-1');
   });
 });

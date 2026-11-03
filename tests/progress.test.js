@@ -96,7 +96,7 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.6');
+    expect(payload.version).toBe('1.7');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
@@ -123,7 +123,7 @@ describe('progress backup exports', () => {
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
     expect(payload).toMatchObject({
-      version: '1.6',
+      version: '1.7',
       watchedSegments: [{ id: 'segment-1', topicId: 'topic-1', start: 0, end: 15 }],
       pdfBookmarks: [{ id: 'page-bookmark', docId: 'document.pdf', page: 4 }],
     });
@@ -134,7 +134,7 @@ describe('progress backup exports', () => {
     const original = window.DB.getSetting;
     window.DB.getSetting = vi.fn(async key => {
       if (key === 'ocd_user_library') return { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } };
-      if (key === 'ocd_course_media_cues') return { 'topic-a': [{ at: 12, text: 'Recall' }] };
+      if (key === 'ocd_course_media_cues') return { [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 12, title: 'Recall' }] } };
       return original(key);
     });
     window.OpenCourseDeck.UserLibrary = {
@@ -144,7 +144,7 @@ describe('progress backup exports', () => {
     const payload = JSON.parse(await downloadedBlob.text());
     expect(payload.settings.library).toEqual({ version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } });
     expect(payload.settings).not.toHaveProperty('myCourses');
-    expect(payload.settings.mediaCues).toEqual({ 'topic-a': [{ at: 12, text: 'Recall' }] });
+    expect(payload.settings.mediaCues).toEqual({ [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 12, title: 'Recall' }] } });
     expect(payload.meta.attachments).toEqual(expect.objectContaining({
       mode: 'metadata-only',
       binaryIncluded: false,
@@ -152,10 +152,37 @@ describe('progress backup exports', () => {
     }));
   });
 
+  it('rejects retired portable formats and topic-only progress before any canonical write', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const oldFormat = new File([JSON.stringify({ version: '1.6', progress: [] })],
+      'retired-v1.6.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(oldFormat);
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+
+    const unscoped = new File([JSON.stringify({
+      version: '1.7', progress: [{ topicId: 'shared', status: 'done' }],
+    })], 'topic-only-progress.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(unscoped);
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
+  it('rejects topic-only authored media cue keys in the current portable format', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      settings: { mediaCues: { shared: { chapters: [{ time: 12, title: 'Legacy' }] } } },
+    })], 'topic-only-cues.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveSetting).not.toHaveBeenCalledWith('ocd_course_media_cues', expect.anything());
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
   it('rejects a corrupted FSRS backup before touching any canonical study data', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       progress: [{ topicId: 'fresh', courseId: 'course-new' }],
       settings: { flashcards: [{
         id: 'fsrs-bad', front: 'Q', back: 'A', scheduler: 'fsrs-v5',
@@ -177,7 +204,7 @@ describe('progress backup exports', () => {
     const original = { id: 'same', front: 'one', back: 'first', scheduler: 'fsrs-v5',
       fsrsState: createFsrsV5State(new Date('2026-09-01T00:00:00.000Z')) };
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { flashcards: [original, { ...original, front: 'different' }] },
+      version: '1.7', settings: { flashcards: [original, { ...original, front: 'different' }] },
     })], 'duplicate-cards.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
@@ -200,7 +227,7 @@ describe('progress backup exports', () => {
     ]) {
       window.DB.saveSetting.mockClear();
       const file = new File([JSON.stringify({
-        version: '1.6', settings: { flashcards: [invalid] },
+        version: '1.7', settings: { flashcards: [invalid] },
       })], 'invalid-scheduler.json', { type: 'application/json' });
       await window.ProgressStats.importJSONFile(file);
       expect(window.DB.saveSetting).not.toHaveBeenCalled();
@@ -221,7 +248,7 @@ describe('progress backup exports', () => {
         nextReviewDate: '2026-11-01' },
     ];
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { flashcards: cards },
+      version: '1.7', settings: { flashcards: cards },
     })], 'valid-cards.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
     expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_flashcards', cards);
@@ -232,7 +259,7 @@ describe('progress backup exports', () => {
   it('treats a false flashcard writer receipt as failure, preserving the old mirror and restoring the atomic snapshot', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
       progress: [], notes: [], settings: [], folders: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
@@ -242,7 +269,7 @@ describe('progress backup exports', () => {
       fsrsState: createFsrsV5State(new Date('2026-10-01T00:00:00.000Z')), front: 'Old', back: 'Safe' }]);
     window.localStorage.setItem('ocd_flashcards', previous);
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { flashcards: [
+      version: '1.7', settings: { flashcards: [
         { id: 'new-card', scheduler: 'fsrs-v5',
           fsrsState: createFsrsV5State(new Date('2026-11-01T00:00:00.000Z')), front: 'New', back: 'A' },
       ] },
@@ -263,14 +290,14 @@ describe('progress backup exports', () => {
   it('does not count a false note/progress receipt as a persisted import', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
       progress: [], notes: [], settings: [], folders: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     window.DB.saveProgress.mockResolvedValue(false);
     window.DB.saveNote.mockResolvedValue(false);
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       progress: [{ topicId: 'new-progress', courseId: 'a', updatedAt: 100 }],
       notes: [{ id: 'new-note', title: 'New', content: '<p>Body</p>', updatedAt: 100 }],
     })], 'false-record-receipts.json', { type: 'application/json' });
@@ -290,14 +317,14 @@ describe('progress backup exports', () => {
   it('does not count annotations or timestamps when their canonical writers refuse storage', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
       progress: [], notes: [], annotations: [], timestamps: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     window.DB.saveAnnotations.mockResolvedValue(false);
     window.DB.saveTimestamp.mockResolvedValue(false);
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       annotations: [{ id: 'annot-new', docId: 'doc-1', page: 2, updatedAt: 123 }],
       timestamps: [{ id: 'time-new', topicId: 'topic-1', position: 40 }],
     })], 'rejected-media-receipts.json', { type: 'application/json' });
@@ -318,7 +345,7 @@ describe('progress backup exports', () => {
     window.DB.clearUserData = vi.fn(async () => true);
     window.DB.saveSetting.mockImplementation(async key => key === 'ocd_playlists' ? false : true);
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { playlists: [{
+      version: '1.7', settings: { playlists: [{
         id: 'new-queue', title: 'New Queue', topicIds: ['topic-1'],
       }] },
     })], 'false-rollback-receipt.json', { type: 'application/json' });
@@ -333,12 +360,12 @@ describe('progress backup exports', () => {
       .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
 
-  it('restores canonical course library and media cues from version 1.6 portable backups', async () => {
+  it('restores canonical course library and media cues from version 1.7 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const library = { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Saved course' } } };
-    const cues = { 'topic-a': [{ at: 18, text: 'Start' }] };
+    const cues = { [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 18, title: 'Start' }] } };
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { library, mediaCues: cues },
+      version: '1.7', settings: { library, mediaCues: cues },
       progress: [], notes: [], annotations: [], timestamps: [],
     })], 'all-domains.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
@@ -347,7 +374,7 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
   });
 
-  it('includes canonical personal tag taxonomy aliases in a version 1.6 portable export', async () => {
+  it('includes canonical personal tag taxonomy aliases in a version 1.7 portable export', async () => {
     const taxonomy = {
       version: 1,
       labels: [{ key: 'کلیه', label: 'کلیه' }],
@@ -359,7 +386,7 @@ describe('progress backup exports', () => {
 
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
-    expect(payload.version).toBe('1.6');
+    expect(payload.version).toBe('1.7');
     expect(payload.settings.tagTaxonomy).toEqual(taxonomy);
     expect(payload.notes[0].content).toBe('<p>Current body</p>');
   });
@@ -384,7 +411,7 @@ describe('progress backup exports', () => {
     });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.6', settings: { tagTaxonomy: taxonomy },
+      version: '1.7', settings: { tagTaxonomy: taxonomy },
     })], 'tag-library.json', { type: 'application/json' });
 
     await window.ProgressStats.importJSONFile(file);
@@ -397,7 +424,7 @@ describe('progress backup exports', () => {
   it('rejects unknown taxonomy revisions before confirmation or any import mutation', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       progress: [{ topicId: 'would-overwrite', courseId: 'biology' }],
       settings: { tagTaxonomy: { version: 100, labels: [], aliases: {} } },
     })], 'future-taxonomy.json', { type: 'application/json' });
@@ -419,7 +446,7 @@ describe('progress backup exports', () => {
   it('rejects an extended media import before any write without an atomic rollback snapshot', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       watchedSegments: [{ id: 'segment', topicId: 'topic-1', start: 0, end: 10 }],
     })], 'media.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
@@ -430,16 +457,16 @@ describe('progress backup exports', () => {
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
 
-  it('restores current portable media records when a v3 rollback snapshot is available', async () => {
+  it('restores current portable media records when a v4 rollback snapshot is available', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
       progress: [], notes: [], folders: [], settings: [], annotations: [],
       timestamps: [], watchedSegments: [], pdfBookmarks: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       watchedSegments: [{ id: 'segment-2', topicId: 'topic-1', start: 3, end: 14 }],
       pdfBookmarks: [{ id: 'pdf-2', docId: 'research.pdf', page: 6 }],
     })], 'portable-media.json', { type: 'application/json' });
@@ -614,7 +641,7 @@ describe('progress backup exports', () => {
     document.getElementById('btn-export-json').click();
 
     await vi.waitFor(() => expect(downloadedBlob).not.toBeNull());
-    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.6');
+    expect(JSON.parse(await downloadedBlob.text()).version).toBe('1.7');
 
     downloadedBlob = null;
     document.getElementById('btn-export-csv').click();
@@ -811,7 +838,7 @@ describe('progress backup exports', () => {
       scheduler: 'fsrs-v5',
       fsrsState: createFsrsV5State(new Date('2026-10-01T00:00:00.000Z')) };
     const payload = {
-      version: '1.6',
+      version: '1.7',
       progress: [
         { topicId: 'ok-topic', courseId: 'course-1', updatedAt: 10 },
         { topicId: 'bad-topic', courseId: 'course-1', updatedAt: 11 },
@@ -850,7 +877,7 @@ describe('progress backup exports', () => {
 
     expect(input.accept).toContain('application/json');
     expect(window.OpenCourseDeck.lastImportResult.preview).toEqual(expect.objectContaining({
-      version: '1.6',
+      version: '1.7',
       fileName: 'backup.json',
       progress: 2,
       notes: 1,
@@ -885,7 +912,7 @@ describe('progress backup exports', () => {
     // stale board back over the restored one.
     window.OpenCourseDeck.Canvas = { restoreBoard: vi.fn(async () => true) };
     const payload = {
-      version: '1.6',
+      version: '1.7',
       progress: [],
       notes: [],
       folders: [],
@@ -914,7 +941,7 @@ describe('progress backup exports', () => {
   });
 
   it('aborts an import before its first write when an original collection cannot be snapshotted', async () => {
-    const payload = { version: '1.6', progress: [{ topicId: 'new', courseId: 'a' }] };
+    const payload = { version: '1.7', progress: [{ topicId: 'new', courseId: 'a' }] };
     const file = new File([JSON.stringify(payload)], 'unsafe-import.json', { type: 'application/json' });
     window.DB.getAllNotes.mockRejectedValueOnce(new Error('Existing notes read failed'));
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
@@ -928,7 +955,7 @@ describe('progress backup exports', () => {
   });
 
   it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
-    const payload = { version: '1.6', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
     const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
@@ -941,11 +968,11 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
 
-  it('prefers atomic full-primary-store rollback when the v3 backup engine is available', async () => {
-    const payload = { version: '1.6', notes: [{ id: 'bad', title: 'Bad' }] };
+  it('prefers atomic full-primary-store rollback when the v4 backup engine is available', async () => {
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
     const original = {
-      _meta: { format: 'opencoursedeck-snapshot', version: 3 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
       watchedSegments: [{ id: 'segment-that-must-survive' }],
       pdfBookmarks: [{ id: 'bookmark-that-must-survive' }],
       notes: [{ id: 'old-note' }],
@@ -967,7 +994,7 @@ describe('progress backup exports', () => {
 
   it('rolls back canonical course library and media cues when a later import write fails', async () => {
     const originalLibrary = { version: 1, courses: { 'course-old': { id: 'course-old', title: 'Original course' } } };
-    const originalCues = { 'topic-old': [{ at: 20, text: 'Original cue' }] };
+    const originalCues = { [JSON.stringify(['course-old', 'topic-old'])]: { chapters: [{ time: 20, title: 'Original cue' }] } };
     const state = new Map([
       ['ocd_user_library', originalLibrary],
       ['ocd_course_media_cues', originalCues],
@@ -982,12 +1009,12 @@ describe('progress backup exports', () => {
     window.DB.saveTimestamp.mockRejectedValueOnce(new Error('timestamp write failed'));
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
-      version: '1.6',
+      version: '1.7',
       settings: {
         library: { version: 1, courses: { 'course-new': { id: 'course-new', title: 'Imported course' } } },
-        mediaCues: { 'topic-new': [{ at: 30, text: 'Imported cue' }] },
+        mediaCues: { [JSON.stringify(['course-new', 'topic-new'])]: { chapters: [{ time: 30, title: 'Imported cue' }] } },
       },
-      timestamps: [{ id: 'ts-new', topicId: 'topic-new', position: 30 }],
+      timestamps: [{ id: 'ts-new', topicId: 'topic-new', courseId: 'course-new', position: 30 }],
       progress: [], notes: [], annotations: [],
     })], 'partial-restore.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
@@ -1014,7 +1041,7 @@ describe('progress backup exports', () => {
     });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const payload = {
-      version: '1.6',
+      version: '1.7',
       progress: [
         { topicId: 'imported', courseId: 'course-new', updatedAt: 100 },
         { topicId: 'read-fails', courseId: 'course-new', updatedAt: 100 },
@@ -1037,7 +1064,7 @@ describe('progress backup exports', () => {
 
   it('rolls back backup import writes when any store write fails', async () => {
     const payload = {
-      version: '1.6',
+      version: '1.7',
       progress: [{ topicId: 'new-progress', courseId: 'course-2', updatedAt: 100 }],
       notes: [{ id: 'new-note', title: 'New note', updatedAt: 100 }],
     };
@@ -1088,7 +1115,7 @@ describe('progress backup exports', () => {
 
   it('shows import preview and does not write records when cancelled', async () => {
     const payload = {
-      version: '1.6',
+      version: '1.7',
       progress: [{ topicId: 'topic-cancel', courseId: 'course-1', updatedAt: 10 }],
       notes: [{ id: 'note-cancel', title: 'Cancelled', updatedAt: 12 }],
       folders: [{ id: 'folder-cancel', name: 'Cancelled folder' }],
@@ -1137,7 +1164,7 @@ describe('progress backup exports', () => {
 
   it('imports current notes-only backups without requiring a progress array', async () => {
     const payload = {
-      version: '1.6',
+      version: '1.7',
       notes: [{ id: 'note-only', title: 'Notes only', content: '<p>Body</p>', updatedAt: 12 }],
     };
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
@@ -1172,7 +1199,7 @@ describe('progress backup exports', () => {
 
   it('imports a File argument without opening another picker', async () => {
     const payload = {
-      version: '1.6',
+      version: '1.7',
       notes: [{ id: 'note-file', title: 'From file', content: '<p>Body</p>', updatedAt: 12 }],
     };
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };

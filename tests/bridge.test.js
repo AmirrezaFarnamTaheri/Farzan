@@ -35,8 +35,85 @@ describe('bridge DB safety helpers', () => {
     );
   });
 
+  it('replaces the pre-release topic-only progress store with the v4 composite-key schema', async () => {
+    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const previous = new OpenCourseDB('opencoursedeck', 3, [
+      { name: 'progress', key: 'topicId', autoIncrement: false },
+    ]);
+    await previous.put('progress', {
+      topicId: 'shared-topic', courseId: 'course-a', status: 'done',
+    });
+    previous.db?.close();
+    previous.db = null;
+
+    await expect(window.DB.getAllProgress()).resolves.toEqual([]);
+    await window.DB.saveProgress('shared-topic', 'course-a', { status: 'in-progress' });
+
+    const schema = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('opencoursedeck');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const store = db.transaction('progress', 'readonly').objectStore('progress');
+        const result = { version: db.version, keyPath: store.keyPath, indexes: [...store.indexNames] };
+        db.close();
+        resolve(result);
+      };
+    });
+    expect(schema).toEqual({
+      version: 4, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
+    });
+  });
+
+  it('deletes only the selected course progress record', async () => {
+    await window.DB.saveProgress('shared-topic', 'course-a', { status: 'done' });
+    await window.DB.saveProgress('shared-topic', 'course-b', { status: 'in-progress' });
+
+    await expect(window.DB.deleteProgress('shared-topic', 'course-a')).resolves.toBe(true);
+
+    await expect(window.DB.getProgress('shared-topic', 'course-a')).resolves.toBeNull();
+    await expect(window.DB.getProgress('shared-topic', 'course-b'))
+      .resolves.toMatchObject({ status: 'in-progress', courseId: 'course-b' });
+  });
+
+  it('stores progress independently for the same topic in different courses', async () => {
+    const courseA = await window.DB.saveProgress('shared-topic', 'course-a', {
+      status: 'done', percent: 100, position: 120,
+    });
+    const courseB = await window.DB.saveProgress('shared-topic', 'course-b', {
+      status: 'in-progress', percent: 35, position: 42,
+    });
+
+    expect(courseA).not.toHaveProperty('id');
+    expect(courseB).not.toHaveProperty('id');
+    await expect(window.DB.getProgress('shared-topic', 'course-a'))
+      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', status: 'done', position: 120 });
+    await expect(window.DB.getProgress('shared-topic', 'course-b'))
+      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', status: 'in-progress', position: 42 });
+    expect(await window.DB.getAllProgress()).toHaveLength(2);
+    const raw = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('opencoursedeck');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const get = db.transaction('progress', 'readonly').objectStore('progress').getAll();
+        get.onsuccess = () => { const rows = get.result; db.close(); resolve(rows); };
+        get.onerror = () => { db.close(); reject(get.error); };
+      };
+    });
+    expect(raw.map(record => record.id).sort()).toEqual([
+      JSON.stringify(['course-a', 'shared-topic']),
+      JSON.stringify(['course-b', 'shared-topic']),
+    ].sort());
+  });
+
+  it('requires course identity for every canonical progress read and write', async () => {
+    await expect(window.DB.getProgress('shared-topic')).rejects.toThrow(/course/i);
+    await expect(window.DB.saveProgress('shared-topic', '', { status: 'done' })).rejects.toThrow(/course/i);
+  });
+
   it.each([
-    ['getProgress', ['topic-stale']],
+    ['getProgress', ['topic-stale', 'course-stale']],
     ['getAllProgress', []],
     ['getAllTimestamps', []],
     ['getAllNotes', []],
@@ -89,7 +166,7 @@ describe('bridge DB safety helpers', () => {
     delete window.OpenCourseDeck.DB.OpenCourseDB;
 
     const reads = [
-      ['getProgress', ['t']], ['getAllProgress', []], ['getAllTimestamps', []],
+      ['getProgress', ['t', 'course-a']], ['getAllProgress', []], ['getAllTimestamps', []],
       ['getAllNotes', []], ['getAllFolders', []], ['getSetting', ['test']],
       ['getAllAnnotations', []], ['getProgressByCourse', ['course-a']],
       ['getTimestampsByTopic', ['t']], ['getNotesByFolder', ['default']],
@@ -372,13 +449,13 @@ describe('bridge DB safety helpers', () => {
       fallback: { topicId: 'fallback', status: 'done' },
       both: { topicId: 'both', status: 'stale' },
     }));
-    const rows = new Map([['both', { topicId: 'both', status: 'canonical' }]]);
+    const rows = new Map([[JSON.stringify(['course-a', 'both']), { id: JSON.stringify(['course-a', 'both']), topicId: 'both', courseId: 'course-a', status: 'canonical' }]]);
     window.OpenCourseDeck.DB.OpenCourseDB = class {
       async get(_store, key) { return rows.get(key) ?? null; }
       async getAll() { return [...rows.values()]; }
     };
-    await expect(window.DB.getProgress('fallback')).resolves.toBeNull();
-    await expect(window.DB.getProgress('both')).resolves.toMatchObject({ status: 'canonical' });
+    await expect(window.DB.getProgress('fallback', 'course-a')).resolves.toBeNull();
+    await expect(window.DB.getProgress('both', 'course-a')).resolves.toMatchObject({ status: 'canonical' });
     expect(await window.DB.getAllProgress()).toHaveLength(1);
   });
 
@@ -623,8 +700,9 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('merges simultaneous progress updates to a topic instead of losing a field', async () => {
-    const persisted = new Map([['topic-concurrent', {
-      topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
+    const progressId = JSON.stringify(['course-a', 'topic-concurrent']);
+    const persisted = new Map([[progressId, {
+      id: progressId, topicId: 'topic-concurrent', courseId: 'course-a', watched: 0, bookmarked: false,
     }]]);
     let activeReads = 0;
     window.OpenCourseDeck.DB.OpenCourseDB = class {
@@ -636,7 +714,7 @@ describe('bridge DB safety helpers', () => {
         const value = persisted.get(id);
         return value ? { ...value } : null;
       }
-      async put(_store, value) { persisted.set(value.topicId, { ...value }); }
+      async put(_store, value) { persisted.set(value.id, { ...value }); }
     };
     const [first, second] = await Promise.all([
       window.DB.saveProgress('topic-concurrent', 'course-a', { watched: 42 }),
@@ -645,7 +723,7 @@ describe('bridge DB safety helpers', () => {
     expect(activeReads).toBe(2);
     expect(first.watched).toBe(42);
     expect(second).toMatchObject({ watched: 42, bookmarked: true });
-    expect(persisted.get('topic-concurrent')).toMatchObject({ watched: 42, bookmarked: true });
+    expect(persisted.get(progressId)).toMatchObject({ watched: 42, bookmarked: true });
   });
 
   it('does not claim PDF bookmarks were persisted when IndexedDB is unavailable', async () => {

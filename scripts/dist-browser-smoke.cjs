@@ -226,7 +226,7 @@ async function run() {
       'Plasmato PDF source course is missing from Materials');
 
     await window.DB.saveProgress(video.topicId, video.courseId, { status: 'in-progress', percent: 41, position: 12 });
-    const saved = await window.DB.getProgress(video.topicId);
+    const saved = await window.DB.getProgress(video.topicId, video.courseId);
     invariant(saved?.topicId === video.topicId && saved?.courseId === video.courseId &&
       saved?.status === 'in-progress', 'Stable Plasmato topic progress did not persist');
 

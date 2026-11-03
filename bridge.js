@@ -357,7 +357,7 @@
   // ───────────────────────────────────────────────────────────
   const DB = (() => {
     const IDB_NAME = 'opencoursedeck';
-    const IDB_VERSION = 3;
+    const IDB_VERSION = 4;
 
     let _idb = null;
     let _idbCtor = null;
@@ -379,7 +379,7 @@
       if (_idb && _idbCtor === OpenCourseDB) return _idb;
       _idbCtor = OpenCourseDB;
       _idb = new OpenCourseDB(IDB_NAME, IDB_VERSION, [
-        { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
+        { name: 'progress', key: 'id', autoIncrement: false, recreateOnUpgrade: true, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
         { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' }] },
         { name: 'folders', key: 'id', autoIncrement: false, indexes: [{ field: 'parentId' }] },
@@ -468,54 +468,110 @@
 
 
 
-    async function getProgress(topicId) {
+    function _progressRecordId(topicId, courseId) {
+      const normalizedTopicId = String(topicId ?? '').trim();
+      const normalizedCourseId = String(courseId ?? '').trim();
+      if (!normalizedTopicId || !normalizedCourseId) {
+        throw new TypeError('Course-scoped progress requires both topicId and courseId');
+      }
+      return JSON.stringify([normalizedCourseId, normalizedTopicId]);
+    }
+
+    function _publicProgress(record) {
+      if (!record || typeof record !== 'object') return record ?? null;
+      const progress = { ...record };
+      delete progress.id;
+      return progress;
+    }
+
+    async function getProgress(topicId, courseId) {
+      const id = _progressRecordId(topicId, courseId);
       const idb = _requireIdb('getProgress');
-      try { return (await idb.get('progress', topicId)) ?? null; }
+      try { return _publicProgress(await idb.get('progress', id)); }
       catch (error) { _canonicalReadFailed('getProgress', error); }
     }
 
     async function getAllProgress() {
       const idb = _requireIdb('getAllProgress');
-      try { return (await idb.getAll('progress')) ?? []; }
-      catch (error) { _canonicalReadFailed('getAllProgress', error); }
+      try {
+        const records = await idb.getAll('progress');
+        if (!Array.isArray(records)) throw new TypeError('Invalid canonical progress collection');
+        return records.map(_publicProgress);
+      } catch (error) { _canonicalReadFailed('getAllProgress', error); }
     }
 
     async function _saveProgressNow(topicId, courseId, patch = {}) {
+      const id = _progressRecordId(topicId, courseId);
+      const normalizedTopicId = String(topicId).trim();
+      const normalizedCourseId = String(courseId).trim();
       const idb = _requireIdb('progress', true);
-      const prev = (await getProgress(topicId)) ?? { topicId, courseId };
+      const prev = (await getProgress(normalizedTopicId, normalizedCourseId))
+        ?? { topicId: normalizedTopicId, courseId: normalizedCourseId };
       const next = {
-        ...prev, ...patch, topicId,
-        courseId: courseId ?? prev.courseId,
+        ...prev, ...patch,
+        id,
+        topicId: normalizedTopicId,
+        courseId: normalizedCourseId,
         updatedAt: patch.updatedAt ?? Date.now(),
       };
       try {
         await idb.put('progress', next);
+        const publicRecord = _publicProgress(next);
         window.OpenCourseDeck?.bus?.emit?.('progress:save', {
-          topicId, courseId: next.courseId, progress: next,
+          topicId: normalizedTopicId, courseId: normalizedCourseId, progress: publicRecord,
         });
-        _broadcast('progress', 'save', next);
-        return next;
+        _broadcast('progress', 'save', publicRecord);
+        return publicRecord;
       } catch (error) {
         _signalSaveError('progress', 'indexedDB', error, { canonical: true });
         throw error;
       }
     }
 
-    function saveProgress(topicId, courseId, patch = {}) {
-      const previous = _pendingProgressWrites.get(topicId) || Promise.resolve();
+    async function saveProgress(topicId, courseId, patch = {}) {
+      const id = _progressRecordId(topicId, courseId);
+      const previous = _pendingProgressWrites.get(id) || Promise.resolve();
       const operation = previous.catch(() => {}).then(() => {
-        // Web Locks serialize cooperating tabs where supported (including
-        // Chromium/WebView2); the promise chain covers browsers without them.
+        // Web Locks serialize cooperating tabs by the full course/topic identity.
         const locks = window.navigator?.locks;
         if (typeof locks?.request === 'function') {
-          return locks.request(`opencoursedeck:progress:${topicId}`, { mode: 'exclusive' },
+          return locks.request(`opencoursedeck:progress:${id}`, { mode: 'exclusive' },
             () => _saveProgressNow(topicId, courseId, patch));
         }
         return _saveProgressNow(topicId, courseId, patch);
       });
-      _pendingProgressWrites.set(topicId, operation);
+      _pendingProgressWrites.set(id, operation);
       operation.finally(() => {
-        if (_pendingProgressWrites.get(topicId) === operation) _pendingProgressWrites.delete(topicId);
+        if (_pendingProgressWrites.get(id) === operation) _pendingProgressWrites.delete(id);
+      }).catch(() => {});
+      return operation;
+    }
+
+    async function deleteProgress(topicId, courseId) {
+      const id = _progressRecordId(topicId, courseId);
+      const previous = _pendingProgressWrites.get(id) || Promise.resolve();
+      const operation = previous.catch(() => {}).then(() => {
+        const remove = async () => {
+          const idb = _requireIdb('progress-delete', true);
+          try {
+            await idb.delete('progress', id);
+            _broadcast('progress', 'delete', {
+              topicId: String(topicId).trim(), courseId: String(courseId).trim(),
+            });
+            return true;
+          } catch (error) {
+            _signalSaveError('progress-delete', 'indexedDB', error, { canonical: true });
+            throw error;
+          }
+        };
+        const locks = window.navigator?.locks;
+        return typeof locks?.request === 'function'
+          ? locks.request(`opencoursedeck:progress:${id}`, { mode: 'exclusive' }, remove)
+          : remove();
+      });
+      _pendingProgressWrites.set(id, operation);
+      operation.finally(() => {
+        if (_pendingProgressWrites.get(id) === operation) _pendingProgressWrites.delete(id);
       }).catch(() => {});
       return operation;
     }
@@ -852,7 +908,7 @@
       } catch (error) { _canonicalReadFailed('getByIndex', error); }
     }
 
-    const getProgressByCourse = courseId => _byIndex('progress', 'courseId', courseId);
+    const getProgressByCourse = async courseId => (await _byIndex('progress', 'courseId', courseId)).map(_publicProgress);
     const getTimestampsByTopic = topicId => _byIndex('timestamps', 'topicId', topicId);
     const getTimestampsByCourse = courseId => _byIndex('timestamps', 'courseId', courseId);
     const getNotesByTopic = topicId => _byIndex('notes', 'topicId', topicId);
@@ -1036,6 +1092,7 @@
       getProgress,
       getAllProgress,
       saveProgress,
+      deleteProgress,
       getAllTimestamps,
       saveTimestamp,
       compareAndSwapTimestamp,

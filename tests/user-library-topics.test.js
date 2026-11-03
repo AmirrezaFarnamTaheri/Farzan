@@ -8,6 +8,9 @@ describe('canonical course/topic editing', () => {
     window.DB = {
       getSetting: vi.fn(async key => settings[key] ?? null),
       saveSetting: vi.fn(async (key, value) => { settings[key] = value; return value; }),
+      getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true),
+      deleteProgress: vi.fn(async () => true),
     };
     window.DataStore = { mergeRaw: vi.fn() };
     window.OpenCourseDeck = { bus: { emit: vi.fn() } };
@@ -53,24 +56,89 @@ describe('canonical course/topic editing', () => {
     const from = await library.upsertCourse({ title: 'Started course' });
     const to = await library.upsertCourse({ title: 'Destination' });
     const topic = await library.addTopic({ courseId: from.id, title: 'Started topic' });
-    let progress = { topicId: topic.topicId, courseId: from.id, position: 340, status: 'in-progress' };
-    window.DB.getProgress = vi.fn(async () => progress);
+    const progressByCourse = new Map([[from.id, {
+      topicId: topic.topicId, courseId: from.id, position: 340, status: 'in-progress',
+    }]]);
+    window.DB.getProgress = vi.fn(async (_topicId, courseId) => progressByCourse.get(courseId) ?? null);
     window.DB.saveProgress = vi.fn(async (topicId, courseId, fields) => {
-      progress = { ...fields, topicId, courseId };
-      return progress;
+      const saved = { ...fields, topicId, courseId };
+      progressByCourse.set(courseId, saved);
+      return saved;
+    });
+    window.DB.deleteProgress = vi.fn(async (_topicId, courseId) => {
+      progressByCourse.delete(courseId);
+      return true;
     });
     await library.moveTopic({ topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id });
-    expect(progress).toMatchObject({ topicId: topic.topicId, courseId: to.id, position: 340, status: 'in-progress' });
+    expect(progressByCourse.has(from.id)).toBe(false);
+    expect(progressByCourse.get(to.id)).toMatchObject({
+      topicId: topic.topicId, courseId: to.id, position: 340, status: 'in-progress',
+    });
+    expect(window.DB.deleteProgress).toHaveBeenCalledWith(topic.topicId, from.id);
   });
 
   it('compensates a canonical topic move when the progress migration fails', async () => {
     const from = await library.upsertCourse({ title: 'Source' });
     const to = await library.upsertCourse({ title: 'Destination' });
     const topic = await library.addTopic({ courseId: from.id, title: 'Protected topic' });
-    window.DB.getProgress = vi.fn(async () => ({ topicId: topic.topicId, courseId: from.id, position: 15 }));
+    window.DB.getProgress = vi.fn(async (_topicId, courseId) => courseId === from.id
+      ? ({ topicId: topic.topicId, courseId: from.id, position: 15 }) : null);
     window.DB.saveProgress = vi.fn(async () => { throw new Error('progress storage is full'); });
+    window.DB.deleteProgress = vi.fn(async () => true);
     await expect(library.moveTopic({ topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id }))
       .rejects.toThrow('progress storage is full');
+    const state = await library.loadLibrary();
+    expect(state.courses[from.id].sources[0].topics.map(item => item.url)).toEqual([topic.topicId]);
+    expect(state.courses[to.id].sources[0].topics).toHaveLength(0);
+  });
+
+  it('does not overwrite destination progress when moving a topic into another course', async () => {
+    const from = await library.upsertCourse({ title: 'Source with progress' });
+    const to = await library.upsertCourse({ title: 'Destination with progress' });
+    const topic = await library.addTopic({ courseId: from.id, title: 'Shared topic' });
+    const records = new Map([
+      [from.id, { topicId: topic.topicId, courseId: from.id, position: 15 }],
+      [to.id, { topicId: topic.topicId, courseId: to.id, position: 88 }],
+    ]);
+    window.DB.getProgress = vi.fn(async (_topicId, courseId) => records.get(courseId) ?? null);
+    window.DB.saveProgress = vi.fn(async () => true);
+    window.DB.deleteProgress = vi.fn(async () => true);
+
+    await expect(library.moveTopic({
+      topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id,
+    })).rejects.toThrow(/destination already has saved progress/i);
+
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.DB.deleteProgress).not.toHaveBeenCalled();
+    const state = await library.loadLibrary();
+    expect(state.courses[from.id].sources[0].topics.map(item => item.url)).toEqual([topic.topicId]);
+    expect(state.courses[to.id].sources[0].topics).toHaveLength(0);
+  });
+
+  it('compensates a failed source-progress deletion after copying the destination record', async () => {
+    const from = await library.upsertCourse({ title: 'Source' });
+    const to = await library.upsertCourse({ title: 'Destination' });
+    const topic = await library.addTopic({ courseId: from.id, title: 'Protected topic' });
+    const records = new Map([[from.id, {
+      topicId: topic.topicId, courseId: from.id, position: 33, status: 'in-progress',
+    }]]);
+    window.DB.getProgress = vi.fn(async (_topicId, courseId) => records.get(courseId) ?? null);
+    window.DB.saveProgress = vi.fn(async (topicId, courseId, fields) => {
+      const saved = { ...fields, topicId, courseId };
+      records.set(courseId, saved);
+      return saved;
+    });
+    window.DB.deleteProgress = vi.fn(async (_topicId, courseId) => {
+      if (courseId === from.id) throw new Error('source progress deletion failed');
+      records.delete(courseId);
+      return true;
+    });
+
+    await expect(library.moveTopic({
+      topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id,
+    })).rejects.toThrow('source progress deletion failed');
+    expect(records.has(from.id)).toBe(true);
+    expect(records.has(to.id)).toBe(false);
     const state = await library.loadLibrary();
     expect(state.courses[from.id].sources[0].topics.map(item => item.url)).toEqual([topic.topicId]);
     expect(state.courses[to.id].sources[0].topics).toHaveLength(0);
