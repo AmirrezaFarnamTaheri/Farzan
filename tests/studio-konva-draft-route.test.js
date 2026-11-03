@@ -197,6 +197,27 @@ describe('Studio experimental Konva draft opt-in', () => {
     controller.unmount();
   });
 
+  it('opens an atomic Konva draft when the obsolete non-atomic saveSetting API is absent', async () => {
+    const { controller, factory, saveSetting } = makeFixture();
+    delete window.DB.saveSetting;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+    expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(true);
+    expect(saveSetting).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('refuses to open a draft when only an obsolete non-atomic saveSetting writer exists', async () => {
+    const { controller, factory } = makeFixture();
+    delete window.DB.compareAndSwapSetting;
+    document.querySelector('[data-studio-konva-open]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-studio-status]').textContent)
+      .toMatch(/unavailable|storage/i));
+    expect(factory).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-konva-dialog]').hasAttribute('open')).toBe(false);
+    controller.unmount();
+  });
+
   it('resumes a separately saved draft, commits only to its own key, and disposes on close', async () => {
     const savedDraft = v1Board();
     savedDraft.layers[0].elements[0].x = 95;
