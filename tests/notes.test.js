@@ -1334,6 +1334,11 @@ describe('notes route filters', () => {
     root.dispatchEvent(new Event('compositionend', { bubbles: true }));
   });
 
+  it('does not expose an unused localStorage-to-IndexedDB repair entry point', () => {
+    expect(window.PlasmaNotesStore.repairStorage).toBeUndefined();
+    expect(window.PlasmaNotesStore.hydrateFromDB).toBeTypeOf('function');
+  });
+
   it('repairs split notes storage by merging local and canonical DB records', async () => {
     window.PlasmaNotesStore._notes = null;
     window.PlasmaNotesStore._folders = null;
