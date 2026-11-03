@@ -353,12 +353,9 @@
   window.OpenCourseDeck.DataStore = window.OpenCourseDeck.DataStore ?? DataStore;
 
   // ───────────────────────────────────────────────────────────
-  // DB (progress + timestamps + notes mirror) — IndexedDB preferred, localStorage fallback.
+  // DB — IndexedDB is the sole source of canonical progress, notes and study records.
   // ───────────────────────────────────────────────────────────
   const DB = (() => {
-    const KEY_PROGRESS = 'ocd_progress_fallback_v1';
-    const KEY_TIMESTAMPS = 'ocd_timestamps_fallback_v1';
-
     const IDB_NAME = 'opencoursedeck';
     const IDB_VERSION = 3;
 
@@ -426,6 +423,19 @@
       throw error;
     }
 
+    // Never treat unavailable canonical storage as an empty record or quietly
+    // create a second source of truth in localStorage.
+    function _requireIdb(kind, writing = false) {
+      const idb = _getIdb();
+      if (idb) return idb;
+      const error = new Error('Canonical IndexedDB storage unavailable');
+      if (writing) {
+        _signalSaveError(kind, 'indexedDB', error, { canonical: true });
+        throw error;
+      }
+      return _canonicalReadFailed(kind, error);
+    }
+
     // Issue 10: close BroadcastChannel on page unload
     function _ensureSyncChannel() {
       try {
@@ -456,65 +466,39 @@
       _emit('sync:local-change', payload);
     }
 
-    function _read(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-      catch { return fallback; }
-    }
-    // Issue: add error handling to _write
-    function _write(key, value) {
-      try { localStorage.setItem(key, JSON.stringify(value)); }
-      catch (e) { console.warn('[DB] localStorage write failed:', key, e); throw e; }
-    }
+
 
     async function getProgress(topicId) {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.get('progress', topicId)) ?? null; }
-        catch (error) { _canonicalReadFailed('getProgress', error); }
-      }
-      return _read(KEY_PROGRESS, {})[topicId] ?? null;
+      const idb = _requireIdb('getProgress');
+      try { return (await idb.get('progress', topicId)) ?? null; }
+      catch (error) { _canonicalReadFailed('getProgress', error); }
     }
 
     async function getAllProgress() {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.getAll('progress')) ?? []; }
-        catch (error) { _canonicalReadFailed('getAllProgress', error); }
-      }
-      return Object.values(_read(KEY_PROGRESS, {}));
+      const idb = _requireIdb('getAllProgress');
+      try { return (await idb.getAll('progress')) ?? []; }
+      catch (error) { _canonicalReadFailed('getAllProgress', error); }
     }
 
     async function _saveProgressNow(topicId, courseId, patch = {}) {
+      const idb = _requireIdb('progress', true);
       const prev = (await getProgress(topicId)) ?? { topicId, courseId };
       const next = {
-        ...prev,
-        ...patch,
-        topicId,
+        ...prev, ...patch, topicId,
         courseId: courseId ?? prev.courseId,
         updatedAt: patch.updatedAt ?? Date.now(),
       };
-
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          await idb.put('progress', next);
-          window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
-          _broadcast('progress', 'save', next);
-          return next;
-        } catch (e) {
-          _signalSaveError('progress', 'indexedDB', e, { canonical: true });
-          throw e;
-        }
+      try {
+        await idb.put('progress', next);
+        window.OpenCourseDeck?.bus?.emit?.('progress:save', {
+          topicId, courseId: next.courseId, progress: next,
+        });
+        _broadcast('progress', 'save', next);
+        return next;
+      } catch (error) {
+        _signalSaveError('progress', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-
-      const map = _read(KEY_PROGRESS, {});
-      map[topicId] = next;
-      _write(KEY_PROGRESS, map);
-      window.OpenCourseDeck?.bus?.emit?.('progress:save', { topicId, courseId: next.courseId, progress: next });
-      // BroadcastChannel works regardless of backend — fallback writes must
-      // sync across tabs too.
-      _broadcast('progress', 'save', next);
-      return next;
     }
 
     function saveProgress(topicId, courseId, patch = {}) {
@@ -537,32 +521,22 @@
     }
 
     async function getAllTimestamps() {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.getAll('timestamps')) ?? []; }
-        catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
-      }
-      return _read(KEY_TIMESTAMPS, []);
+      const idb = _requireIdb('getAllTimestamps');
+      try { return (await idb.getAll('timestamps')) ?? []; }
+      catch (error) { _canonicalReadFailed('getAllTimestamps', error); }
     }
 
     async function saveTimestamp(ts) {
-      const next = { ...ts, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };       
-
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.put('timestamps', next); _broadcast('timestamp', 'save', next); return true; } catch (e) {
-          _signalSaveError('timestamp', 'indexedDB', e, { canonical: true });
-          throw e;
-        }
+      const next = { ...ts, id: ts?.id ?? `ts-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+      const idb = _requireIdb('timestamp', true);
+      try {
+        await idb.put('timestamps', next);
+        _broadcast('timestamp', 'save', next);
+        return true;
+      } catch (error) {
+        _signalSaveError('timestamp', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-
-      const list = _read(KEY_TIMESTAMPS, []);
-      const idx = list.findIndex(item => item?.id === next.id);
-      if (idx >= 0) list[idx] = next;
-      else list.push(next);
-      _write(KEY_TIMESTAMPS, list);
-      _broadcast('timestamp', 'save', next);
-      return true;
     }
 
     // Bookmarks edits/deletions may race another tab or restored backup.
@@ -587,106 +561,72 @@
     }
 
     async function deleteTimestamp(id) {
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.delete('timestamps', id); }
-        catch (error) {
-          _signalSaveError('timestamp-delete', 'indexedDB', error, { canonical: true });
-          throw error;
-        }
-      } else {
-        const list = _read(KEY_TIMESTAMPS, []);
-        _write(KEY_TIMESTAMPS, list.filter(ts => ts?.id !== id));
+      const idb = _requireIdb('timestamp-delete', true);
+      try { await idb.delete('timestamps', id); }
+      catch (error) {
+        _signalSaveError('timestamp-delete', 'indexedDB', error, { canonical: true });
+        throw error;
       }
       _broadcast('timestamp', 'delete', { id });
       return true;
     }
 
     async function getAllNotes() {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.getAll('notes')) ?? []; }
-        catch (error) { _canonicalReadFailed('getAllNotes', error); }
-      }
-      return _read('ocd_notes', []);
+      const idb = _requireIdb('getAllNotes');
+      try { return (await idb.getAll('notes')) ?? []; }
+      catch (error) { _canonicalReadFailed('getAllNotes', error); }
     }
 
     async function saveNote(note) {
       const id = note?.id ?? `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(note ?? {}), id, updatedAt: note?.updatedAt ?? Date.now() };
-
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.put('notes', next); _broadcast('note', 'save', next); return next; }
-        catch (e) { _signalSaveError('note', 'indexedDB', e, { canonical: true }); throw e; }
+      const idb = _requireIdb('note', true);
+      try {
+        await idb.put('notes', next);
+        _broadcast('note', 'save', next);
+        return next;
+      } catch (error) {
+        _signalSaveError('note', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-
-      // IndexedDB unavailable: mirror notes in localStorage (see notes.js primary store).
-      const list = _read('ocd_notes', []);
-      const idx = list.findIndex(n => n?.id === id);
-      if (idx >= 0) list[idx] = next;
-      else list.push(next);
-      try { _write('ocd_notes', list); } catch (e) {
-        _signalSaveError('note', 'localStorage', e, { key: 'ocd_notes' });
-        throw e;
-      }
-      _broadcast('note', 'save', next);
-      return next;
     }
 
     async function deleteNote(id) {
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.delete('notes', id); }
-        catch (error) {
-          _signalSaveError('note-delete', 'indexedDB', error, { canonical: true });
-          throw error;
-        }
-        try { localStorage.removeItem('ocd_notes'); } catch {}
-      } else {
-        const records = _read('ocd_notes', []);
-        _write('ocd_notes', records.filter(note => note?.id !== id));
+      const idb = _requireIdb('note-delete', true);
+      try { await idb.delete('notes', id); }
+      catch (error) {
+        _signalSaveError('note-delete', 'indexedDB', error, { canonical: true });
+        throw error;
       }
       _broadcast('note', 'delete', { id });
     }
 
     async function getAllFolders() {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.getAll('folders')) ?? []; } catch (error) { _canonicalReadFailed('getAllFolders', error); }
-      }
-      return _read('ocd_folders', []);
+      const idb = _requireIdb('getAllFolders');
+      try { return (await idb.getAll('folders')) ?? []; }
+      catch (error) { _canonicalReadFailed('getAllFolders', error); }
     }
 
     async function saveFolder(folder) {
       const id = folder?.id ?? `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(folder ?? {}), id, updatedAt: folder?.updatedAt ?? Date.now() };
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.put('folders', next); _broadcast('folder', 'save', next); return next; }
-        catch (e) { _signalSaveError('folder', 'indexedDB', e, { canonical: true }); throw e; }
+      const idb = _requireIdb('folder', true);
+      try {
+        await idb.put('folders', next);
+        _broadcast('folder', 'save', next);
+        return next;
+      } catch (error) {
+        _signalSaveError('folder', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-      const list = _read('ocd_folders', []);
-      const idx = list.findIndex(f => f?.id === id);
-      if (idx >= 0) list[idx] = next;
-      else list.push(next);
-      _write('ocd_folders', list);
-      _broadcast('folder', 'save', next);
-      return next;
     }
 
     async function deleteFolder(id) {
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.delete('folders', id); }
-        catch (error) {
-          _signalSaveError('folder-delete', 'indexedDB', error, { canonical: true });
-          throw error;
-        }
-        try { localStorage.removeItem('ocd_folders'); } catch {}
-      } else {
-        const records = _read('ocd_folders', []);
-        _write('ocd_folders', records.filter(folder => folder?.id !== id));
+      const idb = _requireIdb('folder-delete', true);
+      try { await idb.delete('folders', id); }
+      catch (error) {
+        _signalSaveError('folder-delete', 'indexedDB', error, { canonical: true });
+        throw error;
       }
       _broadcast('folder', 'delete', { id });
     }
@@ -709,71 +649,61 @@
     }
 
     async function getSetting(key) {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.get('settings', key))?.value ?? null; }
-        catch (error) { _canonicalReadFailed('getSetting', error); }
-      }
-      return _read(key, null);
+      const idb = _requireIdb('getSetting');
+      try { return (await idb.get('settings', key))?.value ?? null; }
+      catch (error) { _canonicalReadFailed('getSetting', error); }
     }
 
     async function saveSetting(key, value) {
-      const idb = _getIdb();
-      if (idb) {
-        try { await idb.put('settings', { key, value }); _broadcast('setting', 'save', { key, value }); return value; }
-        catch (e) { _signalSaveError('setting', 'indexedDB', e, { canonical: true }); throw e; }
+      const idb = _requireIdb('setting', true);
+      try {
+        await idb.put('settings', { key, value });
+        _broadcast('setting', 'save', { key, value });
+        return value;
+      } catch (error) {
+        _signalSaveError('setting', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-      _write(key, value);
-      return value;
     }
 
     async function getAllAnnotations() {
-      const idb = _getIdb();
-      if (idb) {
-        try { return (await idb.getAll('annotations')) ?? []; } catch (error) { _canonicalReadFailed('getAllAnnotations', error); }
-      }
-      const dict = _read('ocd_pdf_annotations_by_document', {});
-      if (Array.isArray(dict)) return dict;
-      return Object.entries(dict).flatMap(([key, list]) => (Array.isArray(list) ? list : []).map(a => ({ ...a, page: Number(a.page ?? key), docId: a.docId ?? (Number.isFinite(Number(key)) ? 'global' : key) })));
+      const idb = _requireIdb('getAllAnnotations');
+      try { return (await idb.getAll('annotations')) ?? []; }
+      catch (error) { _canonicalReadFailed('getAllAnnotations', error); }
     }
 
     async function getAnnotations(docId) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('annotations', 'docId', docId) ?? [];
-          const all = await idb.getAll('annotations') ?? [];
-          return all.filter(a => a.docId === docId);
-        } catch (error) { _canonicalReadFailed('getAnnotations', error); }
-      }
-      return (await getAllAnnotations()).filter(a => a.docId === docId);
+      const idb = _requireIdb('getAnnotations');
+      try {
+        if (typeof idb.getAllByIndex === 'function') {
+          return await idb.getAllByIndex('annotations', 'docId', docId) ?? [];
+        }
+        const all = await idb.getAll('annotations') ?? [];
+        return all.filter(annotation => annotation.docId === docId);
+      } catch (error) { _canonicalReadFailed('getAnnotations', error); }
     }
 
     async function saveAnnotations(docId, pagesObj) {
-      const idb = _getIdb();
-      const nextArr = [];
-      for (const [pageStr, anns] of Object.entries(pagesObj)) {
-        for (const ann of anns) {
-          const id = ann.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          const next = { ...ann, id, docId, page: Number(pageStr), updatedAt: ann.updatedAt ?? Date.now() };    
-          nextArr.push(next);
+      const idb = _requireIdb('annotation', true);
+      const records = [];
+      for (const [pageStr, annotations] of Object.entries(pagesObj)) {
+        for (const annotation of annotations) {
+          const id = annotation.id ?? `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          records.push({
+            ...annotation, id, docId, page: Number(pageStr),
+            updatedAt: annotation.updatedAt ?? Date.now(),
+          });
         }
       }
-
-      if (idb) {
-        try {
-          const { replaceDocumentAnnotations } = await import('./src/core/annotationPersistence.js');
-          await replaceDocumentAnnotations(idb, docId, nextArr);
-          _broadcast('annotation', 'save', { docId, annotations: nextArr });
-          return nextArr;
-        } catch (e) { _signalSaveError('annotation', 'indexedDB', e, { canonical: true }); throw e; }
+      try {
+        const { replaceDocumentAnnotations } = await import('./src/core/annotationPersistence.js');
+        await replaceDocumentAnnotations(idb, docId, records);
+        _broadcast('annotation', 'save', { docId, annotations: records });
+        return records;
+      } catch (error) {
+        _signalSaveError('annotation', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-
-      const dict = _read('ocd_pdf_annotations_by_document', {});
-      if (nextArr.length) dict[docId] = nextArr;
-      else delete dict[docId];
-      _write('ocd_pdf_annotations_by_document', dict);
-      return nextArr;
     }
 
     function _storageRemoval(storage, keys, backend) {
@@ -856,7 +786,7 @@
       if (includeNotes) stores.push('notes', 'folders');
       if (includeSettings) stores.push('settings');
       if (includeAnnotations) stores.push('annotations');
-      const localKeys = [KEY_PROGRESS, KEY_TIMESTAMPS];
+      const localKeys = [];
       if (includeNotes) localKeys.push('ocd_notes', 'ocd_folders');
       if (includeSettings) localKeys.push('ocd_notes_settings', 'ocd_user_library', 'ocd_course_media_cues', 'ocd_ai_settings', 'ocd_tag_taxonomy', 'ocd_studio_board', 'ocd_studio_konva_draft');
       if (includeAnnotations) localKeys.push('ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page');
@@ -886,13 +816,13 @@
       if (scope === 'progress') {
         return _deletionOutcome('clear-progress', scope, [
           await _clearIdbStores(idb, ['progress']),
-          _storageRemoval(localStorage, [KEY_PROGRESS], 'localStorage'),
+          _storageRemoval(localStorage, [], 'localStorage'),
         ]);
       }
       if (scope === 'media') {
         return _deletionOutcome('clear-media', scope, [
           await _clearIdbStores(idb, ['timestamps', 'annotations', 'watchedSegments', 'pdfBookmarks']),
-          _storageRemoval(localStorage, [KEY_TIMESTAMPS, 'ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page'], 'localStorage'),
+          _storageRemoval(localStorage, ['ocd_pdf_annotations_by_document', 'ocd_pdf_annotations_by_page'], 'localStorage'),
         ]);
       }
       if (scope === 'playlists') {
@@ -911,25 +841,25 @@
       throw new TypeError(`Unknown deletion scope: ${String(scope || '(empty)')}`);
     }
 
-    async function _byIndex(store, indexName, value, fallback) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex(store, indexName, value) ?? [];
-          const all = await idb.getAll(store) ?? [];
-          return all.filter(record => record?.[indexName] === value);
-        } catch (error) { _canonicalReadFailed('getByIndex', error); }
-      }
-      return fallback().filter(record => record?.[indexName] === value);
+    async function _byIndex(store, indexName, value) {
+      const idb = _requireIdb('getByIndex');
+      try {
+        if (typeof idb.getAllByIndex === 'function') {
+          return await idb.getAllByIndex(store, indexName, value) ?? [];
+        }
+        const records = await idb.getAll(store) ?? [];
+        return records.filter(record => record?.[indexName] === value);
+      } catch (error) { _canonicalReadFailed('getByIndex', error); }
     }
 
-    const getProgressByCourse = (courseId) => _byIndex('progress', 'courseId', courseId, () => Object.values(_read(KEY_PROGRESS, {})));
-    const getTimestampsByTopic = (topicId) => _byIndex('timestamps', 'topicId', topicId, () => _read(KEY_TIMESTAMPS, []));
-    const getTimestampsByCourse = (courseId) => _byIndex('timestamps', 'courseId', courseId, () => _read(KEY_TIMESTAMPS, []));
-    const getNotesByTopic = (topicId) => _byIndex('notes', 'topicId', topicId, () => _read('ocd_notes', []));
-    const getNotesByCourse = (courseId) => _byIndex('notes', 'courseId', courseId, () => _read('ocd_notes', []));
-    const getNotesByFolder = (folderId) => _byIndex('notes', 'folderId', folderId, () => _read('ocd_notes', []).map(n => ({ folderId: n.folderId ?? 'default', ...n })));
-    const getFoldersByParent = (parentId) => _byIndex('folders', 'parentId', parentId, () => _read('ocd_folders', []).map(f => ({ parentId: f.parentId ?? null, ...f })));
+    const getProgressByCourse = courseId => _byIndex('progress', 'courseId', courseId);
+    const getTimestampsByTopic = topicId => _byIndex('timestamps', 'topicId', topicId);
+    const getTimestampsByCourse = courseId => _byIndex('timestamps', 'courseId', courseId);
+    const getNotesByTopic = topicId => _byIndex('notes', 'topicId', topicId);
+    const getNotesByCourse = courseId => _byIndex('notes', 'courseId', courseId);
+    const getNotesByFolder = folderId => _byIndex('notes', 'folderId', folderId);
+    const getFoldersByParent = parentId => _byIndex('folders', 'parentId', parentId);
+
     async function getRecentNotes(limit = 10) {
       const idb = _getIdb();
       if (idb) {
@@ -941,53 +871,44 @@
     }
 
     // Issue 5: use IDBKeyRange + cursor instead of getAll() + filter
-    async function queryByRange(store, indexName, lower, upper, { lowerOpen = false, upperOpen = false, limit } = {}) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          const range = IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
-          if (typeof idb.queryIndex === 'function') return await idb.queryIndex(store, indexName, range, { limit }) ?? [];
-          const db = await idb.open();
-          const tx = db.transaction(store, 'readonly');
-          const idx = tx.objectStore(store).index(indexName);
-          return await new Promise((resolve, reject) => {
-            const out = [];
-            const req = idx.openCursor(range);
-            req.onsuccess = () => {
-              const cursor = req.result;
-              if (!cursor || (limit && out.length >= limit)) { resolve(out); return; }
-              out.push(cursor.value);
-              cursor.continue();
-            };
-            req.onerror = () => reject(req.error);
-          });
-        } catch (error) { _canonicalReadFailed('queryByRange', error); }
-      }
-      const all = store === 'progress'
-        ? Object.values(_read(KEY_PROGRESS, {}))
-        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'ocd_notes', []);
-      return all.filter(r => r && r[indexName] >= lower && r[indexName] <= upper).slice(0, limit);
+    async function queryByRange(store, indexName, lower, upper,
+      { lowerOpen = false, upperOpen = false, limit } = {}) {
+      const idb = _requireIdb('queryByRange');
+      try {
+        const range = IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
+        if (typeof idb.queryIndex === 'function') {
+          return await idb.queryIndex(store, indexName, range, { limit }) ?? [];
+        }
+        const db = await idb.open();
+        const tx = db.transaction(store, 'readonly');
+        const idx = tx.objectStore(store).index(indexName);
+        return await new Promise((resolve, reject) => {
+          const out = [];
+          const req = idx.openCursor(range);
+          req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor || (limit && out.length >= limit)) { resolve(out); return; }
+            out.push(cursor.value);
+            cursor.continue();
+          };
+          req.onerror = () => reject(req.error);
+        });
+      } catch (error) { _canonicalReadFailed('queryByRange', error); }
     }
 
     // Issue 6: use index.count() instead of loading all records
     async function countByIndex(store, indexName, value) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          const db = await idb.open();
-          const tx = db.transaction(store, 'readonly');
-          const idx = tx.objectStore(store).index(indexName);
-          return await new Promise((resolve, reject) => {
-            const req = idx.count(value);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-          });
-        } catch (error) { _canonicalReadFailed('countByIndex', error); }
-      }
-      const all = store === 'progress'
-        ? Object.values(_read(KEY_PROGRESS, {}))
-        : _read(store === 'timestamps' ? KEY_TIMESTAMPS : 'ocd_notes', []);
-      return all.filter(r => r?.[indexName] === value).length;
+      const idb = _requireIdb('countByIndex');
+      try {
+        const db = await idb.open();
+        const tx = db.transaction(store, 'readonly');
+        const idx = tx.objectStore(store).index(indexName);
+        return await new Promise((resolve, reject) => {
+          const req = idx.count(value);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      } catch (error) { _canonicalReadFailed('countByIndex', error); }
     }
 
     // Issue 8: throw on save failure, return null when IDB unavailable
@@ -1009,30 +930,26 @@
     async function addWatchedSegment(segment) {
       const id = segment?.id ?? `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = { ...(segment ?? {}), id, updatedAt: segment?.updatedAt ?? Date.now() };
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          await idb.put('watchedSegments', next);
-          _broadcast('watchedSegment', 'save', next);
-          return next;
-        } catch (e) {
-          _signalSaveError('watchedSegment', 'indexedDB', e);
-          throw e;
-        }
+      const idb = _requireIdb('watchedSegment', true);
+      try {
+        await idb.put('watchedSegments', next);
+        _broadcast('watchedSegment', 'save', next);
+        return next;
+      } catch (error) {
+        _signalSaveError('watchedSegment', 'indexedDB', error, { canonical: true });
+        throw error;
       }
-      return null;
     }
 
     async function getWatchedSegments(topicId) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('watchedSegments', 'topicId', topicId) ?? [];
-          const all = await idb.getAll('watchedSegments') ?? [];
-          return all.filter(s => s.topicId === topicId);
-        } catch (error) { _canonicalReadFailed('getWatchedSegments', error); }
-      }
-      return [];
+      const idb = _requireIdb('getWatchedSegments');
+      try {
+        if (typeof idb.getAllByIndex === 'function') {
+          return await idb.getAllByIndex('watchedSegments', 'topicId', topicId) ?? [];
+        }
+        const all = await idb.getAll('watchedSegments') ?? [];
+        return all.filter(segment => segment.topicId === topicId);
+      } catch (error) { _canonicalReadFailed('getWatchedSegments', error); }
     }
 
     async function getWatchedPercent(topicId, duration) {
@@ -1088,15 +1005,14 @@
     }
 
     async function getPdfBookmarks(docId) {
-      const idb = _getIdb();
-      if (idb) {
-        try {
-          if (typeof idb.getAllByIndex === 'function') return await idb.getAllByIndex('pdfBookmarks', 'docId', docId) ?? [];
-          const all = await idb.getAll('pdfBookmarks') ?? [];
-          return all.filter(b => b.docId === docId);
-        } catch (error) { _canonicalReadFailed('getPdfBookmarks', error); }
-      }
-      return [];
+      const idb = _requireIdb('getPdfBookmarks');
+      try {
+        if (typeof idb.getAllByIndex === 'function') {
+          return await idb.getAllByIndex('pdfBookmarks', 'docId', docId) ?? [];
+        }
+        const all = await idb.getAll('pdfBookmarks') ?? [];
+        return all.filter(bookmark => bookmark.docId === docId);
+      } catch (error) { _canonicalReadFailed('getPdfBookmarks', error); }
     }
 
     // Issue 9: only broadcast on success
@@ -1114,79 +1030,6 @@
       }
       _signalSaveError('pdfBookmark-delete', 'indexedDB', new Error('IndexedDB unavailable'));
       return false;
-    }
-
-    // Issue 1: include watchedSegments and pdfBookmarks
-    async function exportBackup({ includeProgress = true, includeTimestamps = true, includeNotes = true, includeFolders = true, includeSettings = true, includeAnnotations = true, includeWatchedSegments = true, includePdfBookmarks = true } = {}) {
-      const data = {};
-      if (includeProgress) data.progress = await getAllProgress();
-      if (includeTimestamps) data.timestamps = await getAllTimestamps();
-      if (includeNotes) data.notes = await getAllNotes();
-      if (includeFolders) data.folders = await getAllFolders();
-      if (includeSettings) {
-        const idb = _getIdb();
-        if (idb) {
-            try { data.settings = await idb.getAll('settings') ?? []; } catch { data.settings = []; }
-        } else {
-          data.settings = [];
-        }
-      }
-      if (includeAnnotations) data.annotations = await getAllAnnotations();
-      if (includeWatchedSegments) {
-        const idb = _getIdb();
-        if (idb) {
-            data.watchedSegments = await getAllWatchedSegments();
-        } else {
-          data.watchedSegments = [];
-        }
-      }
-      if (includePdfBookmarks) {
-        const idb = _getIdb();
-        if (idb) {
-            data.pdfBookmarks = await getAllPdfBookmarks();
-        } else {
-          data.pdfBookmarks = [];
-        }
-      }
-      data._meta = { exportedAt: Date.now(), version: 1 };
-      return data;
-    }
-
-    // Issue 3: explicit overwrite path
-    async function importBackup(data, { mode = 'merge' } = {}) {
-      if (!data || typeof data !== 'object') throw new Error('Invalid backup data');
-      const idb = _getIdb();
-      if (!idb) throw new Error('IndexedDB unavailable');
-
-
-      const isOverwrite = mode === 'overwrite';
-      const storeMap = {
-        progress: 'progress',
-        timestamps: 'timestamps',
-        notes: 'notes',
-        folders: 'folders',
-        settings: 'settings',
-        annotations: 'annotations',
-        watchedSegments: 'watchedSegments',
-        pdfBookmarks: 'pdfBookmarks',
-      };
-
-      for (const [key, store] of Object.entries(storeMap)) {
-        const records = data[key];
-        if (!Array.isArray(records) || !records.length) continue;
-        if (isOverwrite) {
-          try { await idb.clear(store); } catch {}
-        }
-        for (const record of records) {
-          if (!record) continue;
-          try { await idb.put(store, record); } catch (e) {
-            console.warn(`[DB] importBackup failed for store ${store}:`, e);
-          }
-        }
-      }
-
-      _emit('storage:import-complete', { mode, timestamp: Date.now() });
-      return true;
     }
 
     return {
@@ -1227,8 +1070,6 @@
       getAllPdfBookmarks,
       getPdfBookmarks,
       deletePdfBookmark,
-      exportBackup,
-      importBackup,
       clearAll,
       clearUserData,
     };
