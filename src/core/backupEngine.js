@@ -111,6 +111,10 @@ function validateBackup(input) {
           throw new TypeError(`Backup progress record at index ${index} has an invalid course-scoped key`);
         }
       }
+      if (store === 'timestamps') {
+        try { courseTopicIdentity(record.courseId, record.topicId); }
+        catch { throw new TypeError(`Backup timestamp at index ${index} has no course/topic identity`); }
+      }
     }
     included.push(store);
   }
