@@ -1,5 +1,6 @@
 import { dueReviewCards, watchedCoverageSeconds } from '../core/studyMetrics.js';
 import { ProceduralTrophy } from '../features/proceduralTrophy.js';
+import { courseTopicIdentity } from '../core/courseTopicIdentity.js';
 
 export function mountAchievementsView(deps = {}) {
   const {
@@ -99,7 +100,7 @@ export function mountAchievementsView(deps = {}) {
       listRoot.replaceChildren(notice);
       return;
     }
-    const [progress, notes, timestamps, topics, watchedSegments, cards] = loaded;
+    const [progress, , , topics, watchedSegments, cards] = loaded;
     if (!document.body.contains(listRoot)) return;
 
     const scopedProgress = progress.filter(record => record?.courseId && record?.topicId);
