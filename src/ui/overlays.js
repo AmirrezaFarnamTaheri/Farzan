@@ -96,6 +96,12 @@ export const Modal = {
         if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229) return;
         const stack = shell().state?.openModals ?? [];
         if (stack[stack.length - 1] !== modal) return;
+        // Escape belongs to this topmost modal, regardless of whether
+        // Drawer.init() ran before or after the modal installed its handler.
+        // Stop propagation to later document-level Escape owners before
+        // removing this modal from the stack.
+        e.preventDefault();
+        e.stopImmediatePropagation();
         this.close(modal);
       };
       document.addEventListener('keydown', onEsc);
