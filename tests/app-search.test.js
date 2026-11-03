@@ -540,7 +540,7 @@ describe('app topbar search rendering', () => {
         },
       ]),
     };
-    window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
+    window.DB = { getAllProgress: vi.fn(async () => []), getProgress: vi.fn().mockResolvedValue(null) };
     window.OpenCourseDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
 
     await window.OpenCourseDeck.Views.courses();
@@ -583,7 +583,7 @@ describe('app topbar search rendering', () => {
         pdfs: [],
       }))),
     };
-    window.DB = { getProgress: vi.fn().mockResolvedValue(null) };
+    window.DB = { getAllProgress: vi.fn(async () => []), getProgress: vi.fn().mockResolvedValue(null) };
     window.OpenCourseDeck.Player = { init: vi.fn(), destroyAll: vi.fn() };
 
     const controller = await window.OpenCourseDeck.Views.courses();
