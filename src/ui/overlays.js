@@ -93,7 +93,7 @@ export const Modal = {
       // registers its own document-level handler, so without this guard one
       // Escape collapsed the entire stack at once.
       const onEsc = e => {
-        if (e.key !== 'Escape') return;
+        if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229) return;
         const stack = shell().state?.openModals ?? [];
         if (stack[stack.length - 1] !== modal) return;
         this.close(modal);
@@ -447,7 +447,7 @@ export const Drawer = {
         }
       };
       this._documentKeydownHandler = e => {
-        if (e.key === 'Escape') this.closeAll();
+        if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) this.closeAll();
       };
       document.addEventListener('click', this._documentClickHandler);
       document.addEventListener('keydown', this._documentKeydownHandler);
