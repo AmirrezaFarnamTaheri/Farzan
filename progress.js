@@ -4,7 +4,7 @@
 import { createVaultZip } from './src/features/vaultZip.js';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 import { assertFlashcardBackupImportable } from './src/core/flashcardBackupSafety.js';
-import { courseTopicIdentity } from './src/core/courseTopicIdentity.js';
+import { courseTopicIdentity, parseCourseTopicIdentity } from './src/core/courseTopicIdentity.js';
 
 'use strict';
 
@@ -667,6 +667,17 @@ const ProgressStats = (() => {
         }
         const rawProgress = _asArray(payload.progress);
         const progressRecords = rawProgress.filter(_isProgressRecord);
+        if (progressRecords.length !== rawProgress.length) {
+          throw new TypeError('Portable progress records require course and topic identity');
+        }
+        const progressIdentities = new Set();
+        for (const record of progressRecords) {
+          const identity = courseTopicIdentity(record.courseId, record.topicId);
+          if (progressIdentities.has(identity)) {
+            throw new TypeError('Portable progress contains a duplicate course/topic record');
+          }
+          progressIdentities.add(identity);
+        }
         const noteRecords = _asArray(payload.notes).filter(_isObjectRecord);
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
@@ -680,6 +691,14 @@ const ProgressStats = (() => {
         if (payload.settings && Object.prototype.hasOwnProperty.call(payload.settings, 'flashcards')
             && payload.settings.flashcards != null) {
           await assertFlashcardBackupImportable(payload.settings.flashcards);
+        }
+        if (payload.settings?.mediaCues != null) {
+          const mediaCues = payload.settings.mediaCues;
+          if (!_isObjectRecord(mediaCues)
+            || Object.entries(mediaCues).some(([identity, cues]) => !parseCourseTopicIdentity(identity)
+              || !_isObjectRecord(cues))) {
+            throw new TypeError('Portable course media cues require canonical course/topic identity keys');
+          }
         }
         let importedTagTaxonomy = null;
         if (payload.settings?.tagTaxonomy != null) {
@@ -1199,7 +1218,9 @@ const ProgressStats = (() => {
   }
 
   function _isProgressRecord(value) {
-    return _isObjectRecord(value) && value.topicId != null && value.courseId != null;
+    if (!_isObjectRecord(value)) return false;
+    try { courseTopicIdentity(value.courseId, value.topicId); return true; }
+    catch { return false; }
   }
 
   function _isAnnotationRecord(value) {
