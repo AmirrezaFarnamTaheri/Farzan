@@ -23,7 +23,7 @@ describe('bridge DB safety helpers', () => {
   });
 
   it('acknowledges a successful timestamp deletion after removing its canonical record', async () => {
-    const saved = { id: 'ts-ack', topicId: 'topic-1', position: 30 };
+    const saved = { id: 'ts-ack', topicId: 'topic-1', courseId: 'course-1', position: 30 };
     await expect(window.DB.saveTimestamp(saved)).resolves.toBe(true);
     expect(await window.DB.getAllTimestamps()).toEqual(
       expect.arrayContaining([expect.objectContaining(saved)])
@@ -297,7 +297,7 @@ describe('bridge DB safety helpers', () => {
 
   it('clearAll removes app-owned stores and localStorage mirrors', async () => {
     await window.DB.saveProgress('topic-1', 'course-1', { status: 'done' });
-    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
+    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1', courseId: 'course-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
@@ -325,7 +325,7 @@ describe('bridge DB safety helpers', () => {
 
   it('clearUserData removes only the requested data scope', async () => {
     await window.DB.saveProgress('topic-1', 'course-1', { status: 'done' });
-    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1' });
+    await window.DB.saveTimestamp({ id: 'ts-1', topicId: 'topic-1', courseId: 'course-1' });
     await window.DB.saveNote({ id: 'note-1', title: 'Note' });
     await window.DB.saveFolder({ id: 'folder-1', name: 'Folder' });
     await window.DB.saveSetting('ocd_notes_settings', { view: 'list' });
