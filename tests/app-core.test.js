@@ -2656,7 +2656,9 @@ describe('app shell resilience helpers', () => {
     await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(track.chapters.some(c => c.title === 'Cardiac output')).toBe(true));
     expect(saveSetting).not.toHaveBeenCalled();
-    expect(saved['source:["course-a","topic-1"]'].chapters).toEqual(expect.arrayContaining([
+    // Unique catalog topic IDs retain their canonical topic key; ambiguous
+    // imported duplicates use a course-scoped source identity.
+    expect(saved['topic-1'].chapters).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: 'Cardiac output', time: 45, authored: true }),
     ]));
     expect(field.value).toBe('');
