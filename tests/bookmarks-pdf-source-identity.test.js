@@ -8,6 +8,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
     annotations = [];
     notes = [];
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => []),
       getAllNotes: vi.fn(async () => notes),
       getAllAnnotations: vi.fn(async () => annotations),
