@@ -131,9 +131,9 @@ describe('bridge DB safety helpers', () => {
     expect(courseA).not.toHaveProperty('id');
     expect(courseB).not.toHaveProperty('id');
     await expect(window.DB.getProgress('shared-topic', 'course-a'))
-      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', courseId: 'course-a', status: 'done', position: 120 });
+      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', status: 'done', position: 120 });
     await expect(window.DB.getProgress('shared-topic', 'course-b'))
-      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', courseId: 'course-a', status: 'in-progress', position: 42 });
+      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', status: 'in-progress', position: 42 });
     expect(await window.DB.getAllProgress()).toHaveLength(2);
     const raw = await new Promise((resolve, reject) => {
       const request = indexedDB.open('opencoursedeck');
