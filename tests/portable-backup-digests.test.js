@@ -88,6 +88,13 @@ describe('read-only portable recovery digests', () => {
     })).toThrow(/course and topic identity/i);
   });
 
+  it('rejects unscoped timestamp records in portable backups', () => {
+    expect(() => summarizePortableBackup({
+      version: '1.7',
+      timestamps: [{ id: 'ts-legacy', topicId: 'shared', position: 12 }],
+    })).toThrow(/course and topic identity/i);
+  });
+
   it('rejects malformed, duplicate-ID, future-version, and missing required snapshot sections', () => {
     expect(() => summarizePortableBackup({ ...before, version: '9.0' })).toThrow(/version/i);
     expect(() => summarizePortableBackup({ ...before, notes: undefined })).toThrow(/notes/i);
