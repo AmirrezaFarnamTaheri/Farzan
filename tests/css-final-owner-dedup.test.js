@@ -276,4 +276,23 @@ describe('final-layer shared workspace style ownership (#175)', () => {
     }
   });
 
+  it('removes 46 shadowed Home and Courses properties from the old workspace.css cascade', () => {
+    const report = inventoryCss();
+    const retired = [[".home-hero-copy","max-width"],[".home-title","max-width"],[".home-title","font-size"],[".home-title","font-weight"],[".home-title","line-height"],[".home-title","letter-spacing"],[".home-subtitle","max-width"],[".home-subtitle","line-height"],[".home-subtitle","font-size"],[".home-subtitle","color"],[".home-actions","gap"],[".home-actions","margin-top"],[".home-actions .btn","min-height"],[".home-command-strip","margin-top"],[".home-command-strip","padding-top"],[".home-command-strip","border-top"],[".home-command-strip","color"],[".home-command-strip strong","color"],[".home-focus-panel","padding"],[".home-focus-panel","border"],[".home-focus-panel","border-radius"],[".home-focus-panel","background"],[".home-focus-panel","box-shadow"],[".home-focus-status","border"],[".home-focus-status","border-radius"],[".home-focus-status","color"],[".home-focus-status","background"],[".home-focus-meta","color"],[".home-focus-action","min-height"],[".home-focus-action","background"],[".home-focus-action","border"],[".home-focus-action","color"],[".home-focus-action:hover","background"],[".home-grid","gap"],[".home-grid","margin-top"],[".home-card .card-body","padding"],[".home-card-title","font-weight"],[".home-card-title","letter-spacing"],[".home-pulse-grid","gap"],[".home-pulse-item","min-height"],[".home-pulse-item","padding"],[".home-pulse-item","border"],[".home-pulse-item","border-radius"],[".view-courses .filter-chip","border-color"],[".view-courses .filter-chip","color"],[".view-courses .filter-chip","font-weight"]];
+    const owners = (file, selector, property) => report.rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body))
+      .filter(item => item.property === property);
+    for (const [selector, property] of retired) {
+      expect(owners('workspace.css', selector, property),
+        `obsolete workspace owner: ${selector}: ${property}`).toHaveLength(0);
+      expect(owners('farzan-redesign.css', selector, property).length,
+        `final redesign owner: ${selector}: ${property}`).toBeGreaterThan(0);
+      const final = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(final?.owner.file, `authoritative owner: ${selector}: ${property}`)
+        .toBe('farzan-redesign.css');
+    }
+  });
+
 });
