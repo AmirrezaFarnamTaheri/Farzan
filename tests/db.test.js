@@ -171,20 +171,20 @@ describe('OpenCourseDB helper', () => {
     await indexedDB.deleteDatabase('ocd-test-db-write-crypto');
     const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('ocd-test-db-write-crypto', 1, [
-      { name: 'progress', key: 'topicId', autoIncrement: false, indexes: [{ field: 'courseId' }] },
+      { name: 'progress', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
     ]);
     db.setPassphrase('secret-study-key');
 
-    await db.put('progress', { topicId: 'topic-1', courseId: 'course-a', percent: 40, notes: 'private' });
-    await db.put('progress', { topicId: 'topic-2', courseId: 'course-a', percent: 80, notes: 'also private' });
-    await db.put('progress', { topicId: 'topic-3', courseId: 'course-b', percent: 10, notes: 'other' });
+    await db.put('progress', { id: JSON.stringify(['course-a', 'topic-1']), topicId: 'topic-1', courseId: 'course-a', percent: 40, notes: 'private' });
+    await db.put('progress', { id: JSON.stringify(['course-a', 'topic-2']), topicId: 'topic-2', courseId: 'course-a', percent: 80, notes: 'also private' });
+    await db.put('progress', { id: JSON.stringify(['course-b', 'topic-3']), topicId: 'topic-3', courseId: 'course-b', percent: 10, notes: 'other' });
 
     const raw = await new Promise((resolve, reject) => {
       const req = indexedDB.open('ocd-test-db-write-crypto', 1);
       req.onerror = () => reject(req.error);
       req.onsuccess = () => {
         const tx = req.result.transaction('progress', 'readonly');
-        const getReq = tx.objectStore('progress').get('topic-1');
+        const getReq = tx.objectStore('progress').get(JSON.stringify(['course-a', 'topic-1']));
         getReq.onsuccess = () => {
           const value = getReq.result;
           req.result.close();
@@ -199,7 +199,7 @@ describe('OpenCourseDB helper', () => {
     expect(raw.notes).toBeUndefined();
     expect(raw.ciphertext).toBeDefined();
 
-    await expect(db.get('progress', 'topic-1')).resolves.toEqual(expect.objectContaining({
+    await expect(db.get('progress', JSON.stringify(['course-a', 'topic-1']))).resolves.toEqual(expect.objectContaining({
       topicId: 'topic-1',
       courseId: 'course-a',
       notes: 'private',
