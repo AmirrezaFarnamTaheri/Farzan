@@ -206,6 +206,14 @@ export function planKonvaV1Board(board) {
     || board.activeLayerIdx < 0 || board.activeLayerIdx >= board.layers.length)) {
     return unsupported('invalid-active-layer');
   }
+  // An explicitly saved viewport must be a record. Treating a malformed
+  // null/array/string/number as an omitted viewport silently renders the
+  // wrong pan and zoom when importing an existing board.
+  if (Object.hasOwn(board, 'viewport')
+    && (!board.viewport || typeof board.viewport !== 'object'
+      || Array.isArray(board.viewport))) {
+    return unsupported('invalid-viewport-record');
+  }
   if (board.grid?.enabled) return unsupported('grid-renderer-not-parity-tested');
   // Do not silently coerce corrupt viewport data into a different visible
   // position or zoom. Omitted legacy fields still use the canonical defaults.
