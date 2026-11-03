@@ -163,7 +163,14 @@ async function persistLibrary(library, extra = {}) {
     throw new Error('Unable to save the user library: persistent storage is unavailable');
   }
   const next = cloneLibrary(library);
-  await window.DB.saveSetting(LIBRARY_SETTING_KEY, next);
+  const receipt = await window.DB.saveSetting(LIBRARY_SETTING_KEY, next);
+  // Canonical IndexedDB returns the exact committed value. A test adapter
+  // may return true; false, missing and unrelated responses are not evidence
+  // of a durable write. Never publish an unsaved course or a phantom source.
+  if (receipt !== true
+    && JSON.stringify(receipt) !== JSON.stringify(next)) {
+    throw new Error('User library metadata write was not acknowledged by canonical storage');
+  }
   // The canonical mutation is durable now. View refresh failures must not
   // make the caller delete blobs which this committed metadata references.
   try {
