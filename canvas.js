@@ -1056,14 +1056,10 @@
 
     _autosave() {
       this._autosaveTimer = null;
-      if (!window.DB?.saveSetting && !window.localStorage) return;
+      if (typeof window.DB?.saveSetting !== 'function') return;
       try {
         const board = this.serialize();
-        if (window.DB?.saveSetting) {
-          window.DB.saveSetting(this._autosaveKey, board).catch?.(() => {});
-        } else {
-          try { window.localStorage.setItem(this._autosaveKey, JSON.stringify(board)); } catch {}
-        }
+        window.DB.saveSetting(this._autosaveKey, board).catch?.(() => {});
       } catch {}
     },
 
@@ -1081,18 +1077,14 @@
       // An in-flight read must not replace a newer local edit or remote replay.
       this._cancelPendingAutosave();
       const epoch = this._boardEpoch;
+      if (typeof window.DB?.getSetting !== 'function') return false;
       let raw;
       try {
-        raw = window.DB?.getSetting
-          ? await window.DB.getSetting(this._autosaveKey)
-          : window.localStorage?.getItem?.(this._autosaveKey) ?? null;
+        raw = await window.DB.getSetting(this._autosaveKey);
       } catch {
         return false;
       }
       if (this._boardEpoch !== epoch || raw == null) return false;
-      if (typeof raw === 'string') {
-        try { raw = JSON.parse(raw); } catch { return false; }
-      }
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
       this.loadState(raw, { preserveViewport: true });
       return true;
@@ -1100,10 +1092,8 @@
 
     clearAutosave() {
       this._flushAutosave();
-      if (window.DB?.saveSetting) {
+      if (typeof window.DB?.saveSetting === 'function') {
         window.DB.saveSetting(this._autosaveKey, null).catch?.(() => {});
-      } else {
-        try { window.localStorage?.removeItem(this._autosaveKey); } catch {}
       }
     },
 
