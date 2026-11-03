@@ -434,6 +434,12 @@ const ProgressStats = (() => {
     const allProgress  = await DB.getAllProgress();
     const allNotes     = await DB.getAllNotes();
     const allTimestamps= await DB.getAllTimestamps();
+    if (!Array.isArray(allProgress) || allProgress.some(record => !_isProgressRecord(record))) {
+      throw new TypeError('Saved progress cannot be exported without course/topic identity');
+    }
+    if (!Array.isArray(allTimestamps) || allTimestamps.some(record => !_isTimestampRecord(record))) {
+      throw new TypeError('Saved timestamps cannot be exported without course/topic identity');
+    }
     const allFolders   = await DB.getAllFolders?.() ?? [];
     const allAnnotations = await DB.getAllAnnotations?.() ?? [];
     // A portable app-data backup must not silently omit auxiliary stores.
