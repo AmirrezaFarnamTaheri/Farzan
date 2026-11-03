@@ -2765,7 +2765,7 @@ describe('app shell resilience helpers', () => {
     document.querySelector('[data-save-transcript-cue]').click();
 
     await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenLastCalledWith('ocd_course_media_cues', expect.anything(), expect.objectContaining({
-      'topic-1': expect.objectContaining({
+      [cueKey]: expect.objectContaining({
         chapters: expect.arrayContaining([expect.objectContaining({ title: 'QRS morphology' })]),
         transcript: expect.arrayContaining([expect.objectContaining({ start: 95, text: 'Axis deviation becomes clear.', authored: true })]),
       }),
@@ -2802,7 +2802,7 @@ describe('app shell resilience helpers', () => {
     });
     document.querySelector('[data-import-learning-cues]').click();
 
-    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2]['topic-1'].chapters).toEqual(expect.arrayContaining([
+    await vi.waitFor(() => expect(compareAndSwapSetting.mock.calls.at(-1)[2][cueKey].chapters).toEqual(expect.arrayContaining([
       expect.objectContaining({ time: 140, title: 'Imported chapter' }),
     ])));
     await vi.waitFor(() => expect(activeTrack.chapters).toEqual(expect.arrayContaining([
@@ -2992,13 +2992,13 @@ describe('app shell resilience helpers', () => {
     json.value = JSON.stringify({ topicId: 'shared', chapters: [{ time: 15, title: 'Ambiguous' }] });
     apply.click();
     await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
-      .toMatch(/course identity|course ID/i));
+      .toMatch(/course identity|course ID|current course and topic/i));
     expect(compareAndSwapSetting).not.toHaveBeenCalled();
     json.value = JSON.stringify({ courseId: 'course-a', topicId: 'shared',
       chapters: [{ time: 15, title: 'Wrong course' }] });
     apply.click();
     await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
-      .toMatch(/different course/i));
+      .toMatch(/current course and topic|different course/i));
     expect(compareAndSwapSetting).not.toHaveBeenCalled();
   });
 
