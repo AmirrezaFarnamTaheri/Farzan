@@ -45,7 +45,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
     });
   });
 
-  it('reads existing IndexedDB v3 notes and course index without rewriting the schema', async () => {
+  it('reads existing IndexedDB v4 notes and course index without rewriting the schema', async () => {
     const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     await db.put('notes', { id: 'note-1', courseId: 'medicine', updatedAt: 100, content: '<p>Heart 你好</p>' });
@@ -66,7 +66,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
   });
 
   it('preserves encrypted envelopes and existing plaintext-index metadata', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     db.setPassphrase('secret');
     await db.put('notes', { id: 'note-1', courseId: 'medicine', updatedAt: 123, content: 'Confidential' });
@@ -84,7 +84,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
   });
 
   it('reads individual records, full stores and counts through Dexie without changing encrypted records', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     db.setPassphrase('sensitive-data');
     await db.put('notes', { id: 'note-1', courseId: 'medicine', updatedAt: 200, content: '<p>علاج 你好</p>' });
@@ -97,23 +97,23 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
     expect((await db.getAll('notes')).map(x => x.id).sort()).toEqual(['note-1', 'note-2']);
     expect(await db.count('notes')).toBe(2);
     expect((await inspectRaw()).value.__encrypted).toBe(true);
-    expect((await inspectRaw()).schema.version).toBe(3);
+    expect((await inspectRaw()).schema.version).toBe(4);
     db.setPassphrase(null);
     await expect(db.get('notes', 'note-1')).rejects.toThrow(/passphrase/i);
     await expect(db.getAll('notes')).rejects.toThrow(/passphrase/i);
   });
 
   it('reads an empty store and zero count without starting a schema migration', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     expect(await db.getAll('notes')).toEqual([]);
     expect(await db.get('notes', 'unknown')).toBeUndefined();
     expect(await db.count('notes')).toBe(0);
-    expect((await inspectRaw()).schema.version).toBe(3);
+    expect((await inspectRaw()).schema.version).toBe(4);
   });
 
   it('retains failure behavior for a missing index and leaves the database usable', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     await db.put('notes', { id: 'note-1', courseId: 'medicine', content: 'Saved' });
     const native = await db.open();
@@ -123,11 +123,11 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
   });
 
   it('does not open missing database names or accidentally create schemas', async () => {
-    const db = new OpenCourseDB(NAME, 3, SCHEMA);
+    const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     await expect(withExistingIndexedDBStore(null, 'notes', t => t.toArray())).rejects.toThrow(/existing/i);
     const native = await db.open();
     expect((await withExistingIndexedDBStore(native, 'progress', t => t.count()))).toBe(0);
-    expect((await inspectRaw()).schema.version).toBe(3);
+    expect((await inspectRaw()).schema.version).toBe(4);
   });
 });
