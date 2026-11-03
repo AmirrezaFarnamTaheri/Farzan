@@ -15,6 +15,7 @@ describe('saved timestamp Bookmark destination preflight (#174)', () => {
     Toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     pending = vi.fn();
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => structuredClone(saved)),
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
