@@ -60,11 +60,8 @@ describe('overlay Escape preserves active multilingual IME composition (#175)', 
     escape(field, { isComposing: true });
     expect(drawer.hidden).toBe(false);
     expect(document.getElementById('ocd-app').hasAttribute('inert')).toBe(true);
-    const processingEscape = escape(field);
-    Object.defineProperty(processingEscape, 'keyCode', { value: 229 });
-    // Construct and dispatch an explicitly 229-marked event: the already
-    // dispatched event above is just a normal Escape and must close.
-    Drawer.open(drawer);
+    // Windows IMEs can report the composition key code even when
+    // KeyboardEvent.isComposing is false. That Escape is not a dismissal.
     const composing = new KeyboardEvent('keydown', {
       key: 'Escape', bubbles: true, cancelable: true,
     });
