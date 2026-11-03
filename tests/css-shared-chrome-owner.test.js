@@ -60,16 +60,19 @@ describe('superseded chrome declarations removed from earlier layers', () => {
     return css.slice(open + 1, css.indexOf('}', open));
   };
 
-  it('keeps sidebar and topbar blur/shadow reset only in the final redesign', () => {
-    for (const selector of ['.sidebar', '.topbar']) {
-      const early = getBlock(study, selector);
-      const owner = getBlock(late, selector);
-      expect(early).not.toMatch(/(?:^|;)\s*(?:backdrop-filter|-webkit-backdrop-filter|box-shadow)\s*:/);
+  it('keeps sidebar and topbar border, blur and shadow ownership in the final redesign', () => {
+    const earlySidebar = getBlock(study, '.sidebar');
+    expect(earlySidebar).not.toMatch(/(?:^|;)\s*(?:backdrop-filter|-webkit-backdrop-filter|box-shadow|border-inline-end)\s*:/);
+    expect(study).not.toContain('.topbar {');
+
+    const sidebarOwner = getBlock(late, '.sidebar');
+    const topbarOwner = getBlock(late, '.topbar');
+    for (const owner of [sidebarOwner, topbarOwner]) {
       expect(owner).toMatch(/backdrop-filter:\s*none/);
       expect(owner).toMatch(/box-shadow:\s*none/);
     }
-    expect(getBlock(study, '.sidebar')).toMatch(/border-inline-end:/);
-    expect(getBlock(study, '.topbar')).toMatch(/border-bottom:/);
+    expect(sidebarOwner).toMatch(/border-inline-end:\s*1px solid #25445c/);
+    expect(topbarOwner).toMatch(/border-bottom:\s*1px solid var\(--fz-line\)/);
   });
 
   it('leaves navigation scroll-mask behavior but retires duplicate sizing', () => {

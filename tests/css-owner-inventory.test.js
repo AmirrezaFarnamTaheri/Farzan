@@ -51,6 +51,36 @@ describe('CSS authoritative selector ownership', () => {
       'nested.css', 'enhancements')).toHaveLength(0);
   });
 
+  it('retains one unconditional owner for shared polish properties in the final redesign layer', () => {
+    const { inventoryCss, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
+    const rules = inventoryCss().rules;
+    const retired = [
+      ['study-polish.css', '.view-container', ['scroll-padding-top']],
+      ['study-polish.css', '.sidebar', ['border-inline-end']],
+      ['study-polish.css', '.topbar', ['border-bottom']],
+      ['study-polish.css', '.nav-item.active, .nav-item[aria-current="page"]', ['background', 'color', 'font-weight']],
+      ['study-polish.css', '.home-hero-copy', ['max-width']],
+      ['study-polish.css', '.home-focus-panel > p', ['color']],
+      ['study-polish.css', '.home-focus-progress', ['background']],
+      ['study-polish.css', '.home-pulse-item', ['background']],
+      ['study-polish.css', '.home-tool-list a', ['min-height']],
+      ['enhancements.css', '.view .page-header', ['align-items', 'gap', 'margin-bottom']],
+      ['enhancements.css', '.view-courses .filter-chip', ['min-height', 'border-radius', 'background', 'font-size', 'font-weight']],
+    ];
+    const properties = (file, selector) => rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body).map(declaration => declaration.property));
+
+    for (const [source, selector, shadowedProperties] of retired) {
+      const early = properties(source, selector);
+      const owner = properties('farzan-redesign.css', selector);
+      for (const property of shadowedProperties) {
+        expect(early, `${source} still shadows ${selector}: ${property}`).not.toContain(property);
+        expect(owner, `final design must own ${selector}: ${property}`).toContain(property);
+      }
+    }
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');
