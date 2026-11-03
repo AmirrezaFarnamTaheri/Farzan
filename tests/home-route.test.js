@@ -8,8 +8,8 @@ function mountDashboard({ progress = [], notes = [], timestamps = [], flashcards
     init: vi.fn(async () => true),
     allCourses: vi.fn(() => [{ id: 'course-1' }, { id: 'course-2' }]),
     allTopics: vi.fn(() => catalogTopics ?? [
-      { topicId: 'topic-1', title: 'Design Systems' },
-      { topicId: 'topic-2', title: 'Frontend Performance' },
+      { topicId: 'topic-1', courseId: 'course-1', title: 'Design Systems' },
+      { topicId: 'topic-2', courseId: 'course-1', title: 'Frontend Performance' },
     ]),
   };
   window.DB = {
@@ -69,7 +69,7 @@ describe('home dashboard', () => {
     const previousLanguage = document.documentElement.lang;
     document.documentElement.lang = 'en-US';
     try {
-      mountDashboard({ catalogTopics: Array.from({ length: 6421 }, (_, i) => ({ topicId: `topic-${i}` })) });
+      mountDashboard({ catalogTopics: Array.from({ length: 6421 }, (_, i) => ({ topicId: `topic-${i}`, courseId: 'course-1' })) });
       await vi.waitFor(() => expect(document.getElementById('home-topic-count')?.textContent).toBe('6,421'));
       expect(document.getElementById('home-course-count')?.textContent).toBe('2');
     } finally {
