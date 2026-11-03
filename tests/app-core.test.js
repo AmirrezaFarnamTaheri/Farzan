@@ -1388,9 +1388,18 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
     window.OpenCourseDeck.Canvas = canvasApi;
+    window.OpenCourseDeck.UserLibrary = { overlay: vi.fn(async () => {}) };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: vi.fn(async () => [{ id: 'course-1', title: 'Saved course' }]),
+      allTopics: vi.fn(async () => [{ topicId: 'topic-1', courseId: 'course-1', title: 'Saved lesson' }]),
+    };
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting: vi.fn(async () => true),
+      getAllNotes: vi.fn(async () => []),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
     };
     window.open = vi.fn();
 
@@ -1401,10 +1410,14 @@ describe('app shell resilience helpers', () => {
     expect(window.open).toHaveBeenCalledWith('https://example.test/resource', '_blank', 'noopener,noreferrer');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Linked URL opened');
 
+    const studioStatus = document.querySelector('[data-studio-status]');
     document.querySelector('[data-open-studio-link="ts-link"]').click();
-    expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1');
-    expect(window.location.hash).toBe('#/courses');
-    expect(document.querySelector('[data-studio-status]').textContent).toBe('Opening linked timestamp');
+    await vi.waitFor(() => expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1'));
+    expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-1');
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/courses'));
+    // Navigation can unmount Studio immediately; check the captured status
+    // node rather than querying the new Courses DOM for a Studio element.
+    expect(studioStatus.textContent).toBe('Opening linked timestamp');
 
     controller.unmount();
   });
