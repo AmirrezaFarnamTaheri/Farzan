@@ -459,7 +459,7 @@ const ProgressStats = (() => {
 
     const payload = {
       exportedAt  : new Date().toISOString(),
-      version     : '1.6',
+      version     : '1.7',
       meta        : {
         storage: await _storageEstimate(),
         attachments: {
@@ -658,7 +658,7 @@ const ProgressStats = (() => {
         }
         // Only the current, never-yet-shipped portable export is importable.
         // Reject obsolete/unversioned payloads before prompting or writing.
-        if (payload.version !== '1.6') {
+        if (payload.version !== '1.7') {
           throw new Error('Unsupported backup version: ' + String(payload.version));
         }
         const storage = await _storageEstimate();
