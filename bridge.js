@@ -546,19 +546,33 @@
       return operation;
     }
 
-    async function deleteProgress(topicId, courseId) {
+    function deleteProgress(topicId, courseId) {
       const id = _progressRecordId(topicId, courseId);
-      const idb = _requireIdb('progress-delete', true);
-      try {
-        await idb.delete('progress', id);
-        _broadcast('progress', 'delete', {
-          topicId: String(topicId).trim(), courseId: String(courseId).trim(),
-        });
-        return true;
-      } catch (error) {
-        _signalSaveError('progress-delete', 'indexedDB', error, { canonical: true });
-        throw error;
-      }
+      const previous = _pendingProgressWrites.get(id) || Promise.resolve();
+      const operation = previous.catch(() => {}).then(() => {
+        const remove = async () => {
+          const idb = _requireIdb('progress-delete', true);
+          try {
+            await idb.delete('progress', id);
+            _broadcast('progress', 'delete', {
+              topicId: String(topicId).trim(), courseId: String(courseId).trim(),
+            });
+            return true;
+          } catch (error) {
+            _signalSaveError('progress-delete', 'indexedDB', error, { canonical: true });
+            throw error;
+          }
+        };
+        const locks = window.navigator?.locks;
+        return typeof locks?.request === 'function'
+          ? locks.request(`opencoursedeck:progress:${id}`, { mode: 'exclusive' }, remove)
+          : remove();
+      });
+      _pendingProgressWrites.set(id, operation);
+      operation.finally(() => {
+        if (_pendingProgressWrites.get(id) === operation) _pendingProgressWrites.delete(id);
+      }).catch(() => {});
+      return operation;
     }
 
     async function getAllTimestamps() {
