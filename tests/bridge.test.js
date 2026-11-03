@@ -35,8 +35,30 @@ describe('bridge DB safety helpers', () => {
     );
   });
 
+  it('stores progress independently for the same topic in different courses', async () => {
+    const courseA = await window.DB.saveProgress('shared-topic', 'course-a', {
+      status: 'done', percent: 100, position: 120,
+    });
+    const courseB = await window.DB.saveProgress('shared-topic', 'course-b', {
+      status: 'in-progress', percent: 35, position: 42,
+    });
+
+    expect(courseA.id).toBe(JSON.stringify(['course-a', 'shared-topic']));
+    expect(courseB.id).toBe(JSON.stringify(['course-b', 'shared-topic']));
+    await expect(window.DB.getProgress('shared-topic', 'course-a'))
+      .resolves.toMatchObject({ courseId: 'course-a', topicId: 'shared-topic', status: 'done', position: 120 });
+    await expect(window.DB.getProgress('shared-topic', 'course-b'))
+      .resolves.toMatchObject({ courseId: 'course-b', topicId: 'shared-topic', status: 'in-progress', position: 42 });
+    expect(await window.DB.getAllProgress()).toHaveLength(2);
+  });
+
+  it('requires course identity for every canonical progress read and write', async () => {
+    await expect(window.DB.getProgress('shared-topic')).rejects.toThrow(/course/i);
+    await expect(window.DB.saveProgress('shared-topic', '', { status: 'done' })).rejects.toThrow(/course/i);
+  });
+
   it.each([
-    ['getProgress', ['topic-stale']],
+    ['getProgress', ['topic-stale', 'course-stale']],
     ['getAllProgress', []],
     ['getAllTimestamps', []],
     ['getAllNotes', []],
@@ -89,7 +111,7 @@ describe('bridge DB safety helpers', () => {
     delete window.OpenCourseDeck.DB.OpenCourseDB;
 
     const reads = [
-      ['getProgress', ['t']], ['getAllProgress', []], ['getAllTimestamps', []],
+      ['getProgress', ['t', 'course-a']], ['getAllProgress', []], ['getAllTimestamps', []],
       ['getAllNotes', []], ['getAllFolders', []], ['getSetting', ['test']],
       ['getAllAnnotations', []], ['getProgressByCourse', ['course-a']],
       ['getTimestampsByTopic', ['t']], ['getNotesByFolder', ['default']],
