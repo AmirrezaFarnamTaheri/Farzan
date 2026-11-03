@@ -294,6 +294,37 @@ describe('home dashboard', () => {
     expect(document.querySelector('.home-empty-state').textContent).toContain('temporarily unavailable');
   });
 
+  it('retries unavailable saved activity in place without pretending the library is empty', async () => {
+    const now = Date.now();
+    const { Router, setPendingCourseMedia } = mountDashboard({
+      failNotes: true,
+      progress: [{ topicId: 'topic-1', percent: 36, position: 115,
+        status: 'in-progress', updatedAt: now }],
+      timestamps: [{ topicId: 'topic-1', position: 115, updatedAt: now }],
+    });
+    await vi.waitFor(() => expect(document.querySelector('.home-data-error')).not.toBeNull());
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('—');
+    const retry = document.querySelector('[data-home-retry]');
+    expect(retry?.tagName).toBe('BUTTON');
+    expect(retry?.textContent).toMatch(/retry/i);
+    window.DB.getAllNotes = vi.fn(async () => [
+      { id: 'restored-note', title: 'Recovered saved note', updatedAt: now },
+    ]);
+    retry.focus();
+    retry.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-home-widgets]')?.getAttribute('aria-busy')).toBe('false'));
+    await vi.waitFor(() => expect(document.querySelector('.home-data-error')).toBeNull());
+    expect(document.querySelector('[data-home-retry]')).toBeNull();
+    expect(document.querySelector('[data-pulse-active]').textContent).toBe('1');
+    expect(document.getElementById('home-focus-title').textContent).toBe('Design Systems');
+    expect(document.querySelector('[data-home-note-count]').textContent).toBe('1');
+    expect(document.activeElement).not.toBe(document.body);
+    document.querySelector('[data-home-resume]').click();
+    expect(setPendingCourseMedia).toHaveBeenCalledWith('topic-1', 115);
+    expect(Router.navigate).toHaveBeenCalledWith('#/courses');
+    expect(window.DB.saveSetting).toBeUndefined();
+  });
+
   it('shows a useful empty state for a new learner', async () => {
     mountDashboard();
 
