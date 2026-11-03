@@ -4,9 +4,10 @@ import {
   AI_SETTINGS_KEY,
   stripPortableAIAuthority,
 } from './aiAuthority.js';
+import { courseTopicIdentity } from './courseTopicIdentity.js';
 
 const DATABASE_NAME = 'opencoursedeck';
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 const MAIN_STORES = Object.freeze([
   'progress',
   'timestamps',
@@ -102,6 +103,14 @@ function validateBackup(input) {
       if (!record || typeof record !== 'object' || Array.isArray(record)) {
         throw new TypeError(`Backup store "${store}" contains an invalid record at index ${index}`);
       }
+      if (store === 'progress') {
+        let expectedId;
+        try { expectedId = courseTopicIdentity(record.courseId, record.topicId); }
+        catch { throw new TypeError(`Backup progress record at index ${index} has no course/topic identity`); }
+        if (record.id !== expectedId) {
+          throw new TypeError(`Backup progress record at index ${index} has an invalid course-scoped key`);
+        }
+      }
     }
     included.push(store);
   }
@@ -143,7 +152,7 @@ export function installBackupEngine(root = window) {
       await completion;
       result._meta = {
         format: 'opencoursedeck-snapshot',
-        version: 3,
+        version: 4,
         databaseVersion: db.version,
         exportedAt: new Date().toISOString(),
         portableAuthority: false,
