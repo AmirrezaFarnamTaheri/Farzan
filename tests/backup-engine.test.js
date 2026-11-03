@@ -74,7 +74,7 @@ describe('atomic backup engine', () => {
   it('observes completion even when a transaction finishes immediately after its last read', async () => {
     const tx = { oncomplete: null, onerror: null, onabort: null };
     const db = {
-      version: 4,
+      version: 5,
       objectStoreNames: { contains: () => true },
       close() {},
       transaction: () => tx,
