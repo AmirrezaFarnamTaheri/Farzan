@@ -182,7 +182,7 @@ describe('Playlists task-first organization', () => {
     let inaccessible = true;
     window.DB.getAllTimestamps = vi.fn(async () => {
       if (inaccessible) throw new Error('Canonical timestamp storage inaccessible');
-      return [{ id: 'ts-a', topicId: 'a', position: 42, title: 'Saved point' }];
+      return [{ id: 'ts-a', topicId: 'a', courseId: 'course-1', position: 42, title: 'Saved point' }];
     });
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-playlists-error]')).not.toBeNull());
