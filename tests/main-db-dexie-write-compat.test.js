@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { OpenCourseDB } from '../db.js';
 
-const name = 'farzan-dexie-mutation-compat-v4';
+const name = 'farzan-dexie-mutation-compat-v5';
 const schema = [
   { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'courseId' }] },
   { name: 'settings', key: 'key', autoIncrement: false },
@@ -30,7 +30,7 @@ async function raw(id) {
   });
 }
 
-describe('Dexie primary-database mutations retain native-v4 semantics', () => {
+describe('Dexie primary-database mutations retain native-v5 semantics', () => {
   afterEach(async () => {
     opened.forEach(db => { try { db.db?.close(); } catch {} });
     opened.length = 0;
