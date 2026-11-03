@@ -66,35 +66,17 @@ describe('annotation persistence', () => {
     await expect(pending).rejects.toThrow(/quota exceeded.*Close other OpenCourseDeck tabs.*retry/i);
   });
 
-  it('writes replacements before deleting stale records on compatibility adapters', async () => {
-    const order = [];
+  it('rejects non-transactional annotation adapters without reading or modifying saved records', async () => {
     const adapter = {
-      getAllByIndex: vi.fn(async () => [
-        { id: 'keep', docId: 'doc-a' },
-        { id: 'remove', docId: 'doc-a' },
-      ]),
-      put: vi.fn(async (_store, record) => order.push(`put:${record.id}`)),
-      delete: vi.fn(async (_store, id) => order.push(`delete:${id}`)),
+      getAllByIndex: vi.fn(async () => [{ id: 'saved', docId: 'doc-a' }]),
+      put: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
     };
-
-    await replaceDocumentAnnotations(adapter, 'doc-a', [
-      { id: 'keep', docId: 'doc-a' },
-      { id: 'add', docId: 'doc-a' },
-    ]);
-
-    expect(order).toEqual(['put:keep', 'put:add', 'delete:remove']);
-  });
-
-  it('propagates compatibility write failures before deleting prior data', async () => {
-    const adapter = {
-      getAllByIndex: vi.fn(async () => [{ id: 'remove', docId: 'doc-a' }]),
-      put: vi.fn(async () => { throw new Error('annotation canonical failed'); }),
-      delete: vi.fn(),
-    };
-
     await expect(replaceDocumentAnnotations(adapter, 'doc-a', [
-      { id: 'add', docId: 'doc-a' },
-    ])).rejects.toThrow('annotation canonical failed');
+      { id: 'replacement', docId: 'doc-a' },
+    ])).rejects.toThrow(/atomic.*transaction|open\(\)/i);
+    expect(adapter.getAllByIndex).not.toHaveBeenCalled();
+    expect(adapter.put).not.toHaveBeenCalled();
     expect(adapter.delete).not.toHaveBeenCalled();
   });
 

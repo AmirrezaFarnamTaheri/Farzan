@@ -437,19 +437,25 @@ describe('bridge DB safety helpers', () => {
     }));
   });
 
-  it('signals and rejects canonical IndexedDB annotation failures from the first launch', async () => {
+  it('rejects non-atomic annotation adapters without mutating saved records', async () => {
     const emit = vi.fn();
+    const getAllByIndex = vi.fn(async () => []);
+    const put = vi.fn(async () => { throw new Error('Obsolete annotation write should never run'); });
+    const del = vi.fn(async () => {});
     window.OpenCourseDeck.bus = { emit };
     window.OpenCourseDeck.DB.OpenCourseDB = class {
-      async getAllByIndex() { return []; }
-      async put() { throw new Error('annotation canonical failed'); }
-      async delete() {}
+      getAllByIndex(...args) { return getAllByIndex(...args); }
+      put(...args) { return put(...args); }
+      delete(...args) { return del(...args); }
     };
 
     await expect(window.DB.saveAnnotations('doc-mirror', {
       2: [{ id: 'ann-mirror', type: 'highlight', updatedAt: 10 }],
-    })).rejects.toThrow('annotation canonical failed');
+    })).rejects.toThrow(/atomic IndexedDB transaction/);
 
+    expect(getAllByIndex).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
     expect(localStorage.getItem('ocd_pdf_annotations_by_document')).toBeNull();
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'annotation',
