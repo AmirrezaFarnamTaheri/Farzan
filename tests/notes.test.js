@@ -1339,6 +1339,61 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.hydrateFromDB).toBeTypeOf('function');
   });
 
+  it('never loads stale pre-release localStorage note, folder or settings mirrors before canonical hydration', async () => {
+    const store = window.PlasmaNotesStore;
+    await store.hydrateFromDB({ force: true });
+    store._notes = null;
+    store._folders = null;
+    store._settings = null;
+    store._hydrated = false;
+    localStorage.setItem('ocd_notes', JSON.stringify([
+      { id: 'retired-note', title: 'Must never resurrect from browser mirror' },
+    ]));
+    localStorage.setItem('ocd_folders', JSON.stringify([
+      { id: 'retired-folder', name: 'Must never resurrect' },
+    ]));
+    localStorage.setItem('ocd_notes_settings', JSON.stringify({ mode: 'retired' }));
+    expect(store.getNotes()).toEqual([]);
+    expect(store.getFolders().map(folder => folder.id)).not.toContain('retired-folder');
+    expect(store.getSettings()).toEqual({});
+  });
+
+  it('keeps edits in memory, warns and never mirrors canonical Notes data to localStorage when bridge writers are absent', async () => {
+    const store = window.PlasmaNotesStore;
+    const before = Object.fromEntries(['ocd_notes', 'ocd_folders', 'ocd_notes_settings']
+      .map(key => [key, localStorage.getItem(key)]));
+    delete window.DB.saveNote;
+    delete window.DB.saveFolder;
+    delete window.DB.saveSetting;
+    const note = store.createNote({ title: 'Unsaved canonical draft' });
+    store.createFolder('Unsaved canonical folder');
+    const settingsReceipt = store.saveSettings({ view: 'list' });
+    await Promise.all([...store._noteWriteQueue.values()]);
+    expect(await settingsReceipt).toBe(false);
+    expect(store.getNote(note.id)?.title).toBe('Unsaved canonical draft');
+    for (const [key, value] of Object.entries(before)) {
+      expect(localStorage.getItem(key), key).toBe(value);
+    }
+    expect(window.OpenCourseDeck.beforeUnload.mark)
+      .toHaveBeenCalledWith('notes-durable-write:' + note.id);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalled();
+  });
+
+  it('rejects unavailable canonical Notes reads instead of reporting a successful empty hydration', async () => {
+    const store = window.PlasmaNotesStore;
+    await store.hydrateFromDB({ force: true });
+    store._hydrated = false;
+    const prior = store.getNotes();
+    window.DB.getAllNotes.mockRejectedValueOnce(new Error('IndexedDB notes read unavailable'));
+    await expect(store.hydrateFromDB({ force: true })).rejects.toThrow(/IndexedDB notes read unavailable/);
+    expect(store._hydrated).toBe(false);
+    expect(store.getNotes()).toEqual(prior);
+    expect(window.OpenCourseDeck.bus.emit)
+      .toHaveBeenCalledWith('storage:read-error', expect.objectContaining({
+        kind: 'notes-hydration', backend: 'indexedDB',
+      }));
+  });
+
   it('keeps localStorage as a bridge-less notes, folders, and settings fallback', () => {
     delete window.DB.saveNote;
     delete window.DB.saveFolder;
