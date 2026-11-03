@@ -1410,11 +1410,14 @@ describe('app shell resilience helpers', () => {
     expect(window.open).toHaveBeenCalledWith('https://example.test/resource', '_blank', 'noopener,noreferrer');
     expect(document.querySelector('[data-studio-status]').textContent).toBe('Linked URL opened');
 
+    const studioStatus = document.querySelector('[data-studio-status]');
     document.querySelector('[data-open-studio-link="ts-link"]').click();
     await vi.waitFor(() => expect(sessionStorage.getItem('ocd_pending_topic')).toBe('topic-1'));
     expect(sessionStorage.getItem('ocd_pending_course')).toBe('course-1');
     await vi.waitFor(() => expect(window.location.hash).toBe('#/courses'));
-    expect(document.querySelector('[data-studio-status]').textContent).toBe('Opening linked timestamp');
+    // Navigation can unmount Studio immediately; check the captured status
+    // node rather than querying the new Courses DOM for a Studio element.
+    expect(studioStatus.textContent).toBe('Opening linked timestamp');
 
     controller.unmount();
   });
