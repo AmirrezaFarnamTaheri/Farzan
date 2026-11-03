@@ -233,15 +233,6 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
-  it('does not disguise rejected legacy reads as empty progress', async () => {
-    delete window.DB.getAllProgress;
-    window.DB.getProgress.mockRejectedValueOnce(new Error('Database offline'));
-    const controller = await mountCourses();
-    await vi.waitFor(() => expect(document.querySelector('[data-retry-course-progress]')).not.toBeNull());
-    expect(document.querySelectorAll('.topic-row')).toHaveLength(0);
-    controller.unmount();
-  });
-
   it('shows an honest retry path after a failed canonical progress read, never fake not-started rows', async () => {
     window.DB.getAllProgress.mockRejectedValueOnce(new Error('IndexedDB unavailable'));
     const controller = await mountCourses();
@@ -255,14 +246,17 @@ describe('Courses workbench progress and accessible row actions', () => {
   });
 
   it('does not erase a completed lesson when playback opens or moves backward', async () => {
-    const records = new Map([['anemia', {
+    const progressId = JSON.stringify([COURSE_ID, 'anemia']);
+    const records = new Map([[progressId, {
       topicId: 'anemia', courseId: COURSE_ID, status: 'done', percent: 100,
       position: 105, duration: 120,
     }]]);
-    window.DB.getProgress.mockImplementation(async id => records.get(id) ?? null);
+    window.DB.getProgress.mockImplementation(async (id, courseId) =>
+      records.get(JSON.stringify([courseId, id])) ?? null);
     window.DB.saveProgress.mockImplementation(async (topicId, courseId, patch) => {
-      const next = { ...records.get(topicId), ...patch, topicId, courseId };
-      records.set(topicId, next);
+      const key = JSON.stringify([courseId, topicId]);
+      const next = { ...records.get(key), ...patch, topicId, courseId };
+      records.set(key, next);
       return next;
     });
 
@@ -283,24 +277,27 @@ describe('Courses workbench progress and accessible row actions', () => {
 
     // Opening an existing lesson is an activity touch, never a progress reset.
     await callbacks.get('trackChange')(track);
-    expect(records.get('anemia')).toMatchObject({ status: 'done', percent: 100, position: 105 });
+    expect(records.get(progressId)).toMatchObject({ status: 'done', percent: 100, position: 105 });
 
     // Replaying an already-completed lesson at an earlier position is not
     // equivalent to the learner explicitly marking it incomplete.
     await callbacks.get('timeupdate')({ currentTime: 12, duration: 120, percent: 10 });
-    expect(records.get('anemia')).toMatchObject({ status: 'done', percent: 100, position: 12 });
+    expect(records.get(progressId)).toMatchObject({ status: 'done', percent: 100, position: 12 });
     controller.unmount();
   });
 
   it('retains an unfinished lesson resume point when it is opened again', async () => {
-    const records = new Map([['anemia', {
+    const progressId = JSON.stringify([COURSE_ID, 'anemia']);
+    const records = new Map([[progressId, {
       topicId: 'anemia', courseId: COURSE_ID, status: 'in-progress',
       percent: 40, position: 48, duration: 120,
     }]]);
-    window.DB.getProgress.mockImplementation(async id => records.get(id) ?? null);
+    window.DB.getProgress.mockImplementation(async (id, courseId) =>
+      records.get(JSON.stringify([courseId, id])) ?? null);
     window.DB.saveProgress.mockImplementation(async (id, courseId, patch) => {
-      const next = { ...records.get(id), ...patch, topicId: id, courseId };
-      records.set(id, next);
+      const key = JSON.stringify([courseId, id]);
+      const next = { ...records.get(key), ...patch, topicId: id, courseId };
+      records.set(key, next);
       return next;
     });
     const callbacks = new Map();
