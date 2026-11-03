@@ -1217,6 +1217,12 @@ const ProgressStats = (() => {
     return !!value && typeof value === 'object' && !Array.isArray(value);
   }
 
+  function _isTimestampRecord(value) {
+    if (!_isObjectRecord(value) || value.id == null) return false;
+    try { courseTopicIdentity(value.courseId, value.topicId); return true; }
+    catch { return false; }
+  }
+
   function _isProgressRecord(value) {
     if (!_isObjectRecord(value)) return false;
     try { courseTopicIdentity(value.courseId, value.topicId); return true; }
