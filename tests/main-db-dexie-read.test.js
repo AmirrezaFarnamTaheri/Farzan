@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { OpenCourseDB } from '../db.js';
 import { withExistingIndexedDBStore } from '../src/core/mainDbDexieRead.js';
 
-const NAME = 'farzan-native-primary-v4-test';
+const NAME = 'farzan-native-primary-v5-test';
 const SCHEMA = [
   { name: 'notes', key: 'id', autoIncrement: false, indexes: [{ field: 'courseId' }, { field: 'updatedAt' }] },
   { name: 'progress', key: 'id', autoIncrement: false, indexes: [{ field: 'topicId' }, { field: 'courseId' }] },
@@ -33,7 +33,7 @@ function inspectRaw() {
   });
 }
 
-describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
+describe('Dexie read-only adapter for existing primary IndexedDB v5', () => {
   afterEach(async () => {
     for (const db of connections) { try { db.db?.close(); } catch {} }
     connections = [];
@@ -45,7 +45,7 @@ describe('Dexie read-only adapter for existing primary IndexedDB v4', () => {
     });
   });
 
-  it('reads existing IndexedDB v4 notes and course index without rewriting the schema', async () => {
+  it('reads existing IndexedDB v5 notes and course index without rewriting the schema', async () => {
     const db = new OpenCourseDB(NAME, 4, SCHEMA);
     connections.push(db);
     await db.put('notes', { id: 'note-1', courseId: 'medicine', updatedAt: 100, content: '<p>Heart 你好</p>' });
