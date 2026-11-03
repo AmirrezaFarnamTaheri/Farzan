@@ -238,4 +238,23 @@ describe('final-layer shared workspace style ownership (#175)', () => {
     }
   });
 
+  it('removes 21 obsolete global Home declarations shadowed by the final redesign', () => {
+    const report = inventoryCss();
+    const candidates = [[".home-title","margin"],[".home-title","max-width"],[".home-title","font-size"],[".home-title","line-height"],[".home-title","letter-spacing"],[".home-title","color"],[".home-subtitle","max-width"],[".home-subtitle","font-size"],[".home-subtitle","line-height"],[".home-focus-panel","align-self"],[".home-focus-panel","padding"],[".home-focus-panel","border-radius"],[".home-focus-panel","border"],[".home-focus-status","border-radius"],[".home-focus-status","border"],[".home-focus-status","background"],[".home-focus-status","color"],[".home-focus-progress","background"],[".home-focus-meta","color"],[".home-focus-action","border"],[".home-focus-action","background"]];
+    const props = (file, selector, property) => report.rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body))
+      .filter(decl => decl.property === property);
+    for (const [selector, property] of candidates) {
+      expect(props('views.css', selector, property), `obsolete owner ${selector}: ${property}`)
+        .toHaveLength(0);
+      expect(props('farzan-redesign.css', selector, property), `final owner ${selector}: ${property}`)
+        .toHaveLength(1);
+      const final = report.propertyOwnership.finalDeclarations.find(item =>
+        item.selector === selector && item.context === '' && item.property === property);
+      expect(final?.owner.file, `final cascade ${selector}: ${property}`)
+        .toBe('farzan-redesign.css');
+    }
+  });
+
 });
