@@ -479,7 +479,8 @@
 
     function _publicProgress(record) {
       if (!record || typeof record !== 'object') return record ?? null;
-      const { id: _storageId, ...progress } = record;
+      const progress = { ...record };
+      delete progress.id;
       return progress;
     }
 
@@ -527,7 +528,7 @@
       }
     }
 
-    function saveProgress(topicId, courseId, patch = {}) {
+    async function saveProgress(topicId, courseId, patch = {}) {
       const id = _progressRecordId(topicId, courseId);
       const previous = _pendingProgressWrites.get(id) || Promise.resolve();
       const operation = previous.catch(() => {}).then(() => {
@@ -546,7 +547,7 @@
       return operation;
     }
 
-    function deleteProgress(topicId, courseId) {
+    async function deleteProgress(topicId, courseId) {
       const id = _progressRecordId(topicId, courseId);
       const previous = _pendingProgressWrites.get(id) || Promise.resolve();
       const operation = previous.catch(() => {}).then(() => {

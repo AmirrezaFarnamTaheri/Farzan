@@ -243,7 +243,7 @@ describe('atomic backup engine', () => {
 
   it('treats an included empty store as an overwrite-to-empty command', async () => {
     const seed = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('opencoursedeck', 3);
+      const request = indexedDB.open('opencoursedeck', 5);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -331,7 +331,7 @@ describe('atomic backup engine', () => {
     expect(root.sessionStorage.getItem(AI_BINDING_KEY)).toContain('prior');
 
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('opencoursedeck', 3);
+      const request = indexedDB.open('opencoursedeck', 5);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

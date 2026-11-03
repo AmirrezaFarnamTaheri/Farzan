@@ -1827,6 +1827,7 @@ describe('app shell resilience helpers', () => {
   it('renders Courses AI action rows without stringifying child elements', async () => {
     await loadApp();
     window.DB = {
+      getAllProgress: vi.fn(async () => []),
       getSetting: vi.fn(async () => null),
       getProgress: vi.fn(async () => null),
       saveProgress: vi.fn(async () => true),
@@ -2613,7 +2614,7 @@ describe('app shell resilience helpers', () => {
     ['conflicting concurrent tab', true],
   ])('never substitutes a non-atomic saved-cue writer for %s', async (_name, hasCas) => {
     await loadApp();
-    const saved = { 'topic-1': { chapters: [{ time: 8, title: 'Durable chapter' }] } };
+    const saved = { [JSON.stringify(['course-a', 'topic-1'])]: { chapters: [{ time: 8, title: 'Durable chapter' }] } };
     const before = structuredClone(saved);
     const saveSetting = vi.fn(async () => true);
     const compareAndSwapSetting = vi.fn(async () => false);
@@ -3008,6 +3009,7 @@ describe('app shell resilience helpers', () => {
       'topic-1': { topicId: 'topic-1', courseId: 'course-a', status: 'not-started', percent: 0 },
     };
     window.DB = {
+      getAllProgress: vi.fn(async () => Object.values(progressByTopic)),
       getSetting: vi.fn(async () => null),
       getProgress: vi.fn(async topicId => progressByTopic[topicId] || null),
       saveProgress: vi.fn(async () => true),

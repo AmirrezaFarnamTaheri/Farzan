@@ -18,6 +18,7 @@ describe('My Courses canonical ownership without historical migrations', () => {
     window.DB = {
       getSetting: vi.fn(async key => settings[key] ?? null),
       saveSetting: vi.fn(async (key, value) => { settings[key] = value; return value; }),
+      getProgress: vi.fn(async () => null),
     };
     toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     window.OpenCourseDeck = { Toast: toast, UI: { confirm: vi.fn(async () => true) }, bus: { on: vi.fn(), emit: vi.fn() } };
