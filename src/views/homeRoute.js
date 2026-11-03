@@ -348,8 +348,30 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     const message = document.createElement('p');
     message.className = 'home-data-error';
     message.setAttribute('role', 'alert');
-    message.textContent = 'Saved activity could not be loaded. Nothing was changed. Reload to try again.';
-    widgetsRoot.append(message);
+    message.textContent = 'Saved activity could not be loaded. Nothing was changed.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn btn-ghost btn-sm';
+    retry.dataset.homeRetry = '';
+    retry.textContent = 'Retry saved activity';
+    retry.addEventListener('click', async () => {
+      if (retry.disabled || !widgetsRoot.isConnected) return;
+      const hadFocus = document.activeElement === retry;
+      retry.disabled = true;
+      retry.textContent = 'Retrying saved activity…';
+      // The canonical read remains the only source of truth. Never synthesize
+      // progress or replace saved records after a transient IndexedDB failure.
+      await renderHomeDashboard({ Router, setPendingCourseMedia });
+      if (!widgetsRoot.isConnected) return;
+      if (hadFocus) {
+        // Retry replaces the error contents. Move keyboard focus to the
+        // recovered primary action or the newly rendered retry control.
+        const target = widgetsRoot.querySelector('[data-home-retry]')
+          || document.querySelector('[data-home-resume]');
+        target?.focus({ preventScroll: true });
+      }
+    });
+    widgetsRoot.append(message, retry);
     activityRoot.replaceChildren();
     const activityMessage = document.createElement('p');
     activityMessage.className = 'home-empty-state';
@@ -360,8 +382,12 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     setText('[data-home-focus-detail]', 'Your saved activity could not be read.');
     setText('[data-home-focus-percent]', '—');
     setText('[data-home-focus-time]', '');
-    document.querySelector('[data-home-focus-action]')?.addEventListener('click', () => Router.navigate('#/courses'));
-    document.querySelector('[data-home-resume]')?.addEventListener('click', () => Router.navigate('#/courses'));
+    // Repeated failed-read retries reuse these hero buttons. Own one click
+    // handler per action instead of stacking stale error navigation listeners.
+    const focusAction = document.querySelector('[data-home-focus-action]');
+    const resumeAction = document.querySelector('[data-home-resume]');
+    if (focusAction) focusAction.onclick = () => Router.navigate('#/courses');
+    if (resumeAction) resumeAction.onclick = () => Router.navigate('#/courses');
     return;
   }
   const [progress, notes, timestamps, flashcards, topics] = collections;
@@ -514,12 +540,12 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
   const resumeAction = document.querySelector('[data-home-resume]');
   if (focusAction) {
     focusAction.querySelector('span').textContent = focusRecord ? 'Resume this topic' : 'Browse the catalog';
-    focusAction.addEventListener('click', openFocus);
+    focusAction.onclick = openFocus;
   }
   if (resumeAction) {
     resumeAction.querySelector('span').textContent = focusRecord ? 'Continue studying' : 'Browse courses';
     resumeAction.querySelector('use')?.setAttribute('href', focusRecord ? '#i-play' : '#i-curriculum');
-    resumeAction.addEventListener('click', openFocus);
+    resumeAction.onclick = openFocus;
   }
   // Avoid repeating empty counters and the same browse CTA twice on the
   // mobile first-run screen. This is presentation-only: all saved state,
