@@ -38,7 +38,8 @@ function sortedRecords(records, section) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new TypeError('Portable backup ' + section + ' has an invalid record');
     }
-    const id = record.id ?? record.topicId ?? record.key;
+    const id = record.id ?? (section === 'progress' && record.courseId && record.topicId
+      ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key);
     if (id !== undefined && id !== null) {
       const key = String(id);
       if (seen.has(key)) throw new TypeError('Portable backup ' + section + ' contains a duplicate stable ID');
@@ -47,7 +48,8 @@ function sortedRecords(records, section) {
     return record;
   });
   return normalized.sort((a, b) => {
-    const key = record => String(record.id ?? record.topicId ?? record.key ?? digest(record));
+    const key = record => String(record.id ?? (section === 'progress' && record.courseId && record.topicId
+      ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key) ?? digest(record));
     return key(a).localeCompare(key(b));
   });
 }
@@ -56,7 +58,7 @@ function summarizePortableBackup(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new TypeError('Portable backup must be a JSON object');
   }
-  if (input.version !== '1.6') throw new TypeError('Unsupported portable backup version (require 1.6)');
+  if (input.version !== '1.7') throw new TypeError('Unsupported portable backup version (require 1.7)');
   if (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings)) {
     throw new TypeError('Portable backup settings are unavailable');
   }
