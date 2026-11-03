@@ -270,7 +270,7 @@ describe('progress backup exports', () => {
   it('treats a false flashcard writer receipt as failure, preserving the old mirror and restoring the atomic snapshot', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
       progress: [], notes: [], settings: [], folders: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
@@ -301,7 +301,7 @@ describe('progress backup exports', () => {
   it('does not count a false note/progress receipt as a persisted import', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
       progress: [], notes: [], settings: [], folders: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
@@ -328,7 +328,7 @@ describe('progress backup exports', () => {
   it('does not count annotations or timestamps when their canonical writers refuse storage', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
       progress: [], notes: [], annotations: [], timestamps: [],
     }));
     window.DB.importBackup = vi.fn(async () => ({ committed: true }));
@@ -468,10 +468,10 @@ describe('progress backup exports', () => {
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
 
-  it('restores current portable media records when a v4 rollback snapshot is available', async () => {
+  it('restores current portable media records when a v5 rollback snapshot is available', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
-      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
       progress: [], notes: [], folders: [], settings: [], annotations: [],
       timestamps: [], watchedSegments: [], pdfBookmarks: [],
     }));
@@ -979,11 +979,11 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
 
-  it('prefers atomic full-primary-store rollback when the v4 backup engine is available', async () => {
+  it('prefers atomic full-primary-store rollback when the v5 backup engine is available', async () => {
     const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
     const original = {
-      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
       watchedSegments: [{ id: 'segment-that-must-survive' }],
       pdfBookmarks: [{ id: 'bookmark-that-must-survive' }],
       notes: [{ id: 'old-note' }],
