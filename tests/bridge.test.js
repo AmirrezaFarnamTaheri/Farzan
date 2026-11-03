@@ -67,7 +67,7 @@ describe('bridge DB safety helpers', () => {
     expect(raw).toBe(5);
   });
 
-  it('replaces the pre-release topic-only progress store with the v4 composite-key schema', async () => {
+  it('replaces the pre-release topic-only progress store with the v5 composite-key schema', async () => {
     const { OpenCourseDB } = window.OpenCourseDeck.DB;
     const previous = new OpenCourseDB('opencoursedeck', 3, [
       { name: 'progress', key: 'topicId', autoIncrement: false },
@@ -93,7 +93,7 @@ describe('bridge DB safety helpers', () => {
       };
     });
     expect(schema).toEqual({
-      version: 4, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
+      version: 5, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
     });
   });
 
