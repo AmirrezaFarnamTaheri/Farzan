@@ -1705,6 +1705,26 @@ describe('notes route filters', () => {
     );
   });
 
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+  ])('does not wipe an existing note when a newer imported record has %s rich-text content', async (_name, content) => {
+    const original = structuredClone(window.PlasmaNotesStore.getNote('pinned-note'));
+    window.DB.saveNote.mockClear();
+    const incoming = { id: 'pinned-note', title: 'Metadata-only revision', updatedAt: now + 10000 };
+    if (content === null) incoming.content = null;
+    window.PlasmaNotesExport.importJSON(new File([JSON.stringify([incoming])], 'metadata-only.json',
+      { type: 'application/json' }));
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
+      imported: 0, updated: 0, invalid: 1,
+    })), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('pinned-note')).toEqual(original);
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'pinned-note' }));
+    expect(window.OpenCourseDeck.lastNotesImportResult.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'pinned-note', message: expect.stringMatching(/content|html|text/i) })])
+    );
+  });
+
   it('permits an absent first-use note body as empty HTML without guessing an object encoding', async () => {
     const file = new File([JSON.stringify([{ id: 'empty-imported-note', title: 'Blank import', content: null }])],
       'blank-notes.json', { type: 'application/json' });
