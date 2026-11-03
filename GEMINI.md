@@ -3,14 +3,14 @@
 ## Project structure
 
 - JavaScript ES modules, HTML, CSS layers, and Rust for the Tauri desktop wrapper.
-- IndexedDB for main records; localStorage for preferences and compatibility data.
+- IndexedDB is the sole source for canonical records; localStorage is for preferences/noncanonical UI state, with no pre-release data mirrors.
 - The backup engine lives in `src/core/backupEngine.js`. A separate IndexedDB database holds imported video/PDF files.
 - Interface and writing conventions are in [DESIGN.md](DESIGN.md). Use source CSS layers instead of adding one-off inline styles.
 
 ## Working rules
 
 - Make storage errors visible. A failed canonical read must never be treated as an empty collection.
-- Preserve migrations, existing saved data, keyboard navigation, and all supported themes.
+- Remove obsolete pre-release migration shims and compatibility fallbacks; preserve current canonical saved data and backups, keyboard navigation, and supported themes. Unsupported imports fail without mutation.
 - Treat user-controlled HTML, media URLs, and configured AI endpoints as untrusted.
 - Do not claim full offline availability of external media or optional AI providers.
 - Do not introduce decorative status badges, unsupported product promises, or jargon in UI copy.

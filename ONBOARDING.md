@@ -43,7 +43,7 @@ npm run ci
 
 ## Working rules
 
-- Keep the local storage schema and migration paths compatible. A read error must not become an empty library.
+- Use the canonical IndexedDB record schema and v3 backup engine; delete obsolete pre-release data mirrors and migration shims. Never treat a read failure as an empty library.
 - Treat imports, deletes, resets, and backup restoration as data-changing operations; cover failure cases with tests.
 - Edit the source stylesheet layers and modules, not generated production output.
 - Keep CSS theme, accent, density, keyboard focus, and reduced-motion behavior intact.
