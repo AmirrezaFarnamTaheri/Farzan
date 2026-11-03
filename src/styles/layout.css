@@ -5,7 +5,6 @@
 }
 
 .sidebar {
-
   flex: 0 0 var(--sidebar-width);
   display: flex;
   flex-direction: column;
@@ -54,7 +53,6 @@
 }
 
 .topbar {
-
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -80,8 +78,6 @@
 }
 
 .view-container {
-
-
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -140,14 +136,7 @@
   color: var(--text-on-accent);
 }
 
-.sidebar-logo-text {
-
-  /* UI font scaling must not truncate the application identity beside
-     the fixed-width sidebar collapse control. */
-}
-
 .sidebar-collapse-btn {
-
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
