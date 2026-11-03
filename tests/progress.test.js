@@ -134,7 +134,7 @@ describe('progress backup exports', () => {
     const original = window.DB.getSetting;
     window.DB.getSetting = vi.fn(async key => {
       if (key === 'ocd_user_library') return { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } };
-      if (key === 'ocd_course_media_cues') return { 'topic-a': [{ at: 12, text: 'Recall' }] };
+      if (key === 'ocd_course_media_cues') return { [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 12, title: 'Recall' }] } };
       return original(key);
     });
     window.OpenCourseDeck.UserLibrary = {
@@ -144,7 +144,7 @@ describe('progress backup exports', () => {
     const payload = JSON.parse(await downloadedBlob.text());
     expect(payload.settings.library).toEqual({ version: 1, courses: { 'course-a': { id: 'course-a', title: 'Study course' } } });
     expect(payload.settings).not.toHaveProperty('myCourses');
-    expect(payload.settings.mediaCues).toEqual({ 'topic-a': [{ at: 12, text: 'Recall' }] });
+    expect(payload.settings.mediaCues).toEqual({ [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 12, title: 'Recall' }] } });
     expect(payload.meta.attachments).toEqual(expect.objectContaining({
       mode: 'metadata-only',
       binaryIncluded: false,
@@ -336,7 +336,7 @@ describe('progress backup exports', () => {
   it('restores canonical course library and media cues from version 1.6 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const library = { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Saved course' } } };
-    const cues = { 'topic-a': [{ at: 18, text: 'Start' }] };
+    const cues = { [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 18, title: 'Start' }] } };
     const file = new File([JSON.stringify({
       version: '1.7', settings: { library, mediaCues: cues },
       progress: [], notes: [], annotations: [], timestamps: [],
