@@ -4,6 +4,7 @@
 import { createVaultZip } from './src/features/vaultZip.js';
 import { noteHtmlToMarkdown } from './src/features/markdownExport.js';
 import { assertFlashcardBackupImportable } from './src/core/flashcardBackupSafety.js';
+import { courseTopicIdentity } from './src/core/courseTopicIdentity.js';
 
 'use strict';
 
@@ -413,7 +414,7 @@ const ProgressStats = (() => {
 
   /** Toggle a single topic's done status */
   async function toggleTopicDone(topicId, courseId) {
-    const existing = await DB.getProgress(topicId);
+    const existing = await DB.getProgress(topicId, courseId);
     const isDone   = existing?.status === 'done';
     await DB.saveProgress(topicId, courseId, {
       status   : isDone ? 'not-started' : 'done',
@@ -495,13 +496,13 @@ const ProgressStats = (() => {
   async function exportCSV() {
     const allProgress = await DB.getAllProgress();
     const allTopics   = DataStore.allTopics();
-    const topicMap    = Object.fromEntries(allTopics.map(t => [t.topicId, t]));
+    const topicMap    = new Map(allTopics.map(t => [courseTopicIdentity(t.courseId, t.topicId), t]));
 
     const rows = [
       ['courseId', 'courseTitle', 'topicId', 'topicTitle', 'status', 'percent', 'position', 'duration', 'updatedAt'],
     ];
     allProgress.forEach(p => {
-      const t = topicMap[p.topicId] || {};
+      const t = topicMap.get(courseTopicIdentity(p.courseId, p.topicId)) || {};
       rows.push([
         p.courseId,
         t.courseTitle || '',
@@ -524,11 +525,11 @@ const ProgressStats = (() => {
   async function exportNotesMarkdown() {
     const allNotes  = await DB.getAllNotes();
     const allTopics = DataStore.allTopics();
-    const topicMap  = Object.fromEntries(allTopics.map(t => [t.topicId, t]));
+    const topicMap  = new Map(allTopics.map(t => [courseTopicIdentity(t.courseId, t.topicId), t]));
 
     const lines = [`# OpenCourseDeck Notes Export\n_${new Date().toISOString()}_\n`];
     allNotes.forEach(n => {
-      const t = topicMap[n.topicId] || {};
+      const t = n.courseId && n.topicId ? topicMap.get(courseTopicIdentity(n.courseId, n.topicId)) || {} : {};
       lines.push(`\n## ${n.title || t.title || n.topicId || 'Untitled note'}`);
       lines.push(`> دوره: ${t.courseId || n.courseId || '—'}\n`);
       lines.push(noteHtmlToMarkdown(n.content ?? n.html ?? '') || n.text || '');
@@ -544,10 +545,10 @@ const ProgressStats = (() => {
     const allTimestamps = await DB.getAllTimestamps?.() ?? [];
     const allAnnotations = await DB.getAllAnnotations?.() ?? [];
     const allTopics = DataStore.allTopics();
-    const topicMap = Object.fromEntries(allTopics.map(t => [t.topicId, t]));
+    const topicMap = new Map(allTopics.map(t => [courseTopicIdentity(t.courseId, t.topicId), t]));
     const usedNames = new Map();
     const noteFiles = allNotes.map((note, index) => {
-      const topic = topicMap[note.topicId] || {};
+      const topic = note.courseId && note.topicId ? topicMap.get(courseTopicIdentity(note.courseId, note.topicId)) || {} : {};
       const slug = _vaultSlug(note.title || topic.title || note.id || `note-${index + 1}`);
       const count = (usedNames.get(slug) || 0) + 1;
       usedNames.set(slug, count);
@@ -758,7 +759,7 @@ const ProgressStats = (() => {
 
         rollbackSnapshot = await _createImportSnapshot();
         // The legacy multi-step restore does not atomically restore auxiliary
-        // media stores. Reject the import BEFORE writing anything unless a v3
+        // media stores. Reject the import BEFORE writing anything unless a v4
         // atomic rollback snapshot is available.
         const hasExtendedMedia = watchedSegmentRecords.length > 0 || pdfBookmarkRecords.length > 0;
         if (hasExtendedMedia && !rollbackSnapshot.primary) {
@@ -771,7 +772,7 @@ const ProgressStats = (() => {
         };
 
         await _forEachChunk(progressRecords, async (p) => {
-          const existing = await DB.getProgress(p.topicId);
+          const existing = await DB.getProgress(p.topicId, p.courseId);
           if (!_shouldImportRecord(existing, p)) {
             result.skipped += 1;
             return;
@@ -1295,7 +1296,7 @@ const ProgressStats = (() => {
     result.rollbackErrors = [];
     try {
       if (snapshot.primary && typeof DB.importBackup === 'function') {
-        // The v3 backup engine overwrites all primary object stores in ONE IDB
+        // The v4 backup engine overwrites all primary object stores in ONE IDB
         // transaction, preserving untouched watchedSegments/pdfBookmarks.
         const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
         if (receipt?.committed !== true || receipt.degraded === true) {
