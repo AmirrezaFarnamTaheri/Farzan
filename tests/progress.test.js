@@ -168,6 +168,17 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
   });
 
+  it('rejects unscoped timestamps in the current portable format', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      timestamps: [{ id: 'ts-legacy', topicId: 'shared', position: 12 }],
+    })], 'topic-only-timestamp.json', { type: 'application/json' });
+    await window.ProgressStats.importJSONFile(file);
+    expect(window.DB.saveTimestamp).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+  });
+
   it('rejects topic-only authored media cue keys in the current portable format', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
