@@ -1263,7 +1263,7 @@ const ProgressStats = (() => {
       ? await DB.exportBackup()
       : null;
     const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
-      && primary._meta.version === 3;
+      && primary._meta.version === 4;
     const mirrorKeys = [
       'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists',
