@@ -51,7 +51,7 @@ describe('Courses workbench progress and accessible row actions', () => {
       getAllProgress: vi.fn(async () => [
         { topicId: 'anemia', courseId: COURSE_ID, status: 'done', percent: 100 },
       ]),
-      getProgress: vi.fn(async id => id === 'anemia' ? { topicId: id, courseId: COURSE_ID, status: 'done' } : null),
+      getProgress: vi.fn(async (id, courseId) => id === 'anemia' && courseId === COURSE_ID ? { topicId: id, courseId, status: 'done' } : null),
       saveProgress: vi.fn(async () => true),
     };
   });
@@ -224,14 +224,12 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
-  it('supports older progress adapters that expose only the per-topic read API', async () => {
+  it('requires the canonical bulk progress snapshot instead of an obsolete per-topic adapter', async () => {
     delete window.DB.getAllProgress;
-    window.DB.getProgress.mockImplementation(async id => id === 'anemia'
-      ? { topicId: id, courseId: COURSE_ID, status: 'done' } : null);
     const controller = await mountCourses();
-    await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
-    expect(window.DB.getProgress).toHaveBeenCalledTimes(2);
-    expect(document.querySelector('[data-topic-id="anemia"] [data-status="done"]')).not.toBeNull();
+    await vi.waitFor(() => expect(document.querySelector('[data-retry-course-progress]')).not.toBeNull());
+    expect(window.DB.getProgress).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('.topic-row')).toHaveLength(0);
     controller.unmount();
   });
 
@@ -414,7 +412,7 @@ describe('Courses workbench progress and accessible row actions', () => {
     controller.unmount();
   });
 
-  it('does not render or overwrite another course\'s progress for duplicate topic IDs', async () => {
+  it('keeps progress independent and editable for duplicate topic IDs across courses', async () => {
     window.DataStore.allCourses = () => [
       { id: 'course-a', title: 'Heart' },
       { id: 'course-b', title: 'Kidneys' },
@@ -423,10 +421,24 @@ describe('Courses workbench progress and accessible row actions', () => {
       { ...topics[0], topicId: 'shared', courseId: 'course-a', title: 'Cardiac lesson' },
       { ...topics[0], topicId: 'shared', courseId: 'course-b', title: 'Renal lesson' },
     ];
-    window.DB.getAllProgress.mockResolvedValue([
-      { topicId: 'shared', courseId: 'course-a', status: 'done', percent: 100 },
+    const records = new Map([
+      [JSON.stringify(['course-a', 'shared']), {
+        topicId: 'shared', courseId: 'course-a', status: 'done', percent: 100,
+      }],
+      [JSON.stringify(['course-b', 'shared']), {
+        topicId: 'shared', courseId: 'course-b', status: 'in-progress', percent: 35,
+      }],
     ]);
-    const error = vi.fn();
+    window.DB.getAllProgress.mockImplementation(async () => [...records.values()]);
+    window.DB.getProgress.mockImplementation(async (topicId, courseId) =>
+      records.get(JSON.stringify([courseId, topicId])) ?? null);
+    window.DB.saveProgress.mockImplementation(async (topicId, courseId, patch) => {
+      const key = JSON.stringify([courseId, topicId]);
+      const next = { ...records.get(key), ...patch, topicId, courseId };
+      records.set(key, next);
+      return next;
+    });
+
     const controller = await mountCourses();
     const button = await vi.waitFor(() => {
       const candidate = document.querySelector('#courses-list [data-course-id="course-b"]');
@@ -442,9 +454,13 @@ describe('Courses workbench progress and accessible row actions', () => {
     });
     expect(row.querySelector('[data-status="done"]')).toBeNull();
     const completion = row.querySelector('[data-action="toggle-done"]');
-    expect(completion.disabled).toBe(true);
+    expect(completion.disabled).toBe(false);
     completion.click();
-    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(window.DB.saveProgress).toHaveBeenCalledWith(
+      'shared', 'course-b', expect.objectContaining({ status: 'done' }),
+    ));
+    expect(records.get(JSON.stringify(['course-a', 'shared'])).status).toBe('done');
+    expect(records.get(JSON.stringify(['course-b', 'shared'])).status).toBe('done');
     controller.unmount();
   });
 
