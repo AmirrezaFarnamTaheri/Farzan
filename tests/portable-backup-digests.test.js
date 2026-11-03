@@ -75,17 +75,15 @@ describe('read-only portable recovery digests', () => {
   });
 
   it('distinguishes identical topic IDs across courses and rejects unscoped progress', () => {
-    const scoped = summarizePortableBackup({
-      version: '1.7',
-      progress: [
-        { topicId: 'shared', courseId: 'course-a', percent: 100 },
-        { topicId: 'shared', courseId: 'course-b', percent: 30 },
-      ],
-    });
-    expect(scoped.counts.progress).toBe(2);
-    expect(() => summarizePortableBackup({
-      version: '1.7', progress: [{ topicId: 'shared', percent: 100 }],
-    })).toThrow(/course and topic identity/i);
+    const scoped = structuredClone(before);
+    scoped.progress = [
+      { topicId: 'shared', courseId: 'course-a', percent: 100 },
+      { topicId: 'shared', courseId: 'course-b', percent: 30 },
+    ];
+    const result = summarizePortableBackup(scoped);
+    expect(result.counts.progress).toBe(2);
+    scoped.progress = [{ topicId: 'shared', percent: 100 }];
+    expect(() => summarizePortableBackup(scoped)).toThrow(/course and topic identity/i);
   });
 
   it('rejects malformed, duplicate-ID, future-version, and missing required snapshot sections', () => {
