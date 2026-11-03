@@ -2574,6 +2574,91 @@ describe('app shell resilience helpers', () => {
     if (failure === 'read-failed') expect(saveSetting).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['missing atomic writer', false],
+    ['conflicting concurrent tab', true],
+  ])('never substitutes a non-atomic saved-cue writer for %s', async (_name, hasCas) => {
+    await loadApp();
+    const saved = { 'topic-1': { chapters: [{ time: 8, title: 'Durable chapter' }] } };
+    const before = structuredClone(saved);
+    const saveSetting = vi.fn(async () => true);
+    const compareAndSwapSetting = vi.fn(async () => false);
+    window.DB = {
+      getSetting: vi.fn(async () => structuredClone(saved)),
+      getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true),
+      saveSetting,
+      ...(hasCas ? { compareAndSwapSetting } : {}),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: () => [{ id: 'course-a', title: 'Cardiology' }],
+      allTopics: () => [{ topicId: 'topic-1', courseId: 'course-a', title: 'Lecture',
+        videos: ['https://example.test/video.mp4'] }],
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const track = {
+      topicId: 'topic-1', courseId: 'course-a', title: 'Lecture',
+      chapters: [{ time: 8, title: 'Durable chapter' }],
+    };
+    document.getElementById('course-player')._pdPlayer = {
+      snapshot: () => ({ track, queueIndex: 0, currentTime: 45, duration: 180 }),
+      queue: [track], trackIndex: 0, on: vi.fn(), off: vi.fn(),
+      showChapters: vi.fn(), showTranscript: vi.fn(),
+    };
+    const field = document.querySelector('[data-learning-marker-text]');
+    field.value = 'Draft not committed';
+    document.querySelector('[data-save-chapter-cue]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-learning-marker-status]').textContent)
+      .toMatch(/atomic|changed elsewhere|could not be saved|unavailable|not saved/i));
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(compareAndSwapSetting).toHaveBeenCalledTimes(hasCas ? 1 : 0);
+    expect(saved).toEqual(before);
+    expect(track.chapters).toEqual([{ time: 8, title: 'Durable chapter' }]);
+    expect(field.value).toBe('Draft not committed');
+  });
+
+  it('acknowledges an authored chapter only after atomic CAS and canonical readback', async () => {
+    await loadApp();
+    let saved = null;
+    const saveSetting = vi.fn(async () => true);
+    const compareAndSwapSetting = vi.fn(async (key, expected, next) => {
+      expect(key).toBe('ocd_course_media_cues');
+      expect(expected).toBeNull();
+      saved = structuredClone(next);
+      return true;
+    });
+    window.DB = {
+      getSetting: vi.fn(async () => structuredClone(saved)),
+      getProgress: vi.fn(async () => null),
+      saveProgress: vi.fn(async () => true),
+      saveSetting, compareAndSwapSetting,
+    };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: () => [{ id: 'course-a', title: 'Cardiology' }],
+      allTopics: () => [{ topicId: 'topic-1', courseId: 'course-a', title: 'Lecture',
+        videos: ['https://example.test/video.mp4'] }],
+    };
+    await window.OpenCourseDeck.Views.courses();
+    const track = { topicId: 'topic-1', courseId: 'course-a', title: 'Lecture', chapters: [] };
+    document.getElementById('course-player')._pdPlayer = {
+      snapshot: () => ({ track, queueIndex: 0, currentTime: 45, duration: 180 }),
+      queue: [track], trackIndex: 0, on: vi.fn(), off: vi.fn(),
+      showChapters: vi.fn(), showTranscript: vi.fn(),
+    };
+    const field = document.querySelector('[data-learning-marker-text]');
+    field.value = 'Cardiac output';
+    document.querySelector('[data-save-chapter-cue]').click();
+    await vi.waitFor(() => expect(compareAndSwapSetting).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(track.chapters.some(c => c.title === 'Cardiac output')).toBe(true));
+    expect(saveSetting).not.toHaveBeenCalled();
+    expect(saved['source:["course-a","topic-1"]'].chapters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'Cardiac output', time: 45, authored: true }),
+    ]));
+    expect(field.value).toBe('');
+  });
+
   it('authors chapter and transcript cues from the course player', async () => {
     await loadApp();
     const saveSetting = vi.fn(async () => true);
