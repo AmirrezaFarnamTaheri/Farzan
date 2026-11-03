@@ -110,9 +110,7 @@ async function renderTags() {
     (async () => {
       const db = window.DB;
       if (typeof db?.getSetting !== 'function') {
-        // Legacy read-only integrations can still browse existing labels;
-        // only genuine canonical store support enables new mutations.
-        return { writable: false, taxonomy: parseTagTaxonomy(null) };
+        throw new Error('Canonical tag taxonomy reader unavailable');
       }
       const saved = await db.getSetting(TAG_TAXONOMY_KEY);
       return { writable: typeof db.compareAndSwapSetting === 'function', taxonomy: parseTagTaxonomy(saved) };

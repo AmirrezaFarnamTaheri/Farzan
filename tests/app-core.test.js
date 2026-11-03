@@ -439,6 +439,7 @@ describe('app shell resilience helpers', () => {
         { id: 'note-1', title: 'Rhythm note', tags: ['ECG', 'arrhythmia'] },
         { id: 'note-2', title: 'Cardio note', tags: ['cardiology', 'ecg'] },
       ]),
+      getSetting: vi.fn(async () => null),
     };
     window.DataStore = {
       init: vi.fn(async () => {}),

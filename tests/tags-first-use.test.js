@@ -11,7 +11,10 @@ describe('Tags first-use, populated, and read-failure states', () => {
     window.OpenCourseDeck = window.OpenCourseDeck || {};
     delete window.OpenCourseDeck.tagFacetState;
     delete window.OpenCourseDeck.rerenderVisibleTags;
-    window.DB = { getAllNotes: vi.fn(async () => []) };
+    window.DB = {
+      getAllNotes: vi.fn(async () => []),
+      getSetting: vi.fn(async () => null),
+    };
     window.DataStore = {
       init: vi.fn(async () => {}),
       allTopics: vi.fn(async () => []),
