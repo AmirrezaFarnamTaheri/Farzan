@@ -25,8 +25,9 @@ describe('pre-release storage and AI ownership', () => {
     for (const live of ['ocd_playlists', 'ocd_studio_board', 'ocd_pdf_annotations_by_page']) {
       expect(source).toContain(live);
     }
-    expect(source).toContain("'ocd_progress_fallback_v1'");
-    expect(source).toContain("'ocd_timestamps_fallback_v1'");
+    expect(source).not.toContain("'ocd_progress_fallback_v1'");
+    expect(source).not.toContain("'ocd_timestamps_fallback_v1'");
+    expect(source).not.toContain('localStorage fallback');
     expect(fs.readFileSync('src/features/aiClient.js', 'utf8'))
       .toContain("'ocd_ai_api_key_session'");
   });

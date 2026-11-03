@@ -75,6 +75,51 @@ describe('bridge DB safety helpers', () => {
     await expect(window.DB.getAllPdfBookmarks()).rejects.toThrow(/Canonical PDF bookmark/);
   });
 
+  it('rejects every canonical record mutation when IndexedDB is absent rather than restoring a localStorage snapshot', async () => {
+    const snapshots = {
+      ocd_progress_fallback_v1: JSON.stringify({ t: { topicId: 't', percent: 1 } }),
+      ocd_timestamps_fallback_v1: JSON.stringify([{ id: 'legacy-ts', topicId: 't' }]),
+      ocd_notes: JSON.stringify([{ id: 'legacy-note', title: 'Older' }]),
+      ocd_folders: JSON.stringify([{ id: 'legacy-folder' }]),
+      ocd_pdf_annotations_by_document: JSON.stringify({ doc: [{ id: 'legacy-ann' }] }),
+    };
+    for (const [key, value] of Object.entries(snapshots)) localStorage.setItem(key, value);
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    delete window.OpenCourseDeck.DB.OpenCourseDB;
+
+    const reads = [
+      ['getProgress', ['t']], ['getAllProgress', []], ['getAllTimestamps', []],
+      ['getAllNotes', []], ['getAllFolders', []], ['getSetting', ['test']],
+      ['getAllAnnotations', []], ['getProgressByCourse', ['course-a']],
+      ['getTimestampsByTopic', ['t']], ['getNotesByFolder', ['default']],
+      ['queryByRange', ['progress', 'updatedAt', 0, 100]],
+      ['countByIndex', ['progress', 'courseId', 'course-a']],
+      ['getWatchedSegments', ['t']], ['getPdfBookmarks', ['doc']],
+      ['getWatchedPercent', ['t', 120]],
+    ];
+    for (const [method, args] of reads) {
+      await expect(window.DB[method](...args), method).rejects.toThrow(/IndexedDB|canonical|unavailable/i);
+    }
+    const writes = [
+      ['saveProgress', ['t', 'course-a', { percent: 99 }]],
+      ['saveTimestamp', [{ id: 'legacy-ts', topicId: 't', position: 99 }]],
+      ['saveNote', [{ id: 'legacy-note', title: 'Unsafe overwrite' }]],
+      ['saveFolder', [{ id: 'legacy-folder', name: 'Unsafe overwrite' }]],
+      ['saveSetting', ['test', true]],
+      ['saveAnnotations', ['doc', { 1: [{ id: 'legacy-ann', text: 'Unsafe' }] }]],
+      ['addWatchedSegment', [{ id: 'ws-unsaved', topicId: 't', start: 0, end: 10 }]],
+    ];
+    for (const [method, args] of writes) {
+      await expect(window.DB[method](...args), method).rejects.toThrow(/IndexedDB|canonical|unavailable/i);
+    }
+    for (const [key, value] of Object.entries(snapshots)) {
+      expect(localStorage.getItem(key)).toBe(value);
+    }
+    expect(localStorage.getItem('test')).toBeNull();
+    expect(emit).not.toHaveBeenCalledWith('storage:fallback', expect.anything());
+  });
+
   it('never resurrects unpublished local Notes when canonical IndexedDB is available', async () => {
     localStorage.setItem('ocd_notes', JSON.stringify([
       { id: 'n1', title: 'Local older', updatedAt: 10 },
@@ -351,27 +396,6 @@ describe('bridge DB safety helpers', () => {
     expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
       kind: 'timestamp',
       backend: 'indexedDB',
-      error: expect.objectContaining({ quota: true }),
-    }));
-  });
-
-  it('signals and rejects when note localStorage write fails', async () => {
-    const emit = vi.fn();
-    const quotaError = Object.assign(new Error('localStorage quota exceeded'), { name: 'QuotaExceededError' });
-    const originalSetItem = Storage.prototype.setItem;
-    window.OpenCourseDeck.bus = { emit };
-    window.OpenCourseDeck.DB.OpenCourseDB = null;
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
-      if (key === 'ocd_notes') throw quotaError;
-      return originalSetItem.call(this, key, value);
-    });
-
-    await expect(window.DB.saveNote({ id: 'note-quota', title: 'Cannot save' })).rejects.toThrow('localStorage quota exceeded');
-
-    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
-      kind: 'note',
-      backend: 'localStorage',
-      key: 'ocd_notes',
       error: expect.objectContaining({ quota: true }),
     }));
   });
@@ -740,98 +764,26 @@ describe('bridge DB safety helpers', () => {
     ]));
   });
 
-  it('falls back to localStorage for indexed helpers when IndexedDB is unavailable', async () => {
-    window.OpenCourseDeck.DB.OpenCourseDB = null;
-    localStorage.setItem('ocd_progress_fallback_v1', JSON.stringify({
-      'topic-a': { topicId: 'topic-a', courseId: 'course-a' },
-      'topic-b': { topicId: 'topic-b', courseId: 'course-b' },
+  it('never acknowledges note or folder deletion without canonical IndexedDB', async () => {
+    const localNoteSnapshot = JSON.stringify([
+      { id: 'keep-me', title: 'Unrelated' }, { id: 'drop-me', title: 'Do not delete' },
+    ]);
+    const localFolderSnapshot = JSON.stringify([{ id: 'folder-old' }]);
+    localStorage.setItem('ocd_notes', localNoteSnapshot);
+    localStorage.setItem('ocd_folders', localFolderSnapshot);
+    const emit = vi.fn();
+    window.OpenCourseDeck.bus = { emit };
+    delete window.OpenCourseDeck.DB.OpenCourseDB;
+
+    await expect(window.DB.deleteNote('drop-me')).rejects.toThrow(/canonical|IndexedDB|unavailable/i);
+    await expect(window.DB.deleteFolder('folder-old')).rejects.toThrow(/canonical|IndexedDB|unavailable/i);
+    await expect(window.DB.deleteTimestamp('ts-old')).rejects.toThrow(/canonical|IndexedDB|unavailable/i);
+    expect(localStorage.getItem('ocd_notes')).toBe(localNoteSnapshot);
+    expect(localStorage.getItem('ocd_folders')).toBe(localFolderSnapshot);
+    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
+      backend: 'indexedDB', canonical: true, kind: 'note-delete',
     }));
-    localStorage.setItem('ocd_timestamps_fallback_v1', JSON.stringify([
-      { id: 'ts-a', topicId: 'topic-a', courseId: 'course-a' },
-      { id: 'ts-b', topicId: 'topic-b', courseId: 'course-b' },
-    ]));
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'n1', topicId: 'topic-a', courseId: 'course-a', updatedAt: 10 },
-      { id: 'n2', topicId: 'topic-b', courseId: 'course-a', folderId: 'folder-a', updatedAt: 30 },
-      { id: 'n3', topicId: 'topic-c', courseId: 'course-c', folderId: 'folder-a', updatedAt: 20 },
-    ]));
-    localStorage.setItem('ocd_folders', JSON.stringify([
-      { id: 'folder-a', parentId: 'root' },
-      { id: 'folder-b' },
-    ]));
-
-    await expect(window.DB.getProgressByCourse('course-a')).resolves.toEqual([
-      expect.objectContaining({ topicId: 'topic-a' }),
-    ]);
-    await expect(window.DB.getTimestampsByTopic('topic-b')).resolves.toEqual([
-      expect.objectContaining({ id: 'ts-b' }),
-    ]);
-    await expect(window.DB.getNotesByCourse('course-a')).resolves.toEqual([
-      expect.objectContaining({ id: 'n1' }),
-      expect.objectContaining({ id: 'n2' }),
-    ]);
-    await expect(window.DB.getNotesByFolder('default')).resolves.toEqual([
-      expect.objectContaining({ id: 'n1' }),
-    ]);
-    await expect(window.DB.getNotesByFolder('folder-a')).resolves.toEqual([
-      expect.objectContaining({ id: 'n2' }),
-      expect.objectContaining({ id: 'n3' }),
-    ]);
-    await expect(window.DB.getRecentNotes(2)).resolves.toEqual([
-      expect.objectContaining({ id: 'n2' }),
-      expect.objectContaining({ id: 'n3' }),
-    ]);
-    await expect(window.DB.getFoldersByParent(null)).resolves.toEqual([
-      expect.objectContaining({ id: 'folder-b' }),
-    ]);
-  });
-  it('keeps the localStorage note mirror intact when the IndexedDB delete cannot run', async () => {
-    // LocalStorage mode must delete only the selected record, not the whole deck.
-    localStorage.setItem('ocd_notes', JSON.stringify([
-      { id: 'keep-me', title: 'Survivor' },
-      { id: 'drop-me', title: 'Doomed' },
-    ]));
-    window.OpenCourseDeck.DB.OpenCourseDB = undefined;
-
-    await window.DB.deleteNote('drop-me');
-
-    const remaining = JSON.parse(localStorage.getItem('ocd_notes'));
-    expect(remaining).toEqual([expect.objectContaining({ id: 'keep-me' })]);
-  });
-
-  it('broadcasts localStorage-fallback writes so cross-tab sync works without IndexedDB', async () => {
-    const channels = [];
-    class BroadcastChannelMock {
-      constructor(name) {
-        this.name = name;
-        this.postMessage = vi.fn();
-        this.close = vi.fn();
-        channels.push(this);
-      }
-    }
-    window.BroadcastChannel = BroadcastChannelMock;
-    window.OpenCourseDeck.DB.OpenCourseDB = undefined;
-
-    await window.DB.saveNote({ id: 'fallback-note', title: 'No IDB' });
-
-    expect(channels.length).toBeGreaterThanOrEqual(1);
-    const posted = channels.flatMap((ch) => ch.postMessage.mock.calls.map(([msg]) => msg));
-    expect(posted).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'note', action: 'save' }),
-    ]));
-  });
-  it('never revives unshipped progress/timestamp aliases when IndexedDB is unavailable', async () => {
-    window.OpenCourseDeck.DB.OpenCourseDB = null;
-    localStorage.setItem('plasma_progress_v1', JSON.stringify({ old: { topicId: 'old' } }));
-    localStorage.setItem('plasma_timestamps_v1', JSON.stringify([{ id: 'ts-old', topicId: 'old' }]));
-    expect(await window.DB.getAllProgress()).toEqual([]);
-    expect(await window.DB.getAllTimestamps()).toEqual([]);
-    await window.DB.saveProgress('now', 'course', { status: 'done' });
-    await window.DB.saveTimestamp({ id: 'ts-now', topicId: 'now' });
-    expect(JSON.parse(localStorage.getItem('ocd_progress_fallback_v1')).now.topicId).toBe('now');
-    expect(JSON.parse(localStorage.getItem('ocd_timestamps_fallback_v1'))).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: 'ts-now' })])
-    );
+    expect(emit).not.toHaveBeenCalledWith('note:delete', expect.anything());
   });
 
   it('never resolves a canonical setting from an obsolete alias', async () => {
