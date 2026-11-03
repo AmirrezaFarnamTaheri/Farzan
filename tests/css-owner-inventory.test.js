@@ -105,6 +105,34 @@ describe('CSS authoritative selector ownership', () => {
     }
   });
 
+  it('retires shadowed base-layout paint only after the final redesign owns each property', () => {
+    const { inventoryCss, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
+    const rules = inventoryCss().rules;
+    // Same exact selector and no at-rule context; later enhancements layer
+    // always wins. Do not remove responsive or RTL/forced-color owners.
+    const retired = [
+      ['.view-container', ['padding']],
+      ['.sidebar', ['padding', 'gap', '-webkit-backdrop-filter']],
+      ['.topbar', ['flex', 'padding', 'border-bottom', 'background', 'backdrop-filter']],
+      ['.sidebar-logo', ['gap', 'padding', 'border', 'border-radius']],
+      ['.sidebar-logo-icon', ['width', 'height', 'border-radius', 'background']],
+      ['.sidebar-logo-text', ['font-size', 'overflow', 'text-overflow', 'font-weight', 'letter-spacing', 'white-space']],
+      ['.sidebar-collapse-btn', ['border', 'background', 'color']],
+      ['.sidebar-search-wrap', ['background', 'border', 'border-radius']],
+    ];
+    const declarations = (file, selector) => rules
+      .filter(rule => rule.file === file && rule.selector === selector && rule.context === '')
+      .flatMap(rule => parseDeclarations(rule.body).map(d => d.property));
+    for (const [selector, props] of retired) {
+      const legacy = declarations('layout.css', selector);
+      const authoritative = declarations('farzan-redesign.css', selector);
+      for (const property of props) {
+        expect(legacy, `Old layout still owns ${selector}:${property}`).not.toContain(property);
+        expect(authoritative, `Redesign must own ${selector}:${property}`).toContain(property);
+      }
+    }
+  });
+
   it('has a reproducible stylesheet/at-rule inventory across all 22 imported stylesheets', () => {
     const { inventoryCss, parseRules } = require('../scripts/css-owner-inventory.cjs');
     const conditional = parseRules('@media (max-width: 640px) { .example { width: 100%; } } .example { width: 50%; }', 'fixture.css', 'enhancements');

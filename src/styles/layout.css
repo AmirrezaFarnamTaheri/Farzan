@@ -5,14 +5,10 @@
 }
 
 .sidebar {
-
   flex: 0 0 var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  padding: var(--space-5);
-  gap: var(--space-4);
   border-right: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   z-index: 70;
   transition: transform var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
@@ -57,16 +53,10 @@
 }
 
 .topbar {
-
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: env(safe-area-inset-top) max(var(--density-pad-x), env(safe-area-inset-right)) 0 max(var(--density-pad-x), env(safe-area-inset-left));
-  border-bottom: 1px solid var(--glass-border);
-  background: linear-gradient(180deg, var(--glass-bg-strong) 0%, color-mix(in srgb, var(--glass-bg) 76%, var(--bg)) 100%);
-  backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   z-index: 50;
 }
@@ -88,11 +78,8 @@
 }
 
 .view-container {
-
-
   overflow: auto;
   overscroll-behavior: contain;
-  padding: var(--space-6) var(--density-pad-x) max(var(--space-8), env(safe-area-inset-bottom));
 }
 
 .view {
@@ -139,47 +126,21 @@
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
   position: relative;
 }
 
 .sidebar-logo-icon {
-  width: 36px;
-  height: 36px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 12px;
   color: var(--text-on-accent);
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), transparent 55%),
-    linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 35%, #06b6d4) 100%);
-}
-
-.sidebar-logo-text {
-
-  /* UI font scaling must not truncate the application identity beside
-     the fixed-width sidebar collapse control. */
-  font-size: min(0.95rem, 15px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 800;
-  letter-spacing: var(--tracking-tight);
-  white-space: nowrap;
 }
 
 .sidebar-collapse-btn {
-
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
   border-radius: 12px;
-  color: var(--text-secondary);
-  border: 1px solid transparent;
-  background: color-mix(in srgb, var(--surface-3) 40%, transparent);
   transition: transform var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
 
@@ -197,9 +158,6 @@
   gap: var(--space-3);
   min-height: 46px;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 65%, transparent);
   backdrop-filter: blur(calc(var(--glass-blur) - 6px));
   -webkit-backdrop-filter: blur(calc(var(--glass-blur) - 6px));
 }
