@@ -19,7 +19,11 @@
 /* Structural navigation should remain clearly separated while scrolling.
  * A solid surface also works on platforms lacking backdrop-filter. */
 .sidebar {
+  border-inline-end: 1px solid var(--border);
   border-right: none;
+}
+.topbar {
+  border-bottom: 1px solid var(--border);
 }
 .sidebar-logo {
   border-color: var(--border);
