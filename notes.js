@@ -1895,7 +1895,13 @@ import { countWords } from './src/core/textMetrics.js';
       if (!id) return { ok: false, error: { id: null, message: 'Note id is empty.' } };
       const createdAt = Number(raw.createdAt);
       const updatedAt = Number(raw.updatedAt);
-      const content = typeof raw.content === 'string' ? raw.content : String(raw.content ?? '');
+      // Notes are HTML-canonical. A JSON object, fragment array or number is
+      // not an alternate encoding: string coercion can overwrite a newer
+      // saved note with "[object Object]" before Squire can reject it.
+      if (raw.content != null && typeof raw.content !== 'string') {
+        return { ok: false, error: { id, message: 'Note content must be HTML text.' } };
+      }
+      const content = raw.content ?? '';
       const tags = Array.isArray(raw.tags)
         ? raw.tags
             .filter(tag => tag !== null && tag !== undefined)
