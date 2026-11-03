@@ -241,7 +241,7 @@ export function mountSettingsView(deps = {}) {
                 <div>
                   <span class="eyebrow">Storage</span>
                   <h2 id="settings-storage-title">Storage</h2>
-                  <p>Review browser quota, local fallback usage, and recent persistence warnings.</p>
+                  <p>Review canonical storage usage and recent persistence warnings.</p>
                 </div>
                 <span class="badge badge-info" data-storage-status>Checking</span>
               </div>
@@ -255,9 +255,12 @@ export function mountSettingsView(deps = {}) {
                   <span id="storage-bar" data-storage-bar></span>
                 </div>
               </div>
-              <dl class="help-facts settings-facts" data-storage-health>
-                <div><dt>Status</dt><dd>Loading…</dd></div>
-              </dl>
+              <details class="settings-storage-details" data-storage-diagnostics>
+                <summary class="btn btn-ghost">Advanced storage diagnostics</summary>
+                <dl class="help-facts settings-facts" data-storage-health>
+                  <div><dt>Status</dt><dd>Loading…</dd></div>
+                </dl>
+              </details>
             </div>
           </section>
 
