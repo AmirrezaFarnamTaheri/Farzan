@@ -128,6 +128,8 @@ describe('notes route filters', () => {
     `;
 
     await import('../notes.js');
+    if (!window.PlasmaNotesApp._inited) document.dispatchEvent(new Event('DOMContentLoaded'));
+    await window.PlasmaNotesApp._initialHydration;
   });
 
   afterEach(() => {
@@ -135,6 +137,31 @@ describe('notes route filters', () => {
     vi.useRealTimers();
     localStorage.clear();
     sessionStorage.removeItem('ocd_note_external_images_session');
+  });
+
+  it('accepts the canonical folder delete bridge void success without leaking an unsaved-work warning', async () => {
+    const store = window.PlasmaNotesStore;
+    const folder = store.createFolder('A canonical folder to delete');
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    window.OpenCourseDeck.beforeUnload.unmark.mockClear();
+    window.OpenCourseDeck.Toast.error.mockClear();
+    window.DB.deleteFolder.mockResolvedValueOnce(undefined);
+    store.deleteFolder(folder.id);
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(window.DB.deleteFolder).toHaveBeenCalledWith(folder.id);
+    expect(window.OpenCourseDeck.beforeUnload.unmark)
+      .toHaveBeenCalledWith('notes-durable-folder:' + folder.id);
+    expect(window.OpenCourseDeck.Toast.error).not.toHaveBeenCalled();
+  });
+
+  it('does not save or restamp a saved note just by completing first canonical hydration', () => {
+    // A previously loaded record must be opened exactly once. Reopening
+    // through openNote() immediately after _renderAfterCanonicalRefresh()
+    // incorrectly invokes Editor.save(true) before the user has edited it,
+    // making an older local copy look newer than a genuine remote revision.
+    expect(window.PlasmaNotesStore.getNote('pinned-note')).not.toBeNull();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesStore.getNote('pinned-note').updatedAt).toBe(now - 1000);
   });
 
   it('counts Chinese words accurately in saved note metadata using native word segmentation', async () => {
@@ -1339,53 +1366,59 @@ describe('notes route filters', () => {
     expect(window.PlasmaNotesStore.hydrateFromDB).toBeTypeOf('function');
   });
 
-  it('keeps localStorage as a bridge-less notes, folders, and settings fallback', () => {
+  it('never loads stale pre-release localStorage note, folder or settings mirrors before canonical hydration', async () => {
+    const store = window.PlasmaNotesStore;
+    await store.hydrateFromDB({ force: true });
+    store._notes = null;
+    store._folders = null;
+    store._settings = null;
+    store._hydrated = false;
+    localStorage.setItem('ocd_notes', JSON.stringify([
+      { id: 'retired-note', title: 'Must never resurrect from browser mirror' },
+    ]));
+    localStorage.setItem('ocd_folders', JSON.stringify([
+      { id: 'retired-folder', name: 'Must never resurrect' },
+    ]));
+    localStorage.setItem('ocd_notes_settings', JSON.stringify({ mode: 'retired' }));
+    expect(store.getNotes()).toEqual([]);
+    expect(store.getFolders().map(folder => folder.id)).not.toContain('retired-folder');
+    expect(store.getSettings()).toEqual({});
+  });
+
+  it('keeps edits in memory, warns and never mirrors canonical Notes data to localStorage when bridge writers are absent', async () => {
+    const store = window.PlasmaNotesStore;
+    const before = Object.fromEntries(['ocd_notes', 'ocd_folders', 'ocd_notes_settings']
+      .map(key => [key, localStorage.getItem(key)]));
     delete window.DB.saveNote;
     delete window.DB.saveFolder;
     delete window.DB.saveSetting;
-
-    const note = window.PlasmaNotesStore.createNote({ title: 'Fallback note', folderId: 'default' });
-    const folder = window.PlasmaNotesStore.createFolder('Fallback folder');
-    window.PlasmaNotesStore.saveSettings({ view: 'list' });
-
-    expect(JSON.parse(localStorage.getItem('ocd_notes'))).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: note.id, title: 'Fallback note' }),
-    ]));
-    expect(JSON.parse(localStorage.getItem('ocd_folders'))).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: folder.id, name: 'Fallback folder' }),
-    ]));
-    expect(JSON.parse(localStorage.getItem('ocd_notes_settings'))).toEqual({ view: 'list' });
+    const note = store.createNote({ title: 'Unsaved canonical draft' });
+    store.createFolder('Unsaved canonical folder');
+    const settingsReceipt = store.saveSettings({ view: 'list' });
+    await Promise.all([...store._noteWriteQueue.values()]);
+    expect(await settingsReceipt).toBe(false);
+    expect(store.getNote(note.id)?.title).toBe('Unsaved canonical draft');
+    for (const [key, value] of Object.entries(before)) {
+      expect(localStorage.getItem(key), key).toBe(value);
+    }
+    expect(window.OpenCourseDeck.beforeUnload.mark)
+      .toHaveBeenCalledWith('notes-durable-write:' + note.id);
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalled();
   });
 
-  it('reports bridge-less localStorage write failures through the storage issue channel', () => {
-    delete window.DB.saveNote;
-    const emit = vi.fn();
-    const quotaError = Object.assign(new Error('notes storage full'), { name: 'QuotaExceededError' });
-    const originalSetItem = Storage.prototype.setItem;
-    window.OpenCourseDeck.bus.emit = emit;
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(key, value) {
-      if (key === 'ocd_notes') throw quotaError;
-      return originalSetItem.call(this, key, value);
-    });
-
-    const result = window.PlasmaNotesStore.saveNotes([{ id: 'fallback-fail', title: 'Cannot mirror' }]);
-    setItemSpy.mockRestore();
-
-    expect(result).toEqual(expect.objectContaining({
-      ok: false,
-      error: expect.objectContaining({ quota: true, name: 'QuotaExceededError' }),
-    }));
-    expect(window.OpenCourseDeck.lastStorageIssue).toEqual(expect.objectContaining({
-      kind: 'note-list',
-      backend: 'localStorage',
-      key: 'ocd_notes',
-      error: expect.objectContaining({ quota: true }),
-    }));
-    expect(emit).toHaveBeenCalledWith('storage:save-error', expect.objectContaining({
-      kind: 'note-list',
-      backend: 'localStorage',
-      key: 'ocd_notes',
-    }));
+  it('rejects unavailable canonical Notes reads instead of reporting a successful empty hydration', async () => {
+    const store = window.PlasmaNotesStore;
+    await store.hydrateFromDB({ force: true });
+    store._hydrated = false;
+    const prior = store.getNotes();
+    window.DB.getAllNotes.mockRejectedValueOnce(new Error('IndexedDB notes read unavailable'));
+    await expect(store.hydrateFromDB({ force: true })).rejects.toThrow(/IndexedDB notes read unavailable/);
+    expect(store._hydrated).toBe(false);
+    expect(store.getNotes()).toEqual(prior);
+    expect(window.OpenCourseDeck.bus.emit)
+      .toHaveBeenCalledWith('storage:read-error', expect.objectContaining({
+        kind: 'notes-hydration', backend: 'indexedDB',
+      }));
   });
 
   it('renders note list and folder labels as text, not executable HTML', () => {
