@@ -102,11 +102,11 @@ export function mountAchievementsView(deps = {}) {
     const [progress, notes, timestamps, topics, watchedSegments, cards] = loaded;
     if (!document.body.contains(listRoot)) return;
 
-    const progressByTopic = new Map(progress
-      .filter(record => record?.courseId && record?.topicId)
+    const scopedProgress = progress.filter(record => record?.courseId && record?.topicId);
+    const progressByTopic = new Map(scopedProgress
       .map(record => [courseTopicIdentity(record.courseId, record.topicId), record]));
-    const doneRecords = progress.filter(record => record.status === 'done' || Number(record.percent) >= 100);
-    const activeRecords = progress.filter(record => Number(record.percent) > 0 || Number(record.position) > 0 || record.status === 'in-progress');
+    const doneRecords = scopedProgress.filter(record => record.status === 'done' || Number(record.percent) >= 100);
+    const activeRecords = scopedProgress.filter(record => Number(record.percent) > 0 || Number(record.position) > 0 || record.status === 'in-progress');
     const watchedSeconds = watchedCoverageSeconds(watchedSegments);
     const courseIds = new Set(topics.map(topic => topic.courseId).filter(Boolean));
     const reviewItems = dueReviewCards(cards).slice(0, 6);
