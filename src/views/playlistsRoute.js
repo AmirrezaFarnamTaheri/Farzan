@@ -215,7 +215,7 @@ async function renderPlaylists(deps) {
         if (typeof window.DB?.getSetting !== 'function') {
           throw new Error('Canonical saved playlist reader unavailable');
         }
-        return sanitizeSavedPlaylists(await window.DB.getSetting('ocd_playlists'));
+        return sanitizeSavedPlaylists((await window.DB.getSetting('ocd_playlists')) ?? []);
       } catch (error) {
         savedReadError = error;
         return [];
