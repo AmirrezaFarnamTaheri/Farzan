@@ -106,7 +106,7 @@ function validateBackup(input) {
       if (store === 'progress') {
         let expectedId;
         try { expectedId = courseTopicIdentity(record.courseId, record.topicId); }
-        catch { throw new TypeError(`Backup progress record at index ${index} has no course/topic identity`); }
+        catch (error) { throw new TypeError(`Backup progress record at index ${index} has no course/topic identity`, { cause: error }); }
         if (record.id !== expectedId) {
           throw new TypeError(`Backup progress record at index ${index} has an invalid course-scoped key`);
         }
