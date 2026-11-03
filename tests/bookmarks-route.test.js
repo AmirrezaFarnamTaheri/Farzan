@@ -22,6 +22,28 @@ describe('Bookmarks canonical read failure states', () => {
     sanitizeHtml: html => html,
   });
 
+  it('does not mistake a missing canonical PDF-bookmarks reader for an empty saved library', async () => {
+    // All other categories have a valid reader, and the user has a saved
+    // timestamp. An absent reader must not authorize incomplete counts.
+    const stamp = { id: 'ts-1', title: 'Previously saved' };
+    const getAllTimestamps = window.DB.getAllTimestamps;
+    const getAllPdfBookmarks = vi.fn(async () => []);
+    mount();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[role="alert"].bookmarks-load-error')).not.toBeNull();
+      expect(document.querySelector('[data-bookmark-retry]')).not.toBeNull();
+    });
+    expect(document.querySelector('[data-bookmark-metrics]').children).toHaveLength(0);
+    expect(document.querySelectorAll('[data-bookmark-type]')).toHaveLength(0);
+    expect(getAllTimestamps).toHaveBeenCalled();
+    // Restoring the real first-use canonical empty PDF collection can recover.
+    window.DB.getAllPdfBookmarks = getAllPdfBookmarks;
+    document.querySelector('[data-bookmark-retry]').click();
+    await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="ts-1"]')).not.toBeNull());
+    expect(getAllPdfBookmarks).toHaveBeenCalledOnce();
+    expect(stamp.title).toBe('Previously saved');
+  });
+
   it.each(['missing', 'invalid', 'rejected'])('shows unavailable state without partial totals for %s canonical notes', async mode => {
     if (mode === 'missing') delete window.DB.getAllNotes;
     if (mode === 'invalid') window.DB.getAllNotes.mockResolvedValue('not a collection');
