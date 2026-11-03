@@ -298,7 +298,8 @@ export const Modal = {
      * Init data-attribute driven modals
      */
     init() {
-      document.addEventListener('click', e => {
+      if (this._documentClickHandler) return this;
+      this._documentClickHandler = e => {
         const target = eventTargetEl(e);
         if (!target) return;
         const trigger = target.closest('[data-modal-open]');
@@ -311,7 +312,17 @@ export const Modal = {
           const modal = closeBtn.closest('.modal-container, .drawer');
           if (modal) this.close(modal);
         }
-      });
+      };
+      document.addEventListener('click', this._documentClickHandler);
+      return this;
+    },
+
+    destroy() {
+      if (this._documentClickHandler) {
+        document.removeEventListener('click', this._documentClickHandler);
+        this._documentClickHandler = null;
+      }
+      return this;
     },
 };
 
@@ -422,7 +433,8 @@ export const Drawer = {
     },
 
     init() {
-      document.addEventListener('click', e => {
+      if (this._documentClickHandler) return this;
+      this._documentClickHandler = e => {
         const target = eventTargetEl(e);
         if (!target) return;
         const trigger = target.closest('[data-drawer-open]');
@@ -433,11 +445,24 @@ export const Drawer = {
           const drawer = closeBtn.closest('.drawer');
           if (drawer) this.close(drawer);
         }
-      });
-
-      // Close on Escape
-      document.addEventListener('keydown', e => {
+      };
+      this._documentKeydownHandler = e => {
         if (e.key === 'Escape') this.closeAll();
-      });
+      };
+      document.addEventListener('click', this._documentClickHandler);
+      document.addEventListener('keydown', this._documentKeydownHandler);
+      return this;
+    },
+
+    destroy() {
+      if (this._documentClickHandler) {
+        document.removeEventListener('click', this._documentClickHandler);
+        this._documentClickHandler = null;
+      }
+      if (this._documentKeydownHandler) {
+        document.removeEventListener('keydown', this._documentKeydownHandler);
+        this._documentKeydownHandler = null;
+      }
+      return this;
     },
   };
