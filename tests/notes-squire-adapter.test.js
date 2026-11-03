@@ -191,6 +191,28 @@ describe('Squire HTML-canonical edit adapter', () => {
     }
   });
 
+  it('returns the committed live DOM after a native edit before the delayed input observer fires', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const updates = vi.fn();
+    const editor = createSquireNoteEditor({
+      element: host, html: '<p>Previous saved note</p>', onUpdate: updates,
+    });
+    try {
+      // Real contenteditable engines can mutate a paragraph before their
+      // MutationObserver/input callback. A save caller reading getHTML()
+      // must never receive the stale original HTML.
+      const paragraph = host.querySelector('.notes-modern-editor p');
+      paragraph.append(document.createTextNode(' نوشته تازه'));
+      const saved = editor.getHTML();
+      expect(saved).toContain('Previous saved note');
+      expect(saved).toContain('نوشته تازه');
+      expect(updates).toHaveBeenCalledExactlyOnceWith(saved);
+      expect(editor.getHTML()).toBe(saved);
+      expect(updates).toHaveBeenCalledTimes(1);
+    } finally { editor.destroy(); host.remove(); }
+  });
+
   it('round-trips inserted text through native undo and redo without losing content', () => {
     const instance = createSquireNoteEditor({
       element: document.createElement('div'), html: '<p>Before editing</p>',
