@@ -1861,6 +1861,14 @@ import { countWords } from './src/core/textMetrics.js';
             }
             const note = normalized.note;
             const existing = Store.getNote(note.id);
+            // A first-use blank note is valid. An incoming record with no
+            // HTML body must never erase an existing saved note merely
+            // because its metadata carries a later updatedAt timestamp.
+            if (existing && n.content == null) {
+              invalid++;
+              errors.push({ id: note.id, message: 'Existing note import requires HTML text content.' });
+              return;
+            }
             if (!existing) {
               const nextNotes = Store.getNotes();
               nextNotes.push(note);
