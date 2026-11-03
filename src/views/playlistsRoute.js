@@ -543,7 +543,34 @@ async function renderPlaylists(deps) {
     card.appendChild(body);
     root.appendChild(card);
   };
-  playlists.slice(0, 24).forEach(playlist => appendPlaylistCard(playlist, listRoot));
+  // A hard 24-card cap made saved queues after position 24 permanently
+  // unreachable. Render in bounded pages without hiding user-owned data or
+  // paying the cost of constructing every card on first entry.
+  const pageSize = 24;
+  let visibleCount = 0;
+  const showMore = document.createElement('button');
+  showMore.type = 'button';
+  showMore.className = 'btn btn-ghost btn-sm playlists-show-more';
+  showMore.dataset.playlistsShowMore = '';
+  const appendNextPage = () => {
+    const beforeCount = visibleCount;
+    const hadFocus = document.activeElement === showMore;
+    showMore.remove();
+    const end = Math.min(playlists.length, visibleCount + pageSize);
+    playlists.slice(visibleCount, end).forEach(playlist => appendPlaylistCard(playlist, listRoot));
+    visibleCount = end;
+    if (visibleCount < playlists.length) {
+      showMore.textContent = `Show more playlists (${visibleCount} of ${playlists.length})`;
+      listRoot.appendChild(showMore);
+      if (hadFocus) showMore.focus({ preventScroll: true });
+    } else if (hadFocus) {
+      // Do not strand keyboard focus on a detached final disclosure button.
+      const firstNew = listRoot.querySelectorAll('.playlist-card')[beforeCount];
+      firstNew?.querySelector('[data-open-playlist], button')?.focus({ preventScroll: true });
+    }
+  };
+  showMore.addEventListener('click', appendNextPage);
+  appendNextPage();
   catalogPlaylists.forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
 
   // New saved queues carry exact (courseId, topicId) identities, so a topic

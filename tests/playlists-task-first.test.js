@@ -58,6 +58,36 @@ describe('Playlists task-first organization', () => {
     expect([...document.querySelectorAll('[data-playlist-metrics] .stat-card')].map(el => el.textContent)).not.toContain('0Queue cards');
   });
 
+  it('makes every saved queue reachable beyond the initial 24-card page without changing storage', async () => {
+    saved = Array.from({ length: 30 }, (_, index) => ({
+      id: 'saved-' + index,
+      title: 'Review queue ' + index,
+      topicIds: ['a'],
+      sourceRefs: [{ courseId: 'course-1', topicId: 'a' }],
+      createdAt: index + 1,
+      updatedAt: index + 1,
+    }));
+    const original = structuredClone(saved);
+    mount();
+    await vi.waitFor(() => expect(document.querySelectorAll(
+      '[data-playlist-list] [data-playlist-id]')).toHaveLength(24));
+    const hiddenLast = document.querySelector('[data-playlist-list] [data-playlist-id="saved-0"]');
+    expect(hiddenLast).toBeNull();
+    const more = document.querySelector('[data-playlists-show-more]');
+    expect(more).not.toBeNull();
+    expect(more.tagName).toBe('BUTTON');
+    expect(more.textContent).toMatch(/more/i);
+    more.focus();
+    more.click();
+    await vi.waitFor(() => expect(document.querySelectorAll(
+      '[data-playlist-list] [data-playlist-id]')).toHaveLength(30));
+    expect(document.querySelector('[data-playlist-list] [data-playlist-id="saved-0"]')).not.toBeNull();
+    expect(document.querySelector('[data-playlists-show-more]')).toBeNull();
+    expect(saved).toEqual(original);
+    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.compareAndSwapSetting).not.toHaveBeenCalled();
+  });
+
   it('allows first-time saving directly from the expanded course catalog without five zero counters', async () => {
     mount();
     await vi.waitFor(() => expect(document.querySelector('[data-playlist-catalog] [data-playlist-id="source-1"]')).not.toBeNull());
