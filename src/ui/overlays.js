@@ -447,7 +447,12 @@ export const Drawer = {
         }
       };
       this._documentKeydownHandler = e => {
-        if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) this.closeAll();
+        if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229) return;
+        // A topmost modal, including one still waiting for first paint, owns
+        // Escape. Dismissing the background drawer as well would strand focus
+        // and release the page's inert/scroll lock prematurely.
+        if (shell().state?.openModals?.length) return;
+        this.closeAll();
       };
       document.addEventListener('click', this._documentClickHandler);
       document.addEventListener('keydown', this._documentKeydownHandler);
