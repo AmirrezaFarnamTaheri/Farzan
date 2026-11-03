@@ -38,8 +38,8 @@ function sortedRecords(records, section) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new TypeError('Portable backup ' + section + ' has an invalid record');
     }
-    if (section === 'progress' && (!record.courseId || !record.topicId)) {
-      throw new TypeError('Portable backup progress must have course and topic identity');
+    if (['progress', 'timestamps'].includes(section) && (!record.courseId || !record.topicId)) {
+      throw new TypeError('Portable backup study records must have course and topic identity');
     }
     const id = record.id ?? (section === 'progress'
       ? JSON.stringify([record.courseId, record.topicId]) : record.topicId ?? record.key);
