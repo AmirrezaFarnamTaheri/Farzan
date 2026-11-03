@@ -34,13 +34,31 @@ describe('persistent, non-destructive tag taxonomy', () => {
         expect(key).toBe(TAG_TAXONOMY_KEY);
         return structuredClone(saved);
       }),
-      saveSetting: vi.fn(async (key, value) => {
+      compareAndSwapSetting: vi.fn(async (key, expected, next) => {
         expect(key).toBe(TAG_TAXONOMY_KEY);
-        saved = structuredClone(value);
-        return structuredClone(value);
+        if (JSON.stringify(saved) !== JSON.stringify(expected)) return false;
+        saved = structuredClone(next);
+        return true;
       }),
     };
     window.DataStore = { init: vi.fn(async () => {}), allTopics: () => structuredClone(topics) };
+  });
+
+  it('does not enable tag changes with a non-atomic saveSetting-only adapter', async () => {
+    // The pre-release route must not present an unsafe writer as durable.
+    const oldWriter = vi.fn(async () => { throw new Error('Obsolete writer must not run'); });
+    window.DB.saveSetting = oldWriter;
+    delete window.DB.compareAndSwapSetting;
+    mount();
+    await vi.waitFor(() => expect(cards()).toHaveLength(2));
+    const create = document.querySelector('[data-tag-create-form] button');
+    const merge = document.querySelector('[data-tag-merge-form] button');
+    expect(create.disabled).toBe(true);
+    expect(merge.disabled).toBe(true);
+    fill('[data-tag-create-name]', 'Anatomy');
+    create.click();
+    expect(oldWriter).not.toHaveBeenCalled();
+    expect(saved).toBeNull();
   });
 
   it('creates and reloads an empty taxonomy label without inventing tagged notes', async () => {
@@ -107,7 +125,7 @@ describe('persistent, non-destructive tag taxonomy', () => {
     fill('[data-tag-merge-to]', 'کلیه');
     submit('[data-tag-merge-form]');
     await vi.waitFor(() => expect(cards()).toHaveLength(1));
-    window.DB.saveSetting.mockRejectedValueOnce(new Error('quota'));
+    window.DB.compareAndSwapSetting.mockRejectedValueOnce(new Error('quota'));
     submit('[data-tag-unmerge-form]');
     await vi.waitFor(() => expect(document.querySelector('[data-tag-mutation-error]')?.textContent)
       .toContain('not saved'));
@@ -116,7 +134,7 @@ describe('persistent, non-destructive tag taxonomy', () => {
   });
 
   it('does not pretend a rejected taxonomy write completed and retains source facets', async () => {
-    window.DB.saveSetting.mockRejectedValue(new Error('storage quota exceeded'));
+    window.DB.compareAndSwapSetting.mockRejectedValue(new Error('storage quota exceeded'));
     mount();
     await vi.waitFor(() => expect(cards()).toHaveLength(2));
     fill('[data-tag-create-name]', 'New topic');
@@ -133,7 +151,7 @@ describe('persistent, non-destructive tag taxonomy', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-tag-retry]')).not.toBeNull());
     expect(cards()).toHaveLength(0);
     expect(document.querySelector('[data-tag-create-form] button').disabled).toBe(true);
-    expect(window.DB.saveSetting).not.toHaveBeenCalled();
+    expect(window.DB.compareAndSwapSetting).not.toHaveBeenCalled();
   });
 });
 
@@ -186,6 +204,16 @@ describe('atomic taxonomy persistence across tabs', () => {
     };
     return { db, read: () => structuredClone(saved) };
   };
+
+  it('rejects non-atomic legacy writers before they can modify stored taxonomy', async () => {
+    const db = {
+      getSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => true),
+    };
+    await expect(persistTagTaxonomy(db, current => createTaxonomyTag(current, 'Anatomy')))
+      .rejects.toThrow(/atomic|compareAndSwap|unavailable/);
+    expect(db.saveSetting).not.toHaveBeenCalled();
+  });
 
   it('preserves the winning mutation when two tabs try to create tags from the same revision', async () => {
     const { db, read } = makeDB();
