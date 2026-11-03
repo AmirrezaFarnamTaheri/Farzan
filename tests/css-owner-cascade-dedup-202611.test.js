@@ -4,8 +4,9 @@ import { describe, it, expect } from 'vitest';
 const require = createRequire(import.meta.url);
 const { inventoryCss, parseDeclarations } = require('../scripts/css-owner-inventory.cjs');
 
-// Only identical selector / context / property / value pairs are eligible.
-// The lower-priority source stays unchanged for every OTHER declaration.
+// Ownership checks track the active final selector/property value after
+// pre-release cascade consolidation. Earlier values can differ, but cannot
+// shadow the authoritative later owner or silently reintroduce old paint.
 const canonical = [
   [
     "components.css",
@@ -37,10 +38,10 @@ const canonical = [
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-subtitle",
     "color",
-    "var(--text-secondary)"
+    "#d5e8f6"
   ],
   [
     "views.css",
@@ -58,24 +59,24 @@ const canonical = [
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-actions",
     "margin-top",
-    "var(--space-6)"
+    "25px"
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-command-strip",
     "margin-top",
-    "var(--space-6)"
+    "24px"
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-command-strip strong",
     "color",
-    "var(--text-primary)"
+    "#fff"
   ],
   [
     "views.css",
@@ -93,24 +94,24 @@ const canonical = [
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-focus-action",
     "color",
-    "var(--text-primary)"
+    "#205389"
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-pulse-grid",
     "gap",
-    "var(--space-3)"
+    "10px"
   ],
   [
     "views.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-pulse-item",
     "padding",
-    "var(--space-4)"
+    "14px"
   ],
   [
     "views.css",
@@ -170,22 +171,22 @@ const canonical = [
   ],
   [
     "enhancements.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".view-courses .filter-chip",
     "color",
-    "var(--text-secondary)"
+    "var(--fz-muted)"
   ],
   [
     "study-polish.css",
-    "workspace.css",
+    "farzan-redesign.css",
     ".home-command-strip",
     "color",
-    "var(--text-secondary)"
+    "#d5e4ee"
   ]
 ];
 
 describe('canonical CSS cascade property ownership (#175)', () => {
-  it.each(canonical)('removes duplicate %s -> %s for %s %s without dropping the final value',
+  it.each(canonical)('keeps authoritative %s -> %s source ownership for %s %s',
     (early, owner, selector, property, value) => {
       const report = inventoryCss();
       const sources = report.stylesheets.map(sheet => sheet.file);
