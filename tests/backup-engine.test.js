@@ -120,6 +120,23 @@ describe('atomic backup engine', () => {
     expect(Object.keys(snapshot._meta.stores).sort()).toEqual(schema.map(([name]) => name).sort());
   });
 
+  it('accepts same-topic progress records from separate courses and rejects mismatched primary keys', async () => {
+    const root = rootWithFacade();
+    installBackupEngine(root);
+    const records = [
+      { id: JSON.stringify(['course-a', 'shared']), topicId: 'shared', courseId: 'course-a', status: 'done' },
+      { id: JSON.stringify(['course-b', 'shared']), topicId: 'shared', courseId: 'course-b', status: 'in-progress' },
+    ];
+    const receipt = await root.DB.importBackup({ progress: records }, { mode: 'merge' });
+    expect(receipt.stores.progress).toBe(2);
+    const snapshot = await root.DB.exportBackup();
+    expect(snapshot.progress).toEqual(expect.arrayContaining(records));
+
+    await expect(root.DB.importBackup({
+      progress: [{ id: 'shared', topicId: 'shared', courseId: 'course-a' }],
+    }, { mode: 'merge' })).rejects.toThrow(/invalid course-scoped key/i);
+  });
+
   it('removes endpoint approval and credential authority from exported settings', async () => {
     await putSetting({
       mode: 'custom-api',
