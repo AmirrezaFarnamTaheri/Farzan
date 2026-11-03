@@ -410,7 +410,8 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
 
   // Every saved lesson is resolved by its exact course/topic pair. A
   // topic-only lookup is not a supported identity in the current schema.
-  const sourceKey = record => courseTopicIdentity(record?.courseId, record?.topicId);
+  const sourceKey = record => record?.courseId && record?.topicId
+    ? courseTopicIdentity(record.courseId, record.topicId) : null;
   const scopedTopicMap = new Map();
   const ambiguousScopedKeys = new Set();
   for (const topic of topics) {
@@ -441,7 +442,7 @@ async function renderHomeDashboard({ Router, setPendingCourseMedia }) {
     && (Number(record?.percent) > 0 || Number(record?.position) > 0
       || record.status === 'in-progress');
   const latestTimestamp = [...timestamps]
-    .filter(item => item?.topicId)
+    .filter(item => item?.topicId && item?.courseId)
     .sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
   const latestNote = [...notes].sort((a, b) => getRecordTime(b) - getRecordTime(a))[0];
 
