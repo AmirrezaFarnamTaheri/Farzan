@@ -8,6 +8,7 @@ describe('Bookmarks retryable canonical reads and newest-render wins', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main id="bookmarks-retry-host"></main>';
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [{ id: 'ts-a', title: 'Saved moment', position: 30 }]),
       getAllNotes: vi.fn(async () => [{ id: 'note-a', title: 'Saved idea' }]),
       getAllAnnotations: vi.fn(async () => []),
