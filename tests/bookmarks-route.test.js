@@ -5,6 +5,7 @@ describe('Bookmarks canonical read failure states', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main id="test-bookmarks"></main>';
     window.DB = {
+      getAllPdfBookmarks: vi.fn(async () => []),
       getAllTimestamps: vi.fn(async () => [{ id: 'ts-1', title: 'Previously saved' }]),
       getAllNotes: vi.fn(async () => []),
       getAllAnnotations: vi.fn(async () => []),
@@ -23,6 +24,7 @@ describe('Bookmarks canonical read failure states', () => {
   });
 
   it('does not mistake a missing canonical PDF-bookmarks reader for an empty saved library', async () => {
+    delete window.DB.getAllPdfBookmarks;
     // All other categories have a valid reader, and the user has a saved
     // timestamp. An absent reader must not authorize incomplete counts.
     const stamp = { id: 'ts-1', title: 'Previously saved' };
