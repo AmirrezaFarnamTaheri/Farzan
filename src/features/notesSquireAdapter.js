@@ -241,7 +241,14 @@ export function createSquireNoteEditor({
 
   const commands = withEditor(editor);
   const facade = {
-    getHTML: () => dirty ? editorHTML(editor) : original,
+    getHTML: () => {
+      // Browser contenteditable DOM can contain a committed keystroke before
+      // Squire's queued input observer runs. Publish it before handing HTML to
+      // any save caller. During IME, return only the last completed document,
+      // never the provisional composition DOM (or a destroyed editor's DOM).
+      if (!disposed && !composing) notify();
+      return dirty ? lastHTML : original;
+    },
     getText: () => root.textContent || '',
     commands: {
       insertContent(fragment) {
