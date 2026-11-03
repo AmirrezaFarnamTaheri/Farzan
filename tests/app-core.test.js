@@ -1261,9 +1261,17 @@ describe('app shell resilience helpers', () => {
       exportSVG: vi.fn(() => '<svg></svg>'),
     };
     window.OpenCourseDeck.Canvas = canvasApi;
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allCourses: vi.fn(async () => [{ id: 'course-1', title: 'Existing course' }]),
+      allTopics: vi.fn(async () => []),
+    };
     window.DB = {
       getSetting: vi.fn(async () => null),
       saveSetting,
+      getAllNotes: vi.fn(async () => [{ id: 'note-7', title: 'ECG note' }]),
+      getAllTimestamps: vi.fn(async () => []),
+      getAllAnnotations: vi.fn(async () => []),
     };
 
     const controller = await window.OpenCourseDeck.Views.studio();

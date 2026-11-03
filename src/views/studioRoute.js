@@ -263,6 +263,14 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   let inspectedElementId = null;
   let interactiveSaveTimer = null;
   let studioLinkOptions = [];
+  let studioLinkOptionsError = false;
+  const studioLinkReadErrorElement = () => {
+    const alert = document.createElement('p');
+    alert.dataset.studioLinkReadError = '';
+    alert.setAttribute('role', 'alert');
+    alert.textContent = 'Linked study sources could not be loaded. Saved board unchanged; reopen Studio to retry.';
+    return alert;
+  };
   let syncHandler = null;
   const openStudioLink = (element = {}) => {
     const type = String(element.linkType || '').trim();
@@ -309,22 +317,43 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     return false;
   };
   const loadStudioLinkOptions = async () => {
-    const [catalog, notes, timestamps, annotations] = await Promise.all([
-      (async () => {
-        try {
-          await window.DataStore?.init?.();
-          return {
-            courses: window.DataStore?.allCourses?.() ?? [],
-            topics: window.DataStore?.allTopics?.() ?? [],
-          };
-        } catch {
-          return { courses: [], topics: [] };
-        }
-      })(),
-      (async () => { try { return await window.DB?.getAllNotes?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllTimestamps?.() ?? []; } catch { return []; } })(),
-      (async () => { try { return await window.DB?.getAllAnnotations?.() ?? []; } catch { return []; } })(),
-    ]);
+    const readCollection = async (owner, method) => {
+      if (typeof owner?.[method] !== 'function') {
+        throw new Error(`Canonical Studio link source reader unavailable: ${method}`);
+      }
+      const rows = await owner[method]();
+      if (!Array.isArray(rows)) {
+        throw new TypeError(`Invalid canonical Studio link source: ${method}`);
+      }
+      return rows;
+    };
+    let catalog, notes, timestamps, annotations;
+    try {
+      const store = window.DataStore;
+      await store?.init?.();
+      const [courses, topics, savedNotes, savedTimes, savedAnnotations] = await Promise.all([
+        readCollection(store, 'allCourses'),
+        readCollection(store, 'allTopics'),
+        readCollection(window.DB, 'getAllNotes'),
+        readCollection(window.DB, 'getAllTimestamps'),
+        readCollection(window.DB, 'getAllAnnotations'),
+      ]);
+      catalog = { courses, topics };
+      notes = savedNotes;
+      timestamps = savedTimes;
+      annotations = savedAnnotations;
+    } catch {
+      // A partial catalog is not a trustworthy set of link suggestions.
+      // Never invent an empty source list or permit a new database-backed
+      // link to be saved after a failed canonical read.
+      if (unmounted) return;
+      studioLinkOptionsError = true;
+      studioLinkOptions = [];
+      renderInspector();
+      return;
+    }
+    if (unmounted) return;
+    studioLinkOptionsError = false;
     const options = [];
     (catalog.courses || []).slice(0, 200).forEach((course) => {
       if (!course?.id) return;
@@ -430,6 +459,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
     if (!inspected) {
       if (inspectedElementId) inspectedElementId = null;
       propertiesRoot.replaceChildren(document.createTextNode('Select an element to edit its properties.'));
+      if (studioLinkOptionsError) propertiesRoot.appendChild(studioLinkReadErrorElement());
       return;
     }
     const wrap = document.createElement('div');
@@ -495,6 +525,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       });
     linkRow.appendChild(linkOptions);
     wrap.appendChild(linkRow);
+    if (studioLinkOptionsError) wrap.appendChild(studioLinkReadErrorElement());
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.gap = '8px';
@@ -1719,6 +1750,18 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
       linkTarget: root?.querySelector?.('[data-studio-prop-link-target]')?.value ?? '',
       linkLabel: root?.querySelector?.('[data-studio-prop-link-label]')?.value ?? '',
     };
+    if (studioLinkOptionsError && ['course', 'pdf', 'note', 'timestamp'].includes(patch.linkType)) {
+      const original = (window.OpenCourseDeck?.Canvas?.serialize?.()?.layers || [])
+        .flatMap(layer => Array.isArray(layer.elements) ? layer.elements : [])
+        .find(element => element?.id === target.dataset.studioApplyProps);
+      if ((patch.linkType || '') !== (original?.linkType || '')
+          || (patch.linkTarget || '') !== (original?.linkTarget || '')
+          || (patch.linkLabel || '') !== (original?.linkLabel || '')) {
+        setStatus('Linked study sources unavailable; link edit refused');
+        Toast.error?.('Linked study sources could not be loaded; retry Studio');
+        return;
+      }
+    }
     const updated = window.OpenCourseDeck?.Canvas?.updateElement?.(target.dataset.studioApplyProps, patch);
     if (updated) await persistBoardChange('Properties updated');
   });
