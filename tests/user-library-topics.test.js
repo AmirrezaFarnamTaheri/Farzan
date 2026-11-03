@@ -81,7 +81,8 @@ describe('canonical course/topic editing', () => {
     const from = await library.upsertCourse({ title: 'Source' });
     const to = await library.upsertCourse({ title: 'Destination' });
     const topic = await library.addTopic({ courseId: from.id, title: 'Protected topic' });
-    window.DB.getProgress = vi.fn(async () => ({ topicId: topic.topicId, courseId: from.id, position: 15 }));
+    window.DB.getProgress = vi.fn(async (_topicId, courseId) => courseId === from.id
+      ? ({ topicId: topic.topicId, courseId: from.id, position: 15 }) : null);
     window.DB.saveProgress = vi.fn(async () => { throw new Error('progress storage is full'); });
     window.DB.deleteProgress = vi.fn(async () => true);
     await expect(library.moveTopic({ topicId: topic.topicId, fromCourseId: from.id, toCourseId: to.id }))
