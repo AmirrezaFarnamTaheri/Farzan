@@ -687,7 +687,17 @@ const ProgressStats = (() => {
         const noteRecords = _asArray(payload.notes).filter(_isObjectRecord);
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
-        const timestampRecords = _asArray(payload.timestamps).filter((timestamp) => _isObjectRecord(timestamp) && timestamp.id != null);
+        const rawTimestamps = _asArray(payload.timestamps);
+        const timestampRecords = rawTimestamps.filter(_isTimestampRecord);
+        if (timestampRecords.length !== rawTimestamps.length) {
+          throw new TypeError('Portable timestamps require stable IDs and exact course/topic identity');
+        }
+        const timestampIds = new Set();
+        for (const record of timestampRecords) {
+          const id = String(record.id);
+          if (timestampIds.has(id)) throw new TypeError('Portable timestamps contain duplicate IDs');
+          timestampIds.add(id);
+        }
         const rawWatchedSegments = _asArray(payload.watchedSegments);
         const watchedSegmentRecords = rawWatchedSegments.filter(_isWatchedSegmentRecord);
         const rawPdfBookmarks = _asArray(payload.pdfBookmarks);
