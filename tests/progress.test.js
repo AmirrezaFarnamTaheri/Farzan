@@ -96,7 +96,7 @@ describe('progress backup exports', () => {
 
     const payload = JSON.parse(await downloadedBlob.text());
 
-    expect(payload.version).toBe('1.6');
+    expect(payload.version).toBe('1.7');
     expect(payload.progress).toHaveLength(1);
     expect(payload.notes).toHaveLength(1);
     expect(payload.folders).toHaveLength(1);
@@ -333,7 +333,7 @@ describe('progress backup exports', () => {
       .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
 
-  it('restores canonical course library and media cues from version 1.6 portable backups', async () => {
+  it('restores canonical course library and media cues from version 1.7 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const library = { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Saved course' } } };
     const cues = { [JSON.stringify(['course-a', 'topic-a'])]: { chapters: [{ time: 18, title: 'Start' }] } };
@@ -347,7 +347,7 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult.settings).toBe(2);
   });
 
-  it('includes canonical personal tag taxonomy aliases in a version 1.6 portable export', async () => {
+  it('includes canonical personal tag taxonomy aliases in a version 1.7 portable export', async () => {
     const taxonomy = {
       version: 1,
       labels: [{ key: 'کلیه', label: 'کلیه' }],
@@ -359,7 +359,7 @@ describe('progress backup exports', () => {
 
     await window.ProgressStats.exportJSON();
     const payload = JSON.parse(await downloadedBlob.text());
-    expect(payload.version).toBe('1.6');
+    expect(payload.version).toBe('1.7');
     expect(payload.settings.tagTaxonomy).toEqual(taxonomy);
     expect(payload.notes[0].content).toBe('<p>Current body</p>');
   });
