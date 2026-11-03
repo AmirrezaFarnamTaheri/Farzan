@@ -35,6 +35,38 @@ describe('bridge DB safety helpers', () => {
     );
   });
 
+  it('preserves v4 course-scoped progress but retires old timestamps at the v5 cutover', async () => {
+    const { OpenCourseDB } = window.OpenCourseDeck.DB;
+    const previous = new OpenCourseDB('opencoursedeck', 4, [
+      { name: 'progress', key: 'id', autoIncrement: false, indexes: [
+        { field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' },
+      ] },
+      { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [
+        { field: 'topicId' }, { field: 'courseId' },
+      ] },
+    ]);
+    const id = JSON.stringify(['course-a', 'shared-topic']);
+    await previous.put('progress', { id, courseId: 'course-a', topicId: 'shared-topic', status: 'done' });
+    await previous.put('timestamps', { id: 'old-timestamp', courseId: 'course-a', topicId: 'shared-topic', position: 42 });
+    previous.db?.close();
+    previous.db = null;
+
+    await expect(window.DB.getAllProgress()).resolves.toEqual([
+      expect.objectContaining({ courseId: 'course-a', topicId: 'shared-topic', status: 'done' }),
+    ]);
+    await expect(window.DB.getAllTimestamps()).resolves.toEqual([]);
+    const raw = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('opencoursedeck');
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const version = req.result.version;
+        req.result.close();
+        resolve(version);
+      };
+    });
+    expect(raw).toBe(5);
+  });
+
   it('replaces the pre-release topic-only progress store with the v4 composite-key schema', async () => {
     const { OpenCourseDB } = window.OpenCourseDeck.DB;
     const previous = new OpenCourseDB('opencoursedeck', 3, [
