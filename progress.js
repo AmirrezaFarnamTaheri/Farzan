@@ -656,6 +656,20 @@ const ProgressStats = (() => {
     let rollbackSnapshot = null;
     let activeResult = null;
     let rollbackTargets = {};
+    let importTouchesNotes = false;
+    // Imported canonical records may already be open in a different view.
+    // Refresh the Notes owner only AFTER all writes (or rollback) have settled;
+    // its sync path preserves dirty drafts and creates conflict copies.
+    const refreshMountedNotes = async action => {
+      const refresh = window.PlasmaNotesApp?.refreshFromSync;
+      if (typeof refresh !== 'function') return;
+      try {
+        await refresh.call(window.PlasmaNotesApp, { kind: 'note', action });
+      } catch (error) {
+        console.warn('[Progress] live Notes refresh failed after backup import', error);
+        if (activeResult) activeResult.liveRefreshError = error?.message || String(error);
+      }
+    };
     try {
         const text    = await file.text();
         const payload = JSON.parse(text);
@@ -684,8 +698,29 @@ const ProgressStats = (() => {
           }
           progressIdentities.add(identity);
         }
-        const noteRecords = _asArray(payload.notes).filter(_isObjectRecord);
+        // Portable 1.7 Notes are HTML-canonical. Never reinterpret old
+        // text/html aliases or let a structured editor object enter IndexedDB.
+        // Preflight the *entire* Notes collection before confirmation/writes,
+        // including IDs: two same-ID rows cannot be imported safely in order.
+        if (Object.hasOwn(payload, 'notes') && !Array.isArray(payload.notes)) {
+          throw new TypeError('Portable Notes must be an array of HTML-canonical records');
+        }
+        const noteRecords = payload.notes ?? [];
+        const noteIds = new Set();
+        for (const note of noteRecords) {
+          if (!_isObjectRecord(note) || typeof note.id !== 'string' || !note.id.trim()) {
+            throw new TypeError('Portable Notes require stable string IDs and HTML text content');
+          }
+          if (typeof note.content !== 'string') {
+            throw new TypeError('Portable Notes content must be canonical HTML text');
+          }
+          if (noteIds.has(note.id)) {
+            throw new TypeError('Duplicate Notes ID in portable backup');
+          }
+          noteIds.add(note.id);
+        }
         const folderRecords = _asArray(payload.folders).filter((folder) => _isObjectRecord(folder) && folder.id != null);
+        importTouchesNotes = noteRecords.length > 0 || folderRecords.length > 0 || payload.settings?.notes != null;
         const annotationRecords = _asArray(payload.annotations).filter(_isAnnotationRecord);
         const rawTimestamps = _asArray(payload.timestamps);
         const timestampRecords = rawTimestamps.filter(_isTimestampRecord);
@@ -725,7 +760,6 @@ const ProgressStats = (() => {
         }
         const invalidCount =
           rawProgress.length - progressRecords.length +
-          _asArray(payload.notes).length - noteRecords.length +
           _asArray(payload.folders).length - folderRecords.length +
           _asArray(payload.annotations).length - annotationRecords.length +
           _asArray(payload.timestamps).length - timestampRecords.length +
@@ -822,9 +856,9 @@ const ProgressStats = (() => {
         // Preserve the full metadata of the current portable Notes records.
         if (noteRecords.length) {
           const imported = noteRecords.map((n) => ({
-            id: n.id ?? `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+            id: n.id,
             title: n.title ?? (n.topicId ? `Topic ${n.topicId}` : 'Imported note'),
-            content: n.content ?? n.html ?? '',
+            content: n.content,
             folderId: n.folderId ?? 'default',
             tags: n.tags ?? [],
             pinned: !!n.pinned,
@@ -836,8 +870,6 @@ const ProgressStats = (() => {
             // Preserve original linkage if present
             topicId: n.topicId,
             courseId: n.courseId,
-            text: n.text,
-            html: n.html,
           }));
 
           const existingNotes = Object.fromEntries((await DB.getAllNotes()).map((note) => [note.id, note]));
@@ -855,8 +887,6 @@ const ProgressStats = (() => {
               }
             });
 
-          // Refresh open Notes UI; report one final import result after all writes.
-          try { window.PlasmaNotesApp?.init?.(); } catch { /* ignore */ }
         }
         if (folderRecords.length && DB.saveFolder) {
           await _forEachChunk(folderRecords, async (folder) => {
@@ -1053,6 +1083,9 @@ const ProgressStats = (() => {
         if (result.errors.length) {
           await _rollbackImport(rollbackSnapshot, result, rollbackTargets);
         }
+        if (importTouchesNotes) {
+          await refreshMountedNotes(result.errors.length ? 'backup-rollback' : 'backup-import');
+        }
         // The known-error path has completed its recovery attempt. Do not
         // retry rollback if a subsequent toast or observer fails.
         rollbackSnapshot = null;
@@ -1065,11 +1098,15 @@ const ProgressStats = (() => {
         } else {
           pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.watchedSegments} watched segments, ${result.pdfBookmarks} PDF bookmarks, ${result.invalid} invalid skipped.`, 'success');
         }
+        if (result.liveRefreshError) {
+          pdToast('The saved Notes view could not refresh after import. Reopen Notes before editing.', 'error');
+        }
     } catch (err) {
       console.error('[Progress] import error', err);
       if (rollbackSnapshot && activeResult) {
         _recordImportError(activeResult, 'import', null, err);
         await _rollbackImport(rollbackSnapshot, activeResult, rollbackTargets);
+        if (importTouchesNotes) await refreshMountedNotes('backup-rollback');
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportResult = activeResult;
         if (activeResult.rolledBack) {
