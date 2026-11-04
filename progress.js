@@ -1095,11 +1095,15 @@ const ProgressStats = (() => {
           pdToast(`Import rolled back after ${result.errors.length} error(s). No partial backup changes were kept.`, 'error');
         } else if (result.errors.length) {
           pdToast('Import failed and recovery was incomplete. Some imported data may remain. Preserve your original backup and review the import errors before retrying.', 'error');
+        } else if (result.liveRefreshError) {
+          // The database write succeeded, but a mounted editor may still
+          // display stale data. Never give a misleading all-clear toast.
+          pdToast('Backup data was saved, but open Notes could not refresh. Reopen Notes before editing.', 'error');
         } else {
           pdToast(`Import complete: ${result.progress} progress, ${result.notes} notes, ${result.folders} folders, ${result.annotations} annotations, ${result.timestamps} timestamps, ${result.watchedSegments} watched segments, ${result.pdfBookmarks} PDF bookmarks, ${result.invalid} invalid skipped.`, 'success');
         }
-        if (result.liveRefreshError) {
-          pdToast('The saved Notes view could not refresh after import. Reopen Notes before editing.', 'error');
+        if (result.liveRefreshError && result.errors.length) {
+          pdToast('Open Notes did not refresh after backup recovery. Reopen Notes before editing.', 'error');
         }
     } catch (err) {
       console.error('[Progress] import error', err);
