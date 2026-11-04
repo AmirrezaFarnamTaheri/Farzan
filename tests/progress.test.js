@@ -797,6 +797,30 @@ describe('progress backup exports', () => {
     }
   });
 
+  it('does not award study days or a streak for a not-started record that was merely updated', async () => {
+    window.DataStore.allCourses = vi.fn(() => [{ id: 'course-1', title: 'Course' }]);
+    window.DB.getAllProgress.mockResolvedValueOnce([{
+      topicId: 'topic-1', courseId: 'course-1',
+      status: 'not-started', percent: 0, position: 0, updatedAt: Date.now(),
+    }]);
+    const stats = await window.ProgressStats.getStats();
+    expect(stats.activeDays).toBe(0);
+    expect(stats.streak).toBe(0);
+    expect(stats.inProgress).toBe(0);
+    expect(stats.doneTopics).toBe(0);
+  });
+
+  it('counts acknowledged meaningful study progress toward active days', async () => {
+    window.DataStore.allCourses = vi.fn(() => [{ id: 'course-1', title: 'Course' }]);
+    window.DB.getAllProgress.mockResolvedValueOnce([{
+      topicId: 'topic-1', courseId: 'course-1',
+      status: 'in-progress', percent: 10, position: 20, updatedAt: Date.now(),
+    }]);
+    const stats = await window.ProgressStats.getStats();
+    expect(stats.activeDays).toBe(1);
+    expect(stats.streak).toBe(1);
+  });
+
   it('renders course stats titles as text instead of HTML', async () => {
     document.body.innerHTML = `
       <strong id="stat-total-topics"></strong>
