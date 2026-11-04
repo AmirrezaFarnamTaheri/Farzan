@@ -1939,18 +1939,26 @@ import { countWords } from './src/core/textMetrics.js';
               continue;
             }
             try {
-              const nextNotes = Store.getNotes();
-              if (existing) {
-                const idx = nextNotes.findIndex(item => item.id === note.id);
-                nextNotes[idx] = note;
-              } else {
-                nextNotes.push(note);
+              // Import is not an editor mutation. Unlike persistNote(), do
+              // not replace the live in-memory record until IndexedDB has
+              // acknowledged the canonical row. Failed imports must never
+              // create ghost notes or overwrite the prior saved revision.
+              const snapshot = { ...note };
+              const receipt = await Store._enqueueNoteMutation(note.id, 'save', async () => {
+                if (typeof window.DB?.saveNote !== 'function') {
+                  throw new Error('Canonical IndexedDB Notes writer is unavailable');
+                }
+                const saved = await window.DB.saveNote(snapshot);
+                if (saved === false || saved == null
+                  || saved?.committed === false || saved?.status === 'failed') {
+                  throw new Error('Canonical Notes write was not acknowledged');
+                }
+                return saved;
+              });
+              if (receipt === false) {
+                throw new Error('Canonical Notes write failed');
               }
-              const receipt = await Store.persistNote(note, nextNotes);
-              if (receipt === false || receipt == null
-                || receipt?.committed === false || receipt?.status === 'failed') {
-                throw new Error('Canonical Notes write was not acknowledged');
-              }
+              Store._cacheNote(note);
               if (existing) updated++;
               else imported++;
             } catch (error) {
@@ -1961,7 +1969,8 @@ import { countWords } from './src/core/textMetrics.js';
           }
           window.OpenCourseDeck = window.OpenCourseDeck ?? {};
           window.OpenCourseDeck.lastNotesImportResult = { imported, updated, skipped, invalid, conflicts, errors };
-          NotesList.render();
+          if (imported || updated) NotesApp._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
+          else NotesList.render();
           if (errors.length) {
             window.OpenCourseDeck?.Toast?.error?.(
               'Notes import failed for ' + errors.length + ' record(s); only '
