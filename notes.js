@@ -346,6 +346,11 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     createNote(data = {}) {
+      // A missing first-use body is blank, but explicitly supplied content
+      // must already be canonical HTML text before allocating/persisting a note.
+      if (Object.hasOwn(data, 'content') && typeof data.content !== 'string') {
+        throw new TypeError('Canonical Notes content must be HTML text');
+      }
       const note = {
         id:        uid('note'),
         title:     data.title     ?? 'Untitled Note',
@@ -370,6 +375,9 @@ import { countWords } from './src/core/textMetrics.js';
       const idx   = notes.findIndex(n => n.id === id);
       if (idx === -1) return null;
       const cleanPatch = { ...(patch || {}) };
+      if (Object.hasOwn(cleanPatch, 'content') && typeof cleanPatch.content !== 'string') {
+        throw new TypeError('Canonical Notes content must be HTML text');
+      }
       if ('folderId' in cleanPatch) cleanPatch.folderId = this._coerceFolderId(cleanPatch.folderId);
       notes[idx] = {
         ...notes[idx],
