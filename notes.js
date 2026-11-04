@@ -915,7 +915,20 @@ import { countWords } from './src/core/textMetrics.js';
         const unchangedClassic = !this._squire && this._classicUneditedHTML !== null
           && this._el.innerHTML === this._classicUneditedHTML
           && typeof savedBody === 'string';
-        const content  = unchangedClassic ? savedBody : this.getContent();
+        const sanitizedContent = this.getContent();
+        // Preserve byte-identical formatting only when sanitization changes
+        // no meaningful DOM structure or attribute. Comparing normalized
+        // markup through an inert template admits harmless browser <tbody>
+        // insertion but never restores a stripped remote image URL, CSS
+        // tracker, event handler, or other unsafe source attribute.
+        const unchangedSafeSource = unchangedClassic && (() => {
+          const inert = document.createElement('template');
+          inert.innerHTML = savedBody;
+          const originalStructure = inert.innerHTML;
+          inert.innerHTML = sanitizedContent;
+          return inert.innerHTML === originalStructure;
+        })();
+        const content = unchangedSafeSource ? savedBody : sanitizedContent;
         const text     = this._squire ? this._squire.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
         const chars    = text.length;
