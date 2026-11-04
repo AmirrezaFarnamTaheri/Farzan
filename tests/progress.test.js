@@ -854,7 +854,7 @@ describe('progress backup exports', () => {
         { topicId: 'ok-topic', courseId: 'course-1', updatedAt: 10 },
         { topicId: 'bad-topic', courseId: 'course-1', updatedAt: 11 },
       ],
-      notes: [{ id: 'note-1', title: 'Imported', updatedAt: 12 }],
+      notes: [{ id: 'note-1', title: 'Imported', content: '<p>Imported</p>', updatedAt: 12 }],
       folders: [],
       settings: {
         playlists: [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }],
@@ -966,7 +966,7 @@ describe('progress backup exports', () => {
   });
 
   it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
-    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
@@ -980,7 +980,7 @@ describe('progress backup exports', () => {
   });
 
   it('prefers atomic full-primary-store rollback when the v5 backup engine is available', async () => {
-    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
     const original = {
       _meta: { format: 'opencoursedeck-snapshot', version: 5 },
@@ -1077,7 +1077,7 @@ describe('progress backup exports', () => {
     const payload = {
       version: '1.7',
       progress: [{ topicId: 'new-progress', courseId: 'course-2', updatedAt: 100 }],
-      notes: [{ id: 'new-note', title: 'New note', updatedAt: 100 }],
+      notes: [{ id: 'new-note', title: 'New note', content: '<p>New note</p>', updatedAt: 100 }],
     };
     const oldProgress = { topicId: 'old-progress', courseId: 'course-1', updatedAt: 20 };
     const oldNote = { id: 'old-note', title: 'Old note', updatedAt: 20 };
@@ -1128,7 +1128,7 @@ describe('progress backup exports', () => {
     const payload = {
       version: '1.7',
       progress: [{ topicId: 'topic-cancel', courseId: 'course-1', updatedAt: 10 }],
-      notes: [{ id: 'note-cancel', title: 'Cancelled', updatedAt: 12 }],
+      notes: [{ id: 'note-cancel', title: 'Cancelled', content: '', updatedAt: 12 }],
       folders: [{ id: 'folder-cancel', name: 'Cancelled folder' }],
       settings: { notes: { view: 'grid' } },
       annotations: [{ id: 'ann-cancel', docId: 'doc-1', page: 1, updatedAt: 13 }],
