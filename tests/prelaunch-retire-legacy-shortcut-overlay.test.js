@@ -14,7 +14,8 @@ describe('pre-release shortcut shell has one canonical modal owner (#175)', () =
   });
 
   it('removes orphaned shortcut-overlay chrome CSS without removing active modal tables', () => {
-    expect(css).not.toMatch(/#shortcut-overlay|\\.shortcut-panel(?:[\\s.#:[{]|$)/);
+    expect(css).not.toContain('#shortcut-overlay');
+    expect(css).not.toContain('.shortcut-panel');
     expect(css).toContain('table.shortcuts-table {');
     expect(css).toContain('table.shortcuts-table kbd {');
   });
