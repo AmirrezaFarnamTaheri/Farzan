@@ -132,15 +132,6 @@ const req = indexedDB.open(this.name, this.version);
 req.onupgradeneeded = e => {
 const db = e.target.result;
 this.schema.forEach(store => {
-if ((store.recreateOnUpgrade === true
-  || (Number.isInteger(store.recreateOnUpgradeBeforeVersion)
-    && e.oldVersion < store.recreateOnUpgradeBeforeVersion))
-  && db.objectStoreNames.contains(store.name)) {
-  // Greenfield schema cutover: the previous topic-only progress key cannot
-  // represent duplicate lesson IDs across courses. Pre-release data is
-  // intentionally retired instead of retaining a compatibility/migration path.
-  db.deleteObjectStore(store.name);
-}
 if (!db.objectStoreNames.contains(store.name)) {
 const os = db.createObjectStore(store.name,{
 keyPath: store.key || 'id',
