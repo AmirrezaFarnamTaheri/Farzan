@@ -1904,6 +1904,24 @@ import { countWords } from './src/core/textMetrics.js';
         try {
           const notes = JSON.parse(e.target.result);
           if (!Array.isArray(notes)) throw new Error('Invalid format');
+          // Reject an ambiguous file before writing its first record. A later
+          // duplicate ID would otherwise silently replace the first import.
+          const seen = new Set();
+          for (const candidate of notes) {
+            if (!candidate || typeof candidate.id !== 'string') continue;
+            if (seen.has(candidate.id)) {
+              window.OpenCourseDeck = window.OpenCourseDeck ?? {};
+              window.OpenCourseDeck.lastNotesImportResult = {
+                imported: 0, updated: 0, skipped: 0, invalid: notes.length, conflicts: 0,
+                errors: [{ id: candidate.id, message: 'Duplicate note ID in Notes JSON.' }],
+              };
+              window.OpenCourseDeck?.Toast?.error?.(
+                'Duplicate note ID in Notes JSON. No notes were imported.',
+              );
+              return;
+            }
+            seen.add(candidate.id);
+          }
           // An incomplete IME composition has no committed text event yet.
           // Do not apply imported records to a mounted composing source.
           if (Editor._compositionActive) {
@@ -1928,11 +1946,6 @@ import { countWords } from './src/core/textMetrics.js';
             }
             const note = normalized.note;
             const existing = Store.getNote(note.id);
-            if (existing && n.content == null) {
-              invalid++;
-              errors.push({ id: note.id, message: 'Existing note import requires HTML text content.' });
-              continue;
-            }
             if (existing && !this._shouldReplaceNote(existing, note)) {
               skipped++;
               conflicts++;
@@ -1995,17 +2008,21 @@ import { countWords } from './src/core/textMetrics.js';
         return { ok: false, error: { id: null, message: 'Note record must be an object.' } };
       }
       const now = Date.now();
-      const id = String(raw.id || uid('note')).trim();
-      if (!id) return { ok: false, error: { id: null, message: 'Note id is empty.' } };
+      // Notes-only JSON is also pre-release and HTML-canonical. Do not invent
+      // IDs or reinterpret unshipped alternate record encodings.
+      if (typeof raw.id !== 'string' || !raw.id || raw.id.trim() !== raw.id) {
+        return { ok: false, error: { id: raw.id ?? null, message: 'Note id must be a stable, unpadded string.' } };
+      }
+      const id = raw.id;
       const createdAt = Number(raw.createdAt);
       const updatedAt = Number(raw.updatedAt);
       // Notes are HTML-canonical. A JSON object, fragment array or number is
       // not an alternate encoding: string coercion can overwrite a newer
       // saved note with "[object Object]" before Squire can reject it.
-      if (raw.content != null && typeof raw.content !== 'string') {
-        return { ok: false, error: { id, message: 'Note content must be HTML text.' } };
+      if (typeof raw.content !== 'string') {
+        return { ok: false, error: { id, message: 'Note content must be canonical HTML text.' } };
       }
-      const content = raw.content ?? '';
+      const content = raw.content;
       const tags = Array.isArray(raw.tags)
         ? raw.tags
             .filter(tag => tag !== null && tag !== undefined)
