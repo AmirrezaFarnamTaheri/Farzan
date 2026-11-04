@@ -342,6 +342,8 @@ test('incompatible note explains its classic fallback accessibly and clears it o
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
   await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor'))
+    .toBeVisible({ timeout: 20_000 });
   const oldTitle = 'RTL advanced formatting original';
   const simpleTitle = 'Squire compatible regular note';
   const ids = await page.evaluate(({ oldTitle: advancedTitle, simpleTitle: regularTitle }) => {
