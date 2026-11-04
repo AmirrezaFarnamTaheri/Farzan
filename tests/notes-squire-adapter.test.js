@@ -408,7 +408,7 @@ describe('Squire HTML-canonical edit adapter', () => {
     expect(element.innerHTML).toBe('<p>Existing untouched draft</p>');
   });
 
-  it('supports core formatting commands and reuses ProseMirror undo/redo', () => {
+  it('supports core formatting commands and Squire undo/redo', () => {
     const element = document.createElement('div');
     const instance = createSquireNoteEditor({ element, html: '<p>Initial</p>' });
     try {
