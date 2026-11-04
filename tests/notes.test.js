@@ -615,7 +615,7 @@ describe('notes route filters', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.advanceTimersByTimeAsync(300);
     expect(window.PlasmaNotesList._filter.query).toBe(input.value);
-    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes match');
 
     window.PlasmaNotesList._semanticIds = ['nonexistent-embedding-result'];
     window.PlasmaNotesApp.destroy();
@@ -636,7 +636,7 @@ describe('notes route filters', () => {
     list._filter.tag = 'missing-tag';
     list._filter._pinned = true;
     list.render();
-    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes match');
     window.PlasmaNotesApp.destroy();
     expect(list._filter).toMatchObject({ folderId: null, tag: null, query: '', _pinned: false });
     window.PlasmaNotesApp.init();
@@ -686,6 +686,29 @@ describe('notes route filters', () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(document.queryCommandState).not.toHaveBeenCalled();
+  });
+
+  it('shows Saving until the exact note revision is acknowledged by IndexedDB', async () => {
+    const store = window.PlasmaNotesStore;
+    const app = window.PlasmaNotesApp;
+    await settleNoteDatabaseWrites();
+    expect(app.openNote('regular-note')).toBe(true);
+    let acknowledge;
+    window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
+      acknowledge = () => resolve(note);
+    }));
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Durable only after the acknowledgement</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(850);
+    const status = document.querySelector('[data-save-status]');
+    expect(store._noteWriteQueue.has('regular-note')).toBe(true);
+    expect(status.textContent).toMatch(/Saving/i);
+    acknowledge();
+    await settleNoteDatabaseWrites();
+    await Promise.resolve();
+    expect(status.textContent).toMatch(/Saved locally/i);
+    expect(status.classList.contains('visible')).toBe(true);
   });
 
   it('keeps All Notes and folder counters in sync after new and duplicated notes', () => {
