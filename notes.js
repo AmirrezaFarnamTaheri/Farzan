@@ -1946,6 +1946,18 @@ import { countWords } from './src/core/textMetrics.js';
             }
             const note = normalized.note;
             const existing = Store.getNote(note.id);
+            // A pending body/title debounce or in-progress IME belongs to the
+            // live editor. A Notes-only import must not overwrite that source
+            // record before the local draft has durably committed. Import
+            // unrelated records normally and tell the user to retry this one.
+            if (existing && note.id === Editor._currentId && NotesApp._hasPendingLocalEdit()) {
+              invalid++;
+              errors.push({
+                id: note.id,
+                message: 'Open Notes draft has unsaved edits. Finish saving or switch notes, then retry importing this note.',
+              });
+              continue;
+            }
             if (existing && !this._shouldReplaceNote(existing, note)) {
               skipped++;
               conflicts++;
