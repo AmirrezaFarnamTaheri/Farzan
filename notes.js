@@ -63,15 +63,8 @@ import { countWords } from './src/core/textMetrics.js';
     );
   }
 
-  // Sprite-backed inline icon (see index.html icon sprite). Folder icons are
-  // stored as free text for backwards compatibility; legacy emoji values map
-  // onto sprite ids so old libraries render with the vector set.
-  const FOLDER_ICON_ALIASES = {
-    'Folder': 'folder', '📁': 'folder', '📂': 'folder-open',
-    '💼': 'briefcase', '🗄️': 'archive', '🗄': 'archive', '📦': 'archive',
-    '🗒️': 'notes', '🗒': 'notes', '📝': 'note', '📄': 'file-text',
-    '📌': 'pin', '⭐': 'spark', '🔥': 'flame', '🏆': 'trophy', '💡': 'lightbulb',
-  };
+  // Folder icons use canonical sprite IDs; custom glyphs remain inert text.
+  // The pre-release format has no historical emoji-to-sprite alias layer.
   function spriteIcon(id, className = 'icon') {
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
@@ -84,10 +77,10 @@ import { countWords } from './src/core/textMetrics.js';
   }
   function folderIconNode(icon) {
     const raw = String(icon || '').trim();
-    const id = FOLDER_ICON_ALIASES[raw] || (/^[a-z][a-z0-9-]*$/.test(raw) && document.getElementById(`i-${raw}`) ? raw : null);
+    const id = /^[a-z][a-z0-9-]*$/.test(raw) && document.getElementById(`i-${raw}`) ? raw : null;
     if (id) return spriteIcon(id);
     if (!raw) return spriteIcon('folder');
-    // Legacy/custom icons (usually a single emoji) render as inert text;
+    // Custom glyphs (often a single emoji) render as inert text;
     // .folder-icon clips anything longer than the glyph slot.
     const span = document.createElement('span');
     span.className = 'folder-icon-text';
