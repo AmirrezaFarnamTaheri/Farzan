@@ -72,7 +72,7 @@ test('first real Squire edit keeps rich RTL saved HTML through Chromium reload o
     expect(metadata.headingDir).toBe('rtl');
     expect(metadata.blockDir).toBe('rtl');
     expect(metadata.fontSize).toBe('18px');
-    expect(metadata.color).toMatch(/(?:#123456|rgb\\(18,\\s*52,\\s*86\\))/i);
+    expect(metadata.color).toMatch(/(?:#123456|rgb\(18,\s*52,\s*86\))/i);
     expect(metadata.href).toBe('https://example.org/study/heart');
     expect(metadata.content).toContain('فیزیولوژی قلب 你好');
     expect(metadata.content).toContain('دریچه Heart');
