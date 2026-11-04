@@ -614,9 +614,8 @@ import { countWords } from './src/core/textMetrics.js';
       // provisional, and Squire would discard the browser's active composition.
       if (this._compositionActive) return { ok: false, reason: 'composing' };
       if (this._syncReadInProgress) return { ok: false, reason: 'synchronizing' };
-      // Check the *original* HTML before sanitization. A schema-based editor
-      // would otherwise drop unsupported saved metadata and silently replace
-      // it when a title-only save occurs.
+      // Check original canonical HTML before sanitization. A modern editor
+      // must not discard unsupported saved metadata on a title-only save.
       // Capture the identity *before* the first asynchronous import. Earlier
       // implementations only guarded the later Squire chunk load; switching
       // notes during the compatibility import could inspect the old saved
@@ -657,7 +656,7 @@ import { countWords } from './src/core/textMetrics.js';
       try {
         adapterModule = await import('./src/features/notesSquireAdapter.js');
       } catch (error) {
-        console.warn('[Notes] Squire preview unavailable', error);
+        console.warn('[Notes] Squire editor unavailable', error);
         return { ok: false, reason: 'unavailable' };
       }
       // Route unmounts, note switches, and intervening keystrokes must never
@@ -716,7 +715,7 @@ import { countWords } from './src/core/textMetrics.js';
         node.replaceChildren();
         node.innerHTML = original;
         node.setAttribute('contenteditable', 'true');
-        console.warn('[Notes] Squire preview rejected this note', error);
+        console.warn('[Notes] Squire editor rejected this note', error);
         return { ok: false, reason: 'incompatible' };
       }
     },
@@ -2372,8 +2371,24 @@ import { countWords } from './src/core/textMetrics.js';
     },
 
     _hasPendingLocalEdit() {
+      // Squire's MutationObserver may not have delivered the last committed
+      // keystroke. Check the live editor before any import/refresh considers
+      // the mounted note clean; a failed sync must always preserve the draft.
+      if (Editor._squire && !Editor._compositionActive) {
+        try {
+          if (Editor._squire.syncChanges() === false) return true;
+        } catch {
+          return true;
+        }
+      }
       const titleInput = $('[data-note-title-input]');
-      return Boolean(Editor._compositionActive || Editor._saveTimer || titleInput?._pdTitleT);
+      // The debounce may already have fired while IndexedDB is still writing.
+      // That unacknowledged canonical save is not a clean draft and must not
+      // be superseded by a Notes JSON import or a remote editor refresh.
+      const pendingWrite = Editor._currentId != null
+        && Store._noteWriteQueue.has(String(Editor._currentId));
+      return Boolean(Editor._compositionActive || Editor._saveTimer
+        || titleInput?._pdTitleT || pendingWrite);
     },
 
     _renderAfterCanonicalRefresh(options = {}) {
