@@ -1726,6 +1726,38 @@ describe('notes route filters', () => {
     editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
   });
 
+
+  it('keeps an unacknowledged imported note out of the canonical in-memory library', async () => {
+    window.DB.saveNote.mockImplementation(note => note.id === 'phantom-import'
+      ? Promise.resolve(false) : Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'phantom-import', title: 'Not saved', content: '<p>Unconfirmed</p>',
+    }])], 'phantom.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, invalid: 1 }), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('phantom-import')).toBeNull();
+    expect(document.querySelector('[data-notes-list]').textContent).not.toContain('Not saved');
+  });
+
+  it('retains the old canonical note in memory after a rejected replacement', async () => {
+    const before = structuredClone(window.PlasmaNotesStore.getNote('regular-note'));
+    window.DB.saveNote.mockImplementation(note => note.id === 'regular-note'
+      && note.title === 'Rejected imported replacement'
+      ? Promise.resolve(false) : Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'regular-note', title: 'Rejected imported replacement',
+      content: '<p>Unacknowledged overwrite</p>', updatedAt: now + 100000,
+    }])], 'rejected-replacement.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, updated: 0, invalid: 1 }), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('regular-note')).toEqual(before);
+    expect(document.querySelector('[data-notes-editor]').textContent).not.toContain('Unacknowledged overwrite');
+  });
+
   it('sanitizes imported note content and records import counts', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     const localNotesBefore = localStorage.getItem('ocd_notes');
