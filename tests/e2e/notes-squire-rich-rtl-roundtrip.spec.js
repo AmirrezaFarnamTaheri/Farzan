@@ -179,12 +179,12 @@ test('unsupported rich HTML stays byte-identical through classic title-only save
   await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toBeVisible({ timeout: 20_000 });
 
   // Synthetic first-party saved note with structures Squire intentionally cannot
-  // round-trip. No remote image request should be required just to open it.
+  // round-trip. Its remote image URL is already privacy-gated as canonical data.
   const title = 'Classic complex HTML preservation';
   const html = '<h2 dir="rtl">گزارش Heart 你好</h2>\n'
     + '<table class="note-table"><tr><th>Study</th></tr><tr><td>72 bpm</td></tr></table>'
     + '<p data-ai-summary-block="true">Original AI metadata</p>'
-    + '<p><img src="https://example.org/private-scan.png" alt="Scan"> End</p>';
+    + '<p><img data-remote-src="https://example.org/private-scan.png" alt="Scan"> End</p>';
   const ids = await page.evaluate(({ source, savedTitle }) => {
     const old = window.PlasmaNotesStore.createNote({
       title: savedTitle, content: source, folderId: 'default',
@@ -201,7 +201,7 @@ test('unsupported rich HTML stays byte-identical through classic title-only save
 
   // A normal title input followed immediately by switching notes triggers the
   // classic editor's synchronous save. The untouched raw body must not be
-  // replaced by sanitized DOM serialization, including <tbody> or blocked src.
+  // replaced by sanitized DOM serialization, including implicit <tbody>.
   const renamed = title + ' renamed';
   await page.locator('[data-note-title-input]').fill(renamed);
   await page.evaluate(nextId => {
