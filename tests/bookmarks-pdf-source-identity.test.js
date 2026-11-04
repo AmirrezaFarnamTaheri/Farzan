@@ -145,7 +145,7 @@ describe('saved PDF bookmark stable-source navigation', () => {
       expect(button).not.toBeNull();
       return button;
     });
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Bookmarks could not be loaded');
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Saved items could not be loaded');
     expect(document.querySelector('[data-bookmark-id="bm-recovered"]')).toBeNull();
     retry.click();
     await vi.waitFor(() => expect(document.querySelector('[data-bookmark-id="bm-recovered"]')).not.toBeNull());

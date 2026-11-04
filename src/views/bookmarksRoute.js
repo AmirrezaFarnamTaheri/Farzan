@@ -19,22 +19,22 @@ export function mountBookmarksView(deps = {}) {
       <div class="page-header bookmarks-header">
         <div>
           <div class="page-title-row">
-            <h1 class="page-title">Bookmarks</h1>
+            <h1 class="page-title">Saved Items</h1>
           </div>
-          <p class="page-subtitle">Return to saved video times, notes, and PDF pages.</p>
+          <p class="page-subtitle">Your locally saved notes, video timestamps, PDF annotations, and pages in one place.</p>
         </div>
       </div>
       <div class="stat-grid" data-bookmark-metrics></div>
       <div class="card card-filled bookmarks-section-card">
         <div class="card-body">
-          <div class="filter-row bookmarks-filter-row" data-bookmark-filters aria-label="Bookmark filters">
+          <div class="filter-row bookmarks-filter-row" data-bookmark-filters aria-label="Saved item filters">
             <button class="filter-chip active" type="button" data-bookmark-filter="all" aria-pressed="true">All</button>
             <button class="filter-chip" type="button" data-bookmark-filter="timestamp" aria-pressed="false">Timestamps</button>
             <button class="filter-chip" type="button" data-bookmark-filter="note" aria-pressed="false">Notes</button>
             <button class="filter-chip" type="button" data-bookmark-filter="pdf" aria-pressed="false">PDF</button>
           </div>
           <div class="grid grid-3 bookmarks-grid" data-bookmark-list>
-            <p>Loading bookmarks...</p>
+            <p>Loading saved items...</p>
           </div>
         </div>
       </div>
@@ -176,7 +176,7 @@ export function mountBookmarksView(deps = {}) {
       const error = document.createElement('p');
       error.className = 'bookmarks-load-error';
       error.setAttribute('role', 'alert');
-      error.textContent = 'Bookmarks could not be loaded. Your stored data was not changed.';
+      error.textContent = 'Saved items could not be loaded. Your stored data was not changed.';
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'btn btn-primary';
@@ -294,7 +294,7 @@ export function mountBookmarksView(deps = {}) {
         ['Video timestamps', timestamps.length],
         ['Notes', notes.length],
         ['PDF annotations and saved pages', annotations.length + pdfBookmarks.length],
-        ['Total bookmarks', bookmarkItems.length],
+        ['Total saved items', bookmarkItems.length],
       ].forEach(([label, value]) => {
         const card = document.createElement('div');
         card.className = 'stat-card';
@@ -333,7 +333,7 @@ export function mountBookmarksView(deps = {}) {
     if (!visibleItems.length) {
       const empty = document.createElement('p');
       empty.className = 'text-muted';
-      empty.textContent = 'No bookmarks match this filter.';
+      empty.textContent = 'No saved items match this filter.';
       listRoot.appendChild(empty);
     }
 

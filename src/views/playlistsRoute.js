@@ -20,6 +20,9 @@ export function mountPlaylistsView({
           </div>
           <p class="page-subtitle">Organize videos into a playing order and return to saved moments.</p>
         </div>
+        <div class="page-actions">
+          <button class="btn btn-primary" type="button" data-playlists-new>New playlist</button>
+        </div>
       </div>
       <div class="stat-grid" data-playlist-metrics hidden></div>
       <div class="playlists-list-card">
@@ -33,12 +36,16 @@ export function mountPlaylistsView({
           <div class="card-body">
             <div class="playlists-form">
               <label class="playlists-field">
+                <span class="text-sm font-semibold">Course queue</span>
+                <select class="select" data-playlist-source aria-label="Choose source course queue"></select>
+              </label>
+              <label class="playlists-field">
                 <span class="text-sm font-semibold">Playlist name</span>
                 <input class="input" data-playlist-name placeholder="e.g. Focus Sprint & Review Queue" />
               </label>
               <button class="btn btn-primary" type="button" data-save-playlist>
                 <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
-                Save available catalog queue
+                Save selected queue
               </button>
             </div>
           </div>
@@ -47,6 +54,15 @@ export function mountPlaylistsView({
       </details>
     </section>
   `);
+  const create = document.querySelector('[data-playlists-new]');
+  create?.addEventListener('click', () => {
+    const discovery = document.querySelector('[data-playlists-discover]');
+    if (!discovery) return;
+    discovery.dataset.userOpened = 'true';
+    discovery.hidden = false;
+    discovery.open = true;
+    document.querySelector('[data-playlist-name]')?.focus({ preventScroll: true });
+  });
   renderPlaylists({ safeMediaUrl, Toast, Router, setPendingCourseSession });
 }
 
@@ -373,8 +389,9 @@ async function renderPlaylists(deps) {
   }));
   // Prioritize personal queues; discovery remains available without dominating the page.
   discover.hidden = catalogPlaylists.length === 0;
-  discover.open = catalogPlaylists.length > 0 && playlists.length === 0;
-  discover.querySelector('summary').textContent = `Browse course queues (${catalogPlaylists.length}) · Video topics: ${videoTopics.length}`;
+  discover.open = discover.dataset.userOpened === 'true'
+    || (catalogPlaylists.length > 0 && playlists.length === 0);
+  discover.querySelector('summary').textContent = `Browse featured course queues (${catalogPlaylists.length} of ${catalogGroups.length}) · Video topics: ${videoTopics.length}`;
 
   metricsRoot.replaceChildren();
   const meaningfulMetrics = [
@@ -460,7 +477,7 @@ async function renderPlaylists(deps) {
     link.className = 'btn btn-ghost';
     link.href = playlist.href;
     if (playlist.id === 'active-queue') link.dataset.resumeLiveQueue = '';
-    link.textContent = playlist.label === 'Resume' ? 'Open bookmarks'
+    link.textContent = playlist.label === 'Resume' ? 'Open saved items'
       : playlist.label === 'Live' ? 'Open player' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
     if (playlist.id === 'active-queue' && activePosition) {
@@ -581,28 +598,45 @@ async function renderPlaylists(deps) {
     }));
   const canSaveCatalog = group => Boolean(group?.topicIds?.length && scopedCatalog(group));
   const firstCatalog = catalogGroups.find(canSaveCatalog) || catalogGroups[0];
+  const sourcePicker = document.querySelector('[data-playlist-source]');
+  if (sourcePicker) {
+    sourcePicker.replaceChildren(...catalogGroups.map((group, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `${group.title} · ${group.items.length} videos`;
+      option.dir = 'auto';
+      return option;
+    }));
+    sourcePicker.value = String(Math.max(0, catalogGroups.indexOf(firstCatalog)));
+  }
+  const selectedCatalog = () => catalogGroups[Number(sourcePicker?.value ?? 0)];
   const saveBtn = document.querySelector('[data-save-playlist]');
   if (saveBtn) {
     let creating = false;
-    const unsafeCatalog = !canSaveCatalog(firstCatalog);
-    saveBtn.disabled = unsafeCatalog
-      || typeof window.DB?.compareAndSwapSetting !== 'function'
-      || typeof window.DB?.getSetting !== 'function';
-    if (unsafeCatalog) {
-      const warning = document.createElement('p');
-      warning.dataset.playlistSourceWarning = '';
-      warning.setAttribute('role', 'alert');
-      warning.textContent = 'Some course or topic sources cannot be identified uniquely. No unsafe queue will be saved.';
-      saveBtn.closest('.playlists-form')?.after(warning);
-    }
+    document.querySelector('[data-playlist-source-warning]')?.remove();
+    const warning = document.createElement('p');
+    warning.dataset.playlistSourceWarning = '';
+    warning.setAttribute('role', 'alert');
+    warning.textContent = 'This queue cannot be saved because its course/topic sources cannot be identified uniquely.';
+    saveBtn.closest('.playlists-form')?.after(warning);
+    const updateAvailability = () => {
+      const unsafe = !canSaveCatalog(selectedCatalog());
+      warning.hidden = !unsafe;
+      saveBtn.disabled = creating || unsafe
+        || typeof window.DB?.compareAndSwapSetting !== 'function'
+        || typeof window.DB?.getSetting !== 'function';
+    };
+    if (sourcePicker) sourcePicker.onchange = updateAvailability;
+    updateAvailability();
     saveBtn.onclick = async () => {
-      if (creating || unsafeCatalog
+      const choice = selectedCatalog();
+      if (creating || !canSaveCatalog(choice)
         || typeof window.DB?.compareAndSwapSetting !== 'function'
         || typeof window.DB?.getSetting !== 'function') return;
       const input = document.querySelector('[data-playlist-name]');
-      const title = String(input?.value || firstCatalog.title || 'Saved playlist').trim() || 'Saved playlist';
+      const title = String(input?.value || choice.title || 'Saved playlist').trim() || 'Saved playlist';
       creating = true;
-      saveBtn.disabled = true;
+      updateAvailability();
       try {
         const raw = await window.DB.getSetting('ocd_playlists');
         const current = sanitizeSavedPlaylists(raw ?? []);
@@ -610,8 +644,8 @@ async function renderPlaylists(deps) {
         const now = Date.now();
         const id = `playlist-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         const next = [
-          { id, title, topicIds: [...new Set(firstCatalog.topicIds.map(String))],
-            sourceRefs: firstCatalog.sourceRefs.map(ref => ({ ...ref })),
+          { id, title, topicIds: [...new Set(choice.topicIds.map(String))],
+            sourceRefs: choice.sourceRefs.map(ref => ({ ...ref })),
             createdAt: now, updatedAt: now },
           ...current,
         ];
@@ -623,7 +657,7 @@ async function renderPlaylists(deps) {
         Toast.error?.('Could not save playlist: ' + (error?.message || 'Storage unavailable'));
       } finally {
         creating = false;
-        saveBtn.disabled = false;
+        updateAvailability();
       }
     };
   }
