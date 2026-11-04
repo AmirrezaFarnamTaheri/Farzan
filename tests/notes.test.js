@@ -697,11 +697,13 @@ describe('notes route filters', () => {
     window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
       acknowledge = () => resolve(note);
     }));
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    document.body.append(status);
     const editor = document.querySelector('[data-notes-editor]');
     editor.innerHTML = '<p>Durable only after the acknowledgement</p>';
     editor.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.advanceTimersByTimeAsync(850);
-    const status = document.querySelector('[data-save-status]');
     expect(store._noteWriteQueue.has('regular-note')).toBe(true);
     expect(status.textContent).toMatch(/Saving/i);
     acknowledge();
@@ -718,10 +720,12 @@ describe('notes route filters', () => {
     window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
       acknowledge = () => resolve(note);
     }));
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    document.body.append(status);
     const title = document.querySelector('[data-note-title-input]');
     title.value = 'Saved title only';
     title.dispatchEvent(new Event('input', { bubbles: true }));
-    const status = document.querySelector('[data-save-status]');
     expect(status.textContent).toMatch(/Saving/i);
     await vi.advanceTimersByTimeAsync(550);
     expect(status.textContent).toMatch(/Saving/i);
@@ -1620,8 +1624,8 @@ describe('notes route filters', () => {
     vi.advanceTimersByTime(300);
 
     const empty = document.querySelector('.notes-empty');
-    expect(empty?.textContent).toContain('No notes found');
-    expect(empty?.querySelector('[data-action="new-note"]')?.textContent.trim()).toBe('New note');
+    expect(empty?.textContent).toContain('No notes match your filters');
+    expect(empty?.querySelector('[data-notes-clear-filters]')?.textContent.trim()).toBe('Clear filters');
   });
 
   it('renders large note lists incrementally and cancels queued batches on destroy', async () => {
