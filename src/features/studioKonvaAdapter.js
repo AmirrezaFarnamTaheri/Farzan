@@ -214,6 +214,14 @@ export function planKonvaV1Board(board) {
       || Array.isArray(board.viewport))) {
     return unsupported('invalid-viewport-record');
   }
+  if (Object.hasOwn(board, 'grid')
+    && (!board.grid || typeof board.grid !== 'object' || Array.isArray(board.grid))) {
+    return unsupported('invalid-grid-record');
+  }
+  if (board.grid && Object.hasOwn(board.grid, 'enabled')
+    && typeof board.grid.enabled !== 'boolean') {
+    return unsupported('invalid-grid-enabled');
+  }
   if (board.grid?.enabled) return unsupported('grid-renderer-not-parity-tested');
   // Do not silently coerce corrupt viewport data into a different visible
   // position or zoom. Omitted legacy fields still use the canonical defaults.
@@ -239,6 +247,9 @@ export function planKonvaV1Board(board) {
     if (!layerId.trim()) return unsupported('missing-layer-id');
     if (seenLayers.has(layerId)) return unsupported('duplicate-layer-id');
     seenLayers.add(layerId);
+    if (Object.hasOwn(layer, 'name') && typeof layer.name !== 'string') {
+      return unsupported('invalid-layer-name');
+    }
     // The isolated Konva draft only maps opacity, visibility, lock and
     // ordinary board-v1 layer order. Appearance-altering layer metadata
     // must retain the classic Canvas2D engine rather than render a misleading
