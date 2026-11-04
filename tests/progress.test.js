@@ -1336,6 +1336,53 @@ describe('progress backup exports', () => {
     );
   });
 
+
+  it('blocks backup note replacement before any write while a mounted IME draft is not durable', async () => {
+    document.body.innerHTML = '<div data-notes-editor role="textbox"></div>';
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.PlasmaNotesApp = {
+      flushPendingSaveDurably: vi.fn(async () => false),
+      refreshFromSync: vi.fn(),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'active-note', title: 'Imported', content: '<p>Could overwrite IME draft</p>' }],
+    })], 'active-ime-import.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/Notes.*(unsaved|durab|finish)/i));
+  });
+
+  it('waits for a mounted Notes durable receipt before writing an imported note', async () => {
+    document.body.innerHTML = '<div data-notes-editor role="textbox"></div>';
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    let finishNotesWrite;
+    window.PlasmaNotesApp = {
+      flushPendingSaveDurably: vi.fn(() => new Promise(resolve => { finishNotesWrite = resolve; })),
+      refreshFromSync: vi.fn(async () => ({ refreshed: true })),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'import-after-flush', content: '<p>Canonical</p>', updatedAt: 100 }],
+    })], 'wait-for-durable-notes.json', { type: 'application/json' });
+
+    const importing = window.ProgressStats.importJSONFile(file);
+    await vi.waitFor(() => expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce());
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    finishNotesWrite(true);
+    await importing;
+    expect(window.DB.saveNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'import-after-flush', content: '<p>Canonical</p>' }),
+    );
+    expect(window.PlasmaNotesApp.refreshFromSync)
+      .toHaveBeenCalledWith({ kind: 'note', action: 'backup-import' });
+  });
+
   it('imports current notes-only backups without requiring a progress array', async () => {
     const payload = {
       version: '1.7',
