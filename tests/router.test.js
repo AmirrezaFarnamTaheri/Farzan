@@ -27,6 +27,35 @@ describe('createRouter', () => {
     router.destroy();
   });
 
+  it('scrolls only the navigation region to reveal an active deep destination', async () => {
+    const nav = document.createElement('nav');
+    nav.className = 'sidebar-nav';
+    nav.scrollTop = 0;
+    nav.getBoundingClientRect = vi.fn(() => ({ top: 100, bottom: 390, height: 290 }));
+    const deepLink = document.createElement('a');
+    deepLink.className = 'nav-item';
+    deepLink.href = '#/flashcards';
+    deepLink.getBoundingClientRect = vi.fn(() => ({ top: 470, bottom: 514, height: 44 }));
+    nav.append(deepLink);
+    document.body.append(nav);
+    window.location.hash = '#/flashcards';
+    const router = createRouter({
+      $: () => [deepLink],
+      bus: { emit: vi.fn() },
+      Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
+    });
+    router.on('#/flashcards', async () => undefined);
+    try {
+      await router.init();
+      await router.ready();
+      expect(deepLink.getAttribute('aria-current')).toBe('page');
+      expect(nav.scrollTop).toBeGreaterThanOrEqual(120);
+    } finally {
+      router.destroy();
+      nav.remove();
+    }
+  });
+
   it('runs registered handler for the current hash on init', async () => {
     window.location.hash = '#/test-route';
     const handler = vi.fn().mockResolvedValue(undefined);
