@@ -531,23 +531,6 @@
        GLOBAL OVERLAY LAYERS
   ════════════════════════════════════════════ -->
 
-  <!-- Modal System -->
-  <div id="modal-overlay" class="modal-overlay" role="dialog"
-    aria-modal="true" aria-labelledby="modal-title" aria-hidden="true"
-    tabindex="-1">
-    <div class="modal-container" id="modal-container" role="document">
-      <div class="modal-header" id="modal-header">
-        <h2 class="modal-title" id="modal-title"></h2>
-        <button class="modal-close-btn" id="modal-close-btn"
-          aria-label="Close dialog" title="Close (Escape)">
-          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-        </button>
-      </div>
-      <div class="modal-body" id="modal-body" tabindex="0"></div>
-      <div class="modal-footer" id="modal-footer"></div>
-    </div>
-  </div>
-
   <!-- Command Palette -->
   <div id="command-palette-overlay" class="command-palette-overlay"
     role="dialog" aria-modal="true" aria-label="Command palette" aria-hidden="true">
@@ -598,20 +581,6 @@
 
   <!-- Drag Ghost -->
   <div id="drag-ghost" class="drag-ghost" aria-hidden="true" hidden></div>
-
-  <!-- Slide-over Panel -->
-  <div id="slideover-overlay" class="slideover-overlay" aria-hidden="true">
-    <aside id="slideover-panel" class="slideover-panel"
-      role="complementary" aria-label="Details panel">
-      <div class="slideover-header">
-        <h3 class="slideover-title" id="slideover-title"></h3>
-        <button class="slideover-close" id="slideover-close" aria-label="Close panel">
-          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-        </button>
-      </div>
-      <div class="slideover-body" id="slideover-body"></div>
-    </aside>
-  </div>
 
   <!-- Notification Panel (Slide-In) — opened via Drawer (see app.js) -->
   <div id="notifications-panel" class="drawer notif-panel" role="log" hidden
