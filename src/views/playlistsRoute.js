@@ -460,7 +460,7 @@ async function renderPlaylists(deps) {
     link.className = 'btn btn-ghost';
     link.href = playlist.href;
     if (playlist.id === 'active-queue') link.dataset.resumeLiveQueue = '';
-    link.textContent = playlist.label === 'Resume' ? 'Open bookmarks'
+    link.textContent = playlist.label === 'Resume' ? 'Open saved items'
       : playlist.label === 'Live' ? 'Open player' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
     if (playlist.id === 'active-queue' && activePosition) {
