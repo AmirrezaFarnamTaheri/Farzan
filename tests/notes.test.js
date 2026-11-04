@@ -1844,8 +1844,8 @@ describe('notes route filters', () => {
     );
   });
 
-  it('permits an absent first-use note body as empty HTML without guessing an object encoding', async () => {
-    const file = new File([JSON.stringify([{ id: 'empty-imported-note', title: 'Blank import', content: null }])],
+  it('imports an explicit empty HTML string as a valid blank first-use note', async () => {
+    const file = new File([JSON.stringify([{ id: 'empty-imported-note', title: 'Blank import', content: '' }])],
       'blank-notes.json', { type: 'application/json' });
     window.PlasmaNotesExport.importJSON(file);
     await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toEqual(expect.objectContaining({
@@ -1854,6 +1854,49 @@ describe('notes route filters', () => {
     const note = window.PlasmaNotesStore.getNote('empty-imported-note');
     expect(note).toBeTruthy();
     expect(note.content).toBe('');
+  });
+
+  it.each([
+    ['missing ID', { title: 'Missing id', content: '<p>Explicit body</p>' }],
+    ['numeric ID', { id: 42, title: 'Numeric id', content: '<p>Explicit body</p>' }],
+    ['whitespace-only ID', { id: '   ', title: 'Blank id', content: '<p>Explicit body</p>' }],
+    ['padded ID', { id: ' padded-id ', title: 'Unsafe id normalization', content: '<p>Explicit body</p>' }],
+    ['missing canonical body', { id: 'missing-html', title: 'Body absent' }],
+    ['null body', { id: 'null-html', title: 'Body is null', content: null }],
+    ['obsolete html-only body', { id: 'legacy-html', title: 'Old alternate body', html: '<p>Legacy</p>' }],
+  ])('rejects Notes-only JSON with %s without adding any database or memory record', async (_name, invalid) => {
+    window.DB.saveNote.mockClear();
+    const before = window.PlasmaNotesStore.getNotes().map(note => note.id).sort();
+    const file = new File([JSON.stringify([invalid])], 'invalid-canonical-notes.json',
+      { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, updated: 0, invalid: 1 }), { timeout: 5000 });
+
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesStore.getNotes().map(note => note.id).sort()).toEqual(before);
+    expect(window.OpenCourseDeck.lastNotesImportResult.errors)
+      .toEqual([expect.objectContaining({ message: expect.stringMatching(/id|html|content/i) })]);
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalled();
+  });
+
+  it('rejects an entire Notes-only JSON file containing duplicate IDs before its first write', async () => {
+    window.DB.saveNote.mockClear();
+    const file = new File([JSON.stringify([
+      { id: 'duplicate-id', title: 'Earlier', content: '<p>Original</p>', updatedAt: 100 },
+      { id: 'duplicate-id', title: 'Later', content: '<p>Overwrite</p>', updatedAt: 200 },
+    ])], 'duplicate-notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/duplicate.*note.*id/i)), { timeout: 5000 });
+
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'duplicate-id' }),
+    );
+    expect(window.PlasmaNotesStore.getNote('duplicate-id')).toBeNull();
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalled();
   });
 
   it('sanitizes imported HTML offline without requiring a separately loaded DOMPurify global', async () => {
