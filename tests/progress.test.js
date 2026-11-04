@@ -455,6 +455,48 @@ describe('progress backup exports', () => {
     expect(downloadedBlob).toBeNull();
   });
 
+  it('refuses an ordinary portable import when the canonical atomic backup engine is unavailable', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    delete window.DB.exportBackup;
+    delete window.DB.importBackup;
+    window.DB.clearUserData = vi.fn(async () => true);
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      progress: [{ courseId: 'course-1', topicId: 'new-atomic-only', updatedAt: 100 }],
+    })], 'progress-without-atomic-recovery.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/atomic|backup engine|snapshot/i));
+  });
+
+  it('refuses portable import when the atomic engine returns an obsolete snapshot version', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 4 },
+      progress: [], notes: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
+    window.DB.clearUserData = vi.fn(async () => true);
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'do-not-import', content: '<p>Not safe to roll back</p>' }],
+    })], 'obsolete-rollback-snapshot.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.exportBackup).toHaveBeenCalledOnce();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/atomic|snapshot|version/i));
+  });
+
   it('rejects an extended media import before any write without an atomic rollback snapshot', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
