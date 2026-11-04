@@ -1947,6 +1947,69 @@ describe('notes route filters', () => {
     expect(content).not.toContain('https://tracker.example');
   });
 
+  it('refuses a Notes-only replacement of an open unsaved classic draft', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    const original = structuredClone(store.getNote('regular-note'));
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Uncommitted Persian فارسی draft</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(app._hasPendingLocalEdit()).toBe(true);
+    window.DB.saveNote.mockClear();
+
+    window.PlasmaNotesExport.importJSON(new File([JSON.stringify([{
+      id: 'regular-note', title: 'New imported revision',
+      content: '<p>Imported version must not replace pending work</p>',
+      updatedAt: now + 100000,
+    }])], 'active-draft.json', { type: 'application/json' }));
+
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toMatchObject({
+      imported: 0, updated: 0, invalid: 1,
+      errors: [expect.objectContaining({ id: 'regular-note' })],
+    }), { timeout: 5000 });
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({
+      id: 'regular-note', content: '<p>Imported version must not replace pending work</p>',
+    }));
+    expect(store.getNote('regular-note')).toEqual(original);
+    expect(editor.textContent).toContain('Uncommitted Persian فارسی draft');
+    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringMatching(/open note|unsaved|retry/i));
+
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('Uncommitted Persian فارسی draft');
+  });
+
+  it('imports unrelated records but skips a dirty open note in the same Notes-only file', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Pending local draft after import</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    window.DB.saveNote.mockClear();
+
+    const incoming = [
+      { id: 'new-unrelated-note', title: 'Other note', content: '<p>Durable other note</p>', updatedAt: now + 1000 },
+      { id: 'regular-note', title: 'Unsafe replacement',
+        content: '<p>Must not overwrite draft</p>', updatedAt: now + 100000 },
+    ];
+    window.PlasmaNotesExport.importJSON(new File([JSON.stringify(incoming)], 'mixed-drafts.json',
+      { type: 'application/json' }));
+
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult).toMatchObject({
+      imported: 1, updated: 0, invalid: 1,
+      errors: [expect.objectContaining({ id: 'regular-note' })],
+    }), { timeout: 5000 });
+    expect(store.getNote('new-unrelated-note').content).toContain('Durable other note');
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({
+      id: 'regular-note', content: '<p>Must not overwrite draft</p>',
+    }));
+    expect(editor.textContent).toContain('Pending local draft after import');
+    await vi.advanceTimersByTimeAsync(900);
+    expect(store.getNote('regular-note').content).toContain('Pending local draft after import');
+    expect(store.getNote('new-unrelated-note').content).toContain('Durable other note');
+  });
+
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     window.PlasmaNotesStore.updateNote('regular-note', {
