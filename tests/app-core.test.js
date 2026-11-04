@@ -675,6 +675,25 @@ describe('app shell resilience helpers', () => {
     expect(catalog.querySelector('a[href="#/courses"]')).toBeTruthy();
   });
 
+  it('gives a new playlist an explicit first-class action even when a live queue is loaded', async () => {
+    await loadApp();
+    const player = document.createElement('div');
+    player.dataset.player = '';
+    player._pdPlayer = { queue: [{ title: 'Lecture', courseId: 'c', topicId: 't', src: 'https://example.test/lecture.mp4' }] };
+    document.body.append(player);
+    window.DB = { getAllTimestamps: vi.fn(async () => []), getSetting: vi.fn(async () => []) };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allTopics: vi.fn(() => [{ courseId: 'c', topicId: 't', title: 'Lecture', videos: ['https://example.test/lecture.mp4'] }]),
+    };
+    await window.OpenCourseDeck.Views.playlists();
+    const create = document.querySelector('[data-playlists-new]');
+    expect(create?.textContent).toMatch(/new playlist|save playlist/i);
+    create.click();
+    expect(document.querySelector('[data-playlists-discover]').open).toBe(true);
+    expect(document.activeElement).toBe(document.querySelector('[data-playlist-name]'));
+  });
+
   it('saves a named playlist from the first catalog queue', async () => {
     await loadApp();
     let stored = [];
@@ -1584,7 +1603,8 @@ describe('app shell resilience helpers', () => {
     expect(view.querySelector('[aria-label="Feature status: ready"]')).toBeNull();
     expect(view.textContent).not.toContain('planned and not yet interactive');
     expect(view.textContent).toContain('Video timestamps');
-    expect(view.textContent).toContain('Total bookmarks');
+    expect(view.textContent).toContain('Total saved items');
+    expect(view.querySelector('h1').textContent).toBe('Saved Items');
     expect(view.querySelector('[data-bookmark-type="timestamp"]').textContent).toContain('At 2:05');
     expect(view.querySelector('[data-bookmark-type="timestamp"]').textContent).toContain('Linked note');
     expect(view.querySelector('[data-bookmark-type="timestamp"]').textContent).toContain('Rhythm insight');
@@ -1795,6 +1815,14 @@ describe('app shell resilience helpers', () => {
     // mount can overwrite the next test's manually mounted Help view.
     await vi.waitFor(() => expect(window.OpenCourseDeck.Router._current).toBe('#/materials'));
     await window.OpenCourseDeck.Router.ready();
+  });
+
+  it('warns before app-data JSON export that local video and PDF bytes require a separate media backup', async () => {
+    await loadApp();
+    await window.OpenCourseDeck.Views.help();
+    const copy = document.querySelector('.view-help').textContent;
+    expect(copy).toMatch(/JSON[^.]*does not include[^.]*PDF|PDF[^.]*video files[^.]*separately/i);
+    expect(copy).toMatch(/My Courses/);
   });
 
   it('renders a catalog health panel in Help from the active DataStore', async () => {
