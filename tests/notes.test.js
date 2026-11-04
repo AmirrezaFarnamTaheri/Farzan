@@ -2036,4 +2036,35 @@ describe('notes route filters', () => {
     expect(store.getNote('pinned-note').content).toContain('Important');
   });
 
+
+  it('persists classic undo and redo revisions without requiring another keystroke', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p>Before undoing</p><table><tbody><tr><td>Stored metadata</td></tr></tbody></table>',
+    });
+    expect(app.openNote('regular-note')).toBe(true);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.querySelector('p').textContent = 'After initial edit';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('After initial edit');
+
+    editor.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(editor.querySelector('p').textContent).toBe('Before undoing');
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('Before undoing');
+
+    editor.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'y', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(editor.querySelector('p').textContent).toBe('After initial edit');
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('After initial edit');
+    expect(store.getNote('regular-note').content).toContain('Stored metadata');
+  });
+
 });
