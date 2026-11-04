@@ -72,6 +72,41 @@ describe('notes route workspace', () => {
     controller.unmount();
   });
 
+
+  it('fails closed when the historical synchronous save exists but the durable API is missing', () => {
+    // An old installed route must never authorize navigation using only an
+    // in-memory save receipt in the pre-release IndexedDB-only application.
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toBeUndefined();
+    expect(controller.beforeLeave()).toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('vetoes route navigation when an async durable save rejects', async () => {
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(
+      () => Promise.reject(new Error('IndexedDB transaction aborted')),
+    );
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    await expect(controller.beforeLeave()).resolves.toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('requires an explicit durable true acknowledgement, not an undefined return', async () => {
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(() => Promise.resolve(undefined));
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    await expect(controller.beforeLeave()).resolves.toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
   it('keeps advanced formatting collapsed while preserving editor commands and Persian font choice', () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },
