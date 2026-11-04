@@ -1344,52 +1344,6 @@
     transform: translateY(-1px);
   }
 
-  /* Modal system alias (index.html uses #modal-overlay + .modal-container) */
-  #modal-overlay.modal-overlay {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: var(--space-4);
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    z-index: var(--z-modal-backdrop);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--duration-base);
-  }
-  #modal-overlay.modal-overlay.open,
-  #modal-overlay.modal-overlay[aria-hidden="false"] {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  #modal-overlay .modal-container {
-    width: min(720px, calc(100vw - var(--space-8)));
-    max-height: min(90vh, calc(100vh - var(--space-8)));
-    display: flex;
-    flex-direction: column;
-    border-radius: var(--radius-2xl);
-    border: 1px solid var(--glass-border);
-    background: linear-gradient(180deg, var(--glass-bg-strong), color-mix(in srgb, var(--glass-bg) 65%, transparent));
-    box-shadow: var(--shadow-xl);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    overflow: hidden;
-    transform: translateY(8px) scale(0.98);
-    transition: transform var(--duration-base) var(--ease-spring);
-  }
-  #modal-overlay.modal-overlay.open .modal-container,
-  #modal-overlay.modal-overlay[aria-hidden="false"] .modal-container {
-    transform: translateY(0) scale(1);
-  }
-  #modal-overlay .modal-header,
-  #modal-overlay .modal-footer {
-    background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-    border-color: var(--glass-border);
-  }
-  #modal-overlay .modal-body { overflow: auto; }
-
   /* Command palette alias */
   #command-palette-overlay.command-palette-overlay {
     position: fixed;
@@ -1782,86 +1736,6 @@
     max-width: 36ch;
   }
 
-  /* ── Slide-over detail panel (optional shell; matches index.html) ── */
-  #slideover-overlay.slideover-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-overlay);
-    display: flex;
-    justify-content: flex-end;
-    align-items: stretch;
-    background: rgba(0, 0, 0, 0.52);
-    backdrop-filter: blur(calc(var(--glass-blur) - 2px));
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) - 2px));
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--duration-base);
-  }
-  #slideover-overlay.slideover-overlay[aria-hidden="false"],
-  #slideover-overlay.slideover-overlay.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  #slideover-panel.slideover-panel {
-    width: min(440px, 100vw);
-    max-width: 100%;
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(180deg, var(--surface-2), var(--surface));
-    border-left: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-xl);
-    transform: translateX(100%);
-    transition: transform var(--duration-slow) var(--ease-inout);
-  }
-  #slideover-overlay[aria-hidden="false"] #slideover-panel,
-  #slideover-overlay.open #slideover-panel {
-    transform: translateX(0);
-  }
-  .slideover-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
-    border-bottom: 1px solid var(--glass-border);
-    background: color-mix(in srgb, var(--glass-bg) 40%, transparent);
-  }
-  .slideover-title {
-    margin: 0;
-    font-size: var(--text-lg);
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: var(--tracking-tight);
-  }
-  .slideover-close {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--glass-border);
-    background: color-mix(in srgb, var(--glass-bg) 50%, transparent);
-    color: var(--text-secondary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
-  }
-  .slideover-close:hover,
-  .slideover-close:focus-visible {
-    outline: none;
-    border-color: color-mix(in srgb, var(--accent) 35%, var(--glass-border));
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-    color: var(--text-primary);
-  }
-  .slideover-body {
-    flex: 1 1 auto;
-    overflow: auto;
-    padding: var(--space-5);
-    color: var(--text-secondary);
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
-  }
-
   table.shortcuts-table {
     width: 100%;
     border-collapse: collapse;
@@ -2229,7 +2103,7 @@
     pointer-events: auto;
   }
 
-  /* Programmatic modals (Modal.create) use .modal-container without #modal-overlay */
+  /* Programmatic modals (Modal.create) own dynamic .modal-container and backdrop. */
   .modal-backdrop.open + .modal-container {
     background: var(--surface-2);
     border: 1px solid var(--border);
