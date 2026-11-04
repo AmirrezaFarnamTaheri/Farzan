@@ -39,6 +39,14 @@ export function installKonvaPenInput({
     if (!point) return;
     const last = active.points.at(-1);
     if (Math.hypot(point[0] - last[0], point[1] - last[1]) >= 1.5) {
+      // The canonical v1 pen command accepts at most 4096 points. A longer
+      // gesture cannot be stored; fail during capture without clipping a
+      // user's path or forwarding unbounded preview data to the renderer.
+      if (active.points.length >= 4096) {
+        cancel();
+        onError(new RangeError('Konva pen gesture exceeds the 4096-point limit'));
+        return;
+      }
       active.points.push(point);
       onPreview(active.points);
     }
