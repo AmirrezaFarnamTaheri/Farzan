@@ -38,7 +38,7 @@ Data is stored in your browser profile for the local origin, usually `http://loc
 
 - Progress and timestamps use IndexedDB when available.
 - Preferences use `localStorage`.
-- Export creates a portable JSON file of supported app data. The current Progress/Settings export is format 1.5 and includes saved watch segments and PDF page bookmarks. Imported video and PDF file blobs are stored separately and are **not** included: retain the original files for migration.
+- Export creates a portable JSON file of supported app data. The current Progress/Settings export is format 1.7 and includes notes, progress, PDF annotations and bookmarks, watched segments, flashcards and review state, custom course outlines, Studio metadata, supported settings, and local-library file references. Imported video and PDF binary bytes are **not** included in the JSON. Use **My Courses → Media backup & restore** to export the separate media folder, and keep a copy of the original files before switching profiles or devices.
 
 Changing browser profile, hostname, or port can make the app look like it has no data because browser storage is origin-scoped.
 
