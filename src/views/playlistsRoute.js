@@ -617,7 +617,7 @@ async function renderPlaylists(deps) {
     const warning = document.createElement('p');
     warning.dataset.playlistSourceWarning = '';
     warning.setAttribute('role', 'alert');
-    warning.textContent = 'This queue cannot be saved because some course/topic identities are unavailable.';
+    warning.textContent = 'This queue cannot be saved because its course/topic sources cannot be identified uniquely.';
     saveBtn.closest('.playlists-form')?.after(warning);
     const updateAvailability = () => {
       const unsafe = !canSaveCatalog(selectedCatalog());
