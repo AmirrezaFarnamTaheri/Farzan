@@ -42,7 +42,7 @@ function seedNotes() {
     },
   ]));
   localStorage.setItem('ocd_folders', JSON.stringify([
-    { id: 'default', name: 'Personal', icon: 'Folder', color: '' },
+    { id: 'default', name: 'Personal', icon: 'folder', color: '' },
     { id: 'xss-folder', name: '<img src=x onerror="window.__folderNameXss = true">', icon: '<svg onload="window.__folderIconXss = true"></svg>', color: '' },
   ]));
 }
