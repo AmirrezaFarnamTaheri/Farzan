@@ -77,6 +77,19 @@ describe('settings route', () => {
     active.controller.unmount();
   });
 
+  it('distinguishes hidden AI controls from a collapsed advanced-settings disclosure', async () => {
+    const { controller } = mountSettings();
+    try {
+      await vi.waitFor(() => expect(document.querySelector('[data-ai-status]').textContent)
+        .toBe('AI controls hidden'));
+      expect(document.querySelector('[data-ai-disclosure]').open).toBe(false);
+      expect(document.querySelector('[data-ai-mode] option[value="hidden"]').textContent)
+        .toBe('Hide AI controls');
+    } finally {
+      controller.unmount();
+    }
+  });
+
   it('keeps the storage meter visible and places technical diagnostics behind a keyboard-operable disclosure', () => {
     const { controller } = mountSettings();
     try {
