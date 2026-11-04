@@ -61,6 +61,21 @@ describe('EventEmitter WHATWG EventTarget interoperability', () => {
     expect(removed).not.toHaveBeenCalled();
   });
 
+  it('rejects unused legacy wildcard subscriptions instead of installing a second event dispatch path', () => {
+    const emitter = new EventEmitter();
+    const callback = vi.fn();
+    expect(() => emitter.on('*', callback)).toThrow(/wildcard|unsupported/i);
+    emitter.emit('notes', { id: '1' });
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('does not expose retired inspection and global-clear convenience APIs', () => {
+    const emitter = new EventEmitter();
+    expect(emitter.listenerCount).toBeUndefined();
+    expect(emitter.eventNames).toBeUndefined();
+    expect(emitter.clear).toBeUndefined();
+  });
+
   it('preserves duplicate suppression for on(), wildcard payloads and clear()', () => {
     const emitter = new EventEmitter();
     const a = vi.fn();
