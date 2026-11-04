@@ -36,6 +36,30 @@ describe('OpenCourseDB helper', () => {
     expect(db).not.toHaveProperty('bulkPutWithCheckpoint');
   });
 
+  it('ignores retired pre-release store recreation hints on a normal schema-version upgrade', async () => {
+    const { OpenCourseDB } = DBExports;
+    const name = 'ocd-test-no-prelaunch-upgrade-hints';
+    await indexedDB.deleteDatabase(name);
+    const first = new OpenCourseDB(name, 1, [
+      { name: 'items', key: 'id', autoIncrement: false },
+    ]);
+    await first.put('items', { id: 'canonical', value: 'current data' });
+    first.db?.close();
+
+    // Old prototype flags must no longer destroy the canonical store.
+    const next = new OpenCourseDB(name, 2, [
+      { name: 'items', key: 'id', autoIncrement: false,
+        recreateOnUpgrade: true, recreateOnUpgradeBeforeVersion: 2 },
+    ]);
+    try {
+      await expect(next.get('items', 'canonical')).resolves.toEqual({
+        id: 'canonical', value: 'current data',
+      });
+    } finally {
+      next.db?.close();
+    }
+  });
+
   it('can read records by an IndexedDB index', async () => {
     const { OpenCourseDB } = DBExports;
     const db = new OpenCourseDB('plasma-test-db', 1, [

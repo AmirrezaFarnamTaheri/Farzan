@@ -35,66 +35,39 @@ describe('bridge DB safety helpers', () => {
     );
   });
 
-  it('preserves v4 course-scoped progress but retires old timestamps at the v5 cutover', async () => {
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
-    const previous = new OpenCourseDB('opencoursedeck', 4, [
-      { name: 'progress', key: 'id', autoIncrement: false, indexes: [
-        { field: 'topicId' }, { field: 'courseId' }, { field: 'updatedAt' },
-      ] },
-      { name: 'timestamps', key: 'id', autoIncrement: false, indexes: [
-        { field: 'topicId' }, { field: 'courseId' },
-      ] },
-    ]);
-    const id = JSON.stringify(['course-a', 'shared-topic']);
-    await previous.put('progress', { id, courseId: 'course-a', topicId: 'shared-topic', status: 'done' });
-    await previous.put('timestamps', { id: 'old-timestamp', courseId: 'course-a', topicId: 'shared-topic', position: 42 });
-    previous.db?.close();
-    previous.db = null;
-
-    await expect(window.DB.getAllProgress()).resolves.toEqual([
-      expect.objectContaining({ courseId: 'course-a', topicId: 'shared-topic', status: 'done' }),
-    ]);
-    await expect(window.DB.getAllTimestamps()).resolves.toEqual([]);
-    const raw = await new Promise((resolve, reject) => {
-      const req = indexedDB.open('opencoursedeck');
-      req.onerror = () => reject(req.error);
-      req.onsuccess = () => {
-        const version = req.result.version;
-        req.result.close();
-        resolve(version);
-      };
+  it('creates the canonical course-scoped progress and timestamp stores on a fresh database', async () => {
+    await window.DB.saveProgress('shared-topic', 'course-a', { status: 'done' });
+    await window.DB.saveTimestamp({
+      id: 'canonical-timestamp', topicId: 'shared-topic', courseId: 'course-a', position: 42,
     });
-    expect(raw).toBe(5);
-  });
-
-  it('replaces the pre-release topic-only progress store with the v5 composite-key schema', async () => {
-    const { OpenCourseDB } = window.OpenCourseDeck.DB;
-    const previous = new OpenCourseDB('opencoursedeck', 3, [
-      { name: 'progress', key: 'topicId', autoIncrement: false },
-    ]);
-    await previous.put('progress', {
-      topicId: 'shared-topic', courseId: 'course-a', status: 'done',
-    });
-    previous.db?.close();
-    previous.db = null;
-
-    await expect(window.DB.getAllProgress()).resolves.toEqual([]);
-    await window.DB.saveProgress('shared-topic', 'course-a', { status: 'in-progress' });
-
     const schema = await new Promise((resolve, reject) => {
       const request = indexedDB.open('opencoursedeck');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
         const db = request.result;
-        const store = db.transaction('progress', 'readonly').objectStore('progress');
-        const result = { version: db.version, keyPath: store.keyPath, indexes: [...store.indexNames] };
+        const tx = db.transaction(['progress', 'timestamps'], 'readonly');
+        const progress = tx.objectStore('progress');
+        const timestamps = tx.objectStore('timestamps');
+        const result = {
+          version: db.version,
+          progress: { keyPath: progress.keyPath, indexes: [...progress.indexNames] },
+          timestamps: { keyPath: timestamps.keyPath, indexes: [...timestamps.indexNames] },
+        };
         db.close();
         resolve(result);
       };
     });
     expect(schema).toEqual({
-      version: 5, keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'],
+      version: 5,
+      progress: { keyPath: 'id', indexes: ['courseId', 'topicId', 'updatedAt'] },
+      timestamps: { keyPath: 'id', indexes: ['courseId', 'topicId'] },
     });
+    await expect(window.DB.getProgress('shared-topic', 'course-a')).resolves.toMatchObject({
+      status: 'done', topicId: 'shared-topic', courseId: 'course-a',
+    });
+    await expect(window.DB.getAllTimestamps()).resolves.toEqual([
+      expect.objectContaining({ id: 'canonical-timestamp', position: 42 }),
+    ]);
   });
 
   it('deletes only the selected course progress record', async () => {
