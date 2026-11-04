@@ -913,6 +913,24 @@ input[type="file"][hidden] {
   .nav-item.active { outline: 2px solid Highlight; }
 }
 
+/* Compact no-activity chart placeholders keep the first real action in view. */
+.view-progress[data-no-study-activity="true"] .progress-chart-frame {
+  height: auto;
+  min-height: 150px;
+}
+.view-progress[data-no-study-activity="true"] .progress-chart-empty[data-progress-empty] {
+  min-height: 150px;
+  height: auto;
+  padding: 16px 22px;
+}
+
+/* Ordinary helper text must remain readable at first use; retain semantic
+ * theme adaptation rather than baking dark-theme white-background colors. */
+.view-flashcards .fc-empty .fc-sub,
+.view-flashcards .page-header .page-subtitle.fc-sub {
+  color: color-mix(in srgb, var(--text-primary) 82%, var(--surface));
+}
+
 /* Real first-run guidance belongs where empty charts used to be. */
 .progress-chart-frame canvas[hidden] { display: none !important; }
 .progress-chart-empty[data-progress-empty] {
@@ -1232,7 +1250,7 @@ input[type="file"][hidden] {
   z-index: 8;
   top: 84px;
   inset-inline-end: 16px;
-  width: min(290px, 33%);
+  width: min(255px, 30%);
   max-height: calc(100% - 102px);
   overflow-y: auto;
   padding: 14px;
