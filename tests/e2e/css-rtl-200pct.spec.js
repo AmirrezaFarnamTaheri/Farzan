@@ -53,3 +53,36 @@ test.describe('CSS ownership computed-style parity at narrow and zoom-equivalent
     });
   }
 });
+
+for (const direction of ['ltr', 'rtl']) {
+  test('keeps keyboard navigation, content menus and notification drawers operable in ' + direction, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(value => localStorage.setItem('ocd_dir', value), direction);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+
+    const add = page.getByRole('button', { name: 'Add content' });
+    await add.focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'false');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'true');
+    await expect(add).toBeFocused();
+
+    const notifications = page.locator('#topbar-notifications-btn');
+    await notifications.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#notifications-panel')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#notifications-panel')).toBeHidden();
+    await expect(notifications).toBeFocused();
+
+    const deep = page.locator('.sidebar-nav a[href="#/achievements"]');
+    await deep.focus();
+    await expect(deep).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.view-achievements')).toBeVisible();
+    await expect(deep).toHaveAttribute('aria-current', 'page');
+  });
+}
