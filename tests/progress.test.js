@@ -1173,6 +1173,102 @@ describe('progress backup exports', () => {
     expect(window.DB.saveTimestamp).not.toHaveBeenCalled();
   });
 
+
+  it.each([
+    ['structured editor JSON', { id: 'bad-json', content: { type: 'doc', content: [] } }],
+    ['array body', { id: 'bad-array', content: ['<p>unexpected</p>'] }],
+    ['legacy html-only body', { id: 'old-html', html: '<p>Obsolete fallback</p>' }],
+    ['missing body', { id: 'no-body', title: 'No canonical content' }],
+    ['null body', { id: 'null-body', content: null }],
+    ['missing stable ID', { content: '<p>Valid text but no ID</p>' }],
+    ['non-string ID', { id: 42, content: '<p>Valid text but invalid ID</p>' }],
+  ])('rejects %s Notes in current backups before any write or confirmation', async (_name, invalid) => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      progress: [{ courseId: 'anatomy', topicId: 'do-not-import', updatedAt: 10 }],
+      notes: [invalid],
+    })], 'invalid-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/note.*(content|html|id)/i));
+  });
+
+  it('rejects duplicate note IDs in a portable backup before any canonical mutation', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [
+        { id: 'same-note', content: '<p>Original</p>', updatedAt: 1 },
+        { id: 'same-note', content: '<p>Conflicting</p>', updatedAt: 2 },
+      ],
+      progress: [{ courseId: 'biology', topicId: 'do-not-import' }],
+    })], 'duplicate-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/duplicate.*note/i));
+  });
+
+  it('imports canonical complex HTML unchanged, excluding obsolete text and html aliases', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const content = '<p dir="rtl">قلب Heart 中文</p><table><tbody><tr><td>72 bpm</td></tr></tbody></table>'
+      + '<img data-remote-src="https://example.test/figure.png" alt="Figure">'
+      + '<div data-ai-summary-block="true">خلاصه Summary</div>';
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{
+        id: 'complex-note', title: 'Preserved', content, updatedAt: 100,
+        topicId: 'topic', courseId: 'course',
+        text: 'obsolete duplicate text', html: '<p>obsolete duplicate HTML</p>',
+      }],
+    })], 'complex-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    const saved = window.DB.saveNote.mock.calls.find(([note]) => note.id === 'complex-note')?.[0];
+    expect(saved?.content).toBe(content);
+    expect(saved).toMatchObject({ id: 'complex-note', topicId: 'topic', courseId: 'course' });
+    expect(saved).not.toHaveProperty('text');
+    expect(saved).not.toHaveProperty('html');
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ notes: 1, errors: [] });
+  });
+
+  it('refreshes a mounted Notes editor only after all canonical backup writes settle', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const order = [];
+    window.DB.saveNote.mockImplementation(async () => { order.push('note'); return true; });
+    window.DB.saveFolder.mockImplementation(async () => { order.push('folder'); return true; });
+    window.DB.saveSetting.mockImplementation(async (key) => { if (key === 'ocd_notes_settings') order.push('settings'); return true; });
+    window.PlasmaNotesApp = {
+      init: vi.fn(),
+      refreshFromSync: vi.fn(async () => { order.push('refresh'); return { refreshed: true }; }),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'backup-note', title: 'From backup', content: '<p>Imported</p>', updatedAt: 100 }],
+      folders: [{ id: 'backup-folder', name: 'From backup', icon: 'folder' }],
+      settings: { notes: { view: 'list' } },
+    })], 'notes-and-folders.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ notes: 1, folders: 1, settings: 1, errors: [] });
+    expect(window.PlasmaNotesApp.init).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync)
+      .toHaveBeenCalledExactlyOnceWith({ kind: 'note', action: 'backup-import' });
+    expect(order).toEqual(['note', 'folder', 'settings', 'refresh']);
+  });
+
   it('imports current notes-only backups without requiring a progress array', async () => {
     const payload = {
       version: '1.7',
