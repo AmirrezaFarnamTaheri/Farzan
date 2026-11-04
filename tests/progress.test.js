@@ -28,6 +28,20 @@ describe('progress backup exports', () => {
         if (key === 'ocd_notes_settings') return { view: 'list' };
         return null;
       }),
+      // The released runtime always installs the v5 atomic backup engine.
+      // Keep test imports on that same contract rather than exercising retired
+      // per-store rollback paths against a partial bridge mock.
+      exportBackup: vi.fn(async () => ({
+        _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+        progress: await window.DB.getAllProgress(),
+        notes: await window.DB.getAllNotes(),
+        folders: await window.DB.getAllFolders(),
+        annotations: await window.DB.getAllAnnotations(),
+        timestamps: await window.DB.getAllTimestamps(),
+        watchedSegments: await window.DB.getAllWatchedSegments(),
+        pdfBookmarks: await window.DB.getAllPdfBookmarks(),
+      })),
+      importBackup: vi.fn(async () => ({ committed: true })),
       saveProgress: vi.fn(async () => true),
       saveNote: vi.fn(async () => true),
       saveFolder: vi.fn(async () => true),
@@ -352,10 +366,10 @@ describe('progress backup exports', () => {
     });
   });
 
-  it('does not claim a completed rollback if restoring a protected setting is explicitly refused', async () => {
+  it('does not claim a completed rollback when the canonical atomic restore fails', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
-    window.DB.clearUserData = vi.fn(async () => true);
     window.DB.saveSetting.mockImplementation(async key => key === 'ocd_playlists' ? false : true);
+    window.DB.importBackup.mockRejectedValueOnce(new Error('Atomic restore rejected'));
     const file = new File([JSON.stringify({
       version: '1.7', settings: { playlists: [{
         id: 'new-queue', title: 'New Queue', topicIds: ['topic-1'],
@@ -366,12 +380,14 @@ describe('progress backup exports', () => {
 
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
       rolledBack: false,
-      rollbackErrors: expect.arrayContaining([expect.stringMatching(/ocd_playlists|acknowledg|refus/i)]),
+      rollbackErrors: ['Atomic restore rejected'],
     });
+    expect(window.DB.importBackup).toHaveBeenCalledWith(expect.objectContaining({
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+    }), { mode: 'overwrite', restoreLocalAuthority: true });
     expect(window.OpenCourseDeck.Toast.error)
       .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
-
   it('restores canonical course library and media cues from version 1.7 portable backups', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const library = { version: 1, courses: { 'course-a': { id: 'course-a', title: 'Saved course' } } };
@@ -497,20 +513,20 @@ describe('progress backup exports', () => {
       .toHaveBeenCalledWith(expect.stringMatching(/atomic|snapshot|version/i));
   });
 
-  it('rejects an extended media import before any write without an atomic rollback snapshot', async () => {
+  it('refuses extended media imports when the atomic rollback engine is unavailable', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    delete window.DB.exportBackup;
+    delete window.DB.importBackup;
     const file = new File([JSON.stringify({
       version: '1.7',
       watchedSegments: [{ id: 'segment', topicId: 'topic-1', courseId: 'course-1', start: 0, end: 10 }],
     })], 'media.json', { type: 'application/json' });
     await window.ProgressStats.importJSONFile(file);
-    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
-      expect.stringContaining('atomic media recovery is unavailable'),
-    );
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/atomic backup engine/i));
     expect(window.DB.addWatchedSegment).not.toHaveBeenCalled();
     expect(window.DB.saveProgress).not.toHaveBeenCalled();
   });
-
   it('restores current portable media records when a v5 rollback snapshot is available', async () => {
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.exportBackup = vi.fn(async () => ({
@@ -1008,20 +1024,22 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toBeUndefined();
   });
 
-  it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
+  it('reports a failed atomic rollback honestly instead of claiming all old data was recovered', async () => {
     const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
-    window.DB.clearUserData = vi.fn(async () => { throw new Error('Rollback deletion failed'); });
+    window.DB.importBackup.mockRejectedValueOnce(new Error('Atomic rollback denied'));
+    window.DB.clearUserData = vi.fn(async () => true);
 
     await window.ProgressStats.importJSONFile(file);
 
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: false });
-    expect(window.OpenCourseDeck.lastImportResult.rollbackErrors).toEqual([expect.stringContaining('Rollback deletion failed')]);
-    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
+    expect(window.OpenCourseDeck.lastImportResult.rollbackErrors).toEqual(['Atomic rollback denied']);
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringContaining('recovery was incomplete'));
   });
-
   it('prefers atomic full-primary-store rollback when the v5 backup engine is available', async () => {
     const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
@@ -1046,7 +1064,7 @@ describe('progress backup exports', () => {
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
   });
 
-  it('rolls back canonical course library and media cues when a later import write fails', async () => {
+  it('atomically restores canonical course library and media cues when a later import write fails', async () => {
     const originalLibrary = { version: 1, courses: { 'course-old': { id: 'course-old', title: 'Original course' } } };
     const originalCues = { [JSON.stringify(['course-old', 'topic-old'])]: { chapters: [{ time: 20, title: 'Original cue' }] } };
     const state = new Map([
@@ -1054,12 +1072,17 @@ describe('progress backup exports', () => {
       ['ocd_course_media_cues', originalCues],
     ]);
     window.DB.getSetting = vi.fn(async key => state.get(key) ?? null);
-    window.DB.saveSetting = vi.fn(async (key, value) => {
-      state.set(key, value);
-      return value;
+    window.DB.saveSetting = vi.fn(async (key, value) => { state.set(key, value); return value; });
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+      settings: [...state].map(([key, value]) => ({ key, value })),
+    }));
+    window.DB.importBackup = vi.fn(async snapshot => {
+      state.clear();
+      for (const record of snapshot.settings) state.set(record.key, record.value);
+      return { committed: true };
     });
     window.DB.clearUserData = vi.fn(async () => true);
-    window.DB.deleteTimestamp = vi.fn(async () => true);
     window.DB.saveTimestamp.mockRejectedValueOnce(new Error('timestamp write failed'));
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify({
@@ -1071,18 +1094,19 @@ describe('progress backup exports', () => {
       timestamps: [{ id: 'ts-new', topicId: 'topic-new', courseId: 'course-1', position: 30 }],
       progress: [], notes: [], annotations: [],
     })], 'partial-restore.json', { type: 'application/json' });
+
     await window.ProgressStats.importJSONFile(file);
+
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true });
     expect(state.get('ocd_user_library')).toEqual(originalLibrary);
     expect(state.get('ocd_course_media_cues')).toEqual(originalCues);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_user_library', originalLibrary);
-    expect(window.DB.saveSetting).toHaveBeenCalledWith('ocd_course_media_cues', originalCues);
+    expect(window.DB.importBackup).toHaveBeenCalledOnce();
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
   });
-
-  it('rolls back earlier progress writes when a later read fails unexpectedly', async () => {
+  it('atomically rolls back earlier progress writes when a later read fails unexpectedly', async () => {
     const saved = new Map([['original', { topicId: 'original', courseId: 'course-old', updatedAt: 20 }]]);
     window.DB.getAllProgress = vi.fn(async () => [...saved.values()]);
-    window.DB.getProgress = vi.fn(async (topicId) => {
+    window.DB.getProgress = vi.fn(async topicId => {
       if (topicId === 'read-fails') throw new Error('Reading progress failed');
       return saved.get(topicId) ?? null;
     });
@@ -1090,18 +1114,24 @@ describe('progress backup exports', () => {
       saved.set(topicId, data);
       return data;
     });
-    window.DB.clearUserData = vi.fn(async (scope) => {
-      if (scope === 'progress') saved.clear();
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+      progress: [...saved.values()],
+    }));
+    window.DB.importBackup = vi.fn(async snapshot => {
+      saved.clear();
+      for (const row of snapshot.progress) saved.set(row.topicId, row);
+      return { committed: true };
     });
+    window.DB.clearUserData = vi.fn(async () => true);
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
-    const payload = {
+    const file = new File([JSON.stringify({
       version: '1.7',
       progress: [
         { topicId: 'imported', courseId: 'course-new', updatedAt: 100 },
         { topicId: 'read-fails', courseId: 'course-new', updatedAt: 100 },
       ],
-    };
-    const file = new File([JSON.stringify(payload)], 'read-failure.json', { type: 'application/json' });
+    })], 'read-failure.json', { type: 'application/json' });
 
     await window.ProgressStats.importJSONFile(file);
 
@@ -1111,12 +1141,12 @@ describe('progress backup exports', () => {
       expect.objectContaining({ store: 'import', message: 'Reading progress failed' }),
     ]);
     expect([...saved.values()]).toEqual([{ topicId: 'original', courseId: 'course-old', updatedAt: 20 }]);
-    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(
-      expect.stringContaining('Previously saved data was restored'),
-    );
+    expect(window.DB.importBackup).toHaveBeenCalledOnce();
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringContaining('Previously saved data was restored'));
   });
-
-  it('rolls back backup import writes when any store write fails', async () => {
+  it('atomically rolls back backup import writes when any store write fails', async () => {
     const payload = {
       version: '1.7',
       progress: [{ topicId: 'new-progress', courseId: 'course-2', updatedAt: 100 }],
@@ -1126,47 +1156,37 @@ describe('progress backup exports', () => {
     const oldNote = { id: 'old-note', title: 'Old note', updatedAt: 20 };
     window.DB.getAllProgress.mockResolvedValue([oldProgress]);
     window.DB.getAllNotes.mockResolvedValue([oldNote]);
-    window.DB.getAllFolders.mockResolvedValue([]);
-    window.DB.getAllTimestamps.mockResolvedValue([]);
-    window.DB.getAllAnnotations.mockResolvedValue([]);
-    window.DB.getSetting.mockResolvedValue(undefined);
+    const original = {
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+      progress: [oldProgress], notes: [oldNote],
+    };
+    window.DB.exportBackup = vi.fn(async () => original);
+    window.DB.importBackup = vi.fn(async () => ({ committed: true }));
     window.DB.clearUserData = vi.fn(async () => true);
-    window.DB.saveNote.mockImplementation(async (note) => {
+    window.DB.saveNote.mockImplementation(async note => {
       if (note.id === 'new-note') throw new Error('note write failed');
       return true;
     });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     const file = new File([JSON.stringify(payload)], 'rollback-backup.json', { type: 'application/json' });
-    const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
-      const el = originalCreateElement(tagName, options);
-      if (tagName === 'input') {
-        Object.defineProperty(el, 'files', { configurable: true, value: [file] });
-        el.click = vi.fn(() => el.onchange?.());
-      }
-      return el;
-    });
 
-    await window.ProgressStats.importJSON();
-    await vi.waitFor(() => expect(window.OpenCourseDeck.lastImportResult?.rolledBack).toBe(true));
+    await window.ProgressStats.importJSONFile(file);
 
-    expect(window.DB.clearUserData.mock.calls.map(([scope]) => scope)).toEqual([
-      'progress',
-      'notes',
-      'playlists',
-      'studio',
-    ]);
-    expect(window.DB.saveProgress).toHaveBeenCalledWith('new-progress', 'course-2', expect.objectContaining({ topicId: 'new-progress' }));
-    expect(window.DB.saveProgress).toHaveBeenCalledWith('old-progress', 'course-1', oldProgress);
+    expect(window.DB.saveProgress).toHaveBeenCalledWith('new-progress', 'course-2',
+      expect.objectContaining({ topicId: 'new-progress' }));
     expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'new-note' }));
-    expect(window.DB.saveNote).toHaveBeenCalledWith(oldNote);
+    expect(window.DB.importBackup).toHaveBeenCalledWith(original, {
+      mode: 'overwrite', restoreLocalAuthority: true,
+    });
+    expect(window.DB.clearUserData).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalledWith('old-progress', 'course-1', oldProgress);
     expect(window.OpenCourseDeck.lastImportResult.errors).toEqual([
       expect.objectContaining({ store: 'notes', id: 'new-note', message: 'note write failed' }),
     ]);
-    expect(window.OpenCourseDeck.lastImportResult.rollbackErrors).toEqual([]);
-    expect(window.OpenCourseDeck.Toast.error).toHaveBeenCalledWith(expect.stringContaining('Import rolled back'));
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ rolledBack: true, rollbackErrors: [] });
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringContaining('Import rolled back'));
   });
-
   it('shows import preview and does not write records when cancelled', async () => {
     const payload = {
       version: '1.7',
