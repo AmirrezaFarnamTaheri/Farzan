@@ -127,7 +127,7 @@ async function main() {
 
   window.PlasmaNotesApp = {
     init() {},
-    flushPendingSave() {},
+    async flushPendingSaveDurably() { return true; },
     destroy() {},
   };
   window.PlasmaPDFInit = () => {};

@@ -6,12 +6,13 @@ describe('notes route workspace', () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     window.PlasmaNotesApp = {
       init: vi.fn(),
-      flushPendingSave: vi.fn(),
+      flushPendingSave: vi.fn(), // Historical path must never be called.
+      flushPendingSaveDurably: vi.fn(async () => true),
       destroy: vi.fn(),
     };
   });
 
-  it('vetoes a route leave while Notes IME composition is active', () => {
+  it('vetoes a route leave while Notes IME composition is active', async () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },
     });
@@ -21,8 +22,9 @@ describe('notes route workspace', () => {
     expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
 
     editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
-    expect(controller.beforeLeave()).toBe(true);
-    expect(window.PlasmaNotesApp.flushPendingSave).toHaveBeenCalledOnce();
+    expect(await controller.beforeLeave()).toBe(true);
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
     controller.unmount();
   });
 
@@ -63,12 +65,48 @@ describe('notes route workspace', () => {
     controller.unmount();
   });
 
-  it('refuses to leave when the Notes app reports an uncommitted storage write', () => {
-    window.PlasmaNotesApp.flushPendingSave.mockReturnValue(false);
+  it('refuses to leave when the Notes app reports an uncommitted storage write', async () => {
+    window.PlasmaNotesApp.flushPendingSaveDurably.mockResolvedValue(false);
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },
     });
+    expect(await controller.beforeLeave()).toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+
+  it('fails closed when the historical synchronous save exists but the durable API is missing', () => {
+    // An old installed route must never authorize navigation using only an
+    // in-memory save receipt in the pre-release IndexedDB-only application.
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    delete window.PlasmaNotesApp.flushPendingSaveDurably;
     expect(controller.beforeLeave()).toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('vetoes route navigation when an async durable save rejects', async () => {
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(
+      () => Promise.reject(new Error('IndexedDB transaction aborted')),
+    );
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    await expect(controller.beforeLeave()).resolves.toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('requires an explicit durable true acknowledgement, not an undefined return', async () => {
+    window.PlasmaNotesApp.flushPendingSaveDurably = vi.fn(() => Promise.resolve(undefined));
+    const controller = mountNotesView({
+      setView: html => { document.getElementById('main-content').innerHTML = html; },
+    });
+    await expect(controller.beforeLeave()).resolves.toBe(false);
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
     controller.unmount();
   });
 
@@ -119,7 +157,7 @@ describe('notes route workspace', () => {
     }
   });
 
-  it('preserves editor, formatting, search, folder, import, and export hooks', () => {
+  it('preserves editor, formatting, search, folder, import, and export hooks', async () => {
     const controller = mountNotesView({
       setView: html => { document.getElementById('main-content').innerHTML = html; },
     });
@@ -156,9 +194,10 @@ describe('notes route workspace', () => {
     expect(document.querySelector('.notes-page-header .page-subtitle bdi')?.textContent).toMatch(/courses\.$/);
     expect(window.PlasmaNotesApp.init).toHaveBeenCalledOnce();
 
-    controller.beforeLeave();
+    expect(await controller.beforeLeave()).toBe(true);
     controller.unmount();
-    expect(window.PlasmaNotesApp.flushPendingSave).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.flushPendingSave).not.toHaveBeenCalled();
     expect(window.PlasmaNotesApp.destroy).toHaveBeenCalledOnce();
   });
 });

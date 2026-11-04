@@ -68,6 +68,15 @@ async function loadApp() {
     };
   }
 
+  // This checks route rendering and navigation, not Notes storage. Its
+  // synthetic Notes owner must use the *current* durable save contract;
+  // otherwise the real fail-closed route correctly refuses to leave.
+  window.PlasmaNotesApp = {
+    init: vi.fn(),
+    flushPendingSaveDurably: vi.fn(async () => true),
+    destroy: vi.fn(),
+  };
+
   // Mock DOMPurify
   window.DOMPurify = { sanitize: (s) => s };
 

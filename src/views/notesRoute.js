@@ -228,14 +228,21 @@ export function mountNotesView({ setView } = {}) {
       }
       try {
         const app = window.PlasmaNotesApp;
-        if (app?.canLeaveEditor?.() === false) return false;
-        // Newer persistence adapters can await the final IndexedDB write;
-        // older installed builds still use the synchronous compatibility path.
-        if (typeof app?.flushPendingSaveDurably === 'function') {
-          return app.flushPendingSaveDurably();
+        // Pre-release Notes has one canonical IndexedDB writer. A missing
+        // writer, a rejected write, or anything but an explicit true receipt
+        // must keep the live draft mounted rather than authorizing navigation.
+        if (typeof app?.flushPendingSaveDurably !== 'function') {
+          console.warn('[Notes view] durable Notes persistence unavailable; navigation blocked');
+          return false;
         }
-        // A deferred/failed flush must not be mistaken for a saved draft.
-        return app?.flushPendingSave?.() !== false;
+        if (app.canLeaveEditor?.() === false) return false;
+        return Promise.resolve(app.flushPendingSaveDurably()).then(
+          persisted => persisted === true,
+          error => {
+            console.warn('[Notes view] durable save failed before navigation', error);
+            return false;
+          },
+        );
       } catch (error) {
         console.warn('[Notes view] could not commit pending data before navigation', error);
         return false;
