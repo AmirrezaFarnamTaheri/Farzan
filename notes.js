@@ -1003,6 +1003,11 @@ import { countWords } from './src/core/textMetrics.js';
       const key = e.key.toLowerCase();
 
       if (ctrl && key === 's') { e.preventDefault(); this.save(true); return; }
+      // An IME owns provisional keyboard input until compositionend. Never
+      // interpret its Ctrl/Meta+Z/Y keys as classic editor history commands:
+      // those would replace unfinished Persian/Chinese text before it can be
+      // committed. Keep Ctrl+S's existing deferred-save behavior above.
+      if (e.isComposing || this._compositionActive) return;
       // Slash commands are a Notes UX feature, not tied to a particular
       // editing engine. Let Squire keep its own formatting/history shortcuts.
       if (!e.isComposing && e.key === '/' && this._isEmptyBlock()) {
