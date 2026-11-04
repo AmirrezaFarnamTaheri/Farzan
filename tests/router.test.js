@@ -40,7 +40,7 @@ describe('createRouter', () => {
     document.body.append(nav);
     window.location.hash = '#/home';
     const router = createRouter({
-      $: () => [deepLink],
+      ['\x24' + '\x24']: () => [deepLink],
       bus: { emit: vi.fn() },
       Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
     });
