@@ -207,7 +207,7 @@ describe('notes route filters', () => {
     }
   });
 
-  it('does not replace unsupported legacy notes when Tiptap preview is requested', async () => {
+  it('keeps unsupported saved HTML in classic mode when Squire activation is requested', async () => {
     const original = '<h2>Legacy</h2><table><tbody><tr><td>70 mL</td></tr></tbody></table>'
       + '<img data-remote-src="https://example.test/image.png" alt="Chart">';
     window.PlasmaNotesStore.updateNote('regular-note', { content: original });
@@ -449,7 +449,7 @@ describe('notes route filters', () => {
     expect(outer.getAttribute('aria-label')).toBe('Note editor');
   });
 
-  it('mounts Tiptap for compatible notes but never rewrites an untouched HTML record', async () => {
+  it('mounts Squire for compatible notes without rewriting untouched canonical HTML', async () => {
     const existing = '<p>هوا و ریه 你好世界</p>';
     window.PlasmaNotesStore.updateNote('regular-note', { content: existing });
     window.PlasmaNotesApp.openNote('regular-note');
@@ -473,9 +473,9 @@ describe('notes route filters', () => {
     app.openNote('regular-note');
     const result = await app.enableModernEditor();
     expect(result).toMatchObject({ ok: true });
-    const proseMirror = document.querySelector('[data-notes-editor] .notes-modern-editor');
-    expect(proseMirror).not.toBeNull();
-    // jsdom lacks Range#getClientRects, which ProseMirror needs during
+    const squireRoot = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    expect(squireRoot).not.toBeNull();
+    // jsdom lacks Range#getClientRects, which selection geometry needs during
     // selection-change scroll measurement; provide measurement only.
     const originalRects = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
     Object.defineProperty(Range.prototype, 'getClientRects', {
@@ -483,8 +483,8 @@ describe('notes route filters', () => {
       value: () => [{ left: 0, right: 1, top: 0, bottom: 1, width: 1, height: 1 }],
     });
     try {
-      proseMirror.focus();
-      expect(document.activeElement).toBe(proseMirror);
+      squireRoot.focus();
+      expect(document.activeElement).toBe(squireRoot);
       document.dispatchEvent(new Event('selectionchange'));
       expect(() => vi.advanceTimersByTime(150)).not.toThrow();
       expect(boldButton.classList.contains('active')).toBe(false);
