@@ -221,3 +221,55 @@ test('unsupported rich HTML stays byte-identical through classic title-only save
   await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toHaveCount(0);
   expect((await saved()).content).toBe(html);
 });
+
+
+test('classic fallback redo persists real RTL keyboard revisions without another edit', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor'))
+    .toBeVisible({ timeout: 20_000 });
+
+  const title = 'RTL classic history persistence';
+  const html = '<p dir="rtl">شروع Heart 你好</p>'
+    + '<table><tbody><tr><td>70 mL</td></tr></tbody></table>';
+  const noteId = await page.evaluate(({ title: name, html: content }) => {
+    const note = window.PlasmaNotesStore.createNote({
+      title: name, content, folderId: 'default',
+    });
+    if (!window.PlasmaNotesApp.openNote(note.id)) throw new Error('Could not open fallback note');
+    return note.id;
+  }, { title, html });
+
+  const editor = page.locator('[data-notes-editor]');
+  const modern = editor.locator('.notes-modern-editor');
+  await expect(page.locator('[data-notes-modern-toggle]'))
+    .toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(modern).toHaveCount(0);
+  await editor.locator('p').click();
+  await page.keyboard.press('End');
+  const edit = ' redo فارسی 你好';
+  await page.keyboard.insertText(edit);
+  const saved = () => page.evaluate(async id =>
+    (await window.DB.getAllNotes()).find(note => note.id === id)?.content ?? '', noteId);
+  await expect(editor).toContainText(edit);
+  await expect.poll(saved, { timeout: 20_000 }).toContain(edit);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(editor).not.toContainText(edit);
+  await expect.poll(saved, { timeout: 20_000 }).not.toContain(edit);
+
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(editor).toContainText(edit);
+  await expect.poll(saved, { timeout: 20_000 }).toContain(edit);
+  expect(await saved()).toContain('70 mL');
+
+  await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-notes-toggle-library]').click();
+  await page.locator('[data-notes-list]').getByText(title).click();
+  await expect(editor).toContainText(edit);
+  await expect(editor.locator('table td')).toHaveText('70 mL');
+  await expect(modern).toHaveCount(0);
+});

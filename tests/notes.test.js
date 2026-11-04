@@ -1996,4 +1996,75 @@ describe('notes route filters', () => {
     expect(list.textContent).toContain('Pinned note');
   });
 
+
+  it.each([
+    ['Control+Shift+Z', { key: 'Z', ctrlKey: true, shiftKey: true }],
+    ['Control+Shift+z', { key: 'z', ctrlKey: true, shiftKey: true }],
+    ['Meta+Shift+Z', { key: 'Z', metaKey: true, shiftKey: true }],
+    ['Control+Y', { key: 'y', ctrlKey: true }],
+  ])('redo %s restores the classic editor draft after undo without leaving its note', async (_name, modifiers) => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    const original = '<p>Original Persian فارسی text</p><table><tbody><tr><td>72 bpm</td></tr></tbody></table>';
+    store.updateNote('regular-note', { content: original });
+    expect(app.openNote('regular-note')).toBe(true);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    expect(editor.querySelector('.notes-modern-editor')).toBeNull();
+
+    editor.querySelector('p').textContent = 'Edited Persian فارسی text';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(550); // Commit one classic history snapshot without firing autosave.
+    expect(editor.querySelector('p').textContent).toBe('Edited Persian فارسی text');
+
+    const undo = new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    editor.dispatchEvent(undo);
+    expect(undo.defaultPrevented).toBe(true);
+    expect(editor.querySelector('p').textContent).toBe('Original Persian فارسی text');
+
+    const redo = new KeyboardEvent('keydown', {
+      ...modifiers, bubbles: true, cancelable: true,
+    });
+    editor.dispatchEvent(redo);
+    expect(redo.defaultPrevented).toBe(true);
+    expect(editor.querySelector('p').textContent).toBe('Edited Persian فارسی text');
+    expect(editor.querySelector('table td').textContent).toBe('72 bpm');
+    expect(app.flushPendingSave()).toBe(true);
+    expect(store.getNote('regular-note').content).toContain('Edited Persian فارسی text');
+    expect(store.getNote('pinned-note').content).toContain('Important');
+  });
+
+
+  it('persists classic undo and redo revisions without requiring another keystroke', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p>Before undoing</p><table><tbody><tr><td>Stored metadata</td></tr></tbody></table>',
+    });
+    expect(app.openNote('regular-note')).toBe(true);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.querySelector('p').textContent = 'After initial edit';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('After initial edit');
+
+    editor.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(editor.querySelector('p').textContent).toBe('Before undoing');
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('Before undoing');
+
+    editor.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'y', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    expect(editor.querySelector('p').textContent).toBe('After initial edit');
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('After initial edit');
+    expect(store.getNote('regular-note').content).toContain('Stored metadata');
+  });
+
 });
