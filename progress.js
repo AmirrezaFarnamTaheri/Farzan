@@ -655,7 +655,6 @@ const ProgressStats = (() => {
     // exits through the outer catch and strands an incomplete import.
     let rollbackSnapshot = null;
     let activeResult = null;
-    let rollbackTargets = {};
     let importTouchesNotes = false;
     // Imported canonical records may already be open in a different view.
     // Refresh the Notes owner only AFTER all writes (or rollback) have settled;
@@ -839,18 +838,9 @@ const ProgressStats = (() => {
         }
 
         rollbackSnapshot = await _createImportSnapshot();
-        // The legacy multi-step restore does not atomically restore auxiliary
-        // media stores. Reject the import BEFORE writing anything unless a v4
-        // atomic rollback snapshot is available.
+        // The same-session v5 atomic snapshot protects all primary stores,
+        // including watch history and PDF bookmarks, before any write.
         const hasExtendedMedia = watchedSegmentRecords.length > 0 || pdfBookmarkRecords.length > 0;
-        if (hasExtendedMedia && !rollbackSnapshot.primary) {
-          rollbackSnapshot = null;
-          throw new Error('This backup contains watch history or PDF bookmarks, but atomic media recovery is unavailable');
-        }
-        rollbackTargets = {
-          annotationDocIds: new Set(annotationRecords.map(row => String(row.docId ?? 'global'))),
-          timestampIds: new Set(timestampRecords.map(row => row.id)),
-        };
 
         await _forEachChunk(progressRecords, async (p) => {
           const existing = await DB.getProgress(p.topicId, p.courseId);
@@ -1093,7 +1083,7 @@ const ProgressStats = (() => {
           });
         }
         if (result.errors.length) {
-          await _rollbackImport(rollbackSnapshot, result, rollbackTargets);
+          await _rollbackImport(rollbackSnapshot, result);
         }
         if (importTouchesNotes) {
           await refreshMountedNotes(result.errors.length ? 'backup-rollback' : 'backup-import');
@@ -1121,7 +1111,7 @@ const ProgressStats = (() => {
       console.error('[Progress] import error', err);
       if (rollbackSnapshot && activeResult) {
         _recordImportError(activeResult, 'import', null, err);
-        await _rollbackImport(rollbackSnapshot, activeResult, rollbackTargets);
+        await _rollbackImport(rollbackSnapshot, activeResult);
         if (importTouchesNotes) await refreshMountedNotes('backup-rollback');
         window.OpenCourseDeck = window.OpenCourseDeck ?? {};
         window.OpenCourseDeck.lastImportResult = activeResult;
@@ -1343,23 +1333,18 @@ const ProgressStats = (() => {
     });
   }
 
-  // Backups imported through the progress UI are written in several steps.
-  // NEVER substitute an empty collection when reading the rollback snapshot:
-  // a later failure would clear the user's existing notes or study history.
+  // Portable import writes across multiple stores. A same-session atomic
+  // snapshot is mandatory, even for a progress-only or Notes-only file:
+  // manual per-store replays cannot guarantee lossless rollback.
   async function _createImportSnapshot() {
-    const settingsKeys = ['ocd_notes_settings', 'ocd_playlists', 'ocd_studio_board', 'ocd_flashcards', 'ocd_user_library', 'ocd_course_media_cues', 'ocd_tag_taxonomy'];
-    const readList = async (name) => {
-      if (typeof DB[name] !== 'function') throw new Error(`Cannot protect existing data: ${name} is unavailable`);
-      const records = await DB[name]();
-      if (!Array.isArray(records)) throw new Error(`Cannot protect existing data: ${name} returned invalid records`);
-      return records;
-    };
-    if (typeof DB.getSetting !== 'function') throw new Error('Cannot protect settings before import');
-    const primary = typeof DB.exportBackup === 'function' && typeof DB.importBackup === 'function'
-      ? await DB.exportBackup()
-      : null;
-    const canAtomicRestore = primary?._meta?.format === 'opencoursedeck-snapshot'
-      && primary._meta.version === 5;
+    if (typeof DB.exportBackup !== 'function' || typeof DB.importBackup !== 'function') {
+      throw new Error('Canonical atomic backup engine is required before importing data');
+    }
+    const primary = await DB.exportBackup();
+    if (primary?._meta?.format !== 'opencoursedeck-snapshot' || primary._meta.version !== 5) {
+      throw new Error('Current atomic backup snapshot version 5 is required before importing data');
+    }
+
     const mirrorKeys = [
       'ocd_notes', 'ocd_folders',
       'ocd_notes_settings', 'ocd_playlists',
@@ -1372,77 +1357,26 @@ const ProgressStats = (() => {
       throw new Error('Cannot protect local backup mirrors: localStorage is unavailable');
     }
     const mirrors = Object.fromEntries(mirrorKeys.map(key => [key, storage.getItem(key)]));
-    return {
-      primary: canAtomicRestore ? primary : null,
-      mirrors,
-      progress: await readList('getAllProgress'),
-      notes: await readList('getAllNotes'),
-      folders: await readList('getAllFolders'),
-      settings: Object.fromEntries(await Promise.all(settingsKeys.map(async (key) => [
-        key,
-        await DB.getSetting(key),
-      ]))),
-      annotations: await readList('getAllAnnotations'),
-      timestamps: await readList('getAllTimestamps'),
-    };
+    return { primary, mirrors };
   }
 
-  async function _rollbackImport(snapshot, result, { annotationDocIds = new Set(), timestampIds = new Set() } = {}) {
+  async function _rollbackImport(snapshot, result) {
     result.rolledBack = false;
     result.rollbackErrors = [];
     try {
-      if (snapshot.primary && typeof DB.importBackup === 'function') {
-        // The v5 backup engine overwrites all primary object stores in ONE IDB
-        // transaction, preserving untouched watchedSegments/pdfBookmarks.
-        const receipt = await DB.importBackup(snapshot.primary, { mode: 'overwrite', restoreLocalAuthority: true });
-        if (receipt?.committed !== true || receipt.degraded === true) {
-          throw new Error('Atomic rollback was incomplete; check storage and AI session status');
-        }
-      } else {
-        // Legacy compatibility path: never clear the broad "media" scope.
-        // That scope also contains watched segments and PDF bookmarks, which
-        // the legacy import snapshot does not include.
-        if (typeof DB.clearUserData !== 'function') throw new Error('Safe rollback requires storage deletion support');
-        _requireAcknowledgedWrite(await DB.clearUserData('progress'), 'rollback progress cleanup');
-        _requireAcknowledgedWrite(await DB.clearUserData('notes'), 'rollback notes cleanup');
-        _requireAcknowledgedWrite(await DB.clearUserData('playlists'), 'rollback playlists cleanup');
-        _requireAcknowledgedWrite(await DB.clearUserData('studio'), 'rollback Studio cleanup');
-        await _forEachChunk(snapshot.progress, async record => {
-          _requireAcknowledgedWrite(await DB.saveProgress(record.topicId, record.courseId, record), 'rollback progress');
-        });
-        await _forEachChunk(snapshot.notes, async record => {
-          _requireAcknowledgedWrite(await DB.saveNote(record), 'rollback notes');
-        });
-        await _forEachChunk(snapshot.folders, async record => {
-          _requireAcknowledgedWrite(await DB.saveFolder(record), 'rollback folders');
-        });
-        for (const [key, value] of Object.entries(snapshot.settings)) {
-          if (value !== undefined) _requireAcknowledgedWrite(await DB.saveSetting(key, value), `rollback ${key}`);
-        }
-        const allDocs = new Set([...annotationDocIds, ...snapshot.annotations.map(a => String(a.docId ?? 'global'))]);
-        for (const docId of allDocs) {
-          const pages = {};
-          for (const ann of snapshot.annotations.filter(a => String(a.docId ?? 'global') === docId)) {
-            const page = String(ann.page ?? 1);
-            (pages[page] ??= []).push(ann);
-          }
-          if (typeof DB.saveAnnotations !== 'function') throw new Error('Cannot restore annotations');
-          _requireAcknowledgedWrite(await DB.saveAnnotations(docId, pages), 'rollback annotations');
-        }
-        const existingTimestamps = new Map(snapshot.timestamps.map(item => [item.id, item]));
-        for (const id of timestampIds) {
-          if (!existingTimestamps.has(id)) {
-            if (typeof DB.deleteTimestamp !== 'function') throw new Error('Cannot undo newly imported timestamp');
-            _requireAcknowledgedWrite(await DB.deleteTimestamp(id), 'rollback timestamp deletion');
-          }
-        }
-        for (const item of snapshot.timestamps) {
-          if (typeof DB.saveTimestamp !== 'function') throw new Error('Cannot restore original timestamps');
-          _requireAcknowledgedWrite(await DB.saveTimestamp(item), 'rollback timestamps');
-        }
+      if (!snapshot?.primary || typeof DB.importBackup !== 'function') {
+        throw new Error('Atomic rollback engine is unavailable');
       }
-      // Restore current local UI mirrors after the canonical primary snapshot
-      // so a partially imported UI setting is never left behind.
+      // Restore all primary stores in one IndexedDB transaction. The
+      // snapshot identity also authorizes same-session AI credential rollback.
+      const receipt = await DB.importBackup(snapshot.primary, {
+        mode: 'overwrite', restoreLocalAuthority: true,
+      });
+      if (receipt?.committed !== true || receipt.degraded === true) {
+        throw new Error('Atomic rollback was incomplete; check storage and AI session status');
+      }
+      // Restore local-only UI mirrors only after the canonical transaction
+      // commits, never when primary recovery failed or became degraded.
       for (const [key, value] of Object.entries(snapshot.mirrors)) {
         if (value === null) window.localStorage.removeItem(key);
         else window.localStorage.setItem(key, value);
