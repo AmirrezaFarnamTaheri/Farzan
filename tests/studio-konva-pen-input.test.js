@@ -93,6 +93,42 @@ describe('Konva pen input pointer capture', () => {
     input.destroy();
   });
 
+  it('cancels an oversized pointer gesture before it can reach a canonical write', async () => {
+    const target = document.createElement('div');
+    const onPreview = vi.fn();
+    const onStroke = vi.fn(async () => true);
+    const onError = vi.fn();
+    const input = pen.installKonvaPenInput({
+      target,
+      worldPoint: event => [event.clientX, event.clientY],
+      onPreview, onStroke, onError,
+    });
+    try {
+      emit(target, 'pointerdown', { x: 0, y: 0 });
+      // Each sample is far beyond the minimum distance. A stroke with more
+      // than 4096 points is invalid in appendKonvaV1Stroke; fail while
+      // capturing rather than allocating ever-growing preview arrays.
+      for (let index = 1; index <= 4096; index++) {
+        emit(target, 'pointermove', { x: index * 4, y: 0 });
+      }
+      emit(target, 'pointerup', { x: 16388, y: 0 });
+      await flush();
+      expect(onStroke).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledOnce();
+      expect(onError.mock.calls[0][0]).toBeInstanceOf(RangeError);
+      expect(onPreview.mock.lastCall[0]).toBeNull();
+
+      // Releasing the old pointer must rearm a clean independent gesture.
+      emit(target, 'pointerdown', { x: 0, y: 0 });
+      emit(target, 'pointermove', { x: 8, y: 0 });
+      emit(target, 'pointerup', { x: 16, y: 0 });
+      await flush();
+      expect(onStroke).toHaveBeenCalledExactlyOnceWith([[0, 0], [8, 0], [16, 0]]);
+    } finally {
+      input.destroy();
+    }
+  });
+
   it('detaches event handlers and does not write after disposal', async () => {
     const { target, strokes, input } = makePointerCapture();
     emit(target, 'pointerdown');
