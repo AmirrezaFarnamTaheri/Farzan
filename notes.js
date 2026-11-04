@@ -1306,6 +1306,18 @@ import { countWords } from './src/core/textMetrics.js';
     // ── Helpers ───────────────────────────────────────────
     _onInput() {
       window.OpenCourseDeck?.beforeUnload?.mark?.('notes-body');
+      // Retract an earlier durable receipt immediately when a new body
+      // revision is typed. The IndexedDB autosave is debounced, so leaving
+      // "Saved locally" visible until that timer fires would be false.
+      if (this._currentId) {
+        this._saveIndicatorRevision = (this._saveIndicatorRevision || 0) + 1;
+        const status = $('[data-save-status]');
+        if (status) {
+          status.textContent = 'Saving…';
+          status.classList.add('visible');
+          status.classList.remove('error');
+        }
+      }
       this.save();
     },
 
