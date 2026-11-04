@@ -732,6 +732,39 @@ describe('app shell resilience helpers', () => {
     expect(saved.topicIds).toEqual(['topic-1', 'topic-2']);
   });
 
+  it('saves the course queue explicitly selected in the New playlist form', async () => {
+    await loadApp();
+    let stored = [];
+    window.DB = {
+      getAllTimestamps: vi.fn(async () => []),
+      getSetting: vi.fn(async () => structuredClone(stored)),
+      compareAndSwapSetting: vi.fn(async (_key, expected, next) => {
+        if (JSON.stringify(expected) !== JSON.stringify(stored)) return false;
+        stored = structuredClone(next);
+        return true;
+      }),
+    };
+    window.DataStore = {
+      init: vi.fn(async () => {}),
+      allTopics: vi.fn(() => [
+        { topicId: 'a1', courseId: 'course-a', courseTitle: 'Cardiology', sourceLabel: 'A', title: 'Lecture A1', videos: ['https://example.test/a1.mp4'] },
+        { topicId: 'a2', courseId: 'course-a', courseTitle: 'Cardiology', sourceLabel: 'A', title: 'Lecture A2', videos: ['https://example.test/a2.mp4'] },
+        { topicId: 'b1', courseId: 'course-b', courseTitle: 'Neurology', sourceLabel: 'B', title: 'Lecture B1', videos: ['https://example.test/b1.mp4'] },
+      ]),
+    };
+    await window.OpenCourseDeck.Views.playlists();
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-playlist-source] option')).toHaveLength(2));
+    const source = document.querySelector('[data-playlist-source]');
+    source.value = '1';
+    source.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[data-playlist-name]').value = 'Neuro queue';
+    document.querySelector('[data-save-playlist]').click();
+    await vi.waitFor(() => expect(stored).toHaveLength(1));
+    expect(stored[0].title).toBe('Neuro queue');
+    expect(stored[0].topicIds).toEqual(['b1']);
+    expect(stored[0].sourceRefs).toEqual([{ courseId: 'course-b', topicId: 'b1' }]);
+  });
+
   it('loads and saves the Studio board through canonical settings storage', async () => {
     await loadApp();
     const savedBoard = {
