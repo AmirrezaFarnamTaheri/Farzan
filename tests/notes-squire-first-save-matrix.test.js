@@ -15,7 +15,7 @@ const supported = [
   ['preformatted code', '<pre>rate = 72\nunit = bpm</pre>', ['rate = 72', 'unit = bpm']],
   ['nested RTL list', '<ul dir="rtl"><li>بند فارسی Heart<ul><li>مرحله عمیق 你好</li></ul></li><li>پایان</li></ul>', ['بند فارسی', 'Heart', 'مرحله عمیق 你好', 'پایان']],
   ['styled mixed-direction span', '<p dir="rtl" style="text-align:right"><span style="color:#123456;font-size:18px">قلب Heart 中文</span> آخر</p>', ['قلب Heart 中文', 'آخر']],
-  ['long mixed-script note', '<p dir="rtl">' + 'فارسی Heart 你好世界 · '.repeat(130) + '</p>', ['فارسی Heart', '你好世界']],
+  ['long mixed-script note', '<p dir="rtl">' + 'فارسی Heart 你好世界 · '.repeat(130).trimEnd() + '</p>', ['فارسی Heart', '你好世界']],
 ];
 
 describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
@@ -78,7 +78,45 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
       // The editor's post-first-edit output must itself be safely reopenable.
       expect(assessNoteForSquire(firstEdit).compatible).toBe(true);
     } finally { editor.destroy(); }
-    const reopened = createSquireNoteEditor({ element: document.createElement('div'), html: firstEdit });
+    let reopened;
+    try {
+      reopened = createSquireNoteEditor({ element: document.createElement('div'), html: firstEdit });
+    } catch (error) {
+      // Diagnostics use synthetic first-party HTML only, never user content.
+      const root = document.createElement('div');
+      const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurify(window);
+      const probe = new Squire(root, {
+        blockTag: 'P', addLinks: false,
+        sanitizeToDOMFragment: value => {
+          const cleaned = purifier.sanitize(String(value ?? ''), {
+            USE_PROFILES: { html: true },
+            FORBID_TAGS: ['iframe', 'object', 'embed', 'svg', 'math'],
+            ADD_ATTR: ['data-remote-src', 'data-ai-summary-block'],
+          });
+          const template = document.createElement('template');
+          template.innerHTML = sanitizeNoteStyles(cleaned);
+          return template.content;
+        },
+      });
+      try {
+        probe.setHTML(firstEdit);
+        const beforeTemplate = document.createElement('template');
+        beforeTemplate.innerHTML = firstEdit;
+        const afterTemplate = document.createElement('template');
+        afterTemplate.innerHTML = probe.getHTML();
+        const before = beforeTemplate.content.textContent;
+        const after = afterTemplate.content.textContent;
+        let mismatch = 0;
+        while (mismatch < Math.min(before.length, after.length) && before[mismatch] === after[mismatch]) mismatch++;
+        console.warn('Synthetic Squire reopen mismatch', JSON.stringify({
+          fixture: _name, beforeLength: before.length, afterLength: after.length,
+          firstDifference: mismatch, beforeWindow: before.slice(Math.max(0,mismatch-18),mismatch+35),
+          afterWindow: after.slice(Math.max(0,mismatch-18),mismatch+35),
+          inputStart: firstEdit.slice(0, 380), outputStart: probe.getHTML().slice(0, 380),
+        }));
+      } finally { probe.destroy(); }
+      throw error;
+    }
     try {
       const html = reopened.getHTML();
       for (const token of [...labels, 'added محفوظ']) expect(html).toContain(token);
