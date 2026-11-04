@@ -52,7 +52,7 @@ purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagr
 seashell sienna silver skyblue slateblue slategray slategrey snow springgreen
 steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow
 yellowgreen transparent none
-`.trim().split(/\\s+/));
+`.trim().split(/\s+/));
 
 function supportedStandalonePaint(value) {
   if (typeof value !== 'string') return false;
@@ -62,8 +62,8 @@ function supportedStandalonePaint(value) {
   if (/^#[0-9a-f]{3}(?:[0-9a-f]{1}|[0-9a-f]{3}(?:[0-9a-f]{2})?)?$/i.test(paint)) return true;
   // Numeric RGB/HSL literals have no dependency on surrounding CSS. Konva
   // cannot resolve CSS variables, URL paint servers, or inherited colors.
-  if (/^rgba?\\(\\s*[\\d.%+\\-\\s,]+\\)$/i.test(paint)) return true;
-  if (/^hsla?\\(\\s*[\\d.%+\\-\\s,]+(?:deg|rad|turn)?[\\d.%+\\-\\s,]*\\)$/i.test(paint)) return true;
+  if (/^rgba?\(\s*[\d.%+\-\s,]+\)$/i.test(paint)) return true;
+  if (/^hsla?\(\s*[\d.%+\-\s,]+(?:deg|rad|turn)?[\d.%+\-\s,]*\)$/i.test(paint)) return true;
   return false;
 }
 
