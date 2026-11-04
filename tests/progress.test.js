@@ -1264,8 +1264,9 @@ describe('progress backup exports', () => {
 
     expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ notes: 1, folders: 1, settings: 1, errors: [] });
     expect(window.PlasmaNotesApp.init).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync).toHaveBeenCalledOnce();
     expect(window.PlasmaNotesApp.refreshFromSync)
-      .toHaveBeenCalledExactlyOnceWith({ kind: 'note', action: 'backup-import' });
+      .toHaveBeenCalledWith({ kind: 'note', action: 'backup-import' });
     expect(order).toEqual(['note', 'folder', 'settings', 'refresh']);
   });
 
