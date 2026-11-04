@@ -335,3 +335,62 @@ test('classic fallback synthetic IME keeps provisional RTL content through histo
   await expect(editor.locator('p')).toContainText('متن کامل 你好完成');
   await expect(editor.locator('table td')).toHaveText('70 mL');
 });
+
+
+test('incompatible note explains its classic fallback accessibly and clears it on switching notes', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor'))
+    .toBeVisible({ timeout: 20_000 });
+  const oldTitle = 'RTL advanced formatting original';
+  const simpleTitle = 'Squire compatible regular note';
+  const ids = await page.evaluate(({ oldTitle: advancedTitle, simpleTitle: regularTitle }) => {
+    const advanced = window.PlasmaNotesStore.createNote({
+      title: advancedTitle,
+      folderId: 'default',
+      content: '<h2 dir="rtl">فارسی Heart 你好</h2><table><tbody><tr><td>70 mL</td></tr></tbody></table>',
+    });
+    const simple = window.PlasmaNotesStore.createNote({
+      title: regularTitle, folderId: 'default', content: '<p dir="rtl">سلام 你好</p>',
+    });
+    if (!window.PlasmaNotesApp.openNote(advanced.id)) throw new Error('Could not open advanced note');
+    return { advanced: advanced.id, simple: simple.id };
+  }, { oldTitle, simpleTitle });
+
+  const toggle = page.locator('[data-notes-modern-toggle]');
+  const hint = page.locator('[data-notes-mode-explanation]');
+  const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+  await expect(toggle).toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(toggle).toBeDisabled();
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('classic editor');
+  await expect(hint).toContainText('formatting');
+  const hintId = await hint.getAttribute('id');
+  expect(hintId).toBeTruthy();
+  await expect(toggle).toHaveAttribute('aria-describedby', hintId);
+  await expect(hint).toHaveAttribute('role', 'status');
+  await expect(modern).toHaveCount(0);
+  const before = await page.evaluate(id => window.PlasmaNotesStore.getNote(id).content, ids.advanced);
+
+  await page.evaluate(id => {
+    if (!window.PlasmaNotesApp.openNote(id)) throw new Error('Could not open compatible note');
+  }, ids.simple);
+  await expect(hint).toBeHidden();
+  await expect(toggle).not.toHaveAttribute('aria-describedby', hintId);
+  await expect(modern).toBeVisible({ timeout: 20_000 });
+  await expect(toggle).toHaveText('Use classic editor');
+  expect(await page.evaluate(id => window.PlasmaNotesStore.getNote(id).content, ids.advanced))
+    .toBe(before);
+
+  await page.evaluate(id => {
+    if (!window.PlasmaNotesApp.openNote(id)) throw new Error('Could not reopen advanced note');
+  }, ids.advanced);
+  await expect(toggle).toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('formatting');
+  await expect(modern).toHaveCount(0);
+  expect(await page.evaluate(id => window.PlasmaNotesStore.getNote(id).content, ids.advanced))
+    .toBe(before);
+});
