@@ -112,7 +112,9 @@ describe('Materials task-first browsing', () => {
     expect(rtl.querySelector('.topic-title')?.getAttribute('dir')).toBe('auto');
     expect(rtl.querySelector('.topic-title')?.textContent).toBe('Ectoderm');
     expect(rtl.querySelector('.topic-submeta')?.textContent).toContain('دوره جامع');
-    expect(rtl.querySelector('.topic-meta')?.getAttribute('dir')).toBe('ltr');
+    // Play and PDF native controls already disclose the available media;
+    // no duplicate metadata column should crowd the bilingual lesson title.
+    expect(rtl.querySelector('.topic-meta')).toBeNull();
     expect(rtl.querySelector('.topic-actions')?.getAttribute('dir')).toBe('ltr');
     expect([...rtl.querySelectorAll('.topic-actions button')].map(btn => btn.dataset.action))
       .toEqual(['play-video', 'open-pdf']);
