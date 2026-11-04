@@ -273,3 +273,65 @@ test('classic fallback redo persists real RTL keyboard revisions without another
   await expect(editor.locator('table td')).toHaveText('70 mL');
   await expect(modern).toHaveCount(0);
 });
+
+
+test('classic fallback synthetic IME keeps provisional RTL content through history shortcuts and saves only the committed text', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor'))
+    .toBeVisible({ timeout: 20_000 });
+
+  const title = 'Classic IME history safety';
+  const noteId = await page.evaluate(name => {
+    const note = window.PlasmaNotesStore.createNote({
+      title: name, folderId: 'default',
+      content: '<p dir="rtl">شروع</p><table><tbody><tr><td>70 mL</td></tr></tbody></table>',
+    });
+    if (!window.PlasmaNotesApp.openNote(note.id)) throw new Error('Could not open complex note');
+    return note.id;
+  }, title);
+  const editor = page.locator('[data-notes-editor]');
+  await expect(page.locator('[data-notes-modern-toggle]'))
+    .toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(editor.locator('.notes-modern-editor')).toHaveCount(0);
+  const stored = () => page.evaluate(async id =>
+    (await window.DB.getAllNotes()).find(note => note.id === id)?.content ?? '', noteId);
+
+  await page.evaluate(() => {
+    const root = document.querySelector('[data-notes-editor]');
+    root.querySelector('p').textContent = 'ویرایش شده Heart 你好';
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect.poll(stored, { timeout: 20_000 }).toContain('ویرایش شده');
+
+  // Synthetic composition events prove our listener routing, not a physical
+  // Windows Persian/Chinese keyboard's behavior or screen-reader acceptance.
+  const provisional = await page.evaluate(() => {
+    const root = document.querySelector('[data-notes-editor]');
+    root.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    root.querySelector('p').textContent = 'متن ناتمام 你好中间';
+    const undo = new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, isComposing: true, bubbles: true, cancelable: true,
+    });
+    root.dispatchEvent(undo);
+    return { prevented: undo.defaultPrevented, text: root.querySelector('p').textContent };
+  });
+  expect(provisional).toEqual({ prevented: false, text: 'متن ناتمام 你好中间' });
+  expect(await stored()).not.toContain('متن ناتمام');
+
+  await page.evaluate(() => {
+    const root = document.querySelector('[data-notes-editor]');
+    root.querySelector('p').textContent = 'متن کامل 你好完成';
+    root.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+  });
+  await expect.poll(stored, { timeout: 20_000 }).toContain('متن کامل 你好完成');
+  expect(await stored()).toContain('70 mL');
+  await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-notes-toggle-library]').click();
+  await page.locator('[data-notes-list]').getByText(title).click();
+  await expect(editor.locator('p')).toContainText('متن کامل 你好完成');
+  await expect(editor.locator('table td')).toHaveText('70 mL');
+});
