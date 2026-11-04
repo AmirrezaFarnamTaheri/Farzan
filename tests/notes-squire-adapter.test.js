@@ -7,6 +7,7 @@ describe('Squire HTML-canonical edit adapter', () => {
     [{ content: '<p>Rich</p>' }],
     [['<p>Rich</p>']],
     [42],
+    [null],
   ])('rejects a non-HTML canonical payload before replacing saved editor state (%j)', value => {
     const host = document.createElement('div');
     host.innerHTML = '<p>Existing saved body</p>';
@@ -26,6 +27,25 @@ describe('Squire HTML-canonical edit adapter', () => {
       expect(editor.getHTML()).toBe(before);
       expect(onUpdate).not.toHaveBeenCalled();
     } finally { editor.destroy(); }
+  });
+
+  it('rejects undefined on a refresh or insertion while allowing an omitted initial blank note', () => {
+    const editor = createSquireNoteEditor({
+      element: document.createElement('div'),
+      html: '<p>سلام <strong>Heart</strong> 中文</p>',
+      onUpdate: vi.fn(),
+    });
+    try {
+      const before = editor.getHTML();
+      expect(() => editor.setContent(undefined)).toThrow(/html|content|type/i);
+      expect(editor.getHTML()).toBe(before);
+      expect(() => editor.editor.commands.insertContent(undefined)).toThrow(/html|content|type/i);
+      expect(editor.getHTML()).toBe(before);
+    } finally { editor.destroy(); }
+
+    const blank = createSquireNoteEditor({ element: document.createElement('div') });
+    try { expect(blank.getHTML()).toBe(''); }
+    finally { blank.destroy(); }
   });
 
   it('exports only the Squire editor entrypoint', () => {
