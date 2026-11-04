@@ -92,3 +92,82 @@ test('first real Squire edit keeps rich RTL saved HTML through Chromium reload o
   await expect(modern.locator('h2[dir="rtl"]')).toBeVisible();
   await expect(modern.locator('p[dir="rtl"] span.size')).toContainText('دریچه Heart');
 });
+
+test('Squire keyboard undo/redo persists the correct RTL revision and reopens without style loss', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+
+  const modern = page.locator('[data-notes-editor] .notes-modern-editor');
+  await expect(modern).toBeVisible({ timeout: 20_000 });
+  const title = 'Squire native undo redo RTL';
+  const initial = '<h2 dir="rtl">آزمایش Heart 你好</h2>'
+    + '<p dir="rtl" style="text-align:right"><span style="font-size:18px;color:#123456">'
+    + 'متن مهم</span> پایان</p><p><a href="https://example.org/heart">Reference</a></p>';
+  const noteId = await page.evaluate(({ title: savedTitle, initial: html }) => {
+    const note = window.PlasmaNotesStore.createNote({
+      title: savedTitle, folderId: 'default', content: html,
+    });
+    if (!window.PlasmaNotesApp.openNote(note.id)) throw new Error('Note was not opened');
+    return note.id;
+  }, { title, initial });
+
+  const stored = () => page.evaluate(async id =>
+    (await window.DB.getAllNotes()).find(note => note.id === id)?.content ?? '', noteId);
+  await expect.poll(stored, { timeout: 20_000 }).toContain('متن مهم');
+  await expect(modern.locator('p[dir="rtl"]')).toContainText('متن مهم');
+  await modern.locator('p[dir="rtl"]').click();
+  await page.keyboard.press('End');
+  const edit = ' CHECK_UNDO_你好';
+  // A real browser keyboard edit must be undoable, not just an injected DOM mutation.
+  await page.keyboard.insertText(edit);
+  await expect(modern).toContainText(edit);
+  await expect.poll(stored, { timeout: 20_000 }).toContain(edit);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(modern).not.toContainText(edit);
+  await expect.poll(stored, { timeout: 20_000 }).not.toContain(edit);
+
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(modern).toContainText(edit);
+  await expect.poll(stored, { timeout: 20_000 }).toContain(edit);
+
+  // The stored revision, not the in-memory Squire DOM, owns reopen.
+  await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  const library = page.locator('[data-notes-toggle-library]');
+  await expect(library).toBeVisible();
+  await library.click();
+  await page.locator('[data-notes-list]').getByText(title).click();
+  await expect(modern).toBeVisible({ timeout: 20_000 });
+  await expect(modern).toContainText(edit);
+
+  const metadata = await page.evaluate(source => {
+    const template = document.createElement('template');
+    template.innerHTML = source;
+    const block = template.content.querySelector('p[dir="rtl"]');
+    const leaf = [...(block?.querySelectorAll('span') ?? [])].reverse()
+      .find(node => node.textContent.includes('متن مهم'));
+    let size = '', color = '';
+    for (let node = leaf; node && node !== block; node = node.parentElement) {
+      size ||= node.style?.fontSize ?? '';
+      color ||= node.style?.color ?? '';
+    }
+    return {
+      headingDir: template.content.querySelector('h2')?.getAttribute('dir'),
+      blockDir: block?.getAttribute('dir'),
+      alignment: block?.style?.textAlign,
+      size, color,
+      link: template.content.querySelector('a[href]')?.getAttribute('href'),
+      text: template.content.textContent,
+    };
+  }, await stored());
+  expect(metadata).toMatchObject({
+    headingDir: 'rtl', blockDir: 'rtl', alignment: 'right',
+    size: '18px', link: 'https://example.org/heart',
+  });
+  expect(metadata.color).toMatch(/(?:#123456|rgb\(18,\s*52,\s*86\))/i);
+  expect(metadata.text).toContain('آزمایش Heart 你好');
+  expect(metadata.text).toContain(edit);
+});
