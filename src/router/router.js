@@ -173,6 +173,24 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
           region.textContent = `Navigated to ${label}`;
         };
 
+        // The sidebar is a separate scroll region; activating a route below
+        // its fold must never leave the current location invisible. Scroll
+        // this region only, without moving the learning workspace or focus.
+        const revealActiveNavigation = () => {
+          const rail = document.querySelector('.sidebar-nav');
+          const current = rail?.querySelector('.nav-item[aria-current="page"]');
+          if (!rail || !current) return;
+          const region = rail.getBoundingClientRect();
+          const link = current.getBoundingClientRect();
+          if (!region.height || !link.height) return;
+          const inset = 8;
+          if (link.top < region.top + inset) {
+            rail.scrollTop -= region.top + inset - link.top;
+          } else if (link.bottom > region.bottom - inset) {
+            rail.scrollTop += link.bottom - (region.bottom - inset);
+          }
+        };
+
         const finish = () => {
           if (!isCurrent()) return;
           // The app scrolls inside its persistent main shell. Reusing the old
@@ -188,6 +206,7 @@ export function createRouter({ $$, Progress, bus, getNotFoundView, getRouteLabel
               if (element && element.scrollTop) element.scrollTop = 0;
             }
           }
+          revealActiveNavigation();
           Progress?.pageBar?.finish?.();
           announce();
           bus?.emit?.('route:change', routeEvent);
