@@ -35,7 +35,7 @@ export function mountHelpView(deps = {}) {
               <li><span aria-hidden="true">1</span><p>Open Farzan in your browser or installed Windows app, then choose Courses to start studying.</p></li>
               <li><span aria-hidden="true">2</span><p>Select a lesson and use Play or Resume. Farzan saves your progress as you study.</p></li>
               <li><span aria-hidden="true">3</span><p>Create Notes, review Flashcards, open PDFs, or use Studio to organize ideas visually.</p></li>
-              <li><span aria-hidden="true">4</span><p>Export a backup from Settings before changing devices, browser profiles, or installations.</p></li>
+              <li><span aria-hidden="true">4</span><p>Export your study-data JSON, and separately back up imported video/PDF files from My Courses before changing devices or profiles.</p></li>
             </ol>
           </div>
         </section>
@@ -47,9 +47,11 @@ export function mountHelpView(deps = {}) {
             <dl class="help-facts">
               <div><dt>Progress</dt><dd>IndexedDB</dd></div>
               <div><dt>Preferences</dt><dd>localStorage</dd></div>
-              <div><dt>Backups</dt><dd>JSON export files</dd></div>
+              <div><dt>App-data backup</dt><dd>JSON study records</dd></div>
+              <div><dt>Imported media</dt><dd>Separate local files</dd></div>
               <div><dt>Current origin</dt><dd id="help-origin"></dd></div>
             </dl>
+            <p class="help-backup-scope">App-data JSON includes notes, learning progress, flashcards and supported settings. <strong>PDF and video files must be backed up separately</strong>; use <a href="#/my-courses">My Courses</a> → Media backup &amp; restore to export their bytes before switching devices or profiles.</p>
           </div>
         </section>
 
