@@ -711,6 +711,26 @@ describe('notes route filters', () => {
     expect(status.classList.contains('visible')).toBe(true);
   });
 
+  it('treats a title-only change as Saving until its canonical write settles', async () => {
+    await settleNoteDatabaseWrites();
+    expect(window.PlasmaNotesApp.openNote('regular-note')).toBe(true);
+    let acknowledge;
+    window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
+      acknowledge = () => resolve(note);
+    }));
+    const title = document.querySelector('[data-note-title-input]');
+    title.value = 'Saved title only';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    const status = document.querySelector('[data-save-status]');
+    expect(status.textContent).toMatch(/Saving/i);
+    await vi.advanceTimersByTimeAsync(550);
+    expect(status.textContent).toMatch(/Saving/i);
+    acknowledge();
+    await settleNoteDatabaseWrites();
+    await Promise.resolve();
+    expect(status.textContent).toMatch(/Saved locally/i);
+  });
+
   it('keeps All Notes and folder counters in sync after new and duplicated notes', () => {
     const total = window.PlasmaNotesStore.getNotes().length;
     const allCounter = () => document.querySelector('[data-folder-id=""] .folder-count')?.textContent;
