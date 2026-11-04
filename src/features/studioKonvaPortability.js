@@ -3,6 +3,7 @@
  * Never export Konva Stage JSON or convert unsupported legacy board features.
  */
 import { planKonvaV1Board } from './studioKonvaAdapter.js';
+import { isStandalonePaint } from './studioStandalonePaint.js';
 
 export const MAX_KONVA_DRAFT_JSON_CHARS = 8 * 1024 * 1024;
 
@@ -76,19 +77,12 @@ const safeNumber = value => {
 };
 function safeSvgPaint(value, fallback = 'none') {
   if (value == null || value === '') return fallback;
-  if (typeof value !== 'string') throw new TypeError('Unsupported SVG paint');
-  const color = value.trim();
-  // A portable, standalone SVG cannot inherit the app's CSS custom
-  // properties or ambient currentColor. Never export a preview that can
-  // silently change saved fill/stroke colors outside the application.
-  if (color.toLowerCase() === 'currentcolor') {
-    throw new TypeError('Unsupported SVG paint/color without a standalone color context');
+  // Konva rendering and standalone SVG export must accept exactly the same
+  // self-contained CSS colors; unknown syntax cannot be reconstructed safely.
+  if (!isStandalonePaint(value)) {
+    throw new TypeError('Unsupported SVG paint/color without a standalone context');
   }
-  // No url(), images, external resources, CSS declarations or event payloads.
-  if (!/^(?:none|transparent|(?:#[0-9a-f]{3}|#[0-9a-f]{4}|#[0-9a-f]{6}|#[0-9a-f]{8})|[a-z]{1,24}|rgba?\([0-9.%\s,]+\)|hsla?\([0-9.%\s,]+\))$/i.test(color)) {
-    throw new TypeError('Unsupported SVG paint/color (remote resources are forbidden)');
-  }
-  return xml(color);
+  return xml(value);
 }
 function svgAttributes(attrs) {
   return ' data-board-id="' + xml(attrs.id) + '"'
