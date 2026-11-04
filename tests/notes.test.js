@@ -2126,6 +2126,11 @@ describe('notes route filters', () => {
 
 
   it('keeps canonical folder sprites but renders custom glyphs without historical emoji alias conversion', async () => {
+    // The app loads its SVG symbols in index.html; install the relevant
+    // registry entry in this isolated jsdom fixture before rendering icons.
+    const symbol = document.createElementNS('http://www.w3.org/2000/svg', 'symbol');
+    symbol.id = 'i-folder';
+    document.body.appendChild(symbol);
     const folders = JSON.parse(localStorage.getItem('ocd_folders'));
     folders[0].icon = 'folder'; // Current canonical sprite name, not an old title-case alias.
     folders.push({ id: 'custom-glyph', name: 'Custom glyph', icon: '📁', color: '' });
