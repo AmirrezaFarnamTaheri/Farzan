@@ -10,6 +10,9 @@ const supported = [
   ['quote', '<blockquote><p>Clinical summary</p></blockquote>', ['Clinical summary']],
   ['source link', '<p><a href="https://example.org/reading">Read source</a> and <code>CO2</code></p>', ['Read source', 'CO2']],
   ['preformatted code', '<pre>rate = 72\nunit = bpm</pre>', ['rate = 72', 'unit = bpm']],
+  ['nested RTL list', '<ul dir="rtl"><li>بند فارسی Heart<ul><li>مرحله عمیق 你好</li></ul></li><li>پایان</li></ul>', ['بند فارسی', 'Heart', 'مرحله عمیق 你好', 'پایان']],
+  ['styled mixed-direction span', '<p dir="rtl" style="text-align:right"><span style="color:#123456;font-size:18px">قلب Heart 中文</span> آخر</p>', ['قلب Heart 中文', 'آخر']],
+  ['long mixed-script note', '<p dir="rtl">' + 'فارسی Heart 你好世界 · '.repeat(130) + '</p>', ['فارسی Heart', '你好世界']],
 ];
 
 describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
@@ -39,6 +42,22 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
       if (original.includes('<blockquote>')) expect(html).toContain('<blockquote');
       if (original.includes('href=')) expect(html).toContain('https://example.org/reading');
       if (original.includes('dir="rtl"')) expect(html).toMatch(/dir=["']rtl["']/);
+      if (original.includes('<ul dir="rtl"')) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const list = template.content.querySelector('ul[dir="rtl"]');
+        expect(list).not.toBeNull();
+        expect(list?.querySelector('li ul li')?.textContent).toContain('مرحله عمیق 你好');
+      }
+      if (original.includes('font-size:18px')) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const textNode = [...template.content.querySelectorAll('span')]
+          .find(node => node.textContent.includes('قلب Heart 中文'));
+        expect(textNode).toBeDefined();
+        const block = template.content.querySelector('p[dir="rtl"]');
+        expect(block?.style.textAlign).toBe('right');
+      }
     } finally { reopened.destroy(); }
   });
 
