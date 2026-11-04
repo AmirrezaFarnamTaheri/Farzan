@@ -630,6 +630,33 @@ describe('notes route filters', () => {
     expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
   });
 
+  it('resets all invisible folder, pinned and tag filters when Notes is reopened', async () => {
+    const list = window.PlasmaNotesList;
+    list._filter.folderId = 'stale-folder';
+    list._filter.tag = 'missing-tag';
+    list._filter._pinned = true;
+    list.render();
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+    window.PlasmaNotesApp.destroy();
+    expect(list._filter).toMatchObject({ folderId: null, tag: null, query: '', _pinned: false });
+    window.PlasmaNotesApp.init();
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
+  });
+
+  it('explains empty filtered results instead of claiming the saved library is empty', () => {
+    const list = window.PlasmaNotesList;
+    list._filter.tag = 'non-existent-tag';
+    list.render();
+    const empty = document.querySelector('[data-notes-list] .notes-empty');
+    expect(empty?.textContent).toContain('No notes match');
+    const reset = empty.querySelector('[data-notes-clear-filters]');
+    expect(reset).not.toBeNull();
+    reset.click();
+    expect(list._filter).toMatchObject({ folderId: null, tag: null, query: '', _pinned: false });
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+  });
+
   it('filters notes by search query and clears the query with Escape', async () => {
     const input = document.querySelector('[data-notes-search]');
 
