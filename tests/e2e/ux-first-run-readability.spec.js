@@ -34,6 +34,17 @@ test.describe('Farzan first-run legibility and responsive workspaces', () => {
     expect(Math.max(...metrics.heights)).toBeLessThanOrEqual(180);
   });
 
+  test('Materials shows direct Play and PDF controls without duplicate media badges', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });
+    const row = page.locator('#materials-list .topic-row[data-media="video-pdf"]').first();
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await expect(row.locator('.topic-actions button')).toHaveCount(2);
+    await expect(row.locator('.topic-actions')).toContainText('Play');
+    await expect(row.locator('.topic-actions')).toContainText('PDF');
+    await expect(row.locator('.topic-meta .badge')).toHaveCount(0);
+  });
+
   test('Studio inspector stays compact to leave a useful drawing area on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
