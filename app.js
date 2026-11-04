@@ -2672,7 +2672,7 @@ import { Pointer } from './src/lib/pointer.js';
       '#/materials': 'Materials',
       '#/tags': 'Tags',
       '#/playlists': 'Playlists',
-      '#/bookmarks': 'Bookmarks',
+      '#/bookmarks': 'Saved Items',
       '#/notes': 'Notes',
       '#/pdf': 'PDF',
       '#/studio': 'Studio',
