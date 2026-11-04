@@ -270,6 +270,28 @@ describe('Konva sidecar for canonical Studio v1 board documents', () => {
     expect(board).toEqual(before);
   });
 
+  it.each([
+    ['remote SVG paint', 'fill', 'url(https://example.org/gradient.svg#ink)'],
+    ['document gradient', 'stroke', 'url(#gradient-1)'],
+    ['unresolved theme token', 'fill', 'var(--accent)'],
+    ['ambient currentColor', 'stroke', 'currentColor'],
+    ['CSS gradient', 'fill', 'linear-gradient(red, blue)'],
+    ['CSS-wide inherited color', 'stroke', 'inherit'],
+  ])('rejects unsupported %s instead of silently changing a Studio board', (_label, property, value) => {
+    const board = fixture();
+    board.layers[0].elements = [{
+      id: 'painted', type: 'rect', x: -20, y: 40,
+      width: -100, height: 50, [property]: value,
+    }];
+    const untouched = structuredClone(board);
+    const plan = planKonvaV1Board(board);
+    expect(plan).toMatchObject({
+      compatible: false,
+      reason: expect.stringMatching(/unsupported|invalid/i),
+    });
+    expect(board).toEqual(untouched);
+  });
+
   it('preserves an explicitly round-capped legacy line', () => {
     const board = fixture();
     board.layers[0].elements = [{ id: 'cap', type: 'line', x1: 0, y1: 10,

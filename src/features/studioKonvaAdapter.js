@@ -32,14 +32,49 @@ const TYPE_KEYS = Object.freeze({
   text: ['text', 'fontSize', 'fontFamily', 'align', 'baseline', 'width'],
 });
 
+const CSS_NAMED_COLORS = new Set(`
+aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond
+blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue
+cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey
+darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon
+darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet
+deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen
+fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew
+hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon
+lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey
+lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey
+lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine
+mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen
+mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin
+navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod
+palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue
+purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen
+seashell sienna silver skyblue slateblue slategray slategrey snow springgreen
+steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow
+yellowgreen transparent none
+`.trim().split(/\s+/));
+
+function supportedStandalonePaint(value) {
+  if (typeof value !== 'string') return false;
+  const paint = value.trim().toLowerCase();
+  if (!paint || paint !== value.toLowerCase()) return false;
+  if (CSS_NAMED_COLORS.has(paint)) return true;
+  if (/^#[0-9a-f]{3}(?:[0-9a-f]{1}|[0-9a-f]{3}(?:[0-9a-f]{2})?)?$/i.test(paint)) return true;
+  // Numeric RGB/HSL literals have no dependency on surrounding CSS. Konva
+  // cannot resolve CSS variables, URL paint servers, or inherited colors.
+  if (/^rgba?\(\s*[\d.%+\-\s,]+\)$/i.test(paint)) return true;
+  if (/^hsla?\(\s*[\d.%+\-\s,]+(?:deg|rad|turn)?[\d.%+\-\s,]*\)$/i.test(paint)) return true;
+  return false;
+}
+
 function validateMappedElement(item, type) {
   const allowed = new Set([...COMMON_KEYS, ...(TYPE_KEYS[type] || [])]);
   for (const key of Object.keys(item)) {
     if (!allowed.has(key)) return unsupported('unsupported-element-attribute-' + key);
   }
   // Konva's paints are CSS colors here, not Canvas gradients/patterns.
-  if (item.fill != null && typeof item.fill !== 'string') return unsupported('unsupported-fill');
-  if (item.stroke != null && typeof item.stroke !== 'string') return unsupported('unsupported-stroke');
+  if (item.fill != null && !supportedStandalonePaint(item.fill)) return unsupported('unsupported-fill');
+  if (item.stroke != null && !supportedStandalonePaint(item.stroke)) return unsupported('unsupported-stroke');
   // Do not coerce malformed coordinates into a different visible shape.
   const numeric = ['x', 'y', 'x1', 'y1', 'x2', 'y2',
     'width', 'height', 'radius', 'radiusX', 'radiusY', 'rotation',
