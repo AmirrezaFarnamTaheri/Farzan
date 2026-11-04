@@ -588,6 +588,20 @@ import { countWords } from './src/core/textMetrics.js';
     return template.innerHTML;
   }
 
+  // Keep the compatibility explanation perceivable without hover or focus.
+  // An incompatible note cannot be edited safely by Squire, so the disabled
+  // button alone must not be the only place a reader can learn why.
+  function updateNotesModeExplanation(toggle, incompatible = false) {
+    const status = $('[data-notes-mode-explanation]');
+    if (!toggle || !status) return;
+    status.textContent = incompatible
+      ? 'This note uses the classic editor to preserve advanced formatting that Squire cannot safely edit.'
+      : '';
+    status.hidden = !incompatible;
+    if (incompatible) toggle.setAttribute('aria-describedby', status.id);
+    else toggle.removeAttribute('aria-describedby');
+  }
+
   // ──────────────────────────────────────────────────────────
   // 2. EDITOR (ContentEditable Rich Text)
   // ──────────────────────────────────────────────────────────
@@ -2155,7 +2169,10 @@ import { countWords } from './src/core/textMetrics.js';
           const note = Store.getNote(Editor._currentId);
           if (note) Editor.load(note, { preventScroll: true });
           const modernToggle = $('[data-notes-modern-toggle]');
-          if (modernToggle && !Editor._squire) modernToggle.textContent = 'Try Squire editor';
+          if (modernToggle && !Editor._squire) {
+            modernToggle.textContent = 'Try Squire editor';
+            updateNotesModeExplanation(modernToggle);
+          }
         });
       }
 
@@ -2170,8 +2187,10 @@ import { countWords } from './src/core/textMetrics.js';
             // Do not end an in-progress IME composition or discard an unsaved
             // last mutation merely to switch editing engines.
             if (!Editor.disableModern()) return;
+            updateNotesModeExplanation(modernToggle);
           } else {
             const result = await this.enableModernEditor();
+            updateNotesModeExplanation(modernToggle, result.reason === 'incompatible');
             if (!result.ok) {
               window.OpenCourseDeck?.Toast?.info?.(
                 result.reason === 'incompatible'
@@ -2480,6 +2499,7 @@ import { countWords } from './src/core/textMetrics.js';
         toggle.hidden = false;
         toggle.disabled = false;
         toggle.removeAttribute('title');
+        updateNotesModeExplanation(toggle);
         toggle.textContent = 'Try Squire editor';
         const sessionEpoch = Editor._loadEpoch;
         toggle.disabled = true;
@@ -2498,11 +2518,13 @@ import { countWords } from './src/core/textMetrics.js';
           if (result.reason === 'incompatible') {
             toggle.title = 'This note keeps its original advanced formatting in the classic editor.';
           }
+          updateNotesModeExplanation(toggle, result.reason === 'incompatible');
         }).catch(error => {
           if (!this._inited || Editor._loadEpoch !== sessionEpoch
             || Editor._currentId !== id || !toggle.isConnected) return;
           toggle.disabled = false;
           toggle.textContent = 'Try Squire editor';
+          updateNotesModeExplanation(toggle);
           console.warn('[Notes] Squire failed to initialize; classic editor preserved', error);
         });
       }
