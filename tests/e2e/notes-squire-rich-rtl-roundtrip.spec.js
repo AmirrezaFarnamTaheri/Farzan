@@ -32,7 +32,7 @@ test('first real Squire edit keeps rich RTL saved HTML through Chromium reload o
   await expect(modern).toBeVisible({ timeout: 20_000 });
   await expect(modern).toHaveAttribute('role', 'textbox');
   await expect(modern.locator('h2[dir="rtl"]')).toContainText('فیزیولوژی');
-  await expect(modern.locator('p[dir="rtl"] span')).toContainText('دریچه Heart');
+  await expect(modern.locator('p[dir="rtl"] span.size')).toContainText('دریچه Heart');
 
   // Actual contenteditable keyboard input, not a mocked update callback.
   await modern.locator('p[dir="rtl"]').click();
@@ -79,5 +79,5 @@ test('first real Squire edit keeps rich RTL saved HTML through Chromium reload o
   await expect(modern).toContainText('ذخیره 你好');
   await assertMeaning(await stored());
   await expect(modern.locator('h2[dir="rtl"]')).toBeVisible();
-  await expect(modern.locator('p[dir="rtl"] span')).toContainText('دریچه Heart');
+  await expect(modern.locator('p[dir="rtl"] span.size')).toContainText('دریچه Heart');
 });
