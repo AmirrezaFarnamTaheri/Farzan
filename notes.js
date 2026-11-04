@@ -2317,6 +2317,13 @@ import { countWords } from './src/core/textMetrics.js';
       if (titleInput) {
         RouteListeners.on(titleInput, 'input', () => {
           window.OpenCourseDeck?.beforeUnload?.mark?.('notes-title');
+          Editor._saveIndicatorRevision = (Editor._saveIndicatorRevision || 0) + 1;
+          const status = $('[data-save-status]');
+          if (status) {
+            status.textContent = 'Saving…';
+            status.classList.add('visible');
+            status.classList.remove('error');
+          }
           clearTimeout(titleInput._pdTitleT);
           const sourceNoteId = Editor._currentId;
           const sourceEpoch = Editor._loadEpoch;
@@ -2327,6 +2334,7 @@ import { countWords } from './src/core/textMetrics.js';
             if (sourceNoteId && Editor._currentId === sourceNoteId
               && Editor._loadEpoch === sourceEpoch && titleInput.isConnected) {
               Store.updateNote(sourceNoteId, { title: titleInput.value.trim() || 'Untitled' });
+              Editor._showSaveIndicator();
               NotesList.render();
             }
             window.OpenCourseDeck?.beforeUnload?.unmark?.('notes-title');
