@@ -2010,6 +2010,67 @@ describe('notes route filters', () => {
     expect(store.getNote('new-unrelated-note').content).toContain('Durable other note');
   });
 
+  it('rejects a Notes-only import while the active note has an unacknowledged IndexedDB save', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    await settleNoteDatabaseWrites();
+
+    let confirmWrite;
+    window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
+      confirmWrite = () => resolve(note);
+    }));
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Unsynced Persian فارسی content</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    try {
+      // The debounce is over but IndexedDB has not acknowledged this draft.
+      await vi.advanceTimersByTimeAsync(900);
+      expect(store._noteWriteQueue.has('regular-note')).toBe(true);
+      expect(app._hasPendingLocalEdit()).toBe(true);
+
+      window.PlasmaNotesExport.importJSON(new File([JSON.stringify([{
+        id: 'regular-note', title: 'Incoming revision',
+        content: '<p>Should not overwrite an unacknowledged local write</p>',
+        updatedAt: now + 100000,
+      }])], 'unacknowledged-draft.json', { type: 'application/json' }));
+      await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+        .toMatchObject({ imported: 0, updated: 0, invalid: 1 }), { timeout: 5000 });
+
+      expect(store.getNote('regular-note').content).toContain('Unsynced Persian فارسی content');
+      expect(window.DB.saveNote).not.toHaveBeenCalledWith(expect.objectContaining({
+        content: '<p>Should not overwrite an unacknowledged local write</p>',
+      }));
+    } finally {
+      confirmWrite?.();
+      await settleNoteDatabaseWrites();
+    }
+    expect(store.getNote('regular-note').content).toContain('Unsynced Persian فارسی content');
+  });
+
+  it('detects a committed Squire DOM keystroke before its queued input observer reports the change', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    expect(app.openNote('regular-note')).toBe(true);
+    await settleNoteDatabaseWrites();
+    expect(await app.enableModernEditor()).toMatchObject({ ok: true });
+    const root = document.querySelector('[data-notes-editor] .notes-modern-editor');
+    root.querySelector('p').textContent = 'New Squire text before input delivery';
+
+    // No dispatched input event or awaited MutationObserver microtask:
+    // canonical import must inspect the live editor before deciding it is clean.
+    expect(app._hasPendingLocalEdit()).toBe(true);
+    window.PlasmaNotesExport.importJSON(new File([JSON.stringify([{
+      id: 'regular-note', title: 'New imported version',
+      content: '<p>Must not replace the new Squire text</p>',
+      updatedAt: now + 100000,
+    }])], 'unobserved-squire.json', { type: 'application/json' }));
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, updated: 0, invalid: 1 }), { timeout: 5000 });
+    expect(root.textContent).toContain('New Squire text before input delivery');
+    expect(store.getNote('regular-note').content).not.toContain('Must not replace');
+  });
+
   it('updates imported note conflicts only when the incoming record is newer', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     window.PlasmaNotesStore.updateNote('regular-note', {
