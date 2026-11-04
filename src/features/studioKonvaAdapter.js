@@ -202,7 +202,7 @@ function planShape(item) {
 
 export function planKonvaV1Board(board) {
   if (!board || board.version !== 1 || !Array.isArray(board.layers)) return unsupported('invalid-v1-board');
-  if (board.activeLayerIdx != null && (!Number.isInteger(board.activeLayerIdx)
+  if (Object.hasOwn(board, 'activeLayerIdx') && (!Number.isInteger(board.activeLayerIdx)
     || board.activeLayerIdx < 0 || board.activeLayerIdx >= board.layers.length)) {
     return unsupported('invalid-active-layer');
   }
@@ -266,7 +266,7 @@ export function planKonvaV1Board(board) {
     // layer into an editable one (or render a hidden layer). Refuse the Konva
     // stage rather than coercing or rewriting canonical Canvas-v1 data.
     for (const flag of ['visible', 'locked']) {
-      if (layer[flag] != null && typeof layer[flag] !== 'boolean') {
+      if (Object.hasOwn(layer, flag) && typeof layer[flag] !== 'boolean') {
         return unsupported('invalid-layer-' + flag);
       }
     }
