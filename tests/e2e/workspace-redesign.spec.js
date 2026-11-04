@@ -110,6 +110,27 @@ test.describe('Farzan desktop workspace redesign', () => {
     }), { timeout: 20000 }).toBe(true);
   });
 
+  test('reveals the active deep sidebar route in the independent navigation scroll area', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+    const rail = page.locator('.sidebar-nav');
+    await expect(rail).toBeVisible();
+    for (const route of ['flashcards', 'achievements']) {
+      await page.evaluate(next => { location.hash = '#/' + next; }, route);
+      await expect(page.locator('.view-' + route)).toBeVisible({ timeout: 20000 });
+      const active = rail.locator('a[href="#/' + route + '"]');
+      await expect(active).toHaveAttribute('aria-current', 'page');
+      await expect.poll(() => active.evaluate(node => {
+        const bounds = node.getBoundingClientRect();
+        const parent = node.closest('.sidebar-nav')?.getBoundingClientRect();
+        return Boolean(parent && bounds.top >= parent.top - 2
+          && bounds.bottom <= parent.bottom + 2);
+      }), { timeout: 7000 }).toBe(true);
+    }
+    expect(await rail.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+  });
+
   test('keeps the selected Materials page size when moving to the next page', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/#/materials', { waitUntil: 'domcontentloaded' });

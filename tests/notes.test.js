@@ -615,7 +615,7 @@ describe('notes route filters', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await vi.advanceTimersByTimeAsync(300);
     expect(window.PlasmaNotesList._filter.query).toBe(input.value);
-    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes found');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes match');
 
     window.PlasmaNotesList._semanticIds = ['nonexistent-embedding-result'];
     window.PlasmaNotesApp.destroy();
@@ -628,6 +628,33 @@ describe('notes route filters', () => {
     expect(restored.value).toBe('');
     expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
     expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
+  });
+
+  it('resets all invisible folder, pinned and tag filters when Notes is reopened', async () => {
+    const list = window.PlasmaNotesList;
+    list._filter.folderId = 'stale-folder';
+    list._filter.tag = 'missing-tag';
+    list._filter._pinned = true;
+    list.render();
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('No notes match');
+    window.PlasmaNotesApp.destroy();
+    expect(list._filter).toMatchObject({ folderId: null, tag: null, query: '', _pinned: false });
+    window.PlasmaNotesApp.init();
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Pinned note');
+  });
+
+  it('explains empty filtered results instead of claiming the saved library is empty', () => {
+    const list = window.PlasmaNotesList;
+    list._filter.tag = 'non-existent-tag';
+    list.render();
+    const empty = document.querySelector('[data-notes-list] .notes-empty');
+    expect(empty?.textContent).toContain('No notes match');
+    const reset = empty.querySelector('[data-notes-clear-filters]');
+    expect(reset).not.toBeNull();
+    reset.click();
+    expect(list._filter).toMatchObject({ folderId: null, tag: null, query: '', _pinned: false });
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
   });
 
   it('filters notes by search query and clears the query with Escape', async () => {
@@ -659,6 +686,74 @@ describe('notes route filters', () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(document.queryCommandState).not.toHaveBeenCalled();
+  });
+
+  it('retracts Saved locally as soon as a new unsaved body revision is typed', async () => {
+    await settleNoteDatabaseWrites();
+    expect(window.PlasmaNotesApp.openNote('regular-note')).toBe(true);
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    status.classList.add('visible');
+    status.textContent = 'Saved locally';
+    document.body.append(status);
+
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft not yet written to IndexedDB</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    // The ordinary autosave has an 800 ms debounce. Saved is not truthful
+    // during that delay, even though the previous revision was durable.
+    expect(status.textContent).toMatch(/Saving/i);
+    expect(status.classList.contains('visible')).toBe(true);
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringContaining('Draft not yet written') }),
+    );
+  });
+
+  it('shows Saving until the exact note revision is acknowledged by IndexedDB', async () => {
+    const store = window.PlasmaNotesStore;
+    const app = window.PlasmaNotesApp;
+    await settleNoteDatabaseWrites();
+    expect(app.openNote('regular-note')).toBe(true);
+    let acknowledge;
+    window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
+      acknowledge = () => resolve(note);
+    }));
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    document.body.append(status);
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Durable only after the acknowledgement</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store._noteWriteQueue.has('regular-note')).toBe(true);
+    expect(status.textContent).toMatch(/Saving/i);
+    acknowledge();
+    await settleNoteDatabaseWrites();
+    await Promise.resolve();
+    expect(status.textContent).toMatch(/Saved locally/i);
+    expect(status.classList.contains('visible')).toBe(true);
+  });
+
+  it('treats a title-only change as Saving until its canonical write settles', async () => {
+    await settleNoteDatabaseWrites();
+    expect(window.PlasmaNotesApp.openNote('regular-note')).toBe(true);
+    let acknowledge;
+    window.DB.saveNote.mockImplementationOnce(note => new Promise(resolve => {
+      acknowledge = () => resolve(note);
+    }));
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    document.body.append(status);
+    const title = document.querySelector('[data-note-title-input]');
+    title.value = 'Saved title only';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(status.textContent).toMatch(/Saving/i);
+    await vi.advanceTimersByTimeAsync(550);
+    expect(status.textContent).toMatch(/Saving/i);
+    acknowledge();
+    await settleNoteDatabaseWrites();
+    await Promise.resolve();
+    expect(status.textContent).toMatch(/Saved locally/i);
   });
 
   it('keeps All Notes and folder counters in sync after new and duplicated notes', () => {
@@ -1550,8 +1645,8 @@ describe('notes route filters', () => {
     vi.advanceTimersByTime(300);
 
     const empty = document.querySelector('.notes-empty');
-    expect(empty?.textContent).toContain('No notes found');
-    expect(empty?.querySelector('[data-action="new-note"]')?.textContent.trim()).toBe('New note');
+    expect(empty?.textContent).toContain('No notes match your filters');
+    expect(empty?.querySelector('[data-notes-clear-filters]')?.textContent.trim()).toBe('Clear filters');
   });
 
   it('renders large note lists incrementally and cancels queued batches on destroy', async () => {
