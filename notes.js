@@ -976,6 +976,10 @@ import { countWords } from './src/core/textMetrics.js';
       this._historyIdx--;
       this._setRichHTML(this._history[this._historyIdx]);
       this._placeCursorAtEnd();
+      // Keyboard history changes do not raise a native input event. Treat
+      // the restored document as an actual edit so it is saved and protected
+      // by the same beforeunload guard as normal typing.
+      this._onInput();
     },
 
     redo() {
@@ -984,6 +988,7 @@ import { countWords } from './src/core/textMetrics.js';
       this._historyIdx++;
       this._setRichHTML(this._history[this._historyIdx]);
       this._placeCursorAtEnd();
+      this._onInput();
     },
 
     _setRichHTML(html) {
@@ -995,20 +1000,23 @@ import { countWords } from './src/core/textMetrics.js';
     // ── Keyboard shortcuts ────────────────────────────────
     _onKeydown(e) {
       const ctrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
 
-      if (ctrl && e.key === 's') { e.preventDefault(); this.save(true); return; }
+      if (ctrl && key === 's') { e.preventDefault(); this.save(true); return; }
       // Slash commands are a Notes UX feature, not tied to a particular
       // editing engine. Let Squire keep its own formatting/history shortcuts.
       if (!e.isComposing && e.key === '/' && this._isEmptyBlock()) {
         this._showSlashMenu();
       }
       if (this._squire) return;
-      if (ctrl && e.key === 'z') { e.preventDefault(); this.undo(); return; }
-      if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); this.redo(); return; }
-      if (ctrl && e.key === 'b') { e.preventDefault(); this.COMMANDS.bold(); return; }
-      if (ctrl && e.key === 'i') { e.preventDefault(); this.COMMANDS.italic(); return; }
-      if (ctrl && e.key === 'u') { e.preventDefault(); this.COMMANDS.underline(); return; }
-      if (ctrl && e.key === 'k') { e.preventDefault(); this.COMMANDS.link(); return; }
+      // Shift+Z is Redo, not Undo; handle it before the unshifted Z case.
+      // On some keyboard layouts Shift produces uppercase event.key = 'Z'.
+      if (ctrl && (key === 'y' || (e.shiftKey && key === 'z'))) { e.preventDefault(); this.redo(); return; }
+      if (ctrl && key === 'z') { e.preventDefault(); this.undo(); return; }
+      if (ctrl && key === 'b') { e.preventDefault(); this.COMMANDS.bold(); return; }
+      if (ctrl && key === 'i') { e.preventDefault(); this.COMMANDS.italic(); return; }
+      if (ctrl && key === 'u') { e.preventDefault(); this.COMMANDS.underline(); return; }
+      if (ctrl && key === 'k') { e.preventDefault(); this.COMMANDS.link(); return; }
 
       // Tab → indent
       if (e.key === 'Tab') {
