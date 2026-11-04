@@ -46,7 +46,7 @@ jobs:
       - name: Verify redesigned workspace at desktop and mobile sizes
         env:
           CHROME_BIN: /usr/bin/google-chrome
-        run: npm run test:e2e -- tests/e2e/workspace-redesign.spec.js tests/e2e/user-library-dexie-compat.spec.js tests/e2e/css-rtl-200pct.spec.js
+        run: npm run test:e2e -- tests/e2e/workspace-redesign.spec.js tests/e2e/user-library-dexie-compat.spec.js tests/e2e/css-rtl-200pct.spec.js tests/e2e/notes-squire-rich-rtl-roundtrip.spec.js
 
       - name: Verify saved Konva draft editing and export in real Chromium
         env:
