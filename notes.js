@@ -2721,6 +2721,9 @@ import { countWords } from './src/core/textMetrics.js';
         titleInput._pdTitleT = null;
       }
       Editor._el = null;
+      // A route teardown must not retain the previous note's rendered HTML
+      // in the singleton editor or reuse it on a later mount.
+      Editor._classicUneditedHTML = null;
       Editor._compositionActive = false;
       // Drop the note binding along with the DOM it was bound to. Leaving it
       // set survives the route unmount, so a later remount that does not reach
