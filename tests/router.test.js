@@ -38,15 +38,18 @@ describe('createRouter', () => {
     deepLink.getBoundingClientRect = vi.fn(() => ({ top: 470, bottom: 514, height: 44 }));
     nav.append(deepLink);
     document.body.append(nav);
-    window.location.hash = '#/flashcards';
+    window.location.hash = '#/home';
     const router = createRouter({
       $: () => [deepLink],
       bus: { emit: vi.fn() },
       Progress: { pageBar: { start: vi.fn(), finish: vi.fn() } },
     });
+    router.on('#/home', async () => undefined);
     router.on('#/flashcards', async () => undefined);
     try {
       await router.init();
+      router.navigate('#/flashcards');
+      await router.refresh();
       await router.ready();
       expect(deepLink.getAttribute('aria-current')).toBe('page');
       expect(nav.scrollTop).toBeGreaterThanOrEqual(120);
