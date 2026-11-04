@@ -35,7 +35,8 @@ describe('static pre-release overlay shells no longer duplicate shared owners (#
 
   it('retains actual shared Modal.create and Drawer lifecycle owners', () => {
     expect(overlay).toContain("class: `modal-container");
-    expect(overlay).toContain("class: `drawer");
+    expect(overlay).toContain('export const Drawer');
+    expect(overlay).toContain('open(target');
     expect(overlay).toContain('create({');
   });
 });
