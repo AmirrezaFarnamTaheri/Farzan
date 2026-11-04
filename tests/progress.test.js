@@ -10,6 +10,7 @@ describe('progress backup exports', () => {
     downloadedFilename = '';
     document.body.innerHTML = '';
     window.OpenCourseDeck = { Toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } };
+    delete window.PlasmaNotesApp; // Isolate mounted-editor backup refresh cases.
     window.DB = {
       getAllProgress: vi.fn(async () => [{ topicId: 'topic-1', courseId: 'course-1', updatedAt: 20 }]),
       getProgress: vi.fn(async () => null),
@@ -854,7 +855,7 @@ describe('progress backup exports', () => {
         { topicId: 'ok-topic', courseId: 'course-1', updatedAt: 10 },
         { topicId: 'bad-topic', courseId: 'course-1', updatedAt: 11 },
       ],
-      notes: [{ id: 'note-1', title: 'Imported', updatedAt: 12 }],
+      notes: [{ id: 'note-1', title: 'Imported', content: '<p>Imported</p>', updatedAt: 12 }],
       folders: [],
       settings: {
         playlists: [{ id: 'playlist-1', title: 'Imported queue', topicIds: ['ok-topic'] }],
@@ -966,7 +967,7 @@ describe('progress backup exports', () => {
   });
 
   it('reports a failed rollback honestly instead of claiming all old data was recovered', async () => {
-    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'rollback-failure.json', { type: 'application/json' });
     window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
     window.DB.saveNote.mockRejectedValueOnce(new Error('Imported note failed'));
@@ -980,7 +981,7 @@ describe('progress backup exports', () => {
   });
 
   it('prefers atomic full-primary-store rollback when the v5 backup engine is available', async () => {
-    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad' }] };
+    const payload = { version: '1.7', notes: [{ id: 'bad', title: 'Bad', content: '<p>Bad</p>' }] };
     const file = new File([JSON.stringify(payload)], 'atomic-rollback.json', { type: 'application/json' });
     const original = {
       _meta: { format: 'opencoursedeck-snapshot', version: 5 },
@@ -1077,7 +1078,7 @@ describe('progress backup exports', () => {
     const payload = {
       version: '1.7',
       progress: [{ topicId: 'new-progress', courseId: 'course-2', updatedAt: 100 }],
-      notes: [{ id: 'new-note', title: 'New note', updatedAt: 100 }],
+      notes: [{ id: 'new-note', title: 'New note', content: '<p>New note</p>', updatedAt: 100 }],
     };
     const oldProgress = { topicId: 'old-progress', courseId: 'course-1', updatedAt: 20 };
     const oldNote = { id: 'old-note', title: 'Old note', updatedAt: 20 };
@@ -1128,7 +1129,7 @@ describe('progress backup exports', () => {
     const payload = {
       version: '1.7',
       progress: [{ topicId: 'topic-cancel', courseId: 'course-1', updatedAt: 10 }],
-      notes: [{ id: 'note-cancel', title: 'Cancelled', updatedAt: 12 }],
+      notes: [{ id: 'note-cancel', title: 'Cancelled', content: '', updatedAt: 12 }],
       folders: [{ id: 'folder-cancel', name: 'Cancelled folder' }],
       settings: { notes: { view: 'grid' } },
       annotations: [{ id: 'ann-cancel', docId: 'doc-1', page: 1, updatedAt: 13 }],
@@ -1171,6 +1172,215 @@ describe('progress backup exports', () => {
     expect(window.DB.saveSetting).not.toHaveBeenCalled();
     expect(window.DB.saveAnnotations).not.toHaveBeenCalled();
     expect(window.DB.saveTimestamp).not.toHaveBeenCalled();
+  });
+
+
+  it.each([
+    ['structured editor JSON', { id: 'bad-json', content: { type: 'doc', content: [] } }],
+    ['array body', { id: 'bad-array', content: ['<p>unexpected</p>'] }],
+    ['legacy html-only body', { id: 'old-html', html: '<p>Obsolete fallback</p>' }],
+    ['missing body', { id: 'no-body', title: 'No canonical content' }],
+    ['null body', { id: 'null-body', content: null }],
+    ['missing stable ID', { content: '<p>Valid text but no ID</p>' }],
+    ['non-string ID', { id: 42, content: '<p>Valid text but invalid ID</p>' }],
+  ])('rejects %s Notes in current backups before any write or confirmation', async (_name, invalid) => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      progress: [{ courseId: 'anatomy', topicId: 'do-not-import', updatedAt: 10 }],
+      notes: [invalid],
+    })], 'invalid-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/note.*(content|html|id)/i));
+  });
+
+  it('rejects duplicate note IDs in a portable backup before any canonical mutation', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [
+        { id: 'same-note', content: '<p>Original</p>', updatedAt: 1 },
+        { id: 'same-note', content: '<p>Conflicting</p>', updatedAt: 2 },
+      ],
+      progress: [{ courseId: 'biology', topicId: 'do-not-import' }],
+    })], 'duplicate-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.UI.confirm).not.toHaveBeenCalled();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.DB.saveProgress).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/duplicate.*note/i));
+  });
+
+  it('imports canonical complex HTML unchanged, excluding obsolete text and html aliases', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const content = '<p dir="rtl">قلب Heart 中文</p><table><tbody><tr><td>72 bpm</td></tr></tbody></table>'
+      + '<img data-remote-src="https://example.test/figure.png" alt="Figure">'
+      + '<div data-ai-summary-block="true">خلاصه Summary</div>';
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{
+        id: 'complex-note', title: 'Preserved', content, updatedAt: 100,
+        topicId: 'topic', courseId: 'course',
+        text: 'obsolete duplicate text', html: '<p>obsolete duplicate HTML</p>',
+      }],
+    })], 'complex-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    const saved = window.DB.saveNote.mock.calls.find(([note]) => note.id === 'complex-note')?.[0];
+    expect(saved?.content).toBe(content);
+    expect(saved).toMatchObject({ id: 'complex-note', topicId: 'topic', courseId: 'course' });
+    expect(saved).not.toHaveProperty('text');
+    expect(saved).not.toHaveProperty('html');
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ notes: 1, errors: [] });
+  });
+
+  it('refreshes a mounted Notes editor only after all canonical backup writes settle', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const order = [];
+    window.DB.saveNote.mockImplementation(async () => { order.push('note'); return true; });
+    window.DB.saveFolder.mockImplementation(async () => { order.push('folder'); return true; });
+    window.DB.saveSetting.mockImplementation(async (key) => { if (key === 'ocd_notes_settings') order.push('settings'); return true; });
+    window.PlasmaNotesApp = {
+      init: vi.fn(),
+      refreshFromSync: vi.fn(async () => { order.push('refresh'); return { refreshed: true }; }),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'backup-note', title: 'From backup', content: '<p>Imported</p>', updatedAt: 100 }],
+      folders: [{ id: 'backup-folder', name: 'From backup', icon: 'folder' }],
+      settings: { notes: { view: 'list' } },
+    })], 'notes-and-folders.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({ notes: 1, folders: 1, settings: 1, errors: [] });
+    expect(window.PlasmaNotesApp.init).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync).toHaveBeenCalledOnce();
+    expect(window.PlasmaNotesApp.refreshFromSync)
+      .toHaveBeenCalledWith({ kind: 'note', action: 'backup-import' });
+    expect(order).toEqual(['note', 'folder', 'settings', 'refresh']);
+  });
+
+
+  it('refreshes an open Notes owner only after a failed import has rolled back', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    const order = [];
+    window.DB.exportBackup = vi.fn(async () => ({
+      _meta: { format: 'opencoursedeck-snapshot', version: 5 },
+      progress: [], notes: [], folders: [], settings: [],
+    }));
+    window.DB.importBackup = vi.fn(async () => {
+      order.push('rollback');
+      return { committed: true };
+    });
+    window.DB.saveNote.mockImplementation(async () => {
+      order.push('rejected-write');
+      return false;
+    });
+    window.PlasmaNotesApp = {
+      init: vi.fn(),
+      refreshFromSync: vi.fn(async () => { order.push('refresh'); return { refreshed: true }; }),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'rollback-note', content: '<p>Should not survive rollback</p>', updatedAt: 100 }],
+    })], 'rollback-notes.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      rolledBack: true, notes: 0, errors: expect.arrayContaining([
+        expect.objectContaining({ store: 'notes', id: 'rollback-note' }),
+      ]),
+    });
+    expect(window.PlasmaNotesApp.init).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync)
+      .toHaveBeenCalledWith({ kind: 'note', action: 'backup-rollback' });
+    expect(order).toEqual(['rejected-write', 'rollback', 'refresh']);
+  });
+
+  it('reports a failed live Notes refresh without claiming the mounted editor was updated', async () => {
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.PlasmaNotesApp = {
+      init: vi.fn(),
+      refreshFromSync: vi.fn(async () => { throw new Error('Cannot read canonical notes'); }),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'durable-note', content: '<p>Saved despite stale view</p>', updatedAt: 100 }],
+    })], 'notes-refresh-failure.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.DB.saveNote).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'durable-note', content: '<p>Saved despite stale view</p>',
+    }));
+    expect(window.OpenCourseDeck.lastImportResult).toMatchObject({
+      notes: 1, errors: [], liveRefreshError: 'Cannot read canonical notes',
+    });
+    expect(window.PlasmaNotesApp.init).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/Notes.*refresh|Reopen Notes/i));
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalledWith(
+      expect.stringMatching(/import complete/i),
+    );
+  });
+
+
+  it('blocks backup note replacement before any write while a mounted IME draft is not durable', async () => {
+    document.body.innerHTML = '<div data-notes-editor role="textbox"></div>';
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    window.PlasmaNotesApp = {
+      flushPendingSaveDurably: vi.fn(async () => false),
+      refreshFromSync: vi.fn(),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'active-note', title: 'Imported', content: '<p>Could overwrite IME draft</p>' }],
+    })], 'active-ime-import.json', { type: 'application/json' });
+
+    await window.ProgressStats.importJSONFile(file);
+
+    expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce();
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    expect(window.PlasmaNotesApp.refreshFromSync).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/Notes.*(unsaved|durab|finish)/i));
+  });
+
+  it('waits for a mounted Notes durable receipt before writing an imported note', async () => {
+    document.body.innerHTML = '<div data-notes-editor role="textbox"></div>';
+    window.OpenCourseDeck.UI = { confirm: vi.fn(async () => true) };
+    let finishNotesWrite;
+    window.PlasmaNotesApp = {
+      flushPendingSaveDurably: vi.fn(() => new Promise(resolve => { finishNotesWrite = resolve; })),
+      refreshFromSync: vi.fn(async () => ({ refreshed: true })),
+    };
+    const file = new File([JSON.stringify({
+      version: '1.7',
+      notes: [{ id: 'import-after-flush', content: '<p>Canonical</p>', updatedAt: 100 }],
+    })], 'wait-for-durable-notes.json', { type: 'application/json' });
+
+    const importing = window.ProgressStats.importJSONFile(file);
+    await vi.waitFor(() => expect(window.PlasmaNotesApp.flushPendingSaveDurably).toHaveBeenCalledOnce());
+    expect(window.DB.saveNote).not.toHaveBeenCalled();
+    finishNotesWrite(true);
+    await importing;
+    expect(window.DB.saveNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'import-after-flush', content: '<p>Canonical</p>' }),
+    );
+    expect(window.PlasmaNotesApp.refreshFromSync)
+      .toHaveBeenCalledWith({ kind: 'note', action: 'backup-import' });
   });
 
   it('imports current notes-only backups without requiring a progress array', async () => {
