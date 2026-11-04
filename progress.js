@@ -177,6 +177,13 @@ const ProgressStats = (() => {
   ══════════════════════════════════════════════════════════ */
   async function renderStatsPage() {
     const stats = await getStats();
+    // Empty first-use charts should not occupy most of the first viewport.
+    // The data attribute is derived only from confirmed canonical progress;
+    // chart data and study records are never manufactured.
+    const view = document.querySelector('.view-progress');
+    if (view) view.dataset.noStudyActivity = String(
+      !stats.doneTopics && !stats.inProgress && !stats.watchedSec,
+    );
 
     // summary cards
     _setText('#stat-total-topics',      fmtCount(stats.totalTopics));
