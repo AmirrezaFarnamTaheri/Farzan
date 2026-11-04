@@ -127,8 +127,14 @@ const ProgressStats = (() => {
     /* streaks: days with at least one topic updated */
     const days = {};
     allProgress.forEach(p => {
-      if (p.updatedAt) {
-        const d = new Date(p.updatedAt).toDateString();
+      // A timestamp-only write to an untouched topic is not study activity.
+      // Use the same meaningful lesson state that feeds active/completed
+      // metrics, or acknowledged playback coverage, before counting a day.
+      const studied = p.status === 'done' || p.status === 'in-progress'
+        || Number(p.position) > 0 || Number(p.percent) > 0;
+      const updatedAt = Number(p.updatedAt);
+      if (studied && Number.isFinite(updatedAt) && updatedAt > 0) {
+        const d = new Date(updatedAt).toDateString();
         days[d] = (days[d] || 0) + 1;
       }
     });
