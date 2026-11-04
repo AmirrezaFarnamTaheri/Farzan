@@ -826,6 +826,18 @@ const ProgressStats = (() => {
         });
         if (!confirmed) return;
 
+        // A backup must never race the active Notes editor's pending autosave,
+        // composition or queued IndexedDB write. Take a durable receipt before
+        // the first import mutation; if no receipt is possible, preserve the
+        // mounted draft and leave the backup unapplied.
+        if (importTouchesNotes && document.querySelector('[data-notes-editor]')) {
+          const notesOwner = window.PlasmaNotesApp;
+          if (typeof notesOwner?.flushPendingSaveDurably !== 'function'
+              || await notesOwner.flushPendingSaveDurably() !== true) {
+            throw new Error('Open Notes draft is unsaved or not durable. Finish editing before importing a backup.');
+          }
+        }
+
         rollbackSnapshot = await _createImportSnapshot();
         // The legacy multi-step restore does not atomically restore auxiliary
         // media stores. Reject the import BEFORE writing anything unless a v4
