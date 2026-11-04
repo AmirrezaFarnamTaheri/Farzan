@@ -161,7 +161,8 @@ describe('Courses workbench progress and accessible row actions', () => {
     await listeners.get('trackChange')(firstTrack);
     expect(anemia.dataset.playing).toBe('true');
     expect(anemia.querySelector('[data-action="play-video"]')?.getAttribute('aria-current')).toBe('true');
-    expect(anemia.querySelector('[data-current-lesson]')?.textContent).toMatch(/playing/i);
+    expect(anemia.querySelector('.topic-primary-hint')?.textContent).toBe('Current');
+    expect(anemia.querySelectorAll('[data-current-lesson]')).toHaveLength(0);
     expect(heart.dataset.playing).toBeUndefined();
     expect(heart.querySelector('[data-current-lesson]')).toBeNull();
 
