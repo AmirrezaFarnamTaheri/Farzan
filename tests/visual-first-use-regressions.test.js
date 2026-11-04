@@ -54,7 +54,7 @@ describe('first-run pages are not overwhelmed by inactive tools or duplicated ch
 
   it('explains JSON-only restoration without implying the backup includes local media', () => {
     const html = fs.readFileSync('index.html', 'utf8');
-    const option = html.match(/<button[^>]+data-action="import-backup"[\\s\\S]*?<\\/button>/)?.[0];
+    const option = html.match(/<button[^>]+data-action="import-backup"[\s\S]*?<\/button>/)?.[0];
     expect(option).toMatch(/restore app data/i);
     expect(option).toMatch(/JSON backup.*media files separate/i);
     const guide = fs.readFileSync('docs/getting-started.md', 'utf8');
