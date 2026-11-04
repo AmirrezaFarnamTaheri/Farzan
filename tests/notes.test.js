@@ -2067,4 +2067,61 @@ describe('notes route filters', () => {
     expect(store.getNote('regular-note').content).toContain('Stored metadata');
   });
 
+  it.each([
+    ['Undo', { key: 'z', ctrlKey: true }],
+    ['Redo by Shift+Z', { key: 'Z', shiftKey: true, ctrlKey: true }],
+    ['Redo by Meta+Shift+Z', { key: 'Z', shiftKey: true, metaKey: true }],
+    ['Redo by Y', { key: 'y', ctrlKey: true }],
+  ])('does not intercept classic %s while Persian/Chinese IME composition is unfinished', async (_name, shortcut) => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p>Saved baseline</p><table><tbody><tr><td>70 mL</td></tr></tbody></table>',
+    });
+    expect(app.openNote('regular-note')).toBe(true);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.querySelector('p').textContent = 'Committed local edit';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(550);
+
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    editor.querySelector('p').textContent = 'متن ناتمام 你好中间';
+    const keydown = new KeyboardEvent('keydown', {
+      ...shortcut, bubbles: true, cancelable: true,
+    });
+    editor.dispatchEvent(keydown);
+    expect(keydown.defaultPrevented).toBe(false);
+    expect(editor.querySelector('p').textContent).toBe('متن ناتمام 你好中间');
+    expect(store.getNote('regular-note').content).not.toContain('متن ناتمام');
+
+    editor.querySelector('p').textContent = 'متن کامل 你好完成';
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(850);
+    expect(store.getNote('regular-note').content).toContain('متن کامل 你好完成');
+    expect(store.getNote('regular-note').content).toContain('70 mL');
+  });
+
+  it('does not intercept a composing-key event when the browser has not emitted compositionstart', async () => {
+    const app = window.PlasmaNotesApp;
+    const store = window.PlasmaNotesStore;
+    store.updateNote('regular-note', {
+      content: '<p>Before</p><table><tbody><tr><td>Original table</td></tr></tbody></table>',
+    });
+    expect(app.openNote('regular-note')).toBe(true);
+    expect(await app.enableModernEditor()).toMatchObject({ ok: false, reason: 'incompatible' });
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.querySelector('p').textContent = 'Already typed';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(550);
+
+    const composingUndo = new KeyboardEvent('keydown', {
+      key: 'z', ctrlKey: true, isComposing: true,
+      bubbles: true, cancelable: true,
+    });
+    editor.dispatchEvent(composingUndo);
+    expect(composingUndo.defaultPrevented).toBe(false);
+    expect(editor.querySelector('p').textContent).toBe('Already typed');
+  });
+
 });
