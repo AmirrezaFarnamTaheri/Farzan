@@ -1900,54 +1900,92 @@ import { countWords } from './src/core/textMetrics.js';
 
     importJSON(file) {
       const reader = new FileReader();
-      reader.onload = e => {
+      reader.onload = async e => {
         try {
           const notes = JSON.parse(e.target.result);
           if (!Array.isArray(notes)) throw new Error('Invalid format');
+          // An incomplete IME composition has no committed text event yet.
+          // Do not apply imported records to a mounted composing source.
+          if (Editor._compositionActive) {
+            window.OpenCourseDeck?.Toast?.error?.('Finish typing before importing Notes; an IME composition is still active.');
+            return;
+          }
           let imported = 0;
           let updated = 0;
           let skipped = 0;
           let invalid = 0;
           let conflicts = 0;
           const errors = [];
-          notes.forEach(n => {
+          // Count only canonical writes that IndexedDB actually acknowledges.
+          // A failed import stays in memory protected by the existing per-note
+          // unload guard, never misreported as a persisted record.
+          for (const n of notes) {
             const normalized = this._normalizeImportedNote(n);
             if (!normalized.ok) {
               invalid++;
               errors.push(normalized.error);
-              return;
+              continue;
             }
             const note = normalized.note;
             const existing = Store.getNote(note.id);
-            // A first-use blank note is valid. An incoming record with no
-            // HTML body must never erase an existing saved note merely
-            // because its metadata carries a later updatedAt timestamp.
             if (existing && n.content == null) {
               invalid++;
               errors.push({ id: note.id, message: 'Existing note import requires HTML text content.' });
-              return;
+              continue;
             }
-            if (!existing) {
-              const nextNotes = Store.getNotes();
-              nextNotes.push(note);
-              Store.persistNote(note, nextNotes);
-              imported++;
-            } else if (this._shouldReplaceNote(existing, note)) {
-              const next = Store.getNotes().map(item => item.id === note.id ? note : item);
-              Store.persistNote(note, next);
-              updated++;
-            } else {
+            if (existing && !this._shouldReplaceNote(existing, note)) {
               skipped++;
               conflicts++;
+              continue;
             }
-          });
+            try {
+              // Import is not an editor mutation. Unlike persistNote(), do
+              // not replace the live in-memory record until IndexedDB has
+              // acknowledged the canonical row. Failed imports must never
+              // create ghost notes or overwrite the prior saved revision.
+              const snapshot = { ...note };
+              const receipt = await Store._enqueueNoteMutation(note.id, 'save', async () => {
+                if (typeof window.DB?.saveNote !== 'function') {
+                  throw new Error('Canonical IndexedDB Notes writer is unavailable');
+                }
+                const saved = await window.DB.saveNote(snapshot);
+                if (saved === false || saved == null
+                  || saved?.committed === false || saved?.status === 'failed') {
+                  throw new Error('Canonical Notes write was not acknowledged');
+                }
+                return saved;
+              });
+              if (receipt === false) {
+                throw new Error('Canonical Notes write failed');
+              }
+              Store._cacheNote(note);
+              if (existing) updated++;
+              else imported++;
+            } catch (error) {
+              invalid++;
+              errors.push({ id: note.id, message: 'Note was not saved to IndexedDB. Retry the import.' });
+              console.warn('[Notes] imported record was not persisted', error);
+            }
+          }
           window.OpenCourseDeck = window.OpenCourseDeck ?? {};
           window.OpenCourseDeck.lastNotesImportResult = { imported, updated, skipped, invalid, conflicts, errors };
-          NotesList.render();
-          window.OpenCourseDeck?.Toast?.success(`Imported ${imported} notes, updated ${updated}.`);
-        } catch {
-          window.OpenCourseDeck?.Toast?.error('Invalid JSON file.');
+          if (imported || updated) NotesApp._renderAfterCanonicalRefresh({ preserveDirtyEditor: true });
+          else NotesList.render();
+          if (errors.length) {
+            window.OpenCourseDeck?.Toast?.error?.(
+              'Notes import failed for ' + errors.length + ' record(s); only '
+              + imported + ' new and ' + updated + ' updated notes were confirmed saved. Retry the import.',
+            );
+          } else {
+            window.OpenCourseDeck?.Toast?.success?.('Imported ' + imported + ' notes, updated ' + updated + '.');
+          }
+        } catch (error) {
+          console.warn('[Notes] unable to read JSON import', error);
+          window.OpenCourseDeck?.Toast?.error?.('Invalid Notes JSON file.');
         }
+      };
+      reader.onerror = () => {
+        window.OpenCourseDeck?.Toast?.error?.('Could not read Notes JSON file.');
       };
       reader.readAsText(file);
     },

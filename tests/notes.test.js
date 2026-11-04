@@ -1657,6 +1657,107 @@ describe('notes route filters', () => {
     expect(open).toHaveBeenCalledWith(first.dataset.noteId);
   });
 
+
+  it('does not announce a Notes-only JSON import while its canonical write is pending', async () => {
+    let finishWrite;
+    window.DB.saveNote.mockImplementation(note => note.id === 'pending-import'
+      ? new Promise(resolve => { finishWrite = resolve; })
+      : Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'pending-import', title: 'Pending receipt', content: '<p>Not durable yet</p>',
+    }])], 'pending-notes.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.DB.saveNote)
+      .toHaveBeenCalledWith(expect.objectContaining({ id: 'pending-import' })), { timeout: 5000 });
+    expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalled();
+    expect(window.OpenCourseDeck.lastNotesImportResult).toBeUndefined();
+
+    finishWrite({ id: 'pending-import', committed: true });
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 1, updated: 0, errors: [] }), { timeout: 5000 });
+    expect(window.OpenCourseDeck.Toast.success).toHaveBeenCalledOnce();
+  });
+
+  it.each(['false receipt', 'rejected IndexedDB write'])(
+    'does not report %s as a successfully imported note', async (caseName) => {
+      window.DB.saveNote.mockImplementation(note => note.id !== 'failed-import'
+        ? Promise.resolve(note)
+        : caseName === 'false receipt'
+          ? Promise.resolve(false)
+          : Promise.reject(new Error('IndexedDB quota exceeded')));
+      const file = new File([JSON.stringify([{
+        id: 'failed-import', title: 'Uncommitted', content: '<p>Never acknowledged</p>',
+      }])], 'failed-notes.json', { type: 'application/json' });
+
+      window.PlasmaNotesExport.importJSON(file);
+      await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+        .toBeDefined(), { timeout: 5000 });
+      expect(window.OpenCourseDeck.lastNotesImportResult).toMatchObject({
+        imported: 0,
+        updated: 0,
+        errors: [expect.objectContaining({ id: 'failed-import' })],
+      });
+      expect(window.OpenCourseDeck.Toast.success).not.toHaveBeenCalled();
+      expect(window.OpenCourseDeck.Toast.error)
+        .toHaveBeenCalledWith(expect.stringMatching(/not saved|failed|retry/i));
+    },
+  );
+
+  it('rejects a Notes-only import while a composition is active without replacing source HTML', async () => {
+    const app = window.PlasmaNotesApp;
+    const original = window.PlasmaNotesStore.getNote('regular-note').content;
+    expect(app.openNote('regular-note')).toBe(true);
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    const file = new File([JSON.stringify([{
+      id: 'regular-note', content: '<p>Attempted remote overwrite</p>', updatedAt: now + 100000,
+    }])], 'unsafe-compose-import.json', { type: 'application/json' });
+
+    window.DB.saveNote.mockClear();
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.Toast.error)
+      .toHaveBeenCalledWith(expect.stringMatching(/finish.*typing|unsaved|composition/i)), { timeout: 5000 });
+
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(
+      expect.objectContaining({ content: '<p>Attempted remote overwrite</p>' }),
+    );
+    expect(window.PlasmaNotesStore.getNote('regular-note').content).toBe(original);
+    editor.dispatchEvent(new Event('compositionend', { bubbles: true }));
+  });
+
+
+  it('keeps an unacknowledged imported note out of the canonical in-memory library', async () => {
+    window.DB.saveNote.mockImplementation(note => note.id === 'phantom-import'
+      ? Promise.resolve(false) : Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'phantom-import', title: 'Not saved', content: '<p>Unconfirmed</p>',
+    }])], 'phantom.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, invalid: 1 }), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('phantom-import')).toBeNull();
+    expect(document.querySelector('[data-notes-list]').textContent).not.toContain('Not saved');
+  });
+
+  it('retains the old canonical note in memory after a rejected replacement', async () => {
+    const before = structuredClone(window.PlasmaNotesStore.getNote('regular-note'));
+    window.DB.saveNote.mockImplementation(note => note.id === 'regular-note'
+      && note.title === 'Rejected imported replacement'
+      ? Promise.resolve(false) : Promise.resolve(note));
+    const file = new File([JSON.stringify([{
+      id: 'regular-note', title: 'Rejected imported replacement',
+      content: '<p>Unacknowledged overwrite</p>', updatedAt: now + 100000,
+    }])], 'rejected-replacement.json', { type: 'application/json' });
+
+    window.PlasmaNotesExport.importJSON(file);
+    await vi.waitFor(() => expect(window.OpenCourseDeck.lastNotesImportResult)
+      .toMatchObject({ imported: 0, updated: 0, invalid: 1 }), { timeout: 5000 });
+    expect(window.PlasmaNotesStore.getNote('regular-note')).toEqual(before);
+    expect(document.querySelector('[data-notes-editor]').textContent).not.toContain('Unacknowledged overwrite');
+  });
+
   it('sanitizes imported note content and records import counts', async () => {
     window.DB.saveNote.mockImplementation((note) => Promise.resolve(note));
     const localNotesBefore = localStorage.getItem('ocd_notes');
