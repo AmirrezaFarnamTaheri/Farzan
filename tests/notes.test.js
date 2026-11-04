@@ -688,6 +688,27 @@ describe('notes route filters', () => {
     expect(document.queryCommandState).not.toHaveBeenCalled();
   });
 
+  it('retracts Saved locally as soon as a new unsaved body revision is typed', async () => {
+    await settleNoteDatabaseWrites();
+    expect(window.PlasmaNotesApp.openNote('regular-note')).toBe(true);
+    const status = document.createElement('span');
+    status.dataset.saveStatus = '';
+    status.classList.add('visible');
+    status.textContent = 'Saved locally';
+    document.body.append(status);
+
+    const editor = document.querySelector('[data-notes-editor]');
+    editor.innerHTML = '<p>Draft not yet written to IndexedDB</p>';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    // The ordinary autosave has an 800 ms debounce. Saved is not truthful
+    // during that delay, even though the previous revision was durable.
+    expect(status.textContent).toMatch(/Saving/i);
+    expect(status.classList.contains('visible')).toBe(true);
+    expect(window.DB.saveNote).not.toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringContaining('Draft not yet written') }),
+    );
+  });
+
   it('shows Saving until the exact note revision is acknowledged by IndexedDB', async () => {
     const store = window.PlasmaNotesStore;
     const app = window.PlasmaNotesApp;
