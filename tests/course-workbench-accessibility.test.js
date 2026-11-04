@@ -161,7 +161,8 @@ describe('Courses workbench progress and accessible row actions', () => {
     await listeners.get('trackChange')(firstTrack);
     expect(anemia.dataset.playing).toBe('true');
     expect(anemia.querySelector('[data-action="play-video"]')?.getAttribute('aria-current')).toBe('true');
-    expect(anemia.querySelector('[data-current-lesson]')?.textContent).toMatch(/playing/i);
+    expect(anemia.querySelector('.topic-primary-hint')?.textContent).toBe('Current');
+    expect(anemia.querySelectorAll('[data-current-lesson]')).toHaveLength(0);
     expect(heart.dataset.playing).toBeUndefined();
     expect(heart.querySelector('[data-current-lesson]')).toBeNull();
 
@@ -174,6 +175,31 @@ describe('Courses workbench progress and accessible row actions', () => {
     expect(anemia.dataset.playing).toBeUndefined();
     expect(anemia.querySelector('[data-current-lesson]')).toBeNull();
     expect(window.DB.saveProgress).toHaveBeenCalled();
+    controller.unmount();
+  });
+
+  it('shows one current-lesson state without announcing or painting a second Playing badge', async () => {
+    const listeners = new Map();
+    const track = { topicId: 'anemia', courseId: COURSE_ID, id: 'lecture-anemia' };
+    const player = {
+      queue: [track], trackIndex: 0, currentTime: 0, duration: 120,
+      loadPlaylist: vi.fn(), pause: vi.fn(),
+      on: vi.fn((event, listener) => listeners.set(event, listener)),
+      off: vi.fn(event => listeners.delete(event)),
+    };
+    window.OpenCourseDeck.Player.init = vi.fn(() => {
+      document.getElementById('course-player')._pdPlayer = player;
+    });
+    const controller = await mountCourses();
+    await vi.waitFor(() => expect(document.querySelectorAll('.topic-row')).toHaveLength(2));
+    await listeners.get('trackChange')(track);
+    const row = document.querySelector('[data-topic-id="anemia"]');
+    const button = row.querySelector('[data-action="play-video"]');
+    expect(button.getAttribute('aria-current')).toBe('true');
+    expect(button.querySelector('.topic-primary-hint')?.textContent).toBe('Current');
+    expect(row.querySelectorAll('[data-current-lesson]')).toHaveLength(0);
+    expect(row.textContent.match(/Playing/g)).toBeNull();
+    expect(document.querySelector('[data-topic-id="heart"] [data-current-lesson]')).toBeNull();
     controller.unmount();
   });
 

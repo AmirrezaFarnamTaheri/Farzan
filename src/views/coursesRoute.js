@@ -172,22 +172,11 @@ export async function mountCoursesView(deps = {}) {
     if (action) {
       if (active) action.setAttribute('aria-current', 'true');
       else action.removeAttribute('aria-current');
-      // Mobile hides the meta column; keep "Playing" visible in the
-      // primary action hint without requiring a second side panel.
+      // A queued or selected track is not necessarily playing. The action
+      // hint is the one visual current-lesson indicator, including in the
+      // narrow outline where the metadata column may be suppressed.
       const hint = action.querySelector('.topic-primary-hint');
-      if (hint) hint.textContent = active ? 'Playing' : 'Play';
-    }
-    const existing = row.querySelector('[data-current-lesson]');
-    if (active && !existing) {
-      row.querySelector('.topic-meta')?.appendChild(
-        createElement('span', {
-          class: 'topic-playing-pill',
-          'data-current-lesson': '',
-          role: 'status',
-        }, 'Playing'),
-      );
-    } else if (!active) {
-      existing?.remove();
+      if (hint) hint.textContent = active ? 'Current' : 'Play';
     }
   };
   const setCurrentLesson = track => {

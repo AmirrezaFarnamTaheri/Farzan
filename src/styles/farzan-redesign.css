@@ -1051,16 +1051,6 @@ input[type="file"][hidden] {
   border-color: var(--accent);
   font-weight: 750;
 }
-.view-courses .topic-playing-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--surface-active);
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 700;
-}
 .view-courses .topic-primary-action {
   display: inline-flex;
   align-items: center;
@@ -1156,6 +1146,47 @@ input[type="file"][hidden] {
   .view-courses .topic-row > .topic-meta { display: none; }
 }
 
+
+/* The desktop player narrows its lesson outline even at 1440px. Respond to
+ * the real outline width, not just the viewport width: title first, then
+ * actions. This keeps long English titles legible alongside RTL sources. */
+.view-courses .course-detail {
+  container-name: courses-outline;
+  container-type: inline-size;
+}
+@container courses-outline (max-width: 560px) {
+  .view-courses .topic-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 7px;
+  }
+  .view-courses .topic-row .topic-primary-action {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 7px;
+    padding-block: 4px;
+  }
+  .view-courses .topic-row .topic-title {
+    width: 100%;
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: normal;
+    line-height: 1.5;
+  }
+  .view-courses .topic-row .topic-meta,
+  .view-courses .topic-row .topic-actions {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .view-courses .topic-row .topic-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 7px;
+  }
+}
 
 /* Studio focus stage: the same, fully functional canvas and inspector, with
    compact floating chrome rather than tool panels taking drawing space. */

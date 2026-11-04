@@ -122,6 +122,34 @@ test.describe('Farzan desktop workspace redesign', () => {
     await expect(size).toHaveValue('25');
   });
 
+  test('keeps a full lesson title readable in the narrow playback outline on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
+    await page.locator('.course-item[data-course-id="comprehensive-internal-medicine-course"]').click();
+    const play = page.locator('#course-detail [data-action="play-video"]').first();
+    await expect(play).toBeVisible({ timeout: 20000 });
+    await play.click();
+    await expect(page.locator('[data-course-playback]')).toBeVisible({ timeout: 12000 });
+    const row = page.locator('#course-detail .topic-row[data-playing="true"]').first();
+    await expect(row).toBeVisible({ timeout: 12000 });
+    const metrics = await row.evaluate(el => {
+      const title = el.querySelector('.topic-title');
+      const box = title.getBoundingClientRect();
+      return {
+        titleWidth: box.width,
+        containerWidth: el.getBoundingClientRect().width,
+        overflowWrap: getComputedStyle(title).overflowWrap,
+        statusPills: el.querySelectorAll('[data-current-lesson]').length,
+        hint: el.querySelector('.topic-primary-hint')?.textContent?.trim(),
+      };
+    });
+    expect(metrics.containerWidth).toBeLessThan(550);
+    expect(metrics.titleWidth).toBeGreaterThan(160);
+    expect(metrics.overflowWrap).not.toBe('anywhere');
+    expect(metrics.statusPills).toBe(0);
+    expect(metrics.hint).toBe('Current');
+  });
+
   test('presents a useful catalog before playback without a blank media theater', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/#/courses', { waitUntil: 'domcontentloaded' });
