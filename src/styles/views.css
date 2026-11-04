@@ -711,14 +711,10 @@
   box-shadow: var(--shadow-sm);
 }
 
-.studio-toolbar-clusters {
-  gap: var(--space-3);
-}
 
 .studio-tool-group {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   padding-inline-end: var(--space-3);
   border-inline-end: 1px solid var(--glass-border);
   flex-wrap: wrap;
@@ -731,23 +727,15 @@
 
 .studio-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: var(--space-4);
   align-items: start;
 }
 
 .studio-canvas-card {
   overflow: hidden;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--glass-border);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
 }
 
 .studio-shell {
   width: 100%;
-  height: min(65vh, 700px);
-  min-height: 480px;
   overflow: hidden;
 }
 
@@ -761,9 +749,7 @@
 .studio-sidebar-card {
   display: grid;
   gap: var(--space-4);
-  max-height: min(75vh, 780px);
   overflow-y: auto;
-  padding: var(--space-4);
 }
 
 @media (max-width: 1024px) {
