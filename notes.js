@@ -596,6 +596,9 @@ import { countWords } from './src/core/textMetrics.js';
     _squire: null,
     _squireChanged: false,
     _squireOriginal: null,
+    // Preserve a saved classic note's exact HTML when the browser only
+    // normalized its read-only display (table wrappers, remote-image gate).
+    _classicUneditedHTML: null,
 
     async enableModern() {
       if (this._squire) return { ok: true, alreadyEnabled: true };
@@ -723,6 +726,9 @@ import { countWords } from './src/core/textMetrics.js';
       this._squire = null;
       this._squireOriginal = null;
       this._squireChanged = false;
+      // The Squire session may contain edits not yet saved in the canonical
+      // record. Its handoff cannot inherit an older classic no-edit baseline.
+      this._classicUneditedHTML = null;
       if (this._el) {
         this._el.replaceChildren();
         this._el.setAttribute('contenteditable', 'true');
@@ -839,6 +845,7 @@ import { countWords } from './src/core/textMetrics.js';
       this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
       this._setRichHTML(note.content || '');
+      this._classicUneditedHTML = this._el.innerHTML;
       this._history    = [];
       this._historyIdx = -1;
       this._snapshot();
@@ -899,7 +906,29 @@ import { countWords } from './src/core/textMetrics.js';
           clearTimeout(this._saveTimer);
           this._saveTimer = null;
         }
-        const content  = this.getContent();
+        // A title-only save or note switch must not rewrite the canonical
+        // body merely because classic contenteditable normalized table HTML
+        // or blocked a remote image in its inert preview. Genuine body edits
+        // still run through sanitization; the stored revision is authoritative
+        // when the visible classic document has not changed since load/save.
+        const savedBody = Store.getNote(this._currentId)?.content;
+        const unchangedClassic = !this._squire && this._classicUneditedHTML !== null
+          && this._el.innerHTML === this._classicUneditedHTML
+          && typeof savedBody === 'string';
+        const sanitizedContent = this.getContent();
+        // Preserve byte-identical formatting only when sanitization changes
+        // no meaningful DOM structure or attribute. Comparing normalized
+        // markup through an inert template admits harmless browser <tbody>
+        // insertion but never restores a stripped remote image URL, CSS
+        // tracker, event handler, or other unsafe source attribute.
+        const unchangedSafeSource = unchangedClassic && (() => {
+          const inert = document.createElement('template');
+          inert.innerHTML = savedBody;
+          const originalStructure = inert.innerHTML;
+          inert.innerHTML = sanitizedContent;
+          return inert.innerHTML === originalStructure;
+        })();
+        const content = unchangedSafeSource ? savedBody : sanitizedContent;
         const text     = this._squire ? this._squire.editor.getText() : (this._el.innerText ?? '');
         const words    = countWords(text);
         const chars    = text.length;
@@ -911,6 +940,7 @@ import { countWords } from './src/core/textMetrics.js';
           content, title, wordCount: words, charCount: chars,
         });
         if (updated) {
+          if (!this._squire) this._classicUneditedHTML = this._el.innerHTML;
           this._updateMeta(updated);
           this._showSaveIndicator();
           NotesList.refreshItem(updated);
@@ -2704,6 +2734,9 @@ import { countWords } from './src/core/textMetrics.js';
         titleInput._pdTitleT = null;
       }
       Editor._el = null;
+      // A route teardown must not retain the previous note's rendered HTML
+      // in the singleton editor or reuse it on a later mount.
+      Editor._classicUneditedHTML = null;
       Editor._compositionActive = false;
       // Drop the note binding along with the DOM it was bound to. Leaving it
       // set survives the route unmount, so a later remount that does not reach

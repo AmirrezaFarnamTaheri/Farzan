@@ -171,3 +171,53 @@ test('Squire keyboard undo/redo persists the correct RTL revision and reopens wi
   expect(metadata.text).toContain('آزمایش Heart 你好');
   expect(metadata.text).toContain(edit);
 });
+
+test('unsupported rich HTML stays byte-identical through classic title-only save and note switch', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/notes', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toBeVisible({ timeout: 20_000 });
+
+  // Synthetic first-party saved note with structures Squire intentionally cannot
+  // round-trip. Its remote image URL is already privacy-gated as canonical data.
+  const title = 'Classic complex HTML preservation';
+  const html = '<h2 dir="rtl">گزارش Heart 你好</h2>\n'
+    + '<table class="note-table"><tr><th>Study</th></tr><tr><td>72 bpm</td></tr></table>'
+    + '<p data-ai-summary-block="true">Original AI metadata</p>'
+    + '<p><img data-remote-src="https://example.org/private-scan.png" alt="Scan"> End</p>';
+  const ids = await page.evaluate(({ source, savedTitle }) => {
+    const old = window.PlasmaNotesStore.createNote({
+      title: savedTitle, content: source, folderId: 'default',
+    });
+    const next = window.PlasmaNotesStore.createNote({
+      title: 'Other unrelated note', content: '<p>Other note</p>', folderId: 'default',
+    });
+    if (!window.PlasmaNotesApp.openNote(old.id)) throw new Error('Failed to open complex note');
+    return { old: old.id, next: next.id };
+  }, { source: html, savedTitle: title });
+  const toggle = page.locator('[data-notes-modern-toggle]');
+  await expect(toggle).toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toHaveCount(0);
+
+  // A normal title input followed immediately by switching notes triggers the
+  // classic editor's synchronous save. The untouched raw body must not be
+  // replaced by sanitized DOM serialization, including implicit <tbody>.
+  const renamed = title + ' renamed';
+  await page.locator('[data-note-title-input]').fill(renamed);
+  await page.evaluate(nextId => {
+    if (!window.PlasmaNotesApp.openNote(nextId)) throw new Error('Note switch was refused');
+  }, ids.next);
+
+  const saved = () => page.evaluate(async id => {
+    const record = (await window.DB.getAllNotes()).find(note => note.id === id);
+    return { title: record?.title, content: record?.content };
+  }, ids.old);
+  await expect.poll(saved, { timeout: 20_000 }).toEqual({ title: renamed, content: html });
+
+  await page.evaluate(oldId => {
+    if (!window.PlasmaNotesApp.openNote(oldId)) throw new Error('Could not reopen original note');
+  }, ids.old);
+  await expect(toggle).toHaveText('Classic editor (advanced formatting)', { timeout: 20_000 });
+  await expect(page.locator('[data-notes-editor] .notes-modern-editor')).toHaveCount(0);
+  expect((await saved()).content).toBe(html);
+});
