@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 import { createSquireNoteEditor } from '../src/features/notesSquireAdapter.js';
+import Squire from 'squire-rte';
+import DOMPurify from 'dompurify';
+import { sanitizeNoteStyles } from '../src/features/safeNoteStyles.js';
 
 // Synthetic *first-party* fixtures model the supported boundary; they are
 // not a substitute for consented user content or physical Windows IME tests.
@@ -20,7 +23,48 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
     expect(assessNoteForSquire(original).compatible).toBe(true);
     const element = document.createElement('div');
     const saved = [];
-    const editor = createSquireNoteEditor({ element, html: original, onUpdate: html => saved.push(html) });
+    let editor;
+    try {
+      editor = createSquireNoteEditor({ element, html: original, onUpdate: html => saved.push(html) });
+    } catch (error) {
+      // Temporary first-party diagnostic for import parity on RED test fixtures.
+      const root = document.createElement('div');
+      const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurify(window);
+      const probe = new Squire(root, {
+        blockTag: 'P', addLinks: false,
+        sanitizeToDOMFragment: value => {
+          const cleaned = purifier.sanitize(String(value ?? ''), {
+            USE_PROFILES: { html: true },
+            FORBID_TAGS: ['iframe', 'object', 'embed', 'svg', 'math'],
+            ADD_ATTR: ['data-remote-src', 'data-ai-summary-block'],
+          });
+          const template = document.createElement('template');
+          template.innerHTML = sanitizeNoteStyles(cleaned);
+          return template.content;
+        },
+      });
+      try {
+        probe.setHTML(original);
+        const beforeTemplate = document.createElement('template');
+        beforeTemplate.innerHTML = original;
+        const afterTemplate = document.createElement('template');
+        afterTemplate.innerHTML = probe.getHTML();
+        const before = beforeTemplate.content.textContent.replace(/\\u200b/g, '');
+        const after = afterTemplate.content.textContent.replace(/\\u200b/g, '');
+        let mismatch = 0;
+        while (mismatch < Math.min(before.length, after.length) && before[mismatch] === after[mismatch]) mismatch++;
+        console.warn('Synthetic Squire source mismatch', JSON.stringify({
+          fixture: _name,
+          beforeLength: before.length,
+          afterLength: after.length,
+          firstDifference: mismatch,
+          beforeWindow: before.slice(Math.max(0, mismatch - 18), mismatch + 36),
+          afterWindow: after.slice(Math.max(0, mismatch - 18), mismatch + 36),
+          htmlStart: probe.getHTML().slice(0, 190),
+        }));
+      } finally { probe.destroy(); }
+      throw error;
+    }
     let firstEdit;
     try {
       const root = element.querySelector('.notes-modern-editor');
