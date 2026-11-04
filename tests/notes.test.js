@@ -139,6 +139,24 @@ describe('notes route filters', () => {
     sessionStorage.removeItem('ocd_note_external_images_session');
   });
 
+  it.each([null, undefined, false, 12, [], { html: '<p>Wrong type</p>' }])(
+    'rejects malformed canonical Note content on create and update (%j)', value => {
+      const store = window.PlasmaNotesStore;
+      const before = structuredClone(store.getNotes());
+      window.DB.saveNote.mockClear();
+
+      expect(() => store.updateNote('regular-note', { content: value }))
+        .toThrow(/content|html|string/i);
+      expect(store.getNotes()).toEqual(before);
+      expect(window.DB.saveNote).not.toHaveBeenCalled();
+
+      expect(() => store.createNote({ content: value }))
+        .toThrow(/content|html|string/i);
+      expect(store.getNotes()).toEqual(before);
+      expect(window.DB.saveNote).not.toHaveBeenCalled();
+    },
+  );
+
   it('accepts the canonical folder delete bridge void success without leaking an unsaved-work warning', async () => {
     const store = window.PlasmaNotesStore;
     const folder = store.createFolder('A canonical folder to delete');
