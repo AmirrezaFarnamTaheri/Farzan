@@ -135,14 +135,18 @@ export async function mountMaterialsView(deps = {}) {
       createElement('div', { class: 'topic-submeta', dir: 'auto' },
         `${topic.courseTitle ?? ''} - ${topic.sourceLabel ?? 'Source'}`)
     );
-    const meta = createElement('div', { class: 'topic-meta', dir: 'ltr' });
-    if (v) meta.appendChild(materialBadge('video'));
-    if (p) meta.appendChild(materialBadge('pdf'));
-    if (!v && !p) meta.appendChild(materialBadge('no media'));
     const actions = createElement('div', { class: 'topic-actions', dir: 'ltr' });
     if (v) actions.appendChild(materialActionButton('play-video', 'Play'));
     if (p) actions.appendChild(materialActionButton('open-pdf', 'PDF'));
-    row.append(copy, meta, actions);
+    // Play/PDF buttons already communicate available media. Repeating them
+    // as metadata badges shrinks the useful title width and adds noise.
+    row.appendChild(copy);
+    if (!v && !p) {
+      const meta = createElement('div', { class: 'topic-meta', dir: 'ltr' });
+      meta.appendChild(materialBadge('no media'));
+      row.appendChild(meta);
+    }
+    row.appendChild(actions);
     return row;
   };
   const render = (query = state.query) => {
