@@ -14,10 +14,10 @@ const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurif
 function preflight(html) {
   // The canonical model is HTML text, not a serialized object or fragment
   // collection. String coercion would corrupt a saved note as [object Object].
-  if (html != null && typeof html !== 'string') {
+  if (typeof html !== 'string') {
     throw new TypeError('Canonical Notes content must be HTML text');
   }
-  const value = html ?? '';
+  const value = html;
   const result = assessNoteForSquire(value);
   if (!result.compatible) throw new Error('Incompatible note HTML for modern editor: ' + result.reason);
   return value;
