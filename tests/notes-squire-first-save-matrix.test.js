@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { assessNoteForSquire } from '../src/features/notesSquireCompatibility.js';
 import { createSquireNoteEditor } from '../src/features/notesSquireAdapter.js';
-import Squire from 'squire-rte';
-import DOMPurify from 'dompurify';
-import { sanitizeNoteStyles } from '../src/features/safeNoteStyles.js';
 
 // Synthetic *first-party* fixtures model the supported boundary; they are
 // not a substitute for consented user content or physical Windows IME tests.
@@ -23,52 +20,14 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
     expect(assessNoteForSquire(original).compatible).toBe(true);
     const element = document.createElement('div');
     const saved = [];
-    let editor;
-    try {
-      editor = createSquireNoteEditor({ element, html: original, onUpdate: html => saved.push(html) });
-    } catch (error) {
-      // Temporary first-party diagnostic for import parity on RED test fixtures.
-      const root = document.createElement('div');
-      const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurify(window);
-      const probe = new Squire(root, {
-        blockTag: 'P', addLinks: false,
-        sanitizeToDOMFragment: value => {
-          const cleaned = purifier.sanitize(String(value ?? ''), {
-            USE_PROFILES: { html: true },
-            FORBID_TAGS: ['iframe', 'object', 'embed', 'svg', 'math'],
-            ADD_ATTR: ['data-remote-src', 'data-ai-summary-block'],
-          });
-          const template = document.createElement('template');
-          template.innerHTML = sanitizeNoteStyles(cleaned);
-          return template.content;
-        },
-      });
-      try {
-        probe.setHTML(original);
-        const beforeTemplate = document.createElement('template');
-        beforeTemplate.innerHTML = original;
-        const afterTemplate = document.createElement('template');
-        afterTemplate.innerHTML = probe.getHTML();
-        const before = beforeTemplate.content.textContent.replace(/\\u200b/g, '');
-        const after = afterTemplate.content.textContent.replace(/\\u200b/g, '');
-        let mismatch = 0;
-        while (mismatch < Math.min(before.length, after.length) && before[mismatch] === after[mismatch]) mismatch++;
-        console.warn('Synthetic Squire source mismatch', JSON.stringify({
-          fixture: _name,
-          beforeLength: before.length,
-          afterLength: after.length,
-          firstDifference: mismatch,
-          beforeWindow: before.slice(Math.max(0, mismatch - 18), mismatch + 36),
-          afterWindow: after.slice(Math.max(0, mismatch - 18), mismatch + 36),
-          htmlStart: probe.getHTML().slice(0, 190),
-        }));
-      } finally { probe.destroy(); }
-      throw error;
-    }
+    const editor = createSquireNoteEditor({ element, html: original, onUpdate: html => saved.push(html) });
     let firstEdit;
     try {
       const root = element.querySelector('.notes-modern-editor');
-      const target = root.querySelector('p, li, pre');
+      // Nested lists keep the parent label in a direct <div>. Editing that
+      // text block models a real caret inside the list label; appending raw
+      // text after a child <ul> would create non-canonical list DOM.
+      const target = root.querySelector('li > div') || root.querySelector('p, li, pre');
       expect(target).not.toBeNull();
       target.append(document.createTextNode(' added محفوظ'));
       expect(editor.syncChanges()).toBe(true);
@@ -78,45 +37,7 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
       // The editor's post-first-edit output must itself be safely reopenable.
       expect(assessNoteForSquire(firstEdit).compatible).toBe(true);
     } finally { editor.destroy(); }
-    let reopened;
-    try {
-      reopened = createSquireNoteEditor({ element: document.createElement('div'), html: firstEdit });
-    } catch (error) {
-      // Diagnostics use synthetic first-party HTML only, never user content.
-      const root = document.createElement('div');
-      const purifier = typeof DOMPurify.sanitize === 'function' ? DOMPurify : DOMPurify(window);
-      const probe = new Squire(root, {
-        blockTag: 'P', addLinks: false,
-        sanitizeToDOMFragment: value => {
-          const cleaned = purifier.sanitize(String(value ?? ''), {
-            USE_PROFILES: { html: true },
-            FORBID_TAGS: ['iframe', 'object', 'embed', 'svg', 'math'],
-            ADD_ATTR: ['data-remote-src', 'data-ai-summary-block'],
-          });
-          const template = document.createElement('template');
-          template.innerHTML = sanitizeNoteStyles(cleaned);
-          return template.content;
-        },
-      });
-      try {
-        probe.setHTML(firstEdit);
-        const beforeTemplate = document.createElement('template');
-        beforeTemplate.innerHTML = firstEdit;
-        const afterTemplate = document.createElement('template');
-        afterTemplate.innerHTML = probe.getHTML();
-        const before = beforeTemplate.content.textContent;
-        const after = afterTemplate.content.textContent;
-        let mismatch = 0;
-        while (mismatch < Math.min(before.length, after.length) && before[mismatch] === after[mismatch]) mismatch++;
-        console.warn('Synthetic Squire reopen mismatch', JSON.stringify({
-          fixture: _name, beforeLength: before.length, afterLength: after.length,
-          firstDifference: mismatch, beforeWindow: before.slice(Math.max(0,mismatch-18),mismatch+35),
-          afterWindow: after.slice(Math.max(0,mismatch-18),mismatch+35),
-          inputStart: firstEdit.slice(0, 380), outputStart: probe.getHTML().slice(0, 380),
-        }));
-      } finally { probe.destroy(); }
-      throw error;
-    }
+    const reopened = createSquireNoteEditor({ element: document.createElement('div'), html: firstEdit });
     try {
       const html = reopened.getHTML();
       for (const token of [...labels, 'added محفوظ']) expect(html).toContain(token);
@@ -141,6 +62,18 @@ describe('pre-release Squire first edit/save/reopen fixture matrix', () => {
         expect(block?.style.textAlign).toBe('right');
       }
     } finally { reopened.destroy(); }
+  });
+
+  it.each([
+    ['literal trailing-space document', '<p dir="rtl">فارسی Heart 你好世界 </p>'],
+    ['post-nested-list text', '<ul dir="rtl"><li><div>بند فارسی Heart</div><ul><li>مرحله عمیق 你好</li></ul> added محفوظ</li></ul>'],
+  ])('refuses %s when Squire would change canonical text on import', (_name, html) => {
+    const host = document.createElement('div');
+    host.innerHTML = '<p>Existing unsaved user draft</p>';
+    const before = host.innerHTML;
+    expect(() => createSquireNoteEditor({ element: host, html, onUpdate: vi.fn() }))
+      .toThrow(/changed initial note text/i);
+    expect(host.innerHTML).toBe(before);
   });
 
   it.each([
