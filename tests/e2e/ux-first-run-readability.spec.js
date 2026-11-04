@@ -9,7 +9,14 @@ test.describe('Farzan first-run legibility and responsive workspaces', () => {
     const paragraph = page.locator('.fc-empty .fc-sub');
     await expect(paragraph).toBeVisible({ timeout: 15000 });
     const ratio = await paragraph.evaluate(node => {
-      const channels = getComputedStyle(node).color.match(/[\\d.]+/g).slice(0, 3).map(Number);
+      // Render the resolved CSS Color 4 value to sRGB. Computed color-mix()
+      // may serialize as color(srgb ...), not rgb(255, 255, 255).
+      const sample = document.createElement('canvas');
+      sample.width = sample.height = 1;
+      const ctx = sample.getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = getComputedStyle(node).color;
+      ctx.fillRect(0, 0, 1, 1);
+      const channels = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
       const lightness = rgb => rgb.map(value => {
         const channel = value / 255;
         return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
