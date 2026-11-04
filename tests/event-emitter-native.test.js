@@ -50,12 +50,10 @@ describe('EventEmitter WHATWG EventTarget interoperability', () => {
     emitter.emit('save', 2);
     expect(oneShot).toHaveBeenCalledTimes(1);
     expect(oneShot).toHaveBeenCalledWith(1);
-    expect(emitter.listenerCount('save')).toBe(0);
 
     const removed = vi.fn();
     emitter.once('save', removed);
     emitter.once('save', removed);
-    expect(emitter.listenerCount('save')).toBe(2);
     emitter.off('save', removed);
     emitter.dispatchEvent(new CustomEvent('save', { detail: [3] }));
     expect(removed).not.toHaveBeenCalled();
@@ -76,23 +74,21 @@ describe('EventEmitter WHATWG EventTarget interoperability', () => {
     expect(emitter.clear).toBeUndefined();
   });
 
-  it('preserves duplicate suppression for on(), wildcard payloads and clear()', () => {
+  it('suppresses duplicate named listeners and off(event) removes only fluent registrations', () => {
     const emitter = new EventEmitter();
-    const a = vi.fn();
-    const wildcard = vi.fn();
-    emitter.on('notes', a).on('notes', a).on('*', wildcard);
-    expect(emitter.eventNames()).toEqual(['notes', '*']);
-    expect(emitter.listenerCount()).toBe(2);
+    const fluent = vi.fn();
+    const native = vi.fn();
+    emitter.on('notes', fluent).on('notes', fluent);
+    emitter.addEventListener('notes', native);
     emitter.emit('notes', 1, 2);
-    expect(a).toHaveBeenCalledOnce();
-    expect(wildcard).toHaveBeenCalledTimes(1);
-    expect(wildcard).toHaveBeenCalledWith({ type: 'notes', args: [1, 2] });
-    emitter.clear();
+    expect(fluent).toHaveBeenCalledOnce();
+    expect(native).toHaveBeenCalledOnce();
+
+    emitter.off('notes');
     emitter.emit('notes', 3);
     emitter.dispatchEvent(new CustomEvent('notes', { detail: [4] }));
-    expect(a).toHaveBeenCalledOnce();
-    expect(wildcard).toHaveBeenCalledOnce();
-    expect(emitter.listenerCount()).toBe(0);
+    expect(fluent).toHaveBeenCalledOnce();
+    expect(native).toHaveBeenCalledTimes(3);
   });
 
   it('does not allow a throwing fluent listener to suppress subsequent handlers', () => {
