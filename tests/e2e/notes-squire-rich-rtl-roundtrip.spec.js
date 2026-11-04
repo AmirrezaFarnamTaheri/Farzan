@@ -48,20 +48,31 @@ test('first real Squire edit keeps rich RTL saved HTML through Chromium reload o
       template.innerHTML = source;
       const heading = template.content.querySelector('h2');
       const block = template.content.querySelector('p[dir="rtl"]');
-      const span = block?.querySelector('span');
+      // Squire can split one styled span into nested size and color marks.
+      // Check the *effective inherited* inline styles on the saved text leaf
+      // rather than assuming both values remain on one HTML element.
+      const matching = [...(block?.querySelectorAll('span') ?? [])]
+        .filter(node => node.textContent.includes('دریچه Heart'));
+      const leaf = matching.find(node =>
+        !matching.some(other => other !== node && node.contains(other)));
+      let fontSize = '', color = '';
+      for (let node = leaf; node && node !== block; node = node.parentElement) {
+        fontSize ||= node.style?.fontSize ?? '';
+        color ||= node.style?.color ?? '';
+      }
       const link = template.content.querySelector('a[href]');
       return {
         headingDir: heading?.getAttribute('dir'),
         blockDir: block?.getAttribute('dir'),
-        spanStyle: span?.getAttribute('style') ?? '',
+        fontSize, color,
         href: link?.getAttribute('href'),
         content: template.content.textContent,
       };
     }, canonical);
     expect(metadata.headingDir).toBe('rtl');
     expect(metadata.blockDir).toBe('rtl');
-    expect(metadata.spanStyle).toMatch(/color:/);
-    expect(metadata.spanStyle).toMatch(/font-size:/);
+    expect(metadata.fontSize).toBe('18px');
+    expect(metadata.color).toMatch(/(?:#123456|rgb\\(18,\\s*52,\\s*86\\))/i);
     expect(metadata.href).toBe('https://example.org/study/heart');
     expect(metadata.content).toContain('فیزیولوژی قلب 你好');
     expect(metadata.content).toContain('دریچه Heart');
