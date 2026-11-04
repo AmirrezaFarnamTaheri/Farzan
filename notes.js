@@ -847,6 +847,12 @@ import { countWords } from './src/core/textMetrics.js';
     load(note, { preventScroll = false } = {}) {
       if (!note || !this._el) return;
       this._loadEpoch += 1;
+      this._saveIndicatorRevision = (this._saveIndicatorRevision || 0) + 1;
+      const oldStatus = $('[data-save-status]');
+      if (oldStatus) {
+        oldStatus.textContent = '';
+        oldStatus.classList.remove('visible', 'error');
+      }
       this._compositionActive = false;
       this.disableModern({ preserveContent: false });
       this._currentId  = note.id;
@@ -1323,10 +1329,30 @@ import { countWords } from './src/core/textMetrics.js';
     _showSaveIndicator() {
       const el = $('[data-save-status]');
       if (!el) return;
-      el.textContent = 'Saved';
+      const id = String(this._currentId ?? '');
+      const epoch = this._loadEpoch;
+      const revision = this._saveIndicatorRevision = (this._saveIndicatorRevision || 0) + 1;
+      const current = () => this._el && this._currentId === id
+        && this._loadEpoch === epoch && this._saveIndicatorRevision === revision;
+      const pending = Store._noteWriteQueue.get(id);
       el.classList.add('visible');
-      clearTimeout(el._timer);
-      el._timer = setTimeout(() => { el.classList.remove('visible'); }, 2000);
+      el.classList.remove('error');
+      el.textContent = pending ? 'Saving…' : 'Saved locally';
+      if (!pending) return;
+      void pending.then(receipt => {
+        if (!current()) return;
+        // Never acknowledge a revision while a newer save for this note is
+        // still queued. Only an acknowledged canonical IndexedDB receipt
+        // earns the persistent Saved locally state.
+        if (Store._noteWriteQueue.get(id) && Store._noteWriteQueue.get(id) !== pending) return;
+        if (receipt === false) {
+          el.classList.add('error');
+          el.textContent = 'Save failed — retry before leaving';
+        } else {
+          el.classList.remove('error');
+          el.textContent = 'Saved locally';
+        }
+      });
     },
 
     _placeCursorAtEnd() {
@@ -1365,9 +1391,12 @@ import { countWords } from './src/core/textMetrics.js';
     destroy() {
       this._clearRenderQueue();
       this._container = null;
-      // The search input is recreated empty on each route mount. Reset its
-      // singleton filters as well, otherwise a previous zero-result query
-      // remains invisibly active and makes already-saved notes appear lost.
+      // The mounted UI is recreated on every route. No hidden folder, tag,
+      // pinned, search or semantic filter may survive into the new blank UI.
+      // A stale filter otherwise hides existing canonical records.
+      this._filter.folderId = null;
+      this._filter.tag = null;
+      this._filter._pinned = false;
       this._filter.query = '';
       this._semanticIds = null;
     },
@@ -1429,12 +1458,32 @@ import { countWords } from './src/core/textMetrics.js';
         icon.appendChild(spriteIcon('file-text'));
         const text = document.createElement('div');
         text.className = 'empty-text';
-        text.textContent = 'No notes found';
+        const hasFilters = Boolean(this._filter.folderId || this._filter.tag
+          || this._filter._pinned || this._filter.query || Array.isArray(this._semanticIds));
+        const hasSavedNotes = Store.getNotes().length > 0;
+        text.textContent = hasFilters || hasSavedNotes
+          ? 'No notes match your filters' : 'No notes yet';
         const button = document.createElement('button');
         button.className = 'btn btn-primary btn-sm';
-        button.dataset.action = 'new-note';
         button.type = 'button';
-        button.append(spriteIcon('plus'), document.createTextNode(' New note'));
+        if (hasFilters || hasSavedNotes) {
+          button.dataset.notesClearFilters = '';
+          button.textContent = 'Clear filters';
+          button.addEventListener('click', () => {
+            this._filter.folderId = null;
+            this._filter.tag = null;
+            this._filter._pinned = false;
+            this._filter.query = '';
+            this._semanticIds = null;
+            const input = $('[data-notes-search]');
+            if (input) input.value = '';
+            FoldersPanel.render();
+            this.render();
+          });
+        } else {
+          button.dataset.action = 'new-note';
+          button.append(spriteIcon('plus'), document.createTextNode(' New note'));
+        }
         empty.append(icon, text, button);
         this._container.appendChild(empty);
         return;
