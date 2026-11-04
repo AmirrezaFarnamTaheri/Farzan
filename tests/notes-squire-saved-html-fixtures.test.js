@@ -184,6 +184,42 @@ describe('Squire saved-HTML compatibility and first-save fidelity fixtures', () 
     } finally { reopened.destroy(); }
   });
 
+  it.each([
+    ['list item', '<ul><li dir="rtl" style="text-align:right">فشار خون <strong>Heart</strong></li></ul>', 'li', 'textAlign', 'right'],
+    ['code block', '<pre dir="rtl" style="white-space:pre-wrap">محاسبه = 72\\nunit = bpm</pre>', 'pre', 'whiteSpace', 'pre-wrap'],
+  ])('retains %s direction and style through first edit, save and reopen',
+    (_name, original, selector, property, expected) => {
+      expect(assessNoteForSquire(original).compatible).toBe(true);
+      const host = document.createElement('div');
+      const updates = vi.fn();
+      const editor = createSquireNoteEditor({ element: host, html: original, onUpdate: updates });
+      let saved;
+      try {
+        const node = host.querySelector('.notes-modern-editor ' + selector);
+        expect(node).not.toBeNull();
+        node.append(document.createTextNode(' اضافه'));
+        expect(editor.syncChanges()).toBe(true);
+        saved = editor.getHTML();
+        expect(updates).toHaveBeenCalledWith(saved);
+        const copy = document.createElement('template');
+        copy.innerHTML = saved;
+        const edited = copy.content.querySelector(selector);
+        expect(edited).not.toBeNull();
+        expect(edited.getAttribute('dir')).toBe('rtl');
+        expect(edited.style[property]).toBe(expected);
+        expect(edited.textContent).toContain('اضافه');
+      } finally { editor.destroy(); }
+
+      const reopened = document.createElement('div');
+      const copy = createSquireNoteEditor({ element: reopened, html: saved });
+      try {
+        const node = reopened.querySelector(selector);
+        expect(node.getAttribute('dir')).toBe('rtl');
+        expect(node.style[property]).toBe(expected);
+        expect(node.textContent).toContain('اضافه');
+      } finally { copy.destroy(); }
+    });
+
   it('accepts inert root break markers emitted by a safe heading edit, never attributed breaks', () => {
     expect(assessNoteForSquire('<h2>Review</h2><br>')).toEqual({
       compatible: true, reason: null,
