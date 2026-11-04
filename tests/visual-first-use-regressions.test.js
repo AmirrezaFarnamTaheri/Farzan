@@ -52,6 +52,16 @@ describe('first-run pages are not overwhelmed by inactive tools or duplicated ch
     expect(pdfRoute).toMatch(/<div class="page-header">\s*<div>\s*<h1 class="page-title">PDF Annotator<\/h1>/);
   });
 
+  it('explains JSON-only restoration without implying the backup includes local media', () => {
+    const html = fs.readFileSync('index.html', 'utf8');
+    const option = html.match(/<button[^>]+data-action="import-backup"[\\s\\S]*?<\\/button>/)?.[0];
+    expect(option).toMatch(/restore app data/i);
+    expect(option).toMatch(/JSON backup.*media files separate/i);
+    const guide = fs.readFileSync('docs/getting-started.md', 'utf8');
+    expect(guide).toContain('format 1.7');
+    expect(guide).not.toContain('format 1.5');
+  });
+
   it('centers missing-route recovery without repeating the same error sentence', () => {
     mountNotFoundView({
       hash: '#/missing',
