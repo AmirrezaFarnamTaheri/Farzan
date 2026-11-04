@@ -2124,4 +2124,25 @@ describe('notes route filters', () => {
     expect(editor.querySelector('p').textContent).toBe('Already typed');
   });
 
+
+  it('keeps canonical folder sprites but renders custom glyphs without historical emoji alias conversion', async () => {
+    const folders = JSON.parse(localStorage.getItem('ocd_folders'));
+    folders[0].icon = 'folder'; // Current canonical sprite name, not an old title-case alias.
+    folders.push({ id: 'custom-glyph', name: 'Custom glyph', icon: '📁', color: '' });
+    localStorage.setItem('ocd_folders', JSON.stringify(folders));
+    window.DB.getAllFolders.mockResolvedValueOnce(folders);
+
+    const refreshed = await window.PlasmaNotesApp.refreshFromSync({ kind: 'folder', action: 'update' });
+    expect(refreshed.refreshed).toBe(true);
+
+    const root = document.querySelector('[data-folders-panel]');
+    const defaultFolder = root.querySelector('[data-folder-id="default"]');
+    const customFolder = root.querySelector('[data-folder-id="custom-glyph"]');
+    expect(defaultFolder).not.toBeNull();
+    expect(defaultFolder.querySelector('.folder-icon svg use')?.getAttribute('href')).toBe('#i-folder');
+    expect(customFolder).not.toBeNull();
+    expect(customFolder.querySelector('.folder-icon-text')?.textContent).toBe('📁');
+    expect(customFolder.querySelector('.folder-icon svg use')).toBeNull();
+  });
+
 });
