@@ -2534,7 +2534,10 @@ import { Pointer } from './src/lib/pointer.js';
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
           const list = $('#notifications-panel .notif-list');
-          if (list) list.replaceChildren();
+          if (list) {
+            list.querySelectorAll('.notif-item').forEach(item => item.remove());
+            this._syncEmptyState();
+          }
           this.markAllRead();
         });
       }
@@ -2550,6 +2553,7 @@ import { Pointer } from './src/lib/pointer.js';
           ?? item.previousElementSibling?.querySelector('[data-notif-dismiss]')
           ?? document.querySelector('#notifications-panel [data-drawer-close]');
         item.remove();
+        this._syncEmptyState();
         if (wasUnread) this.setCount(this._count - 1);
         if (hadFocus) nextFocus?.focus();
       });
@@ -2569,6 +2573,13 @@ import { Pointer } from './src/lib/pointer.js';
       });
 
       OpenCourseDeck.bus.on('notification:new', data => this._onNew(data));
+      this._syncEmptyState();
+    },
+
+    _syncEmptyState() {
+      const list = document.querySelector('#notifications-panel .notif-list');
+      const placeholder = list?.querySelector('[data-notifications-empty]');
+      if (placeholder) placeholder.hidden = Boolean(list.querySelector('.notif-item'));
     },
 
     setCount(n) {
@@ -2609,6 +2620,7 @@ import { Pointer } from './src/lib/pointer.js';
           title: 'Dismiss notification',
         }, '×'));
       list.prepend(item);
+      this._syncEmptyState();
     },
   };
 
