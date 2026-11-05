@@ -847,6 +847,35 @@ import { Pointer } from './src/lib/pointer.js';
         this._toggleSubNav(navItem);
       });
 
+      // Library routes exceed the sidebar height at 900px and at text zoom.
+      // Keep a visible, keyboard-operable way to browse both ends of the
+      // scroll region without moving keyboard focus unexpectedly.
+      const sections = this.el.querySelector('#sidebar-sections');
+      const towardLibrary = this.el.querySelector('[data-sidebar-scroll-up]');
+      const towardActivity = this.el.querySelector('[data-sidebar-scroll-more]');
+      const updateScrollCues = () => {
+        if (!sections) return;
+        const maxScroll = Math.max(0, sections.scrollHeight - sections.clientHeight);
+        if (towardLibrary) towardLibrary.disabled = sections.scrollTop <= 1;
+        if (towardActivity) towardActivity.disabled = sections.scrollTop >= maxScroll - 1;
+        this.el.classList.toggle('sidebar-nav-can-scroll', maxScroll > 2);
+      };
+      const step = () => Math.max(120, Math.round((sections?.clientHeight || 360) * 0.65));
+      towardLibrary?.addEventListener('click', () => {
+        sections?.scrollBy({ top: -step(), behavior: 'auto' });
+        updateScrollCues();
+      });
+      towardActivity?.addEventListener('click', () => {
+        sections?.scrollBy({ top: step(), behavior: 'auto' });
+        updateScrollCues();
+      });
+      sections?.addEventListener('scroll', updateScrollCues, { passive: true });
+      const navObserver = typeof ResizeObserver === 'function'
+        ? new ResizeObserver(updateScrollCues) : null;
+      if (sections) navObserver?.observe(sections);
+      window.addEventListener('resize', updateScrollCues);
+      updateScrollCues();
+
       // Mark active nav item from current URL
       this._setActiveFromURL();
 
