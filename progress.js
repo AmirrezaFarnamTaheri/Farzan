@@ -107,7 +107,11 @@ const ProgressStats = (() => {
         if (p.status === 'done') done++;
         else if (p.status === 'in-progress') inProgress++;
         if (p.duration > 0) watchSec += Math.min(p.position || 0, p.duration);
-        if ((p.updatedAt || 0) > lastUpdated) lastUpdated = p.updatedAt;
+        // Opening a lesson can create a timestamp-only not-started record.
+        // A last-activity date must represent actual study, not its presence.
+        const studied = p.status === 'done' || p.status === 'in-progress'
+          || Number(p.position) > 0 || Number(p.percent) > 0;
+        if (studied && Number(p.updatedAt) > lastUpdated) lastUpdated = Number(p.updatedAt);
       }
       const total = topics.length;
       const pct   = total ? Math.round((done / total) * 100) : 0;
