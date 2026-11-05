@@ -34,6 +34,43 @@ describe('saved video queue playback', () => {
     expect(card.textContent).toContain('2 more topics');
   });
 
+  it('isolates English queue counts from Persian titles under an RTL workspace', async () => {
+    const previousDir = document.documentElement.dir;
+    document.documentElement.dir = 'rtl';
+    try {
+      document.body.innerHTML = '<main id="main-content"></main>';
+      const topics = Array.from({ length: 6 }, (_, i) => ({
+        topicId: 'lesson-' + i, courseId: 'medicine',
+        courseTitle: 'دوره پزشکی', sourceIndex: 0,
+        sourceLabel: 'بخش اول', title: 'درس ' + i,
+        videos: [{ url: 'https://example.test/' + i + '.mp4' }],
+      }));
+      window.DataStore = { init: vi.fn(async () => true), allTopics: vi.fn(() => topics) };
+      window.DB = { getAllTimestamps: vi.fn(async () => []), getSetting: vi.fn(async () => null) };
+      window.OpenCourseDeck = {};
+      mountPlaylistsView({
+        setView: markup => { document.querySelector('main').innerHTML = markup; },
+        safeMediaUrl: media => media?.url || media,
+        Toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+      });
+      const card = await vi.waitFor(() => {
+        const element = document.querySelector('[data-playlist-id="source-1"]');
+        expect(element).not.toBeNull();
+        return element;
+      });
+      expect(card.querySelector('h2').getAttribute('dir')).toBe('auto');
+      expect(card.querySelector('.playlist-card-detail').textContent).toBe('6 video topics');
+      expect(card.querySelector('.playlist-card-detail').getAttribute('dir')).toBe('auto');
+      expect(card.querySelector('.playlist-more').textContent).toBe('2 more topics');
+      expect(card.querySelector('.playlist-more').getAttribute('dir')).toBe('auto');
+      const discovery = document.querySelector('.playlists-discover-summary');
+      expect(discovery.textContent).toContain('1 featured of 1');
+      expect(discovery.getAttribute('dir')).toBe('auto');
+    } finally {
+      document.documentElement.dir = previousDir;
+    }
+  });
+
   it('opens the saved playlist in its original order, not the first catalog queue', async () => {
     document.body.innerHTML = '<main id="main-content"></main>';
     const topics = [
