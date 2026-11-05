@@ -1055,9 +1055,23 @@
 }
 .playlists-discover-summary {
   cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   width: fit-content;
+  max-width: 100%;
   color: var(--text-primary);
   font-weight: 650;
+}
+/* The shared summary arrow is an independent flex item, not inline bidi text.
+   Keep it on the RTL leading edge when the English count wraps on phones. */
+.playlists-discover-summary::before {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.playlists-discover-summary > bdi {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .playlists-discover-summary:focus-visible {
   outline: 2px solid var(--accent);
