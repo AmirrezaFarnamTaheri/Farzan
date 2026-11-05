@@ -60,12 +60,12 @@ describe('saved video queue playback', () => {
       });
       expect(card.querySelector('h2').getAttribute('dir')).toBe('auto');
       expect(card.querySelector('.playlist-card-detail').textContent).toBe('6 video topics');
-      expect(card.querySelector('.playlist-card-detail').getAttribute('dir')).toBe('auto');
+      expect(card.querySelector('.playlist-card-detail > bdi')?.getAttribute('dir')).toBe('auto');
       expect(card.querySelector('.playlist-more').textContent).toBe('2 more topics');
-      expect(card.querySelector('.playlist-more').getAttribute('dir')).toBe('auto');
+      expect(card.querySelector('.playlist-more > bdi')?.getAttribute('dir')).toBe('auto');
       const discovery = document.querySelector('.playlists-discover-summary');
       expect(discovery.textContent).toContain('1 featured of 1');
-      expect(discovery.getAttribute('dir')).toBe('auto');
+      expect(discovery.querySelector('bdi')?.getAttribute('dir')).toBe('auto');
     } finally {
       document.documentElement.dir = previousDir;
     }
