@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+// Browser Assurance installs system Chrome, not Playwright's bundled headless shell.
+test.use({ channel: 'chrome' });
+
 function parseColor(input) {
   const css = String(input).trim().toLowerCase();
   const srgb = /^color\(\s*srgb\s+(.+)\)$/.exec(css);
