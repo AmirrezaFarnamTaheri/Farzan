@@ -632,6 +632,30 @@ input[type="file"][hidden] {
 /* Catalog RTL is driven by the course/source language, not by an English
  * medical lesson title. Grid/flex tracks follow the explicit group/row dir;
  * Latin labels remain in their own LTR islands. */
+/* Materials are a catalog, not a full-width table. Keep each playable item
+   compact with actions beside its own title, including in mixed RTL/LTR rows. */
+.view-materials .materials-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  align-items: start;
+}
+.view-materials .topic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.view-materials .topic-row > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.view-materials .topic-row .topic-actions {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+}
+@media (max-width: 520px) {
+  .view-materials .topic-row { align-items: flex-start; flex-wrap: wrap; }
+  .view-materials .topic-row > :first-child { flex-basis: 100%; }
+}
 .view-courses .source-group-count[dir="ltr"] {
   white-space: nowrap;
   unicode-bidi: isolate;
