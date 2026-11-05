@@ -71,13 +71,15 @@ test('study status labels remain legible across all shipped themes and accents',
     }));
   });
 
+  const failures = [];
   for (const result of results) {
     const base = parseColor(result.panelBackground);
     const background = over(parseColor(result.background), base);
     const foreground = over(parseColor(result.foreground), { rgb: background, alpha: 1 });
-    expect(
-      contrast(foreground, background),
-      `${result.theme}/${result.accent} status color contrast`,
-    ).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrast(foreground, background);
+    if (!Number.isFinite(ratio) || ratio < 4.5) {
+      failures.push(`${result.theme}/${result.accent}: ${ratio.toFixed(2)}:1`);
+    }
   }
+  expect(failures, 'All shipped theme/accent combinations must meet 4.5:1').toEqual([]);
 });
