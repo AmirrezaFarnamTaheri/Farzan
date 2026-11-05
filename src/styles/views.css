@@ -1295,7 +1295,22 @@
   width: min(100%, 480px);
   height: 12px;
   border-radius: var(--radius-md);
+  appearance: none;
+  border: 0;
+  background: var(--surface-3);
   accent-color: var(--accent);
+}
+.achievement-next-card progress::-webkit-progress-bar {
+  background: var(--surface-3);
+  border-radius: var(--radius-md);
+}
+.achievement-next-card progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: var(--radius-md);
+}
+.achievement-next-card progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: var(--radius-md);
 }
 .achievement-next-card .btn { margin-top: var(--space-1); }
 .achievement-locked-section { overflow: hidden; }
