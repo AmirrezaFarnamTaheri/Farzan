@@ -1568,11 +1568,8 @@
     padding: var(--space-2) var(--space-2) var(--space-3);
     border-radius: var(--radius-xl);
     border: 1px solid var(--glass-border);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--glass-bg-strong) 90%, transparent),
-      color-mix(in srgb, var(--surface-2) 94%, transparent)
-    );
+    /* Fully opaque: the underlying Home hero must not bleed into menu text. */
+    background: var(--surface);
     box-shadow: var(--shadow-xl);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -1795,6 +1792,7 @@
     margin-inline-start: auto;
   }
   .notif-clear-btn {
+    min-height: 36px;
     white-space: nowrap;
     border: 1px solid var(--glass-border);
     background: transparent;
@@ -1834,6 +1832,14 @@
     background: var(--surface-hover);
     color: var(--text-primary);
     border-color: color-mix(in srgb, var(--accent) 25%, var(--glass-border));
+  }
+  .notif-empty {
+    padding: var(--space-4);
+    border: 1px dashed var(--glass-border);
+    border-radius: var(--radius-lg);
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.5;
   }
   .notif-list {
     list-style: none;
