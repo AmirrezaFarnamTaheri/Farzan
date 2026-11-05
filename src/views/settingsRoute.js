@@ -135,7 +135,7 @@ export function mountSettingsView(deps = {}) {
                 <label class="settings-field">
                   <span>AI mode</span>
                   <select class="select" data-ai-mode>
-                    <option value="hidden">Hidden</option>
+                    <option value="hidden">Hide AI controls</option>
                     <option value="disabled">Visible but off</option>
                     <option value="local-gemma">Local extractive summary (no model)</option>
                     <option value="custom-api">Approved API endpoint</option>
@@ -634,12 +634,12 @@ export function mountSettingsView(deps = {}) {
 
     const setStatus = (displayMode = current.mode) => {
       const labels = {
-        hidden: 'Hidden',
+        hidden: 'AI controls hidden',
         disabled: 'Off',
         'local-gemma': 'Local extractive summary',
         'custom-api': 'Approved API',
       };
-      const modeLabel = labels[displayMode] || 'Hidden';
+      const modeLabel = labels[displayMode] || 'AI controls hidden';
       status.textContent = modeLabel;
       status.className = `badge ${displayMode === 'hidden' || displayMode === 'disabled' ? 'badge-info' : 'badge-success'}`;
       summary.replaceChildren();

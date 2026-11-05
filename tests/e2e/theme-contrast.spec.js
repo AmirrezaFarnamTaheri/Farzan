@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+// Browser Assurance installs system Chrome, not Playwright's bundled headless shell.
+test.use({ channel: 'chrome' });
+
 function parseColor(input) {
   const css = String(input).trim().toLowerCase();
   const srgb = /^color\(\s*srgb\s+(.+)\)$/.exec(css);
@@ -68,13 +71,15 @@ test('study status labels remain legible across all shipped themes and accents',
     }));
   });
 
+  const failures = [];
   for (const result of results) {
     const base = parseColor(result.panelBackground);
     const background = over(parseColor(result.background), base);
     const foreground = over(parseColor(result.foreground), { rgb: background, alpha: 1 });
-    expect(
-      contrast(foreground, background),
-      `${result.theme}/${result.accent} status color contrast`,
-    ).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrast(foreground, background);
+    if (!Number.isFinite(ratio) || ratio < 4.5) {
+      failures.push(`${result.theme}/${result.accent}: ${ratio.toFixed(2)}:1`);
+    }
   }
+  expect(failures, 'All shipped theme/accent combinations must meet 4.5:1').toEqual([]);
 });

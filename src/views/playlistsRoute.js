@@ -340,8 +340,8 @@ async function renderPlaylists(deps) {
   if (activeQueue.length) {
     playlists.push({
       id: 'active-queue',
-      label: 'Live',
-      title: 'Active player queue',
+      label: 'Loaded',
+      title: 'Current player queue',
       detail: `${activeQueue.length} track${activeQueue.length === 1 ? '' : 's'} currently loaded`,
       href: '#/courses',
       items: activeQueue.map(track => track.title || track.topicTitle || track.topicId || 'Queued track'),
@@ -383,7 +383,7 @@ async function renderPlaylists(deps) {
   });
   const catalogGroups = [...sourceGroups.values()]
     .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
-  const catalogPlaylists = catalogGroups.slice(0, 10).map(group => ({
+  const catalogPlaylists = catalogGroups.map(group => ({
     ...group,
     detail: `${group.items.length} video topic${group.items.length === 1 ? '' : 's'}`,
   }));
@@ -391,7 +391,7 @@ async function renderPlaylists(deps) {
   discover.hidden = catalogPlaylists.length === 0;
   discover.open = discover.dataset.userOpened === 'true'
     || (catalogPlaylists.length > 0 && playlists.length === 0);
-  discover.querySelector('summary').textContent = `Browse featured course queues (${catalogPlaylists.length} of ${catalogGroups.length}) · Video topics: ${videoTopics.length}`;
+  discover.querySelector('summary').textContent = `Browse course queues (${Math.min(10, catalogGroups.length)} featured of ${catalogGroups.length}) · Video topics: ${videoTopics.length}`;
 
   metricsRoot.replaceChildren();
   const meaningfulMetrics = [
@@ -431,7 +431,7 @@ async function renderPlaylists(deps) {
     const body = document.createElement('div');
     body.className = 'card-body playlist-card-body';
     const badge = document.createElement('span');
-    badge.className = playlist.label === 'Live' ? 'badge badge-success' : 'badge badge-info';
+    badge.className = 'badge badge-info';
     badge.textContent = playlist.label;
     const title = document.createElement('h2');
     title.className = 'h4 playlist-card-title';
@@ -478,7 +478,7 @@ async function renderPlaylists(deps) {
     link.href = playlist.href;
     if (playlist.id === 'active-queue') link.dataset.resumeLiveQueue = '';
     link.textContent = playlist.label === 'Resume' ? 'Open saved items'
-      : playlist.label === 'Live' ? 'Open player' : 'Open courses';
+      : playlist.id === 'active-queue' ? 'Open player' : 'Open courses';
     body.append(badge, title, section, detail, preview, more, actions);
     if (playlist.id === 'active-queue' && activePosition) {
       const position = document.createElement('div');
@@ -584,7 +584,33 @@ async function renderPlaylists(deps) {
   };
   showMore.addEventListener('click', appendNextPage);
   appendNextPage();
-  catalogPlaylists.forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
+  // Show a manageable featured page without making the rest of the course
+  // catalog inaccessible to keyboard or pointer users.
+  let visibleCatalogCount = 0;
+  const showMoreCatalog = document.createElement('button');
+  showMoreCatalog.type = 'button';
+  showMoreCatalog.className = 'btn btn-ghost btn-sm playlists-show-more';
+  showMoreCatalog.dataset.playlistsCatalogMore = '';
+  const appendNextCatalogPage = () => {
+    const prior = visibleCatalogCount;
+    const hadFocus = document.activeElement === showMoreCatalog;
+    showMoreCatalog.remove();
+    const end = Math.min(catalogPlaylists.length, visibleCatalogCount + 10);
+    catalogPlaylists.slice(visibleCatalogCount, end)
+      .forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
+    visibleCatalogCount = end;
+    if (visibleCatalogCount < catalogPlaylists.length) {
+      showMoreCatalog.textContent =
+        `Show more course queues (${visibleCatalogCount} of ${catalogPlaylists.length})`;
+      catalogRoot.appendChild(showMoreCatalog);
+      if (hadFocus) showMoreCatalog.focus({ preventScroll: true });
+    } else if (hadFocus) {
+      const firstNew = catalogRoot.querySelectorAll('.playlist-card')[prior];
+      firstNew?.querySelector('a, button')?.focus({ preventScroll: true });
+    }
+  };
+  showMoreCatalog.addEventListener('click', appendNextCatalogPage);
+  appendNextCatalogPage();
 
   // New saved queues carry exact (courseId, topicId) identities, so a topic
   // ID reused in another course is not inherently ambiguous. When a catalog

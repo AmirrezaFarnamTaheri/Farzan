@@ -1031,7 +1031,9 @@ input[type="file"][hidden] {
 :is([data-theme="dark"], [data-theme="midnight"], [data-theme="forest"],
     [data-theme="ocean"], [data-theme="sunset"], [data-theme="rose"])
   .view-home .home-focus-status {
-  color: var(--accent-light);
+  /* Accent-light on an accent-tinted surface failed 4.5:1 (dark/lapis).
+     Keep the tint for orientation; use high-contrast theme ink for text. */
+  color: var(--text-primary);
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
   border-color: var(--border);
 }

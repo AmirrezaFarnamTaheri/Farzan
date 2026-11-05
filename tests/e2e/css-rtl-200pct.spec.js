@@ -5,16 +5,20 @@ test.use({ channel: 'chrome' });
 test.describe('CSS ownership computed-style parity at narrow and zoom-equivalent viewports (#175)', () => {
   for (const scheme of ['dark', 'light']) {
     test('contains English/Persian mixed-script workspaces in ' + scheme + ' RTL without an outer scroll leak', async ({ page }) => {
-      test.setTimeout(80_000);
+      test.setTimeout(200_000);
       await page.addInitScript(theme => {
         localStorage.setItem('ocd_dir', 'rtl');
         localStorage.setItem('ocd_theme', theme);
       }, scheme);
       const viewports = [
         { width: 1440, height: 900, label: 'desktop' },
-        // A 1440x900 desktop at 200% zoom has roughly 720x450 CSS pixels;
-        // this is a viewport proxy, not a claim of native Windows OS zoom.
-        { width: 720, height: 450, label: 'zoom-200-proxy' },
+        { width: 1280, height: 800, label: 'laptop' },
+        { width: 1024, height: 768, label: 'small-desktop' },
+        { width: 768, height: 800, label: 'tablet' },
+        // Equivalent CSS layout widths at 200% and 400% desktop zoom;
+        // these prove reflow only, not physical Windows display scaling.
+        { width: 720, height: 450, label: 'zoom-200-layout-proxy' },
+        { width: 320, height: 256, label: 'zoom-400-layout-proxy' },
         { width: 390, height: 844, label: 'phone' },
       ];
       for (const viewport of viewports) {
@@ -49,3 +53,36 @@ test.describe('CSS ownership computed-style parity at narrow and zoom-equivalent
     });
   }
 });
+
+for (const direction of ['ltr', 'rtl']) {
+  test('keeps keyboard navigation, content menus and notification drawers operable in ' + direction, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(value => localStorage.setItem('ocd_dir', value), direction);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/#/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.view-home')).toBeVisible();
+
+    const add = page.getByRole('button', { name: 'Add content' });
+    await add.focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'false');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#add-content-menu')).toHaveAttribute('aria-hidden', 'true');
+    await expect(add).toBeFocused();
+
+    const notifications = page.locator('#topbar-notifications-btn');
+    await notifications.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#notifications-panel')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#notifications-panel')).toBeHidden();
+    await expect(notifications).toBeFocused();
+
+    const deep = page.locator('.sidebar-nav a[href="#/achievements"]');
+    await deep.focus();
+    await expect(deep).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.view-achievements')).toBeVisible();
+    await expect(deep).toHaveAttribute('aria-current', 'page');
+  });
+}

@@ -36,10 +36,45 @@ describe('Playlists and Settings: readable controls without losing behavior', ()
       return element;
     });
     expect(card.querySelector('[data-playlist-current]').textContent).toContain('Renal review');
+    // A loaded player queue can be paused: never imply that it is live or playing.
+    expect(card.querySelector('.playlist-card-body > .badge')?.textContent).toBe('Loaded');
+    expect(card.querySelector('h2')?.textContent).toBe('Current player queue');
     expect(card.querySelectorAll('.playlist-preview-item')).toHaveLength(0);
     expect(card.querySelector('.playlist-card-actions .btn').textContent).toMatch(/player/i);
     expect(views).toMatch(/\.view-playlists \[data-playlist-list\]:has\(> \.playlist-card:only-child\)/);
     expect(views).toMatch(/\.playlist-card-body \.badge\s*\{[^}]*align-self:\s*flex-start;/s);
+  });
+
+  it('lets keyboard users browse every catalog queue after the featured ten', async () => {
+    document.body.innerHTML = '<main></main>';
+    const topics = Array.from({ length: 13 }, (_, index) => ({
+      topicId: 'topic-' + index,
+      courseId: 'course-' + index,
+      courseTitle: 'Course ' + index,
+      sourceIndex: index,
+      sourceLabel: 'Section ' + index,
+      title: 'Lesson ' + index,
+      videos: [{ url: 'https://example.test/' + index + '.mp4' }],
+    }));
+    window.OpenCourseDeck = {};
+    window.DataStore = { init: vi.fn(async () => {}), allTopics: vi.fn(() => topics) };
+    window.DB = { getSetting: vi.fn(async () => null), getAllTimestamps: vi.fn(async () => []) };
+    mountPlaylistsView({
+      setView: html => { document.querySelector('main').innerHTML = html; },
+      safeMediaUrl: value => value?.url || value,
+      Toast: { error: vi.fn() },
+    });
+    const root = document.querySelector('[data-playlist-catalog]');
+    await vi.waitFor(() => expect(root.querySelectorAll('.playlist-card')).toHaveLength(10));
+    const more = document.querySelector('[data-playlists-catalog-more]');
+    expect(more?.tagName).toBe('BUTTON');
+    expect(more?.textContent).toMatch(/13|3 remaining/);
+    more.focus();
+    more.click();
+    expect(root.querySelectorAll('.playlist-card')).toHaveLength(13);
+    expect(root.querySelector('[data-playlists-catalog-more]')).toBeNull();
+    expect(document.activeElement?.closest('.playlist-card')).not.toBeNull();
+    expect(document.querySelectorAll('[data-playlist-source] option')).toHaveLength(13);
   });
 
   it('keeps Settings anchor navigation marked as current and does not send hashes through the SPA router', () => {

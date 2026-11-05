@@ -1578,7 +1578,7 @@ describe('app shell resilience helpers', () => {
     };
 
     const controller = await window.OpenCourseDeck.Views.settings();
-    await vi.waitFor(() => expect(document.querySelector('[data-ai-status]').textContent).toBe('Hidden'));
+    await vi.waitFor(() => expect(document.querySelector('[data-ai-status]').textContent).toBe('AI controls hidden'));
 
     document.querySelector('[data-ai-mode]').value = 'custom-api';
     document.querySelector('[data-ai-model]').value = 'user-model';
