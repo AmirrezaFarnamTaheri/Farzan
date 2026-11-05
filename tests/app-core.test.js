@@ -1920,7 +1920,7 @@ describe('app shell resilience helpers', () => {
     const storageLink = document.querySelector('.help-links a[href="docs/architecture.md"]');
     expect(storageLink).not.toBeNull();
     expect(storageLink.textContent).toContain('Architecture');
-    expect(document.querySelector('.help-card').textContent).toContain('First-run checklist');
+    expect(document.querySelector('.help-card').textContent).toContain('Getting started');
   });
 
   it('renders achievements from current progress instead of a planned placeholder', async () => {
