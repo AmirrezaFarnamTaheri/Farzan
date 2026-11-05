@@ -222,6 +222,38 @@ input[type="file"][hidden] {
   scrollbar-color: #426079 transparent;
   mask-image: none;
 }
+/* Scrollable library has explicit, keyboard-reachable directional controls.
+   Hide them when every destination fits, and avoid masking clipped routes. */
+.sidebar-nav-scroll-controls {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+}
+.sidebar.sidebar-nav-can-scroll:not(.sidebar-collapsed) .sidebar-nav-scroll-controls {
+  display: flex;
+}
+.sidebar-nav-scroll-controls button {
+  display: inline-flex;
+  flex: 1 1 0;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(228,242,255,.2);
+  border-radius: 7px;
+  background: rgba(255,255,255,.07);
+  color: #d0dfeb;
+  cursor: pointer;
+  font-size: 11px;
+}
+.sidebar-nav-scroll-controls button:disabled { opacity: .45; cursor: default; }
+.sidebar-nav-scroll-controls button:focus-visible {
+  outline: 2px solid #8cb9ee;
+  outline-offset: 2px;
+}
+.sidebar-nav-scroll-controls .icon { width: 13px; height: 13px; }
 .nav-group { margin-block: 6px 19px; }
 .nav-group-label {
   display: block;
@@ -632,6 +664,30 @@ input[type="file"][hidden] {
 /* Catalog RTL is driven by the course/source language, not by an English
  * medical lesson title. Grid/flex tracks follow the explicit group/row dir;
  * Latin labels remain in their own LTR islands. */
+/* Materials are a catalog, not a full-width table. Keep each playable item
+   compact with actions beside its own title, including in mixed RTL/LTR rows. */
+.view-materials .materials-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  align-items: start;
+}
+.view-materials .topic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.view-materials .topic-row > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.view-materials .topic-row .topic-actions {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+}
+@media (max-width: 520px) {
+  .view-materials .topic-row { align-items: flex-start; flex-wrap: wrap; }
+  .view-materials .topic-row > :first-child { flex-basis: 100%; }
+}
 .view-courses .source-group-count[dir="ltr"] {
   white-space: nowrap;
   unicode-bidi: isolate;

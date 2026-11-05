@@ -1413,6 +1413,23 @@ import { countWords } from './src/core/textMetrics.js';
       this._semanticIds = null;
     },
 
+    clearFilters() {
+      this._filter.folderId = null;
+      this._filter.tag = null;
+      this._filter._pinned = false;
+      this._filter.query = '';
+      this._semanticIds = null;
+      const input = $('[data-notes-search]');
+      if (input) input.value = '';
+      const semantic = $('[data-notes-semantic-status]');
+      if (semantic) semantic.textContent = '';
+      const clearSemantic = $('[data-notes-semantic-clear]');
+      if (clearSemantic) clearSemantic.disabled = true;
+      FoldersPanel.render();
+      TagsCloud.render($('[data-tags-cloud]'));
+      this.render();
+    },
+
     _clearRenderQueue() {
       this._renderToken += 1;
       if (this._renderTimer) {
@@ -1461,6 +1478,33 @@ import { countWords } from './src/core/textMetrics.js';
 
       this._container.replaceChildren();
 
+      // Folder badges count the entire library. Show any narrowing criteria
+      // next to the results so an apparently blank search never hides why
+      // the editor's current saved note is absent from the list.
+      const filters = [
+        this._filter.folderId ? `Folder: ${Store.getFolders().find(f => f.id === this._filter.folderId)?.name || this._filter.folderId}` : null,
+        this._filter.tag ? `Tag: ${this._filter.tag}` : null,
+        this._filter._pinned ? 'Pinned only' : null,
+        this._filter.query ? `Search: ${this._filter.query}` : null,
+        Array.isArray(this._semanticIds) ? 'Related keywords' : null,
+      ].filter(Boolean);
+      if (filters.length) {
+        const summary = document.createElement('div');
+        summary.className = 'notes-filter-summary';
+        summary.dataset.notesFilterSummary = '';
+        summary.setAttribute('role', 'status');
+        const label = document.createElement('span');
+        label.textContent = `Showing ${sorted.length} of ${Store.getNotes().length} notes · ${filters.join(' · ')}`;
+        const clear = document.createElement('button');
+        clear.className = 'btn btn-ghost btn-sm';
+        clear.type = 'button';
+        clear.dataset.notesFilterClear = '';
+        clear.textContent = 'Clear filters';
+        clear.addEventListener('click', () => this.clearFilters());
+        summary.append(label, clear);
+        this._container.appendChild(summary);
+      }
+
       if (!sorted.length) {
         const empty = document.createElement('div');
         empty.className = 'notes-empty';
@@ -1472,26 +1516,15 @@ import { countWords } from './src/core/textMetrics.js';
         text.className = 'empty-text';
         const hasFilters = Boolean(this._filter.folderId || this._filter.tag
           || this._filter._pinned || this._filter.query || Array.isArray(this._semanticIds));
-        const hasSavedNotes = Store.getNotes().length > 0;
-        text.textContent = hasFilters || hasSavedNotes
+        text.textContent = hasFilters
           ? 'No notes match your filters' : 'No notes yet';
         const button = document.createElement('button');
         button.className = 'btn btn-primary btn-sm';
         button.type = 'button';
-        if (hasFilters || hasSavedNotes) {
+        if (hasFilters) {
           button.dataset.notesClearFilters = '';
           button.textContent = 'Clear filters';
-          button.addEventListener('click', () => {
-            this._filter.folderId = null;
-            this._filter.tag = null;
-            this._filter._pinned = false;
-            this._filter.query = '';
-            this._semanticIds = null;
-            const input = $('[data-notes-search]');
-            if (input) input.value = '';
-            FoldersPanel.render();
-            this.render();
-          });
+          button.addEventListener('click', () => this.clearFilters());
         } else {
           button.dataset.action = 'new-note';
           button.append(spriteIcon('plus'), document.createTextNode(' New note'));
@@ -1844,9 +1877,11 @@ import { countWords } from './src/core/textMetrics.js';
 
       containerEl.replaceChildren();
       if (!Object.keys(tagMap).length) {
+        containerEl.dataset.empty = 'true';
         containerEl.textContent = 'No tags yet.';
         return;
       }
+      delete containerEl.dataset.empty;
 
       Object.entries(tagMap).forEach(([tag, count]) => {
         const el = document.createElement('span');
@@ -2679,6 +2714,18 @@ import { countWords } from './src/core/textMetrics.js';
       // Do not allocate an orphan note until the previous draft can be saved.
       if (!this._commitCurrentBeforeSwitch()) return false;
       const note = Store.createNote({ folderId });
+      // A newly created note cannot match the old search/tag/related result
+      // constraints. Preserve its intended folder but clear incompatible
+      // filters so it is immediately visible beside its open editor.
+      NotesList._filter.folderId = folderId === 'default' ? null : folderId;
+      NotesList._filter.tag = null;
+      NotesList._filter._pinned = false;
+      NotesList._filter.query = '';
+      NotesList._semanticIds = null;
+      const search = $('[data-notes-search]');
+      if (search) search.value = '';
+      const semanticClear = $('[data-notes-semantic-clear]');
+      if (semanticClear) semanticClear.disabled = true;
       NotesList.render();
       FoldersPanel.render();
       if (!this._activateSavedNote(note.id, { preventScroll })) return false;

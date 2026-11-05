@@ -12,6 +12,14 @@ describe('Studio and Notes authoring affordances', () => {
     expect(playerCss).toMatch(/\.pd-player-video \.pd-advanced-tools > summary::marker\s*\{[^}]*content:\s*none;/s);
   });
 
+  it('updates Studio empty-board instructions for the selected Pen versus Select tool', () => {
+    const source = fs.readFileSync('src/views/studioRoute.js', 'utf8');
+    expect(source).toContain('data-studio-empty-hint-text');
+    expect(source).toContain('Drag on the board to draw with Pen');
+    expect(source).toContain('Choose Pen to draw');
+    expect(source).toMatch(/updateToolButtons\s*=\s*\(\)\s*=>\s*\{[\s\S]*?studioEmptyHintText/);
+  });
+
   it('opens the Studio menu on the opposite side of the inspector on desktop', () => {
     expect(studioCss).toMatch(/\.view-studio \.studio-more-tools-content\s*\{[^}]*inset-inline-end:\s*calc\(100% \+ 12px\)/s);
     expect(studioCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.view-studio \.studio-more-tools-content\s*\{[^}]*inset-inline-start:\s*0;/);

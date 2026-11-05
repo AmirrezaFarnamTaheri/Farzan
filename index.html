@@ -339,8 +339,22 @@
         <kbd class="sidebar-search-kbd" aria-hidden="true">⌘K</kbd>
       </div>
 
+      <!-- The library has more destinations than fit within some desktop heights.
+           Keep explicit scroll controls outside its clipped scrollport. -->
+      <div class="sidebar-nav-scroll-controls" role="group" aria-label="Browse navigation sections">
+        <button type="button" data-sidebar-scroll-up aria-controls="sidebar-sections"
+          aria-label="Scroll navigation toward Library" title="Scroll navigation toward Library">
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
+          <span>Library</span>
+        </button>
+        <button type="button" data-sidebar-scroll-more aria-controls="sidebar-sections"
+          aria-label="Scroll navigation toward Activity" title="Scroll navigation toward Activity">
+          <span>More</span>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </button>
+      </div>
       <!-- Navigation Groups -->
-      <nav class="sidebar-nav" aria-label="Application sections">
+      <nav id="sidebar-sections" class="sidebar-nav" aria-label="Application sections" tabindex="0">
 
         <div class="nav-group">
           <span class="nav-group-label">Library</span>
@@ -600,7 +614,7 @@
       </div>
     </div>
     <ul class="notif-list" id="notif-list" aria-label="Notification items">
-      <!-- Populated dynamically -->
+      <li class="notif-empty" data-notifications-empty role="status">You're all caught up. New notifications will appear here.</li>
     </ul>
   </div>
 

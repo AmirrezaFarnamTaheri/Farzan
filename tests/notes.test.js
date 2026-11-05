@@ -1637,6 +1637,31 @@ describe('notes route filters', () => {
     expect(markdown).not.toContain('tracker.example');
   });
 
+  it('reveals a new note even when a previous search or related-keyword filter hid the list', async () => {
+    const list = window.PlasmaNotesList;
+    list._filter.query = 'query-hiding-all-notes';
+    list._filter.tag = 'not-a-real-tag';
+    list._semanticIds = [];
+    list.render();
+    const note = window.PlasmaNotesApp.newNote('default');
+    expect(note).toBeTruthy();
+    expect(list._filter.query).toBe('');
+    expect(list._filter.tag).toBeNull();
+    expect(list._semanticIds).toBeNull();
+    expect(document.querySelector('[data-notes-search]').value).toBe('');
+    expect(document.querySelector('[data-notes-list]').textContent).toContain(note.title);
+  });
+
+  it('identifies hidden note filters in the list and offers a visible reset', () => {
+    const list = window.PlasmaNotesList;
+    list._filter.tag = 'hidden-active-tag';
+    list.render();
+    expect(document.querySelector('[data-notes-filter-summary]')?.textContent).toContain('Tag: hidden-active-tag');
+    document.querySelector('[data-notes-filter-clear]').click();
+    expect(list._filter.tag).toBeNull();
+    expect(document.querySelector('[data-notes-list]').textContent).toContain('Regular note');
+  });
+
   it('renders the empty notes state with DOM nodes', () => {
     const input = document.querySelector('[data-notes-search]');
 

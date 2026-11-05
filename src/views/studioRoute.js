@@ -137,7 +137,7 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
             <canvas id="studio-canvas" class="studio-canvas" aria-label="Editable Studio canvas"></canvas>
             <div class="studio-empty-hint" data-studio-empty-hint aria-live="polite">
               <strong>Start creating on your board</strong>
-              <span>Choose Pen to draw, type a board note and select Note, or add a card.</span>
+              <span data-studio-empty-hint-text>Drag on the board to draw with Pen, or add a note or card.</span>
             </div>
           </div>
         </div>
@@ -785,6 +785,12 @@ loadKonvaDraft = () => import('../features/studioKonvaDraftWorkspace.js'),
   };
   const updateToolButtons = () => {
     const tool = window.OpenCourseDeck?.Canvas?.getState?.()?.tool || 'pen';
+    const studioEmptyHintText = document.querySelector('[data-studio-empty-hint-text]');
+    if (studioEmptyHintText) {
+      studioEmptyHintText.textContent = tool === 'pen'
+        ? 'Drag on the board to draw with Pen, or add a note or card.'
+        : 'Choose Pen to draw, or add a note or card. Select and move existing elements here.';
+    }
     document.querySelectorAll('[data-studio-tool]').forEach((button) => {
       const active = button.dataset.studioTool === tool;
       button.classList.toggle('active', active);

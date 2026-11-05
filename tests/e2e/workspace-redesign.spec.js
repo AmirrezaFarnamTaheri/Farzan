@@ -429,7 +429,11 @@ test.describe('Farzan desktop workspace redesign', () => {
     await page.goto('/#/studio', { waitUntil: 'domcontentloaded' });
     const hint = page.locator('[data-studio-empty-hint]');
     await expect(hint).toBeVisible();
-    await expect(hint).toContainText('Choose Pen');
+    await expect(hint).toContainText('Drag on the board to draw with Pen');
+    await page.locator('[data-studio-tool="select"]').click();
+    await expect(hint).toContainText('Choose Pen to draw');
+    await page.locator('[data-studio-tool="pen"]').click();
+    await expect(hint).toContainText('Drag on the board to draw with Pen');
     const styles = await hint.evaluate(node => ({
       events: getComputedStyle(node).pointerEvents,
       width: node.getBoundingClientRect().width,

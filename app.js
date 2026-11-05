@@ -847,6 +847,35 @@ import { Pointer } from './src/lib/pointer.js';
         this._toggleSubNav(navItem);
       });
 
+      // Library routes exceed the sidebar height at 900px and at text zoom.
+      // Keep a visible, keyboard-operable way to browse both ends of the
+      // scroll region without moving keyboard focus unexpectedly.
+      const sections = this.el.querySelector('#sidebar-sections');
+      const towardLibrary = this.el.querySelector('[data-sidebar-scroll-up]');
+      const towardActivity = this.el.querySelector('[data-sidebar-scroll-more]');
+      const updateScrollCues = () => {
+        if (!sections) return;
+        const maxScroll = Math.max(0, sections.scrollHeight - sections.clientHeight);
+        if (towardLibrary) towardLibrary.disabled = sections.scrollTop <= 1;
+        if (towardActivity) towardActivity.disabled = sections.scrollTop >= maxScroll - 1;
+        this.el.classList.toggle('sidebar-nav-can-scroll', maxScroll > 2);
+      };
+      const step = () => Math.max(120, Math.round((sections?.clientHeight || 360) * 0.65));
+      towardLibrary?.addEventListener('click', () => {
+        sections?.scrollBy({ top: -step(), behavior: 'auto' });
+        updateScrollCues();
+      });
+      towardActivity?.addEventListener('click', () => {
+        sections?.scrollBy({ top: step(), behavior: 'auto' });
+        updateScrollCues();
+      });
+      sections?.addEventListener('scroll', updateScrollCues, { passive: true });
+      const navObserver = typeof ResizeObserver === 'function'
+        ? new ResizeObserver(updateScrollCues) : null;
+      if (sections) navObserver?.observe(sections);
+      window.addEventListener('resize', updateScrollCues);
+      updateScrollCues();
+
       // Mark active nav item from current URL
       this._setActiveFromURL();
 
@@ -2505,7 +2534,10 @@ import { Pointer } from './src/lib/pointer.js';
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
           const list = $('#notifications-panel .notif-list');
-          if (list) list.replaceChildren();
+          if (list) {
+            list.querySelectorAll('.notif-item').forEach(item => item.remove());
+            this._syncEmptyState();
+          }
           this.markAllRead();
         });
       }
@@ -2521,6 +2553,7 @@ import { Pointer } from './src/lib/pointer.js';
           ?? item.previousElementSibling?.querySelector('[data-notif-dismiss]')
           ?? document.querySelector('#notifications-panel [data-drawer-close]');
         item.remove();
+        this._syncEmptyState();
         if (wasUnread) this.setCount(this._count - 1);
         if (hadFocus) nextFocus?.focus();
       });
@@ -2540,6 +2573,13 @@ import { Pointer } from './src/lib/pointer.js';
       });
 
       OpenCourseDeck.bus.on('notification:new', data => this._onNew(data));
+      this._syncEmptyState();
+    },
+
+    _syncEmptyState() {
+      const list = document.querySelector('#notifications-panel .notif-list');
+      const placeholder = list?.querySelector('[data-notifications-empty]');
+      if (placeholder) placeholder.hidden = Boolean(list.querySelector('.notif-item'));
     },
 
     setCount(n) {
@@ -2580,6 +2620,7 @@ import { Pointer } from './src/lib/pointer.js';
           title: 'Dismiss notification',
         }, '×'));
       list.prepend(item);
+      this._syncEmptyState();
     },
   };
 

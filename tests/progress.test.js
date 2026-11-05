@@ -810,6 +810,20 @@ describe('progress backup exports', () => {
     expect(stats.doneTopics).toBe(0);
   });
 
+  it('does not display a last-study date for an untouched course progress record', async () => {
+    window.DataStore.allCourses = vi.fn(() => [{ id: 'course-1', title: 'Course' }]);
+    window.DataStore.allTopics = vi.fn(() => [{ topicId: 'topic-1', courseId: 'course-1' }]);
+    const timestamp = Date.now();
+    window.DB.getAllProgress.mockResolvedValueOnce([{
+      topicId: 'topic-1', courseId: 'course-1',
+      status: 'not-started', percent: 0, position: 0, updatedAt: timestamp,
+    }]);
+    const stats = await window.ProgressStats.getStats();
+    expect(stats.byCourse[0].lastUpdated).toBe(0);
+    expect(stats.byCourse[0].done).toBe(0);
+    expect(stats.byCourse[0].inProgress).toBe(0);
+  });
+
   it('counts acknowledged meaningful study progress toward active days', async () => {
     window.DataStore.allCourses = vi.fn(() => [{ id: 'course-1', title: 'Course' }]);
     window.DB.getAllProgress.mockResolvedValueOnce([{
