@@ -86,3 +86,37 @@ for (const direction of ['ltr', 'rtl']) {
     await expect(deep).toHaveAttribute('aria-current', 'page');
   });
 }
+
+test('preserves RTL card layout while isolating English numeric playlist metadata', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/playlists', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.view-playlists')).toBeVisible();
+  const catalogCard = page.locator('[data-playlist-catalog] .playlist-card').first();
+  await expect(catalogCard).toBeAttached({ timeout: 20000 });
+  await expect(catalogCard).toHaveCSS('direction', 'rtl');
+  await expect(catalogCard.locator('.playlist-card-detail > bdi[dir="auto"]'))
+    .toHaveCSS('direction', 'ltr');
+  await expect(catalogCard.locator('.playlist-card-title')).toHaveAttribute('dir', 'auto');
+  await expect(page.locator('.playlists-discover-summary > bdi[dir="auto"]'))
+    .toHaveCSS('direction', 'ltr');
+  // The disclosure stays RTL: only its English/count copy changes direction.
+  await expect(page.locator('.playlists-discover-summary')).toHaveCSS('direction', 'rtl');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const geometry = await page.locator('.playlists-discover-summary').evaluate(el => {
+    const text = el.querySelector('bdi');
+    const outer = el.getBoundingClientRect();
+    const words = text.getBoundingClientRect();
+    return {
+      display: getComputedStyle(el).display,
+      direction: getComputedStyle(el).direction,
+      markerContent: getComputedStyle(el, '::before').content,
+      gapOnRight: outer.right - words.right,
+      leftOverflow: outer.left - words.left,
+    };
+  });
+  expect(geometry.display).toBe('flex');
+  expect(geometry.direction).toBe('rtl');
+  expect(geometry.markerContent).not.toBe('none');
+  expect(geometry.gapOnRight).toBeGreaterThanOrEqual(12);
+  expect(geometry.leftOverflow).toBeLessThanOrEqual(2);
+});

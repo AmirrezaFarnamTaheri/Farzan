@@ -1,5 +1,14 @@
 import { courseTopicIdentity } from '../core/courseTopicIdentity.js';
 
+// Keep each text run in its own language direction. The surrounding card and
+// disclosure retain the workspace's RTL order and alignment.
+function isolateText(value) {
+  const isolated = document.createElement('bdi');
+  isolated.dir = 'auto';
+  isolated.textContent = String(value);
+  return isolated;
+}
+
 export function mountPlaylistsView({
   setView,
   safeMediaUrl,
@@ -31,7 +40,7 @@ export function mountPlaylistsView({
         </div>
       </div>
       <details class="playlists-discover" data-playlists-discover hidden>
-        <summary class="playlists-discover-summary">Browse course queues</summary>
+        <summary class="playlists-discover-summary"><bdi dir="auto">Browse course queues</bdi></summary>
         <div class="card card-filled playlists-create-card">
           <div class="card-body">
             <div class="playlists-form">
@@ -391,7 +400,7 @@ async function renderPlaylists(deps) {
   discover.hidden = catalogPlaylists.length === 0;
   discover.open = discover.dataset.userOpened === 'true'
     || (catalogPlaylists.length > 0 && playlists.length === 0);
-  discover.querySelector('summary').textContent = `Browse course queues (${Math.min(10, catalogGroups.length)} featured of ${catalogGroups.length}) · Video topics: ${videoTopics.length}`;
+  discover.querySelector('summary bdi').textContent = `Browse course queues (${Math.min(10, catalogGroups.length)} featured of ${catalogGroups.length}) · Video topics: ${videoTopics.length}`;
 
   metricsRoot.replaceChildren();
   const meaningfulMetrics = [
@@ -449,7 +458,7 @@ async function renderPlaylists(deps) {
     }
     const detail = document.createElement('p');
     detail.className = 'playlist-card-detail';
-    detail.textContent = playlist.detail;
+    detail.appendChild(isolateText(playlist.detail));
     const preview = document.createElement('ol');
     preview.className = 'compact-list playlist-preview';
     // The currently playing row is already identified above with its real
@@ -469,7 +478,7 @@ async function renderPlaylists(deps) {
     const more = document.createElement('p');
     more.className = 'playlist-more';
     const remaining = Math.max(0, previewItems.length - 4);
-    more.textContent = `${remaining.toLocaleString()} more topic${remaining === 1 ? '' : 's'}`;
+    more.appendChild(isolateText(`${remaining.toLocaleString()} more topic${remaining === 1 ? '' : 's'}`));
     more.hidden = remaining === 0;
     const actions = document.createElement('div');
     actions.className = 'playlist-card-actions';
@@ -487,12 +496,12 @@ async function renderPlaylists(deps) {
         const paragraph = document.createElement('p');
         paragraph.className = 'playlist-card-detail';
         paragraph.dataset[key] = '';
+        const phrase = document.createElement('bdi');
+        phrase.dir = 'auto';
         const labelSpan = document.createElement('span');
         labelSpan.textContent = label + ': ';
-        const isolator = document.createElement('bdi');
-        isolator.dir = 'auto';
-        isolator.textContent = value;
-        paragraph.append(labelSpan, isolator);
+        phrase.append(labelSpan, isolateText(value));
+        paragraph.appendChild(phrase);
         position.appendChild(paragraph);
       };
       addPosition('Current', activePosition.current, 'playlistCurrent');
@@ -573,7 +582,7 @@ async function renderPlaylists(deps) {
     playlists.slice(visibleCount, end).forEach(playlist => appendPlaylistCard(playlist, listRoot));
     visibleCount = end;
     if (visibleCount < playlists.length) {
-      showMore.textContent = `Show more playlists (${visibleCount} of ${playlists.length})`;
+      showMore.replaceChildren(isolateText(`Show more playlists (${visibleCount} of ${playlists.length})`));
       listRoot.appendChild(showMore);
       if (hadFocus) showMore.focus({ preventScroll: true });
     } else if (hadFocus) {
@@ -600,8 +609,8 @@ async function renderPlaylists(deps) {
       .forEach(playlist => appendPlaylistCard(playlist, catalogRoot));
     visibleCatalogCount = end;
     if (visibleCatalogCount < catalogPlaylists.length) {
-      showMoreCatalog.textContent =
-        `Show more course queues (${visibleCatalogCount} of ${catalogPlaylists.length})`;
+      showMoreCatalog.replaceChildren(
+        isolateText(`Show more course queues (${visibleCatalogCount} of ${catalogPlaylists.length})`));
       catalogRoot.appendChild(showMoreCatalog);
       if (hadFocus) showMoreCatalog.focus({ preventScroll: true });
     } else if (hadFocus) {
