@@ -86,3 +86,19 @@ for (const direction of ['ltr', 'rtl']) {
     await expect(deep).toHaveAttribute('aria-current', 'page');
   });
 }
+
+test('preserves RTL card layout while isolating English numeric playlist metadata', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ocd_dir', 'rtl'));
+  await page.goto('/#/playlists', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.view-playlists')).toBeVisible();
+  const catalogCard = page.locator('[data-playlist-catalog] .playlist-card').first();
+  await expect(catalogCard).toBeAttached({ timeout: 20000 });
+  await expect(catalogCard).toHaveCSS('direction', 'rtl');
+  await expect(catalogCard.locator('.playlist-card-detail > bdi[dir="auto"]'))
+    .toHaveCSS('direction', 'ltr');
+  await expect(catalogCard.locator('.playlist-card-title')).toHaveAttribute('dir', 'auto');
+  await expect(page.locator('.playlists-discover-summary > bdi[dir="auto"]'))
+    .toHaveCSS('direction', 'ltr');
+  // The disclosure stays RTL: only its English/count copy changes direction.
+  await expect(page.locator('.playlists-discover-summary')).toHaveCSS('direction', 'rtl');
+});
