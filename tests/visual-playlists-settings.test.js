@@ -36,6 +36,8 @@ describe('Playlists and Settings: readable controls without losing behavior', ()
       return element;
     });
     expect(card.querySelector('[data-playlist-current]').textContent).toContain('Renal review');
+    expect(card.querySelector('[data-playlist-current] > bdi[dir="auto"]')).not.toBeNull();
+    expect(card.querySelector('[data-playlist-current] > bdi > bdi[dir="auto"]')).not.toBeNull();
     // A loaded player queue can be paused: never imply that it is live or playing.
     expect(card.querySelector('.playlist-card-body > .badge')?.textContent).toBe('Loaded');
     expect(card.querySelector('h2')?.textContent).toBe('Current player queue');
